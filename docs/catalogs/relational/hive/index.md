@@ -8,15 +8,20 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
+Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org)
+as a catalog for metadata management.
 
 ### Requirements and limitations
 
-* The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation of the HMS, such as AWS Glue.
-* Gravitino must have network access to the Hive metastore service using the Thrift protocol.
+* The Hive catalog requires a Hive Metastore Service (HMS),
+  or a compatible implementation of the HMS, such as AWS Glue.
+* Gravitino must have network access to the Hive metastore service
+  using the Thrift protocol.
 
 :::note
-Although the Hive catalog uses the Hive2 metastore client, it can be compatible with the Hive3 metastore service because the called HMS APIs are still available in Hive3.
+Although the Hive catalog uses the Hive2 metastore client,
+it can be compatible with the Hive3 metastore service
+because the called HMS APIs are still available in Hive3.
 If there is any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 :::
 
@@ -28,7 +33,8 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Hive catalog has the following properties:
+Besides the [common catalog properties](../../../gravitino-server-config.md#gravitino-catalog-properties-configuration),
+the Hive catalog has the following properties:
 
 | Property Name                            | Description                                                                                                                                                                                                                                         | Default Value | Required                     | Since Version |
 |------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
@@ -45,19 +51,29 @@ Besides the [common catalog properties](./gravitino-server-config.md#gravitino-c
 
 :::note
 For `list-all-tables=false`, the Hive catalog will filter out:
+
 - Iceberg tables by table property `table_type=ICEBERG`
 - Paimon tables by table property `table_type=PAIMON`
 - Hudi tables by table property `provider=hudi`
 :::
 
-When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
+When you use the Gravitino with Trino, you can pass the Trino Hive connector configuration
+using prefix `trino.bypass.`.
+For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources`
+to the Gravitino Hive catalog in Trino runtime.
 
-When you use the Gravitino with Spark. You can pass the Spark Hive connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
+When you use the Gravitino with Spark, you can pass the Spark Hive connector configuration
+using prefix `spark.bypass.`.
+For example, using `spark.bypass.hive.exec.dynamic.partition.mode`
+to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
 
-When you use the Gravitino authorization Hive with Apache Ranger. You can see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#authorization-hive-with-ranger-properties)
+When you use the Gravitino authorization Hive with Apache Ranger.
+For more details, you can check
+[Authorization Hive with Ranger properties](../../../security/authorization-pushdown.md#authorization-hive-with-ranger-properties).
+
 ### Catalog operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
 
 ## Schema
 
@@ -68,7 +84,8 @@ The Hive catalog supports creating, updating, and deleting databases in the HMS.
 ### Schema properties
 
 Schema properties supply or set metadata for the underlying Hive database.
-The following table lists predefined schema properties for the Hive database. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
+The following table lists predefined schema properties for the Hive database.
+Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
 
 | Property name | Description                                                              | Default value                                                                           | Required | Since Version |
 |---------------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|----------|---------------|
@@ -76,7 +93,7 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema operations
 
-see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
+See [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
@@ -87,8 +104,12 @@ see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ### Table partitioning
 
-The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Hive catalog with the specific partitioning attribute.
-Although Gravitino supports several partitioning strategies, Apache Hive inherently only supports a single partitioning strategy (partitioned by column). Therefore, the Hive catalog only supports `Identity` partitioning.
+The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables).
+Users can create partitioned tables in the Hive catalog
+with the specific partitioning attribute.
+Although Gravitino supports several partitioning strategies,
+Apache Hive inherently only supports a single partitioning strategy (partitioned by column).
+Therefore, the Hive catalog only supports `Identity` partitioning.
 
 :::caution
 The `fieldName` specified in the partitioning attribute must be the name of a column defined in the table.
@@ -96,8 +117,12 @@ The `fieldName` specified in the partitioning attribute must be the name of a co
 
 ### Table sort orders and distributions
 
-The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Hive catalog with specific `distribution` and `sortOrders` attributes.
-Although Gravitino supports several distribution strategies, Apache Hive inherently only supports a single distribution strategy (clustered by column). Therefore the Hive catalog only supports `Hash` distribution.
+The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables).
+Users can create bucketed sorted tables in the Hive catalog
+with specific `distribution` and `sortOrders` attributes.
+Although Gravitino supports several distribution strategies,
+Apache Hive inherently only supports a single distribution strategy (clustered by column).
+Therefore the Hive catalog only supports `Hash` distribution.
 
 :::caution
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be the name of a column defined in the table.
@@ -105,40 +130,45 @@ The `fieldName` specified in the `distribution` and `sortOrders` attribute must 
 
 ### Table column types
 
-The Hive catalog supports all data types defined in the [Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types).
+The Hive catalog supports all data types defined in the
+[Hive Language Manual](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Types).
 The following table lists the data types mapped from the Hive catalog to Gravitino.
 
 | Hive Data Type              | Gravitino Data Type | Since Version |
 |-----------------------------|---------------------|---------------|
-| `boolean`                   | `boolean`           | 0.2.0         |
-| `tinyint`                   | `byte`              | 0.2.0         |
-| `smallint`                  | `short`             | 0.2.0         |
-| `int`/`integer`             | `integer`           | 0.2.0         |
+| `array`                     | `list`              | 0.2.0         |
 | `bigint`                    | `long`              | 0.2.0         |
-| `float`                     | `float`             | 0.2.0         |
-| `double`/`double precision` | `double`            | 0.2.0         |
-| `decimal`                   | `decimal`           | 0.2.0         |
-| `string`                    | `string`            | 0.2.0         |
+| `binary`                    | `binary`            | 0.2.0         |
+| `boolean`                   | `boolean`           | 0.2.0         |
 | `char`                      | `char`              | 0.2.0         |
-| `varchar`                   | `varchar`           | 0.2.0         |
-| `timestamp`                 | `timestamp`         | 0.2.0         |
 | `date`                      | `date`              | 0.2.0         |
+| `decimal`                   | `decimal`           | 0.2.0         |
+| `double`/`double precision` | `double`            | 0.2.0         |
+| `float`                     | `float`             | 0.2.0         |
+| `int`/`integer`             | `integer`           | 0.2.0         |
 | `interval_year_month`       | `interval_year`     | 0.2.0         |
 | `interval_day_time`         | `interval_day`      | 0.2.0         |
-| `binary`                    | `binary`            | 0.2.0         |
-| `array`                     | `list`              | 0.2.0         |
 | `map`                       | `map`               | 0.2.0         |
+| `smallint`                  | `short`             | 0.2.0         |
+| `string`                    | `string`            | 0.2.0         |
 | `struct`                    | `struct`            | 0.2.0         |
+| `tinyint`                   | `byte`              | 0.2.0         |
+| `timestamp`                 | `timestamp`         | 0.2.0         |
 | `uniontype`                 | `union`             | 0.2.0         |
+| `varchar`                   | `varchar`           | 0.2.0         |
 
 :::info
-Since 0.6.0-incubating, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
+Since 0.6.0-incubating, the data types other than listed above are mapped to Gravitino
+**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+that represents an unresolvable data type from the Hive catalog.
 :::
 
 ### Table properties
 
 Table properties supply or set metadata for the underlying Hive tables.
-The following table lists predefined table properties for a Hive table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
+The following table lists predefined table properties for a Hive table.
+Additionally, you can define your own key-value pair properties
+and transmit them to the underlying Hive database.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -168,11 +198,14 @@ The following table lists predefined table properties for a Hive table. Addition
 
 ### Table operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#table-operations).
 
 #### Alter operations
 
-Gravitino has already defined a unified set of [metadata operation interfaces](./manage-relational-metadata-using-gravitino.md#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update requests which enable you to change the struct of an existing table.
+Gravitino has already defined a unified set of
+[metadata operation interfaces](../../../manage-relational-metadata-using-gravitino.md#alter-a-table).
+Almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column)
+have corresponding table update requests which enable you to change the struct of an existing table.
 The following table lists the mapping relationship between Hive Alter operations and Gravitino table update requests.
 
 ##### Alter table
@@ -189,7 +222,10 @@ The following table lists the mapping relationship between Hive Alter operations
 | `Alter Table Constraints`                     | Unsupported                    | -             |
 
 :::note
-As Gravitino has a separate interface for updating the comment of a table, the Hive catalog sets `comment` as a reserved property for the table, preventing users from setting the comment property. Apache Hive can modify the comment property of the table.
+As Gravitino has a separate interface for updating the comment of a table,
+the Hive catalog sets `comment` as a reserved property for the table,
+preventing users from setting the comment property.
+Apache Hive can modify the comment property of the table.
 :::
 
 ##### Alter column
@@ -209,6 +245,9 @@ Support for altering partitions is under development.
 
 ## Hive catalog with S3 storage
 
-To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-s3.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
-The only difference is the storage location of the files, which is in S3. You can use `location` to specify the S3 path for the database or table.
+To create a Hive catalog with S3 storage, you can refer to the
+[Hive catalog with S3](./cloud-storage.md) documentation.
+No special configurations are required for the Hive catalog to work with S3 storage.
+The only difference is the storage location of the files, which is in S3.
+You can use `location` to specify the S3 path for the database or table.
 

@@ -72,9 +72,9 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider | Catalog property                                                |
-|------------------|-----------------------------------------------------------------|
-| `kafka`          | [Kafka catalog property](./kafka-catalog.md#catalog-properties) |
+| Catalog provider | Catalog property                                                                 |
+|------------------|----------------------------------------------------------------------------------|
+| `kafka`          | [Kafka catalog property](./catalogs/messaging/kafka/index.md#catalog-properties) |
 
 ### Load a catalog
 

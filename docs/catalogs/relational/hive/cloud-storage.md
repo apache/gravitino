@@ -6,18 +6,26 @@ keyword: Hive catalog cloud storage S3 ADLS GCS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-
 ## Introduction
 
-Since Hive 2.x, Hive has supported S3 as a storage backend, enabling users to store and manage data in Amazon S3 directly through Hive. Gravitino enhances this capability by supporting the Hive catalog with S3, allowing users to efficiently manage the storage locations of files located in S3. This integration simplifies data operations and enables seamless access to S3 data from Hive queries.
+Since Hive 2.x, Hive has supported S3 as a storage backend,
+enabling users to store and manage data in Amazon S3 directly through Hive.
+Gravitino enhances this capability by supporting the Hive catalog with S3,
+allowing users to efficiently manage the storage locations of files located in S3.
+This integration simplifies data operations and enables seamless access to S3 data from Hive queries.
 
-For ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)) and GCS (Google Cloud Storage), the integration is similar to S3. The only difference is the configuration properties for ADLS and GCS (see below). 
+For ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2))
+and GCS (Google Cloud Storage), the integration is similar to S3.
+The only difference is the configuration properties for ADLS and GCS (see below). 
 
-The following sections will guide you through the necessary steps to configure the Hive catalog to utilize S3, ADLS, and GCS as a storage backend, including configuration details and examples for creating databases and tables.
+The following sections will guide you through the necessary steps
+to configure the Hive catalog to utilize S3, ADLS, and GCS as a storage backend,
+including configuration details and examples for creating databases and tables.
 
 ## Hive metastore configuration
 
-The following will mainly focus on configuring the Hive metastore to use S3 as a storage backend. The same configuration can be applied to ADLS and GCS with minor changes in the configuration properties. 
+The following will mainly focus on configuring the Hive metastore to use S3 as a storage backend.
+The same configuration can be applied to ADLS and GCS with minor changes in the configuration properties. 
 
 ### Example Configuration Changes
 
@@ -40,9 +48,11 @@ Below are the essential properties to add or modify in the `hive-site.xml` file 
   <value>S3_ENDPOINT_ID</value>
 </property>
 
-<!-- The following property is optional and can be replaced with the location property in the schema
-definition and table definition, as shown in the examples below. After explicitly setting this
-property, you can omit the location property in the schema and table definitions.
+<!--
+The following property is optional and can be replaced with the location property in the schema
+definition and table definition, as shown in the examples below.
+After explicitly setting this property, you can omit the location property
+in the schema and table definitions.
 
 It's also applicable for Azure Blob Storage(ADLS) and GCS.
 -->
@@ -78,7 +88,9 @@ It's also applicable for Azure Blob Storage(ADLS) and GCS.
 
 ### Adding Required JARs
 
-After updating the `hive-site.xml`, you need to ensure that the necessary S3-related JARs are included in the Hive classpath. You can do this by executing the following command:
+After updating the `hive-site.xml`, you need to ensure that the necessary S3-related JARs are included in the Hive classpath.
+You can do this by executing the following command:
+
 ```shell
 cp ${HADOOP_HOME}/share/hadoop/tools/lib/*aws* ${HIVE_HOME}/lib
 
@@ -89,18 +101,24 @@ cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
 cp gcs-connector-hadoop3-2.2.22-shaded.jar ${HIVE_HOME}/lib
 ```
 
-[`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop2-2.2.22-shaded.jar) is the bundle jar that contains Hadoop GCS connector, you need to choose the corresponding gcs connector jar for the version of Hadoop you are using.
+[`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop2-2.2.22-shaded.jar)
+is the bundle jar that contains Hadoop GCS connector,
+you need to choose the corresponding gcs connector jar for the version of Hadoop you are using.
 
-Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath. It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
+Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath.
+It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
 
 ### Restart Hive metastore
 
-Once all configurations have been correctly set, restart the Hive cluster to apply the changes. This step is essential to ensure that the new configurations take effect and that the Hive services can communicate with S3.
-
+Once all configurations have been correctly set, restart the Hive cluster to apply the changes.
+This step is essential to ensure that the new configurations take effect and that the Hive services can communicate with S3.
 
 ## Creating Tables or Databases with S3 Storage using Gravitino
 
-Assuming you have already set up a Hive catalog with Gravitino, you can proceed to create tables or databases using S3 storage. For more information on catalog operations, refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catalog-operations)
+Assuming you have already set up a Hive catalog with Gravitino,
+you can proceed to create tables or databases using S3 storage.
+For more information on catalog operations, refer to
+[catalog operations](../../../manage-fileset-metadata-using-gravitino.md#catalog-operations).
 
 ### Example: Creating a Database with S3 Storage
 
@@ -110,20 +128,22 @@ The following is an example of how to create a database in S3 using Gravitino:
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "hive_schema",
-  "comment": "comment",
-  "properties": {
-    "location": "s3a://bucket-name/path"
-     
-     # The following line is for Azure Blob Storage(ADLS)
-     # "location": "abfss://container-name@user-account-name.dfs.core.windows.net/path"
-     
-     # The following line is for Google Cloud Storage(GCS)
-     # "location": "gs://bucket-name/path"
-  }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+    "name": "hive_schema",
+    "comment": "comment",
+    "properties": {
+      "location": "s3a://bucket-name/path"
+       
+       # The following line is for Azure Blob Storage(ADLS)
+       # "location": "abfss://container-name@user-account-name.dfs.core.windows.net/path"
+       
+       # The following line is for Google Cloud Storage(GCS)
+       # "location": "gs://bucket-name/path"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
 
 </TabItem>
@@ -160,11 +180,16 @@ Schema schema = supportsSchemas.createSchema("hive_schema",
 </TabItem>
 </Tabs>
 
-After creating the database, you can proceed to create tables under this schema using S3 storage. For further details on table operations, please refer to [Table operations](./manage-relational-metadata-using-gravitino.md#table-operations).
+After creating the database, you can proceed to create tables under this schema using S3 storage.
+For further details on table operations, please refer to
+[table operations](../../../manage-relational-metadata-using-gravitino.md#table-operations).
 
 ## Access tables with S3 storage by Hive CLI
 
-Assuming you have already created a table in the section [Creating Tables or Databases with S3 Storage using Gravitino](#creating-tables-or-databases-with-s3-storage-using-gravitino), let’s say the table is named `hive_table`. You can access the database/table and view its details using the Hive CLI as follows:
+Assuming you have already created a table in the section
+[Creating Tables or Databases with S3 Storage using Gravitino](#creating-tables-or-databases-with-s3-storage-using-gravitino),
+let’s say the table is named `hive_table`,
+you can access the database/table and view its details using the Hive CLI as follows:
 
 
 ```shell
@@ -228,11 +253,13 @@ OK
 Time taken: 0.116 seconds, Fetched: 1 row(s)
 ```
 
-This command shows the creation details of the database hive_schema, including its location in S3 and any associated properties.
+This command shows the creation details of the database hive_schema,
+including its location in S3 and any associated properties.
 
 ## Accessing Tables with S3 Storage via Spark
 
-To access S3-stored tables using Spark, you need to configure the SparkSession appropriately. Below is an example of how to set up the SparkSession with the necessary S3 configurations:
+To access S3-stored tables using Spark, you need to configure the SparkSession appropriately.
+Below is an example of how to set up the SparkSession with the necessary S3 configurations:
 
 ```java
   SparkSession sparkSession =
@@ -271,9 +298,19 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
 ```
 
 :::note
-Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of the Spark. If the JARs are missing, Spark will not be able to access the S3 storage.
-Azure Blob Storage(ADLS) requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure), [Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob) to be placed in the classpath of the Spark.
-for Google Cloud Storage(GCS), you need to download the [Hadoop GCS jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases) and place it in the classpath of the Spark.
+Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws),
+[aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle)
+and place them in the classpath of the Spark.
+If the JARs are missing, Spark will not be able to access the S3 storage.
+Azure Blob Storage(ADLS) requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure),
+[Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob)
+to be placed in the classpath of the Spark.
+For Google Cloud Storage(GCS), you need to download the
+[Hadoop GCS jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases)
+and place it in the classpath of the Spark.
 :::
 
-By following these instructions, you can effectively manage and access your S3, ADLS or GCS data through both Hive CLI and Spark, leveraging the capabilities of Gravitino for optimal data management.
+By following these instructions, you can effectively manage
+and access your S3, ADLS or GCS data through both Hive CLI and Spark,
+leveraging the capabilities of Gravitino for optimal data management.
+

@@ -32,7 +32,7 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 | `filesystem-providers`        | The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                                               | (none)          | Yes      | 0.7.0-incubating |
 | `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                                            | `builtin-local` | No       | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, please see [gcs-credential-vending](security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, please see [gcs-credential-vending](../../../security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
 
 
 ### Configurations for a schema
@@ -231,14 +231,15 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 ### Using the GVFS Java client to access the fileset
 
-To access fileset with GCS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+To access fileset with GCS using the GVFS Java client, based on the [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
 | Configuration item         | Description                                | Default value | Required | Since version    |
 |----------------------------|--------------------------------------------|---------------|----------|------------------|
 | `gcs-service-account-file` | The path of GCS service account JSON file. | (none)        | Yes      | 0.7.0-incubating |
 
 :::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
+If the catalog has enabled [credential vending](../../../security/credential-vending.md), the properties above can be omitted.
+More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
 :::
 
 ```java
@@ -351,13 +352,17 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-gcp-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.
-- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp) is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and [`gcs-connector`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 
+- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)
+  is the Gravitino GCP jar with Hadoop environment(3.3.1) and `gcs-connector`.
+- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp)
+  is a condensed version of the Gravitino GCP bundle jar without Hadoop environment and
+  [`gcs-connector`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) 
 
 Please choose the correct jar according to your environment.
 
 :::note
-In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
+In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work.
+If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
 ### Accessing a fileset using the Hadoop fs command
@@ -395,7 +400,9 @@ The following are examples of how to use the `hadoop fs` command to access the f
 
 2. Add the necessary jars to the Hadoop classpath.
 
-For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, `gravitino-gcp-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to Hadoop classpath.
+For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`,
+`gravitino-gcp-${gravitino-version}.jar` and
+[`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) to Hadoop classpath.
 
 3. Run the following command to access the fileset:
 
@@ -406,14 +413,16 @@ For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 
 ### Using the GVFS Python client to access a fileset
 
-In order to access fileset with GCS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+In order to access fileset with GCS using the GVFS Python client,
+apart from [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1),
+you need to add the following configurations:
 
 | Configuration item         | Description                               | Default value | Required | Since version    |
 |----------------------------|-------------------------------------------|---------------|----------|------------------|
 | `gcs_service_account_file` | The path of GCS service account JSON file.| (none)        | Yes      | 0.7.0-incubating |
 
 :::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+If the catalog has enabled [credential vending](../../../security/credential-vending.md), the properties above can be omitted.
 :::
 
 Please install the `gravitino` package before running the following code:
@@ -453,15 +462,21 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
 ds.head()
 ```
 
-For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For other use cases, please refer to the [Gravitino Virtual File System](../../../how-to-use-gvfs.md) document.
 
 ## Fileset with credential vending
 
-Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
+Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset.
+If the catalog has been [configured with credential](../../../security/credential-vending.md),
+you can access GCS fileset without providing authentication information like `gcs-service-account-file`
+in the properties.
 
 ### How to create a GCS Hadoop catalog with credential vending
 
-Apart from configuration method in [create-gcs-hadoop-catalog](#configurations-for-a-gcs-hadoop-catalog), properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also be set to enable credential vending for GCS fileset. Take `gcs-token` credential provider for example:
+Apart from configuration method in [create-gcs-hadoop-catalog](#configurations-for-a-gcs-hadoop-catalog),
+properties needed by [gcs-credential](../../../security/credential-vending.md#gcs-credentials)
+should also be set to enable credential vending for GCS fileset.
+Take `gcs-token` credential provider for example:
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -481,7 +496,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### How to access GCS fileset with credential vending
 
-If the catalog has been configured with credential, you can access GCS fileset without providing authentication information via GVFS Java/Python client and Spark. Let's see how to access GCS fileset with credential:
+If the catalog has been configured with credential, you can access GCS fileset
+without providing authentication information via GVFS Java/Python client and Spark.
+Let's see how to access GCS fileset with credential:
 
 GVFS Java client:
 

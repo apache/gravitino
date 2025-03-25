@@ -7,15 +7,17 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store) to manage the catalogs under Gravitino.
-This capability allows users to perform federation queries, accessing data from various catalogs through a unified interface and consistent access control.
+The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store)
+to manage the catalogs under Gravitino.
+This capability allows users to perform federation queries, accessing data from various catalogs
+through a unified interface and consistent access control.
 
 ## Capabilities
 
-1. Supports [Hive catalog](flink-catalog-hive.md)
-1. Supports [Iceberg catalog](flink-catalog-iceberg.md)
-1. Supports [Paimon catalog](flink-catalog-paimon.md)
-2. Supports most DDL and DML SQLs.
+1. Supports [Hive catalog](./flink-catalog-hive.md)
+1. Supports [Iceberg catalog](./flink-catalog-iceberg.md)
+1. Supports [Paimon catalog](./flink-catalog-paimon.md)
+1. Supports most DDL and DML SQLs.
 
 ## Requirement
 
@@ -25,44 +27,48 @@ This capability allows users to perform federation queries, accessing data from 
 
 ## How to use it
 
-1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
-2. Configure the Flink configuration to use the Gravitino flink connector.
+1. [Build](../../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
+   the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
+1. Configure the Flink configuration to use the Gravitino flink connector.
 
-| Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
-|--------------------------------------------------|--------|-------------------|----------------------------------------------------------------------|----------|------------------|
-| table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
+   | Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
+   |--------------------------------------------------|--------|-------------------|----------------------------------------------------------------------|----------|------------------|
+   | table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
+   | table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
+   | table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
 
-Set the flink configuration in flink-conf.yaml.
-```yaml
-table.catalog-store.kind: gravitino
-table.catalog-store.gravitino.gravitino.metalake: test
-table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
-```
-Or you can set the flink configuration in the `TableEnvironment`.
-```java
-final Configuration configuration = new Configuration();
-configuration.setString("table.catalog-store.kind", "gravitino");
-configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "test");
-configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8090");
-EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
-TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
-```
+   Set the flink configuration in flink-conf.yaml.
+   
+   ```yaml
+   table.catalog-store.kind: gravitino
+   table.catalog-store.gravitino.gravitino.metalake: test
+   table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
+   ```
+   
+   Or you can set the flink configuration in the `TableEnvironment`.
+   
+   ```java
+   final Configuration configuration = new Configuration();
+   configuration.setString("table.catalog-store.kind", "gravitino");
+   configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "test");
+   configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8090");
+   EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
+   TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
+   ```
 
-3. Execute the Flink SQL query.
+1. Execute the Flink SQL query.
 
-Suppose there is only one hive catalog with the name `hive` in the metalake `test`.
-
-```sql
-// use hive catalog
-USE hive;
-CREATE DATABASE db;
-USE db;
-CREATE TABLE hive_students (id INT, name STRING);
-INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
-SELECT * FROM hive_students;
-```
+   Suppose there is only one hive catalog with the name `hive` in the metalake `test`.
+   
+   ```sql
+   // use hive catalog
+   USE hive;
+   CREATE DATABASE db;
+   USE db;
+   CREATE TABLE hive_students (id INT, name STRING);
+   INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
+   SELECT * FROM hive_students;
+   ```
 
 ## Datatype mapping
 
@@ -93,3 +99,4 @@ Gravitino flink connector support the following datatype mapping between Flink a
 | `tinyint`                        | `byte`                        | 0.6.0-incubating |
 | `varbinary`                      | `binary`                      | 0.6.0-incubating |
 | `varchar`                        | `string`                      | 0.6.0-incubating |
+

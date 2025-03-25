@@ -82,7 +82,10 @@ Supports using static access-key-id and secret-access-key to access S3 data.
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
 :::info
-To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+To configure the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`.
+For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`.
+Additionally, download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)
+and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 #### OSS
@@ -99,7 +102,10 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
 
 :::info
-Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip) and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` in the `catalogs/lakehouse-iceberg/libs/` directory.
+Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`.
+Additionally, download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip)
+and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar`
+into the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 #### GCS
@@ -115,7 +121,9 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
 
 :::info
-Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`,
+download [Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-gcp-bundle)
+and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
 #### ADLS 
@@ -131,7 +139,9 @@ Supports using Azure account name and secret key to access ADLS data.
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
 :::info
-Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`,
+download the [Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-azure-bundle)
+and place it to `catalogs/lakehouse-iceberg/libs/`.
 :::
 
 #### Other storages
@@ -142,15 +152,21 @@ For other storages that are not managed by Gravitino directly, you can manage th
 |--------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `io-impl`          | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0-incubating |
 
-To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
+To pass custom properties such as `security-token` to your custom `FileIO`,
+you can directly configure it by `gravitino.bypass.security-token`.
+`security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
 
 :::info
-Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
+Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`.
+Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 #### Catalog backend security
 
-Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+Users can use the following properties to configure the security of the catalog backend if needed.
+For example, if you are using a Kerberos Hive catalog backend,
+you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal`
+and `authentication.kerberos.keytab-uri`.
 
 | Property name                                      | Description                                                                                                                                                                                                                                      | Default value | Required                                                                                                                                                             | Since Version    |
 |----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
@@ -164,7 +180,7 @@ Users can use the following properties to configure the security of the catalog 
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
 
 ## Schema
 
@@ -178,7 +194,7 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
@@ -227,7 +243,8 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 - Doesn't support `EvenDistribution`.
 
 :::info
-If you doesn't specify distribution expressions, the table distribution will be adjusted to `RangeDistribution` for a sort order table, to `HashDistribution` for a partition table.
+If you doesn't specify distribution expressions, the table distribution will be adjusted to `RangeDistribution`
+for a sort order table, to `HashDistribution` for a partition table.
 :::
 
 ### Table column types
@@ -254,12 +271,15 @@ If you doesn't specify distribution expressions, the table distribution will be 
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+Meanwhile, the data types other than listed above are mapped to Gravitino
+**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
 ### Table properties
 
-You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configuration/) to Gravitino when creating an Iceberg table.
+You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configuration/)
+to Gravitino when creating an Iceberg table.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -287,23 +307,23 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/co
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations).
 
 #### Alter table operations
 
 Supports operations:
 
-- `RenameTable`
-- `SetProperty`
-- `RemoveProperty`
-- `UpdateComment`
 - `AddColumn`
 - `DeleteColumn`
+- `RemoveProperty`
+- `RenameTable`
 - `RenameColumn`
+- `SetProperty`
 - `UpdateColumnType`
 - `UpdateColumnPosition`
 - `UpdateColumnNullability`
 - `UpdateColumnComment`
+- `UpdateComment`
 
 :::info
 The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
@@ -315,9 +335,13 @@ If you update a nullability column to non nullability, there may be compatibilit
 
 ## HDFS configuration
 
-You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory to automatically load as the default HDFS configuration.
+You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-iceberg/conf` directory
+to automatically load as the default HDFS configuration.
 
 :::info
 Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
-When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
+When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user
+and doesn't support proxying to other HDFS users.
+See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
 :::
+

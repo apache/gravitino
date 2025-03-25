@@ -49,7 +49,8 @@ Builds with Apache Paimon `0.8.0`.
 | `s3-secret-access-key`                             | The secret key of the AWS S3.                                                                                                                                                                               | (none)                                                                         | required if the value of `warehouse` is a S3 path                                                                                                                    | 0.7.0-incubating |
 
 :::note
-If you want to use the `oss` or `s3` warehouse, you need to place related jars in the `catalogs/lakehouse-paimon/lib` directory, more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/).
+If you want to use the `oss` or `s3` warehouse, you need to place related JARs in the `catalogs/lakehouse-paimon/lib` directory,
+more information can be found in the [Paimon S3](https://paimon.apache.org/docs/master/filesystems/s3/).
 :::
 
 :::note
@@ -69,12 +70,13 @@ If you are using JDBC backend, you must specify the properties like `jdbc-user`,
 | `jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL   | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
 
 :::caution
-You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
+You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory
+if you are using JDBC backend.
 :::
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
 
 ## Schema
 
@@ -93,7 +95,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Schema operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
@@ -106,7 +108,9 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 - Doesn't support table distribution and sort orders.
 
 :::info
-Gravitino Paimon Catalog does not support dropTable, because the dropTable in Paimon will both remove the table metadata and the table location from the file system and skip the trash, we should use purgeTable instead in Gravitino.
+Gravitino Paimon Catalog does not support `dropTable`,
+because `dropTable` in Paimon will remove both the table metadata and the table location
+from the file system and skip the trash, we should use purgeTable instead in Gravitino.
 :::
 
 :::info
@@ -115,17 +119,17 @@ Paimon does not support auto increment column.
 
 ### Table changes
 
-- RenameTable
 - AddColumn
 - DeleteColumn
+- RemoveProperty
 - RenameColumn
+- RenameTable
+- SetProperty
 - UpdateColumnComment
 - UpdateColumnNullability
 - UpdateColumnPosition
 - UpdateColumnType
 - UpdateComment
-- SetProperty
-- RemoveProperty
 
 ### Table partitions
 
@@ -184,7 +188,8 @@ Gravitino doesn't support Paimon `MultisetType` type.
 
 ### Table properties
 
-You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
+You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/)
+to Gravitino when creating a Paimon table.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -205,12 +210,14 @@ You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/mainte
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations).
 
 ## HDFS configuration
 
-You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
+You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory
+to automatically load as the default HDFS configuration.
 
 :::caution
-When reading and writing to HDFS, the Gravitino server can only operate as the specified Kerberos user and doesn't support proxying to other Kerberos users now.
+When reading and writing to HDFS, the Gravitino server can only operate as the specified Kerberos user
+and doesn't support proxying to other Kerberos users now.
 :::

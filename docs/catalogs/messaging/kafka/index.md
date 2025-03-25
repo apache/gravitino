@@ -15,7 +15,8 @@ One Kafka catalog corresponds to one Kafka cluster.
 
 ### Catalog properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Kafka catalog has the following properties:
+Besides the [common catalog properties](../../../gravitino-server-config.md#apache-gravitino-catalog-properties-configuration),
+the Kafka catalog has the following properties:
 
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -24,11 +25,12 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 
 ### Catalog operations
 
-Refer to [Catalog operations](./manage-messaging-metadata-using-gravitino.md#catalog-operations) for more details.
+For more details, refer to [Catalog operations](../../../manage-messaging-metadata-using-gravitino.md#catalog-operations).
 
 ## Schema
 
-A "default" schema, which includes all the topics in the Kafka cluster, will be automatically created when catalog is created.
+A "default" schema, which includes all the topics in the Kafka cluster,
+will be automatically created when catalog is created.
 
 ### Schema capabilities
 
@@ -40,7 +42,7 @@ None.
 
 ### Schema operations
 
-Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schema-operations) for more details.
+For more details, refer to [Schema operation](../../../manage-messaging-metadata-using-gravitino.md#schema-operations).
 
 ## Topic
 
@@ -55,8 +57,10 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 | `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partition` property in the broker.              | No       | 0.5.0         |
 | `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       | 0.5.0         |
 
-You can pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
+You can pass other topic configurations to the topic properties.
+Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
 
 ### Topic operations
 
-Refer to [Topic operation](./manage-messaging-metadata-using-gravitino.md#topic-operations) for more details.
+Refer to [topic operation](../../../manage-messaging-metadata-using-gravitino.md#topic-operations).
+

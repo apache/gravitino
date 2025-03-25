@@ -9,19 +9,26 @@ license: "This software is licensed under the Apache License version 2."
 ## Introduction
 
 Hadoop catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
-the storage location of the fileset. Currently, it supports the local filesystem and HDFS. Since 0.7.0-incubating, Gravitino supports [S3](hadoop-catalog-with-s3.md), [GCS](hadoop-catalog-with-gcs.md), [OSS](hadoop-catalog-with-oss.md) and [Azure Blob Storage](hadoop-catalog-with-adls.md) through Hadoop catalog. 
+the storage location of the fileset. Currently, it supports the local filesystem and HDFS.
+Since 0.7.0-incubating, Gravitino supports [S3](./s3.md), [GCS](./gcs.md), [OSS](./oss.md)
+and [Azure Blob Storage](./adls.md) through Hadoop catalog. 
 
-The rest of this document will use HDFS or local file as an example to illustrate how to use the Hadoop catalog. For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS, please refer to the corresponding document for more details.
+The rest of this document will use HDFS or local file as an example to illustrate
+how to use the Hadoop catalog.
+For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS,
+please refer to the corresponding document for more details.
 
-Note that Gravitino uses Hadoop 3 dependencies to build Hadoop catalog. Theoretically, it should be
-compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
-Hadoop 3. If there's any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
+Note that Gravitino uses Hadoop 3 dependencies to build Hadoop catalog.
+Theoretically, it should be compatible with both Hadoop 2.x and 3.x,
+since Gravitino doesn't leverage any new features in Hadoop 3.
+If there's any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 
 ## Catalog
 
 ### Catalog properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hadoop catalog has the following properties:
+Besides the [common catalog properties](../../../gravitino-server-config.md#apache-gravitino-catalog-properties-configuration),
+the Hadoop catalog has the following properties:
 
 | Property Name                  | Description                                                                                                                                                                                                                                                                                                        | Default Value   | Required | Since Version    |
 |--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
@@ -31,7 +38,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `credential-providers`         | The credential provider types, separated by comma.                                                                                                                                                                                                                                                                 | (none)          | No       | 0.8.0-incubating |
 | `filesystem-conn-timeout-secs` | The timeout of getting the file system using Hadoop FileSystem client instance. Time unit: seconds.                                                                                                                                                                                                                | 6               | No       | 0.8.0-incubating |
 
-Please refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
+Please refer to [Credential vending](../../../security/credential-vending.md) for more details about credential vending.
 
 ### HDFS fileset 
 
@@ -47,10 +54,10 @@ Apart from the above properties, to access fileset like HDFS fileset, you need t
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.     | 60            | No                                                          | 0.5.1         |
 
 ### Hadoop catalog with Cloud Storage
-- For S3, please refer to [Hadoop-catalog-with-s3](./hadoop-catalog-with-s3.md) for more details.
-- For GCS, please refer to [Hadoop-catalog-with-gcs](./hadoop-catalog-with-gcs.md) for more details.
-- For OSS, please refer to [Hadoop-catalog-with-oss](./hadoop-catalog-with-oss.md) for more details.
-- For Azure Blob Storage, please refer to [Hadoop-catalog-with-adls](./hadoop-catalog-with-adls.md) for more details.
+- For S3, please refer to [Hadoop-catalog-with-s3](./s3.md) for more details.
+- For GCS, please refer to [Hadoop-catalog-with-gcs](./gcs.md) for more details.
+- For OSS, please refer to [Hadoop-catalog-with-oss](./oss.md) for more details.
+- For Azure Blob Storage, please refer to [Hadoop-catalog-with-adls](./adls.md) for more details.
 
 ### How to custom your own HCFS file system fileset?
 
@@ -91,7 +98,7 @@ schemas and filesets, the default value is inherited from the parent. Value set 
 
 ### Catalog operations
 
-Refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Catalog operations](../../../manage-fileset-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -112,7 +119,7 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
 
 ### Schema operations
 
-Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Schema operation](../../../manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Fileset
 
@@ -138,4 +145,4 @@ Credential providers can be specified in several places, as listed below. Gravit
 
 ### Fileset operations
 
-Refer to [Fileset operations](./manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
+Refer to [Fileset operations](../../../manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.

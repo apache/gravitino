@@ -9,8 +9,8 @@ The Hive catalog allows Trino querying data stored in an Apache Hive data wareho
 
 ## Requirements
 
-The Hive connector requires a Hive metastore service (HMS), or a compatible implementation of the Hive metastore, such
-as AWS Glue.
+The Hive connector requires a Hive metastore service (HMS),
+or a compatible implementation of the Hive metastore, such as AWS Glue.
 
 Apache Hadoop HDFS 2.x supported.
 
@@ -21,9 +21,8 @@ The coordinator and all workers must have network access to the Hive metastore a
 
 Hive metastore access with the Thrift protocol defaults to using port 9083.
 
-Data files must be in a supported file format. Some file formats can be configured using file format configuration
-properties
-per catalog:
+Data files must be in a supported file format.
+Some file formats can be configured using file format configuration properties per catalog:
 
 - ORC
 - PARQUET
@@ -33,7 +32,6 @@ per catalog:
 - JSON
 - CSV
 - TEXTFILE
-
 
 ## Schema operations
 
@@ -49,8 +47,9 @@ CREATE SCHEMA catalog.schema_name
 
 ### Create table
 
-The Gravitino Trino connector currently supports basic Hive table creation statements, such as defining fields,
-allowing null values, and adding comments. The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
+The Gravitino Trino connector currently supports basic Hive table creation statements,
+such as defining fields, allowing null values, and adding comments.
+The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 The following example shows how to create a table in the Hive catalog:
 
@@ -61,7 +60,6 @@ CREATE TABLE catalog.schema_name.table_name
   salary int
 )
 ```
-
 
 ### Alter table
 
@@ -81,9 +79,8 @@ Currently, it doesn't support certain query optimizations, such as pushdown and 
 
 ## Schema and table properties
 
-You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
-statement.
-
+You can set additional properties for tables and schemas in the Hive catalog
+using "WITH" keyword in the "CREATE" statement.
 
 ### Create a schema with properties
 
@@ -149,33 +146,27 @@ The following properties are automatically added and managed as reserved propert
 
 You need to do the following steps before you can use the Hive catalog in Trino through Gravitino.
 
-- Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `hive_test`,
-then you can use the following code to create them in Gravitino:
+- Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test`
+  and the catalog name is `hive_test`, then you can use the following code to create them in Gravitino:
 
-```bash
-curl -X POST -H "Content-Type: application/json" \
--d '{
-  "name": "test",
-  "comment": "comment",
-  "properties": {}
-}' http://gravitino-host:8090/api/metalakes
+  ```bash
+  curl -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"name": "test", "comment": "comment", "properties": {}}' \
+    http://gravitino-host:8090/api/metalakes
+  
+  curl -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"name": "hive_test", "type": "RELATIONAL", "comment": "comment", "provider": "hive", \
+      "properties": {"metastore.uris": "thrift://hive-host:9083"}}' \
+    http://gravitino-host:8090/api/metalakes/test/catalogs
+  ```
 
-curl -X POST \
--H "Content-Type: application/json" \
--d '{
-  "name": "hive_test",
-  "type": "RELATIONAL",
-  "comment": "comment",
-  "provider": "hive",
-  "properties": {
-    "metastore.uris": "thrift://hive-host:9083"
-  }
-}' http://gravitino-host:8090/api/metalakes/test/catalogs
-```
+For More information about the Hive catalog, 
+please refer to [Hive catalog](../../catalogs/relational/hive/index.md).
 
-For More information about the Hive catalog, please refer to [Hive catalog](../apache-hive-catalog.md).
-
-- Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
+- Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test',
+and start the Trino container.
 
 Use the Trino CLI to connect to the Trino container and run a query.
 
@@ -219,7 +210,8 @@ CREATE SCHEMA hive_test.database_01 WITH (
 );
 ```
 
-Create a new table named `table_01` in schema `hive_test.database_01` and stored in a TEXTFILE format, partitioning by `salary`, bucket by `name` and sorted by `salary`.
+Create a new table named `table_01` in schema `hive_test.database_01` and stored in a TEXTFILE format,
+partitioning by `salary`, bucket by `name` and sorted by `salary`.
 
 ```sql
 CREATE TABLE  hive_test.database_01.table_01
@@ -296,8 +288,9 @@ DROP TABLE hive_test.database_01.table_01;
 ## HDFS config and permissions
 
 For basic setups, the Apache Gravitino Trino connector configures the HDFS client
-using catalog configurations. It supports configuring the HDFS client with `hdfs-site.xml`
-and `core-site.xml` files via the `trino.bypass.hive.config.resources` setting in the catalog configurations.
+using catalog configurations.
+It supports configuring the HDFS client with `hdfs-site.xml` and `core-site.xml` files
+via the `trino.bypass.hive.config.resources` setting in the catalog configurations.
 
 Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
@@ -311,10 +304,11 @@ replacing hdfs_user with the appropriate username:
 ## S3
 
 When using AWS S3 within the Hive catalog, users need to configure the Trino Hive connector's
-AWS S3-related properties in the catalog's properteis. Please refer to the documentation
-of [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
+AWS S3-related properties in the catalog's properteis.
+Please refer to [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
 
-To create a Hive catalog with AWS S3 configuration in the Trino CLI, use the following command:
+To create a Hive catalog with AWS S3 configuration in the Trino CLI,
+use the following command:
 
 ```sql
 call gravitino.system.create_catalog(
@@ -329,8 +323,8 @@ call gravitino.system.create_catalog(
 );
 ```
 
-- The settings for `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key` and `trino.bypass.hive.s3.region`
-are required by the Apache Gravitino Trino connector.
+- The settings for `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`
+  and `trino.bypass.hive.s3.region` are required by the Apache Gravitino Trino connector.
 
 Once the Hive catalog is successfully created, users can create schemas and tables as follows:
 

@@ -8,17 +8,26 @@ last_update:
 license: 'This software is licensed under the Apache License version 2.'
 ---
 
-This document primarily outlines how users can manage metadata within Apache Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.
+This document primarily outlines how users can manage metadata within Apache Gravitino using the web UI.
+The Web UI is the graphical interface is accessible through a web browser
+as an alternative to writing code or using the REST interface.
 
-Currently, you can integrate [OAuth settings](security/security.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
+Currently, you can integrate [OAuth settings](./security/security.md)
+to view, add, modify, and delete metalakes, create catalogs,
+and view catalogs, schemas, and tables, among other functions.
 
-[Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`, by default is [http://localhost:8090](http://localhost:8090).
+[Build](./how-to-build.md) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI
+and open it in a browser at `http://<gravitino-host>:<gravitino-port>`,
+by default is [http://localhost:8090](http://localhost:8090).
 
 ## Initial page
 
-The web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode, see the details in [Security](security/security.md).
+The Web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode,
+see the details in [Security](./security/security.md).
 
-Set parameter for `gravitino.authenticators`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode). Simple mode is the default authentication option. If multiple authenticators are set, the first one is taken by default.
+Set parameter for `gravitino.authenticators`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode).
+Simple mode is the default authentication option.
+If multiple authenticators are set, the first one is taken by default.
 
 :::tip
 After changing the configuration, make sure to restart the Gravitino server.
@@ -32,7 +41,8 @@ After changing the configuration, make sure to restart the Gravitino server.
 gravitino.authenticators = simple
 ```
 
-Set the configuration parameter `gravitino.authenticators` to `simple`, and the web UI displays the homepage (Metalakes).
+Set the configuration parameter `gravitino.authenticators` to `simple`,
+and the web UI displays the homepage (Metalakes).
 
 ![webui-metalakes-simple](./assets/webui/metalakes-simple.png)
 
@@ -46,7 +56,8 @@ The main content displays the existing metalake list.
 gravitino.authenticators = oauth
 ```
 
-Set the configuration parameter `gravitino.authenticators` to `oauth`, and the web UI displays the login page.
+Set the configuration parameter `gravitino.authenticators` to `oauth`,
+and the web UI displays the login page.
 
 :::caution
 If both `OAuth` and `HTTPS` are set, due to the different security permission rules of various browsers, to avoid cross-domain errors,
@@ -57,13 +68,14 @@ Such as Safari need to enable the developer menu, and select `Disable Cross-Orig
 
 ![webui-login-with-oauth](./assets/webui/login-with-oauth.png)
 
-1. Enter the values corresponding to your specific configuration. For detailed instructions, please refer to [Security](security/security.md).
+1. Enter the values corresponding to your specific configuration.
+   For detailed instructions, please refer to [Security](./security/security.md).
 
-2. Click on the `LOGIN` button takes you to the homepage.
+1. Click on the `LOGIN` button takes you to the homepage.
 
-![webui-metalakes-oauth](./assets/webui/metalakes-oauth.png)
+   ![webui-metalakes-oauth](./assets/webui/metalakes-oauth.png)
 
-At the top-right, there is an icon button that takes you to the login page when clicked.
+   At the top-right, there is an icon button that takes you to the login page when clicked.
 
 ## Manage metadata
 
@@ -80,8 +92,8 @@ On the homepage, clicking on the `CREATE METALAKE` button displays a dialog to c
 Creating a metalake needs these fields:
 
 1. **Name**(**_required_**): the name of the metalake.
-2. **Comment**(_optional_): the comment of the metalake.
-3. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
+1. **Comment**(_optional_): the comment of the metalake.
+1. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
 ![metalake-list](./assets/webui/metalake-list.png)
 
@@ -147,7 +159,8 @@ On the left side of the page is a tree list, and the icons of the catalog corres
 
 ![tree-view](./assets/webui/tree-view.png)
 
-Hover your mouse over the corresponding icon to the data changes to a reload icon <Icon icon='mdi:reload' fontSize='24px' />. Click on this icon to reload the currently selected data.
+Hover your mouse over the corresponding icon to the data changes to a reload icon <Icon icon='mdi:reload' fontSize='24px' />.
+Click on this icon to reload the currently selected data.
 
 ![tree-view-reload-catalog](./assets/webui/tree-view-reload-catalog.png)
 
@@ -159,15 +172,15 @@ Click on the `CREATE CATALOG` button displays the dialog to create a catalog.
 
 Creating a catalog requires these fields:
 
-1. **Catalog name**(**_required_**): the name of the catalog
-2. **Type**(**_required_**): `relational`/`fileset`/`messaging`/`model`, the default value is `relational`
-3. **Provider**(**_required_**):
-    1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`
-    2. Type `fileset` - `hadoop`
-    3. Type `messaging` - `kafka`
-    4. Type `model` has no provider
-4. **Comment**(_optional_): the comment of this catalog
-5. **Properties**(**each `provider` must fill in the required property fields specifically**)
+- **Catalog name**(**_required_**): the name of the catalog
+- **Type**(**_required_**): `relational`/`fileset`/`messaging`/`model`, the default value is `relational`
+- **Provider**(**_required_**):
+  - Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`
+  - Type `fileset` - `hadoop`
+  - Type `messaging` - `kafka`
+  - Type `model` has no provider
+- **Comment**(_optional_): the comment of this catalog
+- **Properties**(**each `provider` must fill in the required property fields specifically**)
 
 ##### Providers
 
@@ -177,7 +190,7 @@ Creating a catalog requires these fields:
 
 <Tabs>
   <TabItem value='hive' label='Hive'>
-    Follow the [Apache Hive catalog](./apache-hive-catalog.md) document.
+    Follow the [Apache Hive catalog](./catalogs/relational/hive/index.md) document.
 
     <Image img={require('./assets/webui/props-hive.png')} style={{ width: 480 }} />
 
@@ -187,7 +200,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='iceberg' label='Iceberg'>
-    Follow the [Lakehouse Iceberg catalog](./lakehouse-iceberg-catalog.md) document.
+    Follow the [Lakehouse Iceberg catalog](./catalogs/relational/lakehouse/iceberg.md) document.
 
     the parameter `catalog-backend` provides two values: `hive`, and `jdbc`.
 
@@ -232,7 +245,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='mysql' label='MySQL'>
-    Follow the [JDBC MySQL catalog](./jdbc-mysql-catalog.md) document.
+    Follow the [JDBC MySQL catalog](./catalogs/relational/jdbc/mysql.md) document.
 
     <Image img={require('./assets/webui/props-mysql.png')} style={{ width: 480 }} />
 
@@ -245,7 +258,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='postgresql' label='PostgreSQL'>
-    Follow the [JDBC PostgreSQL catalog](./jdbc-postgresql-catalog) document.
+    Follow the [JDBC PostgreSQL catalog](./catalogs/relational/jdbc/postgresql.md) document.
 
     <Image img={require('./assets/webui/props-pg.png')} style={{ width: 480 }} />
 
@@ -259,7 +272,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='doris' label='Doris'>
-    Follow the [JDBC Doris catalog](./jdbc-doris-catalog.md) document.
+    Follow the [JDBC Doris catalog](./catalogs/relational/jdbc/doris.md) document.
 
     <Image img={require('./assets/webui/props-doris.png')} style={{ width: 480 }} />
 
@@ -272,7 +285,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='Paimon' label='Paimon'>
-    Follow the [lakehouse-paimon-catalog](./lakehouse-paimon-catalog.md) document.
+    Follow the [lakehouse-paimon-catalog](./catalogs/relational/lakehouse/paimon.md) document.
 
     the parameter `catalog-backend` provides three values: `filesystem`, `hive`, and `jdbc`.
 
@@ -326,7 +339,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='Hudi' label='Hudi'>
-    Follow the [lakehouse-hudi-catalog](./lakehouse-hudi-catalog.md) document.
+    Follow the [lakehouse-hudi-catalog](./catalogs/relational/lakehouse/hudi.md) document.
 
     <Image img={require('./assets/webui/props-hudi.png')} style={{ width: 480 }} />
 
@@ -337,7 +350,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='OceanBase' label='OceanBase'>
-    Follow the [jdbc-oceanbase-catalog](./jdbc-oceanbase-catalog.md) document.
+    Follow the [jdbc-oceanbase-catalog](./catalogs/relational/jdbc/oceanbase.md) document.
 
     <Image img={require('./assets/webui/props-oceanbase.png')} style={{ width: 480 }} />
 
@@ -355,7 +368,7 @@ Creating a catalog requires these fields:
 
 <Tabs>
   <TabItem value='hadoop' label='Hadoop'>
-    Follow the [Hadoop catalog](./hadoop-catalog.md) document.
+    Follow the [Hadoop catalog](./catalogs/fileset/hadoop/hadoop-catalog.md) document.
 
     <Image img={require('./assets/webui/create-fileset-hadoop-catalog-dialog.png')} style={{ width: 480 }} />
 
@@ -366,7 +379,7 @@ Creating a catalog requires these fields:
 
 <Tabs>
   <TabItem value='kafka' label='Kafka'>
-    Follow the [Kafka catalog](./kafka-catalog.md) document.
+    Follow the [Kafka catalog](./catalogs/messaging/kafka/index.md) document.
 
     <Image img={require('./assets/webui/create-messaging-kafka-catalog-dialog.png')} style={{ width: 480 }} />
 
@@ -711,19 +724,30 @@ Displays a confirmation dialog, clicking on the `DROP` button drops this version
 
 ## E2E test
 
-End-to-end testing for web frontends is conducted using the [Selenium](https://www.selenium.dev/documentation/) testing framework, which is Java-based.
+End-to-end testing for web frontends is conducted using the
+[Selenium](https://www.selenium.dev/documentation/) testing framework,
+which is Java-based.
 
-Test cases can be found in the project directory: `integration-test/src/test/java/org/apache/gravitino/integration/test/web/ui`, where the `pages` directory is designated for storing definitions of frontend elements, among others.
+Test cases can be found in the project directory:
+`integration-test/src/test/java/org/apache/gravitino/integration/test/web/ui`,
+where the `pages` directory is designated for storing definitions of frontend elements,
+among others.
 The root directory contains the actual steps for the test cases.
 
 :::tip
 While writing test cases, running them in a local environment may not pose any issues.
 
-However, due to the limited performance capabilities of GitHub Actions, scenarios involving delayed DOM loading—such as the time taken for a popup animation to open—can result in test failures.
+However, due to the limited performance capabilities of GitHub Actions,
+scenarios involving delayed DOM loading—such as the time taken
+for a popup animation to open—can result in test failures.
 
-To circumvent this issue, it is necessary to manually insert a delay operation, for instance, by adding such as `Thread.sleep(sleepTimeMillis)`.
+To circumvent this issue, it is necessary to manually insert a delay operation,
+for instance, by adding such as `Thread.sleep(sleepTimeMillis)`.
 
-This ensures that the test waits for the completion of the delay animation before proceeding with the next operation, thereby avoiding the problem.
+This ensures that the test waits for the completion of the delay animation
+before proceeding with the next operation, thereby avoiding the problem.
 
-It is advisable to utilize the [`waits`](https://www.selenium.dev/documentation/webdriver/waits/) methods inherent to Selenium as a substitute for `Thread.sleep()`.
+It is advisable to utilize the [`waits`](https://www.selenium.dev/documentation/webdriver/waits/)
+methods inherent to Selenium as a substitute for `Thread.sleep()`.
 :::
+

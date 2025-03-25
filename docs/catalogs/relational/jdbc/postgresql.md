@@ -27,17 +27,25 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value). and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value) and
+  [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
 ### Catalog properties
 
-Any property that isn't defined by Gravitino can pass to PostgreSQL data source by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
-You can check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+Any property that isn't defined by Gravitino can pass to PostgreSQL data source
+by adding `gravitino.bypass.` prefix as a catalog property.
+For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+You can check the relevant data source configuration in
+[data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-When you use the Gravitino with Trino. You can pass the Trino PostgreSQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
+When you use the Gravitino with Trino, you can pass the Trino PostgreSQL connector configuration using prefix `trino.bypass.`.
+For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy`
+to the Gravitino PostgreSQL catalog in Trino runtime.
 
-If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the PostgreSQL catalog has the following properties:
+If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password`
+to catalog properties.
+Besides the [common catalog properties](../../../gravitino-server-config.md#gravitino-catalog-properties-configuration),
+the PostgreSQL catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                                                        | Default value | Required | Since Version |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -59,7 +67,8 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations)
+for more details.
 
 ## Schema
 
@@ -76,7 +85,8 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Schema operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations)
+for more details.
 
 ## Table
 
@@ -85,7 +95,8 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Supports index.
-- Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Support [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value) and
+  [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
 ### Table column types
@@ -110,8 +121,10 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 | `List`         | `Array`         |
 
 :::info
-PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+PostgreSQL doesn't support Gravitino `Fixed`,`Struct`, `Map`,`IntervalDay`, `IntervalYear`,`Union`, or `UUID` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino
+**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
 ### Table column auto-increment
@@ -161,7 +174,8 @@ Index[] indexes = new Index[] {
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations)
+for more details.
 
 #### Alter table operations
 
@@ -182,6 +196,8 @@ You can't submit the `RenameTable` operation at the same time as other operation
 :::
 
 :::caution
-PostgreSQL doesn't support the `UpdateColumnPosition` operation, so you can only use `ColumnPosition.defaultPosition()` when `AddColumn`.
+PostgreSQL doesn't support the `UpdateColumnPosition` operation,
+so you can only use `ColumnPosition.defaultPosition()` when `AddColumn`.
 If you update a nullability column to non nullability, there may be compatibility issues.
 :::
+

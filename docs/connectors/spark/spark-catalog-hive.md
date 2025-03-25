@@ -5,7 +5,8 @@ keyword: spark connector hive catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-With the Apache Gravitino Spark connector, accessing data or managing metadata in Hive catalogs becomes straightforward, enabling seamless federation queries across different Hive catalogs.
+With the Apache Gravitino Spark connector, accessing data or managing metadata in Hive catalogs becomes straightforward,
+enabling seamless federation queries across different Hive catalogs.
 
 ## Capabilities
 
@@ -77,4 +78,11 @@ When using the `spark-sql` shell client, you must explicitly set the `spark.bypa
 
 ### S3
 
-Please refer to [Hive catalog with s3](../hive-catalog-with-s3.md) to set up a Hive catalog with s3 storage. To query the data stored in s3, you need to add s3 secret to the Spark configuration using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and `spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`. Additionally, download [hadoop aws jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws), [aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle) and place them in the classpath of Spark.
+Please refer to [Hive catalog with s3](../../catalogs/relational/hive/cloud-storage.md)
+to set up a Hive catalog with s3 storage.
+To query the data stored in s3, you need to add s3 secret to the Spark configuration
+using `spark.sql.catalog.${hive_catalog_name}.fs.s3a.access.key` and
+`spark.sql.catalog.${hive_catalog_name}.fs.s3a.secret.key`.
+Additionally, download [Hadoop AWS JAR](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws),
+[AWS Java SDK JAR](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle)
+and place them in the classpath of Spark.

@@ -156,7 +156,7 @@ Gravitino provides a Trino connector to manage Trino metadata in a unified way. 
 
 Gravitino provides a Spark connector to manage metadata in a unified way. To use the Spark connector, see:
 
-* [Gravitino Spark connector](./connectors/spark/spark-connector.md): a complete guide to using the Gravitino Spark connector.
+* [Gravitino Spark connector](./connectors/spark/index.md): a complete guide to using the Gravitino Spark connector.
 
 #### Flink connector
 

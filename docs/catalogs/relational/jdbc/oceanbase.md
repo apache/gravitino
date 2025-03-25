@@ -16,7 +16,9 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage OceanBase metadata.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`,
+please don't change or remove this message.
 :::
 
 ## Catalog
@@ -27,16 +29,20 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of OceanBase (4.x).
 - Supports DDL operation for OceanBase databases and tables.
 - Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value)
+  and [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
 ### Catalog properties
 
-You can pass to a OceanBase data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+You can pass to a OceanBase data source any property that isn't defined by Gravitino
+by adding `gravitino.bypass.` prefix as a catalog property.
+For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the OceanBase catalog has the following properties:
+Besides the [common catalog properties](../../../gravitino-server-config.md#gravitino-catalog-properties-configuration),
+the OceanBase catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                           | Default value | Required | Since Version    |
 |----------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -54,7 +60,8 @@ Gravitino doesn't package the JDBC driver for OceanBase due to licensing issues.
 
 ### Catalog operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations)
+for more details.
 
 ## Schema
 
@@ -71,7 +78,8 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations)
+for more details.
 
 ## Table
 
@@ -80,7 +88,8 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Gravitino's table concept corresponds to the OceanBase table.
 - Supports DDL operation for OceanBase tables.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
+- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value) and
+  [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
 ### Table properties
 
@@ -110,8 +119,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `Binary`          | `Binary`            |
 
 :::info
-OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+OceanBase doesn't support Gravitino `Boolean`, `Fixed`, `Struct`, `List`,`Map`,`Timestamp_tz`,
+`IntervalDay` `IntervalYear` `Union` `UUID` type.
+Meanwhile, the data types other than listed above are mapped to Gravitino
+**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
 ### Table column auto-increment
@@ -211,7 +223,8 @@ Index[] indexes = new Index[] {
 The OceanBase catalog does not support creating partitioned tables in the current version.
 :::
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations)
+for more details.
 
 #### Alter table operations
 
@@ -230,6 +243,6 @@ Gravitino supports these table alteration operations:
 - `SetProperty`
 
 :::info
- - You cannot submit the `RenameTable` operation at the same time as other operations.
- - If you update a nullability column to non-nullability, there may be compatibility issues.
+- You cannot submit the `RenameTable` operation at the same time as other operations.
+- If you update a nullability column to non-nullability, there may be compatibility issues.
 :::

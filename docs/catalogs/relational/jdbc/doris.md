@@ -13,11 +13,13 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/) metadata through JDBC connection.
+Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/)
+metadata through JDBC connection.
 
 :::caution
-Gravitino saves some system information in schema and table comments, like
-`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comments,
+like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`,
+please don't change or remove this message.
 :::
 
 ## Catalog
@@ -27,19 +29,20 @@ Gravitino saves some system information in schema and table comments, like
 - Gravitino catalog corresponds to the Doris instance.
 - Supports metadata management of Doris (1.2.x).
 - Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 ### Catalog properties
 
-You can pass to a Doris data source any property that isn't defined by Gravitino by adding
-`gravitino.bypass.` prefix as a catalog property. For example, catalog property
-`gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+You can pass to a Doris data source any property that isn't defined by Gravitino
+by adding `gravitino.bypass.` prefix as a catalog property.
+For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis`
+to the data source property.
 
-You can check the relevant data source configuration in
-[data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
-more details.
+For more details, you can check the relevant data source configuration in
+[data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html).
 
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the Doris catalog has the following properties:
+Besides the [common catalog properties](../../../gravitino-server-config.md#gravitino-catalog-properties-configuration),
+the Doris catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version    |
 |----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -57,7 +60,8 @@ Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
 
 ### Catalog operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+For more details, refer to
+[Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
 
 ## Schema
 
@@ -73,8 +77,8 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema operations
 
-Please refer to
-[Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+For more details, please refer to
+[Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
 
 ## Table
 
@@ -82,7 +86,7 @@ Please refer to
 
 - Gravitino's table concept corresponds to the Doris table.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 #### Table column types
 
@@ -103,13 +107,15 @@ Please refer to
 | `String`       | `String`   |
 
 
-Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
+Doris doesn't support Gravitino `Fixed`, `Timestamp_tz`, `IntervalDay`, `IntervalYear`, `Union`, or `UUID` type.
+The data types other than those listed above are mapped to Gravitino's
+**[Unparsed Type](../../../manage-relational-metadata-using-gravitino.md#unparsed-type)**
+that represents an unresolvable data type since 0.5.0.
 
 :::note
-Gravitino can not load Doris `array`, `map` and `struct` type correctly, because Doris doesn't support these types in JDBC.
+Gravitino can not load Doris `array`, `map` and `struct` type correctly,
+because Doris doesn't support these types in JDBC.
 :::
-
 
 ### Table column auto-increment
 
@@ -124,40 +130,42 @@ Unsupported for now.
 
 - Supports PRIMARY_KEY
 
-    Please be aware that the index can only apply to a single column.
+  Please be aware that the index can only apply to a single column.
 
-    <Tabs groupId='language' queryString>
-    <TabItem value="json" label="Json">
+  <Tabs groupId='language' queryString>
+  <TabItem value="json" label="Json">
 
-    ```json
-    {
-      "indexes": [
-        {
-          "indexType": "primary_key",
-          "name": "PRIMARY",
-          "fieldNames": [["id"]]
-        }
-      ]
-    }
-    ```
+  ```json
+  {
+    "indexes": [
+      {
+        "indexType": "primary_key",
+        "name": "PRIMARY",
+        "fieldNames": [["id"]]
+       }
+    ]
+  }
+  ```
 
-    </TabItem>
-    <TabItem value="java" label="Java">
+  </TabItem>
+  <TabItem value="java" label="Java">
 
-    ```java
-    Index[] indexes = new Index[] {
-        Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-    }
-    ```
+  ```java
+  Index[] indexes = new Index[] {
+      Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+  }
+  ```
 
-    </TabItem>
-    </Tabs>
+  </TabItem>
+  </Tabs>
 
 ### Table partitioning
 
 The Doris catalog supports partitioned tables. 
-Users can create partitioned tables in the Doris catalog with specific partitioning attributes. It is also supported to pre-assign partitions when creating Doris tables. 
-Note that although Gravitino supports several partitioning strategies, Apache Doris inherently only supports these two partitioning strategies:
+Users can create partitioned tables in the Doris catalog with specific partitioning attributes.
+It is also supported to pre-assign partitions when creating Doris tables. 
+Note that although Gravitino supports several partitioning strategies,
+Apache Doris inherently only supports these two partitioning strategies:
 
 - `RANGE`
 - `LIST`
@@ -168,16 +176,20 @@ The `fieldName` specified in the partitioning attributes must be the name of col
 
 ### Table distribution
 
-Users can also specify the distribution strategy when creating tables in the Doris catalog. Currently, the Doris catalog supports the following distribution strategies:
+Users can also specify the distribution strategy when creating tables in the Doris catalog.
+Currently, the Doris catalog supports the following distribution strategies:
+
 - `HASH`
 - `RANDOM`
 
-For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#table-distribution).
-
+For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it.
+More information about the distribution strategy defined in Gravitino can be found
+[here](../../../table-partitioning-distribution-sort-order-indexes.md#table-distribution).
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+For more details, please refer to
+[Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations).
 
 #### Alter table operations
 
@@ -194,11 +206,13 @@ Gravitino supports these table alteration operations:
 
 Please be aware that:
 
- - Not all table alteration operations can be processed in batches.
- - Schema changes, such as adding/modifying/dropping columns can be processed in batches.
- - Supports modifying multiple column comments at the same time.
- - Doesn't support modifying the column type and column comment at the same time.
- - The schema alteration in Doris is asynchronous. You might get an outdated schema if you
-   execute a schema query immediately after the alteration. It is recommended to pause briefly
-   after the schema alteration. Gravitino will add the schema alteration status into
-   the schema information in the upcoming version to solve this problem.
+- Not all table alteration operations can be processed in batches.
+- Schema changes, such as adding/modifying/dropping columns can be processed in batches.
+- Supports modifying multiple column comments at the same time.
+- Doesn't support modifying the column type and column comment at the same time.
+- The schema alteration in Doris is asynchronous. You might get an outdated schema
+  if you execute a schema query immediately after the alteration.
+  It is recommended to pause briefly after the schema alteration.
+  Gravitino will add the schema alteration status into
+  the schema information in the upcoming version to solve this problem.
+

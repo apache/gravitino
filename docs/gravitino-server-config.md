@@ -11,15 +11,18 @@ license: "This software is licensed under the Apache License version 2."
 Apache Gravitino supports several configurations:
 
 1. **Gravitino server configuration**: Used to start up the Gravitino server.
-2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
-3. **Some other configurations**: Includes HDFS and other configurations.
+1. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
+1. **Some other configurations**: Includes HDFS and other configurations.
 
 ## Apache Gravitino server configurations
 
-You can customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
-We strongly recommend that you read the following sections to understand the configuration file, so you can change the default values to suit your specific situation and usage scenario.
+You can customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory.
+The default values are sufficient for most use cases.
+We strongly recommend that you read the following sections to understand the configuration file,
+so you can change the default values to suit your specific situation and usage scenario.
 
-The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
+The `gravitino.conf` file lists the configuration items in the following table.
+It groups those items into the following categories:
 
 ### Apache Gravitino HTTP Server configuration
 
@@ -46,8 +49,12 @@ You can also specify filter parameters by setting configuration entries of the f
 
 #### Storage backend configuration
 
-Currently, Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
-If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.  
+Currently, Gravitino only supports JDBC database backend.
+The default implementation is H2 database as it's an embedded database,
+has no external dependencies and is very suitable for local development or tests.
+If you are going to use H2 in the production environment,
+Gravitino will not guarantee the data consistency and durability.
+It's highly recommended using MySQL as the backend database.  
 
 The following table lists the storage configuration items:
 
@@ -68,16 +75,22 @@ The following table lists the storage configuration items:
 
 
 :::caution
-We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.
+We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`,
+as it's under the deployment directory and future version upgrades may remove it.
 :::
 
 #### Create JDBC backend schema and table 
 
-For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
+For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up.
+For MySQL, you should firstly initialize the database tables yourself
+by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
 ### Tree lock configuration
 
-Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Currently, Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
+Gravitino server uses tree lock to ensure the consistency of the data.
+The tree lock is a memory lock (Currently, Gravitino only supports in memory lock)
+that can be used to ensure the consistency of the data in Gravitino server.
+The configuration items are as follows:
 
 | Configuration item                   | Description                                                   | Default value | Required | Since Version |
 |--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
@@ -98,13 +111,16 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
 | `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
 
-Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
+Refer to [Iceberg REST catalog service](./iceberg-rest-service.md) for configuration details.
 
 ### Event listener configuration
 
-Gravitino provides event listener mechanism to allow users to capture the events which are provided by Gravitino server to integrate some custom operations.
+Gravitino provides event listener mechanism to allow users to capture the events
+which are provided by Gravitino server to integrate some custom operations.
 
-To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
+To leverage the event listener, you must implement the `EventListenerPlugin` interface
+and place the JAR file in the classpath of the Gravitino server.
+Then, add configurations to gravitino.conf to enable the event listener.
 
 | Property name                          | Description                                                                                            | Default value | Required | Since Version |
 |----------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -114,7 +130,9 @@ To leverage the event listener, you must implement the `EventListenerPlugin` int
 
 #### Event
 
-Gravitino triggers a pre-event before the operation, a post-event after the completion of the operation and a failure event after the operation failed.
+Gravitino triggers a pre-event before the operation,
+a post-event after the completion of the operation
+and a failure event after the operation failed.
 
 ##### Post-event
 
@@ -146,23 +164,37 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 
 #### Event listener plugin
 
-The `EventListenerPlugin` defines an interface for event listeners that manage the lifecycle and state of a plugin. This includes handling its initialization, startup, and shutdown processes, as well as handing events triggered by various operations.
+The `EventListenerPlugin` defines an interface for event listeners
+that manage the lifecycle and state of a plugin.
+This includes handling its initialization, startup, and shutdown processes,
+as well as handing events triggered by various operations.
 
-The plugin provides several operational modes for how to process event, supporting both synchronous and asynchronous processing approaches.
+The plugin provides several operational modes for how to process event,
+supporting both synchronous and asynchronous processing approaches.
 
-- **SYNC**: Events are processed synchronously, immediately following the associated operation. This mode ensures events are processed before the operation's result is returned to the client, but it may delay the main process if event processing takes too long.
+- **SYNC**: Events are processed synchronously, immediately following the associated operation.
+  This mode ensures events are processed before the operation's result is returned to the client,
+  but it may delay the main process if event processing takes too long.
 
-- **ASYNC_SHARED**: This mode employs a shared queue and dispatcher for asynchronous event processing. It prevents the main process from being blocked, though there's a risk events might be dropped if not promptly consumed. Sharing a dispatcher can lead to poor isolation in case of slow listeners.
+- **ASYNC_SHARED**: This mode employs a shared queue and dispatcher for asynchronous event processing.
+  It prevents the main process from being blocked, though there's a risk events might be dropped if not promptly consumed.
+  Sharing a dispatcher can lead to poor isolation in case of slow listeners.
  
-- **ASYNC_ISOLATED**: Events are processed asynchronously, with each listener having its own dedicated queue and dispatcher thread. This approach offers better isolation but at the expense of multiple queues and dispatchers.
+- **ASYNC_ISOLATED**: Events are processed asynchronously,
+  with each listener having its own dedicated queue and dispatcher thread.
+  This approach offers better isolation but at the expense of multiple queues and dispatchers.
 
-When processing pre-event, you could throw a `ForbiddenException` to skip the following executions. For more details, please refer to the definition of the plugin.
+When processing pre-event, you could throw a `ForbiddenException` to skip the following executions.
+For more details, please refer to the definition of the plugin.
 
 ### Audit log configuration
 
-The audit log framework defines how audit logs are formatted and written to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`. The writer defines an interface to writing AuditLog to different storages.
+The audit log framework defines how audit logs are formatted and written to various storages.
+The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`.
+The writer defines an interface to writing AuditLog to different storages.
 
-Gravitino provides a default implement to log basic audit information to a file, you could extend the audit system by implementation corresponding interfaces.
+Gravitino provides a default implement to log basic audit information to a file,
+you could extend the audit system by implementation corresponding interfaces.
 
 | Property name                         | Description                            | Default value                               | Required | Since Version              |
 |---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
@@ -172,13 +204,18 @@ Gravitino provides a default implement to log basic audit information to a file,
 
 #### Audit log formatter
 
-The Formatter defines an interface that formats metadata audit logs into a unified format. `SimpleFormatter` is a default implement to format audit information, you don't need to do extra configurations.
+The Formatter defines an interface that formats metadata audit logs into a unified format.
+`SimpleFormatter` is a default implement to format audit information,
+you don't need to do extra configurations.
 
 #### Audit log writer
 
-The `AuditLogWriter` defines an interface that enables the writing of metadata audit logs to different storage mediums such as files, databases, etc.
+The `AuditLogWriter` defines an interface that enables the writing of metadata audit logs
+to different storage mediums such as files, databases, etc.
 
-Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name}` is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
+Writer configuration begins with `gravitino.audit.writer.${name}`,
+where `${name}` is replaced with the actual writer name defined in method `name()`.
+`FileAuditWriter` is a default implement to log audit information, whose name is `file`.
 
 | Property name                                   | Description                                                                   | Default value       | Required | Since Version    |
 |-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
@@ -188,7 +225,7 @@ Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name
 
 ### Security configuration
 
-Refer to [security](security/security.md) for HTTPS and authentication configurations.
+Refer to [security](./security/security.md) for HTTPS and authentication configurations.
 
 ### Metrics configuration
 
@@ -200,19 +237,19 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 
 There are three types of catalog properties:
 
-1. **Gravitino defined properties**: Gravitino defines these properties as the necessary
-   configurations for the catalog to work properly.
-2. **Properties with the `gravitino.bypass.` prefix**: These properties are not managed by
-   Gravitino and pass directly to the underlying system for advanced usage.
-3. **Other properties**: Gravitino doesn't leverage these properties, just store them. Users
-   can use them for their own purposes.
+1. **Gravitino defined properties**: Gravitino defines these properties as the necessary configurations
+   for the catalog to work properly.
+2. **Properties with the `gravitino.bypass.` prefix**: These properties are not managed by Gravitino
+   and pass directly to the underlying system for advanced usage.
+3. **Other properties**: Gravitino doesn't leverage these properties, just store them.
+   Users can use them for their own purposes.
 
-Catalog properties are either defined in catalog configuration files as default values or
-specified as `properties` explicitly when creating a catalog.
+Catalog properties are either defined in catalog configuration files as default values
+or specified as `properties` explicitly when creating a catalog.
 
 :::info
-The catalog properties explicitly specified in the `properties` field take precedence over the
-default values in the catalog configuration file.
+The catalog properties explicitly specified in the `properties` field take precedence
+over the default values in the catalog configuration file.
 
 These rules only apply to the catalog properties and don't affect the schema or table properties.
 :::
@@ -228,18 +265,18 @@ Below is a list of catalog properties that will be used by all Gravitino catalog
 
 The following table lists the catalog specific properties and their default paths:
 
-| catalog provider    | catalog properties                                                                      | catalog properties configuration file path               |
-|---------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------|
-| `hive`              | [Hive catalog properties](apache-hive-catalog.md#catalog-properties)                    | `catalogs/hive/conf/hive.conf`                           |
-| `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
-| `lakehouse-paimon`  | [Lakehouse Paimon catalog properties](lakehouse-paimon-catalog.md#catalog-properties)   | `catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
-| `lakehouse-hudi`    | [Lakehouse Hudi catalog properties](lakehouse-hudi-catalog.md#catalog-properties)       | `catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
-| `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
-| `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
-| `jdbc-doris`        | [Doris catalog properties](jdbc-doris-catalog.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
-| `jdbc-oceanbase`    | [OceanBase catalog properties](jdbc-oceanbase-catalog.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
-| `kafka`             | [Kafka catalog properties](kafka-catalog.md#catalog-properties)                         | `catalogs/kafka/conf/kafka.conf`                         |
-| `hadoop`            | [Hadoop catalog properties](hadoop-catalog.md#catalog-properties)                       | `catalogs/hadoop/conf/hadoop.conf`                       |
+| catalog provider    | catalog properties                                                                 | catalog properties configuration file path               |
+|---------------------|------------------------------------------------------------------------------------|----------------------------------------------------------|
+| `hive`              | [Hive](./catalogs/relational/hive/index.md#catalog-properties)                     | `catalogs/hive/conf/hive.conf`                           |
+| `lakehouse-iceberg` | [Lakehouse Iceberg](./catalogs/relational/lakehouse/iceberg.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
+| `lakehouse-paimon`  | [Lakehouse Paimon](./catalogs/relational/lakehouse/paimon.md#catalog-properties)   | `catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
+| `lakehouse-hudi`    | [Lakehouse Hudi](./catalogs/relational/lakehouse/hudi.md#catalog-properties)       | `catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
+| `jdbc-mysql`        | [MySQL](./catalogs/relational/jdbc/mysql.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
+| `jdbc-postgresql`   | [PostgreSQL](./catalogs/relational/jdbc/postgresql.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
+| `jdbc-doris`        | [Doris](./catalogs/relational/jdbc/doris.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
+| `jdbc-oceanbase`    | [OceanBase](./catalogs/relational/jdbc/oceanbase.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
+| `kafka`             | [Kafka](./catalogs/messaging/kafka/index.md#catalog-properties)                    | `catalogs/kafka/conf/kafka.conf`                         |
+| `hadoop`            | [Hadoop](./catalogs/fileset/hadoop/hadoop-catalog.md#catalog-properties)           | `catalogs/hadoop/conf/hadoop.conf`                       |
 
 :::info
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.
@@ -247,17 +284,23 @@ The Gravitino server automatically adds the catalog properties configuration dir
 
 ## Some other configurations
 
-You could put HDFS configuration file to the catalog properties configuration dir, like `catalogs/lakehouse-iceberg/conf/`.
+You could put HDFS configuration file to the catalog properties configuration dir,
+like `catalogs/lakehouse-iceberg/conf/`.
 
 ## How to set up runtime environment variables
 
-The Gravitino server lets you set up runtime environment variables by editing the `gravitino-env.sh` file, located in the `conf` directory.
+The Gravitino server lets you set up runtime environment variables
+by editing the `gravitino-env.sh` file, located in the `conf` directory.
 
 ### How to access Apache Hadoop
 
-Currently, due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
-Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
-permissions; otherwise, you may encounter a `Permission denied` error. There are two ways to resolve this error:
+Currently, due to the absence of a comprehensive user permission system,
+Gravitino can only use a single username for Apache Hadoop access.
+Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access permissions;
+otherwise, you may encounter a `Permission denied` error.
+There are two ways to resolve this error:
 
 * Grant Gravitino startup user permissions in Hadoop
-* Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME` before starting the Gravitino server.
+* Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME`
+  before starting the Gravitino server.
+

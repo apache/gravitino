@@ -9,28 +9,30 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to manage relational metadata by Apache Gravitino, relational metadata refers
-to relational catalog, schema, table and partitions. Through Gravitino, you can create, edit, and
-delete relational metadata via unified REST APIs or Java client.
+This page introduces how to manage relational metadata by Apache Gravitino,
+relational metadata refers to relational catalog, schema, table and partitions.
+Through Gravitino, you can create, edit, and delete relational metadata via unified REST APIs or Java client.
 
-In this document, Gravitino uses Apache Hive catalog as an example to show how to manage
-relational metadata by Gravitino. Other relational catalogs are similar to Hive catalog,
-but they may have some differences, especially in catalog property, table property, and column type.
+In this document, Gravitino uses Apache Hive catalog as an example
+to show how to manage relational metadata by Gravitino.
+Other relational catalogs are similar to Hive catalog,
+but they may have some differences, especially in catalog property,
+table property, and column type.
 For more details, please refer to the related doc.
 
-- [**Apache Hive**](./apache-hive-catalog.md)
-- [**MySQL**](./jdbc-mysql-catalog.md)
-- [**PostgreSQL**](./jdbc-postgresql-catalog.md)
-- [**Apache Doris**](./jdbc-doris-catalog.md)
-- [**OceanBase**](./jdbc-oceanbase-catalog.md)
-- [**Apache Iceberg**](./lakehouse-iceberg-catalog.md)
-- [**Apache Paimon**](./lakehouse-paimon-catalog.md)
-- [**Apache Hudi**](./lakehouse-hudi-catalog.md)
+- [**Apache Hive**](./catalogs/relational/hive/index.md)
+- [**Apache Doris**](./catalogs/relational/jdbc/doris.md)
+- [**Apache Hudi**](./catalogs/relational/lakehouse/hudi.md)
+- [**Apache Iceberg**](./catalogs/relational/lakehouse/iceberg.md)
+- [**Apache Paimon**](./catalogs/relational/lakehouse/paimon.md)
+- [**MySQL**](./catalogs/relational/jdbc/mysql.md)
+- [**OceanBase**](./catalogs/relational/jdbc/oceanbase.md)
+- [**PostgreSQL**](./catalogs/relational/jdbc/postgresql.md)
 
 Assuming:
 
- - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
- - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
+- Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
+- A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
 
 ## Catalog operations
 
@@ -42,28 +44,35 @@ as multiple catalogs operating on the same source may result in unpredictable be
 :::
 
 :::tip
-The code below is an example of creating a Hive catalog. For other relational catalogs, the code is
-similar, but the catalog type, provider, and properties may be different. For more details, please refer to the related doc.
+The code below is an example of creating a Hive catalog.
+For other relational catalogs, the code is similar,
+but the catalog type, provider, and properties may be different.
+For more details, please refer to the related doc.
 
-For relational catalog, you must specify the catalog `type` as `RELATIONAL` when creating a catalog.
+For relational catalog, you must specify the catalog `type` as `RELATIONAL`
+when creating a catalog.
 :::
 
-You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
+You can create a catalog by sending a `POST` request to the
+`/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client.
+The following is an example of creating a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "catalog",
-  "type": "RELATIONAL",
-  "comment": "comment",
-  "provider": "hive",
-  "properties": {
-    "metastore.uris": "thrift://localhost:9083"
-  }
-}' http://localhost:8090/api/metalakes/metalake/catalogs
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{ \
+    "name": "catalog", \
+    "type": "RELATIONAL", \
+    "comment": "comment", \
+    "provider": "hive", \
+    "properties": { \
+      "metastore.uris": "thrift://localhost:9083" \
+    } \
+  }' \
+  http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
 </TabItem>
@@ -78,7 +87,8 @@ GravitinoClient gravitinoClient = GravitinoClient
     .build();
 
 Map<String, String> hiveProperties = ImmutableMap.<String, String>builder()
-        // You should replace the following with your own hive metastore uris that Gravitino can access
+        // You should replace the following with your own hive metastore uris
+        // that Gravitino can access
         .put("metastore.uris", "thrift://localhost:9083")
         .build();
 
@@ -108,27 +118,32 @@ gravitino_client.create_catalog(name="catalog",
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                               |
-|---------------------|--------------------------------------------------------------------------------|
-| `hive`              | [Hive catalog property](./apache-hive-catalog.md#catalog-properties)           |
-| `lakehouse-iceberg` | [Iceberg catalog property](./lakehouse-iceberg-catalog.md#catalog-properties)  |
-| `lakehouse-paimon`  | [Paimon catalog property](./lakehouse-paimon-catalog.md#catalog-properties)    |
-| `lakehouse-hudi`    | [Hudi catalog property](./lakehouse-hudi-catalog.md#catalog-properties)        |
-| `jdbc-mysql`        | [MySQL catalog property](./jdbc-mysql-catalog.md#catalog-properties)           |
-| `jdbc-postgresql`   | [PostgreSQL catalog property](./jdbc-postgresql-catalog.md#catalog-properties) |
-| `jdbc-doris`        | [Doris catalog property](./jdbc-doris-catalog.md#catalog-properties)           |
-| `jdbc-oceanbase`    | [OceanBase catalog property](./jdbc-oceanbase-catalog.md#catalog-properties)   |
+| Catalog provider    | Catalog property                                                                           |
+|---------------------|--------------------------------------------------------------------------------------------|
+| `hive`              | [Hive catalog property](./catalogs/relational/hive/index.md#catalog-properties)            |
+| `lakehouse-hudi`    | [Hudi catalog property](./catalogs/relational/lakehouse/hudi.md#catalog-properties)        |
+| `lakehouse-iceberg` | [Iceberg catalog property](./catalogs/relational/lakehouse/iceberg.md#catalog-properties)  |
+| `lakehouse-paimon`  | [Paimon catalog property](./catalogs/relational/lakehouse/paimon.md#catalog-properties)    |
+| `jdbc-doris`        | [Doris catalog property](./catalogs/relational/jdbc/doris.md#catalog-properties)           |
+| `jdbc-mysql`        | [MySQL catalog property](./catalogs/relational/jdbc/mysql.md#catalog-properties)           |
+| `jdbc-oceanbase`    | [OceanBase catalog property](./catalogs/relational/jdbc/oceanbase.md#catalog-properties)   |
+| `jdbc-postgresql`   | [PostgreSQL catalog property](./catalogs/relational/jdbc/postgresql.md#catalog-properties) |
 
 ### Load a catalog
 
-You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
+You can load a catalog by sending a `GET` request to the
+`/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of loading a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
 </TabItem>
@@ -155,26 +170,28 @@ catalog = gravitino_client.load_catalog("catalog")
 
 ### Alter a catalog
 
-You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
+You can modify a catalog by sending a `PUT` request to the
+`/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of altering a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "updates": [
-    {
-      "@type": "rename",
-      "newName": "alter_catalog"
-    },
-    {
-      "@type": "setProperty",
-      "property": "key3",
-      "value": "value3"
-    }
-  ]
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{ \
+  "updates": [{ \
+    "@type": "rename", \
+      "newName": "alter_catalog" \
+    }, { \
+      "@type": "setProperty", \
+      "property": "key3", \
+      "value": "value3" \
+    }] \
+  }' \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
 </TabItem>
@@ -184,7 +201,8 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 // ...
 // Assuming you have created a metalake named `metalake` and a catalog named `catalog`
 Catalog catalog = gravitinoClient.alterCatalog("catalog",
-    CatalogChange.rename("alter_catalog"), CatalogChange.updateComment("new comment"));
+    CatalogChange.rename("alter_catalog"),
+    CatalogChange.updateComment("new comment"));
 // ...
 ```
 
@@ -213,17 +231,23 @@ Currently, Gravitino supports the following changes to a catalog:
 
 :::warning
 
-Most catalog-altering operations are generally safe. However, if you want to change the catalog's URI, you should proceed with caution. Changing the URI may point to a different cluster, rendering the metadata stored in Gravitino unusable.
-For instance, if the old URI and the new URI point to different clusters that both have a database named db1, changing the URI might cause the old metadata, such as audit information, to be used when accessing db1, which is undesirable.
+Most catalog-altering operations are generally safe.
+However, if you want to change the catalog's URI, you should proceed with caution.
+Changing the URI may point to a different cluster, rendering the metadata stored in Gravitino unusable.
+For instance, if the old URI and the new URI point to different clusters
+that both have a database named *db1*, changing the URI might cause the old metadata,
+such as audit information, to be used when accessing *db1*, which is undesirable.
 
 Therefore, do not change the catalog's URI unless you fully understand the consequences of such a modification.
-
 :::
 
 ### Enable a catalog
 
-Catalog has a reserved property - `in-use`, which indicates whether the catalog is available for use. By default, the `in-use` property is set to `true`.
-To enable a disabled catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
+Catalog has a reserved property - `in-use`, which indicates whether the catalog is available for use.
+By default, the `in-use` property is set to `true`.
+To enable a disabled catalog, you can send a `PATCH` request to the
+`/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint
+or use the Gravitino Java client.
 
 The following is an example of enabling a catalog:
 
@@ -231,9 +255,11 @@ The following is an example of enabling a catalog:
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{"inUse": true}' \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog
+curl -X PATCH \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"inUse": true}' \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
 </TabItem>
@@ -266,10 +292,13 @@ This operation does nothing if the catalog is already enabled.
 ### Disable a catalog
 
 Once a catalog is disabled:
-- Users can only [list](#list-all-catalogs-in-a-metalake), [load](#load-a-catalog), [drop](#drop-a-catalog), or [enable](#enable-a-catalog) it.
+- Users can only [list](#list-all-catalogs-in-a-metalake),
+  [load](#load-a-catalog), [drop](#drop-a-catalog), or [enable](#enable-a-catalog) it.
 - Any other operation on the catalog or its sub-entities will result in an error.
 
-To disable a catalog, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client.
+To disable a catalog, you can send a `PATCH` request to the
+`/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint
+or use the Gravitino Java client.
 
 The following is an example of disabling a catalog:
 
@@ -277,9 +306,11 @@ The following is an example of disabling a catalog:
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{"inUse": false}' \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog
+curl -X PATCH \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"inUse": false}' \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog
 ```
 
 </TabItem>
@@ -320,17 +351,22 @@ Deleting a catalog by "force" will:
 
 - Delete all sub-entities (schemas, tables, etc.) under the catalog.
 - Delete the catalog itself even if it is enabled.
-- Not delete the external resources (such as database, table, etc.) associated with sub-entities unless they are managed (such as managed fileset).
+- Not delete the external resources (such as database, table, etc.)
+  associated with sub-entities unless they are managed (such as managed fileset).
 
-You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
+You can remove a catalog by sending a `DELETE` request to the
+`/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of dropping a catalog:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog?force=false
+curl -X DELETE \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog?force=false
 ```
 
 </TabItem>
@@ -361,16 +397,19 @@ gravitino_client.drop_catalog(name="catalog", force=False)
 
 ### List all catalogs in a metalake
 
-You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs in
-a metalake:
+You can list all catalogs under a metalake by sending a `GET` request
+to the `/api/metalakes/{metalake_name}/catalogs` endpoint
+or just use the Gravitino Java client.
+The following is an example of listing all the catalogs in a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
 </TabItem>
@@ -398,15 +437,19 @@ catalog_names = gravitino_client.list_catalogs()
 
 ### List all catalogs' information in a metalake
 
-You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
+You can list all catalogs' information under a metalake by sending a `GET` request
+to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint
+or just use the Gravitino Java client.
+The following is an example of listing all the catalogs' information in a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs?details=true
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs?details=true
 ```
 
 </TabItem>
@@ -436,25 +479,31 @@ catalogs_info = gravitino_client.list_catalogs_info()
 ## Schema operations
 
 :::tip
-Users should create a metalake and a catalog, then ensure that the metalake and catalog are enabled before operating schemas.
+Users should create a metalake and a catalog, then ensure that the metalake
+and catalog are enabled before operating schemas.
 :::
 
 ### Create a schema
 
-You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
+You can create a schema by sending a `POST` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint
+or just use the Gravitino Java client.
+The following is an example of creating a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "schema",
-  "comment": "comment",
-  "properties": {
-    "key1": "value1"
-  }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{ \
+    "name": "schema", \
+    "comment": "comment", \
+    "properties": { \
+      "key1": "value1" \
+    } \
+  }' \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
 
 </TabItem>
@@ -479,11 +528,11 @@ Schema schema = supportsSchemas.createSchema("schema",
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
-catalog.as_schemas().create_schema(name="schema",
-                                   comment="This is a schema",
-                                   properties={})
+client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090",
+                                          metalake_name="metalake")
+catalog: Catalog = client.load_catalog(name="hive_catalog")
+schema: Schema = catalog.as_schemas().create_schema(
+  name="schema", comment="This is a schema", properties={})
 ```
 
 </TabItem>
@@ -491,28 +540,32 @@ catalog.as_schemas().create_schema(name="schema",
 
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider    | Schema property                                                              |
-|---------------------|------------------------------------------------------------------------------|
-| `hive`              | [Hive schema property](./apache-hive-catalog.md#schema-properties)           |
-| `lakehouse-iceberg` | [Iceberg scheme property](./lakehouse-iceberg-catalog.md#schema-properties)  |
-| `lakehouse-paimon`  | [Paimon scheme property](./lakehouse-paimon-catalog.md#schema-properties)    |
-| `lakehouse-hudi`    | [Hudi scheme property](./lakehouse-hudi-catalog.md#schema-properties)        |
-| `jdbc-mysql`        | [MySQL schema property](./jdbc-mysql-catalog.md#schema-properties)           |
-| `jdbc-postgresql`   | [PostgreSQL schema property](./jdbc-postgresql-catalog.md#schema-properties) |
-| `jdbc-doris`        | [Doris schema property](./jdbc-doris-catalog.md#schema-properties)           |
-| `jdbc-oceanbase`    | [OceanBase schema property](./jdbc-oceanbase-catalog.md#schema-properties)   |
+| Catalog provider    | Schema property                                                                          |
+|---------------------|------------------------------------------------------------------------------------------|
+| `hive`              | [Hive schema property](./catalogs/relational/hive/index.md#schema-properties)            |
+| `lakehouse-hudi`    | [Hudi schema property](./catalogs/relational/lakehouse/hudi.md#schema-properties)        |
+| `lakehouse-iceberg` | [Iceberg schema property](./catalogs/relational/lakehouse/iceberg.md#schema-properties)  |
+| `lakehouse-paimon`  | [Paimon schema property](./catalogs/relational/lakehouse/paimon.md#schema-properties)    |
+| `jdbc-doris`        | [Doris schema property](./catalogs/relational/jdbc/doris.md#schema-properties)           |
+| `jdbc-mysql`        | [MySQL schema property](./catalogs/relational/jdbc/mysql.md#schema-properties)           |
+| `jdbc-oceanbase`    | [OceanBase schema property](./catalogs/relational/jdbc/oceanbase.md#schema-properties)   |
+| `jdbc-postgresql`   | [PostgreSQL schema property](./catalogs/relational/jdbc/postgresql.md#schema-properties) |
 
 ### Load a schema
 
-You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
+You can create a schema by sending a `GET` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of loading a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET \-H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```
 
 </TabItem>
@@ -531,8 +584,8 @@ Schema schema = supportsSchemas.loadSchema("schema");
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = client.load_catalog(name="hive_catalog")
 schema: Schema = catalog.as_schemas().load_schema(name="schema")
 ```
 
@@ -541,25 +594,29 @@ schema: Schema = catalog.as_schemas().load_schema(name="schema")
 
 ### Alter a schema
 
-You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
+You can change a schema by sending a `PUT` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of modifying a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "updates": [
-    {
-      "@type": "removeProperty",
-      "property": "key2"
-    }, {
-      "@type": "setProperty",
-      "property": "key3",
-      "value": "value3"
-    }
-  ]
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{ \
+    "updates": [{ \
+        "@type": "removeProperty", \
+        "property": "key2" \
+      }, { \
+        "@type": "setProperty", \
+        "property": "key3", \
+        "value": "value3" \
+      }] \
+  }' \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema
 ```
 
 </TabItem>
@@ -582,15 +639,14 @@ Schema schema = supportsSchemas.alterSchema("schema",
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
+client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = client.load_catalog(name="hive_catalog")
 
 changes = (
     SchemaChange.remove_property("schema_properties_key1"),
     SchemaChange.set_property("schema_properties_key2", "schema_properties_new_value"),
 )
-schema_new: Schema = catalog.as_schemas().alter_schema("schema", 
-                                                       *changes)
+schema_new: Schema = catalog.as_schemas().alter_schema("schema", *changes)
 ```
 
 </TabItem>
@@ -604,16 +660,21 @@ Currently, Gravitino supports the following changes to a schema:
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
 
 ### Drop a schema
-You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
+
+You can remove a schema by sending a `DELETE` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of dropping a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
 // cascade can be true or false
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema?cascade=true
+curl -X DELETE \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema?cascade=true
 ```
 
 </TabItem>
@@ -633,30 +694,34 @@ supportsSchemas.dropSchema("schema", true);
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
-
+client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = client.load_catalog(name="hive_catalog")
 catalog.as_schemas().drop_schema("schema", cascade=True)
 ```
 
 </TabItem>
 </Tabs>
 
-If `cascade` is true, Gravitino will drop all tables under the schema. Otherwise, Gravitino will throw an exception if there are tables under the schema. 
-Some catalogs may not support cascading deletion of a schema, please refer to the related doc for more details.
+If `cascade` is true, Gravitino will drop all tables under the schema.
+Otherwise, Gravitino will throw an exception if there are tables under the schema. 
+Some catalogs may not support cascading deletion of a schema,
+please refer to the related doc for more details.
 
 ### List all schemas under a catalog
 
-You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of listing all the schemas
-    in a catalog:
-
+You can list all schemas under a catalog by sending a `GET` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint
+or just use the Gravitino Java client.
+The following is an example of listing all the schemas in a catalog:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
 ```
 
 </TabItem>
@@ -675,9 +740,8 @@ String[] schemas = supportsSchemas.listSchemas();
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="hive_catalog")
-
+client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = client.load_catalog(name="hive_catalog")
 schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 ```
 
@@ -687,19 +751,23 @@ schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 ## Table operations
 
 :::tip
-Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before before operating tables.
+Users should create a metalake, a catalog and a schema,
+then ensure that the metalake and catalog are enabled before before operating tables.
 :::
 
 ### Create a table
 
-You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
+You can create a table by sending a `POST` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint
+or just use the Gravitino Java client.
+The following is an example of creating a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
+cat << EOF > table1.json
+{
   "name": "example_table",
   "comment": "This is an example table",
   "columns": [
@@ -819,7 +887,14 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "format": "ORC"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
+}
+EOF
+
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@table1.json` \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
 
 </TabItem>
@@ -864,7 +939,8 @@ tableCatalog.createTable(
 </Tabs>
 
 :::caution
-The provided example demonstrates table creation but isn't directly executable in Gravitino, since not all catalogs fully support these capabilities.
+The provided example demonstrates table creation but isn't directly executable in Gravitino,
+since not all catalogs fully support these capabilities.
 :::
 
 In order to create a table, you need to provide the following information:
@@ -913,11 +989,13 @@ The related java doc is [here](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/ja
 
 ##### External type
 
-External type is a special type of column type, when you need to use a data type that is not in the Gravitino type
-system, and you explicitly know its string representation in an external catalog (usually used in JDBC catalogs), then
-you can use the ExternalType to represent the type. Similarly, if the original type is unsolvable, it will be
-represented by ExternalType.
-The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
+External type is a special type of column type, when you need to use a data type
+that is not in the Gravitino type system, and you explicitly know its string representation
+in an external catalog (usually used in JDBC catalogs),
+then you can use the ExternalType to represent the type.
+Similarly, if the original type is unsolvable, it will be represented by ExternalType.
+The following shows the data structure of an external type in JSON and Java,
+enabling easy retrieval of its string value.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
@@ -942,10 +1020,12 @@ String typeString = ((ExternalType) type).catalogString();
 
 ##### Unparsed type
 
-Unparsed type is a special type of column type, it used to address compatibility issues in type serialization and
-deserialization between the server and client. For instance, if a new column type is introduced on the Gravitino server
+Unparsed type is a special type of column type, it used to address compatibility issues
+in type serialization and deserialization between the server and client.
+For instance, if a new column type is introduced on the Gravitino server
 that the client does not recognize, it will be treated as an unparsed type on the client side.
-The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
+The following shows the data structure of an unparsed type in JSON and Java,
+enabling easy retrieval of its value.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
@@ -970,7 +1050,9 @@ String unparsedValue = ((UnparsedType) type).unparsedType();
 
 #### Table column default value
 
-When defining a table column, you can specify a [literal](./expression.md#literal) or an [expression](./expression.md) as the default value. The default value typically applies to new rows that are inserted into the table by the underlying catalog.
+When defining a table column, you can specify a [literal](./expression.md#literal)
+or an [expression](./expression.md) as the default value.
+The default value typically applies to new rows that are inserted into the table by the underlying catalog.
 
 The following is a table of the column default value that Gravitino supports for different catalogs:
 
@@ -987,34 +1069,35 @@ The following is a table of the column default value that Gravitino supports for
 
 #### Table column auto-increment
 
-Auto-increment provides a convenient way to ensure that each row in a table has a unique identifier without the need for manually managing identifier allocation.
+Auto-increment provides a convenient way to ensure that
+each row in a table has a unique identifier without the need for manually managing identifier allocation.
 The following table shows the column auto-increment that Gravitino supports for different catalogs:
 
-| Catalog provider    | Supported auto-increment                                                         |
-|---------------------|----------------------------------------------------------------------------------|
-| `hive`              | &#10008;                                                                         |
-| `lakehouse-iceberg` | &#10008;                                                                         |
-| `lakehouse-paimon`  | &#10008;                                                                         |
-| `lakehouse-hudi`    | &#10008;                                                                         |
-| `jdbc-mysql`        | &#10004;([limitations](./jdbc-mysql-catalog.md#table-column-auto-increment))     |
-| `jdbc-postgresql`   | &#10004;                                                                         |
-| `jdbc-doris`        | &#10008;                                                                         |
-| `jdbc-oceanbase`    | &#10004;([limitations](./jdbc-oceanbase-catalog.md#table-column-auto-increment)) |
+| Catalog provider    | Supported auto-increment                                                                     |
+|---------------------|----------------------------------------------------------------------------------------------|
+| `hive`              | &#10008;                                                                                     |
+| `lakehouse-iceberg` | &#10008;                                                                                     |
+| `lakehouse-paimon`  | &#10008;                                                                                     |
+| `lakehouse-hudi`    | &#10008;                                                                                     |
+| `jdbc-mysql`        | &#10004;([limitations](./catalogs/relational/jdbc/mysql.md#table-column-auto-increment))     |
+| `jdbc-postgresql`   | &#10004;                                                                                     |
+| `jdbc-doris`        | &#10008;                                                                                     |
+| `jdbc-oceanbase`    | &#10004;([limitations](./catalogs/relational/jdbc/oceanbase.md#table-column-auto-increment)) |
 
 #### Table property and type mapping
 
 The following is the table property that Gravitino supports:
 
-| Catalog provider    | Table property                                                              | Type mapping                                                               |
-|---------------------|-----------------------------------------------------------------------------|----------------------------------------------------------------------------|
-| `hive`              | [Hive table property](./apache-hive-catalog.md#table-properties)            | [Hive type mapping](./apache-hive-catalog.md#table-column-types)           |
-| `lakehouse-iceberg` | [Iceberg table property](./lakehouse-iceberg-catalog.md#table-properties)   | [Iceberg type mapping](./lakehouse-iceberg-catalog.md#table-column-types)  |
-| `lakehouse-paimon`  | [Paimon table property](./lakehouse-paimon-catalog.md#table-properties)     | [Paimon type mapping](./lakehouse-paimon-catalog.md#table-column-types)    |
-| `lakehouse-hudi`    | [Hudi table property](./lakehouse-hudi-catalog.md#table-properties)         | [Hudi type mapping](./lakehouse-hudi-catalog.md#table-column-types)        |
-| `jdbc-mysql`        | [MySQL table property](./jdbc-mysql-catalog.md#table-properties)            | [MySQL type mapping](./jdbc-mysql-catalog.md#table-column-types)           |
-| `jdbc-postgresql`   | [PostgreSQL table property](./jdbc-postgresql-catalog.md#table-properties)  | [PostgreSQL type mapping](./jdbc-postgresql-catalog.md#table-column-types) |
-| `jdbc-doris`        | [Doris table property](./jdbc-doris-catalog.md#table-properties)            | [Doris type mapping](./jdbc-doris-catalog.md#table-column-types)           |
-| `jdbc-oceanbase`    | [OceanBase table property](./jdbc-oceanbase-catalog.md#table-properties)    | [OceanBase type mapping](./jdbc-oceanbase-catalog.md#table-column-types)   |
+| Catalog provider    | Table property                                                           | Type mapping                                                              |
+|---------------------|--------------------------------------------------------------------------|---------------------------------------------------------------------------|
+| `hive`              | [Hive](./catalogs/relational/hive/index.md#table-properties)             | [Hive](./catalogs/relational/hive/index.md#table-column-types)            |
+| `lakehouse-iceberg` | [Iceberg](./catalogs/relational/lakehouse/iceberg.md#table-properties)   | [Iceberg](./catalogs/relational/lakehouse/iceberg.md#table-column-types)  |
+| `lakehouse-hudi`    | [Hudi](./catalogs/relational/lakehouse/hudi.md#table-properties)         | [Hudi](./catalogs/relational/lakehouse/hudi.md#table-column-types)        |
+| `lakehouse-paimon`  | [Paimon](./catalogs/relational/lakehouse/paimon.md#table-properties)     | [Paimon](./catalogs/relational/lakehouse/paimon.md#table-column-types)    |
+| `jdbc-mysql`        | [MySQL](./catalogs/relational/jdbc/mysql.md#table-properties)            | [MySQL](./catalogs/relational/jdbc/mysql.md#table-column-types)           |
+| `jdbc-postgresql`   | [PostgreSQL](./catalogs/relational/jdbc/postgresql.md#table-properties)  | [PostgreSQL](./catalogs/relational/jdbc/postgresql.md#table-column-types) |
+| `jdbc-doris`        | [Doris](./catalogs/relational/jdbc/doris.md#table-properties)            | [Doris](./catalogs/relational/jdbc/doris.md#table-column-types)           |
+| `jdbc-oceanbase`    | [OceanBase](./catalogs/relational/jdbc/oceanbase.md#table-properties)    | [OceanBase](./catalogs/relational/jdbc/oceanbase.md#table-column-types)   |
 
 #### Table partitioning, distribution, sort ordering and indexes
 
@@ -1027,23 +1110,31 @@ In addition to the basic settings, Gravitino supports the following features:
 | Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
 | Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
 
-For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
+For more information, please see the related document on
+[partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 
 :::note
-The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, please refer to the related doc.
+The code above is an example of creating a Hive table.
+For other catalogs, the code is similar, but the supported column type,
+and table properties may be different.
+For more details, please refer to the related doc.
 :::
 
 ### Load a table
 
-You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
+You can load a table by sending a `GET` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of loading a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json"  \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json"  \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
 
 </TabItem>
@@ -1063,31 +1154,37 @@ tableCatalog.loadTable(NameIdentifier.of("schema", "table"));
 </Tabs>
 
 :::note
-- When Gravitino loads a table from a catalog with various data types, if Gravitino is unable to parse the data type, it will use an **[External Type](#external-type)** to preserve the original data type, ensuring that the table can be loaded successfully.
-- When Gravitino loads a table from a catalog that supports default value, if Gravitino is unable to parse the default value, it will use an **[Unparsed Expression](./expression.md#unparsed-expression)** to preserve the original default value, ensuring that the table can be loaded successfully.
+- When Gravitino loads a table from a catalog with various data types,
+  if Gravitino is unable to parse the data type,
+  it will use an **[External Type](#external-type)** to preserve the original data type,
+  ensuring that the table can be loaded successfully.
+
+- When Gravitino loads a table from a catalog that supports default value,
+  if Gravitino is unable to parse the default value,
+  it will use an **[Unparsed Expression](./expression.md#unparsed-expression)**
+  to preserve the original default value,
+  ensuring that the table can be loaded successfully.
 :::
 
 ### Alter a table
 
-You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
+You can modify a table by sending a `PUT` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint
+or just use the Gravitino Java client.
+The following is an example of modifying a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "updates": [
-    {
-      "@type": "removeProperty",
-      "property": "key2"
-    }, {
-      "@type": "setProperty",
-      "property": "key3",
-      "value": "value3"
-    }
-  ]  
-}' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{ \
+  "updates": [{"@type": "removeProperty", "property": "key2"}, { \
+      "@type": "setProperty", "property": "key3", "value": "value3" }] \
+  }' \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table
 ```
 
 </TabItem>
@@ -1127,7 +1224,9 @@ Currently, Gravitino supports the following changes to a table:
 
 ### Drop a table
 
-You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
+You can remove a table by sending a `DELETE` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint
+or just use the Gravitino Java client. The following is an example of dropping a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1135,9 +1234,10 @@ You can remove a table by sending a `DELETE` request to the `/api/metalakes/{met
 ```shell
 ## Purge can be true or false, if purge is true, Gravitino will remove the data from the table.
 
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table?purge=true
+curl -X DELETE \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables/table?purge=true
 ```
 
 </TabItem>
@@ -1163,22 +1263,31 @@ tableCatalog.purgeTable(NameIdentifier.of("schema", "table"));
 
 There are two ways to remove a table: `dropTable` and `purgeTable`: 
 
-* `dropTable`  removes both the metadata and the directory associated with the table from the file system if the table is not an external table. In case of an external table, only the associated metadata is removed.
-* `purgeTable` completely removes both the metadata and the directory associated with the table and skipping trash, if the table is an external table or the catalogs don't support purge table, `UnsupportedOperationException` is thrown.
+* `dropTable`  removes both the metadata and the directory associated with the table
+  from the file system if the table is not an external table.
+  In the case of an external table, only the associated metadata is removed.
+* `purgeTable` completely removes both the metadata and the directory associated with the table
+  and skipping trash, if the table is an external table or the catalogs don't support purge table,
+  `UnsupportedOperationException` is thrown.
 
-Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysql, jdbc-postgresql and lakehouse-paimon catalog doesn't support.
+Hive catalog and lakehouse-iceberg catalog supports `purgeTable`,
+while jdbc-mysql, jdbc-postgresql and lakehouse-paimon catalog doesn't support.
 
 ### List all tables under a schema
 
-You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of listing all the tables in a schema:
+You can list all tables in a schema by sending a `GET` request
+to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint
+or just use the Gravitino Java client.
+The following is an example of listing all the tables in a schema:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" \
-http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables
 ```
 
 </TabItem>
@@ -1197,3 +1306,4 @@ NameIdentifier[] identifiers =
 
 </TabItem>
 </Tabs>
+

@@ -68,7 +68,7 @@ curl -X POST -H "Content-Type: application/json" \
   }
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
-For more information about the PostgreSQL catalog, please refer to [PostgreSQL catalog](../jdbc-postgresql-catalog.md).
+For more information about the PostgreSQL catalog, please refer to [PostgreSQL catalog](../../catalogs/relational/jdbc/postgresql.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 

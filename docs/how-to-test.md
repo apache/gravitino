@@ -12,7 +12,7 @@ Apache Gravitino has two types of tests:
 ## Prerequisites
 
 * Refer to [How to build Gravitino](./how-to-build.md) to make sure you have a build environment ready.
-* Install a docker environment by following the [install docker](./how-tobuild.md#install-docker) instructions.
+* Install a docker environment by following the [install docker](./how-to-build.md#install-docker) instructions.
 
 ## Unit tests
 

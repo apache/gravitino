@@ -13,8 +13,8 @@ This document explains how to configure a Hadoop catalog with Aliyun OSS (Object
 To set up a Hadoop catalog with OSS, follow these steps:
 
 1. Download the [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) file.
-2. Place the downloaded file into the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
-3. Start the Gravitino server by running the following command:
+1. Place the downloaded file into the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+1. Start the Gravitino server by running the following command:
 
 ```bash
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
@@ -26,7 +26,8 @@ Once the server is up and running, you can proceed to configure the Hadoop catal
 
 ### Configuration for an OSS Hadoop catalog
 
-In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
+In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties),
+the following properties are required to configure a Hadoop catalog with OSS:
 
 | Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Default value   | Required | Since version    |
 |--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
@@ -35,7 +36,7 @@ In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-con
 | `oss-endpoint`                 | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | (none)          | Yes      | 0.7.0-incubating |
 | `oss-access-key-id`            | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
 | `oss-secret-access-key`        | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`         | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, please see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       | 0.8.0-incubating |
+| `credential-providers`         | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, please see [oss-credential-vending](../../../security/credential-vending.md#oss-credentials) | (none)          | No       | 0.8.0-incubating |
 
 
 ### Configurations for a schema
@@ -240,7 +241,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 ### Using the GVFS Java client to access the fileset
 
-To access fileset with OSS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+To access fileset with OSS using the GVFS Java client,
+based on the [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1),
+you need to add the following configurations:
 
 | Configuration item      | Description                       | Default value | Required | Since version    |
 |-------------------------|-----------------------------------|---------------|----------|------------------|
@@ -249,7 +252,8 @@ To access fileset with OSS using the GVFS Java client, based on the [basic GVFS 
 | `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
 
 :::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
+If the catalog has enabled [credential vending](../../../security/credential-vending.md), the properties above can be omitted.
+More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
 :::
 
 ```java
@@ -368,14 +372,18 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aliyun-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) is the Gravitino Aliyun jar with Hadoop environment(3.3.1) and `hadoop-oss` jar.
-- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun) is a condensed version of the Gravitino Aliyun bundle jar without Hadoop environment and `hadoop-aliyun` jar.
--`hadoop-aliyun-3.2.0.jar` and `aliyun-sdk-oss-2.8.3.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
+- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle)
+  is the Gravitino Aliyun jar with Hadoop environment(3.3.1) and `hadoop-oss` jar.
+- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun)
+  is a condensed version of the Gravitino Aliyun bundle jar without Hadoop environment and `hadoop-aliyun` jar.
+- `hadoop-aliyun-3.2.0.jar` and `aliyun-sdk-oss-2.8.3.jar` can be found in the Hadoop distribution
+  in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
 
 Please choose the correct jar according to your environment.
 
 :::note
-In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
+In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work.
+If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
 ### Accessing a fileset using the Hadoop fs command
@@ -434,7 +442,9 @@ For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 
 ### Using the GVFS Python client to access a fileset
 
-In order to access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+In order to access fileset with OSS using the GVFS Python client,
+apart from [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1),
+you need to add the following configurations:
 
 | Configuration item      | Description                       | Default value | Required | Since version    |
 |-------------------------|-----------------------------------|---------------|----------|------------------|
@@ -443,7 +453,7 @@ In order to access fileset with OSS using the GVFS Python client, apart from [ba
 | `oss_secret_access_key` | The secret key of the Aliyun OSS. | (none)        | Yes      | 0.7.0-incubating |
 
 :::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
+If the catalog has enabled [credential vending](../../../security/credential-vending.md), the properties above can be omitted.
 :::
 
 Please install the `gravitino` package before running the following code:
@@ -488,15 +498,21 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
                  storage_options=storage_options)
 ds.head()
 ```
-For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For other use cases, please refer to the [Gravitino Virtual File System](../../../how-to-use-gvfs.md) document.
 
 ## Fileset with credential vending
 
-Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
+Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset.
+If the catalog has been [configured with credential](../../../security/credential-vending.md),
+you can access OSS fileset without providing authentication information like `oss-access-key-id`
+and `oss-secret-access-key` in the properties.
 
 ### How to create an OSS Hadoop catalog with credential vending
 
-Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
+Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog),
+properties needed by [oss-credential](../../../security/credential-vending.md#oss-credentials)
+should also be set to enable credential vending for OSS fileset.
+Take `oss-token` credential provider for example:
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \

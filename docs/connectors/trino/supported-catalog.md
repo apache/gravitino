@@ -7,10 +7,10 @@ license: "This software is licensed under the Apache License version 2."
 
 The catalogs currently supported by the Apache Gravitino Trino connector are as follows:
 
-- [Hive](catalog-hive.md)
-- [Iceberg](catalog-iceberg.md)
-- [MySQL](catalog-mysql.md)
-- [PostgreSQL](catalog-postgresql.md)
+- [Hive](./catalog-hive.md)
+- [Iceberg](./catalog-iceberg.md)
+- [MySQL](./catalog-mysql.md)
+- [PostgreSQL](./catalog-postgresql.md)
 
 ## Create catalog
 
@@ -30,11 +30,11 @@ create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHA
 - IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
 
 The type of catalog properties reference:
-- [Hive catalog](../apache-hive-catalog.md#catalog-properties)
-- [Iceberg catalog](../lakehouse-iceberg-catalog.md#catalog-properties)
-- [MySQL catalog](../jdbc-mysql-catalog.md#catalog-properties)
-- [PostgreSQL catalog](../jdbc-postgresql-catalog.md#catalog-properties)
 
+- [Hive catalog](../../catalogs/relational/hive/index.md#catalog-properties)
+- [Iceberg catalog](../../catalogs/relational/lakehouse/iceberg.md#catalog-properties)
+- [MySQL catalog](../../catalogs/relational/jdbc/mysql.md#catalog-properties)
+- [PostgreSQL catalog](../../catalogs/relational/jdbc/postgresql.md#catalog-properties)
 
 Drop catalog:
 
@@ -42,9 +42,9 @@ Drop catalog:
 drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
 ```
 
-- CATALOG: The catalog name to be deleted.
-- IGNORE_NOT_EXIST: The flag to ignore the error if the catalog does not exist. It's optional, the default value is `false`.
-
+- `CATALOG`: The catalog name to be deleted.
+- `IGNORE_NOT_EXIST`: The flag to ignore the error if the catalog does not exist.
+  It's optional, the default value is `false`.
 
 Alter catalog:
 
@@ -52,13 +52,12 @@ Alter catalog:
 alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROPERTIES ARRY[VARCHAR]);
 ```
 
-- CATALOG: The catalog name to be altered.
-- SET_PROPERTIES: The properties to be set.
-- REMOVE_PROPERTIES: The properties to be removed.
+- `CATALOG`: The catalog name to be altered.
+- `SET_PROPERTIES`: The properties to be set.
+- `REMOVE_PROPERTIES`: The properties to be removed.
 
 These stored procedures are under the `gravitino` connector and the `system` schema.
 So you need to use the following SQL to call them in the `trino-cli`:
-
 
 Describe catalogs:
 
@@ -76,7 +75,6 @@ The result is like:
  gt_hive      | hive     | {gravitino.bypass.hive.metastore.client.capability.check=false, metastore.uris=thrift://trino-ci-hive:9083}
 ```
 
-Example:
 You can run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
 
 ```sql
@@ -118,27 +116,32 @@ call gravitino.system.alter_catalog(
 ```
 
 if you need more information about catalog, please refer to:
-[Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
+[Create a Catalog](../../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
 ## Passing Trino connector configuration
-A Gravitino catalog is implemented by the Trino connector, so you can pass the Trino connector configuration to the Gravitino catalog.
-For example, you want to set the `hive.config.resources` configuration for the Hive catalog, you can pass the configuration to the
-Gravitino catalog like this:
+
+A Gravitino catalog is implemented by the Trino connector,
+so you can pass the Trino connector configuration to the Gravitino catalog.
+For example, you want to set the `hive.config.resources` configuration for the Hive catalog,
+you can pass the configuration to the Gravitino catalog like this:
 
 ```sql
 call gravitino.system.create_catalog(
-    'gt_hive',
-    'hive',
-    map(
-        array['metastore.uris', 'trino.bypass.hive.config.resources'],
-        array['thrift://trino-ci-hive:9083', '/tmp/hive-site.xml,/tmp/core-site.xml']
-    )
+  'gt_hive',
+  'hive',
+  map(
+    array['metastore.uris', 'trino.bypass.hive.config.resources'],
+    array['thrift://trino-ci-hive:9083', '/tmp/hive-site.xml,/tmp/core-site.xml']
+  )
 );
 ```
 
-A prefix with `trino.bypass.` in the configuration key is used to indicate Gravitino Trino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
+A prefix with `trino.bypass.` in the configuration key is used to indicate that
+Gravitino Trino connector to pass the Trino connector configuration
+to the Gravitino catalog in the Trino runtime.
 
 More Trino connector configurations can refer to:
+
 - [Hive catalog](https://trino.io/docs/current/connector/hive.html#hive-general-configuration-properties)
 - [Iceberg catalog](https://trino.io/docs/current/connector/iceberg.html#general-configuration)
 - [MySQL catalog](https://trino.io/docs/current/connector/mysql.html#general-configuration-properties)
@@ -146,29 +149,33 @@ More Trino connector configurations can refer to:
 
 ## Data type mapping between Trino and Apache Gravitino
 
-Gravitino Trino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
-Hive does not support `TIME` data type.
+Gravitino Trino connector supports the following data type conversions between Trino and Gravitino currently.
+Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog.
+For example, Hive does not support `TIME` data type.
 
 | Gravitino Type        | Trino Type               |
 |-----------------------|--------------------------|
+| Binary                | VARBINARY                |
 | Boolean               | BOOLEAN                  |
 | Byte                  | TINYINT                  |
-| Short                 | SMALLINT                 |
-| Integer               | INTEGER                  |
-| Long                  | BIGINT                   |
-| Float                 | REAL                     |
-| Double                | DOUBLE                   |
-| Decimal               | DECIMAL                  |
-| String                | VARCHAR                  |
-| Varchar               | VARCHAR                  |
-| FixedChar             | CHAR                     |
-| Binary                | VARBINARY                |
 | Date                  | DATE                     |
+| Decimal               | DECIMAL                  |
+| Double                | DOUBLE                   |
+| FixedChar             | CHAR                     |
+| Float                 | REAL                     |
+| Integer               | INTEGER                  |
+| List                  | ARRAY                    |
+| Long                  | BIGINT                   |
+| Map                   | MAP                      |
+| Short                 | SMALLINT                 |
+| String                | VARCHAR                  |
+| Struct                | ROW                      |
 | Time                  | TIME                     |
 | Timestamp             | TIMESTAMP                |
 | TimestampWithTimezone | TIMESTAMP WITH TIME ZONE |
-| List                  | ARRAY                    |
-| Map                   | MAP                      |
-| Struct                | ROW                      |
+| Varchar               | VARCHAR                  |
 
-For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html) and Gravitino data types, please refer to [Gravitino data types](../manage-relational-metadata-using-gravitino.md#gravitino-table-column-type).
+For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html).
+For information about Gravitino data types, please refer to
+[Gravitino data types](../../manage-relational-metadata-using-gravitino.md#gravitino-table-column-type).
+

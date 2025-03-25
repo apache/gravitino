@@ -41,7 +41,8 @@ Tested and verified with Apache Hudi `0.15.0`.
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+For more details, please refer to
+[manage relational metadata](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
 
 ## Schema 
 
@@ -56,7 +57,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 ### Schema operations
 
 Only support read operations: listSchema, loadSchema, and schemaExists.
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+For more details, please refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
 
 ## Table 
 
@@ -86,7 +87,8 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Table column types
 
-The following table shows the mapping between Gravitino and [Apache Hudi column types](https://hudi.apache.org/docs/sql_ddl#supported-types):
+The following table shows the mapping between Gravitino
+and [Apache Hudi column types](https://hudi.apache.org/docs/sql_ddl#supported-types):
 
 | Gravitino Type | Apache Hudi Type |
 |----------------|------------------|
@@ -107,4 +109,5 @@ The following table shows the mapping between Gravitino and [Apache Hudi column 
 ### Table operations
 
 Only support read operations: listTable, loadTable, and tableExists.
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+For more details, please refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#table-operations)
+
