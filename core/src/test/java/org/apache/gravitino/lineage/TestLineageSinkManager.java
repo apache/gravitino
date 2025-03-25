@@ -21,8 +21,14 @@ package org.apache.gravitino.lineage;
 
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.SneakyThrows;
+import org.apache.gravitino.listener.AsyncQueueListener;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.EventListenerPluginWrapper;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -34,7 +40,41 @@ public class TestLineageSinkManager {
     LineageSinkManager lineageSinkManager = new LineageSinkManager();
     lineageSinkManager.initialize(getLineageSinkConfig());
     lineageSinkManager.sink(getRunEvent());
-    Thread.sleep(3000);
+    EventBus eventBus = lineageSinkManager.eventBus();
+    List<EventListenerPlugin> listeners = eventBus.getEventListeners();
+    Assertions.assertEquals(2, listeners.size());
+
+    listeners.stream()
+        .forEach(
+            listener -> {
+              Assertions.assertTrue(listener instanceof AsyncQueueListener);
+              AsyncQueueListener asyncQueueListener = (AsyncQueueListener) listener;
+              List<EventListenerPlugin> internalListeners = asyncQueueListener.getEventListeners();
+              Assertions.assertEquals(1, internalListeners.size());
+              Assertions.assertTrue(internalListeners.get(0) instanceof EventListenerPluginWrapper);
+              EventListenerPlugin userListener =
+                  ((EventListenerPluginWrapper) internalListeners.get(0)).getUserEventListener();
+              Assertions.assertTrue(userListener instanceof LineageSinkEventListener);
+              LineageSink sink = ((LineageSinkEventListener) userListener).getSink();
+              Assertions.assertTrue(sink instanceof LineageSinkForTest);
+              checkLineSink((LineageSinkForTest) sink);
+            });
+  }
+
+  private void checkLineSink(LineageSinkForTest sink) {
+    Map<String, String> configs = sink.getConfigs();
+    Assertions.assertTrue(configs.containsKey("name"));
+
+    String name = configs.get("name");
+    Assertions.assertTrue("sink1".equals(name) || "sink2".equals(name));
+    if ("sink1".equals(name)) {
+      Assertions.assertEquals("a", configs.get("a"));
+    } else if ("sink2".equals(name)) {
+      Assertions.assertEquals("b", configs.get("a"));
+    }
+
+    List<RunEvent> events = sink.tryGetEvents();
+    Assertions.assertEquals(1, events.size());
   }
 
   private RunEvent getRunEvent() {
@@ -48,9 +88,11 @@ public class TestLineageSinkManager {
     lineageSinkConfigs.put(
         "sink1." + LineageConfig.LINEAGE_SINK_CLASS_NAME, LineageSinkForTest.class.getName());
     lineageSinkConfigs.put("sink1.a", "a");
+    lineageSinkConfigs.put("sink1.name", "sink1");
     lineageSinkConfigs.put(
         "sink2." + LineageConfig.LINEAGE_SINK_CLASS_NAME, LineageSinkForTest.class.getName());
     lineageSinkConfigs.put("sink2.a", "b");
+    lineageSinkConfigs.put("sink2.name", "sink2");
     return lineageSinkConfigs;
   }
 }

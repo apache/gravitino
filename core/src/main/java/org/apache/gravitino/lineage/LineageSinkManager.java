@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.lineage;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import io.openlineage.server.OpenLineage.RunEvent;
@@ -86,5 +87,10 @@ public class LineageSinkManager {
 
   public void stop() {
     eventListenerManager.stop();
+  }
+
+  @VisibleForTesting
+  EventBus eventBus() {
+    return eventBus;
   }
 }

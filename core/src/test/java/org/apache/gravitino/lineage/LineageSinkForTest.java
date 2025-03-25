@@ -23,7 +23,9 @@ import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import lombok.Getter;
+import org.awaitility.Awaitility;
 
 @Getter
 public class LineageSinkForTest implements LineageSink {
@@ -38,5 +40,17 @@ public class LineageSinkForTest implements LineageSink {
   @Override
   public void sink(RunEvent event) {
     this.runEvents.add(event);
+  }
+
+  public List<RunEvent> tryGetEvents() {
+    Awaitility.await()
+        .atMost(20, TimeUnit.SECONDS)
+        .pollInterval(10, TimeUnit.MILLISECONDS)
+        .until(() -> getEvents().size() > 0);
+    return getEvents();
+  }
+
+  public List<RunEvent> getEvents() {
+    return runEvents;
   }
 }

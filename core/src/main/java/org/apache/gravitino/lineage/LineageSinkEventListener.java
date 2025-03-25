@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.lineage;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.Map;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
@@ -54,6 +55,11 @@ public class LineageSinkEventListener implements EventListenerPlugin {
   public void onPostEvent(Event postEvent) throws RuntimeException {
     EventWrapper<RunEvent> wrapper = (EventWrapper<RunEvent>) postEvent;
     sink.sink(wrapper.getObject());
+  }
+
+  @VisibleForTesting
+  LineageSink getSink() {
+    return sink;
   }
 
   private LineageSink loadLineageSinkClass(String className) {
