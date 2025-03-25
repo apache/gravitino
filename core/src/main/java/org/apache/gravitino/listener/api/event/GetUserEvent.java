@@ -36,7 +36,7 @@ public class GetUserEvent extends UserEvent {
    * @param identifier the identifier of the metalake which the user is retrieved from.
    * @param userInfo the user information.
    */
-  public GetUserEvent(String initiator, NameIdentifier identifier, UserInfo userInfo) {
+  protected GetUserEvent(String initiator, NameIdentifier identifier, UserInfo userInfo) {
     super(initiator, identifier);
 
     this.userInfo = userInfo;

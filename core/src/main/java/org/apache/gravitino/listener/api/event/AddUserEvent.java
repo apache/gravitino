@@ -36,7 +36,7 @@ public class AddUserEvent extends UserEvent {
    * @param identifier the identifier of the metalake which the user is added to.
    * @param userInfo the user information.
    */
-  public AddUserEvent(String initiator, NameIdentifier identifier, UserInfo userInfo) {
+  protected AddUserEvent(String initiator, NameIdentifier identifier, UserInfo userInfo) {
     super(initiator, identifier);
 
     this.userInfo = userInfo;
