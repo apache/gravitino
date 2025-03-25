@@ -131,7 +131,7 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 | `credential-providers`                | The credential provider types, separated by comma.                                                     | (none)                   | No       | 0.8.0-incubating |
 | `placeholder-`                        | Properties that start with `placeholder-` are used to replace placeholders in the location.            | (none)                   | No       | 0.9.0-incubating |
 
-Here are some properties are reserved and cannot be set by users:
+Some properties are reserved and cannot be set by users:
 
 | Property name         | Description                           | Default value               | Since Version    |
 |-----------------------|---------------------------------------|-----------------------------|------------------|
