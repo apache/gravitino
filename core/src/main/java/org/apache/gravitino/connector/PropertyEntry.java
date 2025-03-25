@@ -40,6 +40,7 @@ public final class PropertyEntry<T> {
   private final Function<T, String> encoder;
   private final boolean hidden;
   private final boolean reserved;
+  private final boolean prefix;
 
   /**
    * @param name The name of the property
@@ -66,6 +67,46 @@ public final class PropertyEntry<T> {
       Function<T, String> encoder,
       boolean hidden,
       boolean reserved) {
+    this(
+        name,
+        description,
+        required,
+        immutable,
+        javaType,
+        defaultValue,
+        decoder,
+        encoder,
+        hidden,
+        reserved,
+        false);
+  }
+
+  /**
+   * @param name The name of the property
+   * @param description Describe the purpose of this property
+   * @param required Whether this property is required. If true, the property must be set when
+   *     creating a table
+   * @param immutable Whether this property is immutable. If true, the property cannot be changed by
+   *     user after the table is created
+   * @param javaType The java type of the property
+   * @param defaultValue Non-required property can have a default value
+   * @param decoder Decode the string value to the java type
+   * @param encoder Encode the java type to the string value
+   * @param hidden Whether this property is hidden from user, such as password
+   * @param reserved This property is reserved and cannot be set by user
+   */
+  private PropertyEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      Class<T> javaType,
+      T defaultValue,
+      Function<String, T> decoder,
+      Function<T, String> encoder,
+      boolean hidden,
+      boolean reserved,
+      boolean prefix) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(description), "description cannot be null or empty");
@@ -88,6 +129,7 @@ public final class PropertyEntry<T> {
     this.encoder = encoder;
     this.hidden = hidden;
     this.reserved = reserved;
+    this.prefix = prefix;
   }
 
   public static class Builder<T> {
@@ -102,6 +144,7 @@ public final class PropertyEntry<T> {
     private Function<T, String> encoder;
     private boolean hidden;
     private boolean reserved;
+    private boolean prefix;
 
     public Builder<T> withName(String name) {
       this.name = name;
@@ -153,8 +196,13 @@ public final class PropertyEntry<T> {
       return this;
     }
 
+    public Builder<T> withPrefix(boolean prefix) {
+      this.prefix = prefix;
+      return this;
+    }
+
     public PropertyEntry<T> build() {
-      return new PropertyEntry<T>(
+      return new PropertyEntry<>(
           name,
           description,
           required,
@@ -164,12 +212,36 @@ public final class PropertyEntry<T> {
           decoder,
           encoder,
           hidden,
-          reserved);
+          reserved,
+          prefix);
     }
   }
 
   public T decode(String value) {
     return decoder.apply(value);
+  }
+
+  public static PropertyEntry<String> stringPropertyPrefixEntry(
+      String name,
+      String description,
+      boolean required,
+      boolean immutable,
+      String defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return new Builder<String>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(required)
+        .withImmutable(immutable)
+        .withJavaType(String.class)
+        .withDefaultValue(defaultValue)
+        .withDecoder(Function.identity())
+        .withEncoder(Function.identity())
+        .withHidden(hidden)
+        .withReserved(reserved)
+        .withPrefix(true)
+        .build();
   }
 
   public static PropertyEntry<String> stringPropertyEntry(
@@ -352,6 +424,39 @@ public final class PropertyEntry<T> {
       boolean hidden,
       boolean reserved) {
     return stringPropertyEntry(name, description, required, true, defaultValue, hidden, reserved);
+  }
+
+  public static PropertyEntry<String> stringImmutablePropertyPrefixEntry(
+      String name,
+      String description,
+      boolean required,
+      String defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return stringPropertyPrefixEntry(
+        name, description, required, true /* immutable */, defaultValue, hidden, reserved);
+  }
+
+  public static PropertyEntry<String> stringRequiredPropertyPrefixEntry(
+      String name,
+      String description,
+      boolean immutable,
+      String defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return stringPropertyPrefixEntry(
+        name, description, true /* required */, immutable, defaultValue, hidden, reserved);
+  }
+
+  public static PropertyEntry<String> stringOptionalPropertyPrefixEntry(
+      String name,
+      String description,
+      boolean immutable,
+      String defaultValue,
+      boolean hidden,
+      boolean reserved) {
+    return stringPropertyPrefixEntry(
+        name, description, false /* required */, immutable, defaultValue, hidden, reserved);
   }
 
   public static <T extends Enum<T>> PropertyEntry<T> enumPropertyEntry(
