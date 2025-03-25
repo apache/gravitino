@@ -24,7 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represent a pre-event for a group operation request. */
 @DeveloperApi
-public class GroupPreEvent extends PreEvent {
+public abstract class GroupPreEvent extends PreEvent {
   /**
    * Construct a new {@link GroupPreEvent} instance for a group operation request.
    *
