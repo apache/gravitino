@@ -21,11 +21,9 @@ package org.apache.gravitino.authorization;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -40,10 +38,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
-import org.apache.gravitino.catalog.hadoop.Constants;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.connector.BaseCatalog;
-import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -54,18 +50,19 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /* The utilization class of authorization module*/
 public class AuthorizationUtils {
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
+  private static final String FILESET_CATALOG_LOCATION = "location";
+  private static final String FILESET_SCHEMA_LOCATION = "location";
+  private static final String HIVE_LOCATION = "location";
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
@@ -466,8 +463,8 @@ public class AuthorizationUtils {
             case RELATIONAL:
               LOG.info("Catalog provider is {}", catalogObj.provider());
               if ("hive".equals(catalogObj.provider())
-                  && schema.properties().containsKey(HiveConstants.LOCATION)) {
-                String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
+                  && schema.properties().containsKey(HIVE_LOCATION)) {
+                String schemaLocation = schema.properties().get(HIVE_LOCATION);
                 if (StringUtils.isNotBlank(schemaLocation)) {
                   locations.add(schemaLocation);
                 } else {
@@ -477,37 +474,20 @@ public class AuthorizationUtils {
               break;
 
             case FILESET:
-              if (catalogObj instanceof HasPropertyMetadata) {
-                HasPropertyMetadata catalogObjWithProperties = (HasPropertyMetadata) catalogObj;
-                Map<String, String> properties = schema.properties();
-                String schemaLocation =
-                    (String)
-                        catalogObjWithProperties
-                            .schemaPropertiesMetadata()
-                            .getOrDefault(properties, Constants.LOCATION);
-                if (StringUtils.isNotBlank(schemaLocation)) {
-                  locations.add(normalizeFilesetLocation(schemaLocation));
-                }
-              } else {
-                FilesetCatalog filesetCatalog = catalogObj.asFilesetCatalog();
-                String catalogObjLocation = catalogObj.properties().get(Constants.LOCATION);
-                Namespace namespace = NamespaceUtil.toFileset(ident);
-                NameIdentifier[] nameIdentifiers = filesetCatalog.listFilesets(namespace);
-                if (nameIdentifiers.length == 0) {
-                  LOG.warn(
-                      "{} is empty, use catalog location {} as schema location.",
-                      ident.toString(),
-                      catalogObjLocation);
-                  locations.add(catalogObjLocation);
-                } else {
-                  Arrays.stream(nameIdentifiers)
-                      .forEach(
-                          nameIdentifier -> {
-                            Fileset fileset = filesetCatalog.loadFileset(nameIdentifier);
-                            String filesetLocation = fileset.storageLocation();
-                            if (!StringUtils.isNotBlank(filesetLocation))
-                              locations.add(filesetLocation);
-                          });
+              if ("hadoop".equals(catalogObj.provider())) {
+                if (schema.properties().containsKey(FILESET_SCHEMA_LOCATION)) {
+                  String schemaLocation = schema.properties().get(FILESET_SCHEMA_LOCATION);
+                  if (StringUtils.isNotBlank(schemaLocation)) {
+                    locations.add(schemaLocation);
+                  } else if (catalogObj.properties().containsKey(FILESET_CATALOG_LOCATION)) {
+                    String catalogLocation = schema.properties().get(FILESET_CATALOG_LOCATION);
+                    if (StringUtils.isNotBlank(catalogLocation)) {
+                      schemaLocation = catalogLocation + "/" + schema.name();
+                      locations.add(schemaLocation);
+                    }
+                  } else {
+                    LOG.warn("Schema {} location is not found", ident);
+                  }
                 }
               }
               break;
@@ -560,18 +540,5 @@ public class AuthorizationUtils {
     }
 
     return locations;
-  }
-
-  /**
-   * Normalize the fileset location to end with a slash.
-   *
-   * @param location the hadoop schema location
-   * @return if the location ends with a slash, return the location; otherwise, return the location
-   *     with a slash at the end.
-   */
-  public static String normalizeFilesetLocation(String location) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(location), "Location is blank");
-    location = location.endsWith(Constants.SLASH) ? location : location + Constants.SLASH;
-    return location;
   }
 }

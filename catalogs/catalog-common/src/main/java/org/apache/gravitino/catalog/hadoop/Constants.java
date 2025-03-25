@@ -23,6 +23,4 @@ public class Constants {
 
   public static final String BUILTIN_LOCAL_FS_PROVIDER = "builtin-local";
   public static final String BUILTIN_HDFS_FS_PROVIDER = "builtin-hdfs";
-  public static final String LOCATION = "location";
-  public static final String SLASH = "/";
 }
