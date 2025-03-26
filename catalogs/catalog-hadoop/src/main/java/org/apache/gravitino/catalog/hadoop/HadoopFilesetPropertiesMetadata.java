@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.file.Fileset.RESERVED_CATALOG_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.RESERVED_FILESET_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.RESERVED_SCHEMA_PLACEHOLDER;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
@@ -31,9 +35,28 @@ public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-    builder.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
-    builder.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
-    builder.putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
+    builder
+        .put(
+            RESERVED_CATALOG_PLACEHOLDER,
+            PropertyEntry.stringReservedPropertyEntry(
+                RESERVED_CATALOG_PLACEHOLDER,
+                "The placeholder will be replaced to catalog name in the location",
+                true /* hidden */))
+        .put(
+            RESERVED_SCHEMA_PLACEHOLDER,
+            PropertyEntry.stringReservedPropertyEntry(
+                RESERVED_SCHEMA_PLACEHOLDER,
+                "The placeholder will be replaced to schema name in the location",
+                true /* hidden */))
+        .put(
+            RESERVED_FILESET_PLACEHOLDER,
+            PropertyEntry.stringReservedPropertyEntry(
+                RESERVED_FILESET_PLACEHOLDER,
+                "The placeholder will be replaced to fileset name in the location",
+                true /* hidden */))
+        .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
+        .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
+        .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
     return builder.build();
   }
 }

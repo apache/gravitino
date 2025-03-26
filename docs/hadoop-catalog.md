@@ -129,6 +129,15 @@ Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-
 | `authentication.kerberos.principal`   | The principal of the Kerberos authentication for the fileset.                                          | The parent(schema) value | No       | 0.6.0-incubating |
 | `authentication.kerberos.keytab-uri`  | The URI of The keytab for the Kerberos authentication for the fileset.                                 | The parent(schema) value | No       | 0.6.0-incubating |
 | `credential-providers`                | The credential provider types, separated by comma.                                                     | (none)                   | No       | 0.8.0-incubating |
+| `placeholder-`                        | Properties that start with `placeholder-` are used to replace placeholders in the location.            | (none)                   | No       | 0.9.0-incubating |
+
+Some properties are reserved and cannot be set by users:
+
+| Property name         | Description                           | Default value               | Since Version    |
+|-----------------------|---------------------------------------|-----------------------------|------------------|
+| `placeholder-catalog` | The placeholder for the catalog name. | catalog name of the fileset | 0.9.0-incubating |
+| `placeholder-schema`  | The placeholder for the schema name.  | schema name of the fileset  | 0.9.0-incubating |
+| `placeholder-fileset` | The placeholder for the fileset name. | fileset name                | 0.9.0-incubating |
 
 Credential providers can be specified in several places, as listed below. Gravitino checks the `credential-providers` setting in the following order of precedence:
 

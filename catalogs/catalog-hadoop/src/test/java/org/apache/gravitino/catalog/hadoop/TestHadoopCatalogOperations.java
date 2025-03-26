@@ -167,6 +167,19 @@ public class TestHadoopCatalogOperations {
         Namespace.of(metalakeName));
   }
 
+  private static CatalogInfo randomCatalogInfo(
+      String metalakeName, String catalogName, Map<String, String> props) {
+    return new CatalogInfo(
+        idGenerator.nextId(),
+        catalogName,
+        CatalogInfo.Type.FILESET,
+        "hadoop",
+        "comment1",
+        props,
+        null,
+        Namespace.of(metalakeName));
+  }
+
   @BeforeAll
   public static void setUp() {
     Config config = Mockito.mock(Config.class);
@@ -250,6 +263,23 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(ops.catalogStorageLocation.isPresent());
     Path expectedPath = new Path("file:///tmp/catalog");
     Assertions.assertEquals(expectedPath, ops.catalogStorageLocation.get());
+
+    // test placeholder in location
+    emptyProps.put(HadoopCatalogPropertiesMetadata.LOCATION, "file:///tmp/{{catalog}}");
+    ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
+    Assertions.assertTrue(ops.catalogStorageLocation.isPresent());
+    expectedPath = new Path("file:///tmp/{{catalog}}");
+    Assertions.assertEquals(expectedPath, ops.catalogStorageLocation.get());
+
+    // test illegal placeholder in location
+    emptyProps.put(HadoopCatalogPropertiesMetadata.LOCATION, "file:///tmp/{{}}");
+    Throwable exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Placeholder in location should not be empty"),
+        exception.getMessage());
   }
 
   @Test
@@ -295,6 +325,16 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(fs.exists(schemaPath));
     Assertions.assertTrue(fs.getFileStatus(schemaPath).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath).length == 0);
+
+    // test placeholder in catalog location
+    name = "schema12_1";
+    catalogPath = TEST_ROOT_PATH + "/" + "{{catalog}}-{{schema}}";
+    schema = createSchema(name, comment, catalogPath, null);
+    Assertions.assertEquals(name, schema.name());
+
+    schemaPath = new Path(catalogPath, name);
+    fs = schemaPath.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(schemaPath));
   }
 
   @Test
@@ -311,6 +351,27 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(fs.exists(schemaPath1));
     Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
+
+    // test placeholder in schema location
+    name = "schema13_1";
+    schemaPath = catalogPath + "/" + "{{schema}}";
+    schema = createSchema(name, comment, null, schemaPath);
+    Assertions.assertEquals(name, schema.name());
+
+    schemaPath1 = new Path(schemaPath);
+    fs = schemaPath1.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(schemaPath1));
+
+    // test illegal placeholder in schema location
+    String schemaName1 = "schema13_2";
+    String schemaPath2 = catalogPath + "/" + "{{}}";
+    Throwable exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createSchema(schemaName1, comment, null, schemaPath2));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Placeholder in location should not be empty"),
+        exception.getMessage());
   }
 
   @Test
@@ -328,6 +389,19 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(fs.getFileStatus(schemaPath1).isDirectory());
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
 
+    Assertions.assertFalse(fs.exists(new Path(catalogPath)));
+    Assertions.assertFalse(fs.exists(new Path(catalogPath, name)));
+
+    // test placeholder in location
+    name = "schema14_1";
+    catalogPath = TEST_ROOT_PATH + "/" + "{{catalog}}";
+    schemaPath = TEST_ROOT_PATH + "/" + "{{schema}}";
+    schema = createSchema(name, comment, catalogPath, schemaPath);
+    Assertions.assertEquals(name, schema.name());
+
+    schemaPath1 = new Path(schemaPath);
+    fs = schemaPath1.getFileSystem(new Configuration());
+    Assertions.assertFalse(fs.exists(schemaPath1));
     Assertions.assertFalse(fs.exists(new Path(catalogPath)));
     Assertions.assertFalse(fs.exists(new Path(catalogPath, name)));
   }
@@ -534,6 +608,8 @@ public class TestHadoopCatalogOperations {
       } else {
         Assertions.assertTrue(fs.exists(expectedPath));
       }
+      // clean expected path if exist
+      fs.delete(expectedPath, true);
 
       // Test drop non-existent fileset
       Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
@@ -980,6 +1056,191 @@ public class TestHadoopCatalogOperations {
     }
   }
 
+  @Test
+  public void testLocationPlaceholdersWithException() throws IOException {
+    // test empty placeholder value
+    String schemaName = "schema24";
+    createSchema(schemaName, null, null, null);
+    String name = "fileset24";
+    String storageLocation = TEST_ROOT_PATH + "/{{fileset}}/{{user}}/{{id}}";
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createFileset(
+                    name,
+                    schemaName,
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    null,
+                    storageLocation,
+                    ImmutableMap.of("user", "tom")));
+    Assertions.assertEquals("No value found for placeholder: user", exception.getMessage());
+
+    // test placeholder value not found
+    String storageLocation1 = TEST_ROOT_PATH + "/{{fileset}}/{{}}";
+    Exception exception1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createFileset(
+                    name,
+                    schemaName,
+                    "comment",
+                    Fileset.Type.MANAGED,
+                    null,
+                    storageLocation1,
+                    ImmutableMap.of("user", "tom")));
+    Assertions.assertEquals(
+        "Placeholder in location should not be empty, location: " + storageLocation1,
+        exception1.getMessage());
+  }
+
+  @ParameterizedTest
+  @MethodSource("locationWithPlaceholdersArguments")
+  public void testPlaceholdersInLocation(
+      String name,
+      Fileset.Type type,
+      String catalogPath,
+      String schemaPath,
+      String storageLocation,
+      Map<String, String> placeholders,
+      String expect)
+      throws IOException {
+    String schemaName = "s1_" + name;
+    String comment = "comment_s1";
+    Map<String, String> catalogProps = Maps.newHashMap();
+    if (catalogPath != null) {
+      catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+    }
+
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+      if (!ops.schemaExists(schemaIdent)) {
+        createSchema(schemaName, comment, catalogPath, schemaPath);
+      }
+      Fileset fileset =
+          createFileset(
+              name, schemaName, "comment", type, catalogPath, storageLocation, placeholders);
+
+      Assertions.assertEquals(name, fileset.name());
+      Assertions.assertEquals(type, fileset.type());
+      Assertions.assertEquals("comment", fileset.comment());
+      Assertions.assertEquals(expect, fileset.storageLocation());
+      placeholders.forEach((k, v) -> Assertions.assertEquals(fileset.properties().get(k), v));
+
+      // Test load
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      Fileset loadedFileset = ops.loadFileset(filesetIdent);
+      Assertions.assertEquals(name, loadedFileset.name());
+      Assertions.assertEquals(type, loadedFileset.type());
+      Assertions.assertEquals("comment", loadedFileset.comment());
+      Assertions.assertEquals(expect, loadedFileset.storageLocation());
+
+      // Test drop
+      ops.dropFileset(filesetIdent);
+      Path expectedPath = new Path(expect);
+      FileSystem fs = expectedPath.getFileSystem(new Configuration());
+      if (type == Fileset.Type.MANAGED) {
+        Assertions.assertFalse(fs.exists(expectedPath));
+      } else {
+        Assertions.assertTrue(fs.exists(expectedPath));
+      }
+      // clean expected path if exist
+      fs.delete(expectedPath, true);
+
+      // Test drop non-existent fileset
+      Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
+    }
+  }
+
+  private static Stream<Arguments> locationWithPlaceholdersArguments() {
+    return Stream.of(
+        // placeholders in catalog location
+        Arguments.of(
+            "fileset41",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            null,
+            null,
+            ImmutableMap.of("placeholder-user", "tom"),
+            TEST_ROOT_PATH + "/c1-s1_fileset41-fileset41/workspace/tom"),
+        // placeholders in schema location
+        Arguments.of(
+            "fileset42",
+            Fileset.Type.MANAGED,
+            null,
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            null,
+            ImmutableMap.of("placeholder-user", "tom"),
+            TEST_ROOT_PATH + "/c1-s1_fileset42-fileset42/workspace/tom"),
+        // placeholders in schema location
+        Arguments.of(
+            "fileset43",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/{{catalog}}",
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            null,
+            ImmutableMap.of("placeholder-user", "tom"),
+            TEST_ROOT_PATH + "/c1-s1_fileset43-fileset43/workspace/tom"),
+        // placeholders in storage location
+        Arguments.of(
+            "fileset44",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/{{catalog}}",
+            TEST_ROOT_PATH + "/{{schema}}",
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            ImmutableMap.of("placeholder-user", "tom"),
+            TEST_ROOT_PATH + "/c1-s1_fileset44-fileset44/workspace/tom"),
+        // placeholders in storage location
+        Arguments.of(
+            "fileset45",
+            Fileset.Type.MANAGED,
+            null,
+            null,
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            ImmutableMap.of("placeholder-user", "tom"),
+            TEST_ROOT_PATH + "/c1-s1_fileset45-fileset45/workspace/tom"),
+        // placeholders in storage location
+        Arguments.of(
+            "fileset46",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/{{catalog}}",
+            null,
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            ImmutableMap.of("placeholder-user", "tom"),
+            TEST_ROOT_PATH + "/c1-s1_fileset46-fileset46/workspace/tom"),
+        // placeholders in storage location
+        Arguments.of(
+            "fileset47",
+            Fileset.Type.EXTERNAL,
+            TEST_ROOT_PATH + "/{{catalog}}",
+            TEST_ROOT_PATH + "/{{schema}}",
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            ImmutableMap.of("placeholder-user", "jack"),
+            TEST_ROOT_PATH + "/c1-s1_fileset47-fileset47/workspace/jack"),
+        // placeholders in storage location
+        Arguments.of(
+            "fileset48",
+            Fileset.Type.EXTERNAL,
+            TEST_ROOT_PATH + "/{{catalog}}",
+            null,
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            ImmutableMap.of("placeholder-user", "jack"),
+            TEST_ROOT_PATH + "/c1-s1_fileset48-fileset48/workspace/jack"),
+        // placeholders in storage location
+        Arguments.of(
+            "fileset49",
+            Fileset.Type.EXTERNAL,
+            null,
+            null,
+            TEST_ROOT_PATH + "/{{catalog}}-{{schema}}-{{fileset}}/workspace/{{user}}",
+            ImmutableMap.of("placeholder-user", "jack"),
+            TEST_ROOT_PATH + "/c1-s1_fileset49-fileset49/workspace/jack"));
+  }
+
   private static Stream<Arguments> locationArguments() {
     return Stream.of(
         // Honor the catalog location
@@ -987,6 +1248,14 @@ public class TestHadoopCatalogOperations {
             "fileset11",
             Fileset.Type.MANAGED,
             TEST_ROOT_PATH + "/catalog21",
+            null,
+            null,
+            TEST_ROOT_PATH + "/catalog21/s1_fileset11/fileset11"),
+        Arguments.of(
+            // honor the catalog location with placeholder
+            "fileset11",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog21/{{schema}}/{{fileset}}",
             null,
             null,
             TEST_ROOT_PATH + "/catalog21/s1_fileset11/fileset11"),
@@ -999,11 +1268,27 @@ public class TestHadoopCatalogOperations {
             null,
             TEST_ROOT_PATH + "/s1_fileset12/fileset12"),
         Arguments.of(
+            // honor the schema location with placeholder
+            "fileset12",
+            Fileset.Type.MANAGED,
+            null,
+            TEST_ROOT_PATH + "/{{schema}}/{{fileset}}",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset12/fileset12"),
+        Arguments.of(
             // honor the schema location
             "fileset13",
             Fileset.Type.MANAGED,
             TEST_ROOT_PATH + "/catalog22",
             TEST_ROOT_PATH + "/s1_fileset13",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset13/fileset13"),
+        Arguments.of(
+            // honor the schema location with placeholder
+            "fileset13",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog22",
+            TEST_ROOT_PATH + "/{{schema}}/{{fileset}}",
             null,
             TEST_ROOT_PATH + "/s1_fileset13/fileset13"),
         Arguments.of(
@@ -1015,12 +1300,28 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset14",
             TEST_ROOT_PATH + "/fileset14"),
         Arguments.of(
+            // honor the storage location with placeholder
+            "fileset14",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog23",
+            TEST_ROOT_PATH + "/{{schema}}",
+            TEST_ROOT_PATH + "/{{fileset}}",
+            TEST_ROOT_PATH + "/fileset14"),
+        Arguments.of(
             // honor the storage location
             "fileset15",
             Fileset.Type.MANAGED,
             null,
             null,
             TEST_ROOT_PATH + "/fileset15",
+            TEST_ROOT_PATH + "/fileset15"),
+        Arguments.of(
+            // honor the storage location with placeholder
+            "fileset15",
+            Fileset.Type.MANAGED,
+            null,
+            null,
+            TEST_ROOT_PATH + "/{{fileset}}",
             TEST_ROOT_PATH + "/fileset15"),
         Arguments.of(
             // honor the storage location
@@ -1031,12 +1332,28 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset16",
             TEST_ROOT_PATH + "/fileset16"),
         Arguments.of(
+            // honor the storage location with placeholder
+            "fileset16",
+            Fileset.Type.MANAGED,
+            TEST_ROOT_PATH + "/catalog24",
+            null,
+            TEST_ROOT_PATH + "/{{fileset}}",
+            TEST_ROOT_PATH + "/fileset16"),
+        Arguments.of(
             // honor the storage location
             "fileset17",
             Fileset.Type.EXTERNAL,
             TEST_ROOT_PATH + "/catalog25",
             TEST_ROOT_PATH + "/s1_fileset17",
             TEST_ROOT_PATH + "/fileset17",
+            TEST_ROOT_PATH + "/fileset17"),
+        Arguments.of(
+            // honor the storage location with placeholder
+            "fileset17",
+            Fileset.Type.EXTERNAL,
+            TEST_ROOT_PATH + "/catalog25",
+            TEST_ROOT_PATH + "/s1_fileset17",
+            TEST_ROOT_PATH + "/{{fileset}}",
             TEST_ROOT_PATH + "/fileset17"),
         Arguments.of(
             // honor the storage location
@@ -1047,6 +1364,14 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset18",
             TEST_ROOT_PATH + "/fileset18"),
         Arguments.of(
+            // honor the storage location with placeholder
+            "fileset18",
+            Fileset.Type.EXTERNAL,
+            null,
+            TEST_ROOT_PATH + "/s1_fileset18",
+            TEST_ROOT_PATH + "/{{fileset}}",
+            TEST_ROOT_PATH + "/fileset18"),
+        Arguments.of(
             // honor the storage location
             "fileset19",
             Fileset.Type.EXTERNAL,
@@ -1054,11 +1379,27 @@ public class TestHadoopCatalogOperations {
             null,
             TEST_ROOT_PATH + "/fileset19",
             TEST_ROOT_PATH + "/fileset19"),
+        Arguments.of(
+            // honor the storage location with placeholder
+            "fileset19",
+            Fileset.Type.EXTERNAL,
+            null,
+            null,
+            TEST_ROOT_PATH + "/{{fileset}}",
+            TEST_ROOT_PATH + "/fileset19"),
         // Honor the catalog location
         Arguments.of(
             "fileset101",
             Fileset.Type.MANAGED,
             UNFORMALIZED_TEST_ROOT_PATH + "/catalog201",
+            null,
+            null,
+            TEST_ROOT_PATH + "/catalog201/s1_fileset101/fileset101"),
+        Arguments.of(
+            // Honor the catalog location with placeholder
+            "fileset101",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog201/{{schema}}/{{fileset}}",
             null,
             null,
             TEST_ROOT_PATH + "/catalog201/s1_fileset101/fileset101"),
@@ -1071,11 +1412,27 @@ public class TestHadoopCatalogOperations {
             null,
             TEST_ROOT_PATH + "/s1_fileset102/fileset102"),
         Arguments.of(
+            // honor the schema location with placeholder
+            "fileset102",
+            Fileset.Type.MANAGED,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset102/{{fileset}}",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset102/fileset102"),
+        Arguments.of(
             // honor the schema location
             "fileset103",
             Fileset.Type.MANAGED,
             UNFORMALIZED_TEST_ROOT_PATH + "/catalog202",
             UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset103",
+            null,
+            TEST_ROOT_PATH + "/s1_fileset103/fileset103"),
+        Arguments.of(
+            // honor the schema location with placeholder
+            "fileset103",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog202",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset103/{{fileset}}",
             null,
             TEST_ROOT_PATH + "/s1_fileset103/fileset103"),
         Arguments.of(
@@ -1087,12 +1444,28 @@ public class TestHadoopCatalogOperations {
             UNFORMALIZED_TEST_ROOT_PATH + "/fileset104",
             TEST_ROOT_PATH + "/fileset104"),
         Arguments.of(
+            // honor the storage location with placeholder
+            "fileset104",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog203",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset104",
+            UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}",
+            TEST_ROOT_PATH + "/fileset104"),
+        Arguments.of(
             // honor the storage location
             "fileset105",
             Fileset.Type.MANAGED,
             null,
             null,
             UNFORMALIZED_TEST_ROOT_PATH + "/fileset105",
+            TEST_ROOT_PATH + "/fileset105"),
+        Arguments.of(
+            // honor the storage location with placeholder
+            "fileset105",
+            Fileset.Type.MANAGED,
+            null,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}",
             TEST_ROOT_PATH + "/fileset105"),
         Arguments.of(
             // honor the storage location
@@ -1103,12 +1476,28 @@ public class TestHadoopCatalogOperations {
             UNFORMALIZED_TEST_ROOT_PATH + "/fileset106",
             TEST_ROOT_PATH + "/fileset106"),
         Arguments.of(
+            // honor the storage location with placeholder
+            "fileset106",
+            Fileset.Type.MANAGED,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog204",
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}",
+            TEST_ROOT_PATH + "/fileset106"),
+        Arguments.of(
             // honor the storage location
             "fileset107",
             Fileset.Type.EXTERNAL,
             UNFORMALIZED_TEST_ROOT_PATH + "/catalog205",
             UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset107",
             UNFORMALIZED_TEST_ROOT_PATH + "/fileset107",
+            TEST_ROOT_PATH + "/fileset107"),
+        Arguments.of(
+            // honor the storage location with placeholder
+            "fileset107",
+            Fileset.Type.EXTERNAL,
+            UNFORMALIZED_TEST_ROOT_PATH + "/catalog205",
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset107",
+            UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}",
             TEST_ROOT_PATH + "/fileset107"),
         Arguments.of(
             // honor the storage location
@@ -1119,12 +1508,28 @@ public class TestHadoopCatalogOperations {
             UNFORMALIZED_TEST_ROOT_PATH + "/fileset108",
             TEST_ROOT_PATH + "/fileset108"),
         Arguments.of(
+            // honor the storage location with placeholder
+            "fileset108",
+            Fileset.Type.EXTERNAL,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset108",
+            UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}",
+            TEST_ROOT_PATH + "/fileset108"),
+        Arguments.of(
             // honor the storage location
             "fileset109",
             Fileset.Type.EXTERNAL,
             null,
             null,
             UNFORMALIZED_TEST_ROOT_PATH + "/fileset109",
+            TEST_ROOT_PATH + "/fileset109"),
+        Arguments.of(
+            // honor the storage location with placeholder
+            "fileset109",
+            Fileset.Type.EXTERNAL,
+            null,
+            null,
+            UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}",
             TEST_ROOT_PATH + "/fileset109"));
   }
 
@@ -1254,6 +1659,32 @@ public class TestHadoopCatalogOperations {
 
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
       Map<String, String> filesetProps = Maps.newHashMap();
+      StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+      filesetProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, filesetProps));
+
+      return ops.createFileset(filesetIdent, comment, type, storageLocation, filesetProps);
+    }
+  }
+
+  private Fileset createFileset(
+      String name,
+      String schemaName,
+      String comment,
+      Fileset.Type type,
+      String catalogPath,
+      String storageLocation,
+      Map<String, String> filesetProps)
+      throws IOException {
+    Map<String, String> props = Maps.newHashMap();
+    if (catalogPath != null) {
+      props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+    }
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(props, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      filesetProps = filesetProps == null ? Maps.newHashMap() : filesetProps;
       StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
       filesetProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, filesetProps));
 

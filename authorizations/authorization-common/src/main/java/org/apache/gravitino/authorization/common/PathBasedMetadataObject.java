@@ -19,27 +19,66 @@
 package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
 public class PathBasedMetadataObject implements AuthorizationMetadataObject {
   /**
    * The type of metadata object in the underlying system. Every type will map one kind of the
-   * entity of the Gravitino type system.
+   * entity of the Gravitino type system. When we store a Hive table, first, we will store the
+   * metadata in the JDBC database like MySQL, and then we will store the data in the HDFS location.
+   * For Hive, there is a default location for the cluster level. We can also specify other
+   * locations for schema and table levels. So a path may not be fileset
    */
-  public enum Type implements AuthorizationMetadataObject.Type {
-    /** A path is mapped the path of storages like HDFS, S3 etc. */
-    PATH(MetadataObject.Type.FILESET);
+  public static final class PathType implements AuthorizationMetadataObject.Type {
+
+    private static final Set<MetadataObject.Type> allowObjectTypes =
+        ImmutableSet.of(
+            MetadataObject.Type.METALAKE,
+            MetadataObject.Type.CATALOG,
+            MetadataObject.Type.SCHEMA,
+            MetadataObject.Type.TABLE,
+            MetadataObject.Type.FILESET);
     private final MetadataObject.Type metadataType;
 
-    Type(MetadataObject.Type type) {
+    public static PathType get(MetadataObject.Type type) {
+      return new PathType(type);
+    }
+
+    private PathType(MetadataObject.Type type) {
+      Preconditions.checkArgument(
+          allowObjectTypes.contains(type), "The type isn't allow to create path type");
       this.metadataType = type;
     }
 
     public MetadataObject.Type metadataObjectType() {
       return metadataType;
+    }
+
+    @Override
+    public int hashCode() {
+      return metadataType.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+      if (!(obj instanceof PathType)) {
+        return false;
+      }
+
+      return this.metadataType.equals(((PathType) obj).metadataType);
+    }
+
+    @Override
+    public String toString() {
+      return "PATH";
     }
   }
 
@@ -89,8 +128,8 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
         "Cannot create a path based metadata object with no names");
     Preconditions.checkArgument(
         path != null && !path.isEmpty(), "Cannot create a path based metadata object with no path");
-    Preconditions.checkArgument(
-        type == PathBasedMetadataObject.Type.PATH, "it must be the PATH type");
+
+    Preconditions.checkArgument(type instanceof PathType, "it must be the PATH type");
 
     for (String name : names) {
       Preconditions.checkArgument(
@@ -112,7 +151,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
     return Objects.equals(name, that.name)
         && Objects.equals(parent, that.parent)
         && Objects.equals(path, that.path)
-        && type == that.type;
+        && Objects.equals(type, that.type);
   }
 
   @Override
