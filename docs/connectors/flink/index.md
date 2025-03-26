@@ -27,7 +27,7 @@ through a unified interface and consistent access control.
 
 ## How to use it
 
-1. [Build](../../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
+1. [Build](../../develop/how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
    the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
 1. Configure the Flink configuration to use the Gravitino flink connector.
 

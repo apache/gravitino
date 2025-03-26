@@ -5,9 +5,9 @@ keyword: docker
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# User Docker images
+## User Docker images
 
-## Apache Gravitino Docker image
+### Apache Gravitino Docker image
 
 You can deploy the service with the Gravitino Docker image.
 
@@ -17,30 +17,44 @@ Container startup commands
 docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 ```
 
-Changelog
-
+#### Changelog
 
 - apache/gravitino:0.8.0-incubating
-  - Based on Gravitino 0.8.0-incubating, you can know more information from 0.8.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.8.0-incubating).
+  - Based on Gravitino *0.8.0-incubating* release.
+    You can find more information from the 0.8.0-incubating
+    [release notes](https://github.com/apache/gravitino/releases/tag/v0.8.0-incubating).
 
 - apache/gravitino:0.7.0-incubating
-  - Based on Gravitino 0.7.0-incubating, you can know more information from 0.7.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.7.0-incubating).
-  - Place bundle jars (gravitino-aws-bundle.jar, gravitino-gcp-bundle.jar, gravitino-aliyun-bundle.jar) in the `${GRAVITINO_HOME}/catalogs/hadoop/libs` folder to support the cloud storage catalog without manually adding the jars to the classpath.
+  - Based on Gravitino *0.7.0-incubating* release.
+    You can find more information from the 0.7.0-incubating
+    [release notes](https://github.com/apache/gravitino/releases/tag/v0.7.0-incubating).
+
+  - Place bundle JARs (*gravitino-aws-bundle.jar*, *gravitino-gcp-bundle.jar*, *gravitino-aliyun-bundle.jar*)
+    in the `${GRAVITINO_HOME}/catalogs/hadoop/libs` folder to support the cloud storage catalog
+    without manually adding the JARs to the CLASSPATH.
 
 - apache/gravitino:0.6.1-incubating
-  - Based on Gravitino 0.6.1-incubating, you can know more information from 0.6.1-incubating release notes.
+  - Based on Gravitino *0.6.1-incubating* release.
+    You can find more information from 0.6.1-incubating
+    [release notes](https://github.com/apache/gravitino/releases/tag/v0.6.1-incubating).
 
 - apache/gravitino:0.6.0-incubating (Switch to Apache official DockerHub repository)
-  - Use the latest Gravitino version 0.6.0-incubating source code to build the image.
+  - Use the latest Gravitino version *0.6.0-incubating* source code to build the image.
 
 - datastrato/gravitino:0.5.1
-  - Based on Gravitino 0.5.1, you can know more information from 0.5.1 release notes.
+  - Based on Gravitino *0.5.1* release.
+    You can find more information from the *0.5.1*
+    [release notes](https://github.com/apache/gravitino/releases/tag/v0.5.1).
 
 - datastrato/gravitino:0.5.0
-  - Based on Gravitino 0.5.0, you can know more information from 0.5.0 release notes.
+  - Based on Gravitino *0.5.0 release.
+    You can find more information from the *0.5.0*
+    [release notes](https://github.com/apache/gravitino/releases/tag/v0.5.0).
 
 - datastrato/gravitino:0.4.0
-  - Based on Gravitino 0.4.0, you can know more information from 0.4.0 release notes.
+  - Based on Gravitino *0.4.0* release.
+    You can find more information from the *0.4.0*
+    [release notes](https://github.com/apache/gravitino/releases/tag/v0.4.0).
 
 - datastrato/gravitino:0.3.1
   - Fix some issues
@@ -52,7 +66,7 @@ Changelog
     - `8090` Gravitino Web UI
     - `9001` Iceberg REST service
 
-## Apache Gravitino Iceberg REST server Docker image
+### Apache Gravitino Iceberg REST server Docker image
 
 You can deploy the standalone Gravitino Iceberg REST server with the Docker image.
 
@@ -62,7 +76,8 @@ Container startup commands
 docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
-Changelog
+#### Changelog
+
 - apache/gravitino-iceberg-rest:0.8.0-incubating
   - Supports OSS and ADLS storage.
 
@@ -79,16 +94,17 @@ Changelog
   - Supports changing configuration by environment variables.
 
 - apache/gravitino-iceberg-rest:0.6.1-incubating
-  - Based on Gravitino 0.6.1-incubating, you can know more information from 0.6.1-incubating release notes.
+  - Based on Gravitino *0.6.1-incubating*, you can know more information from 0.6.1-incubating release notes.
 
 - apache/gravitino-iceberg-rest:0.6.0-incubating.
   - Gravitino Iceberg REST Server with memory catalog backend.
   - Expose ports:
     - `9001` Iceberg REST service
 
-## Playground Docker image
+### Playground Docker image
 
-You can use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
+You can use the [playground](https://github.com/apache/gravitino-playground)
+to experience the whole Gravitino system with other components.
 
 The playground consists of multiple Docker images.
 
@@ -96,7 +112,7 @@ The Docker images of the playground have suitable configurations for users to ex
 
 ### Apache Hive image
 
-Changelog
+#### Changelog
 
 - apache/gravitino-playground:hive-2.7.3 (Switch to Apache official DockerHub repository)
   - Use `datastrato/hive:2.7.3-no-yarn` Dockerfile to rebuild the image.
@@ -109,8 +125,7 @@ Changelog
 
 ### Trino image
 
-Changelog
-
+#### Changelog
 
 - apache/gravitino-playground:trino-435-gravitino-0.8.0-incubating
   - Use Gravitino release 0.8.0-incubating Dockerfile to build the image.
@@ -121,7 +136,8 @@ Changelog
 - apache/gravitino-playground:trino-435-gravitino-0.6.1-incubating
   - Use Gravitino release 0.6.1-incubating Dockerfile to build the image.
 
-- apache/gravitino-playground:trino-435-gravitino-0.6.0-incubating (Switch to Apache official DockerHub repository)
+- apache/gravitino-playground:trino-435-gravitino-0.6.0-incubating
+  - Switch to Apache official DockerHub repository.
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/trino:435-gravitino-0.5.1
@@ -141,21 +157,23 @@ Changelog
   - Base on `trino:426`
   - Added Gravitino trino-connector-0.3.0 libraries into the `/usr/lib/trino/plugin/gravitino`
 
-# Developer Docker images
+## Developer Docker images
 
-You can use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
+You can use these kinds of Docker images to facilitate integration testing of all catalogs
+and connector modules within Gravitino.
 
-## Apache Gravitino CI Apache Hive image with kerberos enabled
+### Apache Gravitino CI Apache Hive image with kerberos enabled
 
-You can use this kind of image to test the catalog of Apache Hive with kerberos enable
+You can use this kind of image to test the catalog of Apache Hive with kerberos enabled.
 
-Changelog
+#### Changelog
 
 - apache/gravitino-ci:kerberos-hive-0.1.5 (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.5
-  - Start another HMS for the Hive cluster in the container with port 19083. This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
+  - Start another HMS for the Hive cluster in the container with port 19083.
+    This is to test whether Kerberos authentication works for a Kerberos-enabled Hive cluster with multiple HMS.
   - Refresh ssh keys in the startup script.
   - Add test logic to log in localhost via ssh without password.
 
@@ -169,7 +187,8 @@ Changelog
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.2
   - Add `${HOSTNAME} >> /root/.ssh/known_hosts` to the startup script.
-  - Add check for the status of DataNode, if the DataNode is not running or ready within 100s, the container will exit.
+  - Add check for the status of DataNode, if the DataNode is not running or ready within 100s,
+    the container will exit.
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.1
   - Add a principal for Gravitino web server named 'HTTP/localhost@HADOOPKRB'.
@@ -177,14 +196,14 @@ Changelog
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
-    - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
+    - Install a KDC server and create a principal for Hive.
+      For more information,please see [kerberos-hive](../dev/docker/kerberos-hive)
 
-## Apache Gravitino CI Apache Hive image
+### Apache Gravitino CI Apache Hive image
 
 You can use this kind of image to test the catalog of Apache Hive.
 
-Changelog
-
+#### Changelog
 
 - apache/gravitino-ci:hive-0.1.18
   - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. 
@@ -193,8 +212,9 @@ Changelog
 
 - apache/gravitino-ci:hive-0.1.17
   - Add support for JDBC SQL standard authorization
-    - Add JDBC SQL standard authorization related configuration in the `hive-site-for-sql-base-auth.xml` and `hiveserver2-site-for-sql-base-auth.xml`
-- 
+    - Add JDBC SQL standard authorization related configuration in the `hive-site-for-sql-base-auth.xml`
+      and `hiveserver2-site-for-sql-base-auth.xml`
+ 
 - apache/gravitino-ci:hive-0.1.16
   - Add GCS related configuration in the `hive-site.xml` file.
   - Add GCS bundle jar in the `${HADOOP_HOME}/share/hadoop/common/lib/`
@@ -221,9 +241,22 @@ Changelog
       - `RANGER_SERVER_URL`: Ranger admin URL
       - `RANGER_HIVE_REPOSITORY_NAME`: Hive repository name in Ranger admin
       - `RANGER_HDFS_REPOSITORY_NAME`: HDFS repository name in Ranger admin
-    - If you want to enable Hive Ranger plugin, you need both set the `RANGER_SERVER_URL` and `RANGER_HIVE_REPOSITORY_NAME` environment variables. Hive Ranger audit logs are stored in the `/tmp/root/ranger-hive-audit.log`.
-    - If you want to enable HDFS Ranger plugin, you need both set the `RANGER_SERVER_URL` and `RANGER_HDFS_REPOSITORY_NAME` environment variables. HDFS Ranger audit logs are stored in the `/usr/local/hadoop/logs/ranger-hdfs-audit.log`
-    - Example: docker run -e HIVE_RUNTIME_VERSION='hive3' -e RANGER_SERVER_URL='http://ranger-server:6080' -e RANGER_HIVE_REPOSITORY_NAME='hiveDev' -e RANGER_HDFS_REPOSITORY_NAME='hdfsDev' ... datastrato/gravitino-ci-hive:0.1.13
+    - If you want to enable Hive Ranger plugin, you need both set the `RANGER_SERVER_URL`
+      and `RANGER_HIVE_REPOSITORY_NAME` environment variables.
+      Hive Ranger audit logs are stored in the `/tmp/root/ranger-hive-audit.log`.
+    - If you want to enable HDFS Ranger plugin, you need both set the `RANGER_SERVER_URL`
+      and `RANGER_HDFS_REPOSITORY_NAME` environment variables.
+      HDFS Ranger audit logs are stored in the `/usr/local/hadoop/logs/ranger-hdfs-audit.log`
+    - Example:
+
+      ```shell
+      docker run -e HIVE_RUNTIME_VERSION='hive3' \
+        -e RANGER_SERVER_URL='http://ranger-server:6080' \
+        -e RANGER_HIVE_REPOSITORY_NAME='hiveDev' \
+        -e RANGER_HDFS_REPOSITORY_NAME='hdfsDev' \
+        ... \
+        datastrato/gravitino-ci-hive:0.1.13
+      ```
 
 - datastrato/gravitino-ci-hive:0.1.12
   - Shrink hive Docker image size by 420MB
@@ -253,7 +286,8 @@ Changelog
     - `8088` YARN Service
 
 - datastrato/gravitino-ci-hive:0.1.5
-  - Rollback `Map container hostname to 127.0.0.1 before starting Hadoop` of `datastrato/gravitino-ci-hive:0.1.4`
+  - Rollback `Map container hostname to 127.0.0.1 before starting Hadoop` of
+    `datastrato/gravitino-ci-hive:0.1.4`
 
 - datastrato/gravitino-ci-hive:0.1.4
   - Configure HDFS DataNode data transfer address to be `0.0.0.0:50010`
@@ -290,11 +324,11 @@ Changelog
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 
-## Apache Gravitino CI Trino image
+### Apache Gravitino CI Trino image
 
 You can use this image to test Trino.
 
-Changelog
+#### Changelog
 
 - apache/gravitino-ci:trino-0.1.6 (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
@@ -320,11 +354,11 @@ Changelog
   - Expose ports:
     - `8080` Trino JDBC port
 
-## Apache Gravitino CI Doris image
+### Apache Gravitino CI Doris image
 
 You can use this image to test Apache Doris.
 
-Changelog
+#### Changelog
 
 - apache/gravitino-ci:doris-0.1.5 (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
@@ -348,17 +382,18 @@ Changelog
 - datastrato/gravitino-ci-doris:0.1.0
   - Docker image `datastrato/gravitino-ci-doris:0.1.0`
   - Start Doris BE & FE in one container
-  - Please set table properties `"replication_num" = "1"` when creating a table in Doris, because the default replication number is 3, but the Doris container only has one BE.
+  - Please set table properties `"replication_num" = "1"` when creating a table in Doris,
+    because the default replication number is 3, but the Doris container only has one BE.
   - Username: `root`, Password: N/A (password is empty)
   - Expose ports:
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
 
-## Apache Gravitino CI Apache Ranger image
+### Apache Gravitino CI Apache Ranger image
 
 You can use this image to control Trino's permissions.
 
-Changelog
+#### Changelog
 
 - apache/gravitino-ci:ranger-0.1.1 (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
@@ -370,14 +405,20 @@ Changelog
   - Reduce docker image build time from `~1h` to `~5min`.
   - How to debug Ranger admin service:
     - Use `docker exec -it <container_id> bash` to enter the docker container.
-    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
-    - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
+    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001`
+      into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh`
+      in the docker container.
+    - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh`
+      to restart Ranger admin.
     - Clone the `Apache Ranger` project from GiHub and checkout the `2.4.0` release.
-    - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.
+    - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`)
+      in your IDE and connect to the Ranger admin container.
 
 - datastrato/gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`
   - Support Apache Ranger 2.4.0
-  - Use environment variable `RANGER_PASSWORD` to set up Apache Ranger admin password, Please notice Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
+  - Use environment variable `RANGER_PASSWORD` to set up Apache Ranger admin password.
+    Please note that Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
   - Expose ports:
     - `6080` Apache Ranger admin port
+

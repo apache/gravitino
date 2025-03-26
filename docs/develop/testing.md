@@ -89,7 +89,7 @@ public class CatalogHiveIT extends AbstractIT {
 
 ## Running all the integration tests
 
-You need to [install Docker](./how-to-install.md#install-docker) to run all integration tests.
+You need to [install Docker](../how-to-install.md#install-docker) to run all integration tests.
 Before running the Docker-related integration tests, make sure that the Docker daemon is running,
 and one of the following setttings is specified.
 
@@ -190,17 +190,17 @@ To retrieve the archive:
 1. Click the *detail* link associated with the failed integration test on the Pull Request page.
    This redirects you to the *job* page.
 
-   ![PR page Image](assets/test-fail-pr.png)
+   ![PR page Image](../assets/test-fail-pr.png)
 
 1. On the *Job* page, locate the *Summary* button on the left-hand side and click it to access the workflow summary.
 
-   ![Job page Image](assets/test-fail-job.png)
+   ![Job page Image](../assets/test-fail-job.png)
 
 1. Look for the *Artifacts* item on the summary page and download the archive.
 
-   ![Summary page Image](assets/test-fail-summary.png)
+   ![Summary page Image](../assets/test-fail-summary.png)
 
 1. You can also add the tag `upload log` to your PR to upload the logs to the PR page.
    In this case, the logs will be uploaded to the PR page regardless of the CI workflow result.
-   ![upload log](assets/upload-log-tag.png)
+   ![upload log](../assets/upload-log-tag.png)
 

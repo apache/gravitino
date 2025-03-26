@@ -33,7 +33,7 @@ and do the following steps:
 
 Alternatively, you can build the Gravitino Trino connector package from the sources
 and obtain the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
-Please refer to the [Gravitino Development documentation](../../how-to-build.md)
+Please refer to the [Gravitino Development documentation](../../develop/how-to-build.md)
 
 ## Example
 

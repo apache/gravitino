@@ -91,7 +91,7 @@ You can now proceed to check the [package contents](#package-contents).
 To manually build the binary package from the source code,
 you need to either clone the Gravitino GIT repository or download the source package
 and then decompress it to your local environment.
-You will follow the [how to build guide](./how-to-build.md) to build Gravitino.
+You will follow the [how to build guide](./develop/how-to-build.md) to build Gravitino.
 After you have run the `./gradlew compileDistribution` command,
 you can find the Gravitino binary package contents in the `distribution/package` sub-directory.
 
@@ -207,7 +207,7 @@ curl -v -X GET \
 
 
 For information on debugging the Gravitino server,
-check the [debugging instructions](./how-to-test.md#debugging-the-apache-gravitino-server).
+check the [debugging instructions](./develop/testing.md#debugging-the-apache-gravitino-server).
 
 ## Manage Gravitino Iceberg REST server
 

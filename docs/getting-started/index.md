@@ -138,7 +138,7 @@ You can install Gravitino from the binary release packages or the container imag
 Follow [how-to-install](../how-to-install.md).
 
 Or you can install Gravitino from scratch.
-Follow [how-to-build](../how-to-build.md) and [how-to-install](../how-to-install.md).
+Follow [how-to-build](../develop/how-to-build.md) and [how-to-install](../how-to-install.md).
 
 ## Start Gravitino
 

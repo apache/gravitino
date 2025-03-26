@@ -16,8 +16,8 @@ Currently, you can integrate [OAuth settings](./security/security.md)
 to view, add, modify, and delete metalakes, create catalogs,
 and view catalogs, schemas, and tables, among other functions.
 
-[Build](./how-to-build.md) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI
-and open it in a browser at `http://<gravitino-host>:<gravitino-port>`,
+[Build](./develop/how-to-build.md) and [deploy](./getting-started/index.md#local-workstation)
+the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`,
 by default is [http://localhost:8090](http://localhost:8090).
 
 ## Initial page

@@ -69,7 +69,7 @@ Directly open the client-python module project in the IDE.
 ### Prerequisites
 
 - Python 3.8+
-- Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
+- Refer to [How to build Gravitino](./develop/how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
 ### Build and testing
