@@ -171,9 +171,9 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
       rangerHivePolicies.stream().forEach(policy -> LOG.info("Ranger Hive policy: {}", policy));
       rangerHdfsPolicies.stream().forEach(policy -> LOG.info("Ranger HDFS policy: {}", policy));
       Preconditions.condition(
-          rangerHivePolicies.size() == 0, "Ranger Hive policies should be empty");
+              rangerHivePolicies.isEmpty(), "Ranger Hive policies should be empty");
       Preconditions.condition(
-          rangerHdfsPolicies.size() == 0, "Ranger HDFS policies should be empty");
+              rangerHdfsPolicies.isEmpty(), "Ranger HDFS policies should be empty");
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
     }
