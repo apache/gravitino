@@ -16,6 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+
 image:
   repository: apache/gravitino
   tag: 0.9.0-incubating-SNAPSHOT
@@ -28,69 +29,156 @@ image:
   ##
   pullSecrets: []
 
-# Deploy MySQL instance on K8S cluster as Gravitino storage backend.
+## MySQL chart configuration
+## ref: https://github.com/bitnami/charts/blob/main/bitnami/mysql/values.yaml
+##
 mysql:
+  ## @param mysql.enabled Deploy MySQL container(s)
+  ##
   enabled: false
+  ## Bitnami MySQL image version
+  ## ref: https://hub.docker.com/r/bitnami/mysql/tags/
+  ## @param image.registry MySQL image registry
+  ## @param image.repository MySQL image repository
+  ## @param image.tag MySQL image tag
+  ##
+  image:
+    tag: 8.0.36-debian-12-r12
+  ## @param initdbScriptsConfigMap ConfigMap with the initdb scripts
+  ##
   initdbScriptsConfigMap: gravitino-mysql-init
+  ## MySQL Authentication parameters
+  ##
   auth:
+    ## @param auth.rootPassword Password for the `root` user.
+    ##
     rootPassword: admin
+    ## @param auth.createDatabase Whether to create the .Values.auth.database or not
+    ##
     createDatabase: true
+    ## @param auth.database Name for a custom database to create
+    ##
     database: gravitino
+    ## @param auth.username Name for a custom user to create
+    ##
     username: gravitino
+    ## @param auth.password Password for the new user.
+    ##
     password: gravitino
 
-# Use H2 as the default embedded database, or set up an external database for enhanced scalability and performance.
-# schema-0.*.0-mysql.sql is the data init script that should be executed in the external database manually.
+## THE CONFIGURATION FOR Gravitino ENTITY STORE
+##
 entity:
+  ## The entity store to use, we only supports relational
+  ##
   store: relational
   maxTransactionSkewTimeMs: 2000
   deleteAfterTimeMs: 604800000
   versionRetentionCount: 1
+  ## The backend for the entity store, we only supports JDBC
+  ##
   relationalBackend: JDBCBackend
+  ## The JDBC URL for the entity store
+  ##
   jdbcUrl: jdbc:h2
+  ## The JDBC driver class name
+  ##
   jdbcDriver: org.h2.Driver
+  ## The JDBC user name
+  ##
   jdbcUser: gravitino
+  ## The JDBC password
+  ##
   jdbcPassword: gravitino
   storagePath: /root/gravitino/data/jdbc
 
+## THE CONFIGURATION FOR Gravitino SERVER
+##
 server:
   shutdownTimeout: 3000
   rest:
     extensionPackages: ""
-
+## THE CONFIGURATION FOR Gravitino WEB SERVER
+##
 webserver:
+  ## The host name of the built-in web server
+  ##
   host: 0.0.0.0
+  ## The http port number of the built-in web server
+  ##
   httpPort: 8090
+  ## The min thread size of the built-in web server
+  ##
   minThreads: 24
+  ## The max thread size of the built-in web server
+  ##
   maxThreads: 200
+  ## The stop timeout of the built-in web server
+  ##
   stopTimeout: 30000
+  ## The timeout of idle connections
+  ##
   idleTimeout: 30000
+  ## The executor thread pool work queue size of the built-in web server
+  ##
   threadPoolWorkQueueSize: 100
+  ## The request header size of the built-in web server
+  ##
   requestHeaderSize: 131072
+  ## The response header size of the built-in web server
+  ##
   responseHeaderSize: 131072
   customFilters: ""
 
+## THE CONFIGURATION FOR Gravitino CATALOG
+##
 catalog:
+  ## The interval in milliseconds to evict the catalog cache
+  ##
   cacheEvictionIntervalMs: 3600000
   classloader:
     isolated: true
 
+## THE CONFIGURATION FOR authorization
+##
 authorization:
+  ## Whether Gravitino enable authorization or not
+  ##
   enable: false
+  ## The admins of Gravitino service, multiple admins are spitted by comma.
+  ##
   serviceAdmins: anonymous
 
+## THE CONFIGURATION FOR AUXILIARY SERVICE
+##
 auxService:
+  ## Auxiliary service names, separate by ','
+  ##
   names: iceberg-rest
 
 icebergRest:
+  ## Iceberg REST service classpath
+  ##
   classpath: "iceberg-rest-server/libs, iceberg-rest-server/conf"
+  ## Iceberg REST service host
+  ##
   host: 0.0.0.0
+  ## Iceberg REST service http port
+  ##
   httpPort: 9001
+  ## The backend Iceberg catalog for Iceberg REST service, it's recommended to change to hive or jdbc
+  ##
   catalogBackend: memory
-  warehouse: /gravitino.conf/
+  ## The warehouse directory of Iceberg catalog for Iceberg REST service
+  ##
+  warehouse: /tmp/
 
+## Authentication mechanisms configuration. Support simple, OAuth and Kerberos.
+##
 authenticators: simple
 
+## OAuth mode configuration
+##
 authenticator:
   oauth:
     serviceAudience: test
@@ -98,6 +186,8 @@ authenticator:
     serverUri: http://57.185.211.74:8080
     tokenPath: /realms/myrealm/protocol/openid-connect/token
 
+## Audit log configuration
+##
 audit:
   enabled: false
   writer:
@@ -109,9 +199,13 @@ audit:
   formatter:
     className: org.apache.gravitino.audit.SimpleFormatter
 
+## Metrics configuration
+##
 metrics:
   timeSlidingWindowSecs: 60
 
+## Custom Gravitino configuration items
+##
 visibleConfigs: ""
 # visibleConfigs: "gravitino.datastrato.custom.authorization.ranger.admin.url,gravitino.datastrato.custom.authorization.ranger.username,gravitino.datastrato.custom.authorization.ranger.password,gravitino.datastrato.custom.authorization.ranger.auth.type"
 
@@ -121,13 +215,19 @@ visibleConfigsItems: {}
   # gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
   # gravitino.datastrato.custom.authorization.ranger.auth.type: simple
 
+## Additional Gravitino configuration items in gravitino.conf can be added
+##
 additionalConfigItems: {}
 #  gravitino.eventListener.names: "audit,sync"
 
+## Additional volumes
+##
 extraVolumes:
   - name: gravitino-log
     emptyDir: {}
 
+## Additional volume mounts
+##
 extraVolumeMounts:
   - name: gravitino-log
     mountPath: /root/gravitino/logs
@@ -136,6 +236,7 @@ extraVolumeMounts:
 ## If you set enabled as "True", you need :
 ## - create a pv which above 10Gi
 ## - keep storageClassName same with below setting
+##
 persistence:
   enabled: false
   accessModes:
@@ -146,9 +247,13 @@ persistence:
   # existingClaim:
   # storageClassName:
 
+## Whether redirect the log files to the container stdout and stderr
+##
 log:
   containerStdout: false
 
+## Gravitino log4j2 configuration items in log4j2.properties can be customized
+##
 log4j2Properties: {}
   # status: warn
 
@@ -184,7 +289,14 @@ log4j2Properties: {}
   # rootLoggerLevel: info
   # rootLoggerAppenderRefRollingRef: fileLogger
 
+## Additional log4j2 configuration items in log4j2.properties can be added
+##
 additionalLog4j2Properties: {}
+  # appender.console.type: Console
+  # appender.console.name: console
+  # appender.console.layout.type: PatternLayout
+  # appender.console.layout.pattern: "%d{HH:mm:ss.SSS} %level %msg%n"
+  # rootLogger.appenderRef.console.ref: console
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
@@ -201,6 +313,7 @@ service:
   nodePort: ""
 
 ## Additional ports to the gravitino services. Useful to expose extra container ports.
+##
 extraExposePorts:
   - port: 9001
     protocol: TCP
@@ -208,17 +321,23 @@ extraExposePorts:
     targetPort: 9001
 
 ## Deployment annotations
+##
 annotations: {}
 
-# Deployment replicas
+## Deployment replicas
+##
 replicas: 1
 
 ## Pod Annotations
+##
 podAnnotations: {}
 
 ## Pod Labels
+##
 podLabels: {}
 
+## Readiness probe for the Gravitino deployment
+##
 readinessProbe:
   httpGet:
     path: /
@@ -226,6 +345,8 @@ readinessProbe:
   initialDelaySeconds: 20
   timeoutSeconds: 5
 
+## Liveness probe for the Gravitino deployment
+##
 livenessProbe:
   httpGet:
     path: /
@@ -233,17 +354,23 @@ livenessProbe:
   initialDelaySeconds: 20
   timeoutSeconds: 5
 
+## Container-specific security context configuration
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+##
 containerSecurityContext:
   runAsNonRoot: false
   runAsUser: 0
 
+## Container Environment
+##
 env:
   - name: GRAVITINO_HOME
     value: /root/gravitino
 
-# The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
-# This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"
-# https://helm.sh/docs/howto/charts_tips_and_tricks/#using-the-tpl-function
+## The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
+## This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"
+## https://helm.sh/docs/howto/charts_tips_and_tricks/#using-the-tpl-function
+##
 envWithTpl: []
 #  - name: FOO_2
 #    value: "{{ .Values.foo2 }}"
@@ -252,6 +379,8 @@ envWithTpl: []
 
 envFrom: []
 
+## Resource limits & requests
+##
 resources: {}
   # limits:
   #   cpu: 500m
@@ -262,7 +391,7 @@ resources: {}
 
 ## Node labels for pod assignment
 ## ref: https://kubernetes.io/docs/user-guide/node-selection/
-#
+##
 nodeSelector: {}
 
 ## Tolerations for pod assignment

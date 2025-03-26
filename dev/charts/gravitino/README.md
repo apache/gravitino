@@ -47,16 +47,17 @@ for data and AI assets.
 If the chart has not been released yet, navigate to the chart directory and update its dependencies:
 
 ```console
-cd /path/to/chart
-helm dependency update
+helm dependency update [CHART]
 ```
 
 ## View Chart values
 
+You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino configurations in gravitino.conf can be modified through Helm values.yaml.
+
 To display the default values of the Gravitino chart, run:
 
 ```console
-helm show values gravitino
+helm show values [CHART]
 ```
 
 ## Install Helm Chart
@@ -97,9 +98,9 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
   --set mysql.enabled=true
 ```
 
-### Disable Dynamic Storage Provisioning
+#### Disable Dynamic Storage Provisioning
 
-By default, the storage class is local-path. To disable dynamic provisioning, set the storage class to "-":
+By default, the MySQL PersistentVolumeClaim(PVC) storage class is local-path. To disable dynamic provisioning, set the storage class to "-":
 
 ```console
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
@@ -111,7 +112,7 @@ You must then manually create a PersistentVolume (PV).
 
 ### Deploy Gravitino using an existed MySQL Database
 
-Ensure you have the following MySQL credentials ready: Username, Password, Database Name.
+Ensure you have the following MySQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
 
 Before deploying Gravitino, initialize your existing MySQL instance and create the necessary tables required for Gravitino to function properly.
 
@@ -119,7 +120,7 @@ Before deploying Gravitino, initialize your existing MySQL instance and create t
 mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
 ```
 
-Use Helm to install or upgrade Gravitino,specifying the MySQL connection details.
+Use Helm to install or upgrade Gravitino, specifying the MySQL connection details.
 
 ```console
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace \
