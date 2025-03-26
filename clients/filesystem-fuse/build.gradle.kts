@@ -17,17 +17,14 @@
  * under the License.
  */
 
+import io.github.liurenjie1024.gradle.rust.CargoBuildTask
+import io.github.liurenjie1024.gradle.rust.CargoCleanTask
+import io.github.liurenjie1024.gradle.rust.CargoDocTask
+import io.github.liurenjie1024.gradle.rust.CargoTestTask
 import io.github.liurenjie1024.gradle.rust.FeatureSpec as CargoFeatureSpec
 
 plugins {
   id("io.github.liurenjie1024.gradle.rust") version "0.1.0"
-}
-
-tasks.withType(io.github.liurenjie1024.gradle.rust.CargoBuildTask::class.java).configureEach {
-  verbose = false
-  release = true
-  extraCargoBuildArguments = listOf("--workspace")
-  featureSpec = CargoFeatureSpec.all()
 }
 
 val checkRustEnvironment by tasks.registering(Exec::class) {
@@ -35,6 +32,26 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
   standardOutput = System.out
   errorOutput = System.err
   isIgnoreExitValue = false
+}
+
+tasks.withType(CargoBuildTask::class.java).configureEach {
+  dependsOn(checkRustEnvironment)
+  verbose = false
+  release = true
+  extraCargoBuildArguments = listOf("--workspace")
+  featureSpec = CargoFeatureSpec.all()
+}
+
+tasks.withType(CargoTestTask::class.java).configureEach {
+  dependsOn(checkRustEnvironment)
+}
+
+tasks.withType(CargoCleanTask::class.java).configureEach {
+  dependsOn(checkRustEnvironment)
+}
+
+tasks.withType(CargoDocTask::class.java).configureEach {
+  dependsOn(checkRustEnvironment)
 }
 
 val checkRustProject by tasks.registering(Exec::class) {
