@@ -89,6 +89,9 @@ Alternatively, you can provide a custom values.yaml file:
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace -f /path/to/chart/resources/scenarios/ci-values.yaml
 ```
 
+_Note: \
+/path/to/chart/resources/scenarios/ci-values.yaml is an example scenario to deploy._
+
 ### Deploying Gravitino with MySQL as the Storage Backend
 
 To deploy both Gravitino and MySQL, where MySQL is used as the storage backend, enable the built-in MySQL instance:
