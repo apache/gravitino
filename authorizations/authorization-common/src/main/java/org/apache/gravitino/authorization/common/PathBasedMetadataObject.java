@@ -36,7 +36,7 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
    */
   public static final class PathType implements AuthorizationMetadataObject.Type {
 
-    private final Set<MetadataObject.Type> allowObjectTypes =
+    private static final Set<MetadataObject.Type> allowObjectTypes =
         ImmutableSet.of(
             MetadataObject.Type.METALAKE,
             MetadataObject.Type.CATALOG,
