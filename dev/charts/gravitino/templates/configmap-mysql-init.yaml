@@ -16,7 +16,8 @@
   specific language governing permissions and limitations
   under the License.
   */}}
-  
+
+{{- if .Values.mysql.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -42,3 +43,4 @@ data:
   {{ base $maxVersionFile }}: |-
     {{- tpl (.Files.Get $maxVersionFile | toString) $ | nindent 4 }}
   {{- end }}
+{{- end }}
