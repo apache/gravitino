@@ -246,9 +246,7 @@ curl -v -X GET \
 The Gravitino Docker image published on Docker Hub only contains the Gravitino server with some basic configurations.
 If you want to enjoy the whole Gravitino system with other components, you can use the Docker `compose` file.
 
-For more details, review the
-[Gravitino playground repository](https://github.com/apache/gravitino-playground) and
-[playground example](./how-to-use-the-playground.md).
+For more details, check [installing Apache Gravitino playground](./playground/install.md).
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToInstall" alt="" />
 

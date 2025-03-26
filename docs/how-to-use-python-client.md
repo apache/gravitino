@@ -34,16 +34,15 @@ pip install apache-gravitino
 
 ### Apache Gravitino Fileset Example
 
-We offer a playground environment to help you quickly understand
-how to use Gravitino Python client to manage non-tabular data on HDFS via Fileset in Gravitino.
-You can refer to [how to use the playground](./how-to-use-the-playground.md)
-to launch a Gravitino server, HDFS and Jupyter notebook environment in you local Docker environment.
+The Gravitino project provides a playground environment.
+Using this environment, you can quickly learn how to use the Gravitino Python client
+to manage non-tabular data on HDFS via Fileset in Gravitino.
+For more details, check [installing the playground](./playground/install.md).
 
-Waiting for the playground Docker environment to start, you can directly open
-`http://localhost:18888/lab/tree/gravitino-fileset-example.ipynb` in the browser and run the example.
+With the playground environment ready, in your browser, you can go to
+`http://localhost:18888/lab/tree/gravitino-fileset-example.ipynb` and run the example.
 
-The [gravitino-fileset-example](https://github.com/apache/gravitino-playground/blob/main/init/jupyter/gravitino-fileset-example.ipynb)
-contains the following code snippets:
+The `gravitino-fileset-example` contains the following code snippets:
 
 1. Install HDFS Python client.
 1. Create a HDFS client to connect HDFS and to do some test operations.
