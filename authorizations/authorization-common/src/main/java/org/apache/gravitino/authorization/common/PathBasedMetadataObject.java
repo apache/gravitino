@@ -19,8 +19,10 @@
 package org.apache.gravitino.authorization.common;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
@@ -34,6 +36,13 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
    */
   public static final class PathType implements AuthorizationMetadataObject.Type {
 
+    private final Set<MetadataObject.Type> allowObjectTypes =
+        ImmutableSet.of(
+            MetadataObject.Type.METALAKE,
+            MetadataObject.Type.CATALOG,
+            MetadataObject.Type.SCHEMA,
+            MetadataObject.Type.TABLE,
+            MetadataObject.Type.FILESET);
     private final MetadataObject.Type metadataType;
 
     public static PathType get(MetadataObject.Type type) {
@@ -41,6 +50,8 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
     }
 
     private PathType(MetadataObject.Type type) {
+      Preconditions.checkArgument(
+          allowObjectTypes.contains(type), "The type isn't allow to create path type");
       this.metadataType = type;
     }
 
