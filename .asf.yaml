@@ -58,6 +58,8 @@ github:
     - Abyss-lord
     - sunxiaojian
     - tengqm
+    - hdygxsj
+    - unknowntpo
 
 notifications:
   commits: commits@gravitino.apache.org
