@@ -461,7 +461,6 @@ public class AuthorizationUtils {
 
           switch (catalogObj.type()) {
             case RELATIONAL:
-              LOG.info("Catalog provider is {}", catalogObj.provider());
               if ("hive".equals(catalogObj.provider())
                   && schema.properties().containsKey(HIVE_LOCATION)) {
                 String schemaLocation = schema.properties().get(HIVE_LOCATION);

@@ -85,8 +85,7 @@ public class RangerAuthorizationHDFSPluginIT {
                     Assertions.assertEquals(
                         metalake.fullName(), pathBasedMetadataObject.fullName());
                     Assertions.assertEquals(
-                        PathBasedMetadataObject.PathType.get(MetadataObject.Type.METALAKE),
-                        pathBasedMetadataObject.type());
+                        PathBasedMetadataObject.METALAKE_PATH, pathBasedMetadataObject.type());
                     Assertions.assertEquals("/test", pathBasedMetadataObject.path());
                   });
 
@@ -100,8 +99,7 @@ public class RangerAuthorizationHDFSPluginIT {
                         (PathBasedMetadataObject) securableObject;
                     Assertions.assertEquals(catalog.fullName(), pathBasedMetadataObject.fullName());
                     Assertions.assertEquals(
-                        PathBasedMetadataObject.PathType.get(MetadataObject.Type.CATALOG),
-                        pathBasedMetadataObject.type());
+                        PathBasedMetadataObject.CATALOG_PATH, pathBasedMetadataObject.type());
                     Assertions.assertEquals("/test", pathBasedMetadataObject.path());
                   });
 
@@ -115,8 +113,7 @@ public class RangerAuthorizationHDFSPluginIT {
                         (PathBasedMetadataObject) securableObject;
                     Assertions.assertEquals(schema.fullName(), pathBasedMetadataObject.fullName());
                     Assertions.assertEquals(
-                        PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA),
-                        pathBasedMetadataObject.type());
+                        PathBasedMetadataObject.SCHEMA_PATH, pathBasedMetadataObject.type());
                     Assertions.assertEquals("/test", pathBasedMetadataObject.path());
                   });
 
@@ -131,8 +128,7 @@ public class RangerAuthorizationHDFSPluginIT {
                         (PathBasedMetadataObject) securableObject;
                     Assertions.assertEquals(table.fullName(), pathBasedMetadataObject.fullName());
                     Assertions.assertEquals(
-                        PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE),
-                        securableObject.type());
+                        PathBasedMetadataObject.TABLE_PATH, securableObject.type());
                     Assertions.assertEquals("/test", pathBasedMetadataObject.path());
                   });
 
@@ -147,8 +143,7 @@ public class RangerAuthorizationHDFSPluginIT {
                         (PathBasedMetadataObject) securableObject;
                     Assertions.assertEquals(fileset.fullName(), pathBasedMetadataObject.fullName());
                     Assertions.assertEquals(
-                        PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET),
-                        securableObject.type());
+                        PathBasedMetadataObject.FILESET_PATH, securableObject.type());
                     Assertions.assertEquals("/test", pathBasedMetadataObject.path());
                   });
         });
@@ -211,8 +206,7 @@ public class RangerAuthorizationHDFSPluginIT {
                 PathBasedSecurableObject pathBasedSecurableObject =
                     (PathBasedSecurableObject) securableObject;
                 Assertions.assertEquals(
-                    PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET),
-                    pathBasedSecurableObject.type());
+                    PathBasedMetadataObject.FILESET_PATH, pathBasedSecurableObject.type());
                 Assertions.assertEquals("/test", pathBasedSecurableObject.path());
                 Assertions.assertEquals(2, pathBasedSecurableObject.privileges().size());
               });
@@ -252,8 +246,7 @@ public class RangerAuthorizationHDFSPluginIT {
                 Assertions.assertEquals(1, filesetOwner.size());
                 Assertions.assertEquals("/test", pathBasedSecurableObject.path());
                 Assertions.assertEquals(
-                    PathBasedMetadataObject.PathType.get(MetadataObject.Type.FILESET),
-                    pathBasedSecurableObject.type());
+                    PathBasedMetadataObject.FILESET_PATH, pathBasedSecurableObject.type());
                 Assertions.assertEquals(3, pathBasedSecurableObject.privileges().size());
               });
         });

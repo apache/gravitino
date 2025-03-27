@@ -27,6 +27,13 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 
 public class PathBasedMetadataObject implements AuthorizationMetadataObject {
+
+  public static final PathType METALAKE_PATH = new PathType(MetadataObject.Type.METALAKE);
+  public static final PathType CATALOG_PATH = new PathType(MetadataObject.Type.CATALOG);
+  public static final PathType SCHEMA_PATH = new PathType(MetadataObject.Type.SCHEMA);
+  public static final PathType TABLE_PATH = new PathType(MetadataObject.Type.TABLE);
+  public static final PathType FILESET_PATH = new PathType(MetadataObject.Type.FILESET);
+
   /**
    * The type of metadata object in the underlying system. Every type will map one kind of the
    * entity of the Gravitino type system. When we store a Hive table, first, we will store the
