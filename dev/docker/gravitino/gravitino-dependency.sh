@@ -35,10 +35,11 @@ mkdir -p "${gravitino_dir}/packages"
 
 cp -r "${gravitino_home}/distribution/package" "${gravitino_dir}/packages/gravitino"
 
-# Copy the Aliyun, AWS, and GCP bundles to the Hadoop catalog libs
+# Copy the Aliyun, AWS, GCP and Azure bundles to the Hadoop catalog libs
 cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/hadoop/libs"
 cp ${gravitino_home}/bundles/aws-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/hadoop/libs"
 cp ${gravitino_home}/bundles/gcp-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/hadoop/libs"
+cp ${gravitino_home}/bundles/azure-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/hadoop/libs"
 
 # Keeping the container running at all times
 cat <<EOF >> "${gravitino_dir}/packages/gravitino/bin/gravitino.sh"
