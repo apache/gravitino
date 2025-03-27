@@ -882,7 +882,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     try {
       AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
       Awaitility.await()
-          .atMost(timeoutSeconds, TimeUnit.SECONDS).pollInterval(1, TimeUnit.MILLISECONDS)
+          .atMost(timeoutSeconds, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.MILLISECONDS)
           .until(
               () -> {
                 fileSystem.set(provider.getFileSystem(path, config));
