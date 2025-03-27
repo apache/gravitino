@@ -49,7 +49,7 @@ public class LineageOperations {
   }
 
   @POST
-  @Produces("application/vnd.gravitino.v1+json")
+  @Produces("application/json")
   @Timed(name = "update-lineage." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-lineage", absolute = true)
   public Response updateLineage(OpenLineage.RunEvent event) {
@@ -60,16 +60,15 @@ public class LineageOperations {
         event.getJob().getName());
 
     try {
-      Utils.doAs(
+      return Utils.doAs(
           httpRequest,
           () -> {
             lineageService.dispatchLineageEvent(event);
-            return Utils.ok();
+            return Utils.created();
           });
     } catch (Exception e) {
       LOG.warn("Process lineage failed,", e);
-      Utils.internalError(e.getMessage());
+      return Utils.internalError(e.getMessage());
     }
-    return Utils.ok();
   }
 }

@@ -48,6 +48,10 @@ public class Utils {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
   }
 
+  public static Response created() {
+    return Response.status(Response.Status.CREATED).type(MediaType.APPLICATION_JSON).build();
+  }
+
   public static Response ok() {
     return Response.status(Response.Status.NO_CONTENT).type(MediaType.APPLICATION_JSON).build();
   }
