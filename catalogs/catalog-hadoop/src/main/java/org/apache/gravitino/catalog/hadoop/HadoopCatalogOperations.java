@@ -270,9 +270,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     try {
       // formalize the path to avoid path without scheme, uri, authority, etc.
-      filesetPath = formalizePath(filesetPath, conf);
-
       FileSystem fs = getFileSystem(filesetPath, conf);
+      filesetPath = filesetPath.makeQualified(fs.getUri(), fs.getWorkingDirectory());
       if (!fs.exists(filesetPath)) {
         if (!fs.mkdirs(filesetPath)) {
           throw new RuntimeException(
@@ -884,6 +883,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       AtomicReference<FileSystem> fileSystem = new AtomicReference<>();
       Awaitility.await()
           .atMost(timeoutSeconds, TimeUnit.SECONDS)
+          .pollInterval(1, TimeUnit.MILLISECONDS)
           .until(
               () -> {
                 fileSystem.set(provider.getFileSystem(path, config));
