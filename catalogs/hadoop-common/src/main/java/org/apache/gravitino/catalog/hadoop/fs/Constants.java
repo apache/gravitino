@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.hadoop.fs;
 
+/** Constants used by the Hadoop file system catalog. */
 public class Constants {
 
   // Name of the built-in local file system provider
