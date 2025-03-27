@@ -58,6 +58,7 @@ import org.apache.gravitino.listener.api.event.RegisterModelPreEvent;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -271,6 +272,20 @@ public class ModelEventDispatcher implements ModelDispatcher {
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new DeleteModelVersionFailureEvent(user, ident, e, alias, null));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    // TODO add model pre event
+    try {
+      // TODO add model event
+      return dispatcher.alterModel(ident, changes);
+    } catch (Exception e) {
+      // TODO add model failure event
       throw e;
     }
   }
