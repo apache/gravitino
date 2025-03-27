@@ -117,7 +117,7 @@ public class TestUserEvent {
 
     AddUserEvent addUserEvent = (AddUserEvent) event;
     Assertions.assertEquals(identifier, addUserEvent.identifier());
-    UserInfo userInfo = addUserEvent.userInfo();
+    UserInfo userInfo = addUserEvent.addUserInfo();
 
     validateUserInfo(userInfo, user);
   }
@@ -162,7 +162,7 @@ public class TestUserEvent {
 
     GetUserEvent getUserEvent = (GetUserEvent) event;
     Assertions.assertEquals(identifier, getUserEvent.identifier());
-    UserInfo userInfo = getUserEvent.userInfo();
+    UserInfo userInfo = getUserEvent.getUserInfo();
 
     validateUserInfo(userInfo, user);
   }
@@ -262,7 +262,7 @@ public class TestUserEvent {
     RemoveUserEvent removeUserEvent = (RemoveUserEvent) event;
     Assertions.assertEquals(identifier, removeUserEvent.identifier());
     Assertions.assertTrue(removeUserEvent.isExists());
-    UserInfo userInfo = removeUserEvent.userInfo();
+    UserInfo userInfo = removeUserEvent.removedUserInfo();
     Assertions.assertEquals(userInfo.name(), userName);
     Assertions.assertFalse(userInfo.roles().isPresent());
   }
@@ -280,7 +280,7 @@ public class TestUserEvent {
     RemoveUserEvent removeUserEvent = (RemoveUserEvent) event;
     Assertions.assertEquals(identifier, removeUserEvent.identifier());
     Assertions.assertFalse(removeUserEvent.isExists());
-    UserInfo userInfo = removeUserEvent.userInfo();
+    UserInfo userInfo = removeUserEvent.removedUserInfo();
     Assertions.assertEquals(userInfo.name(), inExistUserName);
     Assertions.assertFalse(userInfo.roles().isPresent());
   }
