@@ -336,7 +336,9 @@ const TableView = () => {
               title='Delete'
               size='small'
               sx={{ color: theme => theme.palette.error.light }}
-              onClick={() => handleDelete({ name: row.name, type: row.node, catalogType: row.type })}
+              onClick={() =>
+                handleDelete({ name: row.name, type: row.node, catalogType: row.type, inUse: row.inUse === 'true' })
+              }
               data-refer={`delete-entity-${row.name}`}
             >
               <DeleteIcon />
@@ -640,9 +642,9 @@ const TableView = () => {
     }
   }
 
-  const handleDelete = ({ name, type, catalogType }) => {
+  const handleDelete = ({ name, type, catalogType, inUse }) => {
     setOpenConfirmDelete(true)
-    setConfirmCacheData({ name, type, catalogType })
+    setConfirmCacheData({ name, type, catalogType, inUse })
   }
 
   const handleCloseConfirm = () => {
