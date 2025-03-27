@@ -34,31 +34,37 @@ val checkRustEnvironment by tasks.registering(Exec::class) {
   isIgnoreExitValue = false
 }
 
-tasks.withType(CargoBuildTask::class.java).configureEach {
+val checkRustProject by tasks.registering(Exec::class) {
   dependsOn(checkRustEnvironment)
+  workingDir = file("$projectDir")
+
+  commandLine("bash", "-c", "make check")
+}
+
+tasks.withType(CargoBuildTask::class.java).configureEach {
+  dependsOn(checkRustProject)
   verbose = false
   release = true
   extraCargoBuildArguments = listOf("--workspace")
   featureSpec = CargoFeatureSpec.all()
 }
 
-tasks.withType(CargoTestTask::class.java).configureEach {
-  dependsOn(checkRustEnvironment)
+val testRustProject = tasks.withType(CargoTestTask::class.java)
+testRustProject.configureEach {
+  dependsOn(checkRustProject)
+  extraCargoBuildArguments = listOf("--no-fail-fast", "--all-targets", "--all-features", "--workspace")
 }
 
 tasks.withType(CargoCleanTask::class.java).configureEach {
-  dependsOn(checkRustEnvironment)
+  dependsOn(checkRustProject)
 }
 
 tasks.withType(CargoDocTask::class.java).configureEach {
-  dependsOn(checkRustEnvironment)
+  dependsOn(checkRustProject)
 }
 
-val checkRustProject by tasks.registering(Exec::class) {
-  dependsOn(checkRustEnvironment)
-  workingDir = file("$projectDir")
-
-  commandLine("bash", "-c", "make check")
+tasks.named("test") {
+  dependsOn(testRustProject)
 }
 
 tasks.named("check") {
