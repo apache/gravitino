@@ -19,7 +19,10 @@
 
 package org.apache.gravitino;
 
-/* User friendly error messages. */
+/**
+ * User friendly error messages for model operations. This class provides standardized error message
+ * templates for model-related operations.
+ */
 public class ErrorMessages {
   public static final String SCHEMA_DOES_NOT_EXIST = "Schema %s does not exist";
   public static final String MODEL_DOES_NOT_EXIST = "Model %s does not exist";
