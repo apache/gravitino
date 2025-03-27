@@ -117,7 +117,7 @@ public class TestUserEvent {
 
     AddUserEvent addUserEvent = (AddUserEvent) event;
     Assertions.assertEquals(identifier, addUserEvent.identifier());
-    UserInfo userInfo = addUserEvent.addUserInfo();
+    UserInfo userInfo = addUserEvent.addedUserInfo();
 
     validateUserInfo(userInfo, user);
   }
@@ -162,7 +162,7 @@ public class TestUserEvent {
 
     GetUserEvent getUserEvent = (GetUserEvent) event;
     Assertions.assertEquals(identifier, getUserEvent.identifier());
-    UserInfo userInfo = getUserEvent.loadUserInfo();
+    UserInfo userInfo = getUserEvent.loadedUserInfo();
 
     validateUserInfo(userInfo, user);
   }

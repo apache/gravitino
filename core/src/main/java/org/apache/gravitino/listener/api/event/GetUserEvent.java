@@ -26,7 +26,7 @@ import org.apache.gravitino.listener.api.info.UserInfo;
 /** Represents an event triggered after successful get a user from specific metalake */
 @DeveloperApi
 public class GetUserEvent extends UserEvent {
-  private final UserInfo loadUserInfo;
+  private final UserInfo loadedUserInfo;
 
   /**
    * Construct a new {@link GetUserEvent} instance with the given initiator, identifier and user
@@ -34,12 +34,12 @@ public class GetUserEvent extends UserEvent {
    *
    * @param initiator the user who initiated the user-get request.
    * @param identifier the identifier of the metalake which the user is retrieved from.
-   * @param loadUserInfo the user information.
+   * @param loadedUserInfo the user information.
    */
-  protected GetUserEvent(String initiator, NameIdentifier identifier, UserInfo loadUserInfo) {
+  protected GetUserEvent(String initiator, NameIdentifier identifier, UserInfo loadedUserInfo) {
     super(initiator, identifier);
 
-    this.loadUserInfo = loadUserInfo;
+    this.loadedUserInfo = loadedUserInfo;
   }
 
   /**
@@ -47,8 +47,8 @@ public class GetUserEvent extends UserEvent {
    *
    * @return the {@link UserInfo} instance.
    */
-  public UserInfo loadUserInfo() {
-    return loadUserInfo;
+  public UserInfo loadedUserInfo() {
+    return loadedUserInfo;
   }
 
   /**
