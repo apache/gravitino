@@ -122,18 +122,18 @@ public class KerberosUtils {
         options.put("useKeyTab", "true");
         options.put("keyTab", keyTabFile);
         options.put("storeKey", "true");
+      } else {
+        options.put("useTicketCache", "true");
+        String ticketCache = System.getenv("KRB5CCNAME");
+        if (ticketCache != null) {
+          options.put("ticketCache", ticketCache);
+        }
+        options.put("renewTGT", "true");
       }
-
       options.put("principal", principal);
       options.put("doNotPrompt", "true");
-      options.put("useTicketCache", "true");
-      options.put("renewTGT", "true");
       options.put("refreshKrb5Config", "true");
       options.put("isInitiator", "true");
-      String ticketCache = System.getenv("KRB5CCNAME");
-      if (ticketCache != null) {
-        options.put("ticketCache", ticketCache);
-      }
       options.put("debug", "true");
 
       return new AppConfigurationEntry[] {
