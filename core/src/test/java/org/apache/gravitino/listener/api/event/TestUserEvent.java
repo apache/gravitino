@@ -162,7 +162,7 @@ public class TestUserEvent {
 
     GetUserEvent getUserEvent = (GetUserEvent) event;
     Assertions.assertEquals(identifier, getUserEvent.identifier());
-    UserInfo userInfo = getUserEvent.getUserInfo();
+    UserInfo userInfo = getUserEvent.loadUserInfo();
 
     validateUserInfo(userInfo, user);
   }
