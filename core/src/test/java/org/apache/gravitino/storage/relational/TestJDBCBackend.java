@@ -29,6 +29,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -81,8 +82,10 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -763,6 +766,13 @@ public class TestJDBCBackend {
         backend.list(catalog.namespace(), Entity.EntityType.CATALOG, true);
     assertTrue(catalogs.contains(catalog));
 
+    assertEquals(
+        1,
+        SessionUtils.doWithCommitAndFetchResult(
+                CatalogMetaMapper.class,
+                mapper -> mapper.listCatalogPOsByMetalakeName(metalake.name()))
+            .size());
+
     List<SchemaEntity> schemas = backend.list(schema.namespace(), Entity.EntityType.SCHEMA, true);
     assertTrue(schemas.contains(schema));
 
@@ -785,6 +795,16 @@ public class TestJDBCBackend {
     assertEquals(role, roleEntity);
     assertEquals(1, RoleMetaService.getInstance().listRolesByUserId(user.id()).size());
     assertEquals(1, RoleMetaService.getInstance().listRolesByGroupId(group.id()).size());
+
+    CatalogEntity catalogEntity = backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    assertEquals(catalog, catalogEntity);
+    assertNotNull(
+        CatalogMetaService.getInstance()
+            .getCatalogPOByName(catalogEntity.namespace().level(0), catalog.name()));
+    assertEquals(
+        catalog.id(),
+        CatalogMetaService.getInstance()
+            .getCatalogIdByName(catalog.namespace().level(0), catalog.name()));
 
     UserEntity userEntity = backend.get(user.nameIdentifier(), Entity.EntityType.USER);
     assertEquals(user, userEntity);
@@ -859,6 +879,13 @@ public class TestJDBCBackend {
 
     // meta data soft delete
     backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, true);
+
+    assertEquals(
+        0,
+        SessionUtils.doWithCommitAndFetchResult(
+                CatalogMetaMapper.class,
+                mapper -> mapper.listCatalogPOsByMetalakeName(metalake.name()))
+            .size());
 
     // check existence after soft delete
     assertFalse(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
