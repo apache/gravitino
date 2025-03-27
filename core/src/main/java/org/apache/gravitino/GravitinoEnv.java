@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import java.util.Set;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -366,6 +367,17 @@ public class GravitinoEnv {
     return lineageService;
   }
 
+  /**
+   * Get the REST packages associated with the Gravitino environment.
+   *
+   * @return The REST packages.
+   */
+  public Set<String> getRESTPackages() {
+    Set<String> packages = new java.util.HashSet<>();
+    packages.addAll(lineageService.getRESTPackages());
+    return packages;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -408,6 +420,10 @@ public class GravitinoEnv {
 
     if (metalakeManager != null) {
       metalakeManager.close();
+    }
+
+    if (lineageService != null) {
+      lineageService.close();
     }
 
     LOG.info("Gravitino Environment is shut down.");

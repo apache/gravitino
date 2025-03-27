@@ -27,6 +27,32 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 public class TestLineageConfig {
 
   @Test
+  void testLineageSource() {
+    // default config with HTTP source
+    LineageConfig lineageConfig = new LineageConfig(ImmutableMap.of());
+    Assertions.assertEquals(LineageConfig.LINEAGE_HTTP_SOURCE_NAME, lineageConfig.source());
+    Assertions.assertEquals(
+        LineageConfig.LINEAGE_HTTP_SOURCE_CLASS_NAME, lineageConfig.sourceClass());
+
+    // config with custom source
+    lineageConfig =
+        new LineageConfig(
+            ImmutableMap.of(
+                LineageConfig.LINEAGE_CONFIG_SOURCE,
+                "source1",
+                "source1." + LineageConfig.LINEAGE_SOURCE_CLASS_NAME,
+                "test-class"));
+    Assertions.assertEquals("source1", lineageConfig.source());
+    Assertions.assertEquals("test-class", lineageConfig.sourceClass());
+
+    LineageConfig lineageConfig2 =
+        new LineageConfig(ImmutableMap.of(LineageConfig.LINEAGE_CONFIG_SOURCE, "source2"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> lineageConfig2.sourceClass());
+  }
+
+  @Test
   void testGetSinkConfigs() {
     // default config with log sink
     LineageConfig lineageConfig = new LineageConfig(ImmutableMap.of());

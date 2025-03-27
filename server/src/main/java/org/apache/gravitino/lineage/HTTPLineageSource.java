@@ -19,15 +19,17 @@
 
 package org.apache.gravitino.lineage;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Set;
+import org.apache.gravitino.server.web.lineage.rest.LineageOperations;
 
 public class HTTPLineageSource implements LineageSource {
-
-  @Override
-  public String shortName() {
-    return "http";
-  }
-
   @Override
   public void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
+
+  @Override
+  public Set<String> getRESTPackages() {
+    return ImmutableSet.of(LineageOperations.class.getPackage().getName());
+  }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.lineage;
 
 import com.google.common.annotations.VisibleForTesting;
 import io.openlineage.server.OpenLineage.RunEvent;
+import java.io.Closeable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +29,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.EventWrapper;
 
-public class LineageSinkManager {
-
+public class LineageSinkManager implements Closeable {
   private EventBus eventBus;
   private EventListenerManager eventListenerManager;
 
@@ -73,7 +73,8 @@ public class LineageSinkManager {
     eventBus.dispatchEvent(new EventWrapper(runEvent));
   }
 
-  public void stop() {
+  @Override
+  public void close() {
     eventListenerManager.stop();
   }
 

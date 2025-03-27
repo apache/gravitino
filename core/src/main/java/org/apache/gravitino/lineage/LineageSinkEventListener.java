@@ -49,7 +49,7 @@ public class LineageSinkEventListener implements EventListenerPlugin {
   @Override
   public void stop() throws RuntimeException {
     if (sink != null) {
-      sink.stop();
+      sink.close();
     }
   }
 

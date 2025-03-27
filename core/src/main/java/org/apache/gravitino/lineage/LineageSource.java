@@ -19,12 +19,18 @@
 
 package org.apache.gravitino.lineage;
 
+import com.google.common.collect.ImmutableSet;
+import java.io.Closeable;
 import java.util.Map;
+import java.util.Set;
 
-public interface LineageSource {
-  String shortName();
+public interface LineageSource extends Closeable {
 
   default void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
 
-  default void stop() {}
+  default void close() {}
+
+  default Set<String> getRESTPackages() {
+    return ImmutableSet.of();
+  }
 }

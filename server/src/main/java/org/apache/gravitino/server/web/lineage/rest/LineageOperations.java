@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.server.web.rest;
+package org.apache.gravitino.server.web.lineage.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -63,8 +63,11 @@ public class LineageOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            lineageService.dispatchLineageEvent(event);
-            return Utils.created();
+            if (lineageService.dispatchLineageEvent(event)) {
+              return Utils.created();
+            } else {
+              return Utils.tooManyRequests();
+            }
           });
     } catch (Exception e) {
       LOG.warn("Process lineage failed,", e);

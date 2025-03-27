@@ -20,7 +20,8 @@
 package org.apache.gravitino.lineage;
 
 import io.openlineage.server.OpenLineage.RunEvent;
+import java.io.Closeable;
 
-public interface LineageDispatcher {
+public interface LineageDispatcher extends Closeable {
   boolean dispatchLineageEvent(RunEvent runEvent);
 }

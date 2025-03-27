@@ -20,12 +20,13 @@
 package org.apache.gravitino.lineage;
 
 import io.openlineage.server.OpenLineage;
+import java.io.Closeable;
 import java.util.Map;
 
-public interface LineageSink {
+public interface LineageSink extends Closeable {
   default void initialize(Map<String, String> configs) {}
 
-  default void stop() {}
+  default void close() {}
 
   void sink(OpenLineage.RunEvent event);
 }

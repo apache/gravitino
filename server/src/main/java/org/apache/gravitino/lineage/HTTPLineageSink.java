@@ -54,7 +54,7 @@ public class HTTPLineageSink implements LineageSink {
   }
 
   @Override
-  public void stop() {
+  public void close() {
     try {
       client.close();
     } catch (Exception e) {

@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
@@ -34,24 +35,34 @@ public class LineageConfig extends Config {
 
   public static final String LINEAGE_CONFIG_PREFIX = "gravitino.lineage.";
   public static final String LINEAGE_CONFIG_SINKS = "sinks";
+  public static final String LINEAGE_CONFIG_SOURCE = "source";
+  public static final String LINEAGE_SOURCE_CLASS_NAME = "source-class";
+  public static final String LINEAGE_PROCESSOR_CLASS_NAME = "processor-class";
   public static final String LINEAGE_SINK_CLASS_NAME = "sink-class";
   public static final String LINEAGE_HTTP_SOURCE_CLASS_NAME =
       "org.apache.gravitino.lineage.HTTPLineageSource";
 
   public static final String LINEAGE_LOG_SINK_NAME = "log";
+  public static final String LINEAGE_HTTP_SOURCE_NAME = "http";
 
   private static final Splitter splitter = Splitter.on(",");
 
-  public static final ConfigEntry<String> SOURCE =
-      new ConfigBuilder("source")
-          .doc("The source of lineage event")
+  public static final ConfigEntry<String> SOURCE_NAME =
+      new ConfigBuilder(LINEAGE_CONFIG_SOURCE)
+          .doc("The name of lineage event source")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .stringConf()
+          .createWithDefault(LINEAGE_HTTP_SOURCE_NAME);
+  public static final ConfigEntry<String> SOURCE_CLASS =
+      new ConfigBuilder(LINEAGE_SOURCE_CLASS_NAME)
+          .doc("The class name of lineage event source")
           .version(ConfigConstants.VERSION_0_9_0)
           .stringConf()
           .createWithDefault(LINEAGE_HTTP_SOURCE_CLASS_NAME);
 
   public static final ConfigEntry<String> PROCESSOR =
-      new ConfigBuilder("processor")
-          .doc("The processor of lineage event")
+      new ConfigBuilder(LINEAGE_PROCESSOR_CLASS_NAME)
+          .doc("The class name of lineage event processor")
           .version(ConfigConstants.VERSION_0_9_0)
           .stringConf()
           .createWithDefault(NoopProcessor.class.getName());
@@ -69,17 +80,26 @@ public class LineageConfig extends Config {
   }
 
   public String source() {
-    return get(SOURCE);
+    return get(SOURCE_NAME);
   }
 
-  public String processor() {
+  public String sourceClass() {
+    if (source().equals(LINEAGE_HTTP_SOURCE_NAME)) {
+      return LINEAGE_HTTP_SOURCE_CLASS_NAME;
+    }
+    String sourceConfig = source() + "." + LINEAGE_SOURCE_CLASS_NAME;
+    String sourceClass = getRawString(sourceConfig);
+    Preconditions.checkArgument(StringUtils.isNotBlank(sourceClass), sourceConfig + " is not set");
+    return sourceClass;
+  }
+
+  public String processorClass() {
     return get(PROCESSOR);
   }
 
   public Map<String, String> getSinkConfigs() {
     List<String> sinks = sinks();
-    String logSinkClass =
-        LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME;
+
     Map<String, String> config = getAllConfig();
     Map m = new HashMap(config);
 
@@ -88,8 +108,10 @@ public class LineageConfig extends Config {
       m.put(LINEAGE_CONFIG_SINKS, sinkString);
     }
 
-    if (sinks.contains(LINEAGE_LOG_SINK_NAME) && !config.containsKey(logSinkClass)) {
-      m.put(logSinkClass, LineageLogSinker.class.getName());
+    String logClassConfigKey =
+        LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME;
+    if (sinks.contains(LINEAGE_LOG_SINK_NAME) && !config.containsKey(logClassConfigKey)) {
+      m.put(logClassConfigKey, LineageLogSinker.class.getName());
     }
 
     sinks.stream()
