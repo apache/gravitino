@@ -34,11 +34,12 @@ public interface MetadataObjectChange {
    *
    * @param metadataObject The metadata object.
    * @param newMetadataObject The new metadata object.
+   * @param locations The locations of the metadata object.
    * @return return a MetadataObjectChange for the rename metadata object.
    */
   static MetadataObjectChange rename(
-      MetadataObject metadataObject, MetadataObject newMetadataObject) {
-    return new RenameMetadataObject(metadataObject, newMetadataObject);
+      MetadataObject metadataObject, MetadataObject newMetadataObject, List<String> locations) {
+    return new RenameMetadataObject(metadataObject, newMetadataObject, locations);
   }
 
   /**
@@ -56,8 +57,14 @@ public interface MetadataObjectChange {
   final class RenameMetadataObject implements MetadataObjectChange {
     private final MetadataObject metadataObject;
     private final MetadataObject newMetadataObject;
+    private final List<String> locations;
 
     private RenameMetadataObject(MetadataObject metadataObject, MetadataObject newMetadataObject) {
+      this(metadataObject, newMetadataObject, null);
+    }
+
+    private RenameMetadataObject(
+        MetadataObject metadataObject, MetadataObject newMetadataObject, List<String> locations) {
       Preconditions.checkArgument(
           !metadataObject.fullName().equals(newMetadataObject.fullName()),
           "The metadata object must be different!");
@@ -67,6 +74,7 @@ public interface MetadataObjectChange {
 
       this.metadataObject = metadataObject;
       this.newMetadataObject = newMetadataObject;
+      this.locations = locations;
     }
 
     /**
@@ -88,6 +96,15 @@ public interface MetadataObjectChange {
     }
 
     /**
+     * Return the locations of the metadata object
+     *
+     * @return return the locations of the metadata object
+     */
+    public List<String> locations() {
+      return locations;
+    }
+
+    /**
      * Compares this RenameMetadataObject instance with another object for equality. The comparison
      * is based on the old metadata entity and new metadata entity.
      *
@@ -100,7 +117,8 @@ public interface MetadataObjectChange {
       if (o == null || getClass() != o.getClass()) return false;
       RenameMetadataObject that = (RenameMetadataObject) o;
       return metadataObject.equals(that.metadataObject)
-          && newMetadataObject.equals(that.newMetadataObject);
+          && newMetadataObject.equals(that.newMetadataObject)
+          && locations.equals(that.locations);
     }
 
     /**

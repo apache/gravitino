@@ -749,7 +749,7 @@ public class RangerHiveIT {
     MetadataObject newMetadataObject = MetadataObjects.parse(newMetalake, oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
             newMetadataObject.fullName(),
@@ -792,7 +792,7 @@ public class RangerHiveIT {
             String.format("catalog-new-%s", currentFunName), oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
             newMetadataObject.fullName(),
@@ -834,7 +834,7 @@ public class RangerHiveIT {
             String.format("catalog.new-%s", currentFunName), oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     assertFindManagedPolicyItems(role, false);
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
@@ -877,7 +877,7 @@ public class RangerHiveIT {
             String.format("catalog.schema1.new-%s", currentFunName), oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     assertFindManagedPolicyItems(role, false);
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(

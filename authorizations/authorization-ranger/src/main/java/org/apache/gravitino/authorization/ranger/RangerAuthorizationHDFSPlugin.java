@@ -22,8 +22,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -36,7 +36,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
@@ -50,7 +49,9 @@ import org.apache.gravitino.authorization.common.PathBasedSecurableObject;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.util.SearchFilter;
@@ -257,6 +258,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       removeTableMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.type().equals(PathBasedMetadataObject.FILESET_PATH)) {
       removePolicyByMetadataObject(authzMetadataObject);
+    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.METALAKE
+        || authzMetadataObject.metadataObjectType() == MetadataObject.Type.CATALOG) {
+      // Do nothing
     } else {
       throw new IllegalArgumentException(
           "Unsupported authorization metadata object type: " + authzMetadataObject.type());
@@ -271,81 +275,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
-    Preconditions.checkArgument(
-        authzMetadataObject.type().equals(PathBasedMetadataObject.SCHEMA_PATH),
-        "The metadata object type must be a schema");
-    Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 1, "The metadata object's size must be 1.");
-    if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
-      // Remove all schema in this catalog
-      String catalogName = authzMetadataObject.names().get(0);
-      NameIdentifier[] schemas =
-          GravitinoEnv.getInstance()
-              .schemaDispatcher()
-              .listSchemas(Namespace.of(metalake, catalogName));
-      Arrays.asList(schemas)
-          .forEach(
-              schema -> {
-                List<String> schemaLocations =
-                    AuthorizationUtils.getMetadataObjectLocation(
-                        NameIdentifier.of(metalake, catalogName, schema.name()),
-                        Entity.EntityType.SCHEMA);
-                schemaLocations.forEach(
-                    locationPath -> {
-                      List<String> names = ImmutableList.of(metalake, catalogName, schema.name());
-                      AuthorizationMetadataObject schemaMetadataObject =
-                          new PathBasedMetadataObject(
-                              AuthorizationMetadataObject.getParentFullName(names),
-                              AuthorizationMetadataObject.getLastName(names),
-                              locationPath,
-                              PathBasedMetadataObject.SCHEMA_PATH);
-                      removeSchemaMetadataObject(schemaMetadataObject);
-                    });
-              });
-    } else {
-      // Remove all table in this schema
-      NameIdentifier[] tables =
-          GravitinoEnv.getInstance()
-              .tableDispatcher()
-              .listTables(Namespace.of(authzMetadataObject.name()));
-      Arrays.asList(tables)
-          .forEach(
-              table -> {
-                NameIdentifier identifier =
-                    NameIdentifier.of(authzMetadataObject.name(), table.name());
-                List<String> tabLocations =
-                    AuthorizationUtils.getMetadataObjectLocation(
-                        identifier, Entity.EntityType.TABLE);
-                tabLocations.forEach(
-                    locationPath -> {
-                      AuthorizationMetadataObject tableMetadataObject =
-                          new PathBasedMetadataObject(
-                              authzMetadataObject.name(),
-                              table.name(),
-                              locationPath,
-                              PathBasedMetadataObject.TABLE_PATH);
-                      removeTableMetadataObject(tableMetadataObject);
-                    });
-              });
-      // Remove schema
-      Schema schema =
-          GravitinoEnv.getInstance()
-              .schemaDispatcher()
-              .loadSchema(NameIdentifier.of(authzMetadataObject.name()));
-      List<String> schemaLocations =
-          AuthorizationUtils.getMetadataObjectLocation(
-              NameIdentifier.parse(authzMetadataObject.fullName()), Entity.EntityType.SCHEMA);
-      schemaLocations.forEach(
-          locationPath -> {
-            AuthorizationMetadataObject schemaMetadataObject =
-                new PathBasedMetadataObject(
-                    authzMetadataObject.name(),
-                    schema.name(),
-                    locationPath,
-                    PathBasedMetadataObject.SCHEMA_PATH);
-            removePolicyByMetadataObject(schemaMetadataObject);
-          });
-    }
+    // TODO: The remove schema logic will be implemented when schema is supported
   }
 
   /**
@@ -507,6 +437,24 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 case SELECT_TABLE:
                 case CREATE_TABLE:
                 case MODIFY_TABLE:
+                  AuthorizationUtils.getMetadataObjectLocation(
+                          identifier, MetadataObjectUtil.toEntityType(securableObject))
+                      .forEach(
+                          locationPath -> {
+                            PathBasedMetadataObject pathBaseMetadataObject =
+                                new PathBasedMetadataObject(
+                                    securableObject.parent(),
+                                    securableObject.name(),
+                                    locationPath,
+                                    PathBasedMetadataObject.PathType.get(securableObject.type()));
+                            pathBaseMetadataObject.validateAuthorizationMetadataObject();
+                            rangerSecurableObjects.add(
+                                generateAuthorizationSecurableObject(
+                                    pathBaseMetadataObject.names(),
+                                    locationPath,
+                                    PathBasedMetadataObject.PathType.get(securableObject.type()),
+                                    rangerPrivileges));
+                          });
                   break;
                 case CREATE_FILESET:
                   // Ignore the Gravitino privilege `CREATE_FILESET` in the
@@ -599,6 +547,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       case SCHEMA:
         break;
       case FILESET:
+      case TABLE:
         translateMetadataObject(gravitinoMetadataObject)
             .forEach(
                 metadataObject -> {
@@ -611,7 +560,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       generateAuthorizationSecurableObject(
                           pathBasedMetadataObject.names(),
                           getAuthorizationPath(pathBasedMetadataObject),
-                          PathBasedMetadataObject.FILESET_PATH,
+                          pathBasedMetadataObject.type(),
                           ownerMappingRule()));
                 });
         break;
@@ -649,10 +598,10 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   public Boolean onMetadataUpdated(MetadataObjectChange... changes) throws RuntimeException {
     for (MetadataObjectChange change : changes) {
       if (change instanceof MetadataObjectChange.RenameMetadataObject) {
-        MetadataObject metadataObject =
-            ((MetadataObjectChange.RenameMetadataObject) change).metadataObject();
-        MetadataObject newMetadataObject =
-            ((MetadataObjectChange.RenameMetadataObject) change).newMetadataObject();
+        MetadataObjectChange.RenameMetadataObject renameChange =
+            (MetadataObjectChange.RenameMetadataObject) change;
+        MetadataObject metadataObject = renameChange.metadataObject();
+        MetadataObject newMetadataObject = renameChange.newMetadataObject();
         Preconditions.checkArgument(
             metadataObject.type() == newMetadataObject.type(),
             "The old and new metadata object types must be equal!");
@@ -665,8 +614,47 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           // Did not need to update the Ranger policy
           continue;
         }
-        List<AuthorizationMetadataObject> oldAuthzMetadataObjects =
-            translateMetadataObject(metadataObject);
+
+        // Like topics and filesets, their locations don't change, we don't need to modify the
+        // policies
+        if (renameChange.locations() == null || renameChange.locations().isEmpty()) {
+          continue;
+        }
+
+        // Only Hive managed tables will change the location
+        if (metadataObject.type() == MetadataObject.Type.TABLE) {
+          NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, newMetadataObject);
+          NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(ident);
+          if (GravitinoEnv.getInstance()
+              .catalogDispatcher()
+              .loadCatalog(catalogIdent)
+              .provider()
+              .equals("hive")) {
+            Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
+            if (table.properties().get("table-type").equals("EXTERNAL_TABLE")) {
+              continue;
+            }
+          } else {
+            // Iceberg and other lake houses don't need to change the privileges of locations
+            continue;
+          }
+        }
+
+        List<AuthorizationMetadataObject> oldAuthzMetadataObjects = Lists.newArrayList();
+        renameChange
+            .locations()
+            .forEach(
+                locationPath -> {
+                  PathBasedMetadataObject pathBaseMetadataObject =
+                      new PathBasedMetadataObject(
+                          metadataObject.parent(),
+                          metadataObject.name(),
+                          locationPath,
+                          PathBasedMetadataObject.PathType.get(metadataObject.type()));
+                  pathBaseMetadataObject.validateAuthorizationMetadataObject();
+                  oldAuthzMetadataObjects.add(pathBaseMetadataObject);
+                });
+
         List<AuthorizationMetadataObject> newAuthzMetadataObjects =
             translateMetadataObject(newMetadataObject);
         Preconditions.checkArgument(
@@ -697,7 +685,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                           changeMetadataObject.metadataObject().parent(),
                           changeMetadataObject.metadataObject().name(),
                           locationPath,
-                          PathBasedMetadataObject.FILESET_PATH);
+                          PathBasedMetadataObject.PathType.get(
+                              changeMetadataObject.metadataObject().type()));
                   pathBaseMetadataObject.validateAuthorizationMetadataObject();
                   authzMetadataObjects.add(pathBaseMetadataObject);
                 });

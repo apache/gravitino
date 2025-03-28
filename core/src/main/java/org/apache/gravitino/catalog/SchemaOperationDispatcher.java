@@ -240,14 +240,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           }
 
           StringIdentifier stringId = getStringIdFromProperties(alteredSchema.properties());
-          // Case 1: The schema is not created by Gravitino.
-          if (stringId == null) {
+          // Case 1: The schema is not created by Gravitino and this schema is never imported.
+          if (stringId == null && !isEntityExist(ident, SCHEMA)) {
             return EntityCombinedSchema.of(alteredSchema)
                 .withHiddenProperties(
                     getHiddenPropertyNames(
                         catalogIdent,
                         HasPropertyMetadata::schemaPropertiesMetadata,
                         alteredSchema.properties()));
+          }
+
+          long schemaId;
+          if (stringId != null) {
+            schemaId = stringId.id();
+          } else {
+            schemaId = getEntity(ident, SCHEMA, SchemaEntity.class).id();
           }
 
           SchemaEntity updatedSchemaEntity =
@@ -273,7 +280,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                           .build())
                                   .build()),
                   "UPDATE",
-                  stringId.id());
+                  schemaId);
 
           return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
               .withHiddenProperties(
