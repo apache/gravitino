@@ -23,10 +23,24 @@ import io.openlineage.server.OpenLineage;
 import java.io.Closeable;
 import java.util.Map;
 
+/** The LineageSink interface defines a closable component responsible for sinking lineage event. */
 public interface LineageSink extends Closeable {
+
+  /**
+   * Initializes the lineage sink with the provided configuration.
+   *
+   * @param configs A map representing the configuration for the sink.
+   */
   default void initialize(Map<String, String> configs) {}
 
+  /** Closes the lineage sink and releases associated resources. */
+  @Override
   default void close() {}
 
+  /**
+   * Sinks the given lineage run event.
+   *
+   * @param event The lineage run event to be processed.
+   */
   void sink(OpenLineage.RunEvent event);
 }

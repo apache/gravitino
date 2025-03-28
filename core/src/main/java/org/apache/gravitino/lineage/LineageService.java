@@ -24,6 +24,10 @@ import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.Set;
 import org.apache.gravitino.utils.ClassUtils;
 
+/**
+ * The LineageService manages the life cycle of lineage sinks, sources, and processors. It provides
+ * {@code dispatchLineageEvent} method for lineage source to dispatch lineage events to the sinks.
+ */
 public class LineageService implements LineageDispatcher {
   private LineageSinkManager sinkManager;
   private LineageSource source;

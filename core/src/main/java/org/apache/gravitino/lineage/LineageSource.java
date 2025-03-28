@@ -24,12 +24,30 @@ import java.io.Closeable;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * The LineageSource interface defines a closable data source for receiving and dispatching lineage
+ * information. It provides default methods for initialization, closing, and retrieving a set of
+ * REST packages.
+ */
 public interface LineageSource extends Closeable {
 
+  /**
+   * Initializes the data source with the given configurations and a lineage dispatcher.
+   *
+   * @param configs A map containing configuration information for the data source.
+   * @param dispatcher A dispatcher used to distribute lineage event.
+   */
   default void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
 
+  /** Closes the data source and releases related resources. */
+  @Override
   default void close() {}
 
+  /**
+   * Retrieves a set of REST packages associated with the data source.
+   *
+   * @return An immutable set containing the names of REST packages.
+   */
   default Set<String> getRESTPackages() {
     return ImmutableSet.of();
   }

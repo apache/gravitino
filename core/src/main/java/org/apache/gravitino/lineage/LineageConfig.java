@@ -36,9 +36,9 @@ public class LineageConfig extends Config {
   public static final String LINEAGE_CONFIG_PREFIX = "gravitino.lineage.";
   public static final String LINEAGE_CONFIG_SINKS = "sinks";
   public static final String LINEAGE_CONFIG_SOURCE = "source";
-  public static final String LINEAGE_SOURCE_CLASS_NAME = "source-class";
-  public static final String LINEAGE_PROCESSOR_CLASS_NAME = "processor-class";
-  public static final String LINEAGE_SINK_CLASS_NAME = "sink-class";
+  public static final String LINEAGE_SOURCE_CLASS_NAME = "sourceClass";
+  public static final String LINEAGE_PROCESSOR_CLASS_NAME = "processorClass";
+  public static final String LINEAGE_SINK_CLASS_NAME = "sinkClass";
   public static final String LINEAGE_HTTP_SOURCE_CLASS_NAME =
       "org.apache.gravitino.lineage.HTTPLineageSource";
 
@@ -53,14 +53,8 @@ public class LineageConfig extends Config {
           .version(ConfigConstants.VERSION_0_9_0)
           .stringConf()
           .createWithDefault(LINEAGE_HTTP_SOURCE_NAME);
-  public static final ConfigEntry<String> SOURCE_CLASS =
-      new ConfigBuilder(LINEAGE_SOURCE_CLASS_NAME)
-          .doc("The class name of lineage event source")
-          .version(ConfigConstants.VERSION_0_9_0)
-          .stringConf()
-          .createWithDefault(LINEAGE_HTTP_SOURCE_CLASS_NAME);
 
-  public static final ConfigEntry<String> PROCESSOR =
+  public static final ConfigEntry<String> PROCESSOR_CLASS =
       new ConfigBuilder(LINEAGE_PROCESSOR_CLASS_NAME)
           .doc("The class name of lineage event processor")
           .version(ConfigConstants.VERSION_0_9_0)
@@ -94,7 +88,7 @@ public class LineageConfig extends Config {
   }
 
   public String processorClass() {
-    return get(PROCESSOR);
+    return get(PROCESSOR_CLASS);
   }
 
   public Map<String, String> getSinkConfigs() {
