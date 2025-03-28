@@ -321,6 +321,8 @@ public class TestUserEvent {
     if (expectedUser.roles() != null) {
       Assertions.assertTrue(userInfo.roles().isPresent());
       Assertions.assertEquals(userInfo.roles().get(), expectedUser.roles());
+    } else {
+      Assertions.assertFalse(userInfo.roles().isPresent());
     }
   }
 }
