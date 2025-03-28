@@ -257,9 +257,7 @@ public class TestUserEvent {
     RemoveUserEvent removeUserEvent = (RemoveUserEvent) event;
     Assertions.assertEquals(identifier, removeUserEvent.identifier());
     Assertions.assertTrue(removeUserEvent.isExists());
-    UserInfo userInfo = removeUserEvent.removedUserInfo();
-    Assertions.assertEquals(userInfo.name(), userName);
-    Assertions.assertFalse(userInfo.roles().isPresent());
+    Assertions.assertEquals(userName, removeUserEvent.removedUserName());
   }
 
   @Test
@@ -275,9 +273,7 @@ public class TestUserEvent {
     RemoveUserEvent removeUserEvent = (RemoveUserEvent) event;
     Assertions.assertEquals(identifier, removeUserEvent.identifier());
     Assertions.assertFalse(removeUserEvent.isExists());
-    UserInfo userInfo = removeUserEvent.removedUserInfo();
-    Assertions.assertEquals(userInfo.name(), inExistUserName);
-    Assertions.assertFalse(userInfo.roles().isPresent());
+    Assertions.assertEquals(inExistUserName, removeUserEvent.removedUserName());
   }
 
   private AccessControlEventDispatcher mockUserDispatcher() {

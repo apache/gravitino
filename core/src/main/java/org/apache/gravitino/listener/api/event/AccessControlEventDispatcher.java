@@ -92,8 +92,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     try {
       boolean isExists = dispatcher.removeUser(metalake, user);
       eventBus.dispatchEvent(
-          new RemoveUserEvent(
-              initiator, NameIdentifier.of(metalake), new UserInfo(user), isExists));
+          new RemoveUserEvent(initiator, NameIdentifier.of(metalake), user, isExists));
 
       return isExists;
     } catch (Exception e) {

@@ -21,12 +21,11 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.UserInfo;
 
 /** Represents an event that is generated after a user is successfully removed from the metalake. */
 @DeveloperApi
 public class RemoveUserEvent extends UserEvent {
-  private final UserInfo removedUserInfo;
+  private final String removedUserName;
   private final boolean isExists;
 
   /**
@@ -35,25 +34,25 @@ public class RemoveUserEvent extends UserEvent {
    *
    * @param initiator the user who initiated the remove user operation.
    * @param identifier the identifier of the metalake where the user is removed.
-   * @param removedUserInfo the user information.
+   * @param removedUserName the username of the user that was removed.
    * @param isExists {@code true} if metalake successfully remove the user, {@code false} only when
    *     there's no such user.
    */
   protected RemoveUserEvent(
-      String initiator, NameIdentifier identifier, UserInfo removedUserInfo, boolean isExists) {
+      String initiator, NameIdentifier identifier, String removedUserName, boolean isExists) {
     super(initiator, identifier);
 
-    this.removedUserInfo = removedUserInfo;
+    this.removedUserName = removedUserName;
     this.isExists = isExists;
   }
 
   /**
-   * Returns the user information for the user which was removed from the metalake.
+   * Returns the username of the user that was removed from the metalake.
    *
-   * @return the {@link UserInfo} instance.
+   * @return the username.
    */
-  public UserInfo removedUserInfo() {
-    return removedUserInfo;
+  public String removedUserName() {
+    return removedUserName;
   }
 
   /**
