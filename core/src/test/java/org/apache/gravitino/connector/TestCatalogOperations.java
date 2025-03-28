@@ -74,6 +74,7 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -893,6 +894,47 @@ public class TestCatalogOperations
     }
 
     return true;
+  }
+
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestModel model = models.get(ident);
+    Map<String, String> newProps =
+        model.properties() != null ? Maps.newHashMap(model.properties()) : Maps.newHashMap();
+    String newComment = model.comment();
+
+    for (ModelChange change : changes) {
+      if (change instanceof ModelChange.UpdateModelComment) {
+        newComment = ((ModelChange.UpdateModelComment) change).getNewComment();
+      } else {
+        throw new IllegalArgumentException("Unsupported model change: " + change);
+      }
+    }
+
+    TestModel updatedModel =
+        TestModel.builder()
+            .withName(ident.name())
+            .withComment(newComment)
+            .withProperties(newProps)
+            .withLatestVersion(model.latestVersion())
+            .withAuditInfo(updatedAuditInfo)
+            .build();
+
+    models.put(ident, updatedModel);
+    return updatedModel;
   }
 
   private boolean hasCallerContext() {

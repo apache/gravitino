@@ -122,6 +122,34 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    put:
+      tags:
+        - model
+      summary: Alter model
+      operationId: alterModel
+      description: Updates the specified model in a schema
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/versions:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -391,6 +419,40 @@ components:
           default: {}
           additionalProperties:
             type: string
+
+    ModelUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelUpdateRequest"
+
+    ModelUpdateRequest:
+      oneOf:
+        - $ref: "#/components/schemas/UpdateModelCommentRequest"
+        # 可扩展其他类型如RenameModelRequest等
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          updateComment: "#/components/schemas/UpdateModelCommentRequest"
+
+    UpdateModelCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum: [updateComment]
+        newComment:
+          type: string
+      example:
+        "@type": "updateComment"
+        newComment: "new comment"
 
   responses:
     ModelResponse:

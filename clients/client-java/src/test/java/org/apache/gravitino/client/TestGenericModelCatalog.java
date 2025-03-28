@@ -19,6 +19,7 @@
 package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
@@ -32,6 +33,8 @@ import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.ModelRegisterRequest;
+import org.apache.gravitino.dto.requests.ModelUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
@@ -504,6 +507,59 @@ public class TestGenericModelCatalog extends TestBase {
     Assertions.assertThrows(
         RuntimeException.class,
         () -> catalog.asModelCatalog().deleteModelVersion(modelId, "alias1"),
+        "internal error");
+  }
+
+  @Test
+  public void testAlterModel() throws JsonProcessingException {
+    NameIdentifier modelId = NameIdentifier.of("schema1", "model1");
+    String modelPath =
+        withSlash(
+            GenericModelCatalog.formatModelRequestPath(
+                    Namespace.of(METALAKE_NAME, CATALOG_NAME, "schema1"))
+                + "/"
+                + modelId.name());
+
+    // Test update comment
+    ModelUpdateRequest.UpdateModelCommentRequest updateCommentReq =
+        new ModelUpdateRequest.UpdateModelCommentRequest("new_comment");
+    ModelDTO commentDTO = mockModelDTO("new_model", 0, "new_comment", Collections.emptyMap());
+    ModelResponse commentResp = new ModelResponse(commentDTO);
+    buildMockResource(
+        Method.PUT,
+        modelPath,
+        new ModelUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        commentResp,
+        HttpStatus.SC_OK);
+    Model commentModel =
+        catalog.asModelCatalog().alterModel(modelId, updateCommentReq.modelChange());
+    compareModel(commentDTO, commentModel);
+
+    // Test NoSuchModelException
+    ErrorResponse notFoundResp =
+        ErrorResponse.notFound(NoSuchModelException.class.getSimpleName(), "model not found");
+    buildMockResource(
+        Method.PUT,
+        modelPath,
+        new ModelUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        notFoundResp,
+        HttpStatus.SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> catalog.asModelCatalog().alterModel(modelId, updateCommentReq.modelChange()),
+        "model not found");
+
+    // Test RuntimeException
+    ErrorResponse internalErrorResp = ErrorResponse.internalError("internal error");
+    buildMockResource(
+        Method.PUT,
+        modelPath,
+        new ModelUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        internalErrorResp,
+        HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> catalog.asModelCatalog().alterModel(modelId, updateCommentReq.modelChange()),
         "internal error");
   }
 

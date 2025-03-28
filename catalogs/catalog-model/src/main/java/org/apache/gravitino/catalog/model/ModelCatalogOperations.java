@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.model;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -46,6 +48,7 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -53,6 +56,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
 
 public class ModelCatalogOperations extends ManagedSchemaOperations
     implements CatalogOperations, ModelCatalog {
+  private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
+  private static final String MODEL_DOES_NOT_EXIST_MSG = "Model %s does not exist";
 
   private static final int INIT_VERSION = 0;
 
@@ -96,7 +101,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
           .toArray(NameIdentifier[]::new);
 
     } catch (NoSuchEntityException e) {
-      throw new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
+      throw new NoSuchSchemaException(e, SCHEMA_DOES_NOT_EXIST_MSG, namespace);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to list models under namespace " + namespace, ioe);
     }
@@ -111,7 +116,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       return toModelImpl(model);
 
     } catch (NoSuchEntityException e) {
-      throw new NoSuchModelException(e, "Model %s does not exist", ident);
+      throw new NoSuchModelException(e, MODEL_DOES_NOT_EXIST_MSG, ident);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to get model " + ident, ioe);
     }
@@ -147,7 +152,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (EntityAlreadyExistsException e) {
       throw new ModelAlreadyExistsException(e, "Model %s already exists", ident);
     } catch (NoSuchEntityException e) {
-      throw new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
+      throw new NoSuchSchemaException(e, SCHEMA_DOES_NOT_EXIST_MSG, ident.namespace());
     }
 
     return toModelImpl(model);
@@ -175,7 +180,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       return versions.stream().mapToInt(ModelVersionEntity::version).toArray();
 
     } catch (NoSuchEntityException e) {
-      throw new NoSuchModelException(e, "Model %s does not exist", ident);
+      throw new NoSuchModelException(e, MODEL_DOES_NOT_EXIST_MSG, ident);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to list model versions for model " + ident, ioe);
     }
@@ -239,7 +244,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       throw new ModelVersionAliasesAlreadyExistException(
           e, "Model version aliases %s already exist", ident);
     } catch (NoSuchEntityException e) {
-      throw new NoSuchModelException(e, "Model %s does not exist", ident);
+      throw new NoSuchModelException(e, MODEL_DOES_NOT_EXIST_MSG, ident);
     }
   }
 
@@ -259,6 +264,38 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     return internalDeleteModelVersion(modelVersionIdent);
   }
 
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    try {
+      if (!store.exists(ident, Entity.EntityType.MODEL)) {
+        throw new NoSuchModelException(MODEL_DOES_NOT_EXIST_MSG, ident);
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to load model " + ident, ioe);
+    }
+
+    try {
+      ModelEntity updatedModelEntity =
+          store.update(
+              ident,
+              ModelEntity.class,
+              Entity.EntityType.MODEL,
+              e -> updateModelEntity(ident, e, changes));
+
+      return toModelImpl(updatedModelEntity);
+
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to update model " + ident, ioe);
+    } catch (NoSuchEntityException nsee) {
+      throw new NoSuchModelException(nsee, MODEL_DOES_NOT_EXIST_MSG, ident);
+    } catch (AlreadyExistsException aee) {
+      // This is happened when renaming a model to an existing model name.
+      throw new RuntimeException(
+          "Model with the same name " + ident.name() + " already exists", aee);
+    }
+  }
+
   private ModelImpl toModelImpl(ModelEntity model) {
     return ModelImpl.builder()
         .withName(model.name())
@@ -266,6 +303,41 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         .withProperties(model.properties())
         .withLatestVersion(model.latestVersion())
         .withAuditInfo(model.auditInfo())
+        .build();
+  }
+
+  private ModelEntity updateModelEntity(
+      NameIdentifier ident, ModelEntity modelEntity, ModelChange... changes) {
+    Map<String, String> props =
+        modelEntity.properties() == null
+            ? Maps.newHashMap()
+            : Maps.newHashMap(modelEntity.properties());
+    String newName = ident.name();
+    String newComment = modelEntity.comment();
+
+    for (ModelChange change : changes) {
+      if (change instanceof ModelChange.UpdateModelComment) {
+        newComment = ((ModelChange.UpdateModelComment) change).getNewComment();
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported model change: " + change.getClass().getSimpleName());
+      }
+    }
+
+    return ModelEntity.builder()
+        .withName(newName)
+        .withNamespace(ident.namespace())
+        .withId(modelEntity.id())
+        .withComment(newComment)
+        .withProperties(props)
+        .withLatestVersion(modelEntity.latestVersion())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(modelEntity.auditInfo().creator())
+                .withCreateTime(modelEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
         .build();
   }
 
