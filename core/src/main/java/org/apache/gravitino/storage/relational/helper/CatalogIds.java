@@ -19,8 +19,8 @@
 package org.apache.gravitino.storage.relational.helper;
 
 public class CatalogIds {
-  private Long metalakeId;
-  private Long catalogId;
+  private final Long metalakeId;
+  private final Long catalogId;
 
   public CatalogIds(Long metalakeId, Long catalogId) {
     this.metalakeId = metalakeId;

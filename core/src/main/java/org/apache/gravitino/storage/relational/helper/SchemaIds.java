@@ -19,9 +19,9 @@
 package org.apache.gravitino.storage.relational.helper;
 
 public class SchemaIds {
-  private Long metalakeId;
-  private Long catalogId;
-  private Long schemaId;
+  private final Long metalakeId;
+  private final Long catalogId;
+  private final Long schemaId;
 
   public SchemaIds(Long metalakeId, Long catalogId, Long schemaId) {
     this.metalakeId = metalakeId;
