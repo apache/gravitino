@@ -105,7 +105,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
   }
 
   @VisibleForTesting
-  List<EventListenerPlugin> getEventListeners() {
+  public List<EventListenerPlugin> getEventListeners() {
     return this.eventListeners;
   }
 

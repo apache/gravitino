@@ -73,7 +73,7 @@ public class EventBus {
    *     EventBus.
    */
   @VisibleForTesting
-  List<EventListenerPlugin> getEventListeners() {
+  public List<EventListenerPlugin> getEventListeners() {
     return eventListeners;
   }
 

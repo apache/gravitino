@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import java.util.Set;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -54,6 +55,8 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.lineage.LineageConfig;
+import org.apache.gravitino.lineage.LineageService;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -133,6 +136,8 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
+
+  private LineageService lineageService;
 
   protected GravitinoEnv() {}
 
@@ -354,6 +359,26 @@ public class GravitinoEnv {
     return futureGrantManager;
   }
 
+  /**
+   * Get the LineageService associated with the Gravitino environment.
+   *
+   * @return The LineageService instance.
+   */
+  public LineageService lineageService() {
+    return lineageService;
+  }
+
+  /**
+   * Get the REST packages associated with the Gravitino environment.
+   *
+   * @return The REST packages.
+   */
+  public Set<String> getRESTPackages() {
+    Set<String> packages = new java.util.HashSet<>();
+    packages.addAll(lineageService.getRESTPackages());
+    return packages;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -396,6 +421,10 @@ public class GravitinoEnv {
 
     if (metalakeManager != null) {
       metalakeManager.close();
+    }
+
+    if (lineageService != null) {
+      lineageService.close();
     }
 
     LOG.info("Gravitino Environment is shut down.");
@@ -508,9 +537,13 @@ public class GravitinoEnv {
     }
 
     this.auxServiceManager = new AuxiliaryServiceManager();
-    this.auxServiceManager.serviceInit(config);
+    auxServiceManager.serviceInit(config);
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
+
+    this.lineageService = new LineageService();
+    lineageService.initialize(
+        new LineageConfig(config.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
   }
 }
