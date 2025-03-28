@@ -319,7 +319,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
                 totalProperty.putAll(getCredentialProperties(provider, catalog, identifier));
 
-                return provider.getFileSystem(filePath, totalProperty);
+                return provider.getFileSystem(filePath, totalProperty, true);
               } catch (IOException ioe) {
                 throw new GravitinoRuntimeException(
                     ioe,
