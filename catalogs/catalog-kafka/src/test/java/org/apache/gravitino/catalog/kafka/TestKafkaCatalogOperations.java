@@ -69,6 +69,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.kafka.common.config.TopicConfig;
@@ -160,6 +161,9 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     doReturn(1L)
         .when(spyCatalogMetaService)
         .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
+    doReturn(new CatalogIds(1L, 1L))
+        .when(spyCatalogMetaService)
+        .getCatalogIdByMetalakeAndCatalogName(Mockito.anyString(), Mockito.anyString());
 
     MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
         Mockito.mockStatic(MetalakeMetaService.class);
