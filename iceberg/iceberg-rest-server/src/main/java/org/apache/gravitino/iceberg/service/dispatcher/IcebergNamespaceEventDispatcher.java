@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespacePreEvent;
@@ -77,13 +78,16 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
 
   @Override
   public CreateNamespaceResponse createNamespace(
-      IcebergRequestContext context, CreateNamespaceRequest createRequest) {
+      IcebergRequestContext context, CreateNamespaceRequest originalCreateRequest) {
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
-            metalakeName, context.catalogName(), createRequest.namespace());
+            metalakeName, context.catalogName(), originalCreateRequest.namespace());
 
+    ObjectWrapper<CreateNamespaceRequest> createRequestWrapper =
+        new ObjectWrapper<>(originalCreateRequest);
     eventBus.dispatchEvent(
-        new IcebergCreateNamespacePreEvent(context, nameIdentifier, createRequest));
+        new IcebergCreateNamespacePreEvent(context, nameIdentifier, createRequestWrapper));
+    CreateNamespaceRequest createRequest = createRequestWrapper.get();
 
     CreateNamespaceResponse createResponse;
     try {
@@ -103,12 +107,15 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
   public UpdateNamespacePropertiesResponse updateNamespace(
       IcebergRequestContext context,
       Namespace namespace,
-      UpdateNamespacePropertiesRequest updateRequest) {
+      UpdateNamespacePropertiesRequest originalUpdateRequest) {
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
 
+    ObjectWrapper<UpdateNamespacePropertiesRequest> updateRequestWrapper =
+        new ObjectWrapper<>(originalUpdateRequest);
     eventBus.dispatchEvent(
-        new IcebergUpdateNamespacePreEvent(context, nameIdentifier, updateRequest));
+        new IcebergUpdateNamespacePreEvent(context, nameIdentifier, updateRequestWrapper));
+    UpdateNamespacePropertiesRequest updateRequest = updateRequestWrapper.get();
 
     UpdateNamespacePropertiesResponse updateResponse;
     try {
