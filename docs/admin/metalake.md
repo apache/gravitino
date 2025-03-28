@@ -9,12 +9,12 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to create, modify, view, and delete [metalakes](../glossary.md#metalake) in Gravitino. 
+This page introduces how to create, modify, view, and delete [metalakes](../reference/glossary.md#metalake) in Gravitino. 
 
 ## Prerequisites
 
 You have installed and launched Gravitino.
-For more details, see [Get started](../getting-started/index.md).
+For more details, see [getting started](../getting-started/index.md).
 This page assumes that Gravitino server is serving at [http://localhost:8090](http://localhost:8090).
 
 ## Create a metalake
