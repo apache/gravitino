@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -52,6 +53,7 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -77,17 +79,47 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePOs(metalakePOS);
   }
 
+  public Long getMetalakeIdByNameIdentifier(NameIdentifier nameIdentifier) {
+    NameIdentifierUtil.checkMetalake(nameIdentifier);
+    EntityIdentifier metalakeIdentifier = EntityIdentifier.of(nameIdentifier, EntityType.METALAKE);
+    return NameIdMappingService.getInstance()
+        .get(
+            metalakeIdentifier,
+            ident -> {
+              Long metalakeId =
+                  SessionUtils.getWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.selectMetalakeIdMetaByName(ident.ident.name()));
+              if (metalakeId == null) {
+                throw new NoSuchEntityException(
+                    NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                    Entity.EntityType.METALAKE.name().toLowerCase(),
+                    nameIdentifier.toString());
+              }
+              return metalakeId;
+            });
+  }
+
   public Long getMetalakeIdByName(String metalakeName) {
-    Long metalakeId =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
-    if (metalakeId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          metalakeName);
-    }
-    return metalakeId;
+    EntityIdentifier metalakeIdentifier =
+        EntityIdentifier.of(NameIdentifier.of(metalakeName), EntityType.METALAKE);
+
+    return NameIdMappingService.getInstance()
+        .get(
+            metalakeIdentifier,
+            ident -> {
+              Long metalakeId =
+                  SessionUtils.getWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.selectMetalakeIdMetaByName(metalakeName));
+              if (metalakeId == null) {
+                throw new NoSuchEntityException(
+                    NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                    Entity.EntityType.METALAKE.name().toLowerCase(),
+                    metalakeName);
+              }
+              return metalakeId;
+            });
   }
 
   public BaseMetalake getMetalakeByIdentifier(NameIdentifier ident) {

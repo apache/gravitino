@@ -47,6 +47,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -97,6 +98,23 @@ public class SchemaMetaService {
           schemaName);
     }
     return schemaId;
+  }
+
+  public Long getSchemaIdByNameIdentifier(NameIdentifier identifier) {
+    EntityIdentifier entityIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.SCHEMA);
+    return NameIdMappingService.getInstance()
+        .get(
+            entityIdentifier,
+            entityIdent -> {
+              NameIdentifierUtil.checkSchema(entityIdent.ident);
+              String schemaName = entityIdent.ident.name();
+
+              Long catalogId =
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(entityIdent.ident.namespace());
+
+              return getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+            });
   }
 
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
@@ -189,9 +207,11 @@ public class SchemaMetaService {
     NameIdentifierUtil.checkSchema(identifier);
 
     String schemaName = identifier.name();
-    Long catalogId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-    Long schemaId = getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+    Long schemaId = getSchemaIdByNameIdentifier(identifier);
+
+    // Invalidate it in the cache.
+    NameIdMappingService.getInstance()
+        .invalidate(EntityIdentifier.of(identifier, Entity.EntityType.SCHEMA));
 
     if (schemaId != null) {
       if (cascade) {
@@ -309,9 +329,7 @@ public class SchemaMetaService {
   public int deleteSchemaMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
-        mapper -> {
-          return mapper.deleteSchemaMetasByLegacyTimeline(legacyTimeline, limit);
-        });
+        mapper -> mapper.deleteSchemaMetasByLegacyTimeline(legacyTimeline, limit));
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {

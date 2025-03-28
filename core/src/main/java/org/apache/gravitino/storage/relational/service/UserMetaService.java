@@ -44,6 +44,7 @@ import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -86,6 +87,21 @@ public class UserMetaService {
           userName);
     }
     return userId;
+  }
+
+  public Long getUserIdByNameIdentifier(NameIdentifier identifier) {
+    AuthorizationUtils.checkUser(identifier);
+
+    EntityIdentifier userIdIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.USER);
+    return NameIdMappingService.getInstance()
+        .get(
+            userIdIdentifier,
+            ident -> {
+              Long metalakeId =
+                  MetalakeMetaService.getInstance()
+                      .getMetalakeIdByName(ident.ident.namespace().level(0));
+              return getUserIdByMetalakeIdAndName(metalakeId, ident.ident.name());
+            });
   }
 
   public UserEntity getUserByIdentifier(NameIdentifier identifier) {
@@ -159,10 +175,7 @@ public class UserMetaService {
 
   public boolean deleteUser(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
-
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long userId = getUserIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long userId = getUserIdByNameIdentifier(identifier);
 
     SessionUtils.doMultipleWithCommit(
         () ->

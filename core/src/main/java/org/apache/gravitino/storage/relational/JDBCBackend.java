@@ -30,6 +30,7 @@ import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -58,6 +59,8 @@ import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
@@ -143,6 +146,7 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
+    EntityType entityType = e.type();
     if (e instanceof BaseMetalake) {
       MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
     } else if (e instanceof CatalogEntity) {
@@ -176,12 +180,19 @@ public class JDBCBackend implements RelationalBackend {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
     }
+
+    NameIdMappingService.getInstance()
+        .put(EntityIdentifier.of(e.nameIdentifier(), entityType), e.id());
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    // Remove all the children entities in the cache as we can't guarantee the children entities
+    // are still valid after the parent entity is updated.
+    EntityIdentifier entityIdentifier = EntityIdentifier.of(ident, entityType);
+    NameIdMappingService.getInstance().invalidateWithPrefix(entityIdentifier);
     switch (entityType) {
       case METALAKE:
         return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
@@ -245,36 +256,49 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
-      throws IOException {
-    switch (entityType) {
-      case METALAKE:
-        return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
-      case CATALOG:
-        return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
-      case SCHEMA:
-        return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
-      case TABLE:
-        return TableMetaService.getInstance().deleteTable(ident);
-      case FILESET:
-        return FilesetMetaService.getInstance().deleteFileset(ident);
-      case TOPIC:
-        return TopicMetaService.getInstance().deleteTopic(ident);
-      case USER:
-        return UserMetaService.getInstance().deleteUser(ident);
-      case GROUP:
-        return GroupMetaService.getInstance().deleteGroup(ident);
-      case ROLE:
-        return RoleMetaService.getInstance().deleteRole(ident);
-      case TAG:
-        return TagMetaService.getInstance().deleteTag(ident);
-      case MODEL:
-        return ModelMetaService.getInstance().deleteModel(ident);
-      case MODEL_VERSION:
-        return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for delete operation", entityType);
+  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade) {
+    // Invalidate the cache first
+    EntityIdentifier entityIdentifier = EntityIdentifier.of(ident, entityType);
+    NameIdMappingService.getInstance().invalidate(entityIdentifier);
+    if (cascade) {
+      // Remove all the children entities in the cache;
+      NameIdMappingService.getInstance().invalidateWithPrefix(entityIdentifier);
+    }
+
+    try {
+      switch (entityType) {
+        case METALAKE:
+          return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
+        case CATALOG:
+          return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
+        case SCHEMA:
+          return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
+        case TABLE:
+          return TableMetaService.getInstance().deleteTable(ident);
+        case FILESET:
+          return FilesetMetaService.getInstance().deleteFileset(ident);
+        case TOPIC:
+          return TopicMetaService.getInstance().deleteTopic(ident);
+        case USER:
+          return UserMetaService.getInstance().deleteUser(ident);
+        case GROUP:
+          return GroupMetaService.getInstance().deleteGroup(ident);
+        case ROLE:
+          return RoleMetaService.getInstance().deleteRole(ident);
+        case TAG:
+          return TagMetaService.getInstance().deleteTag(ident);
+        case MODEL:
+          return ModelMetaService.getInstance().deleteModel(ident);
+        case MODEL_VERSION:
+          return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
+        default:
+          throw new UnsupportedEntityTypeException(
+              "Unsupported entity type: %s for delete operation", entityType);
+      }
+    } finally {
+      // Remove the entity from the cache again because we may add the cache during the deletion
+      // process
+      NameIdMappingService.getInstance().invalidateWithPrefix(entityIdentifier);
     }
   }
 
@@ -378,6 +402,8 @@ public class JDBCBackend implements RelationalBackend {
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
     SQLExceptionConverterFactory.close();
+
+    NameIdMappingService.getInstance().close();
 
     if (jdbcDatabase != null) {
       jdbcDatabase.close();

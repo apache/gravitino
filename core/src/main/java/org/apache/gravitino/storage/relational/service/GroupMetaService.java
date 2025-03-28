@@ -44,6 +44,7 @@ import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -86,6 +87,19 @@ public class GroupMetaService {
           groupName);
     }
     return groupId;
+  }
+
+  public Long getGroupIdByNameIdentifier(NameIdentifier identifier) {
+    EntityIdentifier groupIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.GROUP);
+    return NameIdMappingService.getInstance()
+        .get(
+            groupIdentifier,
+            ident -> {
+              Long metalakeId =
+                  MetalakeMetaService.getInstance()
+                      .getMetalakeIdByName(ident.ident.namespace().level(0));
+              return getGroupIdByMetalakeIdAndName(metalakeId, ident.ident.name());
+            });
   }
 
   public GroupEntity getGroupByIdentifier(NameIdentifier identifier) {
@@ -160,9 +174,7 @@ public class GroupMetaService {
   public boolean deleteGroup(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long groupId = getGroupIdByMetalakeIdAndName(metalakeId, identifier.name());
+    Long groupId = getGroupIdByNameIdentifier(identifier);
 
     SessionUtils.doMultipleWithCommit(
         () ->

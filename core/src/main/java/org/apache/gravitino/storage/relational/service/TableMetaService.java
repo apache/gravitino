@@ -38,6 +38,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.service.NameIdMappingService.EntityIdentifier;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -62,7 +63,7 @@ public class TableMetaService {
     return tablePO;
   }
 
-  public Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
+  private Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
     Long tableId =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
@@ -75,6 +76,22 @@ public class TableMetaService {
           tableName);
     }
     return tableId;
+  }
+
+  public Long getTableByNameIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkTable(identifier);
+    EntityIdentifier tableIdentifier = EntityIdentifier.of(identifier, Entity.EntityType.TABLE);
+
+    return NameIdMappingService.getInstance()
+        .get(
+            tableIdentifier,
+            ident -> {
+              Long schemaId =
+                  CommonMetaService.getInstance()
+                      .getParentEntityIdByNamespace(ident.ident.namespace());
+
+              return getTableIdBySchemaIdAndName(schemaId, ident.ident.name());
+            });
   }
 
   public TableEntity getTableByIdentifier(NameIdentifier identifier) {
@@ -204,13 +221,7 @@ public class TableMetaService {
   public boolean deleteTable(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
 
-    String tableName = identifier.name();
-
-    Long schemaId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long tableId = getTableIdBySchemaIdAndName(schemaId, tableName);
-
+    Long tableId = getTableByNameIdentifier(identifier);
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
