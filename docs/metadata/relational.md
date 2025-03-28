@@ -32,7 +32,7 @@ For more details, please refer to the related doc.
 Assuming:
 
 - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
-- A metalake has been created and [enabled](../manage-metalake-using-gravitino.md#enable-a-metalake).
+- A metalake has been created and [enabled](../admin/metalake.md#enable-a-metalake).
 
 ## Catalog operations
 

@@ -29,7 +29,7 @@ and installing it in your local environment.
 pip install apache-gravitino
 ```
 
-1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
+1. [Manage metalake using Gravitino Python API](./admin/metalake.md?language=python)
 1. [Manage fileset metadata using Gravitino Python API](./metadata/fileset.md?language=python)
 
 ### Apache Gravitino Fileset Example

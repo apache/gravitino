@@ -1,6 +1,6 @@
 ---
-title: "Manage metalake using Apache Gravitino"
-slug: /manage-metalake-using-gravitino
+title: "Manage metalake"
+slug: /manage-metalake
 date: 2023-12-10
 keyword: Gravitino metalake manage
 license: This software is licensed under the Apache License version 2.

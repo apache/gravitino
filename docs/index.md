@@ -51,7 +51,7 @@ Gravitino provides two SDKs to manage metadata from different catalogs in a unif
 the REST API and the Java SDK.
 You can use either to manage metadata. See
 
-* [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage metalakes.
+* [Manage metalake using Gravitino](./admin/metalake.md) to learn how to manage metalakes.
 * [Manage relational metadata using Gravitino](./metadata/relational.md)
   to learn how to manage relational metadata.
 * [Manage fileset metadata using Gravitino](./metadata/fileset.md) to learn

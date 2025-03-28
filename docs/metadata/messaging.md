@@ -18,7 +18,7 @@ using its RESTful APIs or the Java/Python client SDKs.
 To use a messaging catalog, please make sure that:
 
 - The Gravitino server has started and is serving at [http://localhost:8090](http://localhost:8090).
-- A metalake has been created and [enabled](../manage-metalake-using-gravitino.md#enable-a-metalake).
+- A metalake has been created and [enabled](../admin/metalake.md#enable-a-metalake).
 
 ## Catalog operations
 
