@@ -46,11 +46,12 @@ public interface LineageDispatcher extends Closeable {
   /**
    * Dispatches a lineage run event to the configured sink after processing.
    *
+   * <p>Callers should implement appropriate retry/logging mechanisms for rejected events to prevent
+   * system overload.
+   *
    * @param runEvent The OpenLineage run event to be processed and dispatched. Must not be null.
    * @return {@code true} if the event was successfully processed and dispatched to the sinks,
    *     {@code false} if the event was rejected due to the overload of lineage sinks.
-   * @apiNote Callers should implement appropriate retry/logging mechanisms for rejected events to
-   *     prevent system overload.
    */
   boolean dispatchLineageEvent(RunEvent runEvent);
 }
