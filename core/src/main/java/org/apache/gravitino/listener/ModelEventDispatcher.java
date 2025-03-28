@@ -28,6 +28,9 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.listener.api.event.AlterModelEvent;
+import org.apache.gravitino.listener.api.event.AlterModelFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterModelPreEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelFailureEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelPreEvent;
@@ -280,12 +283,17 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    // TODO add model pre event
+    String user = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new AlterModelPreEvent(user, ident, changes));
     try {
-      // TODO add model event
-      return dispatcher.alterModel(ident, changes);
+      Model modelObject = dispatcher.alterModel(ident, changes);
+      ModelInfo modelInfo = new ModelInfo(modelObject);
+      eventBus.dispatchEvent(new AlterModelEvent(user, ident, modelInfo, changes));
+
+      return modelObject;
     } catch (Exception e) {
-      // TODO add model failure event
+      eventBus.dispatchEvent(new AlterModelFailureEvent(user, ident, e, changes));
       throw e;
     }
   }
