@@ -1,8 +1,6 @@
 ---
-title: Apache Gravitino configuration
+title: Apache Gravitino config 
 slug: /gravitino-server-config
-keywords:
-  - configuration
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -26,24 +24,118 @@ It groups those items into the following categories:
 
 ### Apache Gravitino HTTP Server configuration
 
-| Configuration item                                   | Description                                                                                                                                                                           | Default value                                                                | Required | Since version    |
-|------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|------------------|
-| `gravitino.server.webserver.host`                    | The host of the Gravitino server.                                                                                                                                                     | `0.0.0.0`                                                                    | No       | 0.1.0            |
-| `gravitino.server.webserver.httpPort`                | The port on which the Gravitino server listens for incoming connections.                                                                                                              | `8090`                                                                       | No       | 0.1.0            |
-| `gravitino.server.webserver.minThreads`              | The minimum number of threads in the thread pool used by the Jetty webserver. `minThreads` is 8 if the value is less than 8.                                                          | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       | 0.2.0            |
-| `gravitino.server.webserver.maxThreads`              | The maximum number of threads in the thread pool used by the Jetty webserver. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be great or equal to `minThreads`. | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       | 0.1.0            |
-| `gravitino.server.webserver.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by the Jetty webserver.                                                                                                                 | `100`                                                                        | No       | 0.1.0            |
-| `gravitino.server.webserver.stopTimeout`             | Time in milliseconds to gracefully shut down the Jetty webserver, for more, please see `org.eclipse.jetty.server.Server#setStopTimeout`.                                              | `30000`                                                                      | No       | 0.2.0            |
-| `gravitino.server.webserver.idleTimeout`             | The timeout in milliseconds of idle connections.                                                                                                                                      | `30000`                                                                      | No       | 0.2.0            |
-| `gravitino.server.webserver.requestHeaderSize`       | Maximum size of HTTP requests.                                                                                                                                                        | `131072`                                                                     | No       | 0.1.0            |
-| `gravitino.server.webserver.responseHeaderSize`      | Maximum size of HTTP responses.                                                                                                                                                       | `131072`                                                                     | No       | 0.1.0            |
-| `gravitino.server.shutdown.timeout`                  | Time in milliseconds to gracefully shut down of the Gravitino webserver.                                                                                                              | `3000`                                                                       | No       | 0.2.0            |
-| `gravitino.server.webserver.customFilters`           | Comma-separated list of filter class names to apply to the API.                                                                                                                       | (none)                                                                       | No       | 0.4.0            |
-| `gravitino.server.rest.extensionPackages`            | Comma-separated list of REST API packages to expand                                                                                                                                   | (none)                                                                       | No       | 0.6.0-incubating |
-| `gravitino.server.visibleConfigs`                    | List of configs that are visible in the config servlet                                                                                                                                | (none)                                                                       | No       | 0.9.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Configuration item</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.server.webserver.host</tt></td>
+  <td>The host of the Gravitino server.</td>
+  <td>`0.0.0.0`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.httpPort</tt></td>
+  <td>The port on which the Gravitino server listens for incoming connections.</td>
+  <td>`8090`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.minThreads</tt></td>
+  <td>The minimum number of threads in the thread pool used by the Jetty webserver.
+      `minThreads` is 8 if the value is less than 8.</td>
+  <td>`Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)`</td>
+  <td>No</td>
+  <td>0.2.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.maxThreads</tt></td>
+  <td>The maximum number of threads in the thread pool used by the Jetty webserver.
+      `maxThreads` is 8 if the value is less than 8,
+      and `maxThreads` must be great or equal to `minThreads`.</td>
+  <td>`Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.threadPoolWorkQueueSize</tt></td>
+  <td>The size of the queue in the thread pool used by the Jetty webserver.</td>
+  <td>`100`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.stopTimeout</tt></td>
+  <td>Time in milliseconds to gracefully shut down the Jetty webserver.
+      Check `org.eclipse.jetty.server.Server#setStopTimeout` for more details.</td>
+  <td>`30000`</td>
+  <td>No</td>
+  <td>0.2.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.idleTimeout</tt></td>
+  <td>The timeout in milliseconds of idle connections.</td>
+  <td>`30000`</td>
+  <td>No</td>
+  <td>0.2.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.requestHeaderSize</tt></td>
+  <td>Maximum size of HTTP requests.</td>
+  <td>`131072`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.responseHeaderSize</tt></td>
+  <td>Maximum size of HTTP responses.</td>
+  <td>`131072`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.shutdown.timeout</tt></td>
+  <td>Time in milliseconds to gracefully shut down of the Gravitino webserver.</td>
+  <td>`3000`</td>
+  <td>No</td>
+  <td>0.2.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.webserver.customFilters</tt></td>
+  <td>Comma-separated list of filter class names to apply to the API.</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>0.4.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.rest.extensionPackages</tt></td>
+  <td>Comma-separated list of REST API packages to expand.</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>0.6.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>gravitino.server.visibleConfigs</tt></td>
+  <td>List of configs that are visible in the config servlet.</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>0.9.0-incubating</td>
+</tr>
+</tbody>
+</table>
 
 The filter in the customFilters should be a standard javax servlet filter.
-You can also specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
+You can also specify filter parameters by setting configuration entries
+in the format `gravitino.server.webserver.<filter class name>.param.<name>=<value>`.
 
 ### Storage configuration
 
@@ -58,24 +150,121 @@ It's highly recommended using MySQL as the backend database.
 
 The following table lists the storage configuration items:
 
-| Configuration item                                | Description                                                                                                                                                                                                                                             | Default value                     | Required                                        | Since version    |
-|---------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|-------------------------------------------------|------------------|
-| `gravitino.entity.store`                          | Which entity storage implementation to use. Only`relational` storage is currently supported.                                                                                                                                                            | `relational`                      | No                                              | 0.1.0            |
-| `gravitino.entity.store.maxTransactionSkewTimeMs` | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                                  | `2000`                            | No                                              | 0.3.0            |
-| `gravitino.entity.store.deleteAfterTimeMs`        | The maximum time in milliseconds that deleted and old-version data is kept. Set to at least 10 minutes and no longer than 30 days.                                                                                                                      | `604800000`(7 days)               | No                                              | 0.5.0            |
-| `gravitino.entity.store.versionRetentionCount`    | The Count of versions allowed to be retained, including the current version, used to delete old versions data. Set to at least 1 and no greater than 10.                                                                                                | `1`                               | No                                              | 0.5.0            |
-| `gravitino.entity.store.relational`               | Detailed implementation of Relational storage. `H2`, `MySQL` and `PostgreSQL` is currently supported, and the implementation is `JDBCBackend`.                                                                                                          | `JDBCBackend`                     | No                                              | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcUrl`       | The database url that the `JDBCBackend` needs to connect to. If you use `MySQL` or `PostgreSQL`, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/{DATABASE_TYPE}/` directory. | `jdbc:h2`                         | No                                              | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcDriver`    | The jdbc driver name that the `JDBCBackend` needs to use. You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.                                                                                                           | `org.h2.Driver`                   | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcUser`      | The username that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                       | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
-| `gravitino.entity.store.relational.jdbcPassword`  | The password that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                       | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
-| `gravitino.entity.store.relational.storagePath`   | The storage path for embedded JDBC storage implementation. It supports both absolute and relative path, if the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`, default value is `${GRAVITINO_HOME}/data/jdbc`     | `${GRAVITINO_HOME}/data/jdbc`     | No                                              | 0.6.0-incubating |
-| `gravitino.entity.store.relational.maxConnections`| The maximum number of connections for the JDBC Backend connection pool                                                                                                                                                                                  | `100`                             | No                                              | 0.9.0-incubating |
-| `gravitino.entity.store.relational.maxWaitMillis` | The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool                                                                                                                                                            | `1000`                            | No                                              | 0.9.0-incubating |
-
+<table>
+<thead>
+<tr>
+  <th>Configuration item</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.entity.store</tt></td>
+  <td>Which entity storage implementation to use. Only`relational` storage is currently supported.</td>
+  <td>`relational`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.maxTransactionSkewTimeMs</tt></td>
+  <td>The maximum skew time of transactions in milliseconds.</td>
+  <td>`2000`</td>
+  <td>No</td>
+  <td>0.3.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.deleteAfterTimeMs</tt></td>
+  <td>The maximum time in milliseconds that deleted and old-version data is kept.
+      Set to at least 10 minutes and no longer than 30 days.</td>
+  <td>`604800000`(7 days)</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.versionRetentionCount</tt></td>
+  <td>The Count of versions allowed to be retained, including the current version,
+      used to delete old versions data. Set to at least 1 and no greater than 10.</td>
+  <td>`1`</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational</tt></td>
+  <td>Detailed implementation of Relational storage.
+      `H2`, `MySQL` and `PostgreSQL` are currently supported,
+      and the implementation is `JDBCBackend`.</td>
+  <td>`JDBCBackend`</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational.jdbcUrl</tt></td>
+  <td>The database url that the `JDBCBackend` needs to connect to.
+      If you use `MySQL` or `PostgreSQL`, you should firstly initialize the database tables yourself
+      by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/{DATABASE_TYPE}/` directory.</td>
+  <td>`jdbc:h2`</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational.jdbcDriver</tt></td>
+  <td>The JDBC driver name that the `JDBCBackend` needs to use.
+      You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.
+      This options is needed if the jdbc connection url is not `jdbc:h2`</td>
+  <td>`org.h2.Driver`</td>
+  <td>Yes|No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational.jdbcUser</tt></td>
+  <td>The username that the `JDBCBackend` needs to use when connecting the database.
+      It is required for `MySQL`.
+      It is required if the JDBC connection URL is not `jdbc:h2`</td>
+  <td>`gravitino`</td>
+  <td>Yes|No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational.jdbcPassword</tt></td>
+  <td>The password that the `JDBCBackend` needs to use when connecting the database.
+      It is required for `MySQL`.
+      It is required if the JDBC connection URL is not `jdbc:h2`.</td>
+  <td>`gravitino`</td>
+  <td>Yes|No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational.storagePath</tt></td>
+  <td>The storage path for embedded JDBC storage implementation.
+      It supports both absolute and relative path.
+      If the value is a relative path, the final path is `${GRAVITINO_HOME}/${PATH_YOU_HAVA_SET}`.
+      Default value is `${GRAVITINO_HOME}/data/jdbc`.</td>
+  <td>`${GRAVITINO_HOME}/data/jdbc`</td>
+  <td>No</td>
+  <td>0.6.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational.maxConnections</tt></td>
+  <td>The maximum number of connections for the JDBC Backend connection pool.</td>
+  <td>`100`</td>
+  <td>No</td>
+  <td>0.9.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>gravitino.entity.store.relational.maxWaitMillis</tt></td>
+  <td>The maximum wait time in milliseconds for a connection from the JDBC Backend connection pool.</td>
+  <td>`1000`</td>
+  <td>No</td>
+  <td>0.9.0-incubating</td>
+</tr>
+</tbody>
+</table>
 
 :::caution
-We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`,
+We strongly recommend that you change the default value for `gravitino.entity.store.relational.storagePath`,
 as it's under the deployment directory and future version upgrades may remove it.
 :::
 
@@ -92,24 +281,95 @@ The tree lock is a memory lock (Currently, Gravitino only supports in memory loc
 that can be used to ensure the consistency of the data in Gravitino server.
 The configuration items are as follows:
 
-| Configuration item                   | Description                                                   | Default value | Required | Since Version |
-|--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.lock.maxNodes`            | The maximum number of tree lock nodes to keep in memory       | 100000        | No       | 0.5.0         |
-| `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | No       | 0.5.0         |
-| `gravitino.lock.cleanIntervalInSecs` | The interval in seconds to clean up the stale tree lock nodes | 60            | No       | 0.5.0         |
+<table>
+<thead>
+<tr>
+  <th>Configuration item</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.lock.maxNodes</tt></td>
+  <td>The maximum number of tree lock nodes to keep in memory.</td>
+  <td>`100000`</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.lock.minNodes</tt></td>
+  <td>The minimum number of tree lock nodes to keep in memory.</td>
+  <td>`1000`</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.lock.cleanIntervalInSecs</tt></td>
+  <td>The interval in seconds to clean up the stale tree lock nodes.</td>
+  <td>`60`</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+</tbody>
+</table>
 
 ### Catalog configuration
 
-| Configuration item                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
-|----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
-| `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
+<table>
+<thead>
+<tr>
+  <th>Configuration item</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.catalog.cache.evictionIntervalMs</tt></td>
+  <td>The interval in milliseconds to evict the catalog cache.</td>
+  <td>`3600000` (1 hour)</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.catalog.classloader.isolated</tt></td>
+  <td>Whether to use an isolated classloader for catalog.
+      If `true`, an isolated classloader loads all catalog-related libraries and configurations,
+      not the AppClassLoader.</td>
+  <td>`true`</td>
+  <td>No</td>
+  <td>0.1.0</td>
+</tr>
+</tbody>
+</table>
 
 ### Auxiliary service configuration
 
-| Configuration item            | Description                                                                                                                    | Default value | Since Version |
-|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
-| `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
+<table>
+<thead>
+<tr>
+  <th>Configuration item</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.auxService.names</tt></td>
+  <td>The auxiliary service name of the Gravitino Iceberg REST server.
+    Use **`iceberg-rest`** for the Gravitino Iceberg REST server.</td>
+  <td>(none)</td>
+  <td>0.2.0</td>
+</tr>
+</tbody>
+</table>
 
 Refer to [Iceberg REST catalog service](../iceberg-rest-service.md) for configuration details.
 
@@ -122,45 +382,41 @@ To leverage the event listener, you must implement the `EventListenerPlugin` int
 and place the JAR file in the classpath of the Gravitino server.
 Then, add configurations to gravitino.conf to enable the event listener.
 
-| Property name                          | Description                                                                                            | Default value | Required | Since Version |
-|----------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.eventListener.names`        | The name of the event listener, For multiple listeners, separate names with a comma, like "audit,sync" | (none)        | Yes      | 0.5.0         |
-| `gravitino.eventListener.{name}.class` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         | 
-| `gravitino.eventListener.{name}.{key}` | Custom properties that will be passed to the event listener plugin.                                    | (none)        | Yes      | 0.5.0         | 
-
-#### Event
-
-Gravitino triggers a pre-event before the operation,
-a post-event after the completion of the operation
-and a failure event after the operation failed.
-
-##### Post-event
-
-| Operation type                      | Post-event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Since Version    |
-|-------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| table operation                     | `CreateTableEvent`, `AlterTableEvent`, `DropTableEvent`, `LoadTableEvent`, `ListTableEvent`, `PurgeTableFailureEvent`, `CreateTableFailureEvent`, `AlterTableFailureEvent`, `DropTableFailureEvent`, `LoadTableFailureEvent`, `ListTableFailureEvent`, `PurgeTableFailureEvent`                                                                                                                                                                                                                                                                                                                                                                             | 0.5.0            |
-| fileset operation                   | `CreateFileSetEvent`, `AlterFileSetEvent`, `DropFileSetEvent`, `LoadFileSetEvent`, `ListFileSetEvent`, `CreateFileSetFailureEvent`, `AlterFileSetFailureEvent`, `DropFileSetFailureEvent`, `LoadFileSetFailureEvent`, `ListFileSetFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                             | 0.5.0            |
-| topic operation                     | `CreateTopicEvent`, `AlterTopicEvent`, `DropTopicEvent`, `LoadTopicEvent`, `ListTopicEvent`, `CreateTopicFailureEvent`, `AlterTopicFailureEvent`, `DropTopicFailureEvent`, `LoadTopicFailureEvent`, `ListTopicFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                                 | 0.5.0            |
-| schema operation                    | `CreateSchemaEvent`, `AlterSchemaEvent`, `DropSchemaEvent`, `LoadSchemaEvent`, `ListSchemaEvent`, `CreateSchemaFailureEvent`, `AlterSchemaFailureEvent`, `DropSchemaFailureEvent`, `LoadSchemaFailureEvent`, `ListSchemaFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                       | 0.5.0            |
-| catalog operation                   | `CreateCatalogEvent`, `AlterCatalogEvent`, `DropCatalogEvent`, `LoadCatalogEvent`, `ListCatalogEvent`, `CreateCatalogFailureEvent`, `AlterCatalogFailureEvent`, `DropCatalogFailureEvent`, `LoadCatalogFailureEvent`, `ListCatalogFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                             | 0.5.0            |
-| metalake operation                  | `CreateMetalakeEvent`, `AlterMetalakeEvent`, `DropMetalakeEvent`, `LoadMetalakeEvent`, `ListMetalakeEvent`, `CreateMetalakeFailureEvent`, `AlterMetalakeFailureEvent`, `DropMetalakeFailureEvent`, `LoadMetalakeFailureEvent`, `ListMetalakeFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                   | 0.5.0            |
-| Iceberg REST server table operation | `IcebergCreateTableEvent`, `IcebergUpdateTableEvent`, `IcebergDropTableEvent`, `IcebergLoadTableEvent`, `IcebergListTableEvent`, `IcebergTableExistsEvent`, `IcebergRenameTableEvent`, `IcebergCreateTableFailureEvent`, `IcebergUpdateTableFailureEvent`, `IcebergDropTableFailureEvent`, `IcebergLoadTableFailureEvent`, `IcebergListTableFailureEvent`, `IcebergRenameTableFailureEvent`, `IcebergTableExistsFailureEvent`                                                                                                                                                                                                                               | 0.7.0-incubating |
-| tag operation                       | `ListTagsEvent`, `ListTagsInfoEvent`, `CreateTagEvent`, `GetTagEvent`, `AlterTagEvent`, `DeleteTagEvent`, `ListMetadataObjectsForTagEvent`, `ListTagsForMetadataObjectEvent`, `ListTagsInfoForMetadataObjectEvent`, `AssociateTagsForMetadataObjectEvent`, `GetTagForMetadataObjectEvent`, `ListTagsFailureEvent`, `ListTagInfoFailureEvent`, `CreateTagFailureEvent`, `GetTagFailureEvent`, `AlterTagFailureEvent`, `DeleteTagFailureEvent`, `ListMetadataObjectsForTagFailureEvent`, `ListTagsForMetadataObjectFailureEvent`, `ListTagsInfoForMetadataObjectFailureEvent`, `AssociateTagsForMetadataObjectFailureEvent`, `GetTagForMetadataObjectFailureEvent` | 0.9.0-incubating |
-| model operation                     | `DeleteModelEvent`,  `DeleteModelVersionEvent`,  `GetModelEvent`, `GetModelVersionEvent`, `LinkModelVersionEvent`, `ListModelEvent`, `ListModelVersionsEvent`,  `RegisterAndLinkModelEvent`, `RegisterModelEvent`,  `DeleteModelFailureEvent`, `DeleteModelVersionFailureEvent`, `GetModelFailureEvent`, `GetModelVersionFailureEvent`, `LinkModelVersionFailureEvent`, `ListModelFailureEvent`, `ListModelVersionFailureEvent`, `RegisterAndLinkModelFailureEvent`, `RegisterModelFailureEvent`                                                                                                                                                            | 0.9.0-incubating |
-
-##### Pre-event
-
-| Operation type                       | Pre-event                                                                                                                                                                                                                                                                                                                  | Since Version    |
-|--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| Iceberg REST server table operation  | `IcebergCreateTablePreEvent`, `IcebergUpdateTablePreEvent`, `IcebergDropTablePreEvent`, `IcebergLoadTablePreEvent`, `IcebergListTablePreEvent`, `IcebergTableExistsPreEvent`, `IcebergRenameTablePreEvent`                                                                                                                 | 0.7.0-incubating |
-| Gravitino server table operation     | `CreateTablePreEvent`, `AlterTablePreEvent`, `DropTablePreEvent`, `PurgeTablePreEvent`, `LoadTablePreEvent`, `ListTablePreEvent`                                                                                                                                                                                           | 0.8.0-incubating |
-| Gravitino server schema operation    | `CreateSchemaPreEvent`, `AlterSchemaPreEvent`, `DropSchemaPreEvent`, `LoadSchemaPreEvent`, `ListSchemaPreEvent`                                                                                                                                                                                                            | 0.8.0-incubating |
-| Gravitino server catalog operation   | `CreateCatalogPreEvent`, `AlterCatalogPreEvent`, `DropCatalogPreEvent`, `LoadCatalogPreEvent`, `ListCatalogPreEvent`                                                                                                                                                                                                       | 0.8.0-incubating |
-| Gravitino server metalake operation  | `CreateMetalakePreEvent`, `AlterMetalakePreEvent`,`DropMetalakePreEvent`,`LoadMetalakePreEvent`,`ListMetalakePreEvent`                                                                                                                                                                                                     | 0.8.0-incubating |
-| Gravitino server partition operation | `AddPartitionPreEvent`, `DropPartitionPreEvent`, `GetPartitionPreEvent`, `PurgePartitionPreEvent`,`ListPartitionPreEvent`,`ListPartitionNamesPreEvent`                                                                                                                                                                     | 0.8.0-incubating |
-| Gravitino server fileset operation   | `CreateFilesetPreEvent`, `AlterFilesetPreEvent`, `DropFilesetPreEvent`, `LoadFilesetPreEvent`,`ListFilesetPreEvent`,`GetFileLocationPreEvent`                                                                                                                                                                              | 0.8.0-incubating |
-| Gravitino server model operation     | `DeleteModelPreEvent`, `DeleteModelVersionPreEvent`, `RegisterAndLinkModelPreEvent`,`GetModelPreEvent`, `GetModelVersionPreEvent`,`LinkModelVersionPreEvent`,`ListModelPreEvent`,`RegisterModelPreEvent`                                                                                                                                                | 0.9.0-incubating |
-| Gravitino server tag operation       | `ListTagsPreEvent`, `ListTagsInfoPreEvent`, `CreateTagPreEvent`, `GetTagPreEvent`, `AlterTagPreEvent`, `DeleteTagPreEvent`, `ListMetadataObjectsForTagPreEvent`, `ListTagsForMetadataObjectPreEvent`, `ListTagsInfoForMetadataObjectPreEvent`, `AssociateTagsForMetadataObjectPreEvent`, `GetTagForMetadataObjectPreEvent` | 0.9.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Configuration item</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.eventListener.names</tt></td>
+  <td>The name of the event listener.
+      For multiple listeners, separate names with a comma, e.g. "audit,sync".</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.eventListener.&lt;name&gt;.class</tt></td>
+  <td>The class name of the event listener, replace `<name>` with the actual listener name.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>gravitino.eventListener.&lt;name&gt;.&lt;key&gt;</tt></td>
+  <td>Custom properties that will be passed to the event listener plugin.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>0.5.0</td>
+</tr>
+</tbody>
+</table>
 
 #### Event listener plugin
 
@@ -193,20 +449,49 @@ The audit log framework defines how audit logs are formatted and written to vari
 The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`.
 The writer defines an interface to writing AuditLog to different storages.
 
-Gravitino provides a default implement to log basic audit information to a file,
-you could extend the audit system by implementation corresponding interfaces.
+Gravitino provides a default implement to log basic audit information to a file.
+You could extend the audit system by implementation corresponding interfaces.
 
-| Property name                         | Description                            | Default value                               | Required | Since Version              |
-|---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
-| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | NO       | 0.7.0-incubating           |
-| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           | 
-| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.SimpleFormatter  | NO       | 0.7.0-incubating           | 
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.audit.enabled</tt></td>
+  <td>The audit log enable flag.</td>
+  <td>false</td>
+  <td>No</td>
+  <td>0.7.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>gravitino.audit.writer.className</tt></td>
+  <td>The class name of audit log writer.</td>
+  <td>`org.apache.gravitino.audit.FileAuditWriter`</td>
+  <td>No</td>
+  <td>0.7.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>gravitino.audit.formatter.className</tt></td>
+  <td>The class name of audit log formatter.</td>
+  <td>`org.apache.gravitino.audit.SimpleFormatter`</td>
+  <td>No</td>
+  <td>0.7.0-incubating</td>
+</tr>
+</tbody>
+</table>
 
 #### Audit log formatter
 
 The Formatter defines an interface that formats metadata audit logs into a unified format.
 `SimpleFormatter` is a default implement to format audit information,
-you don't need to do extra configurations.
+you don't need to do extra configuration operations.
 
 #### Audit log writer
 
@@ -217,11 +502,40 @@ Writer configuration begins with `gravitino.audit.writer.${name}`,
 where `${name}` is replaced with the actual writer name defined in method `name()`.
 `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
 
-| Property name                                   | Description                                                                   | Default value       | Required | Since Version    |
-|-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
-| `gravitino.audit.writer.file.fileName`          | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.file.append`            | Whether the log will be written to the end or the beginning of the file.      | true                | NO       | 0.7.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.audit.writer.file.fileName</tt></td>
+  <td>The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`.</td>
+  <td>`gravitino_audit.log`</td>
+  <td>No</td>
+  <td>0.7.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>gravitino.audit.writer.file.flushIntervalSecs</tt></td>
+  <td>The flush interval time of the audit file in seconds.</td>
+  <td>`10`</td>
+  <td>No</td>
+  <td>0.7.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>gravitino.audit.writer.file.append</tt></td>
+  <td>Whether the log will be written to the end or the beginning of the file.</td>
+  <td>`true`</td>
+  <td>No</td>
+  <td>0.7.0-incubating</td>
+</tr>
+</tbody>
+</table>
 
 ### Security configuration
 
@@ -229,9 +543,26 @@ Refer to [security](../security/security.md) for HTTPS and authentication config
 
 ### Metrics configuration
 
-| Property name                             | Description                                          | Default value | Required | Since Version |
-|-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>gravitino.metrics.timeSlidingWindowSecs</tt></td>
+  <td>The seconds of Gravitino metrics time sliding window.</td>
+  <td>`60`</td>
+  <td>No</td>
+  <td>0.5.1</td>
+</tr>
+</tbody>
+</table>
 
 ## Apache Gravitino catalog properties configuration
 
@@ -256,38 +587,119 @@ These rules only apply to the catalog properties and don't affect the schema or 
 
 Below is a list of catalog properties that will be used by all Gravitino catalogs:
 
-| Configuration item  | Description                                                                                                                                                                                                                                                | Default value | Required | Since version    |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `package`           | The path of the catalog package, Gravitino leverages this path to load the related catalog libs and configurations. The package should consist two folders, `conf` (for catalog related configurations) and `libs` (for catalog related dependencies/jars) | (none)        | No       | 0.5.0            |
-| `cloud.name`        | The property to specify the cloud that the catalog is running on. The valid values are `aws`, `azure`, `gcp`, `on_premise` and `other`.                                                                                                                    | (none)        | No       | 0.6.0-incubating |
-| `cloud.region-code` | The property to specify the region code of the cloud that the catalog is running on.                                                                                                                                                                       | (none)        | No       | 0.6.0-incubating |
-
+<table>
+<thead>
+<tr>
+  <th>Configuration Option</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>package</tt></td>
+  <td>The path of the catalog package.
+    Gravitino leverages this path to load the related catalog libs and configurations.
+    The package should consist two folders, `conf` (for catalog related configurations)
+    and `libs` (for catalog related dependencies/JARs).</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td><tt>cloud.name</tt></td>
+  <td>The property to specify the cloud that the catalog is running on.
+    The valid values are `aws`, `azure`, `gcp`, `on_premise` and `other`.</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>0.6.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>cloud.region-code</tt></td>
+  <td>The property to specify the region code of the cloud that the catalog is running on.</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>0.6.0-incubating</td>
+</tr>
+</tbody>
+</table>
 
 The following table lists the catalog specific properties and their default paths:
 
-| catalog provider    | catalog properties                                                                  | catalog properties configuration file path               |
-|---------------------|-------------------------------------------------------------------------------------|----------------------------------------------------------|
-| `hive`              | [Hive](../catalogs/relational/hive/index.md#catalog-properties)                     | `catalogs/hive/conf/hive.conf`                           |
-| `lakehouse-iceberg` | [Lakehouse Iceberg](../catalogs/relational/lakehouse/iceberg.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
-| `lakehouse-paimon`  | [Lakehouse Paimon](../catalogs/relational/lakehouse/paimon.md#catalog-properties)   | `catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
-| `lakehouse-hudi`    | [Lakehouse Hudi](../catalogs/relational/lakehouse/hudi.md#catalog-properties)       | `catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
-| `jdbc-mysql`        | [MySQL](../catalogs/relational/jdbc/mysql.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
-| `jdbc-postgresql`   | [PostgreSQL](../catalogs/relational/jdbc/postgresql.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
-| `jdbc-doris`        | [Doris](../catalogs/relational/jdbc/doris.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
-| `jdbc-oceanbase`    | [OceanBase](../catalogs/relational/jdbc/oceanbase.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
-| `kafka`             | [Kafka](../catalogs/messaging/kafka/index.md#catalog-properties)                    | `catalogs/kafka/conf/kafka.conf`                         |
-| `hadoop`            | [Hadoop](../catalogs/fileset/hadoop/hadoop-catalog.md#catalog-properties)           | `catalogs/hadoop/conf/hadoop.conf`                       |
+<table>
+<thead>
+<tr>
+  <th>Catalog provider</th>
+  <th>Catalog prperties</th>
+  <th>Catalog properties config file</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>hadoop</tt></td>
+  <td>[Apache Hadoop](../catalogs/fileset/hadoop/hadoop-catalog.md#catalog-properties)</td>
+  <td>`catalogs/hadoop/conf/hadoop.conf`</td>
+</tr>
+<tr>
+  <td><tt>hive</tt></td>
+  <td>[Apache Hive](../catalogs/relational/hive/index.md#catalog-properties)</td>
+  <td>`catalogs/hive/conf/hive.conf`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-doris</tt></td>
+  <td>[Doris](../catalogs/relational/jdbc/doris.md#catalog-properties)</td>
+  <td>`catalogs/jdbc-doris/conf/jdbc-doris.conf`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-mysql</tt></td>
+  <td>[MySQL](../catalogs/relational/jdbc/mysql.md#catalog-properties)</td>
+  <td>`catalogs/jdbc-mysql/conf/jdbc-mysql.conf`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-oceanbase</tt></td>
+  <td>[OceanBase](../catalogs/relational/jdbc/oceanbase.md#catalog-properties)</td>
+  <td>`catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-postgresql</tt></td>
+  <td>[PostgreSQL](../catalogs/relational/jdbc/postgresql.md#catalog-properties)</td>
+  <td>`catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`</td>
+</tr>
+<tr>
+  <td><tt>kafka</tt></td>
+  <td>[Kafka](../catalogs/messaging/kafka/index.md#catalog-properties)</td>
+  <td>`catalogs/kafka/conf/kafka.conf`</td>
+</tr>
+<tr>
+  <td><tt>lakehouse-hudi</tt></td>
+  <td>[Lakehouse Hudi](../catalogs/relational/lakehouse/hudi.md#catalog-properties)</td>
+  <td>`catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`</td>
+</tr>
+<tr>
+  <td><tt>lakehouse-iceberg</tt></td>
+  <td>[Lakehouse Iceberg](../catalogs/relational/lakehouse/iceberg.md#catalog-properties)</td>
+  <td>`catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf`</td>
+</tr>
+<tr>
+  <td><tt>lakehouse-paimon</tt></td>
+  <td>[Lakehouse Paimon](../catalogs/relational/lakehouse/paimon.md#catalog-properties)</td>
+  <td>`catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`</td>
+</tr>
+</tbody>
+</table>
 
 :::info
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.
 :::
 
-## Some other configurations
+## Other configurations
 
 You could put HDFS configuration file to the catalog properties configuration dir,
 like `catalogs/lakehouse-iceberg/conf/`.
 
-## How to set up runtime environment variables
+### How to set up runtime environment variables
 
 The Gravitino server lets you set up runtime environment variables
 by editing the `gravitino-env.sh` file, located in the `conf` directory.
@@ -303,4 +715,285 @@ There are two ways to resolve this error:
 * Grant Gravitino startup user permissions in Hadoop
 * Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME`
   before starting the Gravitino server.
+
+## Event
+
+Gravitino triggers a pre-event before the operation,
+a post-event after the completion of the operation
+and a failure event after the operation failed.
+
+### Post-event
+
+<table>
+<thead>
+<tr>
+  <th>Operation type</th>
+  <th>Post-event</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>table operation</td>
+  <td>`AlterTableEvent`,
+    `AlterTableFailureEvent`,
+    `CreateTableEvent`,
+    `CreateTableFailureEvent`,
+    `DropTableEvent`,
+    `DropTableFailureEvent`,
+    `ListTableEvent`,
+    `ListTableFailureEvent`,
+    `LoadTableEvent`,
+    `LoadTableFailureEvent`,
+    `PurgeTableFailureEvent`,
+    `PurgeTableFailureEvent`</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td>fileset operation</td>
+  <td>`AlterFileSetEvent`,
+    `AlterFileSetFailureEvent`,
+    `CreateFileSetEvent`,
+    `CreateFileSetFailureEvent`,
+    `DropFileSetEvent`,
+    `DropFileSetFailureEvent`,
+    `ListFileSetEvent`,
+    `ListFileSetFailureEvent`,
+    `LoadFileSetEvent`,
+    `LoadFileSetFailureEvent`</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td>topic operation</td>
+  <td>`AlterTopicEvent`,
+    `AlterTopicFailureEvent`,
+    `CreateTopicEvent`,
+    `CreateTopicFailureEvent`,
+    `DropTopicEvent`,
+    `DropTopicFailureEvent`,
+    `ListTopicEvent`,
+    `ListTopicFailureEvent`,
+    `LoadTopicEvent`,
+    `LoadTopicFailureEvent`</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td>schema operation</td>
+  <td>`AlterSchemaEvent`,
+    `AlterSchemaFailureEvent`,
+    `CreateSchemaEvent`,
+    `CreateSchemaFailureEvent`,
+    `DropSchemaEvent`,
+    `DropSchemaFailureEvent`,
+    `ListSchemaEvent`,
+    `ListSchemaFailureEvent`,
+    `LoadSchemaEvent`,
+    `LoadSchemaFailureEvent`</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td>catalog operation</td>
+  <td>`AlterCatalogEvent`,
+    `AlterCatalogFailureEvent`,
+    `CreateCatalogEvent`,
+    `CreateCatalogFailureEvent`,
+    `DropCatalogEvent`,
+    `DropCatalogFailureEvent`,
+    `ListCatalogEvent`,
+    `ListCatalogFailureEvent`,
+    `LoadCatalogEvent`,
+    `LoadCatalogFailureEvent`</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td>metalake operation</td>
+  <td>`AlterMetalakeEvent`,
+    `AlterMetalakeFailureEvent`,
+    `CreateMetalakeEvent`,
+    `CreateMetalakeFailureEvent`,
+    `DropMetalakeEvent`,
+    `DropMetalakeFailureEvent`,
+    `ListMetalakeEvent`,
+    `ListMetalakeFailureEvent`,
+    `LoadMetalakeEvent`,
+    `LoadMetalakeFailureEvent`</td>
+  <td>0.5.0</td>
+</tr>
+<tr>
+  <td>Iceberg REST server table operation</td>
+  <td>`IcebergCreateTableEvent`,
+    `IcebergCreateTableFailureEvent`,
+    `IcebergDropTableEvent`,
+    `IcebergDropTableFailureEvent`,
+    `IcebergListTableEvent`,
+    `IcebergListTableFailureEvent`,
+    `IcebergLoadTableEvent`,
+    `IcebergLoadTableFailureEvent`,
+    `IcebergRenameTableEvent`,
+    `IcebergRenameTableFailureEvent`,
+    `IcebergTableExistsEvent`,
+    `IcebergTableExistsFailureEvent`,
+    `IcebergUpdateTableEvent`,
+    `IcebergUpdateTableFailureEvent`</td>
+  <td>0.7.0-incubating</td>
+</tr>
+<tr>
+  <td>tag operation</td>
+  <td>`AlterTagEvent`,
+    `AlterTagFailureEvent`,
+    `AssociateTagsForMetadataObjectEvent`,
+    `AssociateTagsForMetadataObjectFailureEvent`,
+    `CreateTagEvent`,
+    `CreateTagFailureEvent`,
+    `DeleteTagEvent`,
+    `DeleteTagFailureEvent`,
+    `GetTagEvent`,
+    `GetTagFailureEvent`,
+    `GetTagForMetadataObjectEvent`,
+    `GetTagForMetadataObjectFailureEvent`,
+    `ListMetadataObjectsForTagEvent`,
+    `ListMetadataObjectsForTagFailureEvent`,
+    `ListTagsEvent`,
+    `ListTagsFailureEvent`,
+    `ListTagsForMetadataObjectEvent`,
+    `ListTagsForMetadataObjectFailureEvent`,
+    `ListTagsInfoEvent`,
+    `ListTagsInfoFailureEvent`,
+    `ListTagsInfoForMetadataObjectEvent`,
+    `ListTagsInfoForMetadataObjectFailureEvent`</td>
+  <td>0.9.0-incubating</td>
+</tr>
+<tr>
+  <td>model operation</td>
+  <td>`DeleteModelEvent`,
+    `DeleteModelFailureEvent`,
+    `DeleteModelVersionEvent`,
+    `DeleteModelVersionFailureEvent`,
+    `GetModelEvent`,
+    `GetModelFailureEvent`,
+    `GetModelVersionEvent`,
+    `GetModelVersionFailureEvent`,
+    `LinkModelVersionEvent`,
+    `LinkModelVersionFailureEvent`,
+    `ListModelEvent`,
+    `ListModelFailureEvent`,
+    `ListModelVersionsEvent`,
+    `ListModelVersionFailureEvent`,
+    `RegisterAndLinkModelEvent`,
+    `RegisterAndLinkModelFailureEvent`,
+    `RegisterModelEvent`,
+    `RegisterModelFailureEvent`</td>
+  <td>0.9.0-incubating</td>
+</tr>
+</tbody>
+</table>
+
+### Pre-event
+
+<table>
+<thead>
+<tr>
+  <th>Operation type</th>
+  <th>Pre-event</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Iceberg REST server table operation</td>
+  <td>`IcebergCreateTablePreEvent`,
+    `IcebergDropTablePreEvent`,
+    `IcebergListTablePreEvent`,
+    `IcebergLoadTablePreEvent`,
+    `IcebergRenameTablePreEvent`,
+    `IcebergTableExistsPreEvent`,
+    `IcebergUpdateTablePreEvent`</td>
+  <td>0.7.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server table operation</td>
+  <td>`AlterTablePreEvent`,
+    `CreateTablePreEvent`,
+    `DropTablePreEvent`,
+    `ListTablePreEvent`,
+    `LoadTablePreEvent`,
+    `PurgeTablePreEvent`</td>
+  <td>0.8.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server schema operation</td>
+  <td>`AlterSchemaPreEvent`,
+    `CreateSchemaPreEvent`,
+    `DropSchemaPreEvent`,
+    `ListSchemaPreEvent`,
+    `LoadSchemaPreEvent`</td>
+  <td>0.8.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server catalog operation</td>
+  <td>`CreateCatalogPreEvent`,
+    `AlterCatalogPreEvent`,
+    `DropCatalogPreEvent`,
+    `LoadCatalogPreEvent`,
+    `ListCatalogPreEvent`</td>
+  <td>0.8.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server metalake operation</td>
+  <td>`CreateMetalakePreEvent`,
+    `AlterMetalakePreEvent`,
+    `DropMetalakePreEvent`,
+    `LoadMetalakePreEvent`,
+    `ListMetalakePreEvent`</td>
+  <td>0.8.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server partition operation</td>
+  <td>`AddPartitionPreEvent`,
+    `DropPartitionPreEvent`,
+    `GetPartitionPreEvent`,
+    `PurgePartitionPreEvent`,
+    `ListPartitionPreEvent`,
+    `ListPartitionNamesPreEvent`</td>
+  <td>0.8.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server fileset operation</td>
+  <td>`CreateFilesetPreEvent`,
+    `AlterFilesetPreEvent`,
+    `DropFilesetPreEvent`,
+    `LoadFilesetPreEvent`,
+    `ListFilesetPreEvent`,
+    `GetFileLocationPreEvent`</td>
+  <td>0.8.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server model operation</td>
+  <td>`DeleteModelPreEvent`,
+    `DeleteModelVersionPreEvent`,
+    `RegisterAndLinkModelPreEvent`,
+    `GetModelPreEvent`,
+    `GetModelVersionPreEvent`,
+    `LinkModelVersionPreEvent`,
+    `ListModelPreEvent`,
+    `RegisterModelPreEvent`</td>
+  <td>0.9.0-incubating</td>
+</tr>
+<tr>
+  <td>Gravitino server tag operation</td>
+  <td>`ListTagsPreEvent`,
+    `ListTagsInfoPreEvent`,
+    `CreateTagPreEvent`,
+    `GetTagPreEvent`,
+    `AlterTagPreEvent`,
+    `DeleteTagPreEvent`,
+    `ListMetadataObjectsForTagPreEvent`,
+    `ListTagsForMetadataObjectPreEvent`,
+    `ListTagsInfoForMetadataObjectPreEvent`,
+    `AssociateTagsForMetadataObjectPreEvent`,
+    `GetTagForMetadataObjectPreEvent`</td>
+  <td>0.9.0-incubating</td>
+</tr>
+</tbody>
+</table>
 
