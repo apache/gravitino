@@ -1055,4 +1055,37 @@ public class TestMysqlTableOperations extends TestMysql {
     sql = MysqlTableOperations.deleteIndexDefinition(null, deleteIndex);
     Assertions.assertEquals("DROP INDEX `uk_1`", sql);
   }
+
+  @Test
+  public void testCalculateDatetimePrecision() {
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATE", 10),
+        "DATE type should return 0 precision");
+
+    Assertions.assertEquals(
+        1,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIME", 10),
+        "TIME type should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIMESTAMP", 23),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 26),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("timestamp", 19),
+        "Lower case type name should work");
+
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50),
+        "Non-datetime type should return 0 precision");
+  }
 }
