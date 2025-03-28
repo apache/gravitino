@@ -218,6 +218,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new GrantRolesPreEvent(initiator, NameIdentifier.of(metalake), roles, user, null));
     try {
       // TODO: add Event
       return dispatcher.grantRolesToUser(metalake, roles, user);
@@ -231,6 +235,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new GrantRolesPreEvent(initiator, NameIdentifier.of(metalake), roles, null, group));
     try {
       // TODO: add Event
       return dispatcher.grantRolesToGroup(metalake, roles, group);
@@ -244,6 +252,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new RevokeRolesPreEvent(initiator, NameIdentifier.of(metalake), roles, null, group));
     try {
       // TODO: add Event
       return dispatcher.revokeRolesFromGroup(metalake, roles, group);
@@ -257,6 +269,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new RevokeRolesPreEvent(initiator, NameIdentifier.of(metalake), roles, user, null));
     try {
       // TODO: add Event
       return dispatcher.revokeRolesFromUser(metalake, roles, user);
@@ -286,6 +302,11 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new CreateRolePreEvent(
+            initiator, NameIdentifier.of(metalake), role, properties, securableObjects));
     try {
       // TODO: add Event
       return dispatcher.createRole(metalake, role, properties, securableObjects);
@@ -299,6 +320,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetRolePreEvent(initiator, NameIdentifier.of(metalake), role));
     try {
       // TODO: add Event
       return dispatcher.getRole(metalake, role);
@@ -311,6 +335,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new DeleteRolePreEvent(initiator, NameIdentifier.of(metalake), role));
     try {
       // TODO: add Event
       return dispatcher.deleteRole(metalake, role);
@@ -323,6 +350,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListRoleNamesPreEvent(initiator, NameIdentifier.of(metalake)));
     try {
       // TODO: add Event
       return dispatcher.listRoleNames(metalake);
@@ -336,6 +366,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public String[] listRoleNamesByObject(String metalake, MetadataObject object)
       throws NoSuchMetalakeException, NoSuchMetadataObjectException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new ListRoleNamesPreEvent(initiator, NameIdentifier.of(metalake), object));
     try {
       // TODO: add Event
       return dispatcher.listRoleNamesByObject(metalake, object);
@@ -350,6 +384,11 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchGroupException, NoSuchRoleException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new GrantPrivilegesPreEvent(
+            initiator, NameIdentifier.of(metalake), role, object, privileges));
     try {
       // TODO: add Event
       return dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
@@ -364,6 +403,11 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new RevokePrivilegesPreEvent(
+            initiator, NameIdentifier.of(metalake), role, object, privileges));
     try {
       // TODO: add Event
       return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
