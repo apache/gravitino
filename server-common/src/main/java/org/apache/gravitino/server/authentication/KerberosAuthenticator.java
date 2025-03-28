@@ -11,14 +11,12 @@
  */
 package org.apache.gravitino.server.authentication;
 
-import com.google.common.base.Splitter;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Base64;
-import java.util.List;
 import javax.security.auth.Subject;
 import javax.security.auth.kerberos.KerberosPrincipal;
 import javax.security.auth.kerberos.KeyTab;
@@ -171,13 +169,7 @@ public class KerberosAuthenticator implements Authenticator {
       }
 
       // Usually principal names are in the form 'user/instance@REALM' or 'user@REALM'.
-      List<String> principalComponents =
-          Splitter.on('@').splitToList(gssContext.getSrcName().toString());
-      if (principalComponents.size() != 2) {
-        throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
-      }
-
-      String user = principalComponents.get(0);
+      String user = gssContext.getSrcName().toString();
       // TODO: We will have KerberosUserPrincipal in the future.
       //  We can put more information of Kerberos to the KerberosUserPrincipal
       // For example, we can put the token into the KerberosUserPrincipal,

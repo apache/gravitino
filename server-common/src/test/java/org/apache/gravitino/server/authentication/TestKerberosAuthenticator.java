@@ -24,6 +24,7 @@ import static org.apache.gravitino.server.authentication.KerberosConfig.PRINCIPA
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.security.Principal;
 import java.util.Base64;
 import java.util.concurrent.Callable;
 import org.apache.gravitino.Config;
@@ -181,8 +182,16 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
                 }
               }
             });
-    kerberosAuthenticator.authenticateToken(
-        (AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + token).getBytes(StandardCharsets.UTF_8));
+    Principal principal =
+        kerberosAuthenticator.authenticateToken(
+            (AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + token)
+                .getBytes(StandardCharsets.UTF_8));
+    Assertions.assertNotNull(principal, "Principal should not be null");
+    String extractedPrincipal = principal.getName();
+    Assertions.assertNotNull(extractedPrincipal, "Extracted principal name should not be null");
+    Assertions.assertTrue(
+        extractedPrincipal.contains("@"),
+        "Extracted principal should contain '@': " + extractedPrincipal);
   }
 
   private void initKeyTab() throws Exception {
