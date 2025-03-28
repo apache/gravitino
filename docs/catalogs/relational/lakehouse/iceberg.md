@@ -342,6 +342,6 @@ to automatically load as the default HDFS configuration.
 Builds with Hadoop 2.10.x, there may be compatibility issues when accessing Hadoop 3.x clusters.
 When writing to HDFS, the Gravitino Iceberg REST server can only operate as the specified HDFS user
 and doesn't support proxying to other HDFS users.
-See [How to access Apache Hadoop](gravitino-server-config.md) for more details.
+See [How to access Apache Hadoop](../../../admin/server-config.md) for more details.
 :::
 

@@ -8,18 +8,20 @@ license: "This software is licensed under the Apache License version 2."
 ## Authentication
 
 Apache Gravitino supports three kinds of authentication mechanisms: simple, OAuth and Kerberos.
-If you don't enable authentication for your client and server explicitly, you will use user `anonymous` to access the server.
+If you don't enable authentication for your client and server explicitly,
+you will use user `anonymous` to access the server.
 
 ### Simple mode
 
 If the client sets the simple mode, it will use the value of environment variable `GRAVITINO_USER` as the user.
-If the environment variable `GRAVITINO_USER` in the client isn't set, the client uses the user logging in the machine that sends requests.
+If the environment variable `GRAVITINO_USER` in the client isn't set,
+the client uses the user logging in the machine that sends requests.
 
 For the client side, users can enable `simple` mode by the following code:
 
 ```java
 GravitinoClient client = GravitinoClient.builder(uri)
-    .withMetalake("metalake")
+    .withMetalake("mymetalake")
     .withSimpleAuth()
     .build();
 ```
@@ -28,14 +30,15 @@ Additionally, the username can be directly used as a parameter to create a clien
 
 ```java
 GravitinoClient client = GravitinoClient.builder(uri)
-    .withMetalake("metalake")
+    .withMetalake("mymetalake")
     .withSimpleAuth("test_user_name")
     .build();
 ```
 
 ### OAuth mode
 
-Gravitino only supports external OAuth 2.0 servers. To enable OAuth mode, users should follow the steps below.
+Gravitino only supports external OAuth 2.0 servers.
+To enable OAuth mode, users should follow the steps below.
 
 - First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
 
@@ -53,15 +56,17 @@ DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder
     .build();
 
 GravitinoClient client = GravitinoClient.builder(uri)
-    .withMetalake("metalake")
+    .withMetalake("mymetalake")
     .withOAuth(authDataProvider)
     .build();
 ```
 
 ### Kerberos mode
 
-To enable Kerberos mode, users need to guarantee that the server and client have the correct Kerberos configuration. In the server side, users should set `gravitino.authenticators` as `kerberos` and give
-`gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value. For the client side, users can enable `kerberos` mode by the following code:
+To enable Kerberos mode, users need to guarantee that the server and client have the correct Kerberos configuration.
+In the server side, users should set `gravitino.authenticators` as `kerberos`
+and give `gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value.
+For the client side, users can enable `kerberos` mode by the following code:
 
 ```java
 // Use keytab to create KerberosTokenProvider
@@ -76,7 +81,7 @@ KerberosTokenProvider provider = KerberosTokenProvider.builder()
         .build();        
 
 GravitinoClient client = GravitinoClient.builder(uri)
-    .withMetalake("metalake")
+    .withMetalake("mymetalake")
     .withKerberosAuth(provider)
     .build();
 ```
@@ -126,49 +131,60 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
    You need to install the JDK8 and Docker.
 
-2. Set up an external OAuth 2.0 server
+1. Set up an external OAuth 2.0 server
 
-   There is a sample-authorization-server based on [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3). The image has registered client information in the external OAuth 2.0 server
+   There is a sample-authorization-server based on
+   [spring-authorization-server](https://github.com/spring-projects/spring-authorization-server/tree/1.0.3).
+   The image has registered client information in the external OAuth 2.0 server
    and its clientId is `test`, secret is `test`, scope is `test`.
 
-```shell
- docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
-```
+   ```shell
+   docker run -p 8177:8177 --name sample-auth-server -d datastrato/sample-authorization-server:0.3.0
+   ```
 
-3. Open [the JWK URL of the Authorization server](http://localhost:8177/oauth2/jwks) in the browser and you can get the JWK.
+1. Open [the JWK URL of the Authorization server](http://localhost:8177/oauth2/jwks)
+   in the browser and you can get the JWK.
 
    ![jks_response_image](../assets/jks.png)
 
-4. Convert the JWK to PEM. You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
+1. Convert the JWK to PEM.
+   You can use the [online tool](https://8gwifi.org/jwkconvertfunctions.jsp#google_vignette) or other tools.
 
    ![pem_convert_result_image](../assets/pem.png)
 
-5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
+1. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
-6. You can refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+1. You can refer to the [Configurations](../admin/server-config.md)
+   and append the configurations to the `conf/gravitino.conf` file.
 
-```text
-gravitino.authenticators = oauth
-gravitino.authenticator.oauth.serviceAudience = test
-gravitino.authenticator.oauth.defaultSignKey = <the default signing key>
-gravitino.authenticator.oauth.tokenPath = /oauth2/token
-gravitino.authenticator.oauth.serverUri = http://localhost:8177
-```
+   ```text
+   gravitino.authenticators = oauth
+   gravitino.authenticator.oauth.serviceAudience = test
+   gravitino.authenticator.oauth.defaultSignKey = <the default signing key>
+   gravitino.authenticator.oauth.tokenPath = /oauth2/token
+   gravitino.authenticator.oauth.serverUri = http://localhost:8177
+   ```
 
-7. Open [the URL of Gravitino server](http://localhost:8090) and login in with clientId `test`, clientSecret `test`, and scope `test`.
+1. Open [the URL of Gravitino server](http://localhost:8090) and login in
+   with clientId `test`, clientSecret `test`, and scope `test`.
 
    ![oauth_login_image](../assets/oauth.png)
 
-8. You can also use the curl command to access Gravitino.
+1. You can also use the curl command to access Gravitino.
 
-Get access token
+   Get access token:
 
-```shell
-curl --location --request POST 'http://127.0.0.1:8177/oauth2/token?grant_type=client_credentials&client_id=test&client_secret=test&scope=test'
-```
+   ```shell
+   curl --location -X POST \
+     http://127.0.0.1:8177/oauth2/token?grant_type=client_credentials&client_id=test&client_secret=test&scope=test
+   ```
 
-Use the access token to request the Gravitino
+   Use the access token to request the Gravitino
 
-```shell
-curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
-```
+   ```shell
+   curl -v -X GET \
+     -H "Accept: application/vnd.gravitino.v1+json" \
+     -H "Authorization: Bearer <access_token>" \
+     http://localhost:8090/api/version
+   ```
+

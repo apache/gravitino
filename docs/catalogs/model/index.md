@@ -39,7 +39,7 @@ users can define the model metadata with more detailed information rather than j
 ### Catalog properties
 
 A Model catalog doesn't have specific properties.
-It uses the [common catalog properties](../../gravitino-server-config.md#apache-gravitino-catalog-properties-configuration).
+It uses the [common catalog properties](../../admin/server-config.md#apache-gravitino-catalog-properties-configuration).
 
 ### Catalog operations
 

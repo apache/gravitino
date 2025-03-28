@@ -33,7 +33,7 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog properties
 
-Besides the [common catalog properties](../../../gravitino-server-config.md#gravitino-catalog-properties-configuration),
+Besides the [common catalog properties](../../../admin/server-config.md#gravitino-catalog-properties-configuration),
 the Hive catalog has the following properties:
 
 | Property Name                            | Description                                                                                                                                                                                                                                         | Default Value | Required                     | Since Version |

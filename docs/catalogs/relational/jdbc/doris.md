@@ -41,7 +41,7 @@ to the data source property.
 For more details, you can check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html).
 
-Besides the [common catalog properties](../../../gravitino-server-config.md#gravitino-catalog-properties-configuration),
+Besides the [common catalog properties](../../../admin/server-config.md#gravitino-catalog-properties-configuration),
 the Doris catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version    |

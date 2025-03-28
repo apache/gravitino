@@ -46,7 +46,7 @@ to the Gravitino PostgreSQL catalog in Trino runtime.
 
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password`
 to catalog properties.
-Besides the [common catalog properties](../../../gravitino-server-config.md#gravitino-catalog-properties-configuration),
+Besides the [common catalog properties](../../../admin/server-config.md#gravitino-catalog-properties-configuration),
 the PostgreSQL catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                                                        | Default value | Required | Since Version |

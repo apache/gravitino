@@ -138,7 +138,7 @@ For more details, please check [how to use relational backend storage](./how-to-
 
 The Gravitino server configuration file (`conf/gravitino.conf`) contains builtin default settings.
 You can configure the Gravitino server by modifying this file.
-For details about the configurable options, please check [Gravitino Server configurations](./gravitino-server-config.md).
+For details about the configurable options, please check [Gravitino Server configurations](./admin/server-config.md).
 
 #### Configure the server logging
 

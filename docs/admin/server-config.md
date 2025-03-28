@@ -111,7 +111,7 @@ The configuration items are as follows:
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
 | `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
 
-Refer to [Iceberg REST catalog service](./iceberg-rest-service.md) for configuration details.
+Refer to [Iceberg REST catalog service](../iceberg-rest-service.md) for configuration details.
 
 ### Event listener configuration
 
@@ -225,7 +225,7 @@ where `${name}` is replaced with the actual writer name defined in method `name(
 
 ### Security configuration
 
-Refer to [security](./security/security.md) for HTTPS and authentication configurations.
+Refer to [security](../security/security.md) for HTTPS and authentication configurations.
 
 ### Metrics configuration
 
@@ -265,18 +265,18 @@ Below is a list of catalog properties that will be used by all Gravitino catalog
 
 The following table lists the catalog specific properties and their default paths:
 
-| catalog provider    | catalog properties                                                                 | catalog properties configuration file path               |
-|---------------------|------------------------------------------------------------------------------------|----------------------------------------------------------|
-| `hive`              | [Hive](./catalogs/relational/hive/index.md#catalog-properties)                     | `catalogs/hive/conf/hive.conf`                           |
-| `lakehouse-iceberg` | [Lakehouse Iceberg](./catalogs/relational/lakehouse/iceberg.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
-| `lakehouse-paimon`  | [Lakehouse Paimon](./catalogs/relational/lakehouse/paimon.md#catalog-properties)   | `catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
-| `lakehouse-hudi`    | [Lakehouse Hudi](./catalogs/relational/lakehouse/hudi.md#catalog-properties)       | `catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
-| `jdbc-mysql`        | [MySQL](./catalogs/relational/jdbc/mysql.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
-| `jdbc-postgresql`   | [PostgreSQL](./catalogs/relational/jdbc/postgresql.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
-| `jdbc-doris`        | [Doris](./catalogs/relational/jdbc/doris.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
-| `jdbc-oceanbase`    | [OceanBase](./catalogs/relational/jdbc/oceanbase.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
-| `kafka`             | [Kafka](./catalogs/messaging/kafka/index.md#catalog-properties)                    | `catalogs/kafka/conf/kafka.conf`                         |
-| `hadoop`            | [Hadoop](./catalogs/fileset/hadoop/hadoop-catalog.md#catalog-properties)           | `catalogs/hadoop/conf/hadoop.conf`                       |
+| catalog provider    | catalog properties                                                                  | catalog properties configuration file path               |
+|---------------------|-------------------------------------------------------------------------------------|----------------------------------------------------------|
+| `hive`              | [Hive](../catalogs/relational/hive/index.md#catalog-properties)                     | `catalogs/hive/conf/hive.conf`                           |
+| `lakehouse-iceberg` | [Lakehouse Iceberg](../catalogs/relational/lakehouse/iceberg.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
+| `lakehouse-paimon`  | [Lakehouse Paimon](../catalogs/relational/lakehouse/paimon.md#catalog-properties)   | `catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
+| `lakehouse-hudi`    | [Lakehouse Hudi](../catalogs/relational/lakehouse/hudi.md#catalog-properties)       | `catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
+| `jdbc-mysql`        | [MySQL](../catalogs/relational/jdbc/mysql.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
+| `jdbc-postgresql`   | [PostgreSQL](../catalogs/relational/jdbc/postgresql.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
+| `jdbc-doris`        | [Doris](../catalogs/relational/jdbc/doris.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
+| `jdbc-oceanbase`    | [OceanBase](../catalogs/relational/jdbc/oceanbase.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
+| `kafka`             | [Kafka](../catalogs/messaging/kafka/index.md#catalog-properties)                    | `catalogs/kafka/conf/kafka.conf`                         |
+| `hadoop`            | [Hadoop](../catalogs/fileset/hadoop/hadoop-catalog.md#catalog-properties)           | `catalogs/hadoop/conf/hadoop.conf`                       |
 
 :::info
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.
