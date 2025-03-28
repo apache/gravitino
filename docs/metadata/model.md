@@ -1,6 +1,6 @@
 ---
-title: Manage model metadata using Gravitino
-slug: /manage-model-metadata-using-gravitino
+title: Manage model metadata
+slug: /manage-model-metadata
 date: 2024-12-26
 keyword: Gravitino model metadata manage
 license: This software is licensed under the Apache License version 2.
@@ -21,7 +21,7 @@ and deleting models and model versions.
 To use a model catalog, please make sure that:
 
 - The Gravitino server has started and is serving at [http://localhost:8090](http://localhost:8090).
-- A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake)
+- A metalake has been created and [enabled](../manage-metalake-using-gravitino.md#enable-a-metalake)
 
 ## Catalog operations
 
@@ -97,27 +97,27 @@ catalog = client.create_catalog(
 
 ### Load a catalog
 
-Refer to [loading a catalog](./manage-relational-metadata-using-gravitino.md#load-a-catalog)
+Refer to [loading a catalog](./relational.md#load-a-catalog)
 for relational catalog.
 
 ### Alter a catalog
 
-Refer to [altering a catalog](./manage-relational-metadata-using-gravitino.md#alter-a-catalog)
+Refer to [altering a catalog](./relational.md#alter-a-catalog)
 for a relational catalog.
 
 ### Drop a catalog
 
-Refer to [dropping a catalog](./manage-relational-metadata-using-gravitino.md#drop-a-catalog)
+Refer to [dropping a catalog](./relational.md#drop-a-catalog)
 for a relational catalog.
 
 ### List all catalogs in a metalake
 
-Refer to [listing all catalogs](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
+Refer to [listing all catalogs](./relational.md#list-all-catalogs-in-a-metalake)
 for relational catalogs.
 
 ### List all catalogs' information in a metalake
 
-Refer to [listing all catalogs' information](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [listing all catalogs' information](./relational.md#list-all-catalogs-information-in-a-metalake)
 for relational catalogs.
 
 ## Schema operations
@@ -197,25 +197,22 @@ catalog.as_schemas().create_schema(
 
 ### Load a schema
 
-Refer to [loading a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
-for a relational catalog.
+Refer to [loading a schema](./relational.md#load-a-schema) for a relational catalog.
 
 ### Alter a schema
 
-Refer to [altering a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
-for a relational catalog.
+Refer to [altering a schema](./relational.md#alter-a-schema) for a relational catalog.
 
 ### Drop a schema
 
-Refer to [dropping a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
-for a relational catalog.
+Refer to [dropping a schema](./relational.md#drop-a-schema) for a relational catalog.
 
 Note that the drop operation will delete all the model metadata under this schema
 if the `cascade` parameter set to `true`.
 
 ### List all schemas under a catalog
 
-Refer to [listing all schemas](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
+Refer to [listing all schemas](./relational.md#list-all-schemas-under-a-catalog)
 for a relational catalog.
 
 ## Model operations

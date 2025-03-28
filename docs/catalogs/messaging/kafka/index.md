@@ -25,7 +25,7 @@ the Kafka catalog has the following properties:
 
 ### Catalog operations
 
-For more details, refer to [Catalog operations](../../../manage-messaging-metadata-using-gravitino.md#catalog-operations).
+For more details, refer to [Catalog operations](../../../metadata/messaging.md#catalog-operations).
 
 ## Schema
 
@@ -42,7 +42,7 @@ None.
 
 ### Schema operations
 
-For more details, refer to [Schema operation](../../../manage-messaging-metadata-using-gravitino.md#schema-operations).
+For more details, refer to [Schema operation](../../../metadata/messaging.md#schema-operations).
 
 ## Topic
 
@@ -62,5 +62,5 @@ Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topiccon
 
 ### Topic operations
 
-Refer to [topic operation](../../../manage-messaging-metadata-using-gravitino.md#topic-operations).
+Refer to [topic operation](../../../metadata/messaging.md#topic-operations).
 

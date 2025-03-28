@@ -16,7 +16,9 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage PostgreSQL metadata.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`,
+please don't change or remove this message.
 :::
 
 ## Catalog
@@ -27,8 +29,8 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Supports table index.
-- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value) and
-  [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](../../../metadata/relational.md#table-column-default-value) and
+  [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
 
 ### Catalog properties
 
@@ -67,7 +69,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations)
+Please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations)
 for more details.
 
 ## Schema
@@ -85,7 +87,7 @@ for more details.
 
 ### Schema operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations)
+Please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations)
 for more details.
 
 ## Table
@@ -95,8 +97,8 @@ for more details.
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Supports index.
-- Support [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value) and
-  [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Support [column default value](../../../metadata/relational.md#table-column-default-value) and
+  [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
 ### Table column types
@@ -123,7 +125,7 @@ for more details.
 :::info
 PostgreSQL doesn't support Gravitino `Fixed`,`Struct`, `Map`,`IntervalDay`, `IntervalYear`,`Union`, or `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino
-**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+**[External Type](../../../metadata/relational.md#external-type)**
 that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
@@ -174,7 +176,7 @@ Index[] indexes = new Index[] {
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations)
+Please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations)
 for more details.
 
 #### Alter table operations

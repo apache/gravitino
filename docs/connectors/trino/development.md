@@ -14,7 +14,7 @@ Before you start developing the Gravitino Trino connector, you need to have the 
 1. You need to start the Gravitino server locally.
    For more information, please refer to the [start Gravitino server](../../how-to-install.md)
 2. Create a catalog in the Gravitino server.
-   For more information, please refer to the [Gravitino metadata management](../../manage-relational-metadata-using-gravitino.md).
+   For more information, please refer to the [Gravitino metadata management](../../metadata/relational.md).
    Assuming we have just created a MySQL catalog using the following command:
 
 ```curl

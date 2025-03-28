@@ -73,7 +73,7 @@ For more details, you can check
 
 ### Catalog operations
 
-Refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
+Refer to [managing relational metadata](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
@@ -93,7 +93,7 @@ Additionally, you can define your own key-value pair properties and transmit the
 
 ### Schema operations
 
-See [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
+See [managing relational metadata](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
@@ -159,7 +159,7 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 
 :::info
 Since 0.6.0-incubating, the data types other than listed above are mapped to Gravitino
-**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+**[External Type](../../../metadata/relational.md#external-type)**
 that represents an unresolvable data type from the Hive catalog.
 :::
 
@@ -198,12 +198,12 @@ and transmit them to the underlying Hive database.
 
 ### Table operations
 
-Refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#table-operations).
+Refer to [managing relational metadata](../../../metadata/relational.md#table-operations).
 
 #### Alter operations
 
 Gravitino has already defined a unified set of
-[metadata operation interfaces](../../../manage-relational-metadata-using-gravitino.md#alter-a-table).
+[metadata operation interfaces](../../../metadata/relational.md#alter-a-table).
 Almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column)
 have corresponding table update requests which enable you to change the struct of an existing table.
 The following table lists the mapping relationship between Hive Alter operations and Gravitino table update requests.

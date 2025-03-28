@@ -42,7 +42,7 @@ Tested and verified with Apache Hudi `0.15.0`.
 ### Catalog operations
 
 For more details, please refer to
-[manage relational metadata](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
+[manage relational metadata](../../../metadata/relational.md#catalog-operations).
 
 ## Schema 
 
@@ -57,7 +57,7 @@ For more details, please refer to
 ### Schema operations
 
 Only support read operations: listSchema, loadSchema, and schemaExists.
-For more details, please refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
+For more details, please refer to [managing relational metadata](../../../metadata/relational.md#schema-operations).
 
 ## Table 
 
@@ -109,5 +109,5 @@ and [Apache Hudi column types](https://hudi.apache.org/docs/sql_ddl#supported-ty
 ### Table operations
 
 Only support read operations: listTable, loadTable, and tableExists.
-For more details, please refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#table-operations)
+For more details, please refer to [managing relational metadata](../../../metadata/relational.md#table-operations)
 

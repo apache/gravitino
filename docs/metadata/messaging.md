@@ -1,6 +1,6 @@
 ---
-title: "Manage massaging metadata using Apache Gravitino"
-slug: /manage-massaging-metadata-using-gravitino
+title: Manage massaging metadata
+slug: /manage-massaging-metadata
 date: 2024-4-22
 keyword: Gravitino massaging metadata manage
 license: This software is licensed under the Apache License version 2.
@@ -18,7 +18,7 @@ using its RESTful APIs or the Java/Python client SDKs.
 To use a messaging catalog, please make sure that:
 
 - The Gravitino server has started and is serving at [http://localhost:8090](http://localhost:8090).
-- A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
+- A metalake has been created and [enabled](../manage-metalake-using-gravitino.md#enable-a-metalake).
 
 ## Catalog operations
 
@@ -93,34 +93,31 @@ Currently, Gravitino supports the following catalog providers:
 <tbody>
 <tr>
   <td><tt>kafka</tt></td>
-  <td>[Link](./catalogs/messaging/kafka/index.md#catalog-properties)</td>
+  <td>[Link](../catalogs/messaging/kafka/index.md#catalog-properties)</td>
 </tr>
 </tbody>
 </table>
 
 ### Load a catalog
 
-Refer to [loading a catalog](./manage-relational-metadata-using-gravitino.md#load-a-catalog)
-for a relational catalog.
+Refer to [loading a catalog](./relational.md#load-a-catalog) for a relational catalog.
 
 ### Alter a catalog
 
-Refer to [altering a catalog](./manage-relational-metadata-using-gravitino.md#alter-a-catalog)
-for a relational catalog.
+Refer to [altering a catalog](./relational.md#alter-a-catalog) for a relational catalog.
 
 ### Drop a catalog
 
-Refer to [dropping a catalog](./manage-relational-metadata-using-gravitino.md#drop-a-catalog)
-for a relational catalog.
+Refer to [dropping a catalog](./relational.md#drop-a-catalog) for a relational catalog.
 
 ### List all catalogs in a metalake
 
-Refer to [listing all catalogs](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
+Refer to [listing all catalogs](./relational.md#list-all-catalogs-in-a-metalake)
 for relational catalogs.
 
 ### List all catalogs' information in a metalake
 
-Refer to [list all catalogs' information](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [list all catalogs' information](./relational.md#list-all-catalogs-information-in-a-metalake)
 for relational catalogs.
 
 ## Schema operations
@@ -136,27 +133,23 @@ Since Kafka does not support topic grouping, only *list* and *load* operations a
 
 ### Create a schema
 
-Refer to [creating a schema](./manage-relational-metadata-using-gravitino.md#create-a-schema)
-for relational catalogs.
+Refer to [creating a schema](./relational.md#create-a-schema) for relational catalogs.
 
 ### Load a schema
 
-Refer to [loading a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
-for a relational catalog.
+Refer to [loading a schema](./relational.md#load-a-schema) for a relational catalog.
 
 ### Alter a schema
 
-Refer to [altering a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
-for a relational catalog.
+Refer to [altering a schema](./relational.md#alter-a-schema) for a relational catalog.
 
 ### Drop a schema
 
-Refer to [dropping a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
-for a relational catalog.
+Refer to [dropping a schema](./relational.md#drop-a-schema) for a relational catalog.
 
 ### List all schemas under a catalog
 
-Refer to [listing all schemas](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
+Refer to [listing all schemas](./relational.md#list-all-schemas-under-a-catalog)
 for a relational catalog.
 
 ## Topic operations

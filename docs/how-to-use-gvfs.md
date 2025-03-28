@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 `Fileset` is a concept brought in by Apache Gravitino, which is a logical collection of files and directories,
 with `fileset` you can manage non-tabular data through Gravitino.
-For details, you can read [How to manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md).
+For details, you can read [How to manage fileset metadata using Gravitino](./metadata/fileset.md).
 
 To use `fileset` managed by Gravitino, Gravitino provides a virtual file system layer called the Gravitino Virtual File System (GVFS):
 * In Java, it's built on top of the Hadoop Compatible File System(HCFS) interface.

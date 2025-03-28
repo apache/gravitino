@@ -115,8 +115,7 @@ call gravitino.system.alter_catalog(
 );
 ```
 
-if you need more information about catalog, please refer to:
-[Create a Catalog](../../manage-relational-metadata-using-gravitino.md#create-a-catalog).
+Formore information about catalog, please refer to [creating a Catalog](../../metadata/relational.md#create-a-catalog).
 
 ## Passing Trino connector configuration
 
@@ -176,6 +175,6 @@ For example, Hive does not support `TIME` data type.
 | Varchar               | VARCHAR                  |
 
 For more about Trino data types, please refer to [Trino data types](https://trino.io/docs/current/language/types.html).
-For information about Gravitino data types, please refer to
-[Gravitino data types](../../manage-relational-metadata-using-gravitino.md#gravitino-table-column-type).
+For information on Gravitino data types, please refer to
+[Gravitino data types](../../metadata/relational.md#gravitino-table-column-type).
 

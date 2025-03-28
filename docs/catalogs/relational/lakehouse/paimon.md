@@ -76,7 +76,7 @@ if you are using JDBC backend.
 
 ### Catalog operations
 
-For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
@@ -95,7 +95,7 @@ For more details, please refer to [Manage Relational Metadata Using Gravitino](.
 
 ### Schema operations
 
-For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
@@ -210,7 +210,7 @@ to Gravitino when creating a Paimon table.
 
 ### Table operations
 
-For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations).
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations).
 
 ## HDFS configuration
 

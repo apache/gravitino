@@ -113,7 +113,7 @@ gravitino.metalake=test
 - The `gravitino.uri` defines the connection information about Gravitino server.
   Make sure your container can access the Gravitino server.
 
-Full configurations for Apache Gravitino Trino connector can be seen [here](configuration.md)
+Full configurations for Apache Gravitino Trino connector can be seen [here](./configuration.md)
 
 If you haven't created the metalake named `test`, you can use the following command to create it.
 
@@ -151,7 +151,7 @@ You can see the `gravitino` catalog in the result set.
 This signifies the successful installation of the Gravitino Trino connector.
 
 Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server,
-or please refer to [Create a Catalog](../../manage-relational-metadata-using-gravitino.md#create-a-catalog).
+or please refer to [Create a Catalog](../../metadata/relational.md#create-a-catalog).
 Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text

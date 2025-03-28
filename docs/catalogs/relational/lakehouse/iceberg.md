@@ -180,7 +180,7 @@ and `authentication.kerberos.keytab-uri`.
 
 ### Catalog operations
 
-For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
@@ -194,7 +194,7 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
@@ -272,7 +272,7 @@ for a sort order table, to `HashDistribution` for a partition table.
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino
-**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+**[External Type](../../../metadata/relational.md#external-type)**
 that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
@@ -307,7 +307,7 @@ to Gravitino when creating an Iceberg table.
 
 ### Table operations
 
-For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations).
+For more details, please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations).
 
 #### Alter table operations
 

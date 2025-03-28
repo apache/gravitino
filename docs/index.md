@@ -52,13 +52,13 @@ the REST API and the Java SDK.
 You can use either to manage metadata. See
 
 * [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage metalakes.
-* [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
+* [Manage relational metadata using Gravitino](./metadata/relational.md)
   to learn how to manage relational metadata.
-* [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
+* [Manage fileset metadata using Gravitino](./metadata/fileset.md) to learn
   how to manage fileset metadata.
-* [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
+* [Manage messaging metadata using Gravitino](./metadata/messaging.md.md) to learn how to manage
   messaging metadata.
-* [Manage model metadata using Gravitino](./manage-model-metadata-using-gravitino.md) to learn how to manage
+* [Manage model metadata using Gravitino](./metadata/model.md) to learn how to manage
   model metadata.
 
 Also, you can find the complete REST API definition in [Gravitino Open API](./api/rest/gravitino-rest-api),

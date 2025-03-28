@@ -29,8 +29,8 @@ please don't change or remove this message.
 - Supports metadata management of OceanBase (4.x).
 - Supports DDL operation for OceanBase databases and tables.
 - Supports table index.
-- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value)
-  and [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](../../../metadata/relational.md#table-column-default-value)
+  and [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
 
 ### Catalog properties
 
@@ -60,7 +60,7 @@ Gravitino doesn't package the JDBC driver for OceanBase due to licensing issues.
 
 ### Catalog operations
 
-Refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations)
+Refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations)
 for more details.
 
 ## Schema
@@ -78,7 +78,7 @@ for more details.
 
 ### Schema operations
 
-Refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations)
+Refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations)
 for more details.
 
 ## Table
@@ -88,8 +88,8 @@ for more details.
 - Gravitino's table concept corresponds to the OceanBase table.
 - Supports DDL operation for OceanBase tables.
 - Supports index.
-- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value) and
-  [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](../../../metadata/relational.md#table-column-default-value) and
+  [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
 
 ### Table properties
 
@@ -122,7 +122,7 @@ for more details.
 OceanBase doesn't support Gravitino `Boolean`, `Fixed`, `Struct`, `List`,`Map`,`Timestamp_tz`,
 `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino
-**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+**[External Type](../../../metadata/relational.md#external-type)**
 that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
@@ -223,7 +223,7 @@ Index[] indexes = new Index[] {
 The OceanBase catalog does not support creating partitioned tables in the current version.
 :::
 
-Refer to [Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations)
+Refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations)
 for more details.
 
 #### Alter table operations

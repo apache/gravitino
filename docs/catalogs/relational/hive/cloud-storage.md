@@ -118,7 +118,7 @@ This step is essential to ensure that the new configurations take effect and tha
 Assuming you have already set up a Hive catalog with Gravitino,
 you can proceed to create tables or databases using S3 storage.
 For more information on catalog operations, refer to
-[catalog operations](../../../manage-fileset-metadata-using-gravitino.md#catalog-operations).
+[catalog operations](../../../metadata/fileset.md#catalog-operations).
 
 ### Example: Creating a Database with S3 Storage
 
@@ -182,7 +182,7 @@ Schema schema = supportsSchemas.createSchema("hive_schema",
 
 After creating the database, you can proceed to create tables under this schema using S3 storage.
 For further details on table operations, please refer to
-[table operations](../../../manage-relational-metadata-using-gravitino.md#table-operations).
+[table operations](../../../metadata/relational.md#table-operations).
 
 ## Access tables with S3 storage by Hive CLI
 

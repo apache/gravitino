@@ -29,8 +29,8 @@ please don't change or remove this message.
 - Supports metadata management of MySQL (5.7, 8.0).
 - Supports DDL operation for MySQL databases and tables.
 - Supports table index.
-- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value)
-  and [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](../../../metadata/relational.md#table-column-default-value)
+  and [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
 - Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
@@ -67,7 +67,7 @@ You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs
 
 ### Catalog operations
 
-Refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
+Refer to [managing relational metadata](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
@@ -84,7 +84,7 @@ Refer to [managing relational metadata](../../../manage-relational-metadata-usin
 
 ### Schema operations
 
-Refer to [manage relational metadata](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
+Refer to [manage relational metadata](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
@@ -93,8 +93,8 @@ Refer to [manage relational metadata](../../../manage-relational-metadata-using-
 - Gravitino's table concept corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
 - Supports index.
-- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value)
-  and [auto-increment](../../../manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](../../../metadata/relational.md#table-column-default-value)
+  and [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
 - Supports managing MySQL table features though table properties,
   like using `engine` to set MySQL storage engine.
 
@@ -126,7 +126,7 @@ Refer to [manage relational metadata](../../../manage-relational-metadata-using-
 MySQL doesn't support Gravitino `Fixed`, `Struct`, `List`, `Map`, `Timestamp_tz`,
 `IntervalDay`, `IntervalYear`, `Union`, or `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino
-**[External Type](../../../manage-relational-metadata-using-gravitino.md#external-type)**
+**[External Type](../../../metadata/relational.md#external-type)**
 that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
@@ -259,7 +259,7 @@ Index[] indexes = new Index[] {
 
 ### Table operations
 
-Refer to [managing relational metadata](../../../manage-relational-metadata-using-gravitino.md#table-operations).
+Refer to [managing relational metadata](../../../metadata/relational.md#table-operations).
 
 #### Alter table operations
 

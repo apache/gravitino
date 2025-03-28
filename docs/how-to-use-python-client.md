@@ -30,7 +30,7 @@ pip install apache-gravitino
 ```
 
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
-1. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
+1. [Manage fileset metadata using Gravitino Python API](./metadata/fileset.md?language=python)
 
 ### Apache Gravitino Fileset Example
 
@@ -53,10 +53,10 @@ The `gravitino-fileset-example` contains the following code snippets:
    [hadoop](./catalogs/fileset/hadoop/hadoop-catalog.md)
 1. Create a Gravitino `Schema` with the `location` pointed to a HDFS path,
    and use `hdfs client` to check if the schema location is successfully created in HDFS.
-1. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./manage-fileset-metadata-using-gravitino.md#fileset-operations),
+1. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./metadata/fileset.md#fileset-operations),
    use `hdfs client` to check if the fileset location was successfully created in HDFS.
 1. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was successfully deleted.
-1. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./manage-fileset-metadata-using-gravitino.md#fileset-operations)
+1. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./metadata/fileset.md#fileset-operations)
    with `location` pointing to an existing HDFS path.
 1. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was not deleted in HDFS.
 

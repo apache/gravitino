@@ -43,7 +43,7 @@ It uses the [common catalog properties](../../gravitino-server-config.md#apache-
 
 ### Catalog operations
 
-Refer to [Catalog operations](../../manage-model-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Catalog operations](../../metadata/model.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -57,7 +57,7 @@ Schema in the model catalog doesn't have predefined properties. Users can define
 
 ### Schema operations
 
-Refer to [Schema operation](../../manage-model-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Schema operation](../../metadata/model.md#schema-operations) for more details.
 
 ## Model
 
@@ -71,7 +71,7 @@ Model doesn't have predefined properties. Users can define the properties for ea
 
 ### Model operations
 
-Refer to [Model operation](../../manage-model-metadata-using-gravitino.md#model-operations) for more details.
+Refer to [Model operation](../../metadata/model.md#model-operations) for more details.
 
 ## ModelVersion
 
@@ -85,5 +85,5 @@ ModelVersion doesn't have predefined properties. Users can define the properties
 
 ### ModelVersion operations
 
-Refer to [ModelVersion operation](../../manage-model-metadata-using-gravitino.md#model-version-operations) for more details.
+Refer to [ModelVersion operation](../../metadata/model.md#model-version-operations) for more details.
 

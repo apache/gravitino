@@ -12,7 +12,7 @@ Gravitino Hadoop catalog index includes the following chapters:
 
 - [Hadoop catalog overview and features](./hadoop-catalog.md):
   An overview of the Hadoop catalog, its features, capabilities and related configurations.
-- [Manage Hadoop catalog with Gravitino API](../../../manage-fileset-metadata-using-gravitino.md):
+- [Manage Hadoop catalog with Gravitino API](../../../metadata/fileset.md):
   A guide on managing fileset metadata using Gravitino API and provides detailed examples.
 - [Using Hadoop catalog with Gravitino virtual file system](../../../how-to-use-gvfs.md):
   A guide to use Hadoop catalog with the Gravitino virtual file system and provides detailed examples.

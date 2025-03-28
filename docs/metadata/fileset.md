@@ -1,6 +1,6 @@
 ---
-title: Manage fileset metadata using Gravitino
-slug: /manage-fileset-metadata-using-gravitino
+title: Manage fileset metadata
+slug: /manage-fileset-metadata
 date: 2024-4-2
 keyword: Gravitino fileset metadata manage
 license: This software is licensed under the Apache License version 2.
@@ -18,10 +18,10 @@ With the fileset managed by Gravitino, the non-tabular data can be managed as as
 tabular data in Gravitino in a unified way. The examples on this page will use HDFS.
 For other HCFS like S3, OSS, GCS, etc, please refer to the corresponding documentation:
 
-- [hadoop-with-s3](./catalogs/fileset/hadoop/s3.md)
-- [hadoop-with-oss](./catalogs/fileset/hadoop/oss.md)
-- [hadoop-with-gcs](./catalogs/fileset/hadoop/gcs.md)
-- [hadoop-with-adls](./catalogs/fileset/hadoop/adls.md)
+- [hadoop-with-s3](../catalogs/fileset/hadoop/s3.md)
+- [hadoop-with-oss](../catalogs/fileset/hadoop/oss.md)
+- [hadoop-with-gcs](../catalogs/fileset/hadoop/gcs.md)
+- [hadoop-with-adls](../catalogs/fileset/hadoop/adls.md)
 
 After a fileset is created, users can easily access, manage the files/directories
 through the fileset's identifier, without needing to know the physical path of the managed dataset.
@@ -32,7 +32,7 @@ to set access controls across different storage systems.
 To use fileset, please make sure that:
 
 - The Gravitino server has started and is serving at [http://localhost:8090](http://localhost:8090).
-- A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
+- A metalake has been created and [enabled](../manage-metalake-using-gravitino.md#enable-a-metalake).
 
 ## Catalog operations
 
@@ -120,26 +120,22 @@ Currently, Gravitino supports the following catalog providers:
 <tbody>
 <tr>
   <td><tt>hadoop</tt></td>
-  <td>[Link](./catalogs/fileset/hadoop/hadoop-catalog.md#catalog-properties)</td>
+  <td>[Link](../catalogs/fileset/hadoop/hadoop-catalog.md#catalog-properties)</td>
 </tr>
 </tbody>
 </table>
 
 ### Load a catalog
 
-The load operation for a fileset catalog is the same as that in
-[load catalog](./manage-relational-metadata-using-gravitino.md#load-a-catalog)
-for a relational catalog.
+Refer to [loading catalog](./relational.md#load-a-catalog) for a relational catalog.
 
 ### Alter a catalog
 
-Refer to [altering a catalog](./manage-relational-metadata-using-gravitino.md#alter-a-catalog)
-for a relational catalog.
+Refer to [altering a catalog](./relational.md#alter-a-catalog) for a relational catalog.
 
 ### Drop a catalog
 
-Refer to [dropping a catalog](./manage-relational-metadata-using-gravitino.md#drop-a-catalog)
-for a relational catalog.
+Refer to [dropping a catalog](./relational.md#drop-a-catalog) for a relational catalog.
 
 :::note
 Currently, Gravitino doesn't support dropping a catalog with schemas and filesets under it.
@@ -148,12 +144,11 @@ You have to drop all the schemas and filesets under the catalog before dropping 
 
 ### List all catalogs in a metalake
 
-Refer to [list all catalogs](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
-for a relational catalog.
+Refer to [list all catalogs](./relational.md#list-all-catalogs-in-a-metalake) for a relational catalog.
 
 ### List all catalogs' information in a metalake
 
-Refer to [listing all catalogs' information](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [listing all catalogs' information](./relational.md#list-all-catalogs-information-in-a-metalake)
 for a relational catalog.
 
 ## Schema operations
@@ -244,25 +239,22 @@ Currently, Gravitino supports the following schema property:
 <tbody>
 <tr>
   <td><tt>hadoop</tt></td>
-  <td>[Link](./catalogs/fileset/hadoop/hadoop-catalog.md#schema-properties)</td>
+  <td>[Link](../catalogs/fileset/hadoop/hadoop-catalog.md#schema-properties)</td>
 </tr>
 </tbody>
 </table>
 
 ### Load a schema
 
-Refer to [loading a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
-for a relational catalog.
+Refer to [loading a schema](./relational.md#load-a-schema) for a relational catalog.
 
 ### Alter a schema
 
-Refer to [altering a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
-for a relational catalog.
+Refer to [altering a schema](./relational.md#alter-a-schema) for a relational catalog.
 
 ### Drop a schema
 
-Refer to [dropping a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
-for a relational catalog.
+Refer to [dropping a schema](./relational.md#drop-a-schema) for a relational catalog.
 
 :::note
 - The *drop* operation will delete all the fileset metadata
@@ -273,7 +265,7 @@ for a relational catalog.
 
 ### List all schemas under a catalog
 
-Refer to [listing all schemas](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
+Refer to [listing all schemas](./relational.md#list-all-schemas-under-a-catalog)
 for relational catalog.
 
 ## Fileset operations

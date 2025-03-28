@@ -1,6 +1,6 @@
 ---
-title: "Manage relational metadata using Apache Gravitino"
-slug: /manage-relational-metadata-using-gravitino
+title: Manage relational metadata
+slug: /manage-relational-metadata
 date: 2023-12-10
 keyword: Gravitino relational metadata manage
 license: This software is licensed under the Apache License version 2.
@@ -20,19 +20,19 @@ but they may have some differences, especially in catalog property,
 table property, and column type.
 For more details, please refer to the related doc.
 
-- [**Apache Hive**](./catalogs/relational/hive/index.md)
-- [**Apache Doris**](./catalogs/relational/jdbc/doris.md)
-- [**Apache Hudi**](./catalogs/relational/lakehouse/hudi.md)
-- [**Apache Iceberg**](./catalogs/relational/lakehouse/iceberg.md)
-- [**Apache Paimon**](./catalogs/relational/lakehouse/paimon.md)
-- [**MySQL**](./catalogs/relational/jdbc/mysql.md)
-- [**OceanBase**](./catalogs/relational/jdbc/oceanbase.md)
-- [**PostgreSQL**](./catalogs/relational/jdbc/postgresql.md)
+- [**Apache Hive**](../catalogs/relational/hive/index.md)
+- [**Apache Doris**](../catalogs/relational/jdbc/doris.md)
+- [**Apache Hudi**](../catalogs/relational/lakehouse/hudi.md)
+- [**Apache Iceberg**](../catalogs/relational/lakehouse/iceberg.md)
+- [**Apache Paimon**](../catalogs/relational/lakehouse/paimon.md)
+- [**MySQL**](../catalogs/relational/jdbc/mysql.md)
+- [**OceanBase**](../catalogs/relational/jdbc/oceanbase.md)
+- [**PostgreSQL**](../catalogs/relational/jdbc/postgresql.md)
 
 Assuming:
 
 - Gravitino has just started, and the host and port is [http://localhost:8090](http://localhost:8090).
-- A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
+- A metalake has been created and [enabled](../manage-metalake-using-gravitino.md#enable-a-metalake).
 
 ## Catalog operations
 
@@ -125,35 +125,35 @@ Currently, Gravitino supports the following catalog providers:
 <tbody>
 <tr>
   <td><tt>hive</tt></td>
-  <td>[Hive catalog property](./catalogs/relational/hive/index.md#catalog-properties)</td>
+  <td>[Hive catalog property](../catalogs/relational/hive/index.md#catalog-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-doris</tt></td>
-  <td>[Doris catalog property](./catalogs/relational/jdbc/doris.md#catalog-properties)</td>
+  <td>[Doris catalog property](../catalogs/relational/jdbc/doris.md#catalog-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-mysql</tt></td>
-  <td>[MySQL catalog property](./catalogs/relational/jdbc/mysql.md#catalog-properties)</td>
+  <td>[MySQL catalog property](../catalogs/relational/jdbc/mysql.md#catalog-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-oceanbase</tt></td>
-  <td>[OceanBase catalog property](./catalogs/relational/jdbc/oceanbase.md#catalog-properties)</td>
+  <td>[OceanBase catalog property](../catalogs/relational/jdbc/oceanbase.md#catalog-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-postgresql</tt></td>
-  <td>[PostgreSQL catalog property](./catalogs/relational/jdbc/postgresql.md#catalog-properties)</td>
+  <td>[PostgreSQL catalog property](../catalogs/relational/jdbc/postgresql.md#catalog-properties)</td>
 </tr>
 <tr>
   <td><tt>lakehouse-hudi</tt></td>
-  <td>[Hudi catalog property](./catalogs/relational/lakehouse/hudi.md#catalog-properties)</td>
+  <td>[Hudi catalog property](../catalogs/relational/lakehouse/hudi.md#catalog-properties)</td>
 </tr>
 <tr>
   <td><tt>lakehouse-iceberg</tt></td>
-  <td>[Iceberg catalog property](./catalogs/relational/lakehouse/iceberg.md#catalog-properties)</td>
+  <td>[Iceberg catalog property](../catalogs/relational/lakehouse/iceberg.md#catalog-properties)</td>
 </tr>
 <tr>
   <td>`lakehouse-paimon`</td>
-  <td>[Paimon catalog property](./catalogs/relational/lakehouse/paimon.md#catalog-properties)</td>
+  <td>[Paimon catalog property](../catalogs/relational/lakehouse/paimon.md#catalog-properties)</td>
 </tr>
 </tbody>
 </table>
@@ -546,35 +546,35 @@ Currently, Gravitino supports the following schema property:
 <tbody>
 <tr>
   <td><tt>hive</tt></td>
-  <td>[Hive schema property](./catalogs/relational/hive/index.md#schema-properties)</td>
+  <td>[Hive schema property](../catalogs/relational/hive/index.md#schema-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-doris</tt></td>
-  <td>[Doris schema property](./catalogs/relational/jdbc/doris.md#schema-properties)</td>
+  <td>[Doris schema property](../catalogs/relational/jdbc/doris.md#schema-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-mysql</tt></td>
-  <td>[MySQL schema property](./catalogs/relational/jdbc/mysql.md#schema-properties)</td>
+  <td>[MySQL schema property](../catalogs/relational/jdbc/mysql.md#schema-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-oceanbase</tt></td>
-  <td>[OceanBase schema property](./catalogs/relational/jdbc/oceanbase.md#schema-properties)</td>
+  <td>[OceanBase schema property](../catalogs/relational/jdbc/oceanbase.md#schema-properties)</td>
 </tr>
 <tr>
   <td><tt>jdbc-postgresql</tt></td>
-  <td>[PostgreSQL schema property](./catalogs/relational/jdbc/postgresql.md#schema-properties)</td>
+  <td>[PostgreSQL schema property](../catalogs/relational/jdbc/postgresql.md#schema-properties)</td>
 </tr>
 <tr>
   <td><tt>lakehouse-hudi</tt></td>
-  <td>[Hudi schema property](./catalogs/relational/lakehouse/hudi.md#schema-properties)</td>
+  <td>[Hudi schema property](../catalogs/relational/lakehouse/hudi.md#schema-properties)</td>
 </tr>
 <tr>
   <td><tt>lakehouse-iceberg</tt></td>
-  <td>[Iceberg schema property](./catalogs/relational/lakehouse/iceberg.md#schema-properties)</td>
+  <td>[Iceberg schema property](../catalogs/relational/lakehouse/iceberg.md#schema-properties)</td>
 </tr>
 <tr>
   <td>`lakehouse-paimon`</td>
-  <td>[Paimon schema property](./catalogs/relational/lakehouse/paimon.md#schema-properties)</td>
+  <td>[Paimon schema property](../catalogs/relational/lakehouse/paimon.md#schema-properties)</td>
 </tr>
 </tbody>
 </table>
@@ -1244,8 +1244,8 @@ String unparsedValue = ((UnparsedType) type).unparsedType();
 
 #### Table column default value
 
-When defining a table column, you can specify a [literal](./expression.md#literal)
-or an [expression](./expression.md) as its default value.
+When defining a table column, you can specify a [literal](../expression.md#literal)
+or an [expression](../expression.md) as its default value.
 The default value typically applies to new rows that are inserted into the table by the underlying catalog.
 
 The following table is a summary of the support to column default value
@@ -1321,11 +1321,11 @@ in Gravitino regarding different catalogs:
 </tr>
 <tr>
   <td><tt>jdbc-mysql</tt></td>
-  <td>&#10004;([limitations](./catalogs/relational/jdbc/mysql.md#table-column-auto-increment))</td>
+  <td>&#10004; ([limitations](../catalogs/relational/jdbc/mysql.md#table-column-auto-increment))</td>
 </tr>
 <tr>
   <td><tt>jdbc-oceanbase</tt></td>
-  <td>&#10004;([limitations](./catalogs/relational/jdbc/oceanbase.md#table-column-auto-increment))</td>
+  <td>&#10004; ([limitations](../catalogs/relational/jdbc/oceanbase.md#table-column-auto-increment))</td>
 </tr>
 <tr>
   <td><tt>jdbc-postgresql</tt></td>
@@ -1361,43 +1361,43 @@ The support status for table property in Gravitino is as follows:
 <tbody>
 <tr>
   <td><tt>hive</tt></td>
-  <td>[Link](./catalogs/relational/hive/index.md#table-properties)</td>
-  <td>[link](./catalogs/relational/hive/index.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/hive/index.md#table-properties)</td>
+  <td>[link](../catalogs/relational/hive/index.md#table-column-types)</td>
 </tr>
 <tr>
   <td><tt>jdbc-doris</tt></td>
-  <td>[Link](./catalogs/relational/jdbc/doris.md#table-properties)</td>
-  <td>[Link](./catalogs/relational/jdbc/doris.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/jdbc/doris.md#table-properties)</td>
+  <td>[Link](../catalogs/relational/jdbc/doris.md#table-column-types)</td>
 </tr>
 <tr>
   <td><tt>jdbc-mysql</tt></td>
-  <td>[Link](./catalogs/relational/jdbc/mysql.md#table-properties)</td>
-  <td>[Link](./catalogs/relational/jdbc/mysql.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/jdbc/mysql.md#table-properties)</td>
+  <td>[Link](../catalogs/relational/jdbc/mysql.md#table-column-types)</td>
 </tr>
 <tr>
   <td><tt>jdbc-oceanbase</tt></td>
-  <td>[Link](./catalogs/relational/jdbc/oceanbase.md#table-properties)</td>
-  <td>[Link](./catalogs/relational/jdbc/oceanbase.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/jdbc/oceanbase.md#table-properties)</td>
+  <td>[Link](../catalogs/relational/jdbc/oceanbase.md#table-column-types)</td>
 </tr>
 <tr>
   <td><tt>jdbc-postgresql</tt></td>
-  <td>[Link](./catalogs/relational/jdbc/postgresql.md#table-properties)</td>
-  <td>[Link](./catalogs/relational/jdbc/postgresql.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/jdbc/postgresql.md#table-properties)</td>
+  <td>[Link](../catalogs/relational/jdbc/postgresql.md#table-column-types)</td>
 </tr>
 <tr>
   <td><tt>lakehouse-hudi</tt></td>
-  <td>[Link](./catalogs/relational/lakehouse/hudi.md#table-properties)</td>
-  <td>[Link](./catalogs/relational/lakehouse/hudi.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/lakehouse/hudi.md#table-properties)</td>
+  <td>[Link](../catalogs/relational/lakehouse/hudi.md#table-column-types)</td>
 </tr>
 <tr>
   <td><tt>lakehouse-iceberg</tt></td>
-  <td>[Link](./catalogs/relational/lakehouse/iceberg.md#table-properties)</td>
-  <td>[Link](./catalogs/relational/lakehouse/iceberg.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/lakehouse/iceberg.md#table-properties)</td>
+  <td>[Link](../catalogs/relational/lakehouse/iceberg.md#table-column-types)</td>
 </tr>
 <tr>
   <td><tt>lakehouse-paimon</tt></td>
-  <td>[Link](./catalogs/relational/lakehouse/paimon.md#table-properties)</td>
-  <td>[Link](./catalogs/relational/lakehouse/paimon.md#table-column-types)</td>
+  <td>[Link](../catalogs/relational/lakehouse/paimon.md#table-properties)</td>
+  <td>[Link](../catalogs/relational/lakehouse/paimon.md#table-column-types)</td>
 </tr>
 </tbody>
 </table>
@@ -1441,7 +1441,7 @@ In addition to the basic settings, Gravitino supports the following features:
   See [Index](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/indexes/Index.html)
 
 For more information, please see the related document on
-[partitioning, bucketing, sorting, and indexes](./table-partitioning-bucketing-sort-order-indexes.md).
+[partitioning, bucketing, sorting, and indexes](../table-partitioning-bucketing-sort-order-indexes.md).
 
 ### Load a table
 
@@ -1479,7 +1479,7 @@ tableCatalog.loadTable(NameIdentifier.of("myschema", "mytable"));
   ensuring that the table can be loaded successfully.
 
 - When Gravitino loads a table that supports default value, if it is unable to parse the default value,
-  it will use an **[Unparsed Expression](./expression.md#unparsed-expression)**
+  it will use an **[Unparsed Expression](../expression.md#unparsed-expression)**
   to preserve the original default value,
   ensuring that the table can be loaded successfully.
 :::

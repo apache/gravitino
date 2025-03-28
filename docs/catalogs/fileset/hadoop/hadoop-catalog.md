@@ -98,7 +98,7 @@ schemas and filesets, the default value is inherited from the parent. Value set 
 
 ### Catalog operations
 
-Refer to [Catalog operations](../../../manage-fileset-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Catalog operations](../../../metadata/fileset.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -119,7 +119,7 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
 
 ### Schema operations
 
-Refer to [Schema operation](../../../manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Schema operation](../../../metadata/fileset.md#schema-operations) for more details.
 
 ## Fileset
 
@@ -145,4 +145,4 @@ Credential providers can be specified in several places, as listed below. Gravit
 
 ### Fileset operations
 
-Refer to [Fileset operations](../../../manage-fileset-metadata-using-gravitino.md#fileset-operations) for more details.
+Refer to [Fileset operations](../../../metadata/fileset.md#fileset-operations) for more details.

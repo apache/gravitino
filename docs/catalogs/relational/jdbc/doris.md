@@ -29,7 +29,7 @@ please don't change or remove this message.
 - Gravitino catalog corresponds to the Doris instance.
 - Supports metadata management of Doris (1.2.x).
 - Supports table index.
-- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](../../../metadata/relational.md#table-column-default-value).
 
 ### Catalog properties
 
@@ -61,7 +61,7 @@ Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
 ### Catalog operations
 
 For more details, refer to
-[Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#catalog-operations).
+[Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
@@ -78,7 +78,7 @@ For more details, refer to
 ### Schema operations
 
 For more details, please refer to
-[Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#schema-operations).
+[Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
@@ -86,7 +86,7 @@ For more details, please refer to
 
 - Gravitino's table concept corresponds to the Doris table.
 - Supports index.
-- Supports [column default value](../../../manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](../../../metadata/relational.md#table-column-default-value).
 
 #### Table column types
 
@@ -109,7 +109,7 @@ For more details, please refer to
 
 Doris doesn't support Gravitino `Fixed`, `Timestamp_tz`, `IntervalDay`, `IntervalYear`, `Union`, or `UUID` type.
 The data types other than those listed above are mapped to Gravitino's
-**[Unparsed Type](../../../manage-relational-metadata-using-gravitino.md#unparsed-type)**
+**[Unparsed Type](../../../metadata/relational.md#unparsed-type)**
 that represents an unresolvable data type since 0.5.0.
 
 :::note
@@ -189,7 +189,7 @@ More information about the distribution strategy defined in Gravitino can be fou
 ### Table operations
 
 For more details, please refer to
-[Manage Relational Metadata Using Gravitino](../../../manage-relational-metadata-using-gravitino.md#table-operations).
+[Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations).
 
 #### Alter table operations
 
