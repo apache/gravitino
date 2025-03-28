@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,7 +36,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
@@ -617,7 +615,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           continue;
         }
 
-        // Like topics and filesets, their locations don't change, we don't need to modify the policies
+        // Like topics and filesets, their locations don't change, we don't need to modify the
+        // policies
         if (renameChange.locations() == null || renameChange.locations().isEmpty()) {
           continue;
         }
