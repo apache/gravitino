@@ -76,12 +76,7 @@ public class TestUserEvent {
     UserInfo info = new UserInfo(mockUser);
 
     Assertions.assertEquals("mock_user", info.name());
-    Assertions.assertTrue(info.roles().isPresent());
-    Assertions.assertEquals(ImmutableList.of("admin"), info.roles().get());
-
-    UserInfo emptyInfo = new UserInfo("user_without_roles");
-    Assertions.assertEquals("user_without_roles", emptyInfo.name());
-    Assertions.assertFalse(emptyInfo.roles().isPresent());
+    Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
   }
 
   @Test
@@ -314,11 +309,6 @@ public class TestUserEvent {
 
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
-    if (expectedUser.roles() != null) {
-      Assertions.assertTrue(userInfo.roles().isPresent());
-      Assertions.assertEquals(userInfo.roles().get(), expectedUser.roles());
-    } else {
-      Assertions.assertFalse(userInfo.roles().isPresent());
-    }
+    Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
   }
 }

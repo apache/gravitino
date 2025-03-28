@@ -20,13 +20,12 @@
 package org.apache.gravitino.listener.api.info;
 
 import java.util.List;
-import java.util.Optional;
 import org.apache.gravitino.authorization.User;
 
 /** Provides read-only access to user information for event listeners. */
 public class UserInfo {
   private final String name;
-  private Optional<List<String>> roles;
+  private List<String> roles;
 
   /**
    * Construct a new {@link UserInfo} instance with the given {@link User} information.
@@ -35,18 +34,7 @@ public class UserInfo {
    */
   public UserInfo(User user) {
     this.name = user.name();
-    this.roles = Optional.ofNullable(user.roles());
-  }
-
-  /**
-   * Construct a new {@link UserInfo} instance with the given name and no roles. the roles will be
-   * set to {@code Optional.empty()}.
-   *
-   * @param name the name of the user.
-   */
-  public UserInfo(String name) {
-    this.name = name;
-    this.roles = Optional.empty();
+    this.roles = user.roles();
   }
 
   /**
@@ -61,9 +49,9 @@ public class UserInfo {
   /**
    * Returns the roles of the user.
    *
-   * @return the roles of the user, or an empty optional if the user has no roles.
+   * @return the roles of the user.
    */
-  public Optional<List<String>> roles() {
+  public List<String> roles() {
     return roles;
   }
 }
