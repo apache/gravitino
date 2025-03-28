@@ -281,7 +281,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         authzMetadataObject.type().equals(PathBasedMetadataObject.SCHEMA_PATH),
         "The metadata object type must be a schema");
     Preconditions.checkArgument(
-        authzMetadataObject.names().size() == 1, "The metadata object's size must be 1.");
+        authzMetadataObject.names().size() == 2, "The metadata object's size must be 2.");
     if (RangerHelper.RESOURCE_ALL.equals(authzMetadataObject.name())) {
       // Remove all schema in this catalog
       String catalogName = authzMetadataObject.names().get(0);
@@ -691,7 +691,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           continue;
         }
 
-        // If locations don't change, we don't need to modify the policies
+        // Like topics and filesets, their locations don't change, we don't need to modify the policies
         if (renameChange.locations() == null || renameChange.locations().isEmpty()) {
           continue;
         }
@@ -709,6 +709,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             if (table.properties().get("table-type").equals("EXTERNAL_TABLE")) {
               continue;
             }
+          } else {
+            // Iceberg and other lake houses don't need to change the privileges of locations
+            continue;
           }
         }
 
