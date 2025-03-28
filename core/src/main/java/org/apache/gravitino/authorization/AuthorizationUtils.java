@@ -299,12 +299,8 @@ public class AuthorizationUtils {
       MetadataObject newMetadataObject =
           NameIdentifierUtil.toMetadataObject(NameIdentifier.of(ident.namespace(), newName), type);
 
-      MetadataObjectChange renameChange;
-      if (locations == null) {
-        renameChange = MetadataObjectChange.rename(oldMetadataObject, newMetadataObject);
-      } else {
-        renameChange = MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, locations);
-      }
+      MetadataObjectChange renameChange =
+          MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, locations);
 
       String metalake = type == Entity.EntityType.METALAKE ? newName : ident.namespace().level(0);
 

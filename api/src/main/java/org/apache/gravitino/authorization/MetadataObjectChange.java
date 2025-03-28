@@ -34,18 +34,6 @@ public interface MetadataObjectChange {
    *
    * @param metadataObject The metadata object.
    * @param newMetadataObject The new metadata object.
-   * @return return a MetadataObjectChange for the rename metadata object.
-   */
-  static MetadataObjectChange rename(
-      MetadataObject metadataObject, MetadataObject newMetadataObject) {
-    return new RenameMetadataObject(metadataObject, newMetadataObject);
-  }
-
-  /**
-   * Rename a metadata entity MetadataObjectChange.
-   *
-   * @param metadataObject The metadata object.
-   * @param newMetadataObject The new metadata object.
    * @param locations The locations of the metadata object.
    * @return return a MetadataObjectChange for the rename metadata object.
    */
