@@ -270,6 +270,17 @@ public class TestHadoopCatalogOperations {
                       Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
             });
 
+    locationWithPlaceholdersArguments()
+        .forEach(
+            arguments -> {
+              String name = (String) arguments.get()[0];
+              long schemaId = idGenerator.nextId();
+              doReturn(new SchemaIds(1L, 1L, schemaId))
+                  .when(spySchemaMetaService)
+                  .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                      Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
+            });
+
     MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
         Mockito.mockStatic(MetalakeMetaService.class);
     MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
