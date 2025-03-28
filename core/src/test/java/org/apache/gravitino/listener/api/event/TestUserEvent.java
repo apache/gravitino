@@ -32,6 +32,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.info.UserInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -70,6 +71,15 @@ public class TestUserEvent {
   }
 
   @Test
+  void testUserInfo() {
+    User mockUser = getMockUser("mock_user", ImmutableList.of("admin"));
+    UserInfo info = new UserInfo(mockUser);
+
+    Assertions.assertEquals("mock_user", info.name());
+    Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
+  }
+
+  @Test
   void testAddUserPreEvent() {
     dispatcher.addUser(METALAKE, otherUserName);
 
@@ -83,6 +93,23 @@ public class TestUserEvent {
     Assertions.assertEquals(identifier, addUserPreEvent.identifier());
     String userName = addUserPreEvent.userName();
     Assertions.assertEquals(otherUserName, userName);
+  }
+
+  @Test
+  void testAddUserEvent() {
+    dispatcher.addUser(METALAKE, userName);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AddUserEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.ADD_USER, event.operationType());
+
+    AddUserEvent addUserEvent = (AddUserEvent) event;
+    Assertions.assertEquals(identifier, addUserEvent.identifier());
+    UserInfo userInfo = addUserEvent.addedUserInfo();
+
+    validateUserInfo(userInfo, user);
   }
 
   @Test
@@ -114,6 +141,35 @@ public class TestUserEvent {
   }
 
   @Test
+  void testGetUserEventWithExistingUser() {
+    dispatcher.getUser(METALAKE, userName);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetUserEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_USER, event.operationType());
+
+    GetUserEvent getUserEvent = (GetUserEvent) event;
+    Assertions.assertEquals(identifier, getUserEvent.identifier());
+    UserInfo userInfo = getUserEvent.loadedUserInfo();
+
+    validateUserInfo(userInfo, user);
+  }
+
+  @Test
+  void testGetUserEventWithNonExistingUser() {
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> dispatcher.getUser(METALAKE, inExistUserName));
+  }
+
+  @Test
+  void testGetUserEventWithNonExistingMetalake() {
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> dispatcher.getUser(INEXIST_METALAKE, userName));
+  }
+
+  @Test
   void testListUserPreEvent() {
     dispatcher.listUsers(METALAKE);
 
@@ -124,6 +180,20 @@ public class TestUserEvent {
 
     ListUsersPreEvent listUsersPreEvent = (ListUsersPreEvent) preEvent;
     Assertions.assertEquals(identifier, listUsersPreEvent.identifier());
+  }
+
+  @Test
+  void testListUserEvent() {
+    dispatcher.listUsers(METALAKE);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListUsersEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USERS, event.operationType());
+
+    ListUsersEvent listUsersEvent = (ListUsersEvent) event;
+    Assertions.assertEquals(identifier, listUsersEvent.identifier());
   }
 
   @Test
@@ -140,6 +210,20 @@ public class TestUserEvent {
   }
 
   @Test
+  void testListUserNamesEvent() {
+    dispatcher.listUserNames(METALAKE);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListUserNamesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USER_NAMES, event.operationType());
+
+    ListUserNamesEvent listUserNamesEvent = (ListUserNamesEvent) event;
+    Assertions.assertEquals(identifier, listUserNamesEvent.identifier());
+  }
+
+  @Test
   void testRemoveUserPreEventWithExistingUser() {
     dispatcher.removeUser(METALAKE, userName);
 
@@ -153,6 +237,38 @@ public class TestUserEvent {
     Assertions.assertEquals(identifier, removeUserPreEvent.identifier());
     String removedUserName = removeUserPreEvent.userName();
     Assertions.assertEquals(userName, removedUserName);
+  }
+
+  @Test
+  void testRemoveUserEventWithExistingUser() {
+    dispatcher.removeUser(METALAKE, userName);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RemoveUserEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.REMOVE_USER, event.operationType());
+
+    RemoveUserEvent removeUserEvent = (RemoveUserEvent) event;
+    Assertions.assertEquals(identifier, removeUserEvent.identifier());
+    Assertions.assertTrue(removeUserEvent.isExists());
+    Assertions.assertEquals(userName, removeUserEvent.removedUserName());
+  }
+
+  @Test
+  void testRemoveUserPreEventWithNonExistingUser() {
+    dispatcher.removeUser(METALAKE, inExistUserName);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RemoveUserEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.REMOVE_USER, event.operationType());
+
+    RemoveUserEvent removeUserEvent = (RemoveUserEvent) event;
+    Assertions.assertEquals(identifier, removeUserEvent.identifier());
+    Assertions.assertFalse(removeUserEvent.isExists());
+    Assertions.assertEquals(inExistUserName, removeUserEvent.removedUserName());
   }
 
   private AccessControlEventDispatcher mockUserDispatcher() {
@@ -189,5 +305,10 @@ public class TestUserEvent {
     when(user.roles()).thenReturn(roles);
 
     return user;
+  }
+
+  private void validateUserInfo(UserInfo userInfo, User expectedUser) {
+    Assertions.assertEquals(userInfo.name(), expectedUser.name());
+    Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
   }
 }
