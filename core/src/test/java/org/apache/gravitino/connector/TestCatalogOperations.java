@@ -34,7 +34,6 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.ErrorMessages;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -901,7 +900,7 @@ public class TestCatalogOperations
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
     if (!models.containsKey(ident)) {
-      throw new NoSuchModelException(ErrorMessages.MODEL_DOES_NOT_EXIST, ident);
+      throw new NoSuchModelException("Model %s does not exist", ident);
     }
 
     AuditInfo updatedAuditInfo =
@@ -922,7 +921,7 @@ public class TestCatalogOperations
         String newName = ((ModelChange.RenameModel) change).newName();
         newIdent = NameIdentifier.of(ident.namespace(), newName);
         if (models.containsKey(newIdent)) {
-          throw new ModelAlreadyExistsException(ErrorMessages.MODEL_ALREADY_EXISTS, ident);
+          throw new ModelAlreadyExistsException("Model %s already exists", ident);
         }
       }
     }

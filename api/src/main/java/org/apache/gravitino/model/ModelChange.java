@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.model;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -36,16 +35,6 @@ public interface ModelChange {
    */
   static ModelChange rename(String newName) {
     return new ModelChange.RenameModel(newName);
-  }
-
-  /**
-   * Create a unsupported ModelChange for testing.
-   *
-   * @param message the error message.
-   * @return A ModelChange for the unsupported operation.
-   */
-  static ModelChange unSupport(String message) {
-    return new UnsupportModelChange(message);
   }
 
   /** A ModelChange to rename a model. */
@@ -106,30 +95,6 @@ public interface ModelChange {
     @Override
     public String toString() {
       return "RenameModel " + newName;
-    }
-  }
-
-  /** A ModelChange to unsupport a model. */
-  @VisibleForTesting
-  final class UnsupportModelChange implements ModelChange {
-    private final String message;
-
-    /**
-     * Constructs a new {@link UnsupportModelChange} instance with the specified error message.
-     *
-     * @param message The error message.
-     */
-    public UnsupportModelChange(String message) {
-      this.message = message;
-    }
-
-    /**
-     * Retrieves the error message.
-     *
-     * @return The error message.
-     */
-    public String message() {
-      return message;
     }
   }
 }
