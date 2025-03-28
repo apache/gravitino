@@ -9,28 +9,36 @@ license: This software is licensed under the Apache License version 2.
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This page introduces how to create, modify, view, and delete [metalakes](./glossary.md#metalake) by using Gravitino. 
+This page introduces how to create, modify, view, and delete [metalakes](./glossary.md#metalake) in Gravitino. 
 
 ## Prerequisites
 
 You have installed and launched Gravitino.
 For more details, see [Get started](./getting-started/index.md).
-
-Let's say, the access is [http://localhost:8090](http://localhost:8090).
+This page assumes that Gravitino server is serving at [http://localhost:8090](http://localhost:8090).
 
 ## Create a metalake
 
-To create a metalake, you can send a `POST` request to the `/api/metalakes` endpoint or use the Gravitino Admin client.
-
-The following is an example of creating a metalake:
+To create a metalake, you can send a `POST` request to the `/api/metalakes` endpoint
+or use the Gravitino Admin client.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{"name":"metalake","comment":"This is a new metalake","properties":{}}' \
-http://localhost:8090/api/metalakes
+cat <<EOF >metalake.json
+{
+  "name": "mymetalake",
+  "comment": "This is a new metalake",
+  "properties": {}
+}
+EOF
+
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@metalake.json' \
+  http://localhost:8090/api/metalakes
 ```
 
 </TabItem>
@@ -42,20 +50,20 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
     .build();
 
 GravitinoMetalake newMetalake = gravitinoAdminClient.createMetalake(
-    NameIdentifier.of("metalake"),
+    NameIdentifier.of("mymetalake"),
     "This is a new metalake",
     new HashMap<>());
-  // ...
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
-gravitino_admin_client.create_metalake(name="metalake", 
-                                       comment="This is a new metalake", 
-                                       properties={})
+client = GravitinoAdminClient(uri="http://localhost:8090")
+admin_client.create_metalake(
+    name="mymetalake", 
+    comment="This is a new metalake", 
+    properties={})
 ```
 
 </TabItem>
@@ -63,69 +71,70 @@ gravitino_admin_client.create_metalake(name="metalake",
 
 ## Load a metalake
 
-To load a metalake, you can send a `GET` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
-
-The following is an example of loading a metalake:
+To load a metalake, you can send a `GET` request to the `/api/metalakes/{metalake}` endpoint
+or use the Gravitino Admin client.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json"  http://localhost:8090/api/metalakes/metalake
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/mymetalake
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
 GravitinoMetalake loaded = gravitinoAdminClient.loadMetalake(
-    NameIdentifier.of("metalake"));
-// ...
+    NameIdentifier.of("mymetalake"));
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client.load_metalake("metalake")
+client.load_metalake("mymetalake")
 ```
-
 </TabItem>
 </Tabs>
 
 ## Alter a metalake
 
-To alter a metalake, you can send a `PUT` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
-
-The following is an example of renaming a metalake:
+To alter a metalake, you can send a `PUT` request to the `/api/metalakes/{metalake}` endpoint
+or use the Gravitino Admin client.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
+cat <<EOF >update.json
+{
   "updates": [
     {
       "@type": "rename",
-      "newName": "metalake_renamed"
+      "newName": "new-name"
     }
   ]
-}' http://localhost:8090/api/metalakes/metalake
+}
+EOF
+
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@updata.json' \
+  http://localhost:8090/api/metalakes/mymetalake
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
 GravitinoMetalake renamed = gravitinoAdminClient.alterMetalake(
-    NameIdentifier.of("metalake"),
-    MetalakeChange.rename("metalake_renamed")
+    NameIdentifier.of("mymetalake"),
+    MetalakeChange.rename("new-name")
 );
-// ...
 ```
 
 </TabItem>
@@ -133,39 +142,70 @@ GravitinoMetalake renamed = gravitinoAdminClient.alterMetalake(
 
 ```python
 changes = (
-    MetalakeChange.rename("metalake_renamed"),
+    MetalakeChange.rename("new-name"),
 )
 
-metalake = gravitino_admin_client.alter_metalake("metalake", *changes)
+metalake = client.alter_metalake("mymetalake", *changes)
 ```
 
 </TabItem>
 </Tabs>
 
-
 The following table outlines the supported modifications that you can make to a metalake:
 
-| Supported modification | JSON                                                         | Java                                            | Python                                                                                    |
-|------------------------|--------------------------------------------------------------|-------------------------------------------------|-------------------------------------------------------------------------------------------|
-| Rename metalake        | `{"@type":"rename","newName":"metalake_renamed"}`            | `MetalakeChange.rename("metalake_renamed")`     | `MetalakeChange.rename("metalake_renamed")`                                               |
-| Update comment         | `{"@type":"updateComment","newComment":"new_comment"}`       | `MetalakeChange.updateComment("new_comment")`   | `MetalakeChange.update_comment("new_comment")`                                    |
-| Set property           | `{"@type":"setProperty","property":"key1","value":"value1"}` | `MetalakeChange.setProperty("key1", "value1")`  | `MetalakeChange.set_property("key1", "value1")` |
-| Remove property        | `{"@type":"removeProperty","property":"key1"}`               | `MetalakeChange.removeProperty("key1")`         | `MetalakeChange.remove_property("key1")`                               |
+<table>
+<thead>
+<tr>
+  <th>Supported modification</th>
+  <th>JSON payload</th>
+  <th>Java</th>
+  <th>Python</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>Rename metalake</td>
+  <td>`{"@type":"rename","newName":"metalake_renamed"}`</td>
+  <td>`MetalakeChange.rename("metalake_renamed")`</td>
+  <td>`MetalakeChange.rename("metalake_renamed")`</td>
+</tr>
+<tr>
+  <td>Update metalake comment</td>
+  <td>`{"@type":"updateComment","newComment":"new_comment"}`</td>
+  <td>`MetalakeChange.updateComment("new_comment")`</td>
+  <td>`MetalakeChange.update_comment("new_comment")`</td>
+</tr>
+<tr>
+  <td>Set metalake property</td>
+  <td>`{"@type":"setProperty","property":"key1","value":"value1"}`</td>
+  <td>`MetalakeChange.setProperty("key1", "value1")`</td>
+  <td>`MetalakeChange.set_property("key1", "value1")`</td>
+</tr>
+<tr>
+  <td>Remove property</td>
+  <td>`{"@type":"removeProperty","property":"key1"}`</td>
+  <td>`MetalakeChange.removeProperty("key1")`</td>
+  <td>`MetalakeChange.remove_property("key1")`</td>
+</tr>
+</tbody>
+</table>
 
 ## Enable a metalake
 
-Metalake has a reserved property - `in-use`, which indicates whether the metalake is available for use. By default, the `in-use` property is set to `true`.
-To enable a disabled metalake, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
-
-The following is an example of enabling a metalake:
+Metalake has a reserved property `in-use` that indicates whether the metalake is available for use.
+By default, the `in-use` property is set to `true`.
+To enable a disabled metalake, you can send a `PATCH` request
+to the `/api/metalakes/{metalake}` endpoint or use the Gravitino Admin client.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{"inUse": true}' \
-http://localhost:8090/api/metalakes/metalake
+curl -X PATCH \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"inUse": true}' \
+  http://localhost:8090/api/metalakes/mymetalake
 ```
 
 </TabItem>
@@ -175,17 +215,15 @@ http://localhost:8090/api/metalakes/metalake
 GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
     .builder("http://localhost:8090")
     .build();
-
-gravitinoAdminClient.enableMetalake("metalake");
-  // ...
+gravitinoAdminClient.enableMetalake("mymetalake");
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
-gravitino_admin_client.enable_metalake("metalake")
+client = GravitinoAdminClient(uri="http://localhost:8090")
+client.enable_metalake("mymetalake")
 ```
 
 </TabItem>
@@ -198,20 +236,23 @@ This operation does nothing if the metalake is already enabled.
 ## Disable a metalake
 
 Once a metalake is disabled:
- - Users can only [list](#list-all-metalakes), [load](#load-a-metalake), [drop](#drop-a-metalake), or [enable](#enable-a-metalake) it.
- - Any other operation on the metalake or its sub-entities will result in an error.
 
-To disable a metalake, you can send a `PATCH` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
+- Users can only [list](#list-all-metalakes), [load](#load-a-metalake), [drop](#drop-a-metalake),
+  or [enable](#enable-a-metalake) it.
+- Any other operation on the metalake or its sub-entities will result in an error.
 
-The following is an example of disabling a metalake:
+To disable a metalake, you can send a `PATCH` request to the `/api/metalakes/{metalake}` endpoint
+or use the Gravitino Admin client.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X PATCH -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{"inUse": false}' \
-http://localhost:8090/api/metalakes/metalake
+curl -X PATCH \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"inUse": false}' \
+  http://localhost:8090/api/metalakes/mymetalake
 ```
 
 </TabItem>
@@ -221,19 +262,17 @@ http://localhost:8090/api/metalakes/metalake
 GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient
     .builder("http://localhost:8090")
     .build();
-
-gravitinoAdminClient.disableMetalake("metalake");
-  // ...
+gravitinoAdminClient.disableMetalake("mymetalake");
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(uri="http://localhost:8090")
-gravitino_admin_client.disable_metalake("metalake")
-```
+client = GravitinoAdminClient(uri="http://localhost:8090")
+client.disable_metalake("mymetalake")
 
+```
 </TabItem>
 </Tabs>
 
@@ -243,44 +282,49 @@ This operation does nothing if the metalake is already disabled.
 
 ## Drop a metalake
 
-Deleting a metalake by "force" is not a default behavior, so please make sure:
+By default, Gravitino doesn't drop a metalake *by force*.
+Before dropping a metalake, please make sure:
 
-- There are no catalogs under the metalake. Otherwise, you will get an error.
-- The metalake is [disabled](#disable-a-metalake). Otherwise, you will get an error.
+- There are no catalogs under the metalake.
+  Otherwise, you will get an error unless you are dropping the metalake *by force*.
+- The metalake is [disabled](#disable-a-metalake).
+  Otherwise, you will get an error unless you are dropping the metalake *by force*.
 
-Deleting a metalake by "force" will:
+Dropping a metalake *by force* will:
 
-- Delete all sub-entities (tags, catalogs, schemas, etc.) under the metalake.
+- Delete all sub-entities (tags, catalogs, schemas, etc.) hosted in the metalake.
 - Delete the metalake itself even if it is enabled.
-- Not delete the external resources (such as database, table, etc.) associated with sub-entities unless they are managed (such as managed fileset).
 
-To drop a metalake, you can send a `DELETE` request to the `/api/metalakes/{metalake_name}` endpoint or use the Gravitino Admin client.
+Dropping a metalake *by force* will not delete the external resources
+(such as database, table, etc.) associated with sub-entities
+unless they are managed (such as managed fileset).
 
-The following is an example of dropping a metalake:
+To drop a metalake, you can send a `DELETE` request to the `/api/metalakes/{metalake}` endpoint
+or use the Gravitino Admin client.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" http://localhost:8090/api/metalakes/metalake?force=false
+curl -X DELETE \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  http://localhost:8090/api/metalakes/mymetalake?force=false
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
-// force can be true or false
-boolean success = gravitinoAdminClient.dropMetalake("metalake", false);
-// ...
+// The second parameter 'force' can be true or false
+boolean success = gravitinoAdminClient.dropMetalake("mymetalake", false);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_admin_client.drop_metalake("metalake", force=True)
+client.drop_metalake("mymetalake", force=True)
 ```
 
 </TabItem>
@@ -288,33 +332,32 @@ gravitino_admin_client.drop_metalake("metalake", force=True)
 
 ## List all metalakes
 
-To view all your metalakes, you can send a `GET` request to the `/api/metalakes` endpoint or use the Gravitino Admin client.
-
-The following is an example of listing all metalakes:
+To view all your metalakes, you can send a `GET` request to the `/api/metalakes` endpoint
+or use the Gravitino Admin client.
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
 
 ```shell
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json"  http://localhost:8090/api/metalakes
+curl -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-// ...
 GravitinoMetalake[] allMetalakes = gravitinoAdminClient.listMetalakes();
-// ...
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-metalake_list: List[GravitinoMetalake] = gravitino_admin_client.list_metalakes()
+metalake_list = client.list_metalakes()
 ```
 
 </TabItem>
 </Tabs>
+
