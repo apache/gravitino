@@ -50,17 +50,6 @@ public class UserInfo {
   }
 
   /**
-   * Construct a new {@link UserInfo} instance with the given name and roles.
-   *
-   * @param name the name of the user.
-   * @param roles the roles of the user.
-   */
-  public UserInfo(String name, List<String> roles) {
-    this.name = name;
-    this.roles = Optional.ofNullable(roles);
-  }
-
-  /**
    * Returns the name of the user.
    *
    * @return the name of the user

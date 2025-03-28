@@ -82,11 +82,6 @@ public class TestUserEvent {
     UserInfo emptyInfo = new UserInfo("user_without_roles");
     Assertions.assertEquals("user_without_roles", emptyInfo.name());
     Assertions.assertFalse(emptyInfo.roles().isPresent());
-
-    UserInfo withRolesInfo = new UserInfo("user_with_roles", ImmutableList.of("admin", "user"));
-    Assertions.assertEquals("user_with_roles", withRolesInfo.name());
-    Assertions.assertTrue(withRolesInfo.roles().isPresent());
-    Assertions.assertEquals(ImmutableList.of("admin", "user"), withRolesInfo.roles().get());
   }
 
   @Test
