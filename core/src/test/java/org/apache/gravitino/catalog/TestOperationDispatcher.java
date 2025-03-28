@@ -21,6 +21,9 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 import static org.apache.gravitino.TestFilesetPropertiesMetadata.TEST_FILESET_HIDDEN_KEY;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -103,7 +106,9 @@ public abstract class TestOperationDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     NameIdentifier ident = NameIdentifier.of(metalake, catalog);
-    Map<String, String> props = ImmutableMap.of("key1", "value1", "key2", "value2");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, "test", "comment", props);
   }
 

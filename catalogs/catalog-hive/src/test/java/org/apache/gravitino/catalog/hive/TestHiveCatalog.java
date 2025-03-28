@@ -125,6 +125,8 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
         throwable
             .getMessage()
             .contains(
-                String.format("Properties are required and must be set: [%s]", METASTORE_URIS)));
+                String.format(
+                    "Properties or properties with a fixed prefix are required and must be set: [%s]",
+                    METASTORE_URIS)));
   }
 }

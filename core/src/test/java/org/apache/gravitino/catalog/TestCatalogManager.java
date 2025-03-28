@@ -19,6 +19,12 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY3;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY4;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY6_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 
 import com.google.common.collect.ImmutableMap;
@@ -28,17 +34,20 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -77,7 +86,7 @@ public class TestCatalogManager {
           .build();
 
   @BeforeAll
-  public static void setUp() throws IOException {
+  public static void setUp() throws IOException, IllegalAccessException {
     config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
@@ -87,6 +96,7 @@ public class TestCatalogManager {
     entityStore.put(metalakeEntity, true);
 
     catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     catalogManager = Mockito.spy(catalogManager);
   }
 
@@ -123,8 +133,9 @@ public class TestCatalogManager {
     // key1 is required;
     Map<String, String> props1 =
         ImmutableMap.<String, String>builder()
-            .put("key2", "value2")
-            .put("key1", "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
             .put("mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
@@ -136,10 +147,12 @@ public class TestCatalogManager {
     // key1 is required;
     Map<String, String> props2 =
         ImmutableMap.<String, String>builder()
-            .put("key2", "value2")
-            .put("key1", "value1")
-            .put("key3", "3")
-            .put("key4", "value4")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
             .put("mock", "mock")
             .build();
     Assertions.assertDoesNotThrow(
@@ -147,30 +160,41 @@ public class TestCatalogManager {
             catalogManager.createCatalog(
                 ident2, Catalog.Type.RELATIONAL, provider, "comment", props2));
 
-    CatalogChange change1 = CatalogChange.setProperty("key1", "value1");
+    CatalogChange change1 = CatalogChange.setProperty(PROPERTY_KEY1, "value1");
     Exception e1 =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident, change1));
     Assertions.assertTrue(e1.getMessage().contains("Property key1 is immutable"));
 
-    CatalogChange change2 = CatalogChange.setProperty("key3", "value2");
+    CatalogChange change2 = CatalogChange.setProperty(PROPERTY_KEY3, "value2");
     Exception e2 =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident2, change2));
     Assertions.assertTrue(e2.getMessage().contains("Property key3 is immutable"));
 
     Assertions.assertDoesNotThrow(
-        () -> catalogManager.alterCatalog(ident2, CatalogChange.setProperty("key4", "value4")));
+        () ->
+            catalogManager.alterCatalog(
+                ident2, CatalogChange.setProperty(PROPERTY_KEY4, "value4")));
     Assertions.assertDoesNotThrow(
-        () -> catalogManager.alterCatalog(ident2, CatalogChange.setProperty("key2", "value2")));
+        () ->
+            catalogManager.alterCatalog(
+                ident2, CatalogChange.setProperty(PROPERTY_KEY2, "value2")));
 
-    CatalogChange change3 = CatalogChange.setProperty("key4", "value4");
-    CatalogChange change4 = CatalogChange.removeProperty("key1");
+    CatalogChange change3 = CatalogChange.setProperty(PROPERTY_KEY4, "value4");
+    CatalogChange change4 = CatalogChange.removeProperty(PROPERTY_KEY1);
     Exception e3 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> catalogManager.alterCatalog(ident2, change3, change4));
     Assertions.assertTrue(e3.getMessage().contains("Property key1 is immutable"));
+
+    CatalogChange change5 = CatalogChange.setProperty(PROPERTY_KEY6_PREFIX + "1", "value1");
+    e3 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident2, change5));
+    Assertions.assertTrue(
+        e3.getMessage().contains("Property key6-1 is immutable"), e3.getMessage());
     reset();
   }
 
@@ -186,37 +210,65 @@ public class TestCatalogManager {
 
     // key1 is required;
     Map<String, String> props1 =
-        ImmutableMap.<String, String>builder().put("key2", "value2").put("mock", "mock").build();
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put("mock", "mock")
+            .build();
     IllegalArgumentException e1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
-    Assertions.assertTrue(
-        e1.getMessage().contains("Properties are required and must be set: [key1]"));
+    Assertions.assertEquals(
+        "Properties or properties with a fixed prefix are required and must be set: [key1]",
+        e1.getMessage());
     // BUG here, in memory does not support rollback
     reset();
 
     // key2 is required;
     Map<String, String> props2 =
-        ImmutableMap.<String, String>builder().put("key1", "value1").put("mock", "mock").build();
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value2")
+            .put("mock", "mock")
+            .build();
     e1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props2));
-    Assertions.assertTrue(
-        e1.getMessage().contains("Properties are required and must be set: [key2]"));
+    Assertions.assertEquals(
+        "Properties or properties with a fixed prefix are required and must be set: [key2]",
+        e1.getMessage());
     reset();
+
+    // property with fixed prefix key5- is required;
+    Map<String, String> props4 =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put("mock", "mock")
+            .build();
+    e1 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props4));
+    Assertions.assertEquals(
+        "Properties or properties with a fixed prefix are required and must be set: [key5-]",
+        e1.getMessage());
 
     // key3 is optional, but we assign a wrong value format
     Map<String, String> props3 =
         ImmutableMap.<String, String>builder()
-            .put("key1", "value1")
-            .put("key2", "value2")
-            .put("key3", "a12a1a")
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "a12a1a")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
             .put("mock", "mock")
             .build();
     e1 =
@@ -225,7 +277,7 @@ public class TestCatalogManager {
             () ->
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props3));
-    Assertions.assertTrue(e1.getMessage().contains("Invalid value: 'a12a1a' for property: 'key3'"));
+    Assertions.assertEquals("Invalid value: 'a12a1a' for property: 'key3'", e1.getMessage());
     reset();
   }
 
@@ -234,8 +286,9 @@ public class TestCatalogManager {
     NameIdentifier ident = NameIdentifier.of("metalake", "test1");
 
     Map<String, String> props = Maps.newHashMap();
-    props.put("key1", "value1");
-    props.put("key2", "value2");
+    props.put(PROPERTY_KEY1, "value1");
+    props.put(PROPERTY_KEY2, "value2");
+    props.put(PROPERTY_KEY5_PREFIX + "1", "value3");
 
     // test before creation
     Assertions.assertDoesNotThrow(
@@ -301,7 +354,10 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(
-        exception3.getMessage().contains("Properties are reserved and cannot be set"),
+        exception3
+            .getMessage()
+            .contains(
+                "Properties or properties with a fixed prefix are reserved and cannot be set"),
         exception3.getMessage());
     Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(failedIdent));
     // Test failed for the second time
@@ -312,7 +368,10 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     failedIdent, Catalog.Type.RELATIONAL, provider, "comment", props));
     Assertions.assertTrue(
-        exception4.getMessage().contains("Properties are reserved and cannot be set"),
+        exception4
+            .getMessage()
+            .contains(
+                "Properties or properties with a fixed prefix are reserved and cannot be set"),
         exception4.getMessage());
     Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(failedIdent));
   }
@@ -322,7 +381,15 @@ public class TestCatalogManager {
     NameIdentifier ident = NameIdentifier.of("metalake", "test11");
     NameIdentifier ident1 = NameIdentifier.of("metalake", "test12");
     Map<String, String> props =
-        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(ident1, Catalog.Type.RELATIONAL, provider, "comment", props);
@@ -345,7 +412,15 @@ public class TestCatalogManager {
     NameIdentifier relIdent = NameIdentifier.of("metalake", "catalog_rel");
     NameIdentifier fileIdent = NameIdentifier.of("metalake", "catalog_file");
     Map<String, String> props =
-        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
 
     catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
@@ -378,7 +453,15 @@ public class TestCatalogManager {
   public void testLoadCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test21");
     Map<String, String> props =
-        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
@@ -404,7 +487,15 @@ public class TestCatalogManager {
   public void testAlterCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test31");
     Map<String, String> props =
-        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
     String comment = "comment";
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
@@ -451,7 +542,15 @@ public class TestCatalogManager {
   public void testDropCatalog() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
-        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
     String comment = "comment";
 
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
@@ -479,7 +578,15 @@ public class TestCatalogManager {
   public void testForceDropCatalog() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
-        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
     String comment = "comment";
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     SchemaEntity schemaEntity =
@@ -507,7 +614,15 @@ public class TestCatalogManager {
   void testAlterMutableProperties() {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
-        ImmutableMap.of("provider", "test", "key1", "value1", "key2", "value2");
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
     String comment = "comment";
 
     Catalog oldCatalog =
