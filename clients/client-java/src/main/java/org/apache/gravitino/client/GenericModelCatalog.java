@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rest.RESTUtils;
 
@@ -247,6 +248,13 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     resp.validate();
 
     return resp.dropped();
+  }
+
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    // TODO: implement alterModel
+    return null;
   }
 
   /** @return A new builder instance for {@link GenericModelCatalog}. */

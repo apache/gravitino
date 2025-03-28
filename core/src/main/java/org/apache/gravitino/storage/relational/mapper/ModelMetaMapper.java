@@ -87,4 +87,8 @@ public interface ModelMetaMapper {
 
   @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelLatestVersion")
   Integer updateModelLatestVersion(@Param("modelId") Long modelId);
+
+  @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelMeta")
+  Integer updateModelMeta(
+      @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO);
 }

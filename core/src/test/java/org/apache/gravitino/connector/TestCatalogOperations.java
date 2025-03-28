@@ -74,6 +74,7 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -893,6 +894,48 @@ public class TestCatalogOperations
     }
 
     return true;
+  }
+
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestModel model = models.get(ident);
+    Map<String, String> newProps =
+        model.properties() != null ? Maps.newHashMap(model.properties()) : Maps.newHashMap();
+
+    NameIdentifier newIdent = ident;
+    for (ModelChange change : changes) {
+      if (change instanceof ModelChange.RenameModel) {
+        String newName = ((ModelChange.RenameModel) change).newName();
+        newIdent = NameIdentifier.of(ident.namespace(), newName);
+        if (models.containsKey(newIdent)) {
+          throw new ModelAlreadyExistsException("Model %s already exists", ident);
+        }
+      }
+    }
+    TestModel updatedModel =
+        TestModel.builder()
+            .withName(newIdent.name())
+            .withComment(model.comment())
+            .withProperties(new HashMap<>(newProps))
+            .withAuditInfo(updatedAuditInfo)
+            .withLatestVersion(model.latestVersion())
+            .build();
+
+    models.put(ident, updatedModel);
+    return updatedModel;
   }
 
   private boolean hasCallerContext() {
