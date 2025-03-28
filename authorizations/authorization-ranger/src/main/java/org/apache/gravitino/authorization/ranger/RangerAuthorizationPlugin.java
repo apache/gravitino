@@ -103,10 +103,7 @@ public abstract class RangerAuthorizationPlugin
     rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
 
-    if (Boolean.parseBoolean(
-        config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))) {
-      createRangerServiceIfNecessary(config, rangerServiceName);
-    }
+    createRangerServiceIfNecessary(config, rangerServiceName);
 
     rangerHelper =
         new RangerHelper(
@@ -786,7 +783,9 @@ public abstract class RangerAuthorizationPlugin
     try {
       rangerClient.getService(serviceName);
     } catch (RangerServiceException rse) {
-      if (rse.getStatus().equals(ClientResponse.Status.NOT_FOUND)) {
+      if (Boolean.parseBoolean(
+              config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))
+          && ClientResponse.Status.NOT_FOUND.equals(rse.getStatus())) {
         try {
           RangerService rangerService = new RangerService();
           rangerService.setType(getServiceType());

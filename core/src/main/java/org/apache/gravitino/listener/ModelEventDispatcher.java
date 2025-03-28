@@ -28,22 +28,31 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.listener.api.event.DeleteModelEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelFailureEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelPreEvent;
+import org.apache.gravitino.listener.api.event.DeleteModelVersionEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelVersionFailureEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelVersionPreEvent;
+import org.apache.gravitino.listener.api.event.GetModelEvent;
 import org.apache.gravitino.listener.api.event.GetModelFailureEvent;
 import org.apache.gravitino.listener.api.event.GetModelPreEvent;
+import org.apache.gravitino.listener.api.event.GetModelVersionEvent;
 import org.apache.gravitino.listener.api.event.GetModelVersionFailureEvent;
 import org.apache.gravitino.listener.api.event.GetModelVersionPreEvent;
+import org.apache.gravitino.listener.api.event.LinkModelVersionEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionFailureEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionPreEvent;
+import org.apache.gravitino.listener.api.event.ListModelEvent;
 import org.apache.gravitino.listener.api.event.ListModelFailureEvent;
 import org.apache.gravitino.listener.api.event.ListModelPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionFailureEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionPreEvent;
+import org.apache.gravitino.listener.api.event.ListModelVersionsEvent;
+import org.apache.gravitino.listener.api.event.RegisterAndLinkModelEvent;
 import org.apache.gravitino.listener.api.event.RegisterAndLinkModelFailureEvent;
 import org.apache.gravitino.listener.api.event.RegisterAndLinkModelPreEvent;
+import org.apache.gravitino.listener.api.event.RegisterModelEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelFailureEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelPreEvent;
 import org.apache.gravitino.listener.api.info.ModelInfo;
@@ -81,10 +90,12 @@ public class ModelEventDispatcher implements ModelDispatcher {
       throws NoSuchSchemaException, ModelAlreadyExistsException {
     String user = PrincipalUtils.getCurrentUserName();
     ModelInfo registerRequest = new ModelInfo(ident.name(), properties, comment);
+
     eventBus.dispatchEvent(new RegisterModelPreEvent(user, ident, registerRequest));
     try {
       Model model = dispatcher.registerModel(ident, comment, properties);
-      // TODO: ModelEvent
+      ModelInfo registeredModel = new ModelInfo(model);
+      eventBus.dispatchEvent(new RegisterModelEvent(user, ident, registeredModel));
       return model;
     } catch (Exception e) {
       eventBus.dispatchEvent(new RegisterModelFailureEvent(user, ident, e, registerRequest));
@@ -106,14 +117,16 @@ public class ModelEventDispatcher implements ModelDispatcher {
     ModelVersionInfo linkModelVersionRequest =
         new ModelVersionInfo(uri, comment, properties, aliases);
     String user = PrincipalUtils.getCurrentUserName();
-
     RegisterAndLinkModelPreEvent registerAndLinkModelPreEvent =
         new RegisterAndLinkModelPreEvent(
             user, ident, registerModelRequest, linkModelVersionRequest);
+
     eventBus.dispatchEvent(registerAndLinkModelPreEvent);
     try {
-      // TODO: ModelEvent
-      return dispatcher.registerModel(ident, uri, aliases, comment, properties);
+      Model registeredModel = dispatcher.registerModel(ident, uri, aliases, comment, properties);
+      ModelInfo registeredModelInfo = new ModelInfo(registeredModel);
+      eventBus.dispatchEvent(new RegisterAndLinkModelEvent(user, ident, registeredModelInfo, uri));
+      return registeredModel;
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new RegisterAndLinkModelFailureEvent(
@@ -126,10 +139,12 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public Model getModel(NameIdentifier ident) throws NoSuchModelException {
     String user = PrincipalUtils.getCurrentUserName();
+
     eventBus.dispatchEvent(new GetModelPreEvent(user, ident));
     try {
       Model model = dispatcher.getModel(ident);
-      // TODO: ModelEvent
+      ModelInfo modelInfo = new ModelInfo(model);
+      eventBus.dispatchEvent(new GetModelEvent(user, ident, modelInfo));
       return model;
     } catch (Exception e) {
       eventBus.dispatchEvent(new GetModelFailureEvent(user, ident, e));
@@ -141,10 +156,12 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public boolean deleteModel(NameIdentifier ident) {
     String user = PrincipalUtils.getCurrentUserName();
+
     eventBus.dispatchEvent(new DeleteModelPreEvent(user, ident));
     try {
-      // TODO: ModelEvent
-      return dispatcher.deleteModel(ident);
+      boolean isExists = dispatcher.deleteModel(ident);
+      eventBus.dispatchEvent(new DeleteModelEvent(user, ident, isExists));
+      return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new DeleteModelFailureEvent(user, ident, e));
       throw e;
@@ -155,10 +172,11 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public NameIdentifier[] listModels(Namespace namespace) throws NoSuchSchemaException {
     String user = PrincipalUtils.getCurrentUserName();
+
     eventBus.dispatchEvent(new ListModelPreEvent(user, namespace));
     try {
       NameIdentifier[] models = dispatcher.listModels(namespace);
-      // TODO: ModelEvent
+      eventBus.dispatchEvent(new ListModelEvent(user, namespace));
       return models;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListModelFailureEvent(user, namespace, e));
@@ -181,7 +199,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     eventBus.dispatchEvent(new LinkModelVersionPreEvent(user, ident, linkModelRequest));
     try {
       dispatcher.linkModelVersion(ident, uri, aliases, comment, properties);
-      // TODO: ModelEvent
+      eventBus.dispatchEvent(new LinkModelVersionEvent(user, ident, linkModelRequest));
     } catch (Exception e) {
       eventBus.dispatchEvent(new LinkModelVersionFailureEvent(user, ident, e, linkModelRequest));
       throw e;
@@ -196,8 +214,11 @@ public class ModelEventDispatcher implements ModelDispatcher {
 
     eventBus.dispatchEvent(new GetModelVersionPreEvent(user, ident, null, version));
     try {
-      // TODO: ModelEvent
-      return dispatcher.getModelVersion(ident, version);
+      ModelVersion modelVersion = dispatcher.getModelVersion(ident, version);
+      ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
+      eventBus.dispatchEvent(
+          new GetModelVersionEvent(user, ident, modelVersionInfo, null, version));
+      return modelVersion;
     } catch (Exception e) {
       eventBus.dispatchEvent(new GetModelVersionFailureEvent(user, ident, e, null, version));
       throw e;
@@ -213,7 +234,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
     eventBus.dispatchEvent(new GetModelVersionPreEvent(user, ident, alias, null));
     try {
       ModelVersion modelVersion = dispatcher.getModelVersion(ident, alias);
-      // TODO: ModelEvent
+      ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
+      eventBus.dispatchEvent(new GetModelVersionEvent(user, ident, modelVersionInfo, alias, null));
       return modelVersion;
     } catch (Exception e) {
       eventBus.dispatchEvent(new GetModelVersionFailureEvent(user, ident, e, alias, null));
@@ -229,7 +251,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     eventBus.dispatchEvent(new DeleteModelVersionPreEvent(user, ident, null, version));
     try {
       boolean isExists = dispatcher.deleteModelVersion(ident, version);
-      // TODO: ModelEvent
+      eventBus.dispatchEvent(new DeleteModelVersionEvent(user, ident, isExists, null, version));
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new DeleteModelVersionFailureEvent(user, ident, e, null, version));
@@ -245,7 +267,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     eventBus.dispatchEvent(new DeleteModelVersionPreEvent(user, ident, alias, null));
     try {
       boolean isExists = dispatcher.deleteModelVersion(ident, alias);
-      // TODO: ModelEvent
+      eventBus.dispatchEvent(new DeleteModelVersionEvent(user, ident, isExists, alias, null));
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new DeleteModelVersionFailureEvent(user, ident, e, alias, null));
@@ -261,7 +283,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     eventBus.dispatchEvent(new ListModelVersionPreEvent(user, ident));
     try {
       int[] versions = dispatcher.listModelVersions(ident);
-      // TODO: ModelEvent
+      eventBus.dispatchEvent(new ListModelVersionsEvent(user, ident, versions));
       return versions;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListModelVersionFailureEvent(user, ident, e));

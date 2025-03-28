@@ -22,6 +22,7 @@ package org.apache.gravitino.flink.connector.hive;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -47,9 +48,12 @@ public class HivePropertiesConverter implements PropertiesConverter {
   }
 
   @Override
-  public Map<String, String> toFlinkTableProperties(Map<String, String> gravitinoProperties) {
+  public Map<String, String> toFlinkTableProperties(
+      Map<String, String> flinkCatalogProperties,
+      Map<String, String> gravitinoTableProperties,
+      ObjectPath tablePath) {
     Map<String, String> properties =
-        gravitinoProperties.entrySet().stream()
+        gravitinoTableProperties.entrySet().stream()
             .collect(
                 Collectors.toMap(
                     entry -> {

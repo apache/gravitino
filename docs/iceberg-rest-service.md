@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Background
 
-The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and acts as an Iceberg REST catalog server.
+The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API specification](https://github.com/apache/iceberg/blob/main/open-api/rest-catalog-open-api.yaml) and acts as an Iceberg REST catalog server, you could access the Iceberg REST endpoint with the uri `http://$ip:$port/iceberg/`.
 
 ### Capabilities
 
@@ -85,7 +85,7 @@ Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Securi
 
 #### Backend authentication
 
-For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc.user` and `gravitino.iceberg-rest.jdbc.password` to authenticate the JDBC connection. For Hive backend, you can use the `gravitino.iceberg-rest.authentication.type` to specify the authentication type, and use the `gravitino.iceberg-rest.authentication.kerberos.principal` and `gravitino.iceberg-rest.authentication.kerberos.keytab-uri` to authenticate the Kerberos connection.
+For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password` to authenticate the JDBC connection. For Hive backend, you can use the `gravitino.iceberg-rest.authentication.type` to specify the authentication type, and use the `gravitino.iceberg-rest.authentication.kerberos.principal` and `gravitino.iceberg-rest.authentication.kerberos.keytab-uri` to authenticate the Kerberos connection.
 The detailed configuration items are as follows:
 
 | Configuration item                                                        | Description                                                                                                                                                                                                                                            | Default value | Required                                                                                                                                                             | Since Version    |
@@ -141,7 +141,7 @@ Additionally, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains O
 Please place the above jars in the classpath of Iceberg REST server, please refer to [server management](#server-management) for classpath details.
 
 :::info
-Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. 
+Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`.
 :::
 
 #### GCS
@@ -217,16 +217,16 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 
 #### JDBC backend configuration
 
-| Configuration item                                                        | Description                                                                                                                           | Default value            | Required | Since Version |
-|---------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend`                                  | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for a JDBC catalog.                       | `memory`                 | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`                                              | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.    | (none)                   | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse `                                       | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`  | (none)                   | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.catalog-backend-name`                             | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.  | `jdbc` for JDBC backend  | No       | 0.5.2         |
-| `gravitino.iceberg-rest.jdbc.user`                                        | The username of the JDBC connection.                                                                                                  | (none)                   | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc.password`                                    | The password of the JDBC connection.                                                                                                  | (none)                   | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc-initialize`                                  | Whether to initialize the meta tables when creating the JDBC catalog.                                                                 | `true`                   | No       | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc-driver`                                      | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                              | (none)                   | Yes      | 0.3.0         |
+| Configuration item                            | Description                                                                                                                           | Default value            | Required | Since Version |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for a JDBC catalog.                       | `memory`                 | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.    | (none)                   | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse `           | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`  | (none)                   | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.  | `jdbc` for JDBC backend  | No       | 0.5.2         |
+| `gravitino.iceberg-rest.jdbc-user`            | The username of the JDBC connection.                                                                                                  | (none)                   | No       | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-password`        | The password of the JDBC connection.                                                                                                  | (none)                   | No       | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                 | `true`                   | No       | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                              | (none)                   | Yes      | 0.3.0         |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
@@ -468,3 +468,4 @@ sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-serve
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).
+

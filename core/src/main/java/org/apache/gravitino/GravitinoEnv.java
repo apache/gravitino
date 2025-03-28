@@ -59,11 +59,13 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
+import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
+import org.apache.gravitino.listener.api.event.AccessControlEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
@@ -481,21 +483,22 @@ public class GravitinoEnv {
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
-    // TODO(jerryshao). Add Hook and event dispatcher support for Model.
+    // TODO(jerryshao). Add Hook support for Model.
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
-    this.modelDispatcher = modelNormalizeDispatcher;
+    this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
+      AccessControlManager accessControlManager =
+          new AccessControlManager(entityStore, idGenerator, config);
       AccessControlHookDispatcher accessControlHookDispatcher =
-          new AccessControlHookDispatcher(
-              new AccessControlManager(entityStore, idGenerator, config));
-
-      this.accessControlDispatcher = accessControlHookDispatcher;
+          new AccessControlHookDispatcher(accessControlManager);
+      this.accessControlDispatcher =
+          new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
       this.ownerManager = new OwnerManager(entityStore);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {

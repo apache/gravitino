@@ -225,6 +225,21 @@ public class HadoopCatalogIT extends BaseIT {
         "storage location should be created");
     Assertions.assertEquals(ImmutableMap.of(), fileset2.properties(), "properties should be empty");
 
+    // create fileset with placeholder in storage location
+    String filesetName4 = "test_create_fileset_with_placeholder";
+    String storageLocation4 = defaultBaseLocation() + "/{{fileset}}";
+    String expectedStorageLocation4 = defaultBaseLocation() + "/" + filesetName4;
+    Assertions.assertFalse(
+        fileSystem.exists(new Path(expectedStorageLocation4)),
+        "storage location should not exists");
+    Fileset fileset4 = createFileset(filesetName4, "comment", MANAGED, storageLocation4, null);
+    assertFilesetExists(filesetName4);
+    Assertions.assertNotNull(fileset4, "fileset should be created");
+    Assertions.assertEquals("comment", fileset4.comment());
+    Assertions.assertEquals(MANAGED, fileset4.type());
+    Assertions.assertEquals(expectedStorageLocation4, fileset4.storageLocation());
+    Assertions.assertEquals(0, fileset4.properties().size(), "properties should be empty");
+
     // create fileset with null fileset name
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,

@@ -30,16 +30,6 @@ public class DeleteModelVersionPreEvent extends ModelPreEvent {
   private final Optional<Integer> version;
 
   /**
-   * Create a new {@link DeleteModelVersionPreEvent} instance.
-   *
-   * @param user The username of the individual who initiated the model version linking.
-   * @param identifier The unique identifier of the model that was linked.
-   */
-  public DeleteModelVersionPreEvent(String user, NameIdentifier identifier) {
-    this(user, identifier, null, null);
-  }
-
-  /**
    * Create a new {@link DeleteModelVersionPreEvent} instance. only one of alias or version are
    * valid.
    *
