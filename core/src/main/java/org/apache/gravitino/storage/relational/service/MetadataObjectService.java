@@ -273,7 +273,7 @@ public class MetadataObjectService {
   public static Map<Long, String> getColumnObjectsFullName(List<Long> columnsIds) {
     List<ColumnPO> columnPOs =
         SessionUtils.getWithoutCommit(
-            TableColumnMapper.class, mapper -> mapper.listColumnPOsByTableIds(columnsIds));
+            TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(columnsIds));
 
     if (columnPOs == null || columnPOs.isEmpty()) {
       return new HashMap<>();
