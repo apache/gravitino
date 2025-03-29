@@ -5,13 +5,13 @@ keyword: flink connector jdbc catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document provides a comprehensive guide on configuring and using Apache Gravitino Flink connector to access the Jdbc catalog managed by the Gravitino server.
+This document provides a comprehensive guide on configuring and using Apache Gravitino Flink connector to access the JDBC catalog managed by the Gravitino server.
 
 ## Capabilities
 
-### Supported Jdbc Types
+### Supported JDBC Types
 
-* Mysql
+* MYSQL
 
 ## Getting Started
 
@@ -21,7 +21,7 @@ Place the following JAR files in the lib directory of your Flink installation:
 
 - `flink-connector-jdbc-${flinkJdbcConnectorVersion}.jar`
 - `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`
-- jdbc driver
+- JDBC driver
 
 ### SQL Example
 
@@ -106,12 +106,12 @@ select * from jdbc_table_a;
 
 ## Catalog properties
 
-Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink Jdbc connector configuration.
+Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink JDBC connector configuration.
 
-| Gravitino catalog property name | Flink Jdbc connector configuration | Description                        | Since Version    |
-|:--------------------------------|------------------------------------|------------------------------------|------------------|
-| `jdbc-url`                      | `base-url`                         | Jdbc url for mysql                 | 0.9.0-incubating |
-| `username`                      | `username`                         | Username of Postgres/MySQL account | 0.9.0-incubating |
-| `password`                      | `password`                         | Password of the account            | 0.9.0-incubating |
-| `flink.bypass.default-database` | `default-database`                 | Default database to connect to     | 0.9.0-incubating |
+| Gravitino catalog property name | Flink JDBC connector configuration | Description                    | Since Version    |
+|:--------------------------------|------------------------------------|--------------------------------|------------------|
+| `jdbc-url`                      | `base-url`                         | JDBC URL for MYSQL             | 0.9.0-incubating |
+| `username`                      | `username`                         | Username of MySQL account      | 0.9.0-incubating |
+| `password`                      | `password`                         | Password of the account        | 0.9.0-incubating |
+| `flink.bypass.default-database` | `default-database`                 | Default database to connect to | 0.9.0-incubating |
 
