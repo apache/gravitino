@@ -1,6 +1,6 @@
 ---
-title: How to use relational backend storage
-slug: /how-to-use-relational-backend-storage
+title: Configure the backend storage
+slug: /configure-backend-storage
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -38,7 +38,7 @@ You can use `H2` directly without any additional configuration.
 
 1. Get the initialization script
 
-   Follow the [install guide](./how-to-install.md) to install the distribution package.
+   Follow the [install guide](./install.md) to install the distribution package.
    You can then find the *initialization script* in the directory:
 
    ```text
@@ -98,7 +98,7 @@ You can use `H2` directly without any additional configuration.
 
 1. Get the initialization script
 
-   Follow the [install guide](./how-to-install.md) to install the distribution package.
+   Follow the [install guide](./install.md) to install the distribution package.
    You can then find the *initialization script* in the directory `${GRAVITINO_HOME}/scripts/postgresql/`.
 
    The script name is like `schema-<version>-postgresql.sql`,

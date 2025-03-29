@@ -37,7 +37,7 @@ There are three deployment scenarios for Gravitino Iceberg REST server:
 - An auxiliary service embedded in the Gravitino server, the classpath is `iceberg-rest-server/libs`.
 
 For detailed instructions on how to build and install the Gravitino server package,
-please refer to [how to build](./develop/how-to-build.md) and [how to install](./how-to-install.md).
+please refer to [how to build](./develop/how-to-build.md) and [the installation guide](./install/install.md).
 To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`.
 Alternatively, to create the corresponding compressed package in the distribution directory,
 use `./gradlew assembleIcebergRESTServer -x test`.

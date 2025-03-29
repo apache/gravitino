@@ -1,6 +1,6 @@
 ---
-title: How to install Apache Gravitino
-slug: /how-to-install
+title: Install Apache Gravitino
+slug: /install-guide
 license: "This software is licensed under the Apache License version 2."
 ---
 

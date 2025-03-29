@@ -12,7 +12,7 @@ This document is to guide users through the development of the Apache Gravitino 
 Before you start developing the Gravitino Trino connector, you need to have the following prerequisites:
 
 1. You need to start the Gravitino server locally.
-   For more information, please refer to the [start Gravitino server](../../how-to-install.md)
+   For more information, please refer to the [start Gravitino server](../../install/install.md)
 2. Create a catalog in the Gravitino server.
    For more information, please refer to the [Gravitino metadata management](../../metadata/relational.md).
    Assuming we have just created a MySQL catalog using the following command:

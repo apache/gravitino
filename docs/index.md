@@ -23,7 +23,7 @@ This should include JVMs on x86_64 and ARM64.
 It's easy to run locally on one machine, all you need is to have `java` installed on
 your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java installation.
 
-See [How to install Gravitino](./how-to-install.md) to learn how to install the Gravitino server.
+See [How to install Gravitino](./install/install.md) to learn how to install the Gravitino server.
 
 Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/apache).
 Pull the image and run it.
