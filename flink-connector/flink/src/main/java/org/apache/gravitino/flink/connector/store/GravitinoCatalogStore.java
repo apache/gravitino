@@ -75,6 +75,13 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
     }
   }
 
+  /**
+   * Get a catalog by name.
+   *
+   * @param catalogName name of the catalog to retrieve
+   * @return the requested catalog or empty if the catalog does not exist
+   * @throws CatalogException throw a CatalogException when the Catalog cannot be created.
+   */
   @Override
   public Optional<CatalogDescriptor> getCatalog(String catalogName) throws CatalogException {
     try {
