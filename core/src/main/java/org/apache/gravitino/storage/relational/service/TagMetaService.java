@@ -19,12 +19,15 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -54,6 +57,18 @@ public class TagMetaService {
   public static TagMetaService getInstance() {
     return INSTANCE;
   }
+
+  private static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
+      TYPE_FUNCTION_MAP =
+          ImmutableMap.of(
+              MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,
+              MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName,
+              MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName,
+              MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName,
+              MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName,
+              MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName,
+              MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName,
+              MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
 
   private TagMetaService() {}
 
@@ -230,20 +245,32 @@ public class TagMetaService {
                   mapper.listTagMetadataObjectRelsByMetalakeAndTagName(metalakeName, tagName));
 
       List<MetadataObject> metadataObjects = Lists.newArrayList();
-      for (TagMetadataObjectRelPO po : tagMetadataObjectRelPOs) {
-        String fullName =
-            MetadataObjectService.getMetadataObjectFullName(
-                po.getMetadataObjectType(), po.getMetadataObjectId());
+      tagMetadataObjectRelPOs.stream()
+          .collect(
+              Collectors.groupingBy(t -> MetadataObject.Type.valueOf(t.getMetadataObjectType())))
+          .forEach(
+              (type, rels) -> {
+                List<Long> metadataObjectIds =
+                    rels.stream()
+                        .map(TagMetadataObjectRelPO::getMetadataObjectId)
+                        .collect(Collectors.toList());
+                Map<Long, String> metadataObjectNames =
+                    Optional.of(TYPE_FUNCTION_MAP.get(type))
+                        .map(f -> f.apply(metadataObjectIds))
+                        .orElseThrow(
+                            () ->
+                                new IllegalArgumentException(
+                                    "Unexpected to reach here for metadata object type: " + type));
 
-        // Metadata object may be deleted asynchronously when we query the name, so it will return
-        // null. We should skip this metadata object.
-        if (fullName == null) {
-          continue;
-        }
-
-        MetadataObject.Type type = MetadataObject.Type.valueOf(po.getMetadataObjectType());
-        metadataObjects.add(MetadataObjects.parse(fullName, type));
-      }
+                metadataObjectNames.forEach(
+                    (id, fullName) -> {
+                      // Metadata object may be deleted asynchronously when we query the name, so it
+                      // will return null, we should skip this metadata object.
+                      if (fullName != null) {
+                        metadataObjects.add(MetadataObjects.parse(fullName, type));
+                      }
+                    });
+              });
 
       return metadataObjects;
     } catch (RuntimeException e) {
