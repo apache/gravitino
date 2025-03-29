@@ -12,18 +12,18 @@ This document primarily outlines how users can manage metadata within Apache Gra
 The Web UI is the graphical interface is accessible through a web browser
 as an alternative to writing code or using the REST interface.
 
-Currently, you can integrate [OAuth settings](./security/security.md)
+Currently, you can integrate [OAuth settings](../security/security.md)
 to view, add, modify, and delete metalakes, create catalogs,
 and view catalogs, schemas, and tables, among other functions.
 
-[Build](./develop/how-to-build.md) and [deploy](./getting-started/index.md#local-workstation)
+[Build](../develop/how-to-build.md) and [deploy](../getting-started/index.md#local-workstation)
 the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`,
 by default is [http://localhost:8090](http://localhost:8090).
 
 ## Initial page
 
 The Web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode,
-see the details in [Security](./security/security.md).
+see the details in [Security](../security/security.md).
 
 Set parameter for `gravitino.authenticators`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode).
 Simple mode is the default authentication option.
@@ -44,7 +44,7 @@ gravitino.authenticators = simple
 Set the configuration parameter `gravitino.authenticators` to `simple`,
 and the web UI displays the homepage (Metalakes).
 
-![webui-metalakes-simple](./assets/webui/metalakes-simple.png)
+![webui-metalakes-simple](../assets/webui/metalakes-simple.png)
 
 At the top-right, the UI displays the current Gravitino version.
 
@@ -66,14 +66,14 @@ it is recommended to use the [Chrome](https://www.google.com/chrome/) browser fo
 Such as Safari need to enable the developer menu, and select `Disable Cross-Origin Restrictions` from the develop menu.
 :::
 
-![webui-login-with-oauth](./assets/webui/login-with-oauth.png)
+![webui-login-with-oauth](../assets/webui/login-with-oauth.png)
 
 1. Enter the values corresponding to your specific configuration.
-   For detailed instructions, please refer to [Security](./security/security.md).
+   For detailed instructions, please refer to [Security](../security/security.md).
 
 1. Click on the `LOGIN` button takes you to the homepage.
 
-   ![webui-metalakes-oauth](./assets/webui/metalakes-oauth.png)
+   ![webui-metalakes-oauth](../assets/webui/metalakes-oauth.png)
 
    At the top-right, there is an icon button that takes you to the login page when clicked.
 
@@ -83,11 +83,11 @@ Such as Safari need to enable the developer menu, and select `Disable Cross-Orig
 
 ### Metalake
 
-#### [Create metalake](./getting-started/index.md#interact-with-apache-gravitino-api)
+#### [Create metalake](../getting-started/index.md#interact-with-apache-gravitino-api)
 
 On the homepage, clicking on the `CREATE METALAKE` button displays a dialog to create a metalake.
 
-![create-metalake-dialog](./assets/webui/create-metalake-dialog.png)
+![create-metalake-dialog](../assets/webui/create-metalake-dialog.png)
 
 Creating a metalake needs these fields:
 
@@ -95,11 +95,11 @@ Creating a metalake needs these fields:
 1. **Comment**(_optional_): the comment of the metalake.
 1. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
-![metalake-list](./assets/webui/metalake-list.png)
+![metalake-list](../assets/webui/metalake-list.png)
 
 There are 3 actions you can perform on a metalake.
 
-![metalake-actions](./assets/webui/metalake-actions.png)
+![metalake-actions](../assets/webui/metalake-actions.png)
 
 #### Show metalake details
 
@@ -107,7 +107,7 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this metalake in the drawer component on the right.
 
-![metalake-details](./assets/webui/metalake-details.png)
+![metalake-details](../assets/webui/metalake-details.png)
 
 #### Edit metalake
 
@@ -115,7 +115,7 @@ Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> i
 
 Displays the dialog for modifying fields of the selected metalake.
 
-![create-metalake-dialog](./assets/webui/create-metalake-dialog.png)
+![create-metalake-dialog](../assets/webui/create-metalake-dialog.png)
 
 #### Disable metalake
 
@@ -123,11 +123,11 @@ Metalake defaults to in-use after successful creation.
 
 Mouse over the switch next to the metalake's name to see the 'In-use' tip.
 
-![metalake-in-use](./assets/webui/metalake-in-use.png)
+![metalake-in-use](../assets/webui/metalake-in-use.png)
 
 Click on the switch will disable the metalake, mouse over the switch next to the metalake's name to see the 'Not in-use' tip.
 
-![metalake-not-in-use](./assets/webui/metalake-not-in-use.png)
+![metalake-not-in-use](../assets/webui/metalake-not-in-use.png)
 
 #### Drop metalake
 
@@ -135,7 +135,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the `DROP` button drops this metalake.
 
-![delete-metalake](./assets/webui/delete-metalake.png)
+![delete-metalake](../assets/webui/delete-metalake.png)
 
 ### Catalog
 
@@ -145,11 +145,11 @@ If this is the first time, it shows no data until after creating a catalog.
 
 Click on the left arrow icon button <Icon icon='mdi:arrow-left' fontSize='24' color='#6877ef' /> takes you to the metalake page.
 
-![metalake-catalogs](./assets/webui/metalake-catalogs.png)
+![metalake-catalogs](../assets/webui/metalake-catalogs.png)
 
 Click on the Tab - `DETAILS` views the details of the metalake on the metalake catalogs page.
 
-![metalake-catalogs-details](./assets/webui/metalake-catalogs-details.png)
+![metalake-catalogs-details](../assets/webui/metalake-catalogs-details.png)
 
 On the left side of the page is a tree list, and the icons of the catalog correspond to their type and provider.
 
@@ -157,18 +157,18 @@ On the left side of the page is a tree list, and the icons of the catalog corres
 - Schema <Icon icon='bx:coin-stack' fontSize='24px' />
 - Table <Icon icon='bx:table' fontSize='24px' />
 
-![tree-view](./assets/webui/tree-view.png)
+![tree-view](../assets/webui/tree-view.png)
 
 Hover your mouse over the corresponding icon to the data changes to a reload icon <Icon icon='mdi:reload' fontSize='24px' />.
 Click on this icon to reload the currently selected data.
 
-![tree-view-reload-catalog](./assets/webui/tree-view-reload-catalog.png)
+![tree-view-reload-catalog](../assets/webui/tree-view-reload-catalog.png)
 
 #### Create catalog
 
 Click on the `CREATE CATALOG` button displays the dialog to create a catalog.
 
-![create-catalog](./assets/webui/create-catalog.png)
+![create-catalog](../assets/webui/create-catalog.png)
 
 Creating a catalog requires these fields:
 
@@ -190,9 +190,9 @@ Creating a catalog requires these fields:
 
 <Tabs>
   <TabItem value='hive' label='Hive'>
-    Follow the [Apache Hive catalog](./catalogs/relational/hive/index.md) document.
+    Follow the [Apache Hive catalog](../catalogs/relational/hive/index.md) document.
 
-    <Image img={require('./assets/webui/props-hive.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-hive.png')} style={{ width: 480 }} />
 
     |Key           |Description                                           |
     |--------------|------------------------------------------------------|
@@ -200,7 +200,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='iceberg' label='Iceberg'>
-    Follow the [Lakehouse Iceberg catalog](./catalogs/relational/lakehouse/iceberg.md) document.
+    Follow the [Lakehouse Iceberg catalog](../catalogs/relational/lakehouse/iceberg.md) document.
 
     the parameter `catalog-backend` provides two values: `hive`, and `jdbc`.
 
@@ -210,7 +210,7 @@ Creating a catalog requires these fields:
 
     - `hive`
 
-    <Image img={require('./assets/webui/props-iceberg-hive.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-iceberg-hive.png')} style={{ width: 480 }} />
 
     |Key      |Description                     |
     |---------|--------------------------------|
@@ -219,7 +219,7 @@ Creating a catalog requires these fields:
 
     - `jdbc`
 
-    <Image img={require('./assets/webui/props-iceberg-jdbc.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-iceberg-jdbc.png')} style={{ width: 480 }} />
 
     |Key          |Description                                                                                            |
     |-------------|-------------------------------------------------------------------------------------------------------|
@@ -231,11 +231,11 @@ Creating a catalog requires these fields:
 
     the parameter `authentication.type` provides two values: `simple`, and `Kerberos`.
 
-    <Image img={require('./assets/webui/props-authentication-type.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-authentication-type.png')} style={{ width: 480 }} />
 
     - `Kerberos`
 
-    <Image img={require('./assets/webui/props-authentication-kerberos.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-authentication-kerberos.png')} style={{ width: 480 }} />
 
     |Key                               |Description                                                                                                  |
     |----------------------------------|-------------------------------------------------------------------------------------------------------------|
@@ -245,9 +245,9 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='mysql' label='MySQL'>
-    Follow the [JDBC MySQL catalog](./catalogs/relational/jdbc/mysql.md) document.
+    Follow the [JDBC MySQL catalog](../catalogs/relational/jdbc/mysql.md) document.
 
-    <Image img={require('./assets/webui/props-mysql.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-mysql.png')} style={{ width: 480 }} />
 
     |Key          |Description                                                                                        |
     |-------------|---------------------------------------------------------------------------------------------------|
@@ -258,9 +258,9 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='postgresql' label='PostgreSQL'>
-    Follow the [JDBC PostgreSQL catalog](./catalogs/relational/jdbc/postgresql.md) document.
+    Follow the [JDBC PostgreSQL catalog](../catalogs/relational/jdbc/postgresql.md) document.
 
-    <Image img={require('./assets/webui/props-pg.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-pg.png')} style={{ width: 480 }} />
 
     |Key          |Description                                          |
     |-------------|-----------------------------------------------------|
@@ -272,9 +272,9 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='doris' label='Doris'>
-    Follow the [JDBC Doris catalog](./catalogs/relational/jdbc/doris.md) document.
+    Follow the [JDBC Doris catalog](../catalogs/relational/jdbc/doris.md) document.
 
-    <Image img={require('./assets/webui/props-doris.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-doris.png')} style={{ width: 480 }} />
 
     |Key          |Description                                                          |
     |-------------|---------------------------------------------------------------------|
@@ -285,7 +285,7 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='Paimon' label='Paimon'>
-    Follow the [lakehouse-paimon-catalog](./catalogs/relational/lakehouse/paimon.md) document.
+    Follow the [lakehouse-paimon-catalog](../catalogs/relational/lakehouse/paimon.md) document.
 
     the parameter `catalog-backend` provides three values: `filesystem`, `hive`, and `jdbc`.
 
@@ -295,7 +295,7 @@ Creating a catalog requires these fields:
 
     - `filesystem`
 
-    <Image img={require('./assets/webui/props-paimon-filesystem.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-paimon-filesystem.png')} style={{ width: 480 }} />
 
     |Key      |Description                     |
     |---------|--------------------------------|
@@ -303,7 +303,7 @@ Creating a catalog requires these fields:
 
     - `hive`
 
-    <Image img={require('./assets/webui/props-paimon-hive.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-paimon-hive.png')} style={{ width: 480 }} />
 
     |Key      |Description                     |
     |---------|--------------------------------|
@@ -312,7 +312,7 @@ Creating a catalog requires these fields:
 
     - `jdbc`
 
-    <Image img={require('./assets/webui/props-paimon-jdbc.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-paimon-jdbc.png')} style={{ width: 480 }} />
 
     |Key          |Description                                                                                            |
     |-------------|-------------------------------------------------------------------------------------------------------|
@@ -324,11 +324,11 @@ Creating a catalog requires these fields:
   
     the parameter `authentication.type` provides two values: `simple`, and `Kerberos`.
 
-    <Image img={require('./assets/webui/props-authentication-type.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-authentication-type.png')} style={{ width: 480 }} />
 
     - `Kerberos`
 
-    <Image img={require('./assets/webui/props-authentication-kerberos.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-authentication-kerberos.png')} style={{ width: 480 }} />
 
 
     |Key                               |Description                                                                                                  |
@@ -339,9 +339,9 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='Hudi' label='Hudi'>
-    Follow the [lakehouse-hudi-catalog](./catalogs/relational/lakehouse/hudi.md) document.
+    Follow the [lakehouse-hudi-catalog](../catalogs/relational/lakehouse/hudi.md) document.
 
-    <Image img={require('./assets/webui/props-hudi.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-hudi.png')} style={{ width: 480 }} />
 
     |Key            |Description                    |
     |---------------|-------------------------------|
@@ -350,9 +350,9 @@ Creating a catalog requires these fields:
 
   </TabItem>
   <TabItem value='OceanBase' label='OceanBase'>
-    Follow the [jdbc-oceanbase-catalog](./catalogs/relational/jdbc/oceanbase.md) document.
+    Follow the [jdbc-oceanbase-catalog](../catalogs/relational/jdbc/oceanbase.md) document.
 
-    <Image img={require('./assets/webui/props-oceanbase.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/props-oceanbase.png')} style={{ width: 480 }} />
 
     |Key          |Description                                                                        |
     |-------------|-----------------------------------------------------------------------------------|
@@ -368,9 +368,9 @@ Creating a catalog requires these fields:
 
 <Tabs>
   <TabItem value='hadoop' label='Hadoop'>
-    Follow the [Hadoop catalog](./catalogs/fileset/hadoop/hadoop-catalog.md) document.
+    Follow the [Hadoop catalog](../catalogs/fileset/hadoop/hadoop-catalog.md) document.
 
-    <Image img={require('./assets/webui/create-fileset-hadoop-catalog-dialog.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/create-fileset-hadoop-catalog-dialog.png')} style={{ width: 480 }} />
 
   </TabItem>
 </Tabs>
@@ -379,9 +379,9 @@ Creating a catalog requires these fields:
 
 <Tabs>
   <TabItem value='kafka' label='Kafka'>
-    Follow the [Kafka catalog](./catalogs/messaging/kafka/index.md) document.
+    Follow the [Kafka catalog](../catalogs/messaging/kafka/index.md) document.
 
-    <Image img={require('./assets/webui/create-messaging-kafka-catalog-dialog.png')} style={{ width: 480 }} />
+    <Image img={require('../assets/webui/create-messaging-kafka-catalog-dialog.png')} style={{ width: 480 }} />
 
     | Key               | Description                                                                               |
     | ----------------- | ----------------------------------------------------------------------------------------- |
@@ -392,7 +392,7 @@ Creating a catalog requires these fields:
 
 After verifying the values of these fields, clicking on the `CREATE` button creates a catalog.
 
-![created-catalog](./assets/webui/created-catalog.png)
+![created-catalog](../assets/webui/created-catalog.png)
 
 #### Show catalog details
 
@@ -400,7 +400,7 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this catalog in the drawer component on the right.
 
-![show-catalog-details](./assets/webui/show-catalog-details.png)
+![show-catalog-details](../assets/webui/show-catalog-details.png)
 
 #### Edit catalog
 
@@ -408,7 +408,7 @@ Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> i
 
 Displays the dialog for modifying fields of the selected catalog.
 
-![update-catalog](./assets/webui/update-catalog.png)
+![update-catalog](../assets/webui/update-catalog.png)
 
 Only the `name`, `comment`, and custom fields in `properties` can be modified, other fields such as `type`, `provider`, and default fields in `properties` cannot be modified.
 
@@ -420,11 +420,11 @@ Catalog defaults to in-use after successful creation.
 
 Mouse over the switch next to the catalog's name to see the 'In-use' tip.
 
-![catalog-in-use](./assets/webui/catalog-in-use.png)
+![catalog-in-use](../assets/webui/catalog-in-use.png)
 
 Click on the switch will disable the catalog, mouse over the switch next to the catalog's name to see the 'Not in-use' tip.
 
-![catalog-not-in-use](./assets/webui/catalog-not-in-use.png)
+![catalog-not-in-use](../assets/webui/catalog-not-in-use.png)
 
 #### Delete catalog
 
@@ -432,7 +432,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the SUBMIT button deletes this catalog.
 
-![delete-catalog](./assets/webui/delete-catalog.png)
+![delete-catalog](../assets/webui/delete-catalog.png)
 
 ### Schema
 
@@ -440,13 +440,13 @@ Click the catalog tree node on the left sidebar or the catalog name link in the 
 
 Displays the list schemas of the catalog.
 
-![list-schemas](./assets/webui/list-schemas.png)
+![list-schemas](../assets/webui/list-schemas.png)
 
 #### Create schema
 
 Click on the `CREATE SCHEMA` button displays the dialog to create a schema.
 
-![create-schema](./assets/webui/create-schema.png)
+![create-schema](../assets/webui/create-schema.png)
 
 Creating a schema needs these fields:
 
@@ -460,7 +460,7 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this schema in the drawer component on the right.
 
-![schema-details](./assets/webui/schema-details.png)
+![schema-details](../assets/webui/schema-details.png)
 
 #### Edit schema
 
@@ -468,7 +468,7 @@ Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> i
 
 Displays the dialog for modifying fields of the selected schema.
 
-![update-schema-dialog](./assets/webui/update-schema-dialog.png)
+![update-schema-dialog](../assets/webui/update-schema-dialog.png)
 
 #### Drop schema
 
@@ -476,7 +476,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the `DROP` button drops this schema.
 
-![delete-schema](./assets/webui/delete-schema.png)
+![delete-schema](../assets/webui/delete-schema.png)
 
 ### Table
 
@@ -484,13 +484,13 @@ Click the hive schema tree node on the left sidebar or the schema name link in t
 
 Displays the list tables of the schema.
 
-![list-tables](./assets/webui/list-tabels.png)
+![list-tables](../assets/webui/list-tabels.png)
 
 #### Create table
 
 Click on the `CREATE TABLE` button displays the dialog to create a table.
 
-![create-table](./assets/webui/create-table.png)
+![create-table](../assets/webui/create-table.png)
 
 Creating a table needs these fields:
 
@@ -507,14 +507,14 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this table in the drawer component on the right.
 
-![table-details](./assets/webui/table-details.png)
+![table-details](../assets/webui/table-details.png)
 
 Click the table tree node on the left sidebar or the table name link in the table cell.
 
 You can see the columns and detailed information on the right page.
 
-![list-columns](./assets/webui/list-columns.png)
-![table-selected-details](./assets/webui/table-selected-details.png)
+![list-columns](../assets/webui/list-columns.png)
+![table-selected-details](../assets/webui/table-selected-details.png)
 
 #### Edit table
 
@@ -522,7 +522,7 @@ Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> i
 
 Displays the dialog for modifying fields of the selected table.
 
-![update-table-dialog](./assets/webui/update-table-dialog.png)
+![update-table-dialog](../assets/webui/update-table-dialog.png)
 
 #### Drop table
 
@@ -530,7 +530,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the `DROP` button drops this table.
 
-![delete-table](./assets/webui/delete-table.png)
+![delete-table](../assets/webui/delete-table.png)
 
 ### Fileset
 
@@ -538,13 +538,13 @@ Click the fileset schema tree node on the left sidebar or the schema name link i
 
 Displays the list filesets of the schema.
 
-![list-filesets](./assets/webui/list-filesets.png)
+![list-filesets](../assets/webui/list-filesets.png)
 
 #### Create fileset
 
 Click on the `CREATE FILESET` button displays the dialog to create a fileset.
 
-![create-fileset](./assets/webui/create-fileset.png)
+![create-fileset](../assets/webui/create-fileset.png)
 
 Creating a fileset needs these fields:
 
@@ -562,13 +562,13 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this fileset in the drawer component on the right.
 
-![fileset-details](./assets/webui/fileset-details.png)
+![fileset-details](../assets/webui/fileset-details.png)
 
 Click the fileset tree node on the left sidebar or the fileset name link in the table cell.
 
 You can see the detailed information on the right page.
 
-![fileset-selected-details](./assets/webui/fileset-selected-details.png)
+![fileset-selected-details](../assets/webui/fileset-selected-details.png)
 
 #### Edit fileset
 
@@ -576,7 +576,7 @@ Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> i
 
 Displays the dialog for modifying fields of the selected fileset.
 
-![update-fileset-dialog](./assets/webui/update-fileset-dialog.png)
+![update-fileset-dialog](../assets/webui/update-fileset-dialog.png)
 
 #### Drop fileset
 
@@ -584,7 +584,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the `DROP` button drops this fileset.
 
-![delete-fileset](./assets/webui/delete-fileset.png)
+![delete-fileset](../assets/webui/delete-fileset.png)
 
 ### Topic
 
@@ -592,13 +592,13 @@ Click the kafka schema tree node on the left sidebar or the schema name link in 
 
 Displays the list topics of the schema.
 
-![list-topics](./assets/webui/list-topics.png)
+![list-topics](../assets/webui/list-topics.png)
 
 #### Create topic
 
 Click on the `CREATE TOPIC` button displays the dialog to create a topic.
 
-![create-topic](./assets/webui/create-topic.png)
+![create-topic](../assets/webui/create-topic.png)
 
 Creating a topic needs these fields:
 
@@ -612,13 +612,13 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this topic in the drawer component on the right.
 
-![topic-details](./assets/webui/topic-drawer-details.png)
+![topic-details](../assets/webui/topic-drawer-details.png)
 
 Click the topic tree node on the left sidebar or the topic name link in the table cell.
 
 You can see the detailed information on the right page.
 
-![topic-details](./assets/webui/topic-details.png)
+![topic-details](../assets/webui/topic-details.png)
 
 #### Edit topic
 
@@ -626,7 +626,7 @@ Click on the action icon <Icon icon='mdi:square-edit-outline' fontSize='24' /> i
 
 Displays the dialog for modifying fields of the selected topic.
 
-![update-topic-dialog](./assets/webui/update-topic-dialog.png)
+![update-topic-dialog](../assets/webui/update-topic-dialog.png)
 
 #### Drop topic
 
@@ -634,7 +634,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the `DROP` button drops this topic.
 
-![delete-topic](./assets/webui/delete-topic.png)
+![delete-topic](../assets/webui/delete-topic.png)
 
 ### Model
 
@@ -642,13 +642,13 @@ Click the model schema tree node on the left sidebar or the schema name link in 
 
 Displays the list model of the schema.
 
-![list-models](./assets/webui/list-models.png)
+![list-models](../assets/webui/list-models.png)
 
 #### Register model
 
 Click on the `REGISTER MODEL` button displays the dialog to register a model.
 
-![register-model](./assets/webui/register-model.png)
+![register-model](../assets/webui/register-model.png)
 
 Register a model needs these fields:
 
@@ -662,7 +662,7 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this model in the drawer component on the right.
 
-![model-details](./assets/webui/model-details.png)
+![model-details](../assets/webui/model-details.png)
 
 #### Drop model
 
@@ -670,7 +670,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the `DROP` button drops this model.
 
-![delete-model](./assets/webui/delete-model.png)
+![delete-model](../assets/webui/delete-model.png)
 
 ### Version
 
@@ -678,13 +678,13 @@ Click the model tree node on the left sidebar or the model name link in the tabl
 
 Displays the list versions of the model.
 
-![list-model-versions](./assets/webui/list-model-versions.png)
+![list-model-versions](../assets/webui/list-model-versions.png)
 
 #### Link version
 
 Click on the `LINK VERSION` button displays the dialog to link a version.
 
-![link-version](./assets/webui/link-version.png)
+![link-version](../assets/webui/link-version.png)
 
 Link a version needs these fields:
 
@@ -699,7 +699,7 @@ Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table 
 
 You can see the detailed information of this version in the drawer component on the right.
 
-![version-details](./assets/webui/version-details.png)
+![version-details](../assets/webui/version-details.png)
 
 #### Drop version
 
@@ -707,7 +707,7 @@ Click on the action icon <Icon icon='mdi:delete-outline' fontSize='24' color='re
 
 Displays a confirmation dialog, clicking on the `DROP` button drops this version.
 
-![delete-version](./assets/webui/delete-version.png)
+![delete-version](../assets/webui/delete-version.png)
 
 ## Feature capabilities
 

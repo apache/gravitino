@@ -56,7 +56,7 @@ You can use either to manage metadata. See
   to learn how to manage relational metadata.
 * [Manage fileset metadata using Gravitino](./metadata/fileset.md) to learn
   how to manage fileset metadata.
-* [Manage messaging metadata using Gravitino](./metadata/messaging.md.md) to learn how to manage
+* [Manage messaging metadata using Gravitino](./metadata/messaging.md) to learn how to manage
   messaging metadata.
 * [Manage model metadata using Gravitino](./metadata/model.md) to learn how to manage
   model metadata.
@@ -67,10 +67,10 @@ and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.9.0-incub
 
 Gravitino also provides a web UI to manage the metadata.
 Visit the web UI in the browser via `http://<ip-address>:8090`.
-See [Gravitino web UI](./webui.md) for details.
+See [Gravitino web UI](./client/webui.md) for details.
 
 Gravitino also provides a Command Line Interface (CLI) to manage the metadata.
-See [Gravitino CLI](./cli.md) for details.
+See [Gravitino CLI](./client/cli.md) for details.
 
 Gravitino currently supports the following catalogs:
 

@@ -1,6 +1,6 @@
 ---
-title: "How to use Apache Gravitino Python client"
-slug: /how-to-use-gravitino-python-client
+title: "Apache Gravitino Python client"
+slug: /gravitino-python-client
 date: 2024-05-09
 keyword: Gravitino Python client
 license: This software is licensed under the Apache License version 2.
@@ -13,14 +13,14 @@ It also provides users the unified metadata access for data and AI assets.
 
 Gravitino Python client helps data scientists easily manage metadata using Python language.
 
-![gravitino-python-client-introduction](./assets/gravitino-python-client-introduction.png)
+![gravitino-python-client-introduction](../assets/gravitino-python-client-introduction.png)
 
 ## Use Guidance
 
 You can use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
 
 First of all, You must have a Gravitino server set up and run.
-You can check the [install guide](./install/install.md) for building Gravitino server from source code
+You can check the [install guide](../install/install.md) for building Gravitino server from source code
 and installing it in your local environment.
 
 ### Apache Gravitino Python client API
@@ -29,15 +29,15 @@ and installing it in your local environment.
 pip install apache-gravitino
 ```
 
-1. [Manage metalake using Gravitino Python API](./admin/metalake.md?language=python)
-1. [Manage fileset metadata using Gravitino Python API](./metadata/fileset.md?language=python)
+1. [Manage metalake using Gravitino Python API](../admin/metalake.md?language=python)
+1. [Manage fileset metadata using Gravitino Python API](../metadata/fileset.md?language=python)
 
 ### Apache Gravitino Fileset Example
 
 The Gravitino project provides a playground environment.
 Using this environment, you can quickly learn how to use the Gravitino Python client
 to manage non-tabular data on HDFS via Fileset in Gravitino.
-For more details, check [installing the playground](./playground/install.md).
+For more details, check [installing the playground](../playground/install.md).
 
 With the playground environment ready, in your browser, you can go to
 `http://localhost:18888/lab/tree/gravitino-fileset-example.ipynb` and run the example.
@@ -50,13 +50,13 @@ The `gravitino-fileset-example` contains the following code snippets:
 1. Initialize Gravitino admin client and create a Gravitino metalake.
 1. Initialize Gravitino client and list metalakes.
 1. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
-   [hadoop](./catalogs/fileset/hadoop/hadoop-catalog.md)
+   [hadoop](../catalogs/fileset/hadoop/hadoop-catalog.md)
 1. Create a Gravitino `Schema` with the `location` pointed to a HDFS path,
    and use `hdfs client` to check if the schema location is successfully created in HDFS.
-1. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./metadata/fileset.md#fileset-operations),
+1. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](../metadata/fileset.md#fileset-operations),
    use `hdfs client` to check if the fileset location was successfully created in HDFS.
 1. Drop this `Fileset.Type.MANAGED` type fileset and check if the fileset location was successfully deleted.
-1. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](./metadata/fileset.md#fileset-operations)
+1. Create a `Fileset` with `type` is [Fileset.Type.EXTERNAL](../metadata/fileset.md#fileset-operations)
    with `location` pointing to an existing HDFS path.
 1. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was not deleted in HDFS.
 
@@ -68,7 +68,7 @@ Directly open the client-python module project in the IDE.
 ### Prerequisites
 
 - Python 3.8+
-- Refer to [How to build Gravitino](./develop/how-to-build.md#prerequisites) to have necessary build
+- Refer to [How to build Gravitino](../develop/how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
 ### Build and testing

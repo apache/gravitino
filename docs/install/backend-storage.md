@@ -64,7 +64,7 @@ You can use `H2` directly without any additional configuration.
 
 1. Set up the Apache Gravitino server configs
 
-   Find the [server configuration file](./admin/server-config.md)
+   Find the [server configuration file](../admin/server-config.md)
    in the `${GRAVITINO_HOME}/conf/` directory, and set the following options:
 
    ```text
@@ -83,7 +83,7 @@ You can use `H2` directly without any additional configuration.
    Run the script in the distribution package directory to start the server:
 
    ```shell
-   ./${GRAVITINO_HOME}/bin/gravitino.sh start
+   ${GRAVITINO_HOME}/bin/gravitino.sh start
    ```
 
 ## PostgreSQL
@@ -137,7 +137,7 @@ You can use `H2` directly without any additional configuration.
 
 1. Set up the Apache Gravitino server configs
 
-   Find the [server configuration file](./admin/server-config.md)
+   Find the [server configuration file](../admin/server-config.md)
    in the `${GRAVITINO_HOME}/conf/` directory, and set the following options:
 
    ```text
@@ -156,6 +156,6 @@ You can use `H2` directly without any additional configuration.
    Run the script in the distribution package directory to start the server:
 
    ```shell
-   ./${GRAVITINO_HOME}/bin/gravitino.sh start
+   ${GRAVITINO_HOME}/bin/gravitino.sh start
    ```
 
