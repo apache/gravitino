@@ -94,7 +94,10 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
           CatalogDescriptor.of(catalogName, Configuration.fromMap(flinkCatalogProperties));
       return Optional.of(descriptor);
     } catch (Exception e) {
-      throw new CatalogException("Failed to get the catalog:" + catalogName, e);
+      throw new CatalogException(
+          String.format(
+              "Failed to get the catalog:%s" + ", cause by: %s", catalogName, e.getMessage()),
+          e);
     }
   }
 
