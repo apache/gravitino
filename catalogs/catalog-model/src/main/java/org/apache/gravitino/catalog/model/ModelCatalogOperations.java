@@ -143,8 +143,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             .build();
 
     try {
-      /* overwrite */
-      store.put(model, false);
+      store.put(model, false /* overwrite */);
     } catch (IOException e) {
       throw new RuntimeException("Failed to register model " + ident, e);
     } catch (EntityAlreadyExistsException e) {
@@ -271,7 +270,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         throw new NoSuchModelException("Model %s does not exist", ident);
       }
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load model " + ident, ioe);
+      throw new RuntimeException("Failed to alter model " + ident, ioe);
     }
 
     try {
