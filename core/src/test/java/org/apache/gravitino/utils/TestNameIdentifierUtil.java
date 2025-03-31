@@ -165,11 +165,22 @@ public class TestNameIdentifierUtil {
         Joiner.on(".")
             .join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME, userName),
         nameIdentifier.toString());
-    Assertions.assertEquals(
-        Joiner.on(".").join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME),
-        NamespaceUtil.ofUser(metalake).toString());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> NameIdentifierUtil.ofUser(null, userName));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.ofUser(null));
+  }
+
+  @Test
+  void testOfGroup() {
+    String groupName = "groupA";
+    String metalake = "demo_metalake";
+
+    NameIdentifier nameIdentifier = NameIdentifierUtil.ofGroup(metalake, groupName);
+    Assertions.assertEquals(
+        Joiner.on(".")
+            .join(
+                metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME, groupName),
+        nameIdentifier.toString());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> NameIdentifierUtil.ofGroup(null, groupName));
   }
 }

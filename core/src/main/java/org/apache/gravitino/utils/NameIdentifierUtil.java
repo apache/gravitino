@@ -518,16 +518,6 @@ public class NameIdentifierUtil {
    * @return the created group {@link NameIdentifier}
    */
   public static NameIdentifier ofGroup(String metalake, String groupName) {
-    return NameIdentifier.of(NameIdentifierUtil.ofGroup(metalake), groupName);
-  }
-
-  /**
-   * Create a namespace for group.
-   *
-   * @param metalake The metalake name
-   * @return A namespace for group
-   */
-  public static Namespace ofGroup(String metalake) {
-    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME);
+    return NameIdentifier.of(NamespaceUtil.ofGroup(metalake), groupName);
   }
 }

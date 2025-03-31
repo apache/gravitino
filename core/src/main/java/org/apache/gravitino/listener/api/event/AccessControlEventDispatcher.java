@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Privilege;
@@ -40,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -155,11 +155,14 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Group addGroup(String metalake, String group)
       throws GroupAlreadyExistsException, NoSuchMetalakeException {
-    try {
-      String initiator = PrincipalUtils.getCurrentUserName();
+    String initiator = PrincipalUtils.getCurrentUserName();
 
-      eventBus.dispatchEvent(new AddGroupPreEvent(initiator, NameIdentifier.of(metalake), group));
-      return dispatcher.addGroup(metalake, group);
+    eventBus.dispatchEvent(new AddGroupPreEvent(initiator, metalake, group));
+    try {
+      Group groupObject = dispatcher.addGroup(metalake, group);
+      eventBus.dispatchEvent(new AddGroupEvent(initiator, metalake, new GroupInfo(groupObject)));
+
+      return groupObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -169,12 +172,14 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
-    try {
-      String initiator = PrincipalUtils.getCurrentUserName();
+    String initiator = PrincipalUtils.getCurrentUserName();
 
-      eventBus.dispatchEvent(
-          new RemoveGroupPreEvent(initiator, NameIdentifier.of(metalake), group));
-      return dispatcher.removeGroup(metalake, group);
+    eventBus.dispatchEvent(new RemoveGroupPreEvent(initiator, metalake, group));
+    try {
+      boolean isExists = dispatcher.removeGroup(metalake, group);
+      eventBus.dispatchEvent(new RemoveGroupEvent(initiator, metalake, group, isExists));
+
+      return isExists;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -187,9 +192,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       throws NoSuchGroupException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new GetGroupPreEvent(initiator, NameIdentifier.of(metalake), group));
+    eventBus.dispatchEvent(new GetGroupPreEvent(initiator, metalake, group));
     try {
-      return dispatcher.getGroup(metalake, group);
+      Group groupObject = dispatcher.getGroup(metalake, group);
+      eventBus.dispatchEvent(new GetGroupEvent(initiator, metalake, new GroupInfo(groupObject)));
+
+      return groupObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -201,10 +209,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public Group[] listGroups(String metalake) {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new ListGroupsPreEvent(initiator, NameIdentifier.of(metalake)));
+    eventBus.dispatchEvent(new ListGroupsPreEvent(initiator, metalake));
     try {
-      // TODO: add Event
-      return dispatcher.listGroups(metalake);
+      Group[] groups = dispatcher.listGroups(metalake);
+      eventBus.dispatchEvent(new ListGroupsEvent(initiator, metalake));
+
+      return groups;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -216,10 +226,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public String[] listGroupNames(String metalake) {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new ListGroupNamesPreEvent(initiator, NameIdentifier.of(metalake)));
+    eventBus.dispatchEvent(new ListGroupNamesPreEvent(initiator, metalake));
     try {
-      // TODO: add Event
-      return dispatcher.listGroupNames(metalake);
+      String[] groupNames = dispatcher.listGroupNames(metalake);
+      eventBus.dispatchEvent(new ListGroupNamesEvent(initiator, metalake));
+
+      return groupNames;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -249,9 +261,15 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GrantGroupRolesPreEvent(initiator, metalake, group, roles));
     try {
-      // TODO: add Event
-      return dispatcher.grantRolesToGroup(metalake, roles, group);
+      Group groupObject = dispatcher.grantRolesToGroup(metalake, roles, group);
+      eventBus.dispatchEvent(
+          new GrantGroupRolesEvent(initiator, metalake, new GroupInfo(groupObject), roles));
+
+      return groupObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -262,9 +280,15 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new RevokeGroupRolesPreEvent(initiator, metalake, group, roles));
     try {
-      // TODO: add Event
-      return dispatcher.revokeRolesFromGroup(metalake, roles, group);
+      Group groupObject = dispatcher.revokeRolesFromGroup(metalake, roles, group);
+      eventBus.dispatchEvent(
+          new RevokeGroupRolesEvent(initiator, metalake, new GroupInfo(groupObject), roles));
+
+      return groupObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
