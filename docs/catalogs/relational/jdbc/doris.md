@@ -184,7 +184,7 @@ Currently, the Doris catalog supports the following distribution strategies:
 
 For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it.
 More information about the distribution strategy defined in Gravitino can be found
-[here](../../../table-partitioning-distribution-sort-order-indexes.md#table-distribution).
+[here](../distributed-table.md#distribution-strategies).
 
 ### Table operations
 

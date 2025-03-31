@@ -1412,7 +1412,7 @@ In addition to the basic settings, Gravitino supports the following features:
   It is a partitioning strategy that is used to split a table into parts based on partition keys.
   Some table engines may not support this feature.
 
-  See [Partition](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/dto/rel/partitioning/Partitioning.html)
+  See [partitioned tables](../catalogs/relational/partitioned-table.md)
 
 - **Table distribution**:
 
@@ -1421,7 +1421,7 @@ In addition to the basic settings, Gravitino supports the following features:
   (By specifying the number of buckets to create).
   The value of the distribution column will be hashed by a user-defined number into buckets.
 
-  See [Distribution](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/distributions/Distribution.html)
+  See [distributed tables](../catalogs/relational/distributed-table.md)
 
 - **Table sort ordering**:
 
@@ -1429,7 +1429,7 @@ In addition to the basic settings, Gravitino supports the following features:
   Sort ordering is about sorting data in ways such as by a column or a function.
   It will highly improve the query performance under certain scenarios.
 
-  See [SortOrder](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)
+  See [sorted tables](../catalogs/relational/sorted-table.md)
 
 - **Table indice**:
 
@@ -1438,10 +1438,7 @@ In addition to the basic settings, Gravitino supports the following features:
   It ensures that no two rows have identical values in specified columns,
   thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations.
 
-  See [Index](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/indexes/Index.html)
-
-For more information, please see the related document on
-[partitioning, bucketing, sorting, and indexes](../table-partitioning-bucketing-sort-order-indexes.md).
+  See [indexed tables](../catalogs/relational/indexed-table.md)
 
 ### Load a table
 

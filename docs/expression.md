@@ -12,9 +12,9 @@ import TabItem from '@theme/TabItem';
 This page introduces the expression system of Apache Gravitino.
 *Expressions* are vital component of metadata definition.
 Through expressions, you can define [default values](./metadata/relational.md#table-column-default-value) for columns,
-function arguments for [function partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning),
-[bucketing](./table-partitioning-bucketing-sort-order-indexes.md#table-bucketing),
-and sort term of [sort ordering](./table-partitioning-bucketing-sort-order-indexes.md#sort-ordering) in tables.
+function arguments for [function partitioning](./catalogs/relational/partitioned-table.md#partitioning-strategies),
+[bucketing](./catalogs/relational/distributed-table.md),
+and sort term of [sort ordering](./catalogs/relational/sorted-table.md#sort-ordering) in tables.
 Gravitino expression system divides expressions into three basic parts:
 field reference, literal, and function.
 Function expressions can contain field references, literals, and other function expressions.
@@ -52,7 +52,8 @@ NamedReference field = NamedReference.field("student");
 ## Literal
 
 Literal is a constant value.
-The following is an example of creating a literal expression, demonstrating how to create a `NULL` literal and three different data types of literal expressions for the value `1024`.
+The following example creates a literal expression.
+It shows how to create a `NULL` literal and three different data types of literal expressions for the value `1024`.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
@@ -100,8 +101,10 @@ Literal<?>[] literals =
 
 ## Function expression
 
-Function expression represents a function call with/without arguments. The arguments can be field references, literals, or other function expressions.
-The following is an example of creating a function expression, demonstrating how to create function expressions for `rand()` and `date_trunc('year', birthday)`.
+Function expression represents a function call with/without arguments.
+The arguments can be field references, literals, or other function expressions.
+The following is an example of creating a function expression.
+It shows you how to create function expressions for `rand()` and `date_trunc('year', birthday)`.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
@@ -138,10 +141,10 @@ The following is an example of creating a function expression, demonstrating how
 
 ```java
 FunctionExpression[] functionExpressions =
-        new FunctionExpression[] {
-          FunctionExpression.of("rand"),
-          FunctionExpression.of("date_trunc", Literals.stringLiteral("year"), NamedReference.field("birthday"))
-        };
+   new FunctionExpression[] {
+       FunctionExpression.of("rand"),
+       FunctionExpression.of("date_trunc", Literals.stringLiteral("year"), NamedReference.field("birthday"))
+   };
 ```
 
   </TabItem>
@@ -149,8 +152,10 @@ FunctionExpression[] functionExpressions =
 
 ## Unparsed expression
 
-Unparsed expression is a special type of expression, currently serves exclusively for presenting the default value of a column when it's unsolvable.
-The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.
+Unparsed expression is a special type of expression.
+It currently serves exclusively for presenting the default value of a column when it's unsolvable.
+The following shows the data structure of an unparsed expression in JSON and Java.
+The unparsed expression enables easy retrieval of its value.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="Json">
@@ -172,3 +177,4 @@ String unparsedValue = ((UnparsedExpression) expressino).unparsedExpression();
 
   </TabItem>
 </Tabs>
+

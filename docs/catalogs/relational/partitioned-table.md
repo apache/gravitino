@@ -17,9 +17,131 @@ Usage scenarios like managing the TTL (Time-To-Live) of partition data,
 gathering statistics on partition metadata, and optimizing queries through partition pruning.
 For these reasons, Apache Gravitino provides capabilities of partition management.
 
-## Requirements and limitations
 
-- Partition management is based on the partitioned table, so please ensure that you are operating on a partitioned table.
+To create a partitioned table, you should provide the following two parameters.
+
+- *Field names*: The fields Gravitino uses to partition a table.
+- *Partitioning strategy*. It defines how Gravitino distributes table data across partitions.
+  See [partitioning strategies](#partitioning-strategies) for the details on supported strategies.
+
+In some cases, you may need to provide some other information. For example:
+
+- If the partitioning strategy is "bucket", you should provide the number of buckets;
+- If the partitioning strategy is "truncate", you should provide the width of the truncate.
+
+Once a partitioned table is created, you can [manage its partitions](#partition-operations).
+
+### Partitioning strategies
+
+<table>
+<thead>
+<tr>
+  <th>Partitioning strategy</th>
+  <th>Description</th>
+  <th>JSON</th>
+  <th>Java</th>
+  <th>Equivalent SQL semantics</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>identity</tt></td>
+  <td>Source value, unmodified.</td>
+  <td>`{"strategy":"identity","fieldName":["score"]}`</td>
+  <td>`Transforms.identity("score")`</td>
+  <td>`PARTITION BY score`</td>
+</tr>
+<tr>
+  <td><tt>hour</tt></td>
+  <td>Extract a timestamp hour, as hours from '1970-01-01 00:00:00'.</td>
+  <td>`{"strategy":"hour","fieldName":["createTime"]}`</td>
+  <td>`Transforms.hour("createTime")`</td>
+  <td>`PARTITION BY hour(createTime)`</td>
+</tr>
+<tr>
+  <td><tt>day</tt></td>
+  <td>Extract a date or timestamp day, as days from '1970-01-01'.</td>
+  <td>`{"strategy":"day","fieldName":["createTime"]}`</td>
+  <td>`Transforms.day("createTime")`</td>
+  <td>`PARTITION BY day(createTime)`</td>
+</tr>
+<tr>
+  <td><tt>month</tt></td>
+  <td>Extract a date or timestamp month, as months from '1970-01-01'.</td>
+  <td>`{"strategy":"month","fieldName":["createTime"]}`</td>
+  <td>`Transforms.month("createTime")`</td>
+  <td>`PARTITION BY month(createTime)`</td>
+</tr>
+<tr>
+  <td><tt>year</tt></td>
+  <td>Extract a date or timestamp year, as number of years since 1970.</td>
+  <td>`{"strategy":"year","fieldName":["createTime"]}`</td>
+  <td>`Transforms.year("createTime")`</td>
+  <td>`PARTITION BY year(createTime)`</td>
+</tr>
+<tr>
+  <td><tt>bucket[N]</tt></td>
+  <td>Hash of value, mod N.</td>
+  <td>`{"strategy":"bucket","numBuckets":10,"fieldNames":[["score"]]}`</td>
+  <td>`Transforms.bucket(10, "score")`</td>
+  <td>`PARTITION BY bucket(10, score)`</td>
+</tr>
+<tr>
+  <td><tt>truncate[W]</tt></td>
+  <td>Value truncated to width W.</td>
+  <td>`{"strategy":"truncate","width":20,"fieldName":["score"]}`</td>
+  <td>`Transforms.truncate(20, "score")`</td>
+  <td>`PARTITION BY truncate(20, score)`</td>
+</tr>
+<tr>
+  <td><tt>list</tt></td>
+  <td>Partition the table by a list of values.</td>
+  <td>`{"strategy":"list","fieldNames":[["createTime"],["city"]]}`</td>
+  <td>`Transforms.list(new String[] {"createTime", "city"})`</td>
+  <td>`PARTITION BY list(createTime, city)`</td>
+</tr>
+<tr>
+  <td><tt>range</tt></td>
+  <td>Partition the table by a range value.</td>
+  <td>`{"strategy":"range","fieldName":["createTime"]}`</td>
+  <td>`Transforms.range("createTime")`</td>
+  <td>`PARTITION BY range(createTime)`</td>
+</tr>
+<tr>
+  <td><tt>function</tt></td>
+  <td>Partition the table using a function expression.</td>
+  <td>
+    ```json
+    {
+      "strategy": "function",
+      "funcName":"toYYYYMM",
+      "funcArgs":[
+        {"type":"field","fieldName":["VisitDate"]
+        }
+      ]
+    }
+    ```
+  </td>
+  <td>
+    ```java
+    Transforms.apply(
+      "toYYYYMM",
+      new Expression[]{NamedReference.field("VisitDate")}
+    )
+    ```
+  </td>
+  <td>`PARTITION BY toYYYYMM(VisitDate)`</td>
+</tr>
+</tbody>
+</table>
+
+:::note
+- The `score`, `createTime`, and `city` in the table are table field names.
+- For function partitioning, you should provide the function name and the function arguments.
+  The function arguments must be an [expression](../../expression.md).
+:::
+
+## Supported catalogs
 
 The following table shows the partition operations supported across various catalogs in Gravitino:
 
@@ -88,8 +210,7 @@ in the [Gravitino repository](https://github.com/apache/gravitino).
 
 ### Add partition
 
-You must match the partition types you want to add with the table's
-[partitioning types](../../table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).
+The partition types you want to add must match with the table's [partitioning strategies](#partitioning-strategies).
 Gravitino currently supports adding the following partition types:
 
 - *identity*: An identity partition represents a result of identity partitioning.
