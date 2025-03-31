@@ -45,7 +45,7 @@ public class RevokeUserRolesEvent extends UserEvent {
     super(initiator, NameIdentifierUtil.ofUser(metalake, revokedUserInfo.name()));
 
     this.revokedUserInfo = revokedUserInfo;
-    this.roles = ImmutableList.copyOf(roles);
+    this.roles = roles == null ? ImmutableList.of() : ImmutableList.copyOf(roles);
   }
 
   /**

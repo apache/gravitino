@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -44,7 +43,7 @@ public class RevokeUserRolesPreEvent extends UserPreEvent {
     super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
 
     this.userName = userName;
-    this.roles = ImmutableList.copyOf(roles);
+    this.roles = roles;
   }
 
   /**

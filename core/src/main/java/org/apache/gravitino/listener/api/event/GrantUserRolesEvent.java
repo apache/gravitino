@@ -45,7 +45,7 @@ public class GrantUserRolesEvent extends UserEvent {
     super(initiator, NameIdentifierUtil.ofUser(metalake, grantUserInfo.name()));
 
     this.grantUserInfo = grantUserInfo;
-    this.roles = ImmutableList.copyOf(roles);
+    this.roles = roles == null ? ImmutableList.of() : ImmutableList.copyOf(roles);
   }
 
   /**
