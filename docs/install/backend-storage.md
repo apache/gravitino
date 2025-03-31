@@ -17,14 +17,13 @@ so the users can quickly deploy Gravitino and begin their journey..
 
 ### Backend storage supported
 
-Currently, relational backend storage supports the `JDBCBackend` and `H2`,
-`MySQL` and `PostgreSQL` are supported currently for `JDBCBackend`,
-`H2` is the default storage for `JDBCBackend`.
+Currently, Gravitino supports the `JDBCBackend` option for configuring the backend storage.
+The valid values include `H2`, `MySQL` and `PostgreSQL`.
+`H2` is the default storage for JDBC backend.
 
 ## H2
 
-As mentioned above, `H2` is the default storage for `JDBCBackend`.
-You can use `H2` directly without any additional configuration.
+As the default storage backend, when using `H2` you don't need to perform any additional configurations.
 
 ## MySQL
 
