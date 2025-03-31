@@ -41,9 +41,11 @@ For function partitioning, you should provide the function name and the function
 
 - Field names: It defines which fields Gravitino uses to partition the table.
 
-- In some cases, you require other information. For example, if the partitioning strategy is `bucket`, you should provide the number of buckets; if the partitioning strategy is `truncate`, you should provide the width of the truncate.
+- In some cases, you require other information.
+  For example, if the partitioning strategy is `bucket`, you should provide the number of buckets;
+  if the partitioning strategy is `truncate`, you should provide the width of the truncate.
 
-Once a partitioned table is created, you can [manage its partitions using Gravitino](./manage-table-partition-using-gravitino.md).
+Once a partitioned table is created, you can [manage its partitions](./catalogs/relational/partitions.md).
 
 ## Table distribution
 
