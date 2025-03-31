@@ -61,12 +61,12 @@ public class FlinkPaimonHiveCatalogIT extends FlinkCommonIT {
   }
 
   @BeforeAll
-  void setup() {
+  void paimonSetup() {
     initPaimonCatalog();
   }
 
   @AfterAll
-  void stop() {
+  void paimonStop() {
     Preconditions.checkNotNull(metalake);
     metalake.dropCatalog(DEFAULT_PAIMON_CATALOG, true);
   }
