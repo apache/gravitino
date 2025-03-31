@@ -82,7 +82,7 @@ public class TestLineageConfig {
     Assertions.assertEquals(
         "test-class2", sinkConfigs.get("sink2." + LineageConfig.LINEAGE_SINK_CLASS_NAME));
 
-    // test m
+    // test missing sink1 class name
     Map<String, String> config3 =
         ImmutableMap.of(
             LineageConfig.LINEAGE_CONFIG_SINKS,

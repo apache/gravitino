@@ -50,7 +50,7 @@ public class LineageLogSinker implements LineageSink {
     try {
       LOG.info("Open lineage event:{}", objectMapper.writeValueAsString(event));
     } catch (Exception e) {
-      LOG.warn(" open lineage event failed,", e);
+      LOG.warn("Write open lineage event failed,", e);
     }
   }
 }
