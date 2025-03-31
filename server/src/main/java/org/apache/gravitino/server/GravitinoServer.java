@@ -32,7 +32,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
-import org.apache.gravitino.lineage.LineageService;
+import org.apache.gravitino.lineage.LineageDispatcher;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -122,7 +122,7 @@ public class GravitinoServer extends ResourceConfig {
                 .to(CredentialOperationDispatcher.class)
                 .ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
-            bind(gravitinoEnv.lineageService()).to(LineageService.class).ranked(1);
+            bind(gravitinoEnv.lineageService()).to(LineageDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
