@@ -19,11 +19,14 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered after the operation of revoking roles from a user. */
+@DeveloperApi
 public class RevokeUserRolesEvent extends UserEvent {
   private final UserInfo revokedUserInfo;
   private final List<String> roles;
@@ -42,7 +45,7 @@ public class RevokeUserRolesEvent extends UserEvent {
     super(initiator, NameIdentifierUtil.ofUser(metalake, revokedUserInfo.name()));
 
     this.revokedUserInfo = revokedUserInfo;
-    this.roles = roles;
+    this.roles = ImmutableList.copyOf(roles);
   }
 
   /**

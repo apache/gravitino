@@ -20,9 +20,11 @@
 package org.apache.gravitino.listener.api.info;
 
 import java.util.List;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.User;
 
 /** Provides read-only access to user information for event listeners. */
+@DeveloperApi
 public class UserInfo {
   private final String name;
   private List<String> roles;

@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered before granting roles to a user. */
+@DeveloperApi
 public class GrantUserRolesPreEvent extends UserPreEvent {
   private final String userName;
   private final List<String> roles;
@@ -41,7 +44,7 @@ public class GrantUserRolesPreEvent extends UserPreEvent {
     super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
 
     this.userName = userName;
-    this.roles = roles;
+    this.roles = ImmutableList.copyOf(roles);
   }
 
   /**
