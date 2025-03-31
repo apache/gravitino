@@ -19,40 +19,40 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before add a user to a metalake. */
+/** Represents an event triggered before adding a user to a metalake. */
 @DeveloperApi
 public class AddUserPreEvent extends UserPreEvent {
   private final String userName;
 
   /**
-   * Construct a new {@link AddUserPreEvent} instance with initiator, identifier and username.
+   * Constructs a new {@link AddUserPreEvent} instance with initiator, identifier, and username.
    *
-   * @param initiator the user who initiated the add-user request.
-   * @param identifier the identifier of the metalake which the user is being added to.
-   * @param userName the username which is requested to be added to the metalake.
+   * @param initiator The name of the user who initiated the add-user request.
+   * @param metalake The name of the metalake to which the user is being added.
+   * @param userName The username that is requested to be added to the metalake.
    */
-  public AddUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
-    super(initiator, identifier);
+  public AddUserPreEvent(String initiator, String metalake, String userName) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
 
     this.userName = userName;
   }
 
   /**
-   * Returns the user information which is being added to the metalake.
+   * Returns the username to be added to the metalake.
    *
-   * @return the username which is requested to be added to the metalake.
+   * @return The username to be added.
    */
   public String userName() {
     return userName;
   }
 
   /**
-   * Returns the operation type of this event.
+   * Returns the operation type associated with this event.
    *
-   * @return the operation type.
+   * @return The operation type, specifically {@code OperationType.ADD_USER} for this event.
    */
   @Override
   public OperationType operationType() {

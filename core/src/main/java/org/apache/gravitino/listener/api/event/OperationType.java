@@ -118,6 +118,8 @@ public enum OperationType {
   GET_USER,
   LIST_USERS,
   LIST_USER_NAMES,
+  GRANT_USER_ROLES,
+  REVOKE_USER_ROLES,
 
   // Group
   ADD_GROUP,

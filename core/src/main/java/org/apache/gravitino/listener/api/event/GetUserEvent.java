@@ -19,33 +19,33 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.UserInfo;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered after successful get a user from specific metalake */
+/** Represents an event triggered after successfully retrieving a user from a specific metalake. */
 @DeveloperApi
 public class GetUserEvent extends UserEvent {
   private final UserInfo loadedUserInfo;
 
   /**
-   * Construct a new {@link GetUserEvent} instance with the given initiator, identifier and user
-   * info.
+   * Constructs a new {@link GetUserEvent} instance with the specified initiator, metalake name, and
+   * user information.
    *
-   * @param initiator the user who initiated the user-get request.
-   * @param identifier the identifier of the metalake which the user is retrieved from.
-   * @param loadedUserInfo the user information.
+   * @param initiator the user who initiated the request to get the user.
+   * @param metalake the name of the metalake from which the user is retrieved.
+   * @param loadedUserInfo the user information of the retrieved user.
    */
-  protected GetUserEvent(String initiator, NameIdentifier identifier, UserInfo loadedUserInfo) {
-    super(initiator, identifier);
+  protected GetUserEvent(String initiator, String metalake, UserInfo loadedUserInfo) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, loadedUserInfo.name()));
 
     this.loadedUserInfo = loadedUserInfo;
   }
 
   /**
-   * Returns the user information for a user which is successfully retrieved from the metalake.
+   * Returns the user information of the user successfully retrieved from the metalake.
    *
-   * @return the {@link UserInfo} instance.
+   * @return the {@link UserInfo} instance containing the details of the retrieved user.
    */
   public UserInfo loadedUserInfo() {
     return loadedUserInfo;

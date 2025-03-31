@@ -33,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.info.UserInfo;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,10 @@ public class TestUserEvent {
   private User user;
   private User otherUser;
   private NameIdentifier identifier;
+  private NameIdentifier otherIdentifier;
+  private NameIdentifier inExistIdentifier;
+  private List<String> grantedRoles;
+  private List<String> revokedRoles;
 
   @BeforeAll
   void init() {
@@ -59,7 +64,11 @@ public class TestUserEvent {
     this.inExistUserName = "user_not_exist";
     this.user = getMockUser(userName, ImmutableList.of("test", "engineer"));
     this.otherUser = getMockUser(otherUserName, null);
-    this.identifier = NameIdentifier.of(METALAKE);
+    this.identifier = NameIdentifierUtil.ofUser(METALAKE, userName);
+    this.otherIdentifier = NameIdentifierUtil.ofUser(METALAKE, otherUserName);
+    this.inExistIdentifier = NameIdentifierUtil.ofUser(METALAKE, inExistUserName);
+    this.grantedRoles = ImmutableList.of("test", "engineer");
+    this.revokedRoles = ImmutableList.of("admin", "scientist");
 
     this.dummyEventListener = new DummyEventListener();
     EventBus eventBus = new EventBus(Collections.singletonList(dummyEventListener));
@@ -90,7 +99,7 @@ public class TestUserEvent {
     Assertions.assertEquals(OperationType.ADD_USER, preEvent.operationType());
 
     AddUserPreEvent addUserPreEvent = (AddUserPreEvent) preEvent;
-    Assertions.assertEquals(identifier, addUserPreEvent.identifier());
+    Assertions.assertEquals(otherIdentifier, addUserPreEvent.identifier());
     String userName = addUserPreEvent.userName();
     Assertions.assertEquals(otherUserName, userName);
   }
@@ -179,7 +188,7 @@ public class TestUserEvent {
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     ListUsersPreEvent listUsersPreEvent = (ListUsersPreEvent) preEvent;
-    Assertions.assertEquals(identifier, listUsersPreEvent.identifier());
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), listUsersPreEvent.identifier());
   }
 
   @Test
@@ -193,7 +202,7 @@ public class TestUserEvent {
     Assertions.assertEquals(OperationType.LIST_USERS, event.operationType());
 
     ListUsersEvent listUsersEvent = (ListUsersEvent) event;
-    Assertions.assertEquals(identifier, listUsersEvent.identifier());
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), listUsersEvent.identifier());
   }
 
   @Test
@@ -206,7 +215,7 @@ public class TestUserEvent {
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
     ListUserNamesPreEvent listUserNamesPreEvent = (ListUserNamesPreEvent) preEvent;
-    Assertions.assertEquals(identifier, listUserNamesPreEvent.identifier());
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), listUserNamesPreEvent.identifier());
   }
 
   @Test
@@ -220,7 +229,7 @@ public class TestUserEvent {
     Assertions.assertEquals(OperationType.LIST_USER_NAMES, event.operationType());
 
     ListUserNamesEvent listUserNamesEvent = (ListUserNamesEvent) event;
-    Assertions.assertEquals(identifier, listUserNamesEvent.identifier());
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), listUserNamesEvent.identifier());
   }
 
   @Test
@@ -266,9 +275,77 @@ public class TestUserEvent {
     Assertions.assertEquals(OperationType.REMOVE_USER, event.operationType());
 
     RemoveUserEvent removeUserEvent = (RemoveUserEvent) event;
-    Assertions.assertEquals(identifier, removeUserEvent.identifier());
+    Assertions.assertEquals(inExistIdentifier, removeUserEvent.identifier());
     Assertions.assertFalse(removeUserEvent.isExists());
     Assertions.assertEquals(inExistUserName, removeUserEvent.removedUserName());
+  }
+
+  @Test
+  void testGrantRolesToUserPreEvent() {
+    dispatcher.grantRolesToUser(METALAKE, grantedRoles, userName);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GrantUserRolesPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.GRANT_USER_ROLES, preEvent.operationType());
+
+    GrantUserRolesPreEvent grantUserRolesEvent = (GrantUserRolesPreEvent) preEvent;
+    Assertions.assertEquals(identifier, grantUserRolesEvent.identifier());
+    String grantedUserName = grantUserRolesEvent.userName();
+    Assertions.assertEquals(userName, grantedUserName);
+    Assertions.assertEquals(grantedRoles, grantUserRolesEvent.roles());
+  }
+
+  @Test
+  void testGrantRolesToUserEvent() {
+    dispatcher.grantRolesToUser(METALAKE, grantedRoles, userName);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GrantUserRolesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.GRANT_USER_ROLES, event.operationType());
+
+    GrantUserRolesEvent grantUserRolesEvent = (GrantUserRolesEvent) event;
+    Assertions.assertEquals(identifier, grantUserRolesEvent.identifier());
+    UserInfo userInfo = grantUserRolesEvent.grantUserInfo();
+
+    validateUserInfo(userInfo, user);
+  }
+
+  @Test
+  void testRevokeRolesUserPreEvent() {
+    dispatcher.revokeRolesFromUser(METALAKE, revokedRoles, otherUserName);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(RevokeUserRolesPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.REVOKE_USER_ROLES, preEvent.operationType());
+
+    RevokeUserRolesPreEvent revokeUserRolesEvent = (RevokeUserRolesPreEvent) preEvent;
+    Assertions.assertEquals(otherIdentifier, revokeUserRolesEvent.identifier());
+    String revokedUserName = revokeUserRolesEvent.userName();
+    Assertions.assertEquals(otherUserName, revokedUserName);
+    Assertions.assertEquals(revokedRoles, revokeUserRolesEvent.roles());
+  }
+
+  @Test
+  void testRevokeRolesUserEvent() {
+    dispatcher.revokeRolesFromUser(METALAKE, revokedRoles, otherUserName);
+
+    // validate post-event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RevokeUserRolesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.REVOKE_USER_ROLES, event.operationType());
+
+    RevokeUserRolesEvent revokeUserRolesEvent = (RevokeUserRolesEvent) event;
+    Assertions.assertEquals(otherIdentifier, revokeUserRolesEvent.identifier());
+    UserInfo userInfo = revokeUserRolesEvent.revokedUserInfo();
+
+    validateUserInfo(userInfo, otherUser);
   }
 
   private AccessControlEventDispatcher mockUserDispatcher() {
@@ -287,6 +364,9 @@ public class TestUserEvent {
         .thenThrow(new NoSuchUserException("user not found"));
     when(dispatcher.getUser(INEXIST_METALAKE, userName))
         .thenThrow(new NoSuchMetalakeException("user not found"));
+    when(dispatcher.grantRolesToUser(METALAKE, grantedRoles, userName)).thenReturn(user);
+    when(dispatcher.revokeRolesFromUser(METALAKE, revokedRoles, otherUserName))
+        .thenReturn(otherUser);
 
     return dispatcher;
   }

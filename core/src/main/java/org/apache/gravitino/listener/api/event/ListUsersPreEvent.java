@@ -30,10 +30,10 @@ public class ListUsersPreEvent extends UserPreEvent {
    * Construct a new {@link ListUsersPreEvent} instance with the specified user and identifier.
    *
    * @param initiator the user who initiated the list-user request.
-   * @param identifier the identifier of the metalake which is being listed.
+   * @param metalake the metalake name to list users from.
    */
-  protected ListUsersPreEvent(String initiator, NameIdentifier identifier) {
-    super(initiator, identifier);
+  protected ListUsersPreEvent(String initiator, String metalake) {
+    super(initiator, NameIdentifier.of(metalake));
   }
 
   /**

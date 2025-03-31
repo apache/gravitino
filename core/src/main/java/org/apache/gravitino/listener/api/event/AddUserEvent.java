@@ -19,33 +19,33 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.UserInfo;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event that is generated after a user is successfully added to the metalake. */
+/** Represents an event generated after a user is successfully added to a metalake. */
 @DeveloperApi
 public class AddUserEvent extends UserEvent {
   private UserInfo addedUserInfo;
 
   /**
-   * Construct a new {@link AddUserEvent} instance with the specified initiator, identifier, and
+   * Constructs a new {@link AddUserEvent} instance with the specified initiator, metalake name, and
    * user information.
    *
-   * @param initiator the user who initiated the add-user request.
-   * @param identifier the identifier of the metalake which the user is added to.
-   * @param addedUserInfo the user information.
+   * @param initiator the user who initiated the request to add a user.
+   * @param metalake the name of the metalake where the user was added.
+   * @param addedUserInfo the user information of the newly added user.
    */
-  protected AddUserEvent(String initiator, NameIdentifier identifier, UserInfo addedUserInfo) {
-    super(initiator, identifier);
+  protected AddUserEvent(String initiator, String metalake, UserInfo addedUserInfo) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, addedUserInfo.name()));
 
     this.addedUserInfo = addedUserInfo;
   }
 
   /**
-   * Returns the user information of a user which was added to the metalake.
+   * Returns the user information of the user added to the metalake.
    *
-   * @return the {@link UserInfo} instance.
+   * @return the {@link UserInfo} instance containing the details of the added user.
    */
   public UserInfo addedUserInfo() {
     return addedUserInfo;

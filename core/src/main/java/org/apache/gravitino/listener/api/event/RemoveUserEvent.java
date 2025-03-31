@@ -19,28 +19,28 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event that is generated after a user is successfully removed from the metalake. */
+/** Represents an event triggered after a user is successfully removed from a metalake. */
 @DeveloperApi
 public class RemoveUserEvent extends UserEvent {
   private final String removedUserName;
   private final boolean isExists;
 
   /**
-   * Construct a new {@link RemoveUserEvent} instance with the specified initiator, identifier, user
-   * info and is removed flag.
+   * Constructs a new {@link RemoveUserEvent} instance with the specified initiator, metalake name,
+   * removed username, and removal status.
    *
    * @param initiator the user who initiated the remove user operation.
-   * @param identifier the identifier of the metalake where the user is removed.
+   * @param metalake the name of the metalake from which the user was removed.
    * @param removedUserName the username of the user that was removed.
-   * @param isExists {@code true} if metalake successfully remove the user, {@code false} only when
-   *     there's no such user.
+   * @param isExists {@code true} if the user was successfully removed, {@code false} if no such
+   *     user exists in the metalake.
    */
   protected RemoveUserEvent(
-      String initiator, NameIdentifier identifier, String removedUserName, boolean isExists) {
-    super(initiator, identifier);
+      String initiator, String metalake, String removedUserName, boolean isExists) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, removedUserName));
 
     this.removedUserName = removedUserName;
     this.isExists = isExists;
@@ -49,7 +49,7 @@ public class RemoveUserEvent extends UserEvent {
   /**
    * Returns the username of the user that was removed from the metalake.
    *
-   * @return the username.
+   * @return the username of the removed user.
    */
   public String removedUserName() {
     return removedUserName;
@@ -58,8 +58,8 @@ public class RemoveUserEvent extends UserEvent {
   /**
    * Returns whether the user was removed from the metalake.
    *
-   * @return {@code true} if the user was removed, {@code false} representing there is no such user
-   *     in the metalake.
+   * @return {@code true} if the user was removed, {@code false} if no such user exists in the
+   *     metalake.
    */
   public boolean isExists() {
     return isExists;
