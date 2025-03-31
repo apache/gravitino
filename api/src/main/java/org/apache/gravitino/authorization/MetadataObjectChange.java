@@ -75,8 +75,12 @@ public interface MetadataObjectChange {
 
       this.metadataObject = metadataObject;
       this.newMetadataObject = newMetadataObject;
-      this.locations = Lists.newArrayList(locations);
-      this.locations.sort(String::compareTo);
+      if (locations != null) {
+        this.locations = Lists.newArrayList(locations);
+        this.locations.sort(String::compareTo);
+      } else {
+        this.locations = null;
+      }
     }
 
     /**
