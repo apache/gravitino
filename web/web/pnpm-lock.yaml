@@ -94,8 +94,8 @@ importers:
         specifier: ^2.1.25
         version: 2.3.0
       '@next/bundle-analyzer':
-        specifier: ^14.2.4
-        version: 14.2.24
+        specifier: ^14.2.26
+        version: 14.2.26
       '@types/lodash-es':
         specifier: ^4.17.12
         version: 4.17.12
@@ -706,8 +706,8 @@ packages:
       react: ^17.0.0 || ^18.0.0
       react-dom: ^17.0.0 || ^18.0.0
 
-  '@next/bundle-analyzer@14.2.24':
-    resolution: {integrity: sha512-Dtu4mPkPqmcm81MPlSS2mv+rHf3rdp6S6gYDasH9Pzpdgo5SOvs4hxPiwfxYH7J9a+xkjvvtJ9b+LGw2zcon7w==}
+  '@next/bundle-analyzer@14.2.26':
+    resolution: {integrity: sha512-RpEHYEo04tXKcVkdQQghex0PWRFTad7PInmEN8obvNc1Q/tnWpFbZcZCqTrfsBYpsZo6FXIjOknQy528X80OlQ==}
 
   '@next/env@14.2.21':
     resolution: {integrity: sha512-lXcwcJd5oR01tggjWJ6SrNNYFGuOOMB9c251wUNkjCpkoXOPkDeF/15c3mnVlBqrW4JJXb2kVxDFhC4GduJt2A==}
@@ -969,6 +969,11 @@ packages:
 
   acorn@8.14.0:
     resolution: {integrity: sha512-cl669nCJTZBsL97OF4kUQm5g5hC2uihk0NxY3WENAC0TYdILVkAyHymAntgxGkl7K+t0cXIrH5siy5S4XkFycA==}
+    engines: {node: '>=0.4.0'}
+    hasBin: true
+
+  acorn@8.14.1:
+    resolution: {integrity: sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
 
@@ -3749,7 +3754,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
-  '@next/bundle-analyzer@14.2.24':
+  '@next/bundle-analyzer@14.2.26':
     dependencies:
       webpack-bundle-analyzer: 4.10.1
     transitivePeerDependencies:
@@ -3998,9 +4003,11 @@ snapshots:
 
   acorn-walk@8.3.4:
     dependencies:
-      acorn: 8.14.0
+      acorn: 8.14.1
 
   acorn@8.14.0: {}
+
+  acorn@8.14.1: {}
 
   ajv@6.12.6:
     dependencies:
@@ -6561,7 +6568,7 @@ snapshots:
   webpack-bundle-analyzer@4.10.1:
     dependencies:
       '@discoveryjs/json-ext': 0.5.7
-      acorn: 8.14.0
+      acorn: 8.14.1
       acorn-walk: 8.3.4
       commander: 7.2.0
       debounce: 1.2.1
