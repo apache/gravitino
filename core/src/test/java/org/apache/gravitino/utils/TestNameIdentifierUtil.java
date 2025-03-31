@@ -167,9 +167,9 @@ public class TestNameIdentifierUtil {
         nameIdentifier.toString());
     Assertions.assertEquals(
         Joiner.on(".").join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME),
-        NameIdentifierUtil.ofUser(metalake).toString());
+        NamespaceUtil.ofUser(metalake).toString());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> NameIdentifierUtil.ofUser(null, userName));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> NameIdentifierUtil.ofUser(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.ofUser(null));
   }
 }
