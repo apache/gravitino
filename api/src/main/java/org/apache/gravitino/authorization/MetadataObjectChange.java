@@ -19,6 +19,7 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
@@ -74,7 +75,8 @@ public interface MetadataObjectChange {
 
       this.metadataObject = metadataObject;
       this.newMetadataObject = newMetadataObject;
-      this.locations = locations;
+      this.locations = Lists.newArrayList(locations);
+      this.locations.sort(String::compareTo);
     }
 
     /**
