@@ -242,7 +242,7 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 ### Using the GVFS Java client to access the fileset
 
 To access fileset with Azure Blob Storage(ADLS) using the GVFS Java client,
-based on the [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1),
+based on the [basic GVFS configurations](../gvfs/index.md#java-gvfs-configuration),
 you need to add the following configurations:
 
 | Configuration item           | Description                             | Default value | Required | Since version    |
@@ -439,7 +439,7 @@ The following are examples of how to use the `hadoop fs` command to access the f
 ### Using the GVFS Python client to access a fileset
 
 In order to access fileset with Azure Blob storage (ADLS) using the GVFS Python client,
-apart from [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1),
+apart from [basic GVFS configurations](../gvfs/index.md#python-gvfs-configuration),
 you need to add the following configurations:
 
 | Configuration item           | Description                            | Default value | Required | Since version    |
@@ -487,12 +487,12 @@ storage_options = {
         "azure_storage_account_key": "azure_account_key"
     }
 }
-ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}/people/part-00000-51d366e2-d5eb-448d-9109-32a96c8a14dc-c000.csv",
+ds = pd.read_csv(f"gvfs://fileset/${catalog}/${schema}/${fileset}/people/part-00000-51d366e2-d5eb-448d-9109-32a96c8a14dc-c000.csv",
                  storage_options=storage_options)
 ds.head()
 ```
 
-For other use cases, please refer to the [Gravitino Virtual File System](../../../how-to-use-gvfs.md) document.
+For other use cases, please refer to the [Gravitino Virtual File System](../gvfs/index.md) document.
 
 ## Fileset with credential vending
 

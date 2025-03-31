@@ -11,10 +11,10 @@ import TabItem from '@theme/TabItem';
 
 This page introduces the expression system of Apache Gravitino.
 *Expressions* are vital component of metadata definition.
-Through expressions, you can define [default values](./metadata/relational.md#table-column-default-value) for columns,
-function arguments for [function partitioning](./catalogs/relational/partitioned-table.md#partitioning-strategies),
-[bucketing](./catalogs/relational/distributed-table.md),
-and sort term of [sort ordering](./catalogs/relational/sorted-table.md#sort-ordering) in tables.
+Through expressions, you can define [default values](./relational.md#table-column-default-value) for columns,
+function arguments for [function partitioning](../catalogs/relational/partitioned-table.md#partitioning-strategies),
+[bucketing](../catalogs/relational/distributed-table.md),
+and sort term of [sort ordering](../catalogs/relational/sorted-table.md#sort-ordering) in tables.
 Gravitino expression system divides expressions into three basic parts:
 field reference, literal, and function.
 Function expressions can contain field references, literals, and other function expressions.

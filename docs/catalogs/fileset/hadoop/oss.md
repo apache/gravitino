@@ -242,7 +242,7 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 ### Using the GVFS Java client to access the fileset
 
 To access fileset with OSS using the GVFS Java client,
-based on the [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1),
+based on the [basic GVFS configurations](../gvfs/index.md#java-gvfs-configuration),
 you need to add the following configurations:
 
 | Configuration item      | Description                       | Default value | Required | Since version    |
@@ -443,7 +443,7 @@ For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 ### Using the GVFS Python client to access a fileset
 
 In order to access fileset with OSS using the GVFS Python client,
-apart from [basic GVFS configurations](../../../how-to-use-gvfs.md#configuration-1),
+apart from [basic GVFS configurations](../gvfs/index.md#python-gvfs-configuration),
 you need to add the following configurations:
 
 | Configuration item      | Description                       | Default value | Required | Since version    |
@@ -498,7 +498,7 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
                  storage_options=storage_options)
 ds.head()
 ```
-For other use cases, please refer to the [Gravitino Virtual File System](../../../how-to-use-gvfs.md) document.
+For other use cases, please refer to the [Gravitino Virtual File System](../gvfs/index.md) document.
 
 ## Fileset with credential vending
 

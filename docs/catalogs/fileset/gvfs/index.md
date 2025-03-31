@@ -1,5 +1,5 @@
 ---
-title: Using Apache Gravitino Virtual File System with Filesets
+title: Using Apache Gravitino Virtual File System for Filesets
 slug: /how-to-use-gvfs
 license: "This software is licensed under the Apache License version 2."
 ---
@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 *Fileset* in Apache Gravitinois a conceptual, logical collection of files and directories,
 In Gravitino, you can manage non-tabular data with filesets.
-For more details, refer to [managing fileset using Gravitino](./metadata/fileset.md).
+For more details, refer to [managing fileset using Gravitino](../../../metadata/fileset.md).
 
 Gravitino provides a virtual file system layer called the Gravitino Virtual File System (GVFS),
 for managing filesets.
@@ -42,16 +42,14 @@ by concatenating a file or folder name to the virtual path.
 The usage pattern for GVFS is the same as HDFS or S3.
 GVFS internally manages the path mapping and convert automatically.
 
-## 1. Managing files of Fileset with Java GVFS
-
-### Prerequisites
+## Managing Fileset with Java GVFS
 
 - GVFS has been tested against Hadoop 3.3.1.
   It is recommended to use Hadoop 3.3.1 or later, but it should work with Hadoop 2.x.
   Please create an [issue](https://www.github.com/apache/gravitino/issues)
   if you find any compatibility issues.
 
-### Configuration
+### Java GVFS Configuration
 
 <table>
 <thead>
@@ -215,15 +213,15 @@ GVFS internally manages the path mapping and convert automatically.
 In addition to the above properties, to access fileset like S3, GCS, OSS and custom fileset,
 some extra properties are needed. For more information, please see 
 
-- [S3 GVFS Java client configurations](./catalogs/fileset/hadoop/s3.md#using-the-gvfs-java-client-to-access-the-fileset)
-- [GCS GVFS Java client configurations](./catalogs/fileset/hadoop/gcs.md#using-the-gvfs-java-client-to-access-the-fileset)
-- [OSS GVFS Java client configurations](./catalogs/fileset/hadoop/oss.md#using-the-gvfs-java-client-to-access-the-fileset)
-- [Azure Blob Storage GVFS Java client configurations](./catalogs/fileset/hadoop/adls.md#using-the-gvfs-java-client-to-access-the-fileset)
+- [S3 GVFS Java client configurations](../hadoop/s3.md#using-the-gvfs-java-client-to-access-the-fileset)
+- [GCS GVFS Java client configurations](../hadoop/gcs.md#using-the-gvfs-java-client-to-access-the-fileset)
+- [OSS GVFS Java client configurations](../hadoop/oss.md#using-the-gvfs-java-client-to-access-the-fileset)
+- [Azure Blob Storage GVFS Java client configurations](../hadoop/adls.md#using-the-gvfs-java-client-to-access-the-fileset)
 
 #### Custom fileset 
 
 Since *0.7.0-incubating*, users can define their own fileset type and configure the corresponding properties.
-For more details, please refer to [Custom Fileset](./catalogs/fileset/hadoop/hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
+For more details, please refer to [Custom Fileset](../hadoop/hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
 If you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
 <table>
@@ -437,7 +435,7 @@ For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https:
 Currently, Gravitino Virtual File System supports two kinds of authentication types
 when accessing the Gravitino server: `simple` and `oauth2`.
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
-See [authentication documentation](./security/how-to-authenticate.md) for more details.
+See [authentication documentation](../../../security/how-to-authenticate.md) for more details.
 
 #### Using `simple` authentication
 
@@ -467,7 +465,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 If you want to use `oauth2` authentication for the Gravitino client
 to authenticate against the the Gravitino Virtual File System,
-refer to the [security guide](./security/security.md) for configuring the Gravitino server
+refer to the [security guide](../../../security/security.md) for configuring the Gravitino server
 and the OAuth server.
 After having configured the server, you can set up the Hadoop configuration like this:
 
@@ -495,7 +493,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 
 If you want to use `kerberos` authentication for the Gravitino client
 to authenticate against the Gravitino Virtual File System,
-refer to the [security guide](./security/security.md) for details
+refer to the [security guide](../../../security/security.md) for details
 on configuring the Gravitino server.
 After having prepared the server environment, you can setup the Hadoop configuration like this:
 
@@ -535,7 +533,7 @@ If you are using macOS or Windows operating system, you need to follow
 to recompile the native libraries like `libhdfs` and others.
 Then you need to completely replace the files in `${HADOOP_HOME}/lib/native`.
 
-### Configuration
+### Python GVFS Configuration
 
 <table>
 <thead>
@@ -657,14 +655,14 @@ Then you need to completely replace the files in `${HADOOP_HOME}/lib/native`.
 ### Configurations for S3, GCS, OSS and Azure Blob storage fileset
 
 For more details, please see the cloud-storage-specific configurations
-- [GCS GVFS Java client configurations](./catalogs/fileset/hadoop/gcs.md#using-the-gvfs-python-client-to-access-a-fileset)
-- [S3 GVFS Java client configurations](./catalogs/fileset//hadoop/s3.md#using-the-gvfs-python-client-to-access-a-fileset)
-- [OSS GVFS Java client configurations](./catalogs/fileset/hadoop/oss.md#using-the-gvfs-python-client-to-access-a-fileset)
-- [Azure Blob Storage GVFS Java client configurations](./catalogs/fileset/hadoop/adls.md#using-the-gvfs-python-client-to-access-a-fileset) 
+- [GCS GVFS Java client configurations](../hadoop/gcs.md#using-the-gvfs-python-client-to-access-a-fileset)
+- [S3 GVFS Java client configurations](../hadoop/s3.md#using-the-gvfs-python-client-to-access-a-fileset)
+- [OSS GVFS Java client configurations](../hadoop/oss.md#using-the-gvfs-python-client-to-access-a-fileset)
+- [Azure Blob Storage GVFS Java client configurations](../hadoop/adls.md#using-the-gvfs-python-client-to-access-a-fileset) 
 
 :::note
 Gravitino python client does not support user defined
-[customized file systems](./catalogs/fileset/hadoop/hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset)
+[customized file systems](../hadoop/hadoop-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset)
 due to the limit of `fsspec` library. 
 :::
 
