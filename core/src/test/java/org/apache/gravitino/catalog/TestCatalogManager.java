@@ -222,8 +222,7 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props1));
     Assertions.assertEquals(
-        "Properties or properties with a fixed prefix are required and must be set: [key1]",
-        e1.getMessage());
+        "Properties or property prefixes arerequired and must be set: [key1]", e1.getMessage());
     // BUG here, in memory does not support rollback
     reset();
 
@@ -241,8 +240,7 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props2));
     Assertions.assertEquals(
-        "Properties or properties with a fixed prefix are required and must be set: [key2]",
-        e1.getMessage());
+        "Properties or property prefixes arerequired and must be set: [key2]", e1.getMessage());
     reset();
 
     // property with fixed prefix key5- is required;
@@ -259,8 +257,7 @@ public class TestCatalogManager {
                 catalogManager.createCatalog(
                     ident, Catalog.Type.RELATIONAL, provider, "comment", props4));
     Assertions.assertEquals(
-        "Properties or properties with a fixed prefix are required and must be set: [key5-]",
-        e1.getMessage());
+        "Properties or property prefixes arerequired and must be set: [key5-]", e1.getMessage());
 
     // key3 is optional, but we assign a wrong value format
     Map<String, String> props3 =
@@ -356,8 +353,7 @@ public class TestCatalogManager {
     Assertions.assertTrue(
         exception3
             .getMessage()
-            .contains(
-                "Properties or properties with a fixed prefix are reserved and cannot be set"),
+            .contains("Properties or property prefixes arereserved and cannot be set"),
         exception3.getMessage());
     Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(failedIdent));
     // Test failed for the second time
@@ -370,8 +366,7 @@ public class TestCatalogManager {
     Assertions.assertTrue(
         exception4
             .getMessage()
-            .contains(
-                "Properties or properties with a fixed prefix are reserved and cannot be set"),
+            .contains("Properties or property prefixes arereserved and cannot be set"),
         exception4.getMessage());
     Assertions.assertNull(CatalogManager.catalogCache.getIfPresent(failedIdent));
   }

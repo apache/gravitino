@@ -219,7 +219,7 @@ public class CatalogKafkaIT extends BaseIT {
         exception
             .getMessage()
             .contains(
-                "Properties or properties with a fixed prefix are required and must be set: [bootstrap.servers]"));
+                "Properties or property prefixes arerequired and must be set: [bootstrap.servers]"));
 
     exception =
         Assertions.assertThrows(
@@ -235,7 +235,7 @@ public class CatalogKafkaIT extends BaseIT {
         exception
             .getMessage()
             .contains(
-                "Properties or properties with a fixed prefix are required and must be set: [bootstrap.servers]"));
+                "Properties or property prefixes arerequired and must be set: [bootstrap.servers]"));
 
     // Test BOOTSTRAP_SERVERS that cannot be linked
     String catalogName2 = GravitinoITUtils.genRandomName("test_catalog");

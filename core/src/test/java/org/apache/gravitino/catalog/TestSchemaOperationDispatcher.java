@@ -92,14 +92,14 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
     testPropertyException(
         () -> dispatcher.createSchema(schemaIdent, "comment", illegalSchemaProperties),
-        "Properties or properties with a fixed prefix are required and must be set");
+        "Properties or property prefixes arerequired and must be set");
 
     // Test reserved table properties exception
     illegalSchemaProperties.put(COMMENT_KEY, "table comment");
     illegalSchemaProperties.put(ID_KEY, "gravitino.v1.uidfdsafdsa");
     testPropertyException(
         () -> dispatcher.createSchema(schemaIdent, "comment", illegalSchemaProperties),
-        "Properties or properties with a fixed prefix are reserved and cannot be set",
+        "Properties or property prefixes arereserved and cannot be set",
         "comment",
         "gravitino.identifier");
 

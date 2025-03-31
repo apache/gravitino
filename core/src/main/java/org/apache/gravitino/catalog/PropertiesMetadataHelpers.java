@@ -54,7 +54,7 @@ public class PropertiesMetadataHelpers {
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         reservedProperties.isEmpty(),
-        "Properties or properties with a fixed prefix are reserved and cannot be set: %s",
+        "Properties or property prefixes arereserved and cannot be set: %s",
         reservedProperties);
 
     List<String> absentProperties =
@@ -70,7 +70,7 @@ public class PropertiesMetadataHelpers {
             .collect(Collectors.toList());
     Preconditions.checkArgument(
         absentProperties.isEmpty(),
-        "Properties or properties with a fixed prefix are required and must be set: %s",
+        "Properties or property prefixes arerequired and must be set: %s",
         absentProperties);
 
     // use decode function to validate the property values
