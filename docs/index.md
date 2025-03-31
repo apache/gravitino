@@ -129,7 +129,7 @@ Gravitino supports different catalogs to manage the metadata in different source
 
 Gravitino provides governance features to manage metadata in a unified way. See:
 
-* [Manage tags in Gravitino](./manage-tags-in-gravitino.md): a complete guide to using Gravitino
+* [Manage tags in Gravitino](./metadata/tags.md): a complete guide to using Gravitino
   to manage tags.
 
 ### Gravitino Iceberg REST catalog service
