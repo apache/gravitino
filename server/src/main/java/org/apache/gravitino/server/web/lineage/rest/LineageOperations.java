@@ -29,7 +29,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.lineage.LineageService;
+import org.apache.gravitino.lineage.LineageDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
@@ -39,13 +39,13 @@ import org.slf4j.LoggerFactory;
 public class LineageOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(LineageOperations.class);
-  private LineageService lineageService;
+  private LineageDispatcher lineageDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public LineageOperations(LineageService lineageService) {
-    this.lineageService = lineageService;
+  public LineageOperations(LineageDispatcher lineageDispatcher) {
+    this.lineageDispatcher = lineageDispatcher;
   }
 
   @POST
@@ -63,7 +63,7 @@ public class LineageOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            if (lineageService.dispatchLineageEvent(event)) {
+            if (lineageDispatcher.dispatchLineageEvent(event)) {
               return Utils.created();
             } else {
               return Utils.tooManyRequests();
