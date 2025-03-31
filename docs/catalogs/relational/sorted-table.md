@@ -10,7 +10,7 @@ license: This software is licensed under the Apache License version 2.
 To define a sorted table, you will provide the following three parameters:
 
 - <tt>sortTerm</tt>. The field or function Gravitino uses to sort the table.
-  The parameter value  must be a valid [expression](../../expression.md).
+  The parameter value  must be a valid [expression](../../metadata/expression.md).
 
 - <tt>direction</tt>: The direction in which Gravitino sorts the table.
   See [sort directions](#sort-directions) for details. The default value is `ascending`.

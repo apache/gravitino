@@ -1244,8 +1244,8 @@ String unparsedValue = ((UnparsedType) type).unparsedType();
 
 #### Table column default value
 
-When defining a table column, you can specify a [literal](../expression.md#literal)
-or an [expression](../expression.md) as its default value.
+When defining a table column, you can specify a [literal](./expression.md#literal)
+or an [expression](./expression.md) as its default value.
 The default value typically applies to new rows that are inserted into the table by the underlying catalog.
 
 The following table is a summary of the support to column default value
@@ -1476,7 +1476,7 @@ tableCatalog.loadTable(NameIdentifier.of("myschema", "mytable"));
   ensuring that the table can be loaded successfully.
 
 - When Gravitino loads a table that supports default value, if it is unable to parse the default value,
-  it will use an **[Unparsed Expression](../expression.md#unparsed-expression)**
+  it will use an **[Unparsed Expression](./expression.md#unparsed-expression)**
   to preserve the original default value,
   ensuring that the table can be loaded successfully.
 :::

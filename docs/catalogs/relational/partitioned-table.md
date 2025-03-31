@@ -138,7 +138,7 @@ Once a partitioned table is created, you can [manage its partitions](#partition-
 :::note
 - The `score`, `createTime`, and `city` in the table are table field names.
 - For function partitioning, you should provide the function name and the function arguments.
-  The function arguments must be an [expression](../../expression.md).
+  The function arguments must be an [expression](../../metadata/expression.md).
 :::
 
 ## Supported catalogs

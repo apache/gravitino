@@ -12,7 +12,7 @@ To create a distributed (bucketed) table, you will provide the following paramet
 - <tt>strategy</tt>: How Gravitino distributes table data across partitions.
   See [below](#distribution-strategy) for a list of valid strategies.
 - <tt>number</tt>: Number of buckets you use to distribution the table.
-- <tt>funcArgs</tt>: The arguments of the strategy, the argument must be an [expression](../../expression.md).
+- <tt>funcArgs</tt>: The arguments of the strategy, the argument must be an [expression](../../metadata/expression.md).
 
 ### Distribution strategies
 
