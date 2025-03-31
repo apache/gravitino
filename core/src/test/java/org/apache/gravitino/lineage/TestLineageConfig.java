@@ -57,12 +57,13 @@ public class TestLineageConfig {
     // default config with log sink
     LineageConfig lineageConfig = new LineageConfig(ImmutableMap.of());
     Map<String, String> sinkConfigs = lineageConfig.getSinkConfigs();
-    String sinks = sinkConfigs.get(LineageConfig.LINEAGE_CONFIG_SINKS);
-    Assertions.assertEquals(LineageConfig.LINEAGE_LOG_SINK_NAME, sinks);
     String className =
         sinkConfigs.get(
             LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME);
     Assertions.assertEquals(LineageLogSinker.class.getName(), className);
+    String capacity = sinkConfigs.get(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY);
+    Assertions.assertEquals(
+        LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY_DEFAULT, Integer.parseInt(capacity));
 
     // config multi sinks
     Map<String, String> config2 =
@@ -75,8 +76,6 @@ public class TestLineageConfig {
             "test-class2");
     lineageConfig = new LineageConfig(config2);
     sinkConfigs = lineageConfig.getSinkConfigs();
-    sinks = sinkConfigs.get(LineageConfig.LINEAGE_CONFIG_SINKS);
-    Assertions.assertEquals("sink1,sink2", sinks);
     Assertions.assertEquals(
         "test-class", sinkConfigs.get("sink1." + LineageConfig.LINEAGE_SINK_CLASS_NAME));
     Assertions.assertEquals(

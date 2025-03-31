@@ -27,6 +27,7 @@ import java.util.Map;
 import lombok.SneakyThrows;
 import org.apache.gravitino.listener.AsyncQueueListener;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.EventListenerPluginWrapper;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.junit.jupiter.api.Assertions;
@@ -62,6 +63,33 @@ public class TestLineageSinkManager {
             });
   }
 
+  @Test
+  void testTransformToEventListenerConfigs() {
+    Map<String, String> configs =
+        LineageSinkManager.transformToEventListenerConfigs(
+            Arrays.asList("sink1", "sink2"), getLineageSinkConfig());
+
+    Assertions.assertEquals(
+        "sink1,sink2", configs.get(EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES));
+
+    Assertions.assertEquals(
+        "500",
+        configs.get("sink1." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY));
+    Assertions.assertEquals(
+        LineageSinkEventListener.class.getName(),
+        configs.get("sink1." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS));
+    Assertions.assertEquals("sink1", configs.get("sink1.name"));
+    Assertions.assertEquals("a", configs.get("sink1.a"));
+
+    Assertions.assertEquals(
+        "500",
+        configs.get("sink2." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY));
+    Assertions.assertEquals(
+        LineageSinkEventListener.class.getName(),
+        configs.get("sink2." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS));
+    Assertions.assertEquals("b", configs.get("sink2.a"));
+  }
+
   private void checkLineSink(LineageSinkForTest sink) {
     Map<String, String> configs = sink.getConfigs();
     Assertions.assertTrue(configs.containsKey("name"));
@@ -85,7 +113,6 @@ public class TestLineageSinkManager {
 
   private Map<String, String> getLineageSinkConfig() {
     Map<String, String> lineageSinkConfigs = new HashMap<>();
-    // lineageSinkConfigs.put(LineageConfig.LINEAGE_CONFIG_SINKS, "sink1,sink2");
     lineageSinkConfigs.put(
         "sink1." + LineageConfig.LINEAGE_SINK_CLASS_NAME, LineageSinkForTest.class.getName());
     lineageSinkConfigs.put("sink1.a", "a");
@@ -94,6 +121,8 @@ public class TestLineageSinkManager {
         "sink2." + LineageConfig.LINEAGE_SINK_CLASS_NAME, LineageSinkForTest.class.getName());
     lineageSinkConfigs.put("sink2.a", "b");
     lineageSinkConfigs.put("sink2.name", "sink2");
+    lineageSinkConfigs.put(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY, "1000");
+
     return lineageSinkConfigs;
   }
 }

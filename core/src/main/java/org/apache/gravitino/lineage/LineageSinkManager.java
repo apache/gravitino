@@ -20,11 +20,13 @@
 package org.apache.gravitino.lineage;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.io.Closeable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.EventWrapper;
@@ -46,26 +48,41 @@ public class LineageSinkManager implements Closeable {
   }
 
   public boolean isHighWaterMark() {
-    return false;
+    return eventBus.isHighWaterMark();
   }
 
-  private Map<String, String> transformToEventListenerConfigs(
+  @VisibleForTesting
+  static Map<String, String> transformToEventListenerConfigs(
       List<String> sinks, Map<String, String> lineageConfigs) {
     Map<String, String> eventListenerConfigs = new HashMap<>();
-    eventListenerConfigs.putAll(generateSinkConfig(sinks));
+    eventListenerConfigs.putAll(generateEventListenerConfigs(sinks, lineageConfigs));
     eventListenerConfigs.putAll(lineageConfigs);
     return eventListenerConfigs;
   }
 
-  private Map<String, String> generateSinkConfig(List<String> sinks) {
+  private static Map<String, String> generateEventListenerConfigs(
+      List<String> sinks, Map<String, String> lineageConfigs) {
     HashMap eventListenerConfigs = new HashMap();
+    if (sinks.isEmpty()) {
+      return eventListenerConfigs;
+    }
+
+    String queueCapacity = lineageConfigs.get(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(queueCapacity), "Lineage sink queue capacity is not set");
+    int capacityPerSink = Integer.valueOf(queueCapacity) / sinks.size();
+
     eventListenerConfigs.put(
         EventListenerManager.GRAVITINO_EVENT_LISTENER_NAMES, String.join(",", sinks));
     sinks.forEach(
-        sinkName ->
-            eventListenerConfigs.put(
-                sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
-                LineageSinkEventListener.class.getName()));
+        sinkName -> {
+          eventListenerConfigs.put(
+              sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_CLASS,
+              LineageSinkEventListener.class.getName());
+          eventListenerConfigs.put(
+              sinkName + "." + EventListenerManager.GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY,
+              String.valueOf(capacityPerSink));
+        });
     return eventListenerConfigs;
   }
 
