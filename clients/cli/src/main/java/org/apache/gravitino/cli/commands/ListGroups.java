@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Arrays;
+import java.util.List;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -54,9 +58,29 @@ public class ListGroups extends Command {
     }
 
     if (groups.length == 0) {
-      printInformation("No groups found in metalake " + metalake);
+      printInformation("No groups found in metalake: " + metalake);
     } else {
-      printResults(String.join(",", groups));
+      Group[] groupObjects = Arrays.stream(groups).map(this::getGroup).toArray(Group[]::new);
+      printResults(groupObjects);
     }
+  }
+
+  private Group getGroup(String name) {
+    return new Group() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public List<String> roles() {
+        return null;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return null;
+      }
+    };
   }
 }

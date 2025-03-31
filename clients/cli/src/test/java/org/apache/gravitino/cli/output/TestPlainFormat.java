@@ -27,12 +27,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.outputs.PlainFormat;
+import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -43,6 +47,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 
 public class TestPlainFormat {
 
@@ -339,6 +344,71 @@ public class TestPlainFormat {
     return mockTable;
   }
 
+  @Test
+  void testModelDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Model mockModel = getMockModel("demo_model", "This is a demo model", 1);
+
+    PlainFormat.output(mockModel, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "Model name demo_model, comment: This is a demo model, latest version: 1", output);
+  }
+
+  @Test
+  void testListModelWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Model model1 = getMockModel("model1", "This is a model", 1);
+    Model model2 = getMockModel("model2", "This is another model", 2);
+    Model model3 = getMockModel("model3", "This is a third model", 3);
+
+    PlainFormat.output(new Model[] {model1, model2, model3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("model1\n" + "model2\n" + "model3", output);
+  }
+
+  @Test
+  void testUserDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    User mockUser = getMockUser("demo_user", ImmutableList.of("admin", "user"));
+    PlainFormat.output(mockUser, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("username: demo_user, role: admin,user", output);
+  }
+
+  @Test
+  void testListUsersWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    User user1 = getMockUser("user1", ImmutableList.of("admin", "user"));
+    User user2 = getMockUser("user2", ImmutableList.of("admin"));
+    User user3 = getMockUser("user3", ImmutableList.of("user"));
+
+    PlainFormat.output(new User[] {user1, user2, user3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("user1\n" + "user2\n" + "user3", output);
+  }
+
+  @Test
+  void testGroupDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Group mockGroup = getMockGroup("demo_group", ImmutableList.of("admin", "user"));
+    PlainFormat.output(mockGroup, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("group name: demo_group, role: admin,user", output);
+  }
+
+  @Test
+  void testListGroupsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Group group1 = getMockGroup("group1", ImmutableList.of("admin", "user"));
+    Group group2 = getMockGroup("group2", ImmutableList.of("admin"));
+    Group group3 = getMockGroup("group3", ImmutableList.of("user"));
+
+    PlainFormat.output(new Group[] {group1, group2, group3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("group1\n" + "group2\n" + "group3", output);
+  }
+
   private org.apache.gravitino.rel.Column getMockColumn(
       String name,
       Type dataType,
@@ -356,5 +426,30 @@ public class TestPlainFormat {
     when(mockColumn.defaultValue()).thenReturn(defaultValue);
 
     return mockColumn;
+  }
+
+  private Model getMockModel(String name, String comment, int lastVersion) {
+    Model mockModel = mock(Model.class);
+    when(mockModel.name()).thenReturn(name);
+    when(mockModel.comment()).thenReturn(comment);
+    when(mockModel.latestVersion()).thenReturn(lastVersion);
+
+    return mockModel;
+  }
+
+  private User getMockUser(String name, List<String> roles) {
+    User mockUser = mock(User.class);
+    when(mockUser.name()).thenReturn(name);
+    when(mockUser.roles()).thenReturn(roles);
+
+    return mockUser;
+  }
+
+  private Group getMockGroup(String name, List<String> roles) {
+    Group mockGroup = mock(Group.class);
+    when(mockGroup.name()).thenReturn(name);
+    when(mockGroup.roles()).thenReturn(roles);
+
+    return mockGroup;
   }
 }
