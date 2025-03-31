@@ -22,7 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -30,6 +32,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.requests.ModelRegisterRequest;
+import org.apache.gravitino.dto.requests.ModelUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -253,8 +257,28 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    // TODO: implement alterModel
-    return null;
+    checkModelNameIdentifier(ident);
+
+    // Convert ModelChange objects to DTO requests
+    List<ModelUpdateRequest> updateRequests =
+        Arrays.stream(changes)
+            .map(DTOConverters::toModelUpdateRequest)
+            .collect(Collectors.toList());
+
+    ModelUpdatesRequest req = new ModelUpdatesRequest(updateRequests);
+    req.validate();
+
+    Namespace modelFullNs = modelFullNamespace(ident.namespace());
+    ModelResponse resp =
+        restClient.put(
+            formatModelRequestPath(modelFullNs) + "/" + RESTUtils.encodeString(ident.name()),
+            req,
+            ModelResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.modelErrorHandler());
+
+    resp.validate();
+    return new GenericModel(resp.getModel(), restClient, modelFullNs);
   }
 
   /** @return A new builder instance for {@link GenericModelCatalog}. */
