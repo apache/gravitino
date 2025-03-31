@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.model;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -46,6 +47,7 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -257,6 +259,72 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, alias);
 
     return internalDeleteModelVersion(modelVersionIdent);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    try {
+      if (!store.exists(ident, Entity.EntityType.MODEL)) {
+        throw new NoSuchModelException("Model %s does not exist", ident);
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to alter model " + ident, ioe);
+    }
+
+    try {
+      ModelEntity updatedModelEntity =
+          store.update(
+              ident,
+              ModelEntity.class,
+              Entity.EntityType.MODEL,
+              e -> updateModelEntity(ident, e, changes));
+
+      return toModelImpl(updatedModelEntity);
+
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to load model " + ident, ioe);
+    } catch (NoSuchEntityException nsee) {
+      throw new NoSuchModelException(nsee, "Model %s does not exist", ident);
+    } catch (EntityAlreadyExistsException eaee) {
+      // This is happened when renaming a model to an existing model name.
+      throw new RuntimeException("Model already exist " + ident.name(), eaee);
+    }
+  }
+
+  private ModelEntity updateModelEntity(
+      NameIdentifier ident, ModelEntity modelEntity, ModelChange... changes) {
+
+    Map<String, String> entityProperties =
+        modelEntity.properties() == null
+            ? Maps.newHashMap()
+            : Maps.newHashMap(modelEntity.properties());
+    String entityName = ident.name();
+    String entityComment = modelEntity.comment();
+    Long entityId = modelEntity.id();
+    AuditInfo entityAuditInfo = modelEntity.auditInfo();
+    Namespace entityNamespace = modelEntity.namespace();
+    Integer entityLatestVersion = modelEntity.latestVersion();
+
+    for (ModelChange change : changes) {
+      if (change instanceof ModelChange.RenameModel) {
+        entityName = ((ModelChange.RenameModel) change).newName();
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported model change: " + change.getClass().getSimpleName());
+      }
+    }
+
+    return ModelEntity.builder()
+        .withName(entityName)
+        .withId(entityId)
+        .withComment(entityComment)
+        .withAuditInfo(entityAuditInfo)
+        .withNamespace(entityNamespace)
+        .withProperties(entityProperties)
+        .withLatestVersion(entityLatestVersion)
+        .build();
   }
 
   private ModelImpl toModelImpl(ModelEntity model) {

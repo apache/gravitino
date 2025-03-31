@@ -104,6 +104,7 @@ public enum OperationType {
   DELETE_MODEL,
   GET_MODEL,
   LIST_MODEL,
+  ALTER_MODEL,
 
   // Model Version
   LINK_MODEL_VERSION,
