@@ -19,44 +19,57 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before removing a group from a specific metalake. */
+/** Represents an event triggered before revoking roles from a group. */
 @DeveloperApi
-public class RemoveGroupPreEvent extends GroupPreEvent {
+public class RevokeGroupRolesPreEvent extends GroupPreEvent {
   private final String groupName;
+  private final List<String> roles;
 
   /**
-   * Constructs a new {@link RemoveGroupPreEvent} with the specified initiator, metalake name, and
-   * group name.
+   * Constructs a new {@link RevokeGroupRolesPreEvent} instance with the specified initiator,
+   * metalake, group name, and roles to be revoked.
    *
-   * @param initiator the user who initiated the remove group operation.
-   * @param metalake the name of the metalake from which the group will be removed.
-   * @param groupName the name of the group that is requested to be removed from the metalake.
+   * @param initiator the user who initiated the event to revoke roles.
+   * @param metalake the name of the metalake on which the operation is being performed.
+   * @param groupName the name of the group whose roles are being revoked.
+   * @param roles the list of roles to be revoked from the group.
    */
-  protected RemoveGroupPreEvent(String initiator, String metalake, String groupName) {
+  public RevokeGroupRolesPreEvent(
+      String initiator, String metalake, String groupName, List<String> roles) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, groupName));
-
     this.groupName = groupName;
+    this.roles = roles;
   }
 
   /**
-   * Returns the name of the group that is being removed from the metalake.
+   * Returns the name of the group whose roles are being revoked.
    *
-   * @return the name of the group requested to be removed.
+   * @return the group name of the group.
    */
   public String groupName() {
     return groupName;
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the list of roles that are being revoked from the group.
    *
-   * @return the operation type for this event.
+   * @return the list of roles to be revoked.
+   */
+  public List<String> roles() {
+    return roles;
+  }
+
+  /**
+   * Returns the operation type of this event.
+   *
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.REMOVE_GROUP;
+    return OperationType.REVOKE_GROUP_ROLES;
   }
 }
