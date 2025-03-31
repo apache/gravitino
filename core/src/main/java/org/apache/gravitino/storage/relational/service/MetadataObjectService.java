@@ -20,9 +20,11 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -56,6 +58,18 @@ public class MetadataObjectService {
   private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectService.class);
+
+  public static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
+      TYPE_TO_FULLNAME_FUNCTION_MAP =
+          ImmutableMap.of(
+              MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,
+              MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName,
+              MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName,
+              MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName,
+              MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName,
+              MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName,
+              MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName,
+              MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
 
   private MetadataObjectService() {}
 

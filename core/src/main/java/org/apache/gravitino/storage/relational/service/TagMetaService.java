@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
@@ -57,18 +56,6 @@ public class TagMetaService {
   public static TagMetaService getInstance() {
     return INSTANCE;
   }
-
-  private static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
-      TYPE_FUNCTION_MAP =
-          ImmutableMap.of(
-              MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,
-              MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName,
-              MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName,
-              MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName,
-              MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName,
-              MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName,
-              MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName,
-              MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
 
   private TagMetaService() {}
 
@@ -255,7 +242,7 @@ public class TagMetaService {
                         .map(TagMetadataObjectRelPO::getMetadataObjectId)
                         .collect(Collectors.toList());
                 Map<Long, String> metadataObjectNames =
-                    Optional.of(TYPE_FUNCTION_MAP.get(type))
+                    Optional.of(MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP.get(type))
                         .map(f -> f.apply(metadataObjectIds))
                         .orElseThrow(
                             () ->
