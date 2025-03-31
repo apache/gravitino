@@ -22,27 +22,31 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before list user from specific metalake */
+/**
+ * Represents an abstract base class for events related to user operations. This class extends
+ * {@link Event} to provide a more specific context involving operations performed by users. It
+ * captures essential information including the user performing the operation and the identifier of
+ * the metalake being operated on.
+ *
+ * <p>Concrete implementations of this class should provide additional details pertinent to the
+ * specific type of user operation being represented.
+ */
 @DeveloperApi
-public class ListUsersPreEvent extends UserPreEvent {
+public abstract class UserEvent extends Event {
 
   /**
-   * Construct a new {@link ListUsersPreEvent} instance with the specified user and identifier.
+   * Construct a new {@link UserEvent} instance with the given initiator and identifier.
    *
-   * @param initiator the user who initiated the list-user request.
-   * @param metalake the metalake name to list users from.
+   * @param initiator the user who triggered the event.
+   * @param identifier the identifier of the metalake being operated on.
    */
-  protected ListUsersPreEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifier.of(metalake));
+  protected UserEvent(String initiator, NameIdentifier identifier) {
+    super(initiator, identifier);
   }
 
-  /**
-   * Returns the operation type for this event.
-   *
-   * @return the operation type for this event.
-   */
+  /** {@inheritDoc} */
   @Override
-  public OperationType operationType() {
-    return OperationType.LIST_USERS;
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
   }
 }

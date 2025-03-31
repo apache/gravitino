@@ -22,18 +22,19 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents an event triggered before list users name from specific metalake */
+/** Represents an event triggered before listing usernames from a specific metalake. */
 @DeveloperApi
 public class ListUserNamesPreEvent extends UserPreEvent {
 
   /**
-   * Construct a new {@link ListUserNamesPreEvent} instance with the specified user and identifier.
+   * Constructs a new {@link ListUserNamesPreEvent} instance with the specified user and metalake
+   * name.
    *
-   * @param initiator the user who initiated the list-user request.
-   * @param identifier the identifier of the metalake which is being listed.
+   * @param initiator the user who initiated the request to list usernames.
+   * @param metalake the name of the metalake from which to list usernames.
    */
-  protected ListUserNamesPreEvent(String initiator, NameIdentifier identifier) {
-    super(initiator, identifier);
+  protected ListUserNamesPreEvent(String initiator, String metalake) {
+    super(initiator, NameIdentifier.of(metalake));
   }
 
   /**

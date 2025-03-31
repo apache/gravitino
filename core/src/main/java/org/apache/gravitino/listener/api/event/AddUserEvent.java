@@ -20,33 +20,35 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before retrieving a user from a specific metalake. */
+/** Represents an event generated after a user is successfully added to a metalake. */
 @DeveloperApi
-public class GetUserPreEvent extends UserPreEvent {
-  private final String userName;
+public class AddUserEvent extends UserEvent {
+  private UserInfo addedUserInfo;
 
   /**
-   * Constructs a new {@link GetUserPreEvent} instance with the specified user, identifier, and user
-   * info.
+   * Constructs a new {@link AddUserEvent} instance with the specified initiator, metalake name, and
+   * user information.
    *
-   * @param initiator The name of the user who initiated the get-user request.
-   * @param metalake The name of the metalake where the user is being retrieved from.
-   * @param userName The username that is requested to be retrieved.
+   * @param initiator the user who initiated the request to add a user.
+   * @param metalake the name of the metalake where the user was added.
+   * @param addedUserInfo the user information of the newly added user.
    */
-  public GetUserPreEvent(String initiator, String metalake, String userName) {
-    super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
-    this.userName = userName;
+  protected AddUserEvent(String initiator, String metalake, UserInfo addedUserInfo) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, addedUserInfo.name()));
+
+    this.addedUserInfo = addedUserInfo;
   }
 
   /**
-   * Returns the username for the user being retrieved.
+   * Returns the user information of the user added to the metalake.
    *
-   * @return The username that is requested to be retrieved.
+   * @return the {@link UserInfo} instance containing the details of the added user.
    */
-  public String userName() {
-    return userName;
+  public UserInfo addedUserInfo() {
+    return addedUserInfo;
   }
 
   /**
@@ -56,6 +58,6 @@ public class GetUserPreEvent extends UserPreEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.GET_USER;
+    return OperationType.ADD_USER;
   }
 }

@@ -103,6 +103,18 @@ public class NameIdentifierUtil {
   public static NameIdentifier ofTag(String metalake, String tagName) {
     return NameIdentifier.of(NamespaceUtil.ofTag(metalake), tagName);
   }
+
+  /**
+   * Create the user {@link NameIdentifier} with the given metalake and username.
+   *
+   * @param metalake The metalake name
+   * @param userName The username
+   * @return the created user {@link NameIdentifier}
+   */
+  public static NameIdentifier ofUser(String metalake, String userName) {
+    return NameIdentifier.of(NamespaceUtil.ofUser(metalake), userName);
+  }
+
   /**
    * Create the column {@link NameIdentifier} with the given metalake, catalog, schema, table and
    * column name.

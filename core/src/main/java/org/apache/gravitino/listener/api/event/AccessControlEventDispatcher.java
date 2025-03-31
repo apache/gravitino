@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -69,10 +70,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new AddUserPreEvent(initiator, NameIdentifier.of(metalake), user));
+    eventBus.dispatchEvent(new AddUserPreEvent(initiator, metalake, user));
     try {
-      // TODO add Event
-      return dispatcher.addUser(metalake, user);
+      User userObject = dispatcher.addUser(metalake, user);
+      eventBus.dispatchEvent(new AddUserEvent(initiator, metalake, new UserInfo(userObject)));
+
+      return userObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -84,10 +87,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new RemoveUserPreEvent(initiator, NameIdentifier.of(metalake), user));
+    eventBus.dispatchEvent(new RemoveUserPreEvent(initiator, metalake, user));
     try {
-      // TODO: add Event
-      return dispatcher.removeUser(metalake, user);
+      boolean isExists = dispatcher.removeUser(metalake, user);
+      eventBus.dispatchEvent(new RemoveUserEvent(initiator, metalake, user, isExists));
+
+      return isExists;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -100,9 +105,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       throws NoSuchUserException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new GetUserPreEvent(initiator, NameIdentifier.of(metalake), user));
+    eventBus.dispatchEvent(new GetUserPreEvent(initiator, metalake, user));
     try {
-      return dispatcher.getUser(metalake, user);
+      User userObject = dispatcher.getUser(metalake, user);
+      eventBus.dispatchEvent(new GetUserEvent(initiator, metalake, new UserInfo(userObject)));
+
+      return userObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -114,10 +122,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public User[] listUsers(String metalake) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new ListUsersPreEvent(initiator, NameIdentifier.of(metalake)));
+    eventBus.dispatchEvent(new ListUsersPreEvent(initiator, metalake));
     try {
-      // TODO: add Event
-      return dispatcher.listUsers(metalake);
+      User[] users = dispatcher.listUsers(metalake);
+      eventBus.dispatchEvent(new ListUsersEvent(initiator, metalake));
+
+      return users;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -129,10 +139,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new ListUserNamesPreEvent(initiator, NameIdentifier.of(metalake)));
+    eventBus.dispatchEvent(new ListUserNamesPreEvent(initiator, metalake));
     try {
-      // TODO: add Event
-      return dispatcher.listUserNames(metalake);
+      String[] userNames = dispatcher.listUserNames(metalake);
+      eventBus.dispatchEvent(new ListUserNamesEvent(initiator, metalake));
+
+      return userNames;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -218,9 +230,15 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GrantUserRolesPreEvent(initiator, metalake, user, roles));
     try {
-      // TODO: add Event
-      return dispatcher.grantRolesToUser(metalake, roles, user);
+      User userObject = dispatcher.grantRolesToUser(metalake, roles, user);
+      eventBus.dispatchEvent(
+          new GrantUserRolesEvent(initiator, metalake, new UserInfo(userObject), roles));
+
+      return userObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -257,9 +275,15 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new RevokeUserRolesPreEvent(initiator, metalake, user, roles));
     try {
-      // TODO: add Event
-      return dispatcher.revokeRolesFromUser(metalake, roles, user);
+      User userObject = dispatcher.revokeRolesFromUser(metalake, roles, user);
+      eventBus.dispatchEvent(
+          new RevokeUserRolesEvent(initiator, metalake, new UserInfo(userObject), roles));
+
+      return userObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
