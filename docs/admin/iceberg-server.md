@@ -37,7 +37,7 @@ There are three deployment scenarios for Gravitino Iceberg REST server:
 - An auxiliary service embedded in the Gravitino server, the CLASSPATH is `iceberg-rest-server/libs`.
 
 For detailed instructions on how to build and install the Gravitino server package,
-please refer to [how to build](./develop/how-to-build.md) and [the installation guide](./install/install.md).
+please refer to [the build guide](../develop/how-to-build.md) and [the installation guide](../install/install.md).
 To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`.
 Alternatively, to create the corresponding compressed package in the distribution directory,
 use `./gradlew assembleIcebergRESTServer -x test`.
@@ -222,7 +222,7 @@ in the format `gravitino.iceberg-rest.<filter class name>.param.<name>=<value>`.
 ### Security
 
 Gravitino Iceberg REST server supports OAuth2 and HTTPS,
-please refer to [Security](./security/security.md) for more details.
+please refer to [security documentation](../security/security.md) for more details.
 
 #### Backend authentication
 
@@ -320,7 +320,7 @@ The detailed configuration items are as follows:
 
 ### Credential vending
 
-Please refer to [Credential vending](./security/credential-vending.md) for more details.
+Please refer to [credential vending](../security/credential-vending.md) for more details.
 
 ### Storage
 
@@ -379,7 +379,7 @@ Please refer to [Credential vending](./security/credential-vending.md) for more 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`,
 you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
-Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials)
+Please refer to [S3 credentials](../security/credential-vending.md#s3-credentials)
 for credential related configurations.
 
 :::info
@@ -437,7 +437,7 @@ and place it in the CLASSPATH of Iceberg REST server.
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`,
 you could config it directly by `gravitino.iceberg-rest.client.security-token`.
 
-Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials)
+Please refer to [OSS credentials](../security/credential-vending.md#oss-credentials)
 for credential related configurations.
 
 Additionally, Iceberg doesn't provide Iceberg Aliyun bundle JARs which contains OSS packages,
@@ -486,7 +486,7 @@ Supports using static GCS credential file or generating GCS token to access GCS 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 you can config it directly using `gravitino.iceberg-rest.gcs.project-id`.
 
-Please refer to [GCS credentials](./security/credential-vending.md#gcs-credentials)
+Please refer to [GCS credentials](../security/credential-vending.md#gcs-credentials)
 for credential related configurations.
 
 :::note
@@ -532,7 +532,7 @@ and place it into the CLASSPATH of Gravitino Iceberg REST server,
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`,
 you could config it directly using `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
-Please refer to [ADLS credentials](./security/credential-vending.md#adls-credentials)
+Please refer to [ADLS credentials](../security/credential-vending.md#adls-credentials)
 for credential related configurations.
 
 :::info
@@ -549,7 +549,7 @@ You should place HDFS configuration file to the CLASSPATH of the Iceberg REST se
 `conf` for standalone Gravitino Iceberg REST server package.
 When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate
 as the specified HDFS user and doesn't support proxying to other HDFS users.
-See [How to access Apache Hadoop](./admin/server-config.md#how-to-access-apache-hadoop)
+See [How to access Apache Hadoop](./server-config.md#how-to-access-apache-hadoop)
 for more details.
 
 :::info
@@ -991,12 +991,12 @@ The `clients` property for example:
 
 Gravitino generates pre-event and post-event for table operations
 and provide a pluggable event listener to allow you to inject custom logic.
-For more details, please refer to [Event listener configuration](./admin/server-config.md#event-listener-configuration).
+For more details, please refer to [Event listener configuration](./server-config.md#event-listener-configuration).
 
 ### Audit log
 
 Gravitino provides a pluggable audit logging mechanism, please refer to
-[Audit log configuration](./admin/server-config.md#audit-log-configuration).
+[Audit log configuration](./server-config.md#audit-log-configuration).
 
 ### Apache Iceberg metrics store configuration
 
@@ -1164,7 +1164,7 @@ docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.8.0-incubating
 
 Gravitino Iceberg REST server in docker image could access local storage by default,
 you could set the following environment variables if the storage is cloud/remote storage like S3.
-Please refer to [storage section](#storage) for more details.
+Please refer to the [storage section](#storage) for more details.
 
 <table>
 <thead>
@@ -1347,5 +1347,5 @@ sh ./dev/docker/build-docker.sh \
 ```
 
 You could try Spark with Gravitino REST catalog service in our
-[playground](./playground/using-the-playground.md#using-apache-iceberg-rest-service).
+[playground](../playground/using-the-playground.md#using-apache-iceberg-rest-service).
 

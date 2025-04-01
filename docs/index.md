@@ -129,13 +129,13 @@ Gravitino supports different catalogs to manage the metadata in different source
 
 Gravitino provides governance features to manage metadata in a unified way. See:
 
-* [Manage tags in Gravitino](./metadata/tags.md): a complete guide to using Gravitino
-  to manage tags.
+* [Manage tags in Gravitino](./metadata/tags.md):
+  A complete guide to using Gravitino to manage tags.
 
 ### Gravitino Iceberg REST catalog service
 
-* [Iceberg REST catalog service](./iceberg-rest-service.md): a guide to using Gravitino
-  as an Apache Iceberg REST catalog service.
+* [Iceberg REST catalog service](./admin/iceberg-server.md):
+  A guide to using Gravitino as an Apache Iceberg REST catalog service.
 
 ### Connectors
 
@@ -161,9 +161,9 @@ Gravitino provides a Flink connector to manage metadata in a unified way. To use
 
 Gravitino provides several ways to configure and manage the Gravitino server. See:
 
-* [Gravitino metrics](./metrics.md): provides metrics configurations and detailed a metrics list
+* [Gravitino metrics](./admin/metrics.md): provides metrics configurations and detailed a metrics list
   of the Gravitino server.
-* [How to upgrade Gravitino](./how-to-upgrade.md): a guide to upgrading the schema of Gravitino storage backend from one release version to another.
+* [How to upgrade Gravitino](./admin/upgrade.md): a guide to upgrading the schema of Gravitino storage backend from one release version to another.
 
 ### Security
 

@@ -371,7 +371,7 @@ The configuration items are as follows:
 </tbody>
 </table>
 
-Refer to [Iceberg REST catalog service](../iceberg-rest-service.md) for configuration details.
+Refer to [Iceberg REST catalog service](./iceberg-server.md) for configuration details.
 
 ### Event listener configuration
 

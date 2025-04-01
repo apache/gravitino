@@ -91,7 +91,7 @@ You can now proceed to check the [package contents](#package-contents).
 To manually build the binary package from the source code,
 you need to either clone the Gravitino GIT repository or download the source package
 and then decompress it to your local environment.
-You will follow the [how to build guide](./develop/how-to-build.md) to build Gravitino.
+You will follow the [how to build guide](../develop/how-to-build.md) to build Gravitino.
 After you have run the `./gradlew compileDistribution` command,
 you can find the Gravitino binary package contents in the `distribution/package` sub-directory.
 
@@ -102,22 +102,22 @@ The Gravitino binary distribution package contains the following files/directori
 ```text
  ├authorizations/                        # Packages for chain authorization and ranger authorization.
  ├bin/
- |  ├gravitino.sh                        # Gravitino server launching scripts.
- |  └ gravitino-iceberg-rest-server.sh   # Gravitino Iceberg REST server launching scripts.
+ │ ├gravitino.sh                        # Gravitino server launching scripts.
+ │ └ gravitino-iceberg-rest-server.sh   # Gravitino Iceberg REST server launching scripts.
  ├catalogs
- |  ├hadoop/                             # Apache Hadoop catalog dependencies and configurations.
- |  ├hive/                               # Apache Hive catalog dependencies and configurations.
- |  ├jdbc-doris/                         # JDBC doris catalog dependencies and configurations.
- |  ├jdbc-mysql/                         # JDBC MySQL catalog dependencies and configurations.
- |  ├jdbc-postgresql/                    # JDBC PostgreSQL catalog dependencies and configurations.
- |  ├kafka/                              # Apache Kafka PostgreSQL catalog dependencies and configurations.
- |  ├lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
- |  └ lakehouse-paimon/                  # Apache Paimon catalog dependencies and configurations.
+ │ ├hadoop/                             # Apache Hadoop catalog dependencies and configurations.
+ │ ├hive/                               # Apache Hive catalog dependencies and configurations.
+ │ ├jdbc-doris/                         # JDBC doris catalog dependencies and configurations.
+ │ ├jdbc-mysql/                         # JDBC MySQL catalog dependencies and configurations.
+ │ ├jdbc-postgresql/                    # JDBC PostgreSQL catalog dependencies and configurations.
+ │ ├kafka/                              # Apache Kafka PostgreSQL catalog dependencies and configurations.
+ │ ├lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
+ │ └ lakehouse-paimon/                  # Apache Paimon catalog dependencies and configurations.
  ├conf/
- |  ├gravitino.conf                      # Gravitino server and Gravitino Iceberg REST server configuration.
- |  ├gravitino-iceberg-rest-server.conf  # Gravitino server Iceberg REST server configuration.
- |  ├gravitino-env.sh                    # Environment variables.
- |  └log4j2.properties                   # Log4j2 configuration for the Gravitino server and Gravitino Iceberg REST server.
+ │ ├gravitino.conf                      # Gravitino server and Gravitino Iceberg REST server configuration.
+ │ ├gravitino-iceberg-rest-server.conf  # Gravitino server Iceberg REST server configuration.
+ │ ├gravitino-env.sh                    # Environment variables.
+ │ └log4j2.properties                   # Log4j2 configuration for the Gravitino server and Gravitino Iceberg REST server.
  ├data/                                  # Default data directory for the Gravitino server.
  ├iceberg-rest-server/                   # Gravitino Iceberg REST server package and dependencies libraries.
  ├libs/                                  # Gravitino server dependencies libraries.
@@ -132,13 +132,14 @@ The Gravitino binary distribution package contains the following files/directori
 #### Initialize the RDBMS (Optional)
 
 If you want to use the `relational` backend storage, you need to initialize the RDBMS first.
-For more details, please check [how to use relational backend storage](./how-to-use-relational-backend-storage.md).
+For more details, please check [how to use relational backend storage](../install/backend-storage.md).
 
 #### Configure the Apache Gravitino server
 
 The Gravitino server configuration file (`conf/gravitino.conf`) contains builtin default settings.
 You can configure the Gravitino server by modifying this file.
-For details about the configurable options, please check [Gravitino Server configurations](./admin/server-config.md).
+For details about the configurable options,
+please check the [Gravitino Server configurations](../admin/server-config.md).
 
 #### Configure the server logging
 
@@ -207,11 +208,11 @@ curl -v -X GET \
 
 
 For information on debugging the Gravitino server,
-check the [debugging instructions](./develop/testing.md#debugging-the-apache-gravitino-server).
+check the [debugging instructions](../develop/testing.md#debugging-the-apache-gravitino-server).
 
 ## Manage Gravitino Iceberg REST server
 
-You can run the [Iceberg REST server](./iceberg-rest-service.md) as standalone server
+You can run the [Iceberg REST server](../admin/iceberg-server.md) as standalone server
 using the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations provided
 in the `./conf/gravitino-iceberg-rest-server.conf` file.
 
@@ -246,7 +247,7 @@ curl -v -X GET \
 The Gravitino Docker image published on Docker Hub only contains the Gravitino server with some basic configurations.
 If you want to enjoy the whole Gravitino system with other components, you can use the Docker `compose` file.
 
-For more details, check [installing Apache Gravitino playground](./playground/install.md).
+For more details, check [installing Apache Gravitino playground](../playground/install.md).
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToInstall" alt="" />
 

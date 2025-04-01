@@ -149,12 +149,15 @@ For Iceberg REST catalog server, please use Gravitino cloud bundle jar without H
 - [Gravitino Azure bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure)
 
 :::note
-For OSS, Iceberg doesn't provide Iceberg Aliyun bundle jar which contains OSS packages, you could provide the OSS jar by yourself or use [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), please refer to [OSS configuration](../iceberg-rest-service.md#oss-configuration) for more details.
+For OSS, Iceberg doesn't provide Iceberg Aliyun bundle JAR which contains OSS packages.
+You can provision the OSS JAR by yourself or use [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle).
+Please refer to [OSS configuration](../admin/iceberg-server.md#oss-configuration) for more details.
 :::
 
-The classpath of the server:
+The CLASSPATH of the server:
 
-- Iceberg REST server: the classpath differs in different deploy mode, please refer to [Server management](../iceberg-rest-service.md#server-management) part.
+- Iceberg REST server: the CLASSPATH differs in different deploy mode.
+  Please refer to [Iceberg server management](../admin/iceberg-server.md#server-management) part.
 - Hadoop catalog: `catalogs/hadoop/libs/`
 
 ## Usage example
