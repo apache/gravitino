@@ -325,6 +325,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         metadataObject.name(),
         metadataObject.path(),
         metadataObject.type(),
+        metadataObject.isRecursive(),
         privileges);
   }
 
@@ -385,7 +386,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   switch (securableObject.type()) {
                     case METALAKE:
                       extractMetalakeLocations(
-                          securableObject, identifier, rangerSecurableObjects, rangerPrivileges);
+                          securableObject,
+                          identifier,
+                          rangerSecurableObjects,
+                          rangerPrivileges,
+                          true);
                       break;
                     case CATALOG:
                     case SCHEMA:
@@ -412,7 +417,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   switch (securableObject.type()) {
                     case METALAKE:
                       extractMetalakeLocations(
-                          securableObject, identifier, rangerSecurableObjects, rangerPrivileges);
+                          securableObject,
+                          identifier,
+                          rangerSecurableObjects,
+                          rangerPrivileges,
+                          false);
                       break;
                     case CATALOG:
                       AuthorizationUtils.getMetadataObjectLocation(
@@ -424,7 +433,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                       locationPath,
                                       rangerSecurableObjects,
                                       rangerPrivileges,
-                                      true));
+                                      false));
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -434,7 +443,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   }
                   break;
                 case SELECT_TABLE:
-                case CREATE_TABLE:
                 case MODIFY_TABLE:
                   AuthorizationUtils.getMetadataObjectLocation(
                           identifier, MetadataObjectUtil.toEntityType(securableObject))
@@ -452,6 +460,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                     pathBaseMetadataObject, rangerPrivileges));
                           });
                   break;
+                case CREATE_TABLE:
                 case CREATE_FILESET:
                   switch (securableObject.type()) {
                     case METALAKE:
@@ -467,7 +476,13 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                     (PathBasedMetadataObject) metadataObject;
                                 rangerSecurableObjects.add(
                                     generateAuthorizationSecurableObject(
-                                        pathBasedMetadataObject, rangerPrivileges));
+                                        new PathBasedMetadataObject(
+                                            pathBasedMetadataObject.parent(),
+                                            pathBasedMetadataObject.name(),
+                                            pathBasedMetadataObject.path(),
+                                            pathBasedMetadataObject.type(),
+                                            false),
+                                        rangerPrivileges));
                               });
                       break;
                     default:
@@ -519,7 +534,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       SecurableObject securableObject,
       NameIdentifier identifier,
       List<AuthorizationSecurableObject> rangerSecurableObjects,
-      Set<AuthorizationPrivilege> rangerPrivileges) {
+      Set<AuthorizationPrivilege> rangerPrivileges,
+      boolean isRecursive) {
     NameIdentifier[] catalogs =
         GravitinoEnv.getInstance()
             .catalogDispatcher()
@@ -548,7 +564,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             securableObject.parent(),
             securableObject.name(),
             locationPath,
-            PathBasedMetadataObject.PathType.get(securableObject.type()));
+            PathBasedMetadataObject.PathType.get(securableObject.type()),
+            isRecursive);
     pathBaseMetadataObject.validateAuthorizationMetadataObject();
     rangerSecurableObjects.add(
         generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
