@@ -21,6 +21,7 @@ package org.apache.gravitino.lineage;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.lineage.sink.LineageLogSinker;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

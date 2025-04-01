@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage;
+package org.apache.gravitino.lineage.processor;
 
 import io.openlineage.server.OpenLineage.RunEvent;
 

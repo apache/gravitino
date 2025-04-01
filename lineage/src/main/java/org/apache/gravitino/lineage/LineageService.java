@@ -22,6 +22,9 @@ package org.apache.gravitino.lineage;
 import io.openlineage.server.OpenLineage;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.Set;
+import org.apache.gravitino.lineage.processor.LineageProcessor;
+import org.apache.gravitino.lineage.sink.LineageSinkManager;
+import org.apache.gravitino.lineage.source.LineageSource;
 import org.apache.gravitino.utils.ClassUtils;
 
 /**

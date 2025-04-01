@@ -30,6 +30,8 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.lineage.processor.NoopProcessor;
+import org.apache.gravitino.lineage.sink.LineageLogSinker;
 
 public class LineageConfig extends Config {
 

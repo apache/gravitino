@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage;
+package org.apache.gravitino.lineage.sink;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.MapperFeature;

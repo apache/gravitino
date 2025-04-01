@@ -17,18 +17,14 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage;
+package org.apache.gravitino.lineage.processor;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Map;
-import java.util.Set;
+import io.openlineage.server.OpenLineage.RunEvent;
 
-public class HTTPLineageSource implements LineageSource {
-  @Override
-  public void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
+public class NoopProcessor implements LineageProcessor {
 
   @Override
-  public Set<String> getRESTPackages() {
-    return ImmutableSet.of();
+  public RunEvent process(RunEvent runEvent) {
+    return runEvent;
   }
 }

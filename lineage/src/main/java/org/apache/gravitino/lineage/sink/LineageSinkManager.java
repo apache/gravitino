@@ -17,30 +17,24 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage;
+package org.apache.gravitino.lineage.sink;
 
-import io.openlineage.server.OpenLineage;
+import io.openlineage.server.OpenLineage.RunEvent;
 import java.io.Closeable;
+import java.util.List;
 import java.util.Map;
 
-/** The LineageSink interface defines a closable component responsible for sinking lineage event. */
-public interface LineageSink extends Closeable {
+@SuppressWarnings("unused")
+public class LineageSinkManager implements Closeable {
 
-  /**
-   * Initializes the lineage sink with the provided configuration.
-   *
-   * @param configs A map representing the configuration for the sink.
-   */
-  default void initialize(Map<String, String> configs) {}
+  public void initialize(List<String> sinks, Map<String, String> LineageConfigs) {}
 
-  /** Closes the lineage sink and releases associated resources. */
+  public boolean isHighWaterMark() {
+    return false;
+  }
+
+  public void sink(RunEvent runEvent) {}
+
   @Override
-  default void close() {}
-
-  /**
-   * Sinks the given lineage run event.
-   *
-   * @param event The lineage run event to be processed.
-   */
-  void sink(OpenLineage.RunEvent event);
+  public void close() {}
 }

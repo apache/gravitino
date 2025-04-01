@@ -17,12 +17,13 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage;
+package org.apache.gravitino.lineage.source;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.Closeable;
 import java.util.Map;
 import java.util.Set;
+import org.apache.gravitino.lineage.LineageDispatcher;
 
 /**
  * The LineageSource interface defines a closable data source for receiving and dispatching lineage
