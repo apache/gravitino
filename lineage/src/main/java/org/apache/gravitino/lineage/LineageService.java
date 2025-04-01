@@ -51,8 +51,12 @@ public class LineageService implements LineageDispatcher {
 
   @Override
   public void close() {
-    source.close();
-    sinkManager.close();
+    if (source != null) {
+      source.close();
+    }
+    if (sinkManager != null) {
+      sinkManager.close();
+    }
   }
 
   @Override

@@ -32,6 +32,7 @@ import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.lineage.processor.NoopProcessor;
 import org.apache.gravitino.lineage.sink.LineageLogSinker;
+import org.apache.gravitino.lineage.source.HTTPLineageSource;
 
 public class LineageConfig extends Config {
 
@@ -41,8 +42,7 @@ public class LineageConfig extends Config {
   public static final String LINEAGE_SOURCE_CLASS_NAME = "sourceClass";
   public static final String LINEAGE_PROCESSOR_CLASS_NAME = "processorClass";
   public static final String LINEAGE_SINK_CLASS_NAME = "sinkClass";
-  public static final String LINEAGE_HTTP_SOURCE_CLASS_NAME =
-      "org.apache.gravitino.lineage.HTTPLineageSource";
+  public static final String LINEAGE_HTTP_SOURCE_CLASS_NAME = HTTPLineageSource.class.getName();
 
   public static final String LINEAGE_LOG_SINK_NAME = "log";
   public static final String LINEAGE_HTTP_SOURCE_NAME = "http";

@@ -172,7 +172,9 @@ public class GravitinoServer extends ResourceConfig {
   public void stop() {
     server.stop();
     gravitinoEnv.shutdown();
-    lineageService.close();
+    if (lineageService != null) {
+      lineageService.close();
+    }
   }
 
   public static void main(String[] args) {
