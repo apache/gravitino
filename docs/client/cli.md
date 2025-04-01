@@ -118,7 +118,7 @@ The CLI checks the URL setting in the following order:
 
 ### The authentication type
 
-The Gravitino server supports several [authentication-types](../security/how-to-authenticate.md).
+The Gravitino server supports several [authentication-types](../security/authentication.md).
 You can specify the authentication type in several ways.
 The CLI checks the authentication type in the following order:
 

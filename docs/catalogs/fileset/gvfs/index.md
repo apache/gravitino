@@ -435,7 +435,7 @@ For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https:
 Currently, Gravitino Virtual File System supports two kinds of authentication types
 when accessing the Gravitino server: `simple` and `oauth2`.
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
-See [authentication documentation](../../../security/how-to-authenticate.md) for more details.
+See [authentication documentation](../../../security/authentication.md) for more details.
 
 #### Using `simple` authentication
 

@@ -170,7 +170,7 @@ Gravitino provides several ways to configure and manage the Gravitino server. Se
 Gravitino provides security configurations for Gravitino, including HTTPS, authentication and access control configurations.
 
 * [HTTPS](./security/how-to-use-https.md): provides HTTPS configurations.
-* [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, OAuth, Kerberos.
+* [Authentication](./security/authentication.md): provides authentication configurations including simple, OAuth, Kerberos.
 * [Access Control](./security/access-control.md): provides access control configurations.
 * [CORS](./security/cors.md): Guide on CORS configurations.
 
