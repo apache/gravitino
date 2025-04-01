@@ -253,11 +253,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    */
   @Override
   protected void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
-    if (authzMetadataObject.type().equals(PathBasedMetadataObject.SCHEMA_PATH)) {
+    if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.SCHEMA) {
       removeSchemaMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.type().equals(PathBasedMetadataObject.TABLE_PATH)) {
+    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.TABLE) {
       removeTableMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.type().equals(PathBasedMetadataObject.FILESET_PATH)) {
+    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.FILESET) {
       removePolicyByMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.METALAKE
         || authzMetadataObject.metadataObjectType() == MetadataObject.Type.CATALOG) {
@@ -306,30 +306,22 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     policy.setName(getAuthorizationPath(pathBasedMetadataObject));
     RangerPolicy.RangerPolicyResource policyResource =
         new RangerPolicy.RangerPolicyResource(
-            getAuthorizationPath(pathBasedMetadataObject), false, true);
+            getAuthorizationPath(pathBasedMetadataObject), false, pathBasedMetadataObject.isRecursive());
     policy.getResources().put(RangerDefines.PolicyResource.PATH.getName(), policyResource);
     return policy;
   }
 
   @Override
-  public AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      List<String> names,
-      String path,
-      AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges) {
-    AuthorizationMetadataObject authMetadataObject =
-        new PathBasedMetadataObject(
-            AuthorizationMetadataObject.getParentFullName(names),
-            AuthorizationMetadataObject.getLastName(names),
-            path,
-            type);
-    authMetadataObject.validateAuthorizationMetadataObject();
+  public AuthorizationSecurableObject generateAuthorizationSecurableObject(AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges) {
+    object.validateAuthorizationMetadataObject();
+    Preconditions.checkArgument(object instanceof PathBasedMetadataObject, "Object must be a path based metadata object");
+    PathBasedMetadataObject metadataObject = (PathBasedMetadataObject) object;
     return new PathBasedSecurableObject(
-        authMetadataObject.parent(),
-        authMetadataObject.name(),
-        path,
-        authMetadataObject.type(),
-        privileges);
+            metadataObject.parent(),
+            metadataObject.name(),
+            metadataObject.path(),
+            metadataObject.type(),
+            privileges);
   }
 
   @Override
@@ -401,7 +393,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                     securableObject,
                                     locationPath,
                                     rangerSecurableObjects,
-                                    rangerPrivileges);
+                                    rangerPrivileges, true);
                               });
                       break;
                     default:
@@ -426,7 +418,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                       securableObject,
                                       locationPath,
                                       rangerSecurableObjects,
-                                      rangerPrivileges));
+                                      rangerPrivileges, true));
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -451,9 +443,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                             pathBaseMetadataObject.validateAuthorizationMetadataObject();
                             rangerSecurableObjects.add(
                                 generateAuthorizationSecurableObject(
-                                    pathBaseMetadataObject.names(),
-                                    locationPath,
-                                    PathBasedMetadataObject.PathType.get(securableObject.type()),
+                                    pathBaseMetadataObject,
                                     rangerPrivileges));
                           });
                   break;
@@ -462,6 +452,19 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                     case METALAKE:
                     case CATALOG:
                     case SCHEMA:
+                      translateMetadataObject(securableObject)
+                              .forEach(
+                                      metadataObject -> {
+                                        Preconditions.checkArgument(
+                                                metadataObject instanceof PathBasedMetadataObject,
+                                                "The metadata object must be a PathBasedMetadataObject");
+                                        PathBasedMetadataObject pathBasedMetadataObject =
+                                                (PathBasedMetadataObject) metadataObject;
+                                        rangerSecurableObjects.add(
+                                                generateAuthorizationSecurableObject(
+                                                        pathBasedMetadataObject,
+                                                        rangerPrivileges));
+                                      });
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -487,9 +490,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                     (PathBasedMetadataObject) metadataObject;
                                 rangerSecurableObjects.add(
                                     generateAuthorizationSecurableObject(
-                                        pathBasedMetadataObject.names(),
-                                        getAuthorizationPath(pathBasedMetadataObject),
-                                        PathBasedMetadataObject.FILESET_PATH,
+                                        pathBasedMetadataObject,
                                         rangerPrivileges));
                               });
                       break;
@@ -525,15 +526,16 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           .forEach(
               locationPath ->
                   createPathBasedMetadataObject(
-                      securableObject, locationPath, rangerSecurableObjects, rangerPrivileges));
+                      securableObject, locationPath, rangerSecurableObjects, rangerPrivileges, true));
     }
   }
 
   private void createPathBasedMetadataObject(
-      SecurableObject securableObject,
-      String locationPath,
-      List<AuthorizationSecurableObject> rangerSecurableObjects,
-      Set<AuthorizationPrivilege> rangerPrivileges) {
+          SecurableObject securableObject,
+          String locationPath,
+          List<AuthorizationSecurableObject> rangerSecurableObjects,
+          Set<AuthorizationPrivilege> rangerPrivileges,
+          boolean isRecursive) {
     PathBasedMetadataObject pathBaseMetadataObject =
         new PathBasedMetadataObject(
             securableObject.parent(),
@@ -542,9 +544,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             PathBasedMetadataObject.PathType.get(securableObject.type()));
     pathBaseMetadataObject.validateAuthorizationMetadataObject();
     rangerSecurableObjects.add(
-        generateAuthorizationSecurableObject(
-            pathBaseMetadataObject.names(), locationPath,
-            PathBasedMetadataObject.PathType.get(securableObject.type()), rangerPrivileges));
+        generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
   }
 
   @Override
@@ -567,9 +567,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       (PathBasedMetadataObject) metadataObject;
                   rangerSecurableObjects.add(
                       generateAuthorizationSecurableObject(
-                          pathBasedMetadataObject.names(),
-                          getAuthorizationPath(pathBasedMetadataObject),
-                          pathBasedMetadataObject.type(),
+                          pathBasedMetadataObject,
                           ownerMappingRule()));
                 });
         break;

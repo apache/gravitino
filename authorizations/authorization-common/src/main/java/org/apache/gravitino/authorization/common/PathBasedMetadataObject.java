@@ -92,15 +92,22 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
   private final String name;
   private final String parent;
   private final String path;
+  private final boolean isRecursive;
 
   private final AuthorizationMetadataObject.Type type;
 
   public PathBasedMetadataObject(
       String parent, String name, String path, AuthorizationMetadataObject.Type type) {
+    this(parent, name, path, type, true);
+  }
+
+  public PathBasedMetadataObject(
+          String parent, String name, String path, AuthorizationMetadataObject.Type type, boolean isRecursive) {
     this.parent = parent;
     this.name = name;
     this.path = path;
     this.type = type;
+    this.isRecursive = isRecursive;
   }
 
   @Override
@@ -120,6 +127,10 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
 
   public String path() {
     return path;
+  }
+
+  public boolean isRecursive() {
+    return isRecursive;
   }
 
   @Override

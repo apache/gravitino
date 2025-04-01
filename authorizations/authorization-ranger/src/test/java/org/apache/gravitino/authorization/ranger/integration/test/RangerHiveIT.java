@@ -49,12 +49,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
-import org.apache.gravitino.authorization.ranger.RangerClientExtension;
-import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
-import org.apache.gravitino.authorization.ranger.RangerHadoopSQLSecurableObject;
-import org.apache.gravitino.authorization.ranger.RangerHelper;
-import org.apache.gravitino.authorization.ranger.RangerPrivileges;
+import org.apache.gravitino.authorization.ranger.*;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
@@ -81,7 +76,7 @@ import org.slf4j.LoggerFactory;
 public class RangerHiveIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveIT.class);
 
-  private static RangerAuthorizationPlugin rangerAuthHivePlugin;
+  private static RangerAuthorizationHadoopSQLPlugin rangerAuthHivePlugin;
   private static RangerHelper rangerHelper;
   private final AuditInfo auditInfo =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -390,7 +385,6 @@ public class RangerHiveIT {
     AuthorizationSecurableObject rangerSecurableObject =
         rangerAuthHivePlugin.generateAuthorizationSecurableObject(
             ImmutableList.of(String.format("%s3", dbName), "tab1"),
-            "",
             RangerHadoopSQLMetadataObject.Type.TABLE,
             ImmutableSet.of(
                 new RangerPrivileges.RangerHivePrivilegeImpl(

@@ -1028,9 +1028,7 @@ public abstract class RangerAuthorizationPlugin
 
   /** Generate authorization securable object */
   public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      List<String> names,
-      String path,
-      AuthorizationMetadataObject.Type type,
+      AuthorizationMetadataObject object,
       Set<AuthorizationPrivilege> privileges);
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
