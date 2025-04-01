@@ -172,7 +172,7 @@ including HTTPS, authentication and access control configurations.
 
 * [HTTPS](./security/https.md): configurations for enabling HTTPS access.
 * [Authentication](./security/authentication.md): configurations for simple, OAuth, Kerberos authentications.
-* [Access Control](./security/access-control.md): provides access control configurations.
+* [Authorization](./security/authorization.md): configurations related to access authorization.
 * [CORS](./security/cors.md): Guide on CORS configurations.
 
 ### Programming guides

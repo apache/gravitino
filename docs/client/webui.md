@@ -12,7 +12,7 @@ This document primarily outlines how users can manage metadata within Apache Gra
 The Web UI is the graphical interface is accessible through a web browser
 as an alternative to writing code or using the REST interface.
 
-Currently, you can integrate [OAuth settings](../security/security.md)
+Currently, you can integrate [OAuth settings](../security/index.md)
 to view, add, modify, and delete metalakes, create catalogs,
 and view catalogs, schemas, and tables, among other functions.
 
@@ -23,7 +23,7 @@ by default is [http://localhost:8090](http://localhost:8090).
 ## Initial page
 
 The Web UI homepage displayed in Gravitino depends on the configuration parameter for OAuth mode,
-see the details in [Security](../security/security.md).
+see the details in [Security](../security/index.md).
 
 Set parameter for `gravitino.authenticators`, [`simple`](#simple-mode) or [`oauth`](#oauth-mode).
 Simple mode is the default authentication option.
@@ -60,8 +60,9 @@ Set the configuration parameter `gravitino.authenticators` to `oauth`,
 and the web UI displays the login page.
 
 :::caution
-If both `OAuth` and `HTTPS` are set, due to the different security permission rules of various browsers, to avoid cross-domain errors,
-it is recommended to use the [Chrome](https://www.google.com/chrome/) browser for access and operation.
+If both `OAuth` and `HTTPS` are set, due to the different security permission rules of various browsers,
+it is recommended to use the [Chrome](https://www.google.com/chrome/) browser for access and operation
+to avoid cross-domain errors,
 
 Such as Safari need to enable the developer menu, and select `Disable Cross-Origin Restrictions` from the develop menu.
 :::
@@ -69,7 +70,7 @@ Such as Safari need to enable the developer menu, and select `Disable Cross-Orig
 ![webui-login-with-oauth](../assets/webui/login-with-oauth.png)
 
 1. Enter the values corresponding to your specific configuration.
-   For detailed instructions, please refer to [Security](../security/security.md).
+   For detailed instructions, please refer to [Security](../security/index.md).
 
 1. Click on the `LOGIN` button takes you to the homepage.
 

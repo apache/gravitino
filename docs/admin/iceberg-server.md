@@ -222,7 +222,7 @@ in the format `gravitino.iceberg-rest.<filter class name>.param.<name>=<value>`.
 ### Security
 
 Gravitino Iceberg REST server supports OAuth2 and HTTPS,
-please refer to [security documentation](../security/security.md) for more details.
+please refer to [security documentation](../security/index.md) for more details.
 
 #### Backend authentication
 

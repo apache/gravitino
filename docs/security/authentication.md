@@ -1,6 +1,6 @@
 ---
 title: "How to authenticate"
-slug: /security/how-to-authenticate
+slug: /security/authentication
 keyword: security authentication oauth kerberos
 license: "This software is licensed under the Apache License version 2."
 ---

@@ -1,6 +1,6 @@
 ---
 title: "Security"
-slug: /security/security
+slug: /security
 keyword: security
 license: "This software is licensed under the Apache License version 2."
 ---
@@ -15,6 +15,6 @@ Gravitino has supported the following security features:
 
 - [Authorization push down](./authorization-pushdown.md)
 - [Authentication](./authentication.md)
+- [Authorization](./authorization.md)
 - Enabling [HTTPS](./https.md) access for servers
-- [Access Control](./access-control.md)
 - [CORS](./cors.md)
