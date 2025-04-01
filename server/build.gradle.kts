@@ -27,6 +27,7 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
+  implementation(project(":lineage"))
   implementation(project(":server-common"))
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
