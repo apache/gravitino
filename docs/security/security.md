@@ -15,6 +15,6 @@ Gravitino has supported the following security features:
 
 - [Authorization push down](./authorization-pushdown.md)
 - [Authentication](./authentication.md)
-- [HTTPS](./how-to-use-https.md)
+- Enabling [HTTPS](./https.md) access for servers
 - [Access Control](./access-control.md)
 - [CORS](./cors.md)
