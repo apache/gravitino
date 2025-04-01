@@ -30,6 +30,8 @@ import io.openlineage.server.OpenLineage.RunEvent;
 import io.openlineage.server.OpenLineage.RunEvent.EventType;
 import io.openlineage.server.OpenLineage.RunFacets;
 import java.io.File;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -44,12 +46,46 @@ public class TestRunEventUtils {
   @SneakyThrows
   @Test
   void testRunEventUtils() {
+    List<File> files = getRunEventJsonFiles();
+    files.forEach(
+        file -> {
+          try {
+            testRunEventJsonFile(file);
+          } catch (Exception e) {
+            Assertions.fail("Failed to test file: " + file.getName(), e);
+          }
+        });
+  }
+
+  @SneakyThrows
+  private void testRunEventJsonFile(File jsonFile) {
     ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
-    RunEvent runEvent =
-        objectMapper.readValue(
-            new File("/Users/fanng/deploy/openlineage/fileset-model.json"), RunEvent.class);
-    OpenLineage.RunEvent clientEvent = RunEventUtils.getClientRunEvent(runEvent);
-    checkRunEvent(runEvent, clientEvent);
+    RunEvent serverEvent = objectMapper.readValue(jsonFile, RunEvent.class);
+    OpenLineage.RunEvent clientEvent = RunEventUtils.getClientRunEvent(serverEvent);
+    checkRunEvent(serverEvent, clientEvent);
+  }
+
+  private List<File> getRunEventJsonFiles() {
+    String projectDir = System.getenv("GRAVITINO_ROOT_DIR");
+
+    String path =
+        Paths.get(projectDir, "server", "src", "test", "resources", "lineage")
+            .toAbsolutePath()
+            .toString();
+    List<File> jsonFiles = new ArrayList<>();
+    File directory = new File(path);
+
+    if (directory.exists() && directory.isDirectory()) {
+      File[] files = directory.listFiles();
+      if (files != null) {
+        for (File file : files) {
+          if (file.isFile() && file.getName().endsWith(".json")) {
+            jsonFiles.add(file);
+          }
+        }
+      }
+    }
+    return jsonFiles;
   }
 
   private void checkRunEvent(RunEvent serverEvent, OpenLineage.RunEvent clientEvent) {
@@ -303,6 +339,9 @@ public class TestRunEventUtils {
     }
     if (clientRunFacets.getNominalTime() != null) {
       sets.add("nominalTime");
+    }
+    if (clientRunFacets.getProcessing_engine() != null) {
+      sets.add("processing_engine");
     }
     return sets;
   }
