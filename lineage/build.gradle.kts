@@ -21,7 +21,6 @@ plugins {
   id("java")
 }
 
-// try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
   implementation(project(":core"))
   implementation(libs.commons.lang3)
