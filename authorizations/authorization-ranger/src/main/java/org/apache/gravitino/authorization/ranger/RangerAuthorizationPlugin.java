@@ -28,9 +28,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
@@ -722,35 +724,40 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public Boolean onUserAdded(User user) throws AuthorizationPluginException {
-    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
-    if (list.getListSize() > 0) {
-      LOG.warn("The user({}) already exists in the Ranger!", user.name());
-      return Boolean.FALSE;
-    }
-
-    VXUser rangerUser = VXUser.builder().withName(user.name()).withDescription(user.name()).build();
-    return rangerClient.createUser(rangerUser);
+    return getUserId(user.name())
+        .map(
+            id -> {
+              LOG.warn("The user({}) already exists in the Ranger!", user.name());
+              return Boolean.FALSE;
+            })
+        .orElseGet(
+            () -> {
+              VXUser rangerUser =
+                  VXUser.builder().withName(user.name()).withDescription(user.name()).build();
+              return rangerClient.createUser(rangerUser);
+            });
   }
 
   @Override
   public Boolean onUserRemoved(User user) throws AuthorizationPluginException {
-    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
-    if (list.getListSize() == 0) {
-      LOG.warn("The user({}) doesn't exist in the Ranger!", user);
-      return Boolean.FALSE;
-    }
-    rangerClient.deleteUser(list.getList().get(0).getId());
-    return Boolean.TRUE;
+    return getUserId(user.name())
+        .map(id -> rangerClient.deleteUser(id))
+        .orElseGet(
+            () -> {
+              LOG.warn("The user({}) doesn't exist in the Ranger!", user.name());
+              return Boolean.FALSE;
+            });
   }
 
   @Override
   public Boolean onUserAcquired(User user) throws AuthorizationPluginException {
-    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
-    if (list.getListSize() == 0) {
-      LOG.warn("The user({}) doesn't exist in the Ranger!", user);
-      return Boolean.FALSE;
-    }
-    return Boolean.TRUE;
+    return getUserId(user.name())
+        .map(id -> Boolean.TRUE)
+        .orElseGet(
+            () -> {
+              LOG.warn("The user({}) doesn't exist in the Ranger!", user);
+              return Boolean.FALSE;
+            });
   }
 
   @Override
@@ -761,18 +768,19 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public Boolean onGroupRemoved(Group group) throws AuthorizationPluginException {
-    VXGroupList list = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
-    if (list.getListSize() == 0) {
-      LOG.warn("The group({}) doesn't exist in the Ranger!", group);
-      return Boolean.FALSE;
-    }
-    return rangerClient.deleteGroup(list.getList().get(0).getId());
+    Optional<Long> groupId = getGroupId(group.name());
+    return groupId
+        .map(id -> rangerClient.deleteGroup(id))
+        .orElseGet(
+            () -> {
+              LOG.warn("The group({}) doesn't exist in the Ranger!", group.name());
+              return Boolean.FALSE;
+            });
   }
 
   @Override
   public Boolean onGroupAcquired(Group group) {
-    VXGroupList vxGroupList = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
-    if (vxGroupList.getListSize() == 0) {
+    if (!getGroupId(group.name()).isPresent()) {
       LOG.warn("The group({}) doesn't exist in the Ranger!", group);
       return Boolean.FALSE;
     }
@@ -1043,5 +1051,32 @@ public abstract class RangerAuthorizationPlugin
                       });
               return match.get();
             });
+  }
+
+  private Optional<Long> getUserId(String name) {
+    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", name));
+    if (list.getListSize() > 0) {
+      for (VXUser vxUser : list.getList()) {
+        if (vxUser.getName().equals(name)) {
+          return Optional.of(vxUser.getId());
+        }
+      }
+    }
+    return Optional.empty();
+  }
+
+  private Optional<Long> getGroupId(String name) {
+    VXGroupList vxGroupList = rangerClient.searchGroup(ImmutableMap.of("name", name));
+    try {
+      for (VXGroup group : vxGroupList.getList()) {
+        String value = (String) FieldUtils.readField(group, "name", true);
+        if (name.equals(value)) {
+          return Optional.of(group.getId());
+        }
+      }
+    } catch (Exception e) {
+      throw new AuthorizationPluginException("Fail to get the field name of class VXGroup");
+    }
+    return Optional.empty();
   }
 }

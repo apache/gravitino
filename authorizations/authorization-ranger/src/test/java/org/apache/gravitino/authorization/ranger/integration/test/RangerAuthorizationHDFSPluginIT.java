@@ -75,7 +75,7 @@ public class RangerAuthorizationHDFSPluginIT {
     withMockedAuthorizationUtils(
         () -> {
           MetadataObject metalake =
-              MetadataObjects.parse(String.format("metalake1"), MetadataObject.Type.METALAKE);
+              MetadataObjects.parse("metalake1", MetadataObject.Type.METALAKE);
           rangerAuthPlugin
               .translateMetadataObject(metalake)
               .forEach(
@@ -89,8 +89,7 @@ public class RangerAuthorizationHDFSPluginIT {
                     Assertions.assertEquals("/test", pathBasedMetadataObject.path());
                   });
 
-          MetadataObject catalog =
-              MetadataObjects.parse(String.format("catalog1"), MetadataObject.Type.CATALOG);
+          MetadataObject catalog = MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG);
           rangerAuthPlugin
               .translateMetadataObject(catalog)
               .forEach(
@@ -104,7 +103,7 @@ public class RangerAuthorizationHDFSPluginIT {
                   });
 
           MetadataObject schema =
-              MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
+              MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA);
           rangerAuthPlugin
               .translateMetadataObject(schema)
               .forEach(
@@ -118,8 +117,7 @@ public class RangerAuthorizationHDFSPluginIT {
                   });
 
           MetadataObject table =
-              MetadataObjects.parse(
-                  String.format("catalog1.schema1.tab1"), MetadataObject.Type.TABLE);
+              MetadataObjects.parse("catalog1.schema1.tab1", MetadataObject.Type.TABLE);
           rangerAuthPlugin
               .translateMetadataObject(table)
               .forEach(
@@ -133,8 +131,7 @@ public class RangerAuthorizationHDFSPluginIT {
                   });
 
           MetadataObject fileset =
-              MetadataObjects.parse(
-                  String.format("catalog1.schema1.fileset1"), MetadataObject.Type.FILESET);
+              MetadataObjects.parse("catalog1.schema1.fileset1", MetadataObject.Type.FILESET);
           rangerAuthPlugin
               .translateMetadataObject(fileset)
               .forEach(
@@ -155,7 +152,7 @@ public class RangerAuthorizationHDFSPluginIT {
         () -> {
           SecurableObject filesetInMetalake =
               SecurableObjects.parse(
-                  String.format("metalake1"),
+                  "metalake1",
                   MetadataObject.Type.METALAKE,
                   Lists.newArrayList(
                       Privileges.CreateFileset.allow(),
@@ -167,7 +164,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
           SecurableObject filesetInCatalog =
               SecurableObjects.parse(
-                  String.format("catalog1"),
+                  "catalog1",
                   MetadataObject.Type.CATALOG,
                   Lists.newArrayList(
                       Privileges.CreateFileset.allow(),
@@ -179,7 +176,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
           SecurableObject filesetInSchema =
               SecurableObjects.parse(
-                  String.format("catalog1.schema1"),
+                  "catalog1.schema1",
                   MetadataObject.Type.SCHEMA,
                   Lists.newArrayList(
                       Privileges.CreateFileset.allow(),
@@ -191,7 +188,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
           SecurableObject filesetInFileset =
               SecurableObjects.parse(
-                  String.format("catalog1.schema1.fileset1"),
+                  "catalog1.schema1.fileset1",
                   MetadataObject.Type.FILESET,
                   Lists.newArrayList(
                       Privileges.CreateFileset.allow(),
@@ -218,25 +215,23 @@ public class RangerAuthorizationHDFSPluginIT {
     withMockedAuthorizationUtils(
         () -> {
           MetadataObject metalake =
-              MetadataObjects.parse(String.format("metalake1"), MetadataObject.Type.METALAKE);
+              MetadataObjects.parse("metalake1", MetadataObject.Type.METALAKE);
           List<AuthorizationSecurableObject> metalakeOwner =
               rangerAuthPlugin.translateOwner(metalake);
           Assertions.assertEquals(0, metalakeOwner.size());
 
-          MetadataObject catalog =
-              MetadataObjects.parse(String.format("catalog1"), MetadataObject.Type.CATALOG);
+          MetadataObject catalog = MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG);
           List<AuthorizationSecurableObject> catalogOwner =
               rangerAuthPlugin.translateOwner(catalog);
           Assertions.assertEquals(0, catalogOwner.size());
 
           MetadataObject schema =
-              MetadataObjects.parse(String.format("catalog1.schema1"), MetadataObject.Type.SCHEMA);
+              MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA);
           List<AuthorizationSecurableObject> schemaOwner = rangerAuthPlugin.translateOwner(schema);
           Assertions.assertEquals(0, schemaOwner.size());
 
           MetadataObject fileset =
-              MetadataObjects.parse(
-                  String.format("catalog1.schema1.fileset1"), MetadataObject.Type.FILESET);
+              MetadataObjects.parse("catalog1.schema1.fileset1", MetadataObject.Type.FILESET);
           List<AuthorizationSecurableObject> filesetOwner =
               rangerAuthPlugin.translateOwner(fileset);
           filesetOwner.forEach(
