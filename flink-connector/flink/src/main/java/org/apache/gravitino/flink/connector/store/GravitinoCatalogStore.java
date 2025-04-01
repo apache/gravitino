@@ -35,6 +35,7 @@ import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.util.Preconditions;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalogFactory;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
@@ -93,11 +94,10 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       CatalogDescriptor descriptor =
           CatalogDescriptor.of(catalogName, Configuration.fromMap(flinkCatalogProperties));
       return Optional.of(descriptor);
+    } catch (NoSuchCatalogException noSuchCatalogException) {
+      return Optional.empty();
     } catch (Exception e) {
-      throw new CatalogException(
-          String.format(
-              "Failed to get the catalog:%s" + ", cause by: %s", catalogName, e.getMessage()),
-          e);
+      throw new CatalogException(String.format("Failed to get the catalog: %s", catalogName), e);
     }
   }
 

@@ -38,7 +38,6 @@ import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.DefaultCatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
-import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
@@ -129,10 +128,10 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
     tableEnv.useCatalog(DEFAULT_CATALOG);
     tableEnv.executeSql("drop catalog " + catalogName);
     Assertions.assertFalse(metalake.catalogExists(catalogName));
-    Assertions.assertThrows(
-        CatalogException.class,
-        () -> tableEnv.getCatalog(catalogName),
-        "Catalog flink.gravitino_iceberg_catalog does not exist");
+
+    Optional<org.apache.flink.table.catalog.Catalog> droppedCatalog =
+        tableEnv.getCatalog(catalogName);
+    Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
   }
 
   @Test
@@ -195,10 +194,9 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
     tableEnv.executeSql("drop catalog " + catalogName);
     Assertions.assertFalse(metalake.catalogExists(catalogName));
 
-    Assertions.assertThrows(
-        CatalogException.class,
-        () -> tableEnv.getCatalog(catalogName),
-        "Catalog flink.gravitino_iceberg_using_sql does not exist");
+    Optional<org.apache.flink.table.catalog.Catalog> droppedCatalog =
+        tableEnv.getCatalog(catalogName);
+    Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
   }
 
   @Test
