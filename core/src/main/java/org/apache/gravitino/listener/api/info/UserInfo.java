@@ -17,32 +17,43 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.info;
 
-import org.apache.gravitino.NameIdentifier;
+import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.authorization.User;
 
-/** Represents an event triggered before list user from specific metalake */
+/** Provides read-only access to user information for event listeners. */
 @DeveloperApi
-public class ListUsersPreEvent extends UserPreEvent {
+public class UserInfo {
+  private final String name;
+  private List<String> roles;
 
   /**
-   * Construct a new {@link ListUsersPreEvent} instance with the specified user and identifier.
+   * Construct a new {@link UserInfo} instance with the given {@link User} information.
    *
-   * @param initiator the user who initiated the list-user request.
-   * @param metalake the metalake name to list users from.
+   * @param user the {@link User} instance.
    */
-  protected ListUsersPreEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifier.of(metalake));
+  public UserInfo(User user) {
+    this.name = user.name();
+    this.roles = user.roles();
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the name of the user.
    *
-   * @return the operation type for this event.
+   * @return the name of the user
    */
-  @Override
-  public OperationType operationType() {
-    return OperationType.LIST_USERS;
+  public String name() {
+    return name;
+  }
+
+  /**
+   * Returns the roles of the user.
+   *
+   * @return the roles of the user.
+   */
+  public List<String> roles() {
+    return roles;
   }
 }

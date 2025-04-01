@@ -23,12 +23,14 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.model.ModelVersion;
 
 /**
  * {@link ModelVersionInfo} exposes model version information for event listener, it's supposed to
  * be read only. Most of the fields are shallow copied internally not deep copies for performance.
  */
+@DeveloperApi
 public class ModelVersionInfo {
   private final String uri;
   private final Map<String, String> properties;

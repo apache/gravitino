@@ -19,43 +19,58 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before retrieving a user from a specific metalake. */
+/** Represents an event triggered before revoking roles from a user. */
 @DeveloperApi
-public class GetUserPreEvent extends UserPreEvent {
+public class RevokeUserRolesPreEvent extends UserPreEvent {
   private final String userName;
+  private final List<String> roles;
 
   /**
-   * Constructs a new {@link GetUserPreEvent} instance with the specified user, identifier, and user
-   * info.
+   * Constructs a new {@link RevokeUserRolesPreEvent} instance with the specified initiator,
+   * metalake name, username, and roles to be revoked.
    *
-   * @param initiator The name of the user who initiated the get-user request.
-   * @param metalake The name of the metalake where the user is being retrieved from.
-   * @param userName The username that is requested to be retrieved.
+   * @param initiator the user who initiated the event to revoke roles.
+   * @param metalake the name of the metalake on which the operation is being performed.
+   * @param userName the username of the user whose roles are being revoked.
+   * @param roles the list of roles to be revoked from the user.
    */
-  public GetUserPreEvent(String initiator, String metalake, String userName) {
+  public RevokeUserRolesPreEvent(
+      String initiator, String metalake, String userName, List<String> roles) {
     super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
+
     this.userName = userName;
+    this.roles = roles;
   }
 
   /**
-   * Returns the username for the user being retrieved.
+   * Returns the username of the user whose roles are being revoked.
    *
-   * @return The username that is requested to be retrieved.
+   * @return the username of the user.
    */
   public String userName() {
     return userName;
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the list of roles that are being revoked from the user.
    *
-   * @return the operation type for this event.
+   * @return the list of revoked roles.
+   */
+  public List<String> roles() {
+    return roles;
+  }
+
+  /**
+   * Returns the operation type of this event.
+   *
+   * @return the operation type.
    */
   @Override
   public OperationType operationType() {
-    return OperationType.GET_USER;
+    return OperationType.REVOKE_USER_ROLES;
   }
 }

@@ -20,33 +20,35 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before retrieving a user from a specific metalake. */
+/** Represents an event triggered after successfully retrieving a user from a specific metalake. */
 @DeveloperApi
-public class GetUserPreEvent extends UserPreEvent {
-  private final String userName;
+public class GetUserEvent extends UserEvent {
+  private final UserInfo loadedUserInfo;
 
   /**
-   * Constructs a new {@link GetUserPreEvent} instance with the specified user, identifier, and user
-   * info.
+   * Constructs a new {@link GetUserEvent} instance with the specified initiator, metalake name, and
+   * user information.
    *
-   * @param initiator The name of the user who initiated the get-user request.
-   * @param metalake The name of the metalake where the user is being retrieved from.
-   * @param userName The username that is requested to be retrieved.
+   * @param initiator the user who initiated the request to get the user.
+   * @param metalake the name of the metalake from which the user is retrieved.
+   * @param loadedUserInfo the user information of the retrieved user.
    */
-  public GetUserPreEvent(String initiator, String metalake, String userName) {
-    super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
-    this.userName = userName;
+  protected GetUserEvent(String initiator, String metalake, UserInfo loadedUserInfo) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, loadedUserInfo.name()));
+
+    this.loadedUserInfo = loadedUserInfo;
   }
 
   /**
-   * Returns the username for the user being retrieved.
+   * Returns the user information of the user successfully retrieved from the metalake.
    *
-   * @return The username that is requested to be retrieved.
+   * @return the {@link UserInfo} instance containing the details of the retrieved user.
    */
-  public String userName() {
-    return userName;
+  public UserInfo loadedUserInfo() {
+    return loadedUserInfo;
   }
 
   /**

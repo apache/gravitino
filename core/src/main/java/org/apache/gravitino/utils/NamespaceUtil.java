@@ -83,6 +83,16 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for user.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for user
+   */
+  public static Namespace ofUser(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME);
+  }
+
+  /**
    * Create a namespace for column.
    *
    * @param metalake The metalake name
