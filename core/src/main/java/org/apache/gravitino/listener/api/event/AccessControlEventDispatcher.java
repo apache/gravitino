@@ -77,7 +77,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new AddUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -94,7 +94,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return isExists;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -112,7 +112,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new GetUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -129,7 +129,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return users;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListUsersFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -146,7 +146,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userNames;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListUserNamesFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -252,7 +252,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new GrantUserRolesFailureEvent(initiator, metalake, e, user, roles));
       throw e;
     }
   }
@@ -309,7 +309,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new RevokeUserRolesFailureEvent(initiator, metalake, e, user, roles));
       throw e;
     }
   }
