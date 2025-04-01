@@ -107,6 +107,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             RangerPrivileges.RangerHdfsPrivilege.EXECUTE),
         Privilege.Name.WRITE_FILESET,
         ImmutableSet.of(
+            RangerPrivileges.RangerHdfsPrivilege.READ,
             RangerPrivileges.RangerHdfsPrivilege.WRITE,
             RangerPrivileges.RangerHdfsPrivilege.EXECUTE));
   }
@@ -457,8 +458,17 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                           });
                   break;
                 case CREATE_FILESET:
-                  // Ignore the Gravitino privilege `CREATE_FILESET` in the
-                  // RangerAuthorizationHDFSPlugin
+                  switch (securableObject.type()) {
+                    case METALAKE:
+                    case CATALOG:
+                    case SCHEMA:
+                      break;
+                    default:
+                      throw new AuthorizationPluginException(
+                              ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                              gravitinoPrivilege.name(),
+                              securableObject.type());
+                  }
                   break;
                 case READ_FILESET:
                 case WRITE_FILESET:
@@ -466,7 +476,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                     case METALAKE:
                     case CATALOG:
                     case SCHEMA:
-                      break;
                     case FILESET:
                       translateMetadataObject(securableObject)
                           .forEach(
@@ -581,6 +590,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             ? NameIdentifier.of(metadataObject.fullName())
             : NameIdentifier.parse(String.join(".", metalake, metadataObject.fullName()));
     List<String> locations = AuthorizationUtils.getMetadataObjectLocation(identifier, entityType);
+
     locations.forEach(
         locationPath -> {
           AuthorizationMetadataObject.Type type =
