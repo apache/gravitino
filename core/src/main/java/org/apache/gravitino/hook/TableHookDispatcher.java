@@ -97,18 +97,21 @@ public class TableHookDispatcher implements TableDispatcher {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-
-    Table alteredTable = dispatcher.alterTable(ident, changes);
     TableChange.RenameTable lastRenameChange = null;
+    List<String> locations = null;
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
         lastRenameChange = (TableChange.RenameTable) change;
       }
     }
+    if (lastRenameChange != null) {
+      locations = AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE);
+    }
+    Table alteredTable = dispatcher.alterTable(ident, changes);
 
     if (lastRenameChange != null) {
       AuthorizationUtils.authorizationPluginRenamePrivileges(
-          ident, Entity.EntityType.TABLE, lastRenameChange.getNewName());
+          ident, Entity.EntityType.TABLE, lastRenameChange.getNewName(), locations);
     }
 
     return alteredTable;
