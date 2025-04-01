@@ -1028,8 +1028,7 @@ public abstract class RangerAuthorizationPlugin
 
   /** Generate authorization securable object */
   public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      AuthorizationMetadataObject object,
-      Set<AuthorizationPrivilege> privileges);
+      AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges);
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()

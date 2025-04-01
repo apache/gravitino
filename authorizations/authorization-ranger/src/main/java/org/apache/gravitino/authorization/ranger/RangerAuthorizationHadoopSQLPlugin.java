@@ -396,14 +396,24 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
     return policy;
   }
 
+  public AuthorizationSecurableObject generateAuthorizationSecurableObject(
+      List<String> names,
+      AuthorizationMetadataObject.Type type,
+      Set<AuthorizationPrivilege> privileges) {
+    RangerHadoopSQLMetadataObject object =
+        new RangerHadoopSQLMetadataObject(
+            AuthorizationMetadataObject.getParentFullName(names),
+            AuthorizationMetadataObject.getLastName(names),
+            type);
+    return generateAuthorizationSecurableObject(object, privileges);
+  }
+
   @Override
-  public AuthorizationSecurableObject generateAuthorizationSecurableObject(AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges) {
+  public AuthorizationSecurableObject generateAuthorizationSecurableObject(
+      AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges) {
     object.validateAuthorizationMetadataObject();
     return new RangerHadoopSQLSecurableObject(
-            object.parent(),
-            object.name(),
-            object.type(),
-            privileges);
+        object.parent(), object.name(), object.type(), privileges);
   }
 
   @Override
@@ -446,13 +456,13 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                    RangerHadoopSQLMetadataObject.Type.SCHEMA,
+                RangerHadoopSQLMetadataObject.Type.SCHEMA,
                 ownerMappingRule()));
         // Add `*.*` for the TABLE permission
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
-                    RangerHadoopSQLMetadataObject.Type.TABLE,
+                RangerHadoopSQLMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `*.*.*` for the COLUMN permission
         rangerSecurableObjects.add(
@@ -461,7 +471,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     RangerHelper.RESOURCE_ALL,
                     RangerHelper.RESOURCE_ALL,
                     RangerHelper.RESOURCE_ALL),
-                    RangerHadoopSQLMetadataObject.Type.COLUMN,
+                RangerHadoopSQLMetadataObject.Type.COLUMN,
                 ownerMappingRule()));
         break;
       case SCHEMA:
@@ -469,14 +479,14 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(gravitinoMetadataObject.name() /*Schema name*/),
-                    RangerHadoopSQLMetadataObject.Type.SCHEMA,
+                RangerHadoopSQLMetadataObject.Type.SCHEMA,
                 ownerMappingRule()));
         // Add `{schema}.*` for the TABLE permission
         rangerSecurableObjects.add(
             generateAuthorizationSecurableObject(
                 ImmutableList.of(
                     gravitinoMetadataObject.name() /*Schema name*/, RangerHelper.RESOURCE_ALL),
-                    RangerHadoopSQLMetadataObject.Type.TABLE,
+                RangerHadoopSQLMetadataObject.Type.TABLE,
                 ownerMappingRule()));
         // Add `{schema}.*.*` for the COLUMN permission
         rangerSecurableObjects.add(
@@ -485,7 +495,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                     gravitinoMetadataObject.name() /*Schema name*/,
                     RangerHelper.RESOURCE_ALL,
                     RangerHelper.RESOURCE_ALL),
-                    RangerHadoopSQLMetadataObject.Type.COLUMN,
+                RangerHadoopSQLMetadataObject.Type.COLUMN,
                 ownerMappingRule()));
         break;
       case TABLE:
@@ -496,7 +506,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                   rangerSecurableObjects.add(
                       generateAuthorizationSecurableObject(
                           rangerMetadataObject.names(),
-                              RangerHadoopSQLMetadataObject.Type.TABLE,
+                          RangerHadoopSQLMetadataObject.Type.TABLE,
                           ownerMappingRule()));
                   // Add `{schema}.{table}.*` for the COLUMN permission
                   rangerSecurableObjects.add(
@@ -505,7 +515,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                   rangerMetadataObject.names().stream(),
                                   Stream.of(RangerHelper.RESOURCE_ALL))
                               .collect(Collectors.toList()),
-                              RangerHadoopSQLMetadataObject.Type.COLUMN,
+                          RangerHadoopSQLMetadataObject.Type.COLUMN,
                           ownerMappingRule()));
                 });
         break;
@@ -551,7 +561,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                                  RangerHadoopSQLMetadataObject.Type.SCHEMA,
+                              RangerHadoopSQLMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     default:
@@ -569,7 +579,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                                  RangerHadoopSQLMetadataObject.Type.SCHEMA,
+                              RangerHadoopSQLMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     default:
@@ -587,7 +597,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(RangerHelper.RESOURCE_ALL),
-                                  RangerHadoopSQLMetadataObject.Type.SCHEMA,
+                              RangerHadoopSQLMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     case SCHEMA:
@@ -595,7 +605,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                       rangerSecurableObjects.add(
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(securableObject.name() /*Schema name*/),
-                                  RangerHadoopSQLMetadataObject.Type.SCHEMA,
+                              RangerHadoopSQLMetadataObject.Type.SCHEMA,
                               rangerPrivileges));
                       break;
                     default:
@@ -616,7 +626,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                           generateAuthorizationSecurableObject(
                               ImmutableList.of(
                                   RangerHelper.RESOURCE_ALL, RangerHelper.RESOURCE_ALL),
-                                  RangerHadoopSQLMetadataObject.Type.TABLE,
+                              RangerHadoopSQLMetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `*.*.*` for the COLUMN permission
                       rangerSecurableObjects.add(
@@ -625,7 +635,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                   RangerHelper.RESOURCE_ALL,
                                   RangerHelper.RESOURCE_ALL,
                                   RangerHelper.RESOURCE_ALL),
-                                  RangerHadoopSQLMetadataObject.Type.COLUMN,
+                              RangerHadoopSQLMetadataObject.Type.COLUMN,
                               rangerPrivileges));
                       break;
                     case SCHEMA:
@@ -635,7 +645,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                               ImmutableList.of(
                                   securableObject.name() /*Schema name*/,
                                   RangerHelper.RESOURCE_ALL),
-                                  RangerHadoopSQLMetadataObject.Type.TABLE,
+                              RangerHadoopSQLMetadataObject.Type.TABLE,
                               rangerPrivileges));
                       // Add `{schema}.*.*` for the COLUMN permission
                       rangerSecurableObjects.add(
@@ -644,7 +654,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                   securableObject.name() /*Schema name*/,
                                   RangerHelper.RESOURCE_ALL,
                                   RangerHelper.RESOURCE_ALL),
-                                  RangerHadoopSQLMetadataObject.Type.COLUMN,
+                              RangerHadoopSQLMetadataObject.Type.COLUMN,
                               rangerPrivileges));
                       break;
                     case TABLE:
@@ -661,7 +671,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                   rangerSecurableObjects.add(
                                       generateAuthorizationSecurableObject(
                                           rangerMetadataObject.names(),
-                                              RangerHadoopSQLMetadataObject.Type.TABLE,
+                                          RangerHadoopSQLMetadataObject.Type.TABLE,
                                           rangerPrivileges));
                                   // Add `{schema}.{table}.*` for the COLUMN permission
                                   rangerSecurableObjects.add(
@@ -670,7 +680,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                                                   rangerMetadataObject.names().stream(),
                                                   Stream.of(RangerHelper.RESOURCE_ALL))
                                               .collect(Collectors.toList()),
-                                              RangerHadoopSQLMetadataObject.Type.COLUMN,
+                                          RangerHadoopSQLMetadataObject.Type.COLUMN,
                                           rangerPrivileges));
                                 });
                       }
