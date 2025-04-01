@@ -97,7 +97,7 @@ public class LineageConfig extends Config {
     List<String> sinks = sinks();
 
     Map<String, String> config = getAllConfig();
-    Map m = new HashMap(config);
+    Map<String, String> m = new HashMap(config);
 
     String sinkString = get(SINKS);
     if (!m.containsKey(LINEAGE_CONFIG_SINKS)) {
