@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.connector;
 
-import com.google.common.base.Preconditions;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
 
 /** The PropertiesMetadata class is responsible for managing property metadata. */
@@ -38,17 +38,12 @@ public interface PropertiesMetadata {
    */
   default boolean isReservedProperty(String propertyName) {
     // First check non-prefix exact match
-    PropertyEntry<?> directEntry = propertyEntries().get(propertyName);
-    if (directEntry != null && !directEntry.isPrefix() && directEntry.isReserved()) {
+    if (getNonPrefixEntry(propertyName).map(PropertyEntry::isReserved).orElse(false)) {
       return true;
     }
 
     // Then check property prefixes
-    try {
-      return getPropertyPrefixEntry(propertyName).isReserved();
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return getPropertyPrefixEntry(propertyName).map(PropertyEntry::isReserved).orElse(false);
   }
 
   /**
@@ -59,17 +54,12 @@ public interface PropertiesMetadata {
    */
   default boolean isRequiredProperty(String propertyName) {
     // First check non-prefix exact match
-    PropertyEntry<?> directEntry = propertyEntries().get(propertyName);
-    if (directEntry != null && !directEntry.isPrefix() && directEntry.isRequired()) {
+    if (getNonPrefixEntry(propertyName).map(PropertyEntry::isRequired).orElse(false)) {
       return true;
     }
 
     // Then check property prefixes
-    try {
-      return getPropertyPrefixEntry(propertyName).isRequired();
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return getPropertyPrefixEntry(propertyName).map(PropertyEntry::isRequired).orElse(false);
   }
 
   /**
@@ -80,17 +70,12 @@ public interface PropertiesMetadata {
    */
   default boolean isImmutableProperty(String propertyName) {
     // First check non-prefix exact match
-    PropertyEntry<?> directEntry = propertyEntries().get(propertyName);
-    if (directEntry != null && !directEntry.isPrefix() && directEntry.isImmutable()) {
+    if (getNonPrefixEntry(propertyName).map(PropertyEntry::isImmutable).orElse(false)) {
       return true;
     }
 
     // Then check property prefixes
-    try {
-      return getPropertyPrefixEntry(propertyName).isImmutable();
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return getPropertyPrefixEntry(propertyName).map(PropertyEntry::isImmutable).orElse(false);
   }
 
   /**
@@ -101,26 +86,18 @@ public interface PropertiesMetadata {
    */
   default boolean isHiddenProperty(String propertyName) {
     // First check non-prefix exact match
-    PropertyEntry<?> directEntry = propertyEntries().get(propertyName);
-    if (directEntry != null && !directEntry.isPrefix() && directEntry.isHidden()) {
+    if (getNonPrefixEntry(propertyName).map(PropertyEntry::isHidden).orElse(false)) {
       return true;
     }
 
     // Then check property prefixes
-    try {
-      return getPropertyPrefixEntry(propertyName).isHidden();
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
+    return getPropertyPrefixEntry(propertyName).map(PropertyEntry::isHidden).orElse(false);
   }
 
   /** @return true if the property is existed, false otherwise. */
   default boolean containsProperty(String propertyName) {
-    return (propertyEntries().containsKey(propertyName)
-            && !propertyEntries().get(propertyName).isPrefix())
-        || propertyEntries().entrySet().stream()
-            .anyMatch(
-                entry -> entry.getValue().isPrefix() && propertyName.startsWith(entry.getKey()));
+    return getNonPrefixEntry(propertyName).isPresent()
+        || getNonPrefixEntry(propertyName).isPresent();
   }
 
   /**
@@ -155,9 +132,9 @@ public interface PropertiesMetadata {
    * Get the property entry of the property. The non-prefix property entry will be returned if
    * exists, otherwise the longest prefix property entry will be returned.
    *
-   * <p>For example, if there are two property prefix entries "foo." and "foo.bar", and the property
-   * name is "foo.bar.baz", the entry for "foo.bar" will be returned. If the property entry
-   * "foo.bar.baz" is defined, it will be returned instead.
+   * <p>For example, if there are two property prefix entries "foo." and "foo.bar.", and the
+   * property name is "foo.bar.baz", the entry for "foo.bar." will be returned. If the property
+   * entry "foo.bar.baz" is defined, it will be returned instead.
    *
    * @param propertyName The name of the property.
    * @return the property entry object of the property.
@@ -167,37 +144,28 @@ public interface PropertiesMetadata {
     if (!containsProperty(propertyName)) {
       throw new IllegalArgumentException("Property is not defined: " + propertyName);
     }
-
-    try {
-      return getNonPrefixEntry(propertyName);
-    } catch (IllegalArgumentException e) {
-      return getPropertyPrefixEntry(propertyName);
-    }
+    return getNonPrefixEntry(propertyName).isPresent()
+        ? getNonPrefixEntry(propertyName).get()
+        : getPropertyPrefixEntry(propertyName).get();
   }
 
   /**
    * Get the property prefix entry of the property. If there are multiple property prefix entries
    * matching the property name, the longest prefix entry will be returned.
    *
-   * <p>For example, if there are two property prefix entries "foo." and "foo.bar", and the property
-   * name is "foo.bar.baz", the entry for "foo.bar" will be returned.
+   * <p>For example, if there are two property prefix entries "foo." and "foo.bar.", and the
+   * property name is "foo.bar.baz", the entry for "foo.bar." will be returned.
    *
    * @param propertyName The name of the property.
-   * @return the property prefix entry object of the property.
-   * @throws IllegalArgumentException if the property prefix is not defined.
+   * @return an Optional containing the property prefix entry if it exists, or empty Optional
+   *     otherwise.
    */
-  default PropertyEntry<?> getPropertyPrefixEntry(String propertyName)
-      throws IllegalArgumentException {
+  default Optional<PropertyEntry<?>> getPropertyPrefixEntry(String propertyName) {
     return propertyEntries().entrySet().stream()
         .filter(e -> e.getValue().isPrefix() && propertyName.startsWith(e.getKey()))
         // get the longest prefix property
         .max(Map.Entry.comparingByKey(Comparator.comparingInt(String::length)))
-        .map(Map.Entry::getValue)
-        // should not happen since containsProperty check is done before
-        .orElseThrow(
-            () ->
-                new IllegalArgumentException(
-                    "No matching prefix property found for: " + propertyName));
+        .map(Map.Entry::getValue);
   }
 
   /**
@@ -205,14 +173,14 @@ public interface PropertiesMetadata {
    * prefix.
    *
    * @param propertyName The name of the property.
-   * @return the non-prefix property entry object of the property.
-   * @throws IllegalArgumentException if the property is not defined or is a prefix.
+   * @return an Optional containing the non-prefix property entry if it exists, or empty Optional
+   *     otherwise.
    */
-  default PropertyEntry<?> getNonPrefixEntry(String propertyName) throws IllegalArgumentException {
-    Preconditions.checkArgument(
-        propertyEntries().containsKey(propertyName)
-            && !propertyEntries().get(propertyName).isPrefix(),
-        "Property is not defined: " + propertyName);
-    return propertyEntries().get(propertyName);
+  default Optional<PropertyEntry<?>> getNonPrefixEntry(String propertyName) {
+    if (propertyEntries().containsKey(propertyName)
+        && !propertyEntries().get(propertyName).isPrefix()) {
+      return Optional.of(propertyEntries().get(propertyName));
+    }
+    return Optional.empty();
   }
 }
