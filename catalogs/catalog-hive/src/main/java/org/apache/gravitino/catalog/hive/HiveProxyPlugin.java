@@ -75,7 +75,7 @@ class HiveProxyPlugin implements ProxyPlugin {
             ops.getClientPool()
                 .run(
                     client -> {
-                      return client.getDelegationToken(principal.getName(), realUser.getUserName());
+                      return client.getDelegationToken(finalPrincipalName, realUser.getUserName());
                     });
 
         Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
