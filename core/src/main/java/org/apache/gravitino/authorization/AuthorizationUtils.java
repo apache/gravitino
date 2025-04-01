@@ -287,14 +287,20 @@ public class AuthorizationUtils {
 
   public static void authorizationPluginRenamePrivileges(
       NameIdentifier ident, Entity.EntityType type, String newName) {
+    authorizationPluginRenamePrivileges(ident, type, newName, null);
+  }
+
+  public static void authorizationPluginRenamePrivileges(
+      NameIdentifier ident, Entity.EntityType type, String newName, List<String> locations) {
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.
     if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
       MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       MetadataObject newMetadataObject =
           NameIdentifierUtil.toMetadataObject(NameIdentifier.of(ident.namespace(), newName), type);
-      MetadataObjectChange renameObject =
-          MetadataObjectChange.rename(oldMetadataObject, newMetadataObject);
+
+      MetadataObjectChange renameChange =
+          MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, locations);
 
       String metalake = type == Entity.EntityType.METALAKE ? newName : ident.namespace().level(0);
 
@@ -304,7 +310,7 @@ public class AuthorizationUtils {
           metalake,
           newMetadataObject,
           authorizationPlugin -> {
-            authorizationPlugin.onMetadataUpdated(renameObject);
+            authorizationPlugin.onMetadataUpdated(renameChange);
           });
     }
   }
