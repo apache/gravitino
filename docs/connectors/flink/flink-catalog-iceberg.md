@@ -5,8 +5,10 @@ keyword: flink connector iceberg catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The Apache Gravitino Flink connector can be used to read and write Iceberg tables, with the metadata managed by the Gravitino server.
-To enable the Flink connector, you must download the Iceberg Flink runtime JAR and place it in the Flink classpath.
+The Apache Gravitino Flink connector can be used to read and write Iceberg tables,
+with the metadata managed by the Gravitino server.
+To enable the Flink connector, you must download the Iceberg Flink runtime JAR
+and place it into the Flink class path.
 
 ## Capabilities
 
@@ -57,23 +59,76 @@ SELECT * FROM sample WHERE data = 'B';
 
 ## Catalog properties
 
-The Gravitino Flink connector transforms the following properties in a catalog to Flink connector configuration.
+The Gravitino Flink connector transforms the following properties
+in a catalog to Flink connector configuration.
 
+<table>
+<thead>
+<tr>
+  <th>Gravitino catalog property name</th>
+  <th>Flink Iceberg connector configuration</th>
+  <th>Description</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>catalog-backend</tt></td>
+  <td><tt>catalog-type</tt></td>
+  <td>
+    Catalog backend type. Currently, only `Hive` catalog is supported.
+    Support to `JDBC` and `Rest` are coming soon.
+  </td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>uri</tt></td>
+  <td><tt>uri</tt></td>
+  <td>URI for the catalog backend</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>warehouse</tt></td>
+  <td><tt>warehouse</tt></td>
+  <td>Warehouse in the catalog backend</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>io-impl</tt></td>
+  <td><tt>io-impl</tt></td>
+  <td>The I/O implementation for `FileIO` in Iceberg.</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>oss-endpoint</tt></td>
+  <td><tt>oss.endpoint</tt></td>
+  <td>The endpoint of Aliyun OSS service.</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>oss-access-key-id</tt></td>
+  <td><tt>client.access-key-id</tt></td>
+  <td>The static access key ID used to access OSS data.</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>oss-secret-access-key</tt></td>
+  <td><tt>client.access-key-secret</tt></td>
+  <td>The static secret access key used to access OSS data.</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+</tbody>
+</table>
 
-| Gravitino catalog property name | Flink Iceberg connector configuration | Description                                                                                                   | Since Version    |
-|---------------------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`               | `catalog-type`                        | Catalog backend type, currently, only `Hive` Catalog is supported, `JDBC` and `Rest` in Continuous Validation | 0.8.0-incubating |
-| `uri`                           | `uri`                                 | Catalog backend URI                                                                                           | 0.8.0-incubating |
-| `warehouse`                     | `warehouse`                           | Catalog backend warehouse                                                                                     | 0.8.0-incubating |
-| `io-impl`                       | `io-impl`                             | The IO implementation for `FileIO` in Iceberg.                                                                | 0.8.0-incubating |
-| `oss-endpoint`                  | `oss.endpoint`                        | The endpoint of Aliyun OSS service.                                                                           | 0.8.0-incubating |
-| `oss-access-key-id`             | `client.access-key-id`                | The static access key ID used to access OSS data.                                                             | 0.8.0-incubating |
-| `oss-secret-access-key`         | `client.access-key-secret`            | The static secret access key used to access OSS data.                                                         | 0.8.0-incubating |
-
-Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink iceberg connector. For example, using `flink.bypass.clients` to pass the `clients` to the Flink iceberg connector.
+Gravitino catalog property names with the prefix `flink.bypass.` are passed through
+to the Flink iceberg connector.
+For example, `flink.bypass.clients` is translated to `clients` via the Flink iceberg connector.
 
 ## Storage
 
 ### OSS
 
-Additionally, you need download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip), and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar` to the Flink classpath.
+You need download the [Aliyun OSS SDK](https://gosspublic.alicdn.com/sdks/java/aliyun_java_sdk_3.10.2.zip),
+and copy `aliyun-sdk-oss-3.10.2.jar`, `hamcrest-core-1.1.jar`, `jdom2-2.0.6.jar`
+into the Flink class path.
+

@@ -7,9 +7,10 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store)
-to manage the catalogs under Gravitino.
-This capability allows users to perform federation queries, accessing data from various catalogs
+The Apache Gravitino Flink connector implements the
+[Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store)
+spec for managing the catalogs in Gravitino.
+This allows users to perform federation queries, accessing data from various catalogs
 through a unified interface and consistent access control.
 
 ## Capabilities
@@ -27,17 +28,53 @@ through a unified interface and consistent access control.
 
 ## How to use it
 
-1. [Build](../../develop/how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
-   the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
+1. [Build](../../develop/how-to-build.md) or
+   [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
+   the Gravitino Flink connector runtime JAR files, and place them
+   into the classs path for Flink.
+
 1. Configure the Flink configuration to use the Gravitino flink connector.
 
-   | Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
-   |--------------------------------------------------|--------|-------------------|----------------------------------------------------------------------|----------|------------------|
-   | table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
-   | table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
-   | table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
+   <table>
+   <thead>
+   <tr>
+     <th>Property</th>
+     <th>Type</th>
+     <th>Default Value</th>
+     <th>Description</th>
+     <th>Required</th>
+     <th>Since version</th>
+   </tr>
+   </thead>
+   <tbody>
+   <tr>
+     <td><tt>table.catalog-store.kind</tt></td>
+     <td><tt>string</tt></td>
+     <td>`generic_in_memory`</td>
+     <td>The catalog store name. Should be set to `gravitino`.</td>
+     <td>Yes</td>
+     <td>`0.6.0-incubating`</td>
+   </tr>
+   <tr>
+     <td><tt>table.catalog-store.gravitino.gravitino.metalake</tt></td>
+     <td><tt>string</tt></td>
+     <td>(none)</td>
+     <td>The metalake name that the Flink connector use for accessing Gravitino.</td>
+     <td>Yes</td>
+     <td>`0.6.0-incubating`</td>
+   </tr>
+   <tr>
+     <td><tt>table.catalog-store.gravitino.gravitino.uri</tt></td>
+     <td><tt>string</tt></td>
+     <td>(none)</td>
+     <td>The URI of the Gravitino server.</td>
+     <td>Yes</td>
+     <td>`0.6.0-incubating`</td>
+   </tr>
+   </tbody>
+   </table>
 
-   Set the flink configuration in flink-conf.yaml.
+   Set the Flink configuration in `flink-conf.yaml`, as shown below:
    
    ```yaml
    table.catalog-store.kind: gravitino
@@ -45,7 +82,8 @@ through a unified interface and consistent access control.
    table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
    ```
    
-   Or you can set the flink configuration in the `TableEnvironment`.
+   Or you can set the Flink configuration in the `TableEnvironment`,
+   when invoking the Java API:
    
    ```java
    final Configuration configuration = new Configuration();
@@ -56,9 +94,9 @@ through a unified interface and consistent access control.
    TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
    ```
 
-1. Execute the Flink SQL query.
+1. Execute Flink SQL queries.
 
-   Suppose there is only one hive catalog with the name `hive` in the metalake `test`.
+   Suppose there is only one Hive catalog named `hive` in the metalake `mymetalake`.
    
    ```sql
    // use hive catalog

@@ -5,7 +5,9 @@ keyword: flink connector paimon catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document provides a comprehensive guide on configuring and using Apache Gravitino Flink connector to access the Paimon catalog managed by the Gravitino server.
+This document provides a guide on configuring and using Apache Gravitino Flink connector.
+Ths Apache Gravitino Flink connector can be used to access the Paimon catalog
+managed by the Gravitino server.
 
 ## Capabilities
 
@@ -15,7 +17,7 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 
 ### Supported Operation Types
 
-Supports most DDL and DML operations in Flink SQL, except such operations:
+Supports most DDL and DML operations in Flink SQL, except for the following operations:
 
 - Function operations
 - Partition operations
@@ -33,13 +35,13 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 
 * Paimon 0.8
 
-Higher version like 0.9 or above may also support but have not been tested fully.
+Higher version like 0.9 or above may be supported but have not been tested fully.
 
 ## Getting Started
 
 ### Prerequisites
 
-Place the following JAR files in the lib directory of your Flink installation:
+Place the following JAR files into the 'lib' directory of your Flink installation:
 
 - `paimon-flink-1.18-${paimon-version}.jar`
 - `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`
@@ -98,11 +100,45 @@ SELECT * FROM paimon_table_a;
 
 ## Catalog properties
 
-Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink Paimon connector configuration.
+The Gravitino Flink connector will transform some properties defined in catalog properties
+into Flink Paimon connector configurations.
 
-| Gravitino catalog property name | Flink Paimon connector configuration | Description                                                                                                                                                                                                | Since Version    |
-|---------------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`               | `metastore`                          | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`.                                                                                                                                        | 0.8.0-incubating |
-| `warehouse`                     | `warehouse`                          | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS | 0.8.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Gravitino catalog property name</th>
+  <th>Flink Paimon connector configuration</th>
+  <th>Description</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>catalog-backend</tt></td>
+  <td><tt>metastore</tt></td>
+  <td>
+    Catalog backend of Gravitino Paimon catalog.
+    `filesystem` is supported.
+  </td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>warehouse</tt></td>
+  <td><tt>warehouse</tt></td>
+  <td>
+    The warehouse directory for the catalog.
+    For local file systems, this is something like `file:///user/hive/warehouse-paimon/`.
+    For HDFS, this is something like `hdfs://namespace/hdfs/path`.
+    For S3, this looks like `s3://{bucket-name}/path/`.
+    For Aliyun OSS, this looks like `oss://{bucket-name}/path`.
+  </td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+</tbody>
+</table>
 
-Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink Paimon connector. For example, using `flink.bypass.clients` to pass the `clients` to the Flink Paimon connector.
+Gravitino catalog property names with the prefix `flink.bypass.` are passed through
+to the Flink Paimon connector.
+For example, `flink.bypass.clients` will be translated into `clients`
+by the Flink Paimon connector.
+
