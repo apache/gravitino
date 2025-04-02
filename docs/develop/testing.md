@@ -89,7 +89,7 @@ public class CatalogHiveIT extends AbstractIT {
 
 ## Running all the integration tests
 
-You need to [install Docker](../../install/install.md#install-docker) to run all integration tests.
+You need to [install Docker](../install/install.md#install-docker) to run all integration tests.
 Before running the Docker-related integration tests, make sure that the Docker daemon is running,
 and one of the following setttings is specified.
 

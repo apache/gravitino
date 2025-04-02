@@ -24,23 +24,23 @@ Hive metastore access with the Thrift protocol defaults to using port 9083.
 Data files must be in a supported file format.
 Some file formats can be configured using file format configuration properties per catalog:
 
+- AVRO
+- CSV
+- JSON
 - ORC
 - PARQUET
-- AVRO
 - RCFILE
 - SEQUENCEFILE
-- JSON
-- CSV
 - TEXTFILE
 
 ## Schema operations
 
 ### Create a schema 
 
-Users can create a schema with properties through Apache Gravitino Trino connector as follows:
+Users can create a schema with properties using the Apache Gravitino Trino connector:
 
 ```SQL
-CREATE SCHEMA catalog.schema_name 
+CREATE SCHEMA catalog.schema 
 ```
 
 ## Table operations
@@ -48,13 +48,13 @@ CREATE SCHEMA catalog.schema_name
 ### Create table
 
 The Gravitino Trino connector currently supports basic Hive table creation statements,
-such as defining fields, allowing null values, and adding comments.
+such as defining fields, specifying nullability, and adding comments.
 The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
 The following example shows how to create a table in the Hive catalog:
 
 ```shell
-CREATE TABLE catalog.schema_name.table_name
+CREATE TABLE catalog.schema.table
 (
   name varchar,
   salary int
@@ -63,7 +63,7 @@ CREATE TABLE catalog.schema_name.table_name
 
 ### Alter table
 
-Support for the following alter table operations:
+This connector supports the following alter table operations:
 
 - Rename table
 - Add a column
@@ -84,7 +84,7 @@ using "WITH" keyword in the "CREATE" statement.
 
 ### Create a schema with properties
 
-Users can use the following example to create a schema with properties: 
+To create a schema with properties: 
 
 ```sql
 CREATE SCHEMA catalog.dbname
@@ -95,16 +95,36 @@ WITH (
 
 The following tables are the properties supported by the Hive schema:
 
-| Property | Description                     | Default Value | Required | Reserved | Since Version |
-|----------|---------------------------------|---------------|----------|----------|---------------|
-| location | HDFS location for table storage | (none)        | No       | No       | 0.2.0         |
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Reserved</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>location</tt></td>
+  <td>HDFS location for table storage</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.2.0`</td>
+</tr>
+</tbody>
+</table>
 
-Reserved properties: A reserved property is one can't be set by users but can be read by users.
-
+:::note
+A reserved property is one can't be set by users but can be read by users.
+:::
 
 ### Create a table with properties
 
-Users can use the following example to create a table with properties: 
+To create a table with properties: 
 
 ```sql
 CREATE TABLE catalog.dbname.tablename
@@ -118,36 +138,146 @@ CREATE TABLE catalog.dbname.tablename
 );
 ```
 
-The following tables are the properties supported by the Hive table:
+The properties supported by a Hive table is summarized in the following table:
 
-| Property       | Description                             | Default Value                                              | Required | Reserved | Since Version |
-|----------------|-----------------------------------------|------------------------------------------------------------|----------|----------|---------------|
-| format         | Hive storage format for the table       | TEXTFILE                                                   | No       | No       | 0.2.0         |
-| location       | HDFS location for table storage         | (none)                                                     | No       | No       | 0.2.0         |
-| input_format   | The input format class for the table    | org.apache.hadoop.mapred.TextInputFormat                   | No       | No       | 0.2.0         |
-| output_format  | The output format class for the table   | org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat | No       | No       | 0.2.0         |
-| serde_lib      | The serde library class for the table   | org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe         | No       | No       | 0.2.0         |
-| serde_name     | Name of the serde                       | table name by default                                      | No       | No       | 0.2.0         |
-| partitioned_by | Partition columns for the table         | (none)                                                     | No       | No       | 0.4.0         |   
-| bucketed_by    | Bucket columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
-| bucket_count   | Number of buckets for the table         | (none)                                                     | No       | No       | 0.4.0         |
-| sorted_by      | Sorted columns for the table            | (none)                                                     | No       | No       | 0.4.0         |
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Reserved</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><td>format</tt></td>
+  <td>Hive storage format for the table</td>
+  <td><tt>TEXTFILE</tt></td>
+  <td>No</td>
+  <td>No</td>
+  <td>0.2.0</td>
+</tr>
 
-The following properties are automatically added and managed as reserved properties. Users are not allowed to set these properties.
+<tr>
+  <td><tt>location</tt></td>
+  <td>HDFS location for table storage</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>input_format</tt></td>
+  <td>The input format class for the table</td>
+  <td><tt>org.apache.hadoop.mapred.TextInputFormat</tt></td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>output_format</tt></td>
+  <td>The output format class for the table</td>
+  <td><tt>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</tt></td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>serde_lib</tt></td>
+  <td>The serde library class for the table</td>
+  <td><tt>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</tt></td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>serde_name</tt></td>
+  <td>Name of the serde</td>
+  <td>Table name by default</td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>partitioned_by</tt></td>
+  <td>Partition columns for the table</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.4.0`</td>
+</tr>  
+<tr>
+  <td><tt>bucketed_by</tt></td>
+  <td>Bucket columns for the table</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.4.0`</td>
+</tr>
+<tr>
+  <td><tt>bucket_count</tt></td>
+  <td>Number of buckets for the table</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.4.0`</td>
+</tr>
+<tr>
+  <td><tt>sorted_by</tt></td>
+  <td>Sorted columns for the table</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>No</td>
+  <td>`0.4.0`</td>
+</tr>
+</tbody>
+</table>
 
-| Property       | Description                             | Since Version |
-|----------------|-----------------------------------------|---------------|
-| total_size     | Total size of the table                 | 0.2.0         |
-| num_files      | Number of files                         | 0.2.0         |
-| external       | Indicate whether it's an external table | 0.2.0         |
-| table_type     | The type of Hive table                  | 0.2.0         |
+The following properties are automatically added and managed as reserved properties.
+Users are not allowed to set these properties.
+
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Description</th>
+  <th>Since Version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>total_size</tt></td>
+  <td>Total size of the table</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>num_files</tt></td>
+  <td>Number of files</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>external</tt></td>
+  <td>Indicate whether it's an external table</td>
+  <td>`0.2.0`</td>
+</tr>
+<tr>
+  <td><tt>table_type</tt></td>
+  <td>The type of Hive table</td>
+  <td>`0.2.0`</td>
+</tr>
+</tbody>
+</table>
 
 ## Basic usage examples
 
-You need to do the following steps before you can use the Hive catalog in Trino through Gravitino.
+You need to complete some preparation before using a Hive catalog via the Trino connector.
 
-- Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test`
-  and the catalog name is `hive_test`, then you can use the following code to create them in Gravitino:
+- Create a metalake and catalog in Gravitino.
+  Assuming that the metalake name is `test` and the catalog name is `hive_test`,
+  you can use the following code to create them in Gravitino:
 
   ```bash
   curl -X POST \
@@ -162,47 +292,47 @@ You need to do the following steps before you can use the Hive catalog in Trino 
     http://gravitino-host:8090/api/metalakes/test/catalogs
   ```
 
-For More information about the Hive catalog, 
-please refer to [Hive catalog](../../catalogs/relational/hive/index.md).
+  For More information about the Hive catalog, 
+  please refer to [Hive catalog documentation](../../catalogs/relational/hive/index.md).
 
-- Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test',
-and start the Trino container.
+- Set the value of configuration `gravitino.metalake` to the metalake you have created,
+  Then start the Trino container.
 
-Use the Trino CLI to connect to the Trino container and run a query.
+- Use the Trino CLI to connect to the Trino container and run a query.
 
-Listing all Gravitino managed catalogs:
+  Listing all Gravitino managed catalogs:
 
-```sql 
-SHOW CATALOGS;
-```
+  ```sql 
+  SHOW CATALOGS;
+  ```
 
-The results are similar to:
+  The results are similar to:
 
-```text
-    Catalog
-----------------
- gravitino
- jmx
- system
- hive_test
-(4 rows)
+  ```text
+      Catalog
+  ----------------
+   gravitino
+   jmx
+   system
+   hive_test
+  (4 rows)
+  
+  Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
+  ```
 
-Query 20231017_082503_00018_6nt3n, FINISHED, 1 node
-```
-
-The `gravitino` catalog is a catalog defined By Trino catalog configuration.
-The `hive_test` catalog is the catalog created by you in Gravitino.
+The `gravitino` catalog is a catalog defined in the Trino catalog configuration.
+The `hive_test` catalog is the catalog you created.
 Other catalogs are regular user-configured Trino catalogs.
 
 ### Creating tables and schemas
 
-Create a new schema named `database_01` in `hive_test` catalog.
+To create a new schema named `database_01` in `hive_test` catalog.
 
 ```sql
 CREATE SCHEMA hive_test.database_01;
 ```
 
-Create a new schema using HDFS location:
+To create a new schema using HDFS location:
 
 ```sql
 CREATE SCHEMA hive_test.database_01 WITH (
@@ -210,15 +340,16 @@ CREATE SCHEMA hive_test.database_01 WITH (
 );
 ```
 
-Create a new table named `table_01` in schema `hive_test.database_01` and stored in a TEXTFILE format,
-partitioning by `salary`, bucket by `name` and sorted by `salary`.
+Create a new table named `table_01` in schema `hive_test.database_01`
+and store it in a TEXTFILE format, partitioning by `salary`,
+bucket by `name` and sorted by `salary`.
 
 ```sql
 CREATE TABLE  hive_test.database_01.table_01
 (
-name varchar,
-salary int,
-month int    
+  name varchar,
+  salary int,
+  month int    
 )
 WITH (
   format = 'TEXTFILE',
@@ -234,13 +365,15 @@ WITH (
 Insert data into the table `table_01`:
 
 ```sql
-INSERT INTO hive_test.database_01.table_01 (name, salary) VALUES ('ice', 12, 22);
+INSERT INTO hive_test.database_01.table_01 (name, salary)
+  VALUES ('ice', 12, 22);
 ```
 
 Insert data into the table `table_01` from select:
 
 ```sql
-INSERT INTO hive_test.database_01.table_01 (name, salary, month) SELECT * FROM hive_test.database_01.table_01;
+INSERT INTO hive_test.database_01.table_01 (name, salary, month)
+  SELECT * FROM hive_test.database_01.table_01;
 ```
 
 ### Querying data
@@ -253,33 +386,36 @@ SELECT * FROM hive_test.database_01.table_01;
 
 ### Modify a table
 
-Add a new column `age` to the `table_01` table:
+To add a new column `age` to the `table_01` table:
 
 ```sql
-ALTER TABLE hive_test.database_01.table_01 ADD COLUMN age int;
+ALTER TABLE hive_test.database_01.table_01
+  ADD COLUMN age int;
 ```
 
-Drop a column `age` from the `table_01` table:
+To drop a column `age` from the `table_01` table:
 
 ```sql
-ALTER TABLE hive_test.database_01.table_01 DROP COLUMN age;
+ALTER TABLE hive_test.database_01.table_01
+  DROP COLUMN age;
 ```
 
-Rename the `table_01` table to `table_02`:
+To rename the `table_01` table to `table_02`:
 
 ```sql
-ALTER TABLE hive_test.database_01.table_01 RENAME TO hive_test.database_01.table_02;
+ALTER TABLE hive_test.database_01.table_01
+  RENAME TO hive_test.database_01.table_02;
 ```
 
 ### DROP
 
-Drop a schema:
+To drop a schema:
 
 ```sql
 DROP SCHEMA hive_test.database_01;
 ```
 
-Drop a table:
+To drop a table:
 
 ```sql
 DROP TABLE hive_test.database_01.table_01;
@@ -293,9 +429,10 @@ It supports configuring the HDFS client with `hdfs-site.xml` and `core-site.xml`
 via the `trino.bypass.hive.config.resources` setting in the catalog configurations.
 
 Before running any `Insert` statements for Hive tables in Trino,
-you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
-You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config,
-replacing hdfs_user with the appropriate username:
+you must check that the user Trino uses for HDFS has access to the Hive warehouse directory.
+You can override this username by setting the `HADOOP_USER_NAME`
+system property in the Trino JVM config,
+replacing `hdfs_user` with the your username:
 
 ```text
 -DHADOOP_USER_NAME=hdfs_user
@@ -304,7 +441,7 @@ replacing hdfs_user with the appropriate username:
 ## S3
 
 When using AWS S3 within the Hive catalog, users need to configure the Trino Hive connector's
-AWS S3-related properties in the catalog's properteis.
+AWS S3-related properties in the catalog's properties.
 Please refer to [Hive connector with Amazon S3](https://trino.io/docs/435/connector/hive-s3.html).
 
 To create a Hive catalog with AWS S3 configuration in the Trino CLI,
@@ -315,16 +452,24 @@ call gravitino.system.create_catalog(
   'gt_hive',
   'hive',
   map(
-    array['metastore.uris',
-        'trino.bypass.hive.s3.aws-access-key', 'trino.bypass.hive.s3.aws-secret-key', 'trino.bypass.hive.s3.region'
+    array[
+      'metastore.uris',
+      'trino.bypass.hive.s3.aws-access-key',
+      'trino.bypass.hive.s3.aws-secret-key',
+      'trino.bypass.hive.s3.region'
     ],
-    array['thrift://hive:9083', '<aws-access-key>', '<aws-secret-key>', '<region>']
+    array[
+      'thrift://hive:9083',
+      '<aws-access-key>',
+      '<aws-secret-key>',
+      '<region>'
+    ]
   )
 );
 ```
 
-- The settings for `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`
-  and `trino.bypass.hive.s3.region` are required by the Apache Gravitino Trino connector.
+The settings for `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`
+and `trino.bypass.hive.s3.region` are required by the Apache Gravitino Trino connector.
 
 Once the Hive catalog is successfully created, users can create schemas and tables as follows:
 
@@ -345,3 +490,4 @@ After running the command, the tables are ready for data reading and writing ope
 :::note
 Ensure the Hive Metastore service used by the Hive catalog supports AWS S3.
 :::
+

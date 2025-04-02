@@ -5,7 +5,7 @@ keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The connector provides read access and write access to data and metadata stored in Apache Gravitino.
+The connector provides read and write access to data and metadata stored in Apache Gravitino.
 
 ### Globally available statements
 
@@ -16,8 +16,8 @@ The connector provides read access and write access to data and metadata stored 
 
 ### Read operations
 
-- [SELECT](https://trino.io/docs/current/sql/select.html)
 - [DESCRIBE](https://trino.io/docs/current/sql/describe.html)
+- [SELECT](https://trino.io/docs/current/sql/select.html)
 - [SHOW CATALOGS](https://trino.io/docs/current/sql/show-catalogs.html)
 - [SHOW COLUMNS](https://trino.io/docs/current/sql/show-columns.html)
 - [SHOW CREATE SCHEMA](https://trino.io/docs/current/sql/show-create-schema.html)
@@ -45,4 +45,6 @@ The connector provides read access and write access to data and metadata stored 
 - [COMMIT](https://trino.io/docs/current/sql/commit.html)
 - [ROLLBACK](https://trino.io/docs/current/sql/rollback.html)
 
-For more information, please refer to Trino [SQL statements support](https://trino.io/docs/current/language/sql-support.html#sql-globally-available)
+For more information, please refer to Trino
+[SQL statements support](https://trino.io/docs/current/language/sql-support.html#sql-globally-available)
+
