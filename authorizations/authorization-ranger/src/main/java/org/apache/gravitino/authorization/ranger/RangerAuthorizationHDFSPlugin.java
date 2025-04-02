@@ -444,21 +444,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   break;
                 case SELECT_TABLE:
                 case MODIFY_TABLE:
-                  AuthorizationUtils.getMetadataObjectLocation(
-                          identifier, MetadataObjectUtil.toEntityType(securableObject))
-                      .forEach(
-                          locationPath -> {
-                            PathBasedMetadataObject pathBaseMetadataObject =
-                                new PathBasedMetadataObject(
-                                    securableObject.parent(),
-                                    securableObject.name(),
-                                    locationPath,
-                                    PathBasedMetadataObject.PathType.get(securableObject.type()));
-                            pathBaseMetadataObject.validateAuthorizationMetadataObject();
-                            rangerSecurableObjects.add(
-                                generateAuthorizationSecurableObject(
-                                    pathBaseMetadataObject, rangerPrivileges));
-                          });
+                case READ_FILESET:
+                case WRITE_FILESET:
+                  if (!gravitinoPrivilege.canBindTo(securableObject.type())) {
+                    throw new AuthorizationPluginException(
+                            ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                            gravitinoPrivilege.name(),
+                            securableObject.type());
+                  }
+                  createSecurableObjects(securableObject, rangerSecurableObjects, identifier, rangerPrivileges, true, new TableOrFilesetPathExtractor());
                   break;
                 case CREATE_TABLE:
                 case CREATE_FILESET:
@@ -466,51 +460,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                     case METALAKE:
                     case CATALOG:
                     case SCHEMA:
-                      translateMetadataObject(securableObject)
-                          .forEach(
-                              metadataObject -> {
-                                Preconditions.checkArgument(
-                                    metadataObject instanceof PathBasedMetadataObject,
-                                    "The metadata object must be a PathBasedMetadataObject");
-                                PathBasedMetadataObject pathBasedMetadataObject =
-                                    (PathBasedMetadataObject) metadataObject;
-                                rangerSecurableObjects.add(
-                                    generateAuthorizationSecurableObject(
-                                        new PathBasedMetadataObject(
-                                            pathBasedMetadataObject.parent(),
-                                            pathBasedMetadataObject.name(),
-                                            pathBasedMetadataObject.path(),
-                                            pathBasedMetadataObject.type(),
-                                            false),
-                                        rangerPrivileges));
-                              });
-                      break;
-                    default:
-                      throw new AuthorizationPluginException(
-                          ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
-                          gravitinoPrivilege.name(),
-                          securableObject.type());
-                  }
-                  break;
-                case READ_FILESET:
-                case WRITE_FILESET:
-                  switch (securableObject.type()) {
-                    case METALAKE:
-                    case CATALOG:
-                    case SCHEMA:
-                    case FILESET:
-                      translateMetadataObject(securableObject)
-                          .forEach(
-                              metadataObject -> {
-                                Preconditions.checkArgument(
-                                    metadataObject instanceof PathBasedMetadataObject,
-                                    "The metadata object must be a PathBasedMetadataObject");
-                                PathBasedMetadataObject pathBasedMetadataObject =
-                                    (PathBasedMetadataObject) metadataObject;
-                                rangerSecurableObjects.add(
-                                    generateAuthorizationSecurableObject(
-                                        pathBasedMetadataObject, rangerPrivileges));
-                              });
+                      createSecurableObjects(securableObject, rangerSecurableObjects, identifier, rangerPrivileges, false, new SchemaPathExtractor());
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -528,6 +478,25 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             });
 
     return rangerSecurableObjects;
+  }
+
+  private void createSecurableObjects(SecurableObject securableObject, List<AuthorizationSecurableObject> rangerSecurableObjects, NameIdentifier identifier, Set<AuthorizationPrivilege> rangerPrivileges, boolean isRecursive, PathExtractor pathExtractor) {
+    AuthorizationUtils.getMetadataObjectLocation(
+                    identifier, MetadataObjectUtil.toEntityType(securableObject))
+            .forEach(
+                    locationPath -> {
+                      PathBasedMetadataObject pathBaseMetadataObject =
+                              new PathBasedMetadataObject(
+                                      securableObject.parent(),
+                                      securableObject.name(),
+                                      pathExtractor.getPath(MetadataObjectUtil.toEntityType(securableObject), locationPath),
+                                      PathBasedMetadataObject.PathType.get(securableObject.type()),
+                                      isRecursive);
+                      pathBaseMetadataObject.validateAuthorizationMetadataObject();
+                      rangerSecurableObjects.add(
+                              generateAuthorizationSecurableObject(
+                                      pathBaseMetadataObject, rangerPrivileges));
+                    });
   }
 
   private void extractMetalakeLocations(
@@ -770,5 +739,37 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 RangerAuthorizationProperties.FS_DEFAULT_NAME,
                 RangerAuthorizationProperties.FS_DEFAULT_VALUE))
         .build();
+  }
+
+  private interface PathExtractor {
+     String getPath(Entity.EntityType type, String location);
+  }
+
+  private static class TableOrFilesetPathExtractor implements PathExtractor {
+    @Override
+    public String getPath(Entity.EntityType type, String location) {
+      if (type == Entity.EntityType.CATALOG) {
+        return String.format("%s/*/*/", location);
+      } else if (type == Entity.EntityType.SCHEMA) {
+        return String.format("%s/*/", location);
+      } if (type == Entity.EntityType.TABLE || type == Entity.EntityType.FILESET) {
+        return location;
+      } else {
+        throw new AuthorizationPluginException("Don't support %s to get table or fileset location", type);
+      }
+    }
+  }
+
+  private static class SchemaPathExtractor implements PathExtractor {
+    @Override
+    public String getPath(Entity.EntityType type, String location) {
+      if (type == Entity.EntityType.CATALOG) {
+        return String.format("%s/*/", location);
+      } else if (type == Entity.EntityType.SCHEMA) {
+        return location;
+      } else {
+        throw new AuthorizationPluginException("Don't support %s to get table or fileset location", type);
+      }
+    }
   }
 }
