@@ -19,32 +19,32 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before get a group from specific metalake */
+/** Represents an event triggered before a group is retrieved from a specific metalake. */
 @DeveloperApi
 public class GetGroupPreEvent extends GroupPreEvent {
   private final String groupName;
 
   /**
-   * Construct a new {@link GetGroupPreEvent} instance with the given initiator and identifier and
+   * Constructs a new {@link GetGroupPreEvent} with the specified initiator, metalake name, and
    * group name.
    *
    * @param initiator the user who initiated the get-group request.
-   * @param identifier the identifier of the metalake which the group is getting retrieved from.
-   * @param groupName the group name which is requested to be retrieved.
+   * @param metalake the name of the metalake from which the group is being retrieved.
+   * @param groupName the name of the group that is requested to be retrieved.
    */
-  protected GetGroupPreEvent(String initiator, NameIdentifier identifier, String groupName) {
-    super(initiator, identifier);
+  protected GetGroupPreEvent(String initiator, String metalake, String groupName) {
+    super(initiator, NameIdentifierUtil.ofGroup(metalake, groupName));
 
     this.groupName = groupName;
   }
 
   /**
-   * Returns the group info for the group which is getting retrieved.
+   * Retrieves the name of the group that is being requested to be retrieved.
    *
-   * @return the group name which is requested to be retrieved.
+   * @return the name of the group to be retrieved.
    */
   public String groupName() {
     return groupName;

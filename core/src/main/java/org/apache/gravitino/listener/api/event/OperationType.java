@@ -128,6 +128,8 @@ public enum OperationType {
   GET_GROUP,
   LIST_GROUPS,
   LIST_GROUP_NAMES,
+  GRANT_GROUP_ROLES,
+  REVOKE_GROUP_ROLES,
 
   // TODO ROLE
 

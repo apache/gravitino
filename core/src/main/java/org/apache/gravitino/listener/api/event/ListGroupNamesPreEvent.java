@@ -19,19 +19,21 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before list group name from specific metalake */
+/** Represents an event triggered before listing group names from a specific metalake. */
 @DeveloperApi
 public class ListGroupNamesPreEvent extends GroupPreEvent {
 
   /**
+   * Constructs a new {@link ListGroupNamesPreEvent} with the specified initiator and metalake name.
+   *
    * @param initiator the user who initiated the list-group-names request.
-   * @param identifier the identifier of the metalake which is being listed.
+   * @param metalake the name of the metalake from which group names will be listed.
    */
-  protected ListGroupNamesPreEvent(String initiator, NameIdentifier identifier) {
-    super(initiator, identifier);
+  protected ListGroupNamesPreEvent(String initiator, String metalake) {
+    super(initiator, NameIdentifierUtil.ofMetalake(metalake));
   }
 
   /**
