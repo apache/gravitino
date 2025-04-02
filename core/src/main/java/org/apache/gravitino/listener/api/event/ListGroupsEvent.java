@@ -22,16 +22,17 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before listing groups from a specific metalake. */
+/** Represents an event triggered after successfully listing groups from a specific metalake. */
 @DeveloperApi
-public class ListGroupsPreEvent extends GroupPreEvent {
+public class ListGroupsEvent extends GroupEvent {
+
   /**
-   * Constructs a new {@link ListGroupsPreEvent} with the specified initiator and metalake name.
+   * Constructs a new {@link ListGroupsEvent} with the specified initiator and metalake name.
    *
    * @param initiator the user who initiated the list-groups request.
-   * @param metalake the name of the metalake from which groups will be listed.
+   * @param metalake the name of the metalake from which the groups were listed.
    */
-  protected ListGroupsPreEvent(String initiator, String metalake) {
+  protected ListGroupsEvent(String initiator, String metalake) {
     super(initiator, NameIdentifierUtil.ofMetalake(metalake));
   }
 

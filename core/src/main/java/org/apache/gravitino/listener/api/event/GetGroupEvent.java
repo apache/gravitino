@@ -20,19 +20,37 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before listing groups from a specific metalake. */
+/**
+ * Represents an event triggered after a group is successfully retrieved from a specific metalake.
+ */
 @DeveloperApi
-public class ListGroupsPreEvent extends GroupPreEvent {
+public class GetGroupEvent extends GroupEvent {
+  private final GroupInfo loadedGroupInfo;
+
   /**
-   * Constructs a new {@link ListGroupsPreEvent} with the specified initiator and metalake name.
+   * Constructs a new {@link GetGroupEvent} with the specified initiator, metalake name, and group
+   * information.
    *
-   * @param initiator the user who initiated the list-groups request.
-   * @param metalake the name of the metalake from which groups will be listed.
+   * @param initiator the user who initiated the group retrieval request.
+   * @param metalake the name of the metalake from which the group is retrieved.
+   * @param loadedGroupInfo the information of the group that was retrieved.
    */
-  protected ListGroupsPreEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifierUtil.ofMetalake(metalake));
+  protected GetGroupEvent(String initiator, String metalake, GroupInfo loadedGroupInfo) {
+    super(initiator, NameIdentifierUtil.ofGroup(metalake, loadedGroupInfo.name()));
+
+    this.loadedGroupInfo = loadedGroupInfo;
+  }
+
+  /**
+   * Retrieves the {@link GroupInfo} of the group that was successfully retrieved from the metalake.
+   *
+   * @return the {@link GroupInfo} object containing details of the retrieved group.
+   */
+  public GroupInfo loadedGroupInfo() {
+    return loadedGroupInfo;
   }
 
   /**
@@ -42,6 +60,6 @@ public class ListGroupsPreEvent extends GroupPreEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_GROUPS;
+    return OperationType.GET_GROUP;
   }
 }

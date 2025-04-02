@@ -20,19 +20,35 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before listing groups from a specific metalake. */
+/** Represents an event triggered when a group is successfully added to a metalake. */
 @DeveloperApi
-public class ListGroupsPreEvent extends GroupPreEvent {
+public class AddGroupEvent extends GroupEvent {
+  private final GroupInfo addedGroupInfo;
+
   /**
-   * Constructs a new {@link ListGroupsPreEvent} with the specified initiator and metalake name.
+   * Constructs a new {@link AddGroupEvent} with the specified initiator, metalake name, and group
+   * information.
    *
-   * @param initiator the user who initiated the list-groups request.
-   * @param metalake the name of the metalake from which groups will be listed.
+   * @param initiator the user who initiated the add-group request.
+   * @param metalake the name of the metalake where the group was added.
+   * @param addedGroupInfo the information about the group that was added.
    */
-  protected ListGroupsPreEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifierUtil.ofMetalake(metalake));
+  protected AddGroupEvent(String initiator, String metalake, GroupInfo addedGroupInfo) {
+    super(initiator, NameIdentifierUtil.ofGroup(metalake, addedGroupInfo.name()));
+
+    this.addedGroupInfo = addedGroupInfo;
+  }
+
+  /**
+   * Retrieves the {@link GroupInfo} of the group that was added to the metalake.
+   *
+   * @return the {@link GroupInfo} object containing details of the added group.
+   */
+  public GroupInfo addedGroupInfo() {
+    return addedGroupInfo;
   }
 
   /**
@@ -42,6 +58,6 @@ public class ListGroupsPreEvent extends GroupPreEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_GROUPS;
+    return OperationType.ADD_GROUP;
   }
 }

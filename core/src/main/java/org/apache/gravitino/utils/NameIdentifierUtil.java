@@ -509,4 +509,15 @@ public class NameIdentifierUtil {
       return identifier.name();
     }
   }
+
+  /**
+   * Create the group {@link NameIdentifier} with the given metalake and group name.
+   *
+   * @param metalake The metalake name
+   * @param groupName The group name
+   * @return the created group {@link NameIdentifier}
+   */
+  public static NameIdentifier ofGroup(String metalake, String groupName) {
+    return NameIdentifier.of(NamespaceUtil.ofGroup(metalake), groupName);
+  }
 }
