@@ -427,8 +427,12 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Preconditions.checkArgument(
-        null == sortOrders || sortOrders.length == 0, "jdbc-catalog does not support sort orders");
+    // clickhouse support sortOrders
+    if (!tableOperation.getClass().getSimpleName().equals("ClickHouseTableOperations")) {
+      Preconditions.checkArgument(
+          null == sortOrders || sortOrders.length == 0,
+          "jdbc-catalog does not support sort orders");
+    }
 
     StringIdentifier identifier =
         Preconditions.checkNotNull(
@@ -461,7 +465,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
         resultProperties,
         partitioning,
         distribution,
-        indexes);
+        indexes,
+        sortOrders);
 
     return JdbcTable.builder()
         .withAuditInfo(

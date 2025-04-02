@@ -44,6 +44,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.junit.jupiter.api.Assertions;
 
@@ -112,14 +113,34 @@ public class ITUtils {
           Arrays.stream(indexes).collect(Collectors.toMap(Index::name, index -> index));
 
       for (int i = 0; i < table.index().length; i++) {
-        Assertions.assertTrue(indexByName.containsKey(table.index()[i].name()));
-        Assertions.assertEquals(
-            indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
-        for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
-          for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
-            Assertions.assertEquals(
-                indexByName.get(table.index()[i].name()).fieldNames()[j][k],
-                table.index()[i].fieldNames()[j][k]);
+        // some database don't support name primary key, such as clickhouse, mysql.
+        IndexType tableIndexType = table.index()[i].type();
+        if (indexByName.get(table.index()[i].name()) == null) {
+          Assertions.assertTrue(table.index()[i].name().equalsIgnoreCase("PRIMARY"));
+          Assertions.assertEquals(tableIndexType, IndexType.PRIMARY_KEY);
+
+          Index primKey =
+              indexByName.values().stream()
+                  .filter(e -> IndexType.PRIMARY_KEY.equals(e.type()))
+                  .findFirst()
+                  .get();
+          for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
+            for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
+              Assertions.assertEquals(
+                  primKey.fieldNames()[j][k], table.index()[i].fieldNames()[j][k]);
+            }
+          }
+        } else {
+          Assertions.assertTrue(indexByName.containsKey(table.index()[i].name()));
+          Assertions.assertEquals(
+              indexByName.get(table.index()[i].name()).type(), table.index()[i].type());
+
+          for (int j = 0; j < table.index()[i].fieldNames().length; j++) {
+            for (int k = 0; k < table.index()[i].fieldNames()[j].length; k++) {
+              Assertions.assertEquals(
+                  indexByName.get(table.index()[i].name()).fieldNames()[j][k],
+                  table.index()[i].fieldNames()[j][k]);
+            }
           }
         }
       }
