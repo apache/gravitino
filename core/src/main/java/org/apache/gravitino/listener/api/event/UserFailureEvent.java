@@ -28,7 +28,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * caused the failure.
  */
 @DeveloperApi
-public class UserFailureEvent extends FailureEvent {
+public abstract class UserFailureEvent extends FailureEvent {
 
   /**
    * Constructs a new {@code UserFailureEvent} instance.
