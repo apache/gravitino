@@ -5,19 +5,24 @@ keyword: spark connector paimon catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The Apache Gravitino Spark connector offers the capability to read and write Paimon tables, with the metadata managed by the Gravitino server. To enable the use of the Paimon catalog within the Spark connector now, you must set download [Paimon Spark runtime jar](https://paimon.apache.org/docs/0.8/spark/quick-start/#preparation) to Spark classpath.
+The Apache Gravitino Spark connector enables users to read and write Paimon tables
+with their metadata managed by the Gravitino server.
+To enable using Paimon catalogs via the Spark connector, you need to download
+the [Paimon Spark runtime JAR](https://paimon.apache.org/docs/0.8/spark/quick-start/#preparation)
+into the Spark class path.
 
 ## Capabilities
 
-### Support DDL and DML operations:
+### Supported DDL and DML operations
 
 - `CREATE NAMESPACE`
 - `DROP NAMESPACE`
 - `LIST NAMESPACE`
 - `LOAD NAMESPACE`
-  - It can not return any user-specified configs now, as we only support FilesystemCatalog in spark-connector now.
+  - The connector doesn't return any user-defined configs,
+     as we only support FilesystemCatalog at the moment.
 - `CREATE TABLE`
-  - Doesn't support distribution and sort orders.
+  - Distribution and sort orders are not supported yet.
 - `DROP TABLE`
 - `ALTER TABLE`
 - `LIST TABLE`
@@ -25,28 +30,27 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 - `SELECT`
 - `INSERT INTO & OVERWRITE`
 - `Schema Evolution`
-- `PARTITION MANAGEMENT`, such as `LIST PARTITIONS`, `ALTER TABLE ... DROP PARTITION ...`
+- Partition management such as `LIST PARTITIONS`, `ALTER TABLE ... DROP PARTITION ...`
 
 :::info
-Only supports Paimon FilesystemCatalog on HDFS now.
+The connector only supports Paimon FilesystemCatalog on HDFS now.
 :::
 
-#### Not supported operations:
+#### Unupported operations
 
 - `ALTER NAMESPACE`
-  - Paimon does not support alter namespace.
-- Row Level operations, such as `MERGE INTO`, `DELETE`, `UPDATE`, `TRUNCATE`
-- Metadata tables, such as `{paimon_catalog}.{paimon_database}.{paimon_table}$snapshots`
+- Row-level operations such as `MERGE INTO`, `DELETE`, `UPDATE`, `TRUNCATE`
+- Metadata tables such as `<paimon-catalog>.<paimon-database>.<paimon-table>$snapshots`
 - Other Paimon extension SQLs, such as `Tag`
 - Call Statements
-- View
-- Time Travel
-- Hive and Jdbc backend, and Object Storage for FilesystemCatalog
+- Views
+- Time travel
+- Hive and JDBC backend, or object storage for FilesystemCatalog
 
 ## SQL example
 
 ```sql
--- Suppose paimon_catalog is the Paimon catalog name managed by Gravitino
+-- Suppose paimon_catalog is a Paimon catalog managed by Gravitino
 USE paimon_catalog;
 
 CREATE DATABASE IF NOT EXISTS mydatabase;
@@ -63,10 +67,10 @@ SHOW TABLES;
 DESC TABLE EXTENDED employee;
 
 INSERT INTO employee
-VALUES
-(1, 'Alice', 'Engineering', TIMESTAMP '2021-01-01 09:00:00'),
-(2, 'Bob', 'Marketing', TIMESTAMP '2021-02-01 10:30:00'),
-(3, 'Charlie', 'Sales', TIMESTAMP '2021-03-01 08:45:00');
+  VALUES
+    (1, 'Alice', 'Engineering', TIMESTAMP '2021-01-01 09:00:00'),
+    (2, 'Bob', 'Marketing', TIMESTAMP '2021-02-01 10:30:00'),
+    (3, 'Charlie', 'Sales', TIMESTAMP '2021-03-01 08:45:00');
 
 SELECT * FROM employee WHERE name = 'Alice';
 
@@ -76,12 +80,41 @@ ALTER TABLE employee DROP PARTITION (`name`='Alice');
 
 ## Catalog properties
 
-Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Paimon connector configuration.
+The Gravitino Spark connector transforms the properties defined in catalog properties
+into Spark Paimon connector configurations.
 
-| Gravitino catalog property name | Spark Paimon connector configuration | Description                                                                                                                                                                                                         | Since Version     |
-|---------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| `catalog-backend`               | `metastore`                          | Catalog backend type                                                                                                                                                                                                | 0.8.0-incubating  |
-| `uri`                           | `uri`                                | Catalog backend uri                                                                                                                                                                                                 | 0.8.0-incubating  |
-| `warehouse`                     | `warehouse`                          | Catalog backend warehouse                                                                                                                                                                                           | 0.8.0-incubating  |
+<table>
+<thead>
+<tr>
+  <th>Gravitino catalog property name</th>
+  <th>Spark Paimon connector configuration</th>
+  <th>Description</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>catalog-backend</tt></td>
+  <td><tt>metastore</tt></td>
+  <td>Catalog backend type</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>uri</tt></td>
+  <td><tt>uri</tt></td>
+  <td>Catalog backend URI</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>warehouse</tt></td>
+  <td><tt>warehouse</tt></td>
+  <td>Catalog backend warehouse</td>
+  <td>`0.8.0-incubating`</td>
+</tr>
+</tbody>
+</table>
 
-Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Paimon connector. For example, using `spark.bypass.client-pool-size` to pass the `client-pool-size` to the Spark Paimon connector.
+Gravitino catalog property names prefixed with `spark.bypass.` are passed to the Spark Paimon connector.
+For example, `spark.bypass.client-pool-size` is tranformed to `client-pool-size`
+for the Spark Paimon connector.
+

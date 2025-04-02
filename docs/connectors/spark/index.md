@@ -8,9 +8,9 @@ license: "This software is licensed under the Apache License version 2."
 ## Overview
 
 The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface
-to facilitate the management of diverse catalogs under Gravitino.
-This capability allows users to perform federation queries,
-accessing data from various catalogs through a unified interface and consistent access control.
+to facilitate the management of diverse catalogs in Gravitino.
+This allows users to perform federation queries, accessing data from various catalogs
+through a unified interface and consistent access control.
 
 ## Capabilities
 
@@ -37,15 +37,58 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
    [gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3),
    [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4),
    [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)),
-   and place it to the classpath of Spark.
+   and place it to the class path for Spark.
+
 1. Configure the Spark session to use the Gravitino spark connector.
 
-   | Property                                 | Type   | Default Value | Description                                                                                     | Required | Since Version |
-   |------------------------------------------|--------|---------------|-------------------------------------------------------------------------------------------------|----------|---------------|
-   | spark.plugins                            | string | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin` | Yes      | 0.5.0         |
-   | spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                            | Yes      | 0.5.0         |
-   | spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                            | Yes      | 0.5.0         |
-   | spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       | 0.5.1         |
+   <table>
+   <thead>
+   <tr>
+     <th>Property</th>
+     <th>Type</th>
+     <th>Default Value</th>
+     <th>Description</th>
+     <th>Required</th>
+     <th>Since version</th>
+   </tr>
+   </thead>
+   <tbody>
+   <tr>
+     <td><tt>spark.plugins</tt></td>
+     <td><tt>string</tt></td>
+     <td>(none)</td>
+     <td>Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin`.</td>
+     <td>Yes</td>
+     <td>`0.5.0`</td>
+   </tr>
+   <tr>
+     <td><tt>spark.sql.gravitino.metalake</tt></td>
+     <td><tt>string</tt></td>
+     <td>(none)</td>
+     <td>
+       The metalake name that spark connector used when interacting with Gravitino.
+     </td>
+     <td>Yes</td>
+     <td>`0.5.0`</td>
+   </tr>
+   <tr>
+     <td><tt>spark.sql.gravitino.uri</tt></td>
+     <td><tt>string</tt></td>
+     <td>(none)</td>
+     <td>The URI of the Gravitino server.</td>
+     <td>Yes</td>
+     <td>`0.5.0`</td>
+   </tr>
+   <tr>
+     <td><tt>spark.sql.gravitino.enableIcebergSupport</tt></td>
+     <td><tt>string</tt></td>
+     <td>`false`</td>
+     <td>Set to `true` to use Iceberg catalog.</td>
+     <td>No</td>
+     <td>`0.5.1`</td>
+   </tr>
+   </tbody>
+   </table>
 
    ```shell
    ./bin/spark-sql -v \
@@ -56,39 +99,39 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
      --conf spark.sql.warehouse.dir=hdfs://127.0.0.1:9000/user/hive/warehouse-hive
    ```
 
-1. [Download](https://iceberg.apache.org/releases/) corresponding runtime jars
-   and place it to the classpath of Spark if using Iceberg catalog.
+1. [Download](https://iceberg.apache.org/releases/) corresponding runtime JARs
+   and place it into the class path for Spark if a Iceberg catalog is used.
 
-1. Execute the Spark SQL query. 
+1. Execute the Spark SQL queries. 
 
-Suppose there are two catalogs in the metalake `test`,
-`hive` for Hive catalog and `iceberg` for Iceberg catalog. 
+   Suppose there are two catalogs in the metalake `test`,
+   `hive` for Hive catalog and `iceberg` for Iceberg catalog. 
 
-```sql
-// use hive catalog
-USE hive;
-CREATE DATABASE db;
-USE db;
-CREATE TABLE hive_students (id INT, name STRING);
-INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
+   ```sql
+   // use hive catalog
+   USE hive;
+   CREATE DATABASE db;
+   USE db;
+   CREATE TABLE hive_students (id INT, name STRING);
+   INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
 
-// use Iceberg catalog
-USE iceberg;
-USE db;
-CREATE TABLE IF NOT EXISTS iceberg_scores (id INT, score INT) USING iceberg;
-INSERT INTO iceberg_scores VALUES (1, 95), (2, 88);
+   // use Iceberg catalog
+   USE iceberg;
+   USE db;
+   CREATE TABLE IF NOT EXISTS iceberg_scores (id INT, score INT) USING iceberg;
+   INSERT INTO iceberg_scores VALUES (1, 95), (2, 88);
 
-// execute federation query between hive table and iceberg table
-SELECT hs.name, is.score FROM hive.db.hive_students hs JOIN iceberg_scores is ON hs.id = is.id;
-```
+   // execute federation query between hive table and iceberg table
+   SELECT hs.name, is.score FROM hive.db.hive_students hs JOIN iceberg_scores is ON hs.id = is.id;
+   ```
 
-:::info
-The command `SHOW CATALOGS` will only display the Spark default catalog, named *spark_catalog*,
-due to limitations within the Spark catalog manager.
-It does not list the catalogs present in the metalake.
-However, after explicitly using the `USE` command with a specific catalog name,
-that catalog name then becomes visible in the output of `SHOW CATALOGS`.
-:::
+   :::info
+   The command `SHOW CATALOGS` will only display the Spark default catalog, named *spark_catalog*,
+   due to limitations within the Spark catalog manager.
+   It does not list the catalogs present in the metalake.
+   However, after explicitly using the `USE` command with a specific catalog name,
+   that catalog name then becomes visible in the output of `SHOW CATALOGS`.
+   :::
 
 ## Datatype mapping
 

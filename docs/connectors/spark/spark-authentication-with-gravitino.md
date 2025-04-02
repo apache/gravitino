@@ -7,33 +7,119 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Spark connector supports `simple` `oauth2` and `kerberos` authentication when accessing Gravitino server.
+Spark connector supports `simple`, `oauth2` and `kerberos` authentication
+when accessing the Gravitino server.
 
-| Property                     | Type   | Default Value | Description                                                                                                         | Required | Since Version    |
-|------------------------------|--------|---------------|---------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanisms when communicating with Gravitino server, supports `simple`, `oauth2` and `kerberos`. | No       | 0.7.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Type</th>
+  <th>Default value</th>
+  <th>Description</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>spark.sql.gravitino.authType</tt></td>
+  <td><tt>string</tt></td>
+  <td>`simple`</td>
+  <td>
+    The authentication mode when communicating with the Gravitino server.
+    The valid values are `simple`, `oauth2` or `kerberos`.
+  </td>
+  <td>No</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+</tbody>
+</table>
 
 ## Simple mode
 
-In the simple mode, the username originates from Spark, and is obtained using the following sequences:
+In the simple mode, the username is determined in the following order:
+
 1. The environment variable of `SPARK_USER`
-2. The environment variable of `HADOOP_USER_NAME`
-3. The user login in the machine
+1. The environment variable of `HADOOP_USER_NAME`
+1. The current OS user
 
 ## OAuth2 mode
 
-In the OAuth2 mode, you could use the following configuration to fetch an OAuth2 token to access Gravitino server.
+In the OAuth2 mode, you can use the following configuration
+to fetch an OAuth2 token for accessing the Gravitino server.
 
-| Property                              | Type   | Default Value | Description                                   | Required             | Since Version    |
-|---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|------------------|
-| spark.sql.gravitino.oauth2.serverUri  | string | None          | The OAuth2 server uri address.                | Yes, for OAuth2 mode | 0.7.0-incubating |
-| spark.sql.gravitino.oauth2.tokenPath  | string | None          | The path of token interface in OAuth2 server. | Yes, for OAuth2 mode | 0.7.0-incubating |
-| spark.sql.gravitino.oauth2.credential | string | None          | The credential to request the OAuth2 token.   | Yes, for OAuth2 mode | 0.7.0-incubating |
-| spark.sql.gravitino.oauth2.scope      | string | None          | The scope to request the OAuth2 token.        | Yes, for OAuth2 mode | 0.7.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Property</th>
+  <th>Type</th>
+  <th>Default value</th>
+  <th>Description</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>spark.sql.gravitino.oauth2.serverUri</tt></td>
+  <td><tt>string</tt></td>
+  <td>(none)</td>
+  <td>
+    The URI for the OAuth2 server.
+    This property is required when OAuth2 is used.
+  </td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>spark.sql.gravitino.oauth2.tokenPath</tt></td>
+  <td><tt>string</tt></td>
+  <td>(none)</td>
+  <td>
+    The path for token interface in OAuth2 server.
+    This property is required when OAuth2 is used.
+  </td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>spark.sql.gravitino.oauth2.credential</tt></td>
+  <td><tt>string</tt></td>
+  <td>(none)</td>
+  <td>
+    The credential for requesting an OAuth2 token.
+    This property is required when OAuth2 is used.
+  </td>
+  <td>Yes</td>
+  <td>` 0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>spark.sql.gravitino.oauth2.scope</tt></td>
+  <td><tt>string</tt></td>
+  <td>(none)</td>
+  <td>
+   The scope to use when requesting an OAuth2 token.
+    This property is required when OAuth2 is used.
+  </td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+</tbody>
+</table>
 
 ## Kerberos mode
 
-In kerberos mode, you could use the Spark kerberos configuration to fetch a kerberos ticket to access Gravitino server, use `spark.kerberos.principal`, `spark.kerberos.keytab` to specify kerberos principal and keytab.
+In kerberos mode, you can use the Spark kerberos configuration
+to fetch a kerberos ticket for accessing Gravitino server.
+The following properties are used to specify the Kerberos information:
 
-The principal of Gravitino server is like `HTTP/$host@$realm`, please keep the `$host` consistent with the host in Gravitino server uri address.
-Please make sure `krb5.conf` is accessible by Spark, like by specifying the configuration `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.
+- `spark.kerberos.principal`
+- `spark.kerberos.keytab`
+
+The principal of Gravitino server is like `HTTP/$host@$realm`.
+The `$host` must be identical to the host in the Gravitino server URI.
+You need to ensure that the `krb5.conf` file is accessible by Spark.
+You can provide this information  by specifying the configuration
+`spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.
+

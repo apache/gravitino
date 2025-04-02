@@ -5,11 +5,17 @@ keyword: spark connector jdbc catalog
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The Apache Gravitino Spark connector offers the capability to read JDBC tables, with the metadata managed by the Gravitino server. To enable the use of the JDBC catalog within the Spark connector, you must download the jdbc driver jar which you used to Spark classpath.
+The Apache Gravitino Spark connector enable users to read JDBC tables,
+with the metadata managed by the Gravitino server.
+To use the JDBC catalog via the Spark connector,
+you must download the JDBC driver JAR into the Spark class path.
 
 ## Capabilities
 
-Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dialects could use Mysql driver and Mysql Dialects as a trackoff way. But for Doris which do not support MySQL Dialects, are not currently supported.
+This connector supports MySQL and PostgreSQL.
+For OceanBase which is compatible with Mysql Dialects,
+you can use MySQL driver and Mysql Dialects as a workaround.
+Doris does not support MySQL Dialects, so it is currently not supported.
 
 #### Support DML and DDL operations:
 
@@ -20,19 +26,21 @@ Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dial
 - `INSERT`
 
   :::info
-  JDBCTable does not support distributed transaction. When writing data to RDBMS, each task is an independent transaction. If some tasks of spark succeed and some tasks fail, dirty data is generated.
+  JDBCTable does not support distributed transaction.
+  When writing data to RDBMS, each task is an independent transaction.
+  If some Spark tasks succeed while others fail, some data may be corrupted.
   :::
 
-#### Not supported operations:
+#### Unsupported operations
 
-- `UPDATE`
 - `DELETE`
+- `UPDATE`
 - `TRUNCATE`
 
 ## SQL example
 
 ```sql
--- Suppose mysql_a is the mysql catalog name managed by Gravitino
+-- Suppose mysql_a is a mysql catalog managed by Gravitino
 USE mysql_a;
 
 CREATE DATABASE IF NOT EXISTS mydatabase;
@@ -53,20 +61,56 @@ VALUES
 (3, 'Charlie', 'Sales', TIMESTAMP '2021-03-01 08:45:00');
 
 SELECT * FROM employee WHERE date(hire_date) = '2021-01-01';
-
-
 ```
 
 ## Catalog properties
 
-Gravitino spark connector will transform below property names which are defined in catalog properties to Spark JDBC connector configuration.
+The Gravitino Spark connector translates the following properties defined in catalog properties
+into Spark JDBC connector configurations.
 
-| Gravitino catalog property name | Spark JDBC connector configuration | Description                                                                                                                                                                                                         | Since Version |
-|---------------------------------|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| `jdbc-url`                      | `url`                              | JDBC URL for connecting to the database. For example, jdbc:mysql://localhost:3306                                                                                                                                   | 0.3.0         |
-| `jdbc-user`                     | `jdbc.user`                        | JDBC user name                                                                                                                                                                                                      | 0.3.0         |
-| `jdbc-password`                 | `jdbc.password`                    | JDBC password                                                                                                                                                                                                       | 0.3.0         |
-| `jdbc-driver`                   | `driver`                           | The driver of the JDBC connection. For example, com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver                                                                                                                   | 0.3.0         |
+<table>
+<thead>
+<tr>
+  <th>Gravitino catalog property name</th>
+  <th>Spark JDBC connector configuration</th>
+  <th>Description</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>jdbc-url</tt></td>
+  <td><tt>url</tt></td>
+  <td>
+    JDBC URL for connecting to the database.
+    For example, jdbc:mysql://localhost:3306
+  </td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-user</tt></td>
+  <td><tt>jdbc.user</tt></td>
+  <td>JDBC user name</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-password</tt></td>
+  <td><tt>jdbc.password</tt></td>
+  <td>JDBC password</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-driver</tt></td>
+  <td><tt>driver</tt></td>
+  <td>
+    The driver for the JDBC connection.
+    For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.
+  </td>
+  <td>`0.3.0`</td>
+</tr>
+</tbody>
+</table>
 
-Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark JDBC connector.
+Gravitino catalog property names with the prefix `spark.bypass.` are passed
+to the Spark JDBC connector.
 
