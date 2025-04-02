@@ -1,60 +1,91 @@
 ---
-title: "Apache Gravitino Trino connector development"
+title: Apache Gravitino Trino connector development
 slug: /trino-connector/development
 keyword: gravitino connector development 
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document is to guide users through the development of the Apache Gravitino Trino connector for Trino locally.
+This page is about the development of the Apache Gravitino Trino connector for Trino.
 
 ## Prerequisites
 
-Before you start developing the Gravitino Trino connector, you need to have the following prerequisites:
+Before you start developing the Gravitino Trino connector,
+you need to have the following prerequisites in place:
 
 1. You need to start the Gravitino server locally.
-   For more information, please refer to the [start Gravitino server](../../install/install.md)
+   For more information, please refer to [starting Gravitino server](../../install/install.md)
+
 2. Create a catalog in the Gravitino server.
-   For more information, please refer to the [Gravitino metadata management](../../metadata/relational.md).
-   Assuming we have just created a MySQL catalog using the following command:
+   For more information, please refer to [Gravitino metadata management](../../metadata/relational.md).
+   The following commands create a MySQL catalog:
 
-```curl
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"name":"test","comment":"comment","properties":{}}' \
-  http://localhost:8090/api/metalakes
+   ```curl
+   cat <<EOF >metalake.json
+   {
+     "name": "test",
+     "comment": "metalake for testing",
+     "properties":{}
+   }
+   EOF
 
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"name":"mysql_catalog3","type":"RELATIONAL","comment":"comment","provider":"jdbc-mysql", "properties":{ \
-  "jdbc-url": "jdbc:mysql://127.0.0.1:3306?useSSL=false&allowPublicKeyRetrieval=true", \
-  "jdbc-user": "root", "jdbc-password": "123456", "jdbc-driver": "com.mysql.cj.jdbc.Driver" }}' \
-  http://localhost:8090/api/metalakes/test/catalogs
-```
+   curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '@metalake.json' \
+     http://localhost:8090/api/metalakes
+  
+   cat <<EOF >catalog.json
+   {
+     "type": "RELATIONAL",
+     "provider": "jdbc-mysql",
+     "name": "mysql_catalog3",
+     "comment": "a catalog for testing",
+     "properties": {
+       "jdbc-url": "jdbc:mysql://127.0.0.1:3306?useSSL=false&allowPublicKeyRetrieval=true",
+       "jdbc-user": "root",
+       "jdbc-password": "123456",
+       "jdbc-driver": "com.mysql.cj.jdbc.Driver"
+     }
+   }
+   EOF
 
-:::note
-Please change the above `localhost`, `port` and the names of metalake and catalogs accordingly.
-:::
+   curl -X POST \
+     -H "Content-Type: application/json" \
+     -d '@catalog.json' \
+     http://localhost:8090/api/metalakes/test/catalogs
+   ```
 
 ## Development environment
 
-To develop the Gravitino Trino connector locally, you need to do the following steps:
+To develop the Gravitino Trino connector locally, you need to set up the environment:
 
 ### IDEA
 
-1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino) repository.
-   The released version Trino-435 is the least version that Gravitino supports.
+1. Clone the Trino repository from the [GitHub](https://github.com/trinodb/trino).
+   The released version 'Trino-435' is the least version that Gravitino supports.
+
 1. Open the Trino project in your IDEA.
-1. Create a new module for the Gravitino Trino connector in the Trino project as the following picture.
+
+1. Create a new module for the Gravitino Trino connector in the Trino project
+   as shown in the following picture.
    We will use the name `trino-gravitino` as the module name in the following steps.
+
    ![trino-gravitino](../../assets/trino/create-gravitino-trino-connector.jpg)
+
 1. Add a soft link to the Gravitino Trino connector module in the Trino project.
-   Assuming the src java main directory of the Gravitino Trino connector in project Gravitino is
+   Assuming the Java source main directory for the Trino connector
+   in the Gravitino project is
    `gravitino/path/to/gravitino-trino-connector/src/main/java`,
-   and the src java main directory of trino-gravitino in the Trino project is
-   `trino/path/to/trino-gravitino/src/main/java`, you can use the following command to create a soft link:
+   and the Java source main directory for trino-gravitino in the Trino project is
+   `trino/path/to/trino-gravitino/src/main/java`,
+   you can use the following command to create a soft link:
 
    ```shell
-   ln -s gravitino/path/to/trino-connector/src/main/java trino/path/to/trino-gravitino/src/main/java
+   ln -s gravitino/path/to/trino-connector/src/main/java \
+     trino/path/to/trino-gravitino/src/main/java
    ```
-   then you can see the `gravitino-trino-connecor` source files and directories in the `trino-gravitino` module as follows:
+
+   You can then see the `gravitino-trino-connecor` source files and directories
+   in the `trino-gravitino` module as shown below:
 
    ![trino-gravitino-structure](../../assets/trino/add-link.jpg)
 
@@ -68,144 +99,145 @@ To develop the Gravitino Trino connector locally, you need to do the following s
    <project xmlns="http://maven.apache.org/POM/4.0.0"
      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
      xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-       <modelVersion>4.0.0</modelVersion>
-       <parent>
-           <groupId>io.trino</groupId>
-           <artifactId>trino-root</artifactId>
-           <version>435</version>
-           <relativePath>../../pom.xml</relativePath>
-       </parent>
 
-       <artifactId>trino-gravitino</artifactId>
-       <packaging>trino-plugin</packaging>
-       <description>Trino - Gravitino Connector</description>
+     <modelVersion>4.0.0</modelVersion>
+     <parent>
+       <groupId>io.trino</groupId>
+       <artifactId>trino-root</artifactId>
+       <version>435</version>
+       <relativePath>../../pom.xml</relativePath>
+     </parent>
 
-       <properties>
-           <air.main.basedir>${project.parent.basedir}</air.main.basedir>
-       </properties>
+     <artifactId>trino-gravitino</artifactId>
+     <packaging>trino-plugin</packaging>
+     <description>Trino - Gravitino Connector</description>
 
-       <dependencies>
-           <!--
-               You can switch to the snapshot version as you like,  for example,
-               if you want to use the jar of latest main branch,
-               you can execute the following command to install Gravitino `client-java-runtime` jar locally.
-               ./gradlew publishToMavenLocal
-           -->
-           <dependency>
-               <groupId>org.apache.gravitino</groupId>
-               <artifactId>catalog-common</artifactId>
-               <version><GRAVITINO_VERSION></version>
-               <exclusions>
-                   <exclusion>
-                       <groupId>io.dropwizard.metrics</groupId>
-                       <artifactId>metrics-core</artifactId>
-                   </exclusion>
-                   <exclusion>
-                       <groupId>io.netty</groupId>
-                       <artifactId>netty</artifactId>
-                   </exclusion>
-                   <exclusion>
-                       <groupId>org.apache.logging.log4j</groupId>
-                       <artifactId>log4j-core</artifactId>
-                   </exclusion>
-               </exclusions>
-           </dependency>
+     <properties>
+       <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+     </properties>
 
-           <dependency>
-               <groupId>org.apache.gravitino</groupId>
-               <artifactId>client-java-runtime</artifactId>
-               <version><GRAVITINO_VERSION></version>
-           </dependency>
+     <dependencies>
+       <!--
+         You can switch to the snapshot version as you like,
+         for example, if you want to use the jar of latest main branch,
+         you can execute the following command to install Gravitino `client-java-runtime` jar locally.
+         ./gradlew publishToMavenLocal
+       -->
+       <dependency>
+         <groupId>org.apache.gravitino</groupId>
+         <artifactId>catalog-common</artifactId>
+         <version><GRAVITINO_VERSION></version>
+         <exclusions>
+           <exclusion>
+             <groupId>io.dropwizard.metrics</groupId>
+             <artifactId>metrics-core</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>io.netty</groupId>
+             <artifactId>netty</artifactId>
+           </exclusion>
+           <exclusion>
+             <groupId>org.apache.logging.log4j</groupId>
+             <artifactId>log4j-core</artifactId>
+           </exclusion>
+         </exclusions>
+       </dependency>
 
-           <dependency>
-               <groupId>io.airlift</groupId>
-               <artifactId>json</artifactId>
-           </dependency>
+       <dependency>
+         <groupId>org.apache.gravitino</groupId>
+         <artifactId>client-java-runtime</artifactId>
+         <version><GRAVITINO_VERSION></version>
+       </dependency>
 
-           <dependency>
-               <groupId>io.airlift.resolver</groupId>
-               <artifactId>resolver</artifactId>
-               <version>1.6</version>
-           </dependency>
+       <dependency>
+         <groupId>io.airlift</groupId>
+         <artifactId>json</artifactId>
+       </dependency>
 
-           <dependency>
-               <groupId>io.trino</groupId>
-               <artifactId>trino-client</artifactId>
-           </dependency>
+       <dependency>
+         <groupId>io.airlift.resolver</groupId>
+         <artifactId>resolver</artifactId>
+         <version>1.6</version>
+       </dependency>
 
-           <dependency>
-               <groupId>io.trino</groupId>
-               <artifactId>trino-jdbc</artifactId>
-           </dependency>
+       <dependency>
+         <groupId>io.trino</groupId>
+         <artifactId>trino-client</artifactId>
+       </dependency>
 
-           <dependency>
-               <groupId>joda-time</groupId>
-               <artifactId>joda-time</artifactId>
-           </dependency>
+       <dependency>
+         <groupId>io.trino</groupId>
+         <artifactId>trino-jdbc</artifactId>
+       </dependency>
 
-           <dependency>
-               <groupId>org.apache.commons</groupId>
-               <artifactId>commons-collections4</artifactId>
-               <version>4.4</version>
-           </dependency>
+       <dependency>
+         <groupId>joda-time</groupId>
+         <artifactId>joda-time</artifactId>
+       </dependency>
 
-           <dependency>
-               <groupId>org.apache.commons</groupId>
-               <artifactId>commons-lang3</artifactId>
-           </dependency>
+       <dependency>
+         <groupId>org.apache.commons</groupId>
+         <artifactId>commons-collections4</artifactId>
+         <version>4.4</version>
+       </dependency>
 
-           <dependency>
-               <groupId>org.codehaus.plexus</groupId>
-               <artifactId>plexus-xml</artifactId>
-               <version>4.0.2</version>
-           </dependency>
+       <dependency>
+         <groupId>org.apache.commons</groupId>
+         <artifactId>commons-lang3</artifactId>
+       </dependency>
 
-           <dependency>
-               <groupId>org.slf4j</groupId>
-               <artifactId>slf4j-api</artifactId>
-               <version>2.0.9</version>
-           </dependency>
+       <dependency>
+         <groupId>org.codehaus.plexus</groupId>
+         <artifactId>plexus-xml</artifactId>
+         <version>4.0.2</version>
+       </dependency>
 
-           <dependency>
-               <groupId>org.apache.logging.log4j</groupId>
-               <artifactId>log4j-slf4j2-impl</artifactId>
-               <version>2.22.0</version>
-           </dependency>
+       <dependency>
+         <groupId>org.slf4j</groupId>
+         <artifactId>slf4j-api</artifactId>
+         <version>2.0.9</version>
+       </dependency>
 
-           <dependency>
-               <groupId>org.apache.logging.log4j</groupId>
-               <artifactId>log4j-api</artifactId>
-               <version>2.22.0</version>
-           </dependency>
+       <dependency>
+         <groupId>org.apache.logging.log4j</groupId>
+         <artifactId>log4j-slf4j2-impl</artifactId>
+         <version>2.22.0</version>
+       </dependency>
 
-           <dependency>
-               <groupId>org.apache.logging.log4j</groupId>
-               <artifactId>log4j-core</artifactId>
-               <version>2.22.0</version>
-           </dependency>
+       <dependency>
+         <groupId>org.apache.logging.log4j</groupId>
+         <artifactId>log4j-api</artifactId>
+         <version>2.22.0</version>
+       </dependency>
 
-           <dependency>
-               <groupId>com.fasterxml.jackson.core</groupId>
-               <artifactId>jackson-annotations</artifactId>
-               <scope>provided</scope>
-           </dependency>
+       <dependency>
+         <groupId>org.apache.logging.log4j</groupId>
+         <artifactId>log4j-core</artifactId>
+         <version>2.22.0</version>
+       </dependency>
 
-           <dependency>
-               <groupId>io.opentelemetry</groupId>
-               <artifactId>opentelemetry-api</artifactId>
-               <scope>provided</scope>
-           </dependency>
+       <dependency>
+         <groupId>com.fasterxml.jackson.core</groupId>
+         <artifactId>jackson-annotations</artifactId>
+         <scope>provided</scope>
+       </dependency>
 
-           <dependency>
-               <groupId>io.trino</groupId>
-               <artifactId>trino-spi</artifactId>
-               <scope>provided</scope>
-           </dependency>
-       </dependencies>
+       <dependency>
+         <groupId>io.opentelemetry</groupId>
+         <artifactId>opentelemetry-api</artifactId>
+         <scope>provided</scope>
+       </dependency>
+
+       <dependency>
+         <groupId>io.trino</groupId>
+         <artifactId>trino-spi</artifactId>
+         <scope>provided</scope>
+       </dependency>
+     </dependencies>
    </project>
    ```
 
-1. Try to compile module `trino-gravitino` to see if there are any errors. 
+1. Compile the module `trino-gravitino` and resolve errors if there are any. 
 
    ```shell
    # build the whole trino project
@@ -213,39 +245,42 @@ To develop the Gravitino Trino connector locally, you need to do the following s
 
    # build the trino-gravitino module if we change the code in the trino-gravitino module
    ./mvnw clean -pl 'plugin/trino-gravitino' package \
-      -DskipTests -Dcheckstyle.skip -Dair.check.skip-checkstyle=true -DskipTests -Dair.check.skip-all=true
+      -DskipTests -Dcheckstyle.skip \
+      -Dair.check.skip-checkstyle=true \
+      -Dair.check.skip-all=true
    ```
 
    :::note
-   If a compile error occurs due to
-   `The following artifacts could not be resolved: org.apache.gravitino:xxx:jar`,
-   which can be resolved by executing `./gradlew publishToMavenLocal` in gravitino beforehand.
+   If you see an error like the following when compiling the module:
+
+   `The following artifacts could not be resolved: org.apache.gravitino:xxx:jar`
+
+   you can try resolve it by running `./gradlew publishToMavenLocal` in gravitino.
    :::
 
-1. Set up the configuration for the Gravitino Trino connector in the Trino project.
-   You can do as the following picture shows:
+1. Set up the configuration for the Gravitino Trino connector in the Trino project,
+   as shown in the following picture:
 
    ![](../../assets/trino/add-config.jpg)
 
-   The corresponding configuration files are here:
+   The configuration files are:
 
-   - Gravitino properties file: `gravitino.properties`
+   - `gravitino.properties`: Gravitino properties file 
 
      ```properties
      # the connector name is always 'gravitino'
      connector.name=gravitino
 
-     # uri of the gravitino server, you need to change it according to your environment
+     # URI of the gravitino server
      gravitino.uri=http://localhost:8090
 
-     # The name of the metalake to which the connector is connected, you need to change it according to your environment
+     # The name of the metalake for the connector to connect
      gravitino.metalake=test
      ```
 
-   - Trino configuration file: `config.properties`
+   - `config.properties`: Trino configuration file: 
 
      ```properties
-     #
      # WARNING
      # ^^^^^^^
      # This configuration file is for development only and should NOT be used
@@ -301,8 +336,9 @@ To develop the Gravitino Trino connector locally, you need to do the following s
 
    ![](../../assets/trino/start-trino.jpg)
 
-1. If `DevelopmentServer` has started successfully, you can connect to the Trino server using the `trino-cli`
-   and run the following command to see if the Gravitino Trino connector is available:
+1. If the DevelopmentServer has started successfully, you can connect to the Trino server
+   using the `trino-cli` and run the following command to see
+   if the Gravitino Trino connector is available:
 
    ```shell
    java -jar trino-cli-429-executable.jar --server localhost:8180
@@ -313,8 +349,8 @@ To develop the Gravitino Trino connector locally, you need to do the following s
    **Users can use the version of the Trino CLI jar file according to the version of the Trino server.**
    :::
 
-1. If nothing goes wrong, you can start developing the Gravitino Trino connector in the Gravitino project
-   and debug it in the Trino project.
+1. If everying works, you can start developing the Gravitino Trino connector
+   in the Gravitino project and debug it in the Trino project.
 
    ![](../../assets/trino/show-catalogs.jpg)
 

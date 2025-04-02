@@ -541,7 +541,7 @@ where `${name}` is replaced with the actual writer name defined in method `name(
 
 ### Security configuration
 
-Refer to [security](../security/security.md) for HTTPS and authentication configurations.
+Refer to [security](../security/index.md) for HTTPS and authentication configurations.
 
 ### Metrics configuration
 

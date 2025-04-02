@@ -5,7 +5,7 @@ keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-The catalogs currently supported by the Apache Gravitino Trino connector are as follows:
+The catalogs currently supported by the Apache Gravitino Trino connector are:
 
 - [Hive](./catalog-hive.md)
 - [Iceberg](./catalog-iceberg.md)
@@ -36,7 +36,7 @@ The type of catalog properties reference:
 - [MySQL catalog](../../catalogs/relational/jdbc/mysql.md#catalog-properties)
 - [PostgreSQL catalog](../../catalogs/relational/jdbc/postgresql.md#catalog-properties)
 
-Drop catalog:
+To drop a catalog:
 
 ```sql
 drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
@@ -46,7 +46,7 @@ drop_catalog(CATALOG varchar, IGNORE_NOT_EXIST boolean);
 - `IGNORE_NOT_EXIST`: The flag to ignore the error if the catalog does not exist.
   It's optional, the default value is `false`.
 
-Alter catalog:
+To alter a catalog:
 
 ```sql
 alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROPERTIES ARRY[VARCHAR]);
@@ -59,7 +59,7 @@ alter_catalog(CATALOG varchar, SET_PROPERTIES MAP(VARCHAR, VARCHAR), REMOVE_PROP
 These stored procedures are under the `gravitino` connector and the `system` schema.
 So you need to use the following SQL to call them in the `trino-cli`:
 
-Describe catalogs:
+To describe catalogs:
 
 The system table `gravitino.system.catalog` is used to describe all the catalogs.
 

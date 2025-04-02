@@ -153,7 +153,7 @@ The properties supported by a Hive table is summarized in the following table:
 </thead>
 <tbody>
 <tr>
-  <td><td>format</tt></td>
+  <td><tt>format</tt></td>
   <td>Hive storage format for the table</td>
   <td><tt>TEXTFILE</tt></td>
   <td>No</td>

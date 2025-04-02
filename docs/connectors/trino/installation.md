@@ -7,21 +7,21 @@ license: "This software is licensed under the Apache License version 2."
 
 To install the Apache Gravitino Trino connector, you should first deploy the Trino environment,
 and then install the Gravitino Trino connector plugin into Trino.
-Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html)
-and do the following steps:
+Please refer to the [Trino documentation](https://trino.io/docs/current/installation/deployment.html)
+for installation instructions:
 
-1. [Download](https://github.com/apache/gravitino/releases) the Gravitino Trino connector tarball and unpack it.
-   The tarball contains a single top-level directory `gravitino-trino-connector-<version>`,
-   which called the connector directory.
-1. Copy the connector directory to the Trino's plugin directory.
-   Normally, the directory location is `Trino-server-<version>/plugin`,
-   and the directory contains other catalogs used by Trino.
+1. [Download](https://github.com/apache/gravitino/releases) the Gravitino Trino connector tarball
+   and unpack it.
+
+1. Copy the untared directory to the Trino's plugin directory.
+   The directory location is typically `Trino-server-<version>/plugin`,
+   where other catalogs used by Trino are hosted.
+
 1. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties`
    to enable logging for the Gravitino Trino connector.
-1. Update Trino coordinator configuration. 
-   You need to set `catalog.management=dynamic`,
-   The config location is `Trino-server-<version>/etc/config.properties`,
-   and the contents like:
+
+1. Update the configuration for Trino coordinator in `Trino-server-<version>/etc/config.properties`,
+   as shown below:
 
    ```text
    coordinator=true
@@ -32,8 +32,8 @@ and do the following steps:
    ```
 
 Alternatively, you can build the Gravitino Trino connector package from the sources
-and obtain the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
-Please refer to the [Gravitino Development documentation](../../develop/how-to-build.md)
+and use the `gravitino-trino-connector-<version>.tar.gz` file in the `$PROJECT/distribution` directory.
+Please refer to the [Gravitino build guide](../../develop/how-to-build.md)
 
 ## Example
 
@@ -50,7 +50,7 @@ from inside the container to port 8080 on your machine.
 docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:435
 ```
 
-Run `docker ps` to check whether the container is running.
+Run `docker ps` to verify that the container is running.
 
 ### Installing the Apache Gravitino Trino connector
 
