@@ -549,7 +549,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       locationPath,
                       rangerSecurableObjects,
                       rangerPrivileges,
-                      true));
+                      isRecursive));
     }
   }
 
