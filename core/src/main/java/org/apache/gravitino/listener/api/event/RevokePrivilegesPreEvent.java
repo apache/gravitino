@@ -21,11 +21,14 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event that is generated before revoking a set of privileges from a role. */
+/**
+ * Represents an event generated before revoking a set of privileges from a role. This class
+ * encapsulates the details of the privilege revocation event prior to its execution.
+ */
 @DeveloperApi
 public class RevokePrivilegesPreEvent extends RolePreEvent {
   private final String roleName;
@@ -33,22 +36,22 @@ public class RevokePrivilegesPreEvent extends RolePreEvent {
   private final Set<Privilege> privileges;
 
   /**
-   * Constructs a new {@link RevokePrivilegesPreEvent} instance with specified initiator,
+   * Constructs a new {@link RevokePrivilegesPreEvent} instance with the specified initiator,
    * identifier, role name, object, and privileges.
    *
-   * @param initiator the user who initiated the event.
-   * @param identifier the identifier of the metalake which is being operated on.
-   * @param roleName the name of the role.
-   * @param object the {@link MetadataObject} instance.
-   * @param privileges the set of privileges to revoke.
+   * @param initiator The user who initiated the event.
+   * @param metalake The name of the metalake.
+   * @param roleName The name of the role from which privileges will be revoked.
+   * @param object The {@link MetadataObject} instance related to the role.
+   * @param privileges The set of privileges to revoke from the role.
    */
   public RevokePrivilegesPreEvent(
       String initiator,
-      NameIdentifier identifier,
+      String metalake,
       String roleName,
       MetadataObject object,
       Set<Privilege> privileges) {
-    super(initiator, identifier);
+    super(initiator, NameIdentifierUtil.ofRole(metalake, roleName));
     this.roleName = roleName;
     this.object = object;
     this.privileges = privileges;
@@ -57,16 +60,16 @@ public class RevokePrivilegesPreEvent extends RolePreEvent {
   /**
    * Returns the name of the role.
    *
-   * @return the name of the role.
+   * @return The name of the role from which privileges will be revoked.
    */
   public String roleName() {
     return roleName;
   }
 
   /**
-   * Returns the MetadataObject instance.
+   * Returns the {@link MetadataObject} instance related to the role.
    *
-   * @return the {@link MetadataObject} instance.
+   * @return The {@link MetadataObject} instance associated with the role.
    */
   public MetadataObject object() {
     return object;
@@ -75,7 +78,7 @@ public class RevokePrivilegesPreEvent extends RolePreEvent {
   /**
    * Returns the set of privileges to revoke.
    *
-   * @return the set of privileges to revoke.
+   * @return The set of privileges to revoke from the role.
    */
   public Set<Privilege> privileges() {
     return privileges;

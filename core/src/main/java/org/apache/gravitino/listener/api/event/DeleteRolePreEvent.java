@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event that is generated before a role is successfully deleted. */
 @DeveloperApi
@@ -32,11 +32,11 @@ public class DeleteRolePreEvent extends RolePreEvent {
    * role name.
    *
    * @param initiator the user who initiated the event.
-   * @param identifier the identifier of the metalake which is being operated on.
+   * @param metalake The name of the metalake.
    * @param roleName the name of the role to be deleted.
    */
-  public DeleteRolePreEvent(String initiator, NameIdentifier identifier, String roleName) {
-    super(initiator, identifier);
+  public DeleteRolePreEvent(String initiator, String metalake, String roleName) {
+    super(initiator, NameIdentifierUtil.ofRole(metalake, roleName));
 
     this.roleName = roleName;
   }
@@ -44,7 +44,7 @@ public class DeleteRolePreEvent extends RolePreEvent {
   /**
    * Returns the name of the role to be deleted.
    *
-   * @return the name of the role to be deleted.
+   * @return The name of the role to be deleted.
    */
   public String roleName() {
     return roleName;

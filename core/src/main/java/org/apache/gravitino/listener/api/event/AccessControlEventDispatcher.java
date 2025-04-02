@@ -334,6 +334,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       Map<String, String> properties,
       List<SecurableObject> securableObjects)
       throws RoleAlreadyExistsException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new CreateRolePreEvent(initiator, metalake, role, properties, securableObjects));
     try {
       // TODO: add Event
       return dispatcher.createRole(metalake, role, properties, securableObjects);
@@ -347,6 +351,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetRolePreEvent(initiator, metalake, role));
     try {
       // TODO: add Event
       return dispatcher.getRole(metalake, role);
@@ -359,6 +366,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new DeleteRolePreEvent(initiator, metalake, role));
     try {
       // TODO: add Event
       return dispatcher.deleteRole(metalake, role);
@@ -371,6 +381,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListRoleNamesPreEvent(initiator, metalake));
     try {
       // TODO: add Event
       return dispatcher.listRoleNames(metalake);
@@ -384,6 +397,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public String[] listRoleNamesByObject(String metalake, MetadataObject object)
       throws NoSuchMetalakeException, NoSuchMetadataObjectException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListRoleNamesPreEvent(initiator, metalake, object));
     try {
       // TODO: add Event
       return dispatcher.listRoleNamesByObject(metalake, object);
@@ -398,6 +414,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchGroupException, NoSuchRoleException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new GrantPrivilegesPreEvent(initiator, metalake, role, object, privileges));
     try {
       // TODO: add Event
       return dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
@@ -412,6 +432,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new RevokePrivilegesPreEvent(initiator, metalake, role, object, privileges));
     try {
       // TODO: add Event
       return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);

@@ -21,11 +21,14 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event that is generated before grant the set of privileges to a role */
+/**
+ * Represents an event generated before granting a set of privileges to a role. This class
+ * encapsulates the details of the privilege granting event prior to its execution.
+ */
 @DeveloperApi
 public class GrantPrivilegesPreEvent extends RolePreEvent {
   private final String roleName;
@@ -33,22 +36,22 @@ public class GrantPrivilegesPreEvent extends RolePreEvent {
   private final Set<Privilege> privileges;
 
   /**
-   * Construct a new {@link GrantPrivilegesPreEvent} instance with the specified initiator,
+   * Constructs a new {@link GrantPrivilegesPreEvent} instance with the specified initiator,
    * identifier, role name, object, and privileges.
    *
    * @param initiator The name of the user who initiated the event.
-   * @param identifier the identifier of the metalake which is operated on.
-   * @param roleName the name of the role.
-   * @param object the {@link MetadataObject} instance.
-   * @param privileges The set of privileges to grant.
+   * @param metalake The name of the metalake.
+   * @param roleName The name of the role to which privileges will be granted.
+   * @param object The {@link MetadataObject} instance related to the role.
+   * @param privileges The set of privileges to grant to the role.
    */
   public GrantPrivilegesPreEvent(
       String initiator,
-      NameIdentifier identifier,
+      String metalake,
       String roleName,
       MetadataObject object,
       Set<Privilege> privileges) {
-    super(initiator, identifier);
+    super(initiator, NameIdentifierUtil.ofRole(metalake, roleName));
 
     this.roleName = roleName;
     this.object = object;
@@ -58,16 +61,16 @@ public class GrantPrivilegesPreEvent extends RolePreEvent {
   /**
    * Returns the name of the role.
    *
-   * @return the name of the role.
+   * @return The name of the role to which privileges will be granted.
    */
   public String roleName() {
     return roleName;
   }
 
   /**
-   * Returns the MetadataObject instance.
+   * Returns the {@link MetadataObject} instance.
    *
-   * @return the {@link MetadataObject} instance.
+   * @return The {@link MetadataObject} instance related to the role.
    */
   public MetadataObject object() {
     return object;
@@ -76,7 +79,7 @@ public class GrantPrivilegesPreEvent extends RolePreEvent {
   /**
    * Returns the set of privileges to grant.
    *
-   * @return the set of privileges to grant.
+   * @return The set of privileges to grant to the role.
    */
   public Set<Privilege> privileges() {
     return privileges;

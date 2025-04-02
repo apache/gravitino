@@ -22,16 +22,19 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Represents a pre-event for a role operation request. */
+/**
+ * Represents a pre-event for a role operation request. This class serves as a base class for events
+ * triggered before a role operation takes place.
+ */
 @DeveloperApi
 public abstract class RolePreEvent extends PreEvent {
 
   /**
-   * Constructs a new {@link RolePreEvent} instance with the given initiator and identifier for a
-   * role operation.
+   * Constructs a new {@link RolePreEvent} instance with the specified initiator and identifier for
+   * a role operation.
    *
-   * @param initiator the user who triggered the event.
-   * @param identifier the identifier of the metalake which is being operated on.
+   * @param initiator The user who triggered the event.
+   * @param identifier The identifier of the metalake being operated on.
    */
   protected RolePreEvent(String initiator, NameIdentifier identifier) {
     super(initiator, identifier);

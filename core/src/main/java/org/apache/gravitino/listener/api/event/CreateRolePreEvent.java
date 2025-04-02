@@ -21,11 +21,14 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event that is generated before a role is successfully created. */
+/**
+ * Represents an event generated before a role is successfully created. This class encapsulates the
+ * details of the role creation event prior to its completion.
+ */
 @DeveloperApi
 public class CreateRolePreEvent extends RolePreEvent {
   private final String roleName;
@@ -36,19 +39,19 @@ public class CreateRolePreEvent extends RolePreEvent {
    * Constructs a new {@link CreateRolePreEvent} instance with the specified initiator, identifier,
    * role, properties, and securable objects.
    *
-   * @param initiator the user who initiated the event.
-   * @param identifier the identifier of the metalake which is being operated on.
-   * @param roleName the name of the role being created.
-   * @param properties the properties of the role being created.
-   * @param securableObjects the list of securable objects which belong to the role.
+   * @param initiator The user who initiated the event.
+   * @param metalake The name of the metalake.
+   * @param roleName The name of the role being created.
+   * @param properties The properties of the role being created.
+   * @param securableObjects The list of securable objects belonging to the role.
    */
   protected CreateRolePreEvent(
       String initiator,
-      NameIdentifier identifier,
+      String metalake,
       String roleName,
       Map<String, String> properties,
       List<SecurableObject> securableObjects) {
-    super(initiator, identifier);
+    super(initiator, NameIdentifierUtil.ofRole(metalake, roleName));
 
     this.roleName = roleName;
     this.properties = properties;
@@ -58,7 +61,7 @@ public class CreateRolePreEvent extends RolePreEvent {
   /**
    * Returns the name of the role being created.
    *
-   * @return the name of the role being created.
+   * @return The name of the role being created.
    */
   public String roleName() {
     return roleName;
@@ -67,16 +70,16 @@ public class CreateRolePreEvent extends RolePreEvent {
   /**
    * Returns the properties of the role being created.
    *
-   * @return the properties of the role being created.
+   * @return The properties of the role being created.
    */
   protected Map<String, String> properties() {
     return properties;
   }
 
   /**
-   * Returns the list of securable objects which belong to the role.
+   * Returns the list of securable objects that belong to the role.
    *
-   * @return the list of securable objects which belong to the role.
+   * @return The list of securable objects that belong to the role.
    */
   protected List<SecurableObject> securableObjects() {
     return securableObjects;

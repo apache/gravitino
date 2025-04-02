@@ -19,31 +19,34 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before getting a role from a specific metalake. */
+/**
+ * Represents an event triggered before retrieving a role from a specific metalake. This class
+ * encapsulates the details of the role retrieval event prior to its execution.
+ */
 @DeveloperApi
 public class GetRolePreEvent extends RolePreEvent {
   private final String roleName;
 
   /**
-   * Constructs a new {@link GetRolePreEvent} instance with specified initiator, identifier and role
-   * name.
+   * Constructs a new {@link GetRolePreEvent} instance with the specified initiator, identifier, and
+   * role name.
    *
-   * @param initiator the user who initiated the event.
-   * @param identifier the identifier of the metalake which is being operated on.
-   * @param roleName the name of the role being retrieved.
+   * @param initiator The user who initiated the event.
+   * @param metalake The name of the metalake where the role is being retrieved from.
+   * @param roleName The name of the role being retrieved.
    */
-  public GetRolePreEvent(String initiator, NameIdentifier identifier, String roleName) {
-    super(initiator, identifier);
+  public GetRolePreEvent(String initiator, String metalake, String roleName) {
+    super(initiator, NameIdentifierUtil.ofRole(metalake, roleName));
     this.roleName = roleName;
   }
 
   /**
    * Returns the name of the role.
    *
-   * @return the name of the role.
+   * @return The name of the role being retrieved.
    */
   public String roleName() {
     return roleName;

@@ -21,43 +21,48 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event that is generated before listing the role names of a metalake. */
+/**
+ * Represents an event generated before listing the role names of a metalake. This class
+ * encapsulates the details of the role name listing event prior to its execution.
+ */
 @DeveloperApi
 public class ListRoleNamesPreEvent extends RolePreEvent {
   private final Optional<MetadataObject> object;
 
   /**
-   * Constructs a new {@link ListRoleNamesPreEvent} instance with the given initiator and
+   * Constructs a new {@link ListRoleNamesPreEvent} instance with the specified initiator and
    * identifier.
    *
-   * @param initiator the user who initiated the event.
-   * @param identifier the identifier of the metalake which is being operated on.
+   * @param initiator The user who initiated the event.
+   * @param metalake The name of the metalake for which role names are being listed.
    */
-  public ListRoleNamesPreEvent(String initiator, NameIdentifier identifier) {
-    this(initiator, identifier, null);
+  public ListRoleNamesPreEvent(String initiator, String metalake) {
+    super(initiator, NameIdentifierUtil.ofMetalake(metalake));
+
+    this.object = Optional.empty();
   }
 
   /**
-   * Constructs a new {@link ListRoleNamesPreEvent} instance with the given initiator, identifier
-   * and {@link MetadataObject} instance.
+   * Constructs a new {@link ListRoleNamesPreEvent} instance with the specified initiator,
+   * identifier, and {@link MetadataObject} instance.
    *
-   * @param initiator the user who initiated the event.
-   * @param identifier the identifier of the metalake which is being operated on.
-   * @param object the {@link MetadataObject} instance.
+   * @param initiator The user who initiated the event.
+   * @param metalake The name of the metalake for which role names are being listed.
+   * @param object The {@link MetadataObject} instance related to the role names.
    */
-  public ListRoleNamesPreEvent(String initiator, NameIdentifier identifier, MetadataObject object) {
-    super(initiator, identifier);
+  public ListRoleNamesPreEvent(String initiator, String metalake, MetadataObject object) {
+    super(initiator, NameIdentifierUtil.ofMetalake(metalake));
 
     this.object = Optional.ofNullable(object);
   }
 
   /**
-   * Returns the {@link MetadataObject} instance of the role.
+   * Returns the {@link MetadataObject} instance related to the role names.
    *
-   * @return the {@link MetadataObject} instance of the role.
+   * @return The {@link MetadataObject} instance, if present.
    */
   public Optional<MetadataObject> object() {
     return object;
