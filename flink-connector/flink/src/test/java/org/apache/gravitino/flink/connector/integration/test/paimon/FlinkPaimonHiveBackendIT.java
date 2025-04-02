@@ -20,58 +20,15 @@ package org.apache.gravitino.flink.connector.integration.test.paimon;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.nio.file.Path;
-import java.util.Map;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
-import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 @Tag("gravitino-docker-test")
-public class FlinkPaimonHiveCatalogIT extends FlinkCommonIT {
-
-  @TempDir private static Path warehouseDir;
+public class FlinkPaimonHiveBackendIT extends FlinkPaimonCatalogIT {
 
   private static final String DEFAULT_PAIMON_CATALOG = "test_flink_paimon_hive_catalog";
 
-  private static org.apache.gravitino.Catalog catalog;
-
-  @Override
-  protected boolean supportSchemaOperationWithCommentAndOptions() {
-    return false;
-  }
-
-  @Override
-  protected String getProvider() {
-    return "lakehouse-paimon";
-  }
-
-  @Override
-  protected boolean supportDropCascade() {
-    return true;
-  }
-
-  protected Catalog currentCatalog() {
-    return catalog;
-  }
-
-  @BeforeAll
-  void paimonSetup() {
-    initPaimonCatalog();
-  }
-
-  @AfterAll
-  void paimonStop() {
-    Preconditions.checkNotNull(metalake);
-    metalake.dropCatalog(DEFAULT_PAIMON_CATALOG, true);
-  }
-
-  private void initPaimonCatalog() {
+  protected void initPaimonCatalog() {
     Preconditions.checkNotNull(metalake);
     catalog =
         metalake.createCatalog(
@@ -88,12 +45,8 @@ public class FlinkPaimonHiveCatalogIT extends FlinkCommonIT {
                 hiveMetastoreUri));
   }
 
-  @Test
-  public void testCreateGravitinoPaimonCatalogUsingSQL() {
-    tableEnv.useCatalog(DEFAULT_CATALOG);
-    int numCatalogs = tableEnv.listCatalogs().length;
-    String catalogName = "gravitino_hive_sql";
-    String warehouse = warehouseDir.toString();
+  @Override
+  protected void createGravitinoCatalogByFlinkSql(String catalogName) {
     tableEnv.executeSql(
         String.format(
             "create catalog %s with ("
@@ -103,11 +56,15 @@ public class FlinkPaimonHiveCatalogIT extends FlinkCommonIT {
                 + "'uri'='%s'"
                 + ")",
             catalogName, warehouse, hiveMetastoreUri));
-    String[] catalogs = tableEnv.listCatalogs();
-    Assertions.assertEquals(numCatalogs + 1, catalogs.length, "Should create a new catalog");
-    Assertions.assertTrue(metalake.catalogExists(catalogName));
-    org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
-    Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(warehouse, properties.get("warehouse"));
+  }
+
+  @Override
+  protected String getDefaultPaimonCatalog() {
+    return DEFAULT_PAIMON_CATALOG;
+  }
+
+  @Override
+  protected String getWarehouse() {
+    return warehouse;
   }
 }
