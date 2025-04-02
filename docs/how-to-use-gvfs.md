@@ -419,7 +419,7 @@ fs.ls(path="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/sub_dir")
 # get file info under the fileset
 fs.info(path="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/sub_dir/test.parquet")
 
-# check a file or a diretory whether exists
+# check a file or a directory whether exists
 fs.exists(path="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/sub_dir")
 
 # write something into a file
@@ -563,7 +563,7 @@ from gravitino import gvfs
 
 options = {"auth_type": "simple"}
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
-print(fs.ls("gvfs://fileset/fileset_catlaog/tmp/test_fileset"))
+print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 ```
 
 ##### Using `OAuth` authentication
@@ -584,5 +584,5 @@ options = {
     GVFSConfig.OAUTH2_PATH: "token/test",
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
-print(fs.ls("gvfs://fileset/fileset_catlaog/tmp/test_fileset"))
+print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 ```
