@@ -1,19 +1,21 @@
 ---
-title: "Hadoop catalog index"
-slug: /hadoop-catalog-index
+title: Hadoop catalog guide
+slug: /hadoop-catalog-guide
 date: 2025-01-13
 keyword: Hadoop catalog index S3 GCS ADLS OSS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-### Hadoop catalog overall
+### Hadoop catalog overview
 
-Gravitino Hadoop catalog index includes the following chapters:
+Gravitino Hadoop catalog guide includes the following chapters:
 
 - [Hadoop catalog overview and features](./hadoop-catalog.md):
   An overview of the Hadoop catalog, its features, capabilities and related configurations.
+
 - [Manage Hadoop catalog with Gravitino API](../../../metadata/fileset.md):
   A guide on managing fileset metadata using Gravitino API and provides detailed examples.
+
 - [Using Hadoop catalog with Gravitino virtual file system](../gvfs/index.md):
   A guide to use Hadoop catalog with the Gravitino virtual file system and provides detailed examples.
 
