@@ -448,11 +448,17 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 case WRITE_FILESET:
                   if (!gravitinoPrivilege.canBindTo(securableObject.type())) {
                     throw new AuthorizationPluginException(
-                            ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
-                            gravitinoPrivilege.name(),
-                            securableObject.type());
+                        ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                        gravitinoPrivilege.name(),
+                        securableObject.type());
                   }
-                  createSecurableObjects(securableObject, rangerSecurableObjects, identifier, rangerPrivileges, true, new TableOrFilesetPathExtractor());
+                  createSecurableObjects(
+                      securableObject,
+                      rangerSecurableObjects,
+                      identifier,
+                      rangerPrivileges,
+                      true,
+                      new TableOrFilesetPathExtractor());
                   break;
                 case CREATE_TABLE:
                 case CREATE_FILESET:
@@ -460,7 +466,13 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                     case METALAKE:
                     case CATALOG:
                     case SCHEMA:
-                      createSecurableObjects(securableObject, rangerSecurableObjects, identifier, rangerPrivileges, false, new SchemaPathExtractor());
+                      createSecurableObjects(
+                          securableObject,
+                          rangerSecurableObjects,
+                          identifier,
+                          rangerPrivileges,
+                          false,
+                          new SchemaPathExtractor());
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -480,23 +492,29 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     return rangerSecurableObjects;
   }
 
-  private void createSecurableObjects(SecurableObject securableObject, List<AuthorizationSecurableObject> rangerSecurableObjects, NameIdentifier identifier, Set<AuthorizationPrivilege> rangerPrivileges, boolean isRecursive, PathExtractor pathExtractor) {
+  private void createSecurableObjects(
+      SecurableObject securableObject,
+      List<AuthorizationSecurableObject> rangerSecurableObjects,
+      NameIdentifier identifier,
+      Set<AuthorizationPrivilege> rangerPrivileges,
+      boolean isRecursive,
+      PathExtractor pathExtractor) {
     AuthorizationUtils.getMetadataObjectLocation(
-                    identifier, MetadataObjectUtil.toEntityType(securableObject))
-            .forEach(
-                    locationPath -> {
-                      PathBasedMetadataObject pathBaseMetadataObject =
-                              new PathBasedMetadataObject(
-                                      securableObject.parent(),
-                                      securableObject.name(),
-                                      pathExtractor.getPath(MetadataObjectUtil.toEntityType(securableObject), locationPath),
-                                      PathBasedMetadataObject.PathType.get(securableObject.type()),
-                                      isRecursive);
-                      pathBaseMetadataObject.validateAuthorizationMetadataObject();
-                      rangerSecurableObjects.add(
-                              generateAuthorizationSecurableObject(
-                                      pathBaseMetadataObject, rangerPrivileges));
-                    });
+            identifier, MetadataObjectUtil.toEntityType(securableObject))
+        .forEach(
+            locationPath -> {
+              PathBasedMetadataObject pathBaseMetadataObject =
+                  new PathBasedMetadataObject(
+                      securableObject.parent(),
+                      securableObject.name(),
+                      pathExtractor.getPath(
+                          MetadataObjectUtil.toEntityType(securableObject), locationPath),
+                      PathBasedMetadataObject.PathType.get(securableObject.type()),
+                      isRecursive);
+              pathBaseMetadataObject.validateAuthorizationMetadataObject();
+              rangerSecurableObjects.add(
+                  generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
+            });
   }
 
   private void extractMetalakeLocations(
@@ -742,7 +760,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
   }
 
   private interface PathExtractor {
-     String getPath(Entity.EntityType type, String location);
+    String getPath(Entity.EntityType type, String location);
   }
 
   private static class TableOrFilesetPathExtractor implements PathExtractor {
@@ -752,10 +770,12 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         return String.format("%s/*/*/", location);
       } else if (type == Entity.EntityType.SCHEMA) {
         return String.format("%s/*/", location);
-      } if (type == Entity.EntityType.TABLE || type == Entity.EntityType.FILESET) {
+      }
+      if (type == Entity.EntityType.TABLE || type == Entity.EntityType.FILESET) {
         return location;
       } else {
-        throw new AuthorizationPluginException("Don't support %s to get table or fileset location", type);
+        throw new AuthorizationPluginException(
+            "Don't support %s to get table or fileset location", type);
       }
     }
   }
@@ -768,7 +788,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       } else if (type == Entity.EntityType.SCHEMA) {
         return location;
       } else {
-        throw new AuthorizationPluginException("Don't support %s to get table or fileset location", type);
+        throw new AuthorizationPluginException(
+            "Don't support %s to get table or fileset location", type);
       }
     }
   }
