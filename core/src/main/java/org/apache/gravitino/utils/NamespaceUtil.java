@@ -93,6 +93,16 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for group.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for group
+   */
+  public static Namespace ofGroup(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME);
+  }
+
+  /**
    * Create a namespace for column.
    *
    * @param metalake The metalake name
