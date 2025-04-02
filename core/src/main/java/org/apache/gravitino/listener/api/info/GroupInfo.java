@@ -17,31 +17,43 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.info;
 
+import java.util.List;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.authorization.Group;
 
-/** Represents an event triggered before listing groups from a specific metalake. */
+/** Provides read-only access to group information for event listeners. */
 @DeveloperApi
-public class ListGroupsPreEvent extends GroupPreEvent {
+public class GroupInfo {
+  private final String name;
+  private List<String> roles;
+
   /**
-   * Constructs a new {@link ListGroupsPreEvent} with the specified initiator and metalake name.
+   * Constructs a new {@link GroupInfo} instance from the specified {@link Group} object.
    *
-   * @param initiator the user who initiated the list-groups request.
-   * @param metalake the name of the metalake from which groups will be listed.
+   * @param group the {@link Group} object from which to create the {@link GroupInfo}.
    */
-  protected ListGroupsPreEvent(String initiator, String metalake) {
-    super(initiator, NameIdentifierUtil.ofMetalake(metalake));
+  public GroupInfo(Group group) {
+    this.name = group.name();
+    this.roles = group.roles();
   }
 
   /**
-   * Returns the operation type for this event.
+   * Returns the name of the group.
    *
-   * @return the operation type for this event.
+   * @return The name of the group.
    */
-  @Override
-  public OperationType operationType() {
-    return OperationType.LIST_GROUPS;
+  public String name() {
+    return name;
+  }
+
+  /**
+   * Returns the roles of the roles.
+   *
+   * @return The roles of the group.
+   */
+  public List<String> roles() {
+    return roles;
   }
 }
