@@ -97,7 +97,7 @@ public interface PropertiesMetadata {
   /** @return true if the property is existed, false otherwise. */
   default boolean containsProperty(String propertyName) {
     return getNonPrefixEntry(propertyName).isPresent()
-        || getNonPrefixEntry(propertyName).isPresent();
+        || getPropertyPrefixEntry(propertyName).isPresent();
   }
 
   /**
