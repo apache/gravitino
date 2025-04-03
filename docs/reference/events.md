@@ -138,9 +138,11 @@ It also triggers a failure event if the operation failed.
   <td>
     `AddUserPreEvent`<br/>
     `GetUserPreEvent`<br/>
+    `GrantUserRolesPreEvent`<br/>
     `ListUserNamesPreEvent`<br/>
     `ListUsersPreEvent`<br/>
-    `RemoveUserPreEvent`
+    `RemoveUserPreEvent`<br/>
+    `RevokeUserRolesPreEvent`
   </td>
   <td>0.9.0-incubating</td>
 </tr>
@@ -149,9 +151,11 @@ It also triggers a failure event if the operation failed.
   <td>
     `AddGroupPreEvent`<br/>
     `GetGroupPreEvent`<br/>
+    `GrantGroupRolesPreEvent`
     `ListGroupNamesPreEvent`</br>
     `ListGroupsPreEvent`<br/>
-    `RemoveGroupPreEvent`
+    `RemoveGroupPreEvent`<br/>
+    `RevokeGroupRolesPreEvent`
   </td>
   <td>0.9.0-incubating</td>
 </tr>
@@ -344,12 +348,28 @@ It also triggers a failure event if the operation failed.
   <td>
     `AddUserEvent`<br/>
     `GetUserEvent`<br/>
+    `GrantUserRolesEvent`<br/>
     `ListUserNamesEvent`<br/>
     `ListUsersEvent`<br/>
-    `RemoveUserEvent`
+    `RemoveUserEvent`<br/>
+    `RevokeUserRolesEvent`
   </td>
   <td>0.9.0-incubating</td>
 </tr>
+<tr>
+  <td>group operation</td>
+  <td>
+    `AddGroupEvent`<br/>
+    `GetGroupEvent`<br/>
+    `GrantGroupRolesEvent`<br/>
+    `ListGroupNamesEvent`<br/>
+    `ListGroupsEvent`<br/>
+    `RemoveGroupEvent`<br/>
+    `RevokeGroupRolesEvent`
+  </td>
+  <td>0.9.0-incubating</td>
+</tr>
+
 
 </tbody>
 </table>
