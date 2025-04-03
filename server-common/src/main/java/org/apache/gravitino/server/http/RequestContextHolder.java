@@ -21,9 +21,11 @@ package org.apache.gravitino.server.http;
  * Used to store the user's identity information when requesting a REST API, and allows the user
  * information to be accessed anywhere within the request thread.
  */
-public enum RequestContextHolder {
-  /** Singleton Pattern */
-  INSTANCE;
+public class RequestContextHolder {
+
+  private static final RequestContextHolder INSTANCE = new RequestContextHolder();
+
+  private RequestContextHolder() {}
 
   /**
    * Store the user's identity information when requesting a REST API

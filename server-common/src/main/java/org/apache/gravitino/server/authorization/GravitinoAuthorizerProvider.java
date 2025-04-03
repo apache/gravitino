@@ -25,9 +25,11 @@ import org.apache.gravitino.server.ServerConfig;
  * in the GravitinoAuthorizerProvider. The GravitinoAuthorizer instance can then be retrieved using
  * the getGravitinoAuthorizer method.
  */
-public enum GravitinoAuthorizerProvider {
-  /** Singleton Pattern */
-  INSTANCE;
+public class GravitinoAuthorizerProvider {
+
+  private static final GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
+
+  private GravitinoAuthorizerProvider() {}
 
   private GravitinoAuthorizer gravitinoAuthorizer;
 
