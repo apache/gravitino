@@ -339,6 +339,18 @@ It also triggers a failure event if the operation failed.
   </td>
   <td>0.9.0-incubating</td>
 </tr>
+<tr>
+  <td>user operation</td>
+  <td>
+    `AddUserEvent`<br/>
+    `GetUserEvent`<br/>
+    `ListUserNamesEvent`<br/>
+    `ListUsersEvent`<br/>
+    `RemoveUserEvent`
+  </td>
+  <td>0.9.0-incubating</td>
+</tr>
+
 </tbody>
 </table>
 
