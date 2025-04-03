@@ -284,7 +284,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
             The updated schema object.
         """
         self._check_model_ident(model_ident)
-        model_full_ident = self._model_full_identifier(model_ident)
+        model_full_ns = self._model_full_namespace(model_ident.namespace())
 
         update_requests = [
             GenericModelCatalog.to_model_update_request(change) for change in changes
@@ -293,8 +293,12 @@ class GenericModelCatalog(BaseSchemaCatalog):
         req = ModelUpdatesRequest(update_requests)
         req.validate()
 
+        print(
+            f"{self._format_model_request_path(model_full_ns)}/{encode_string(model_ident.name())}"
+        )
+
         resp = self.rest_client.put(
-            self._format_model_version_request_path(model_full_ident),
+            f"{self._format_model_request_path(model_full_ns)}/{encode_string(model_ident.name())}",
             req,
             error_handler=MODEL_ERROR_HANDLER,
         )
