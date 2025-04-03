@@ -17,12 +17,22 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
-/** Convert the authorization expression to ognl expression. */
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizeApi;
+
+/** Convert the authorization expression to OGNL expression. */
 public class AuthorizationExpressionConverter {
 
   private AuthorizationExpressionConverter() {}
 
-  public static String convertToOgnlExpression(String expression) {
+  /**
+   * Convert the authorization expression to OGNL expression
+   *
+   * @param authorizationExpression authorization expression from {@link MetadataFilterHelper} or
+   *     {@link AuthorizeApi}
+   * @return an OGNL expression used to call GravitinoAuthorizer
+   */
+  public static String convertToOgnlExpression(String authorizationExpression) {
     return null;
   }
 }
