@@ -133,6 +133,17 @@ It also triggers a failure event if the operation failed.
   </td>
   <td>0.9.0-incubating</td>
 </tr>
+<tr>
+  <td>Gravitino server user operation</td>
+  <td>
+    `AddUserPreEvent`<br/>
+    `GetUserPreEvent`<br/>
+    `ListUserNamesPreEvent`<br/>
+    `ListUserPreEvent`<br/>
+    `RemoveUserPreEvent`<br/>
+  </td>
+  <td>0.9.0-incubating</td>
+</tr>
 </tbody>
 </table>
 
