@@ -25,8 +25,7 @@ import org.apache.gravitino.lineage.LineageDispatcher;
 
 /**
  * The LineageSource interface defines a closable data source for receiving and dispatching lineage
- * information. It provides default methods for initialization, closing, and retrieving a set of
- * REST packages.
+ * information.
  */
 public interface LineageSource extends Closeable {
 
