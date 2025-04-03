@@ -12,7 +12,7 @@ license: 'This software is licensed under the Apache License version 2.'
 To display help on command usage:
 
 ```bash
-gcli --help
+gcli.sh --help
 ```
 
 ### Display client version
@@ -20,7 +20,7 @@ gcli --help
 To display the client version:
 
 ```bash
-gcli --version
+gcli.sh --version
 ```
 
 ### Display server version
@@ -28,7 +28,7 @@ gcli --version
 To display the server version:
 
 ```bash
-gcli --server
+gcli.sh --server
 ```
 
 

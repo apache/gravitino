@@ -9,30 +9,30 @@ license: 'This software is licensed under the Apache License version 2.'
 ### List all groups
 
 ```bash
-gcli group list
+gcli.sh group list
 ```
 
 ### Create a group
 
 ```bash
-gcli group create --group new_group
+gcli.sh group create --group new_group
 ```
 
 ### Display a group's details
 
 ```bash
-gcli group details --group new_group
+gcli.sh group details --group new_group
 ```
 
 ### Show a groups's audit information
 
 ```bash
-gcli group details --group new_group --audit
+gcli.sh group details --group new_group --audit
 ```
 
 ### Delete a group
 
 ```bash
-gcli group delete --group new_group
+gcli.sh group delete --group new_group
 ```
 

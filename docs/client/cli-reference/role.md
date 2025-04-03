@@ -21,71 +21,71 @@ Note that some are only valid for certain entities.
 ### List all roles
 
 ```bash
-gcli role list
+gcli.sh role list
 ```
 
 ### Create a role
 
 ```bash
-gcli role create --role admin
+gcli.sh role create --role admin
 ```
 
 ### Display role details
 
 ```bash
-gcli role details --role admin
+gcli.sh role details --role admin
 ```
 
 ### Show a roles's audit information
 
 ```bash
-gcli role details --role admin --audit
+gcli.sh role details --role admin --audit
 ```
 
 ### Delete a role
 
 ```bash
-gcli role delete --role admin
+gcli.sh role delete --role admin
 ```
 
 ## User bindings for roles
 
-### Add a role to a user
+### Add/bind a role to a user
 
 ```bash
-gcli user grant --user new_user --role admin
+gcli.sh user grant --user new_user --role admin
 ```
 
 ### Remove a role from a user
 
 ```bash
-gcli user revoke --user new_user --role admin
+gcli.sh user revoke --user new_user --role admin
 ```
 
 ### Remove all roles from a user
 
 ```bash
-gcli user revoke --user new_user --all
+gcli.sh user revoke --user new_user --all
 ```
 
 ## Group bindings for roles
 
-### Add a role to a group
+### Add/bind a role to a group
 
 ```bash
-gcli group grant --group groupA --role admin
+gcli.sh group grant --group groupA --role admin
 ```
 
 ### Remove a role from a group
 
 ```bash
-gcli group revoke --group groupA --role admin
+gcli.sh group revoke --group groupA --role admin
 ```
 
 ### Remove all roles from a group
 
 ```bash
-gcli group revoke --group groupA --all
+gcli.sh group revoke --group groupA --all
 ```
 
 ## Privilige operations
@@ -93,18 +93,18 @@ gcli group revoke --group groupA --all
 ### Grant a privilege
 
 ```bash
-gcli role grant --name catalog_postgres --role admin --privilege create_table modify_table
+gcli.sh role grant --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
 ### Revoke a privilege
 
 ```bash
-gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
+gcli.sh role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
 ### Revoke all privileges
 
 ```bash
-gcli role revoke --metalake metalake_demo --name catalog_postgres --role admin --all
+gcli.sh role revoke --metalake metalake_demo --name catalog_postgres --role admin --all
 ```
 

@@ -9,19 +9,18 @@ license: 'This software is licensed under the Apache License version 2.'
 ### List owners
 
 ```bash
-gcli catalog details --owner --name postgres
+gcli.sh catalog details --owner --name postgres
 ```
 
-### Set an owner to a user
+### Set a user as the owner
 
 ```bash
-gcli catalog set --owner --user admin --name postgres
+gcli.sh catalog set --owner --user admin --name postgres
 ```
 
-### Set an owner to a group
+### Set a group as the owner
 
 ```bash
-gcli catalog set --owner --group groupA --name postgres
+gcli.sh catalog set --owner --group groupA --name postgres
 ```
-
 

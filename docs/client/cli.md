@@ -2,26 +2,27 @@
 title: 'Command Line Interface (CLI)'
 slug: /cli
 keyword: cli
-last_update:
-  date: 2024-10-23
-  author: justinmclean
 license: 'This software is licensed under the Apache License version 2.'
 ---
+
+The command line interface (CLI) allows users to view, create and update metadata information
+for *metalakes*, *catalogs*, *schemas*, *tables*, *models*, *columns*, *users*, *roles*,
+*groups*, *tags*, *topics* and *filesets*.
 
 This document shows you how to manage metadata in Apache Gravitino using its Command Line Interface (CLI).
 The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
 ## Usage
 
-The general syntax for CLI commands is `gcli <entity> <command> [options]`.
+The general syntax for CLI commands is `gcli.sh <entity> <command> [options]`.
 
  ```bash
-  usage: gcli [metalake|catalog|schema|model|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
+  usage: gcli.sh [metalake|catalog|schema|model|table|column|user|group|tag|topic|fileset] [list|details|create|delete|update|set|remove|properties|revoke|grant] [options]
   Options
- usage: gcli
-  -a,--audit             display audit information
+ usage: gcli.sh
+ -a,--audit             display audit information
     --alias <arg>        model aliases
-    --all                all operation for --enable
+    --all                on all entities
     --auto <arg>         column value auto-increments (true/false)
  -c,--comment <arg>      entity comment
     --columnfile <arg>   CSV file describing columns
@@ -46,6 +47,7 @@ The general syntax for CLI commands is `gcli <entity> <command> [options]`.
     --partition          display partition information
     --position <arg>     position of column
     --privilege <arg>    privilege(s)
+    --quiet              quiet mode
  -r,--role <arg>         role name
     --rename <arg>       new entity name
  -s,--server             Gravitino server version
@@ -61,16 +63,9 @@ The general syntax for CLI commands is `gcli <entity> <command> [options]`.
                          iceberg, kafka
  ```
 
-:::tip
-You can configure an alias for the CLI for ease of use.
-For example:
-
-```bash
-alias gcli='java -jar ../../cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar'
-```
-
-Or you can use the `gcli.sh` script which can be found in the `clients/cli/bin/` directory.
-:::
+To run the Gravitino CLI, please use the `gcli.sh` script located in Gravitino's <tt>bin</tt> directory.
+If you have defined the `GRAVITINO_HOME` environment variable, you can run the script from any location
+using `$GRAVITINO_HOME/bin/gcli.sh`.
 
 ## Command Overview
 
@@ -203,13 +198,13 @@ All the commands are performed by using the [Java API](../api/java-api) internal
 
 For commands that accept multiple properties they can be specified in a couple of different ways:
 
-1. <tt>gcli --properties n1=v1,n2=v2,n3=v3</tt>
-2. <tt>gcli --properties n1=v1 n2=v2 n3=v3</tt>
-3. <tt>gcli --properties n1=v1 --properties n2=v2 --properties n3=v3</tt>
+1. <tt>gcli.sh --properties n1=v1,n2=v2,n3=v3</tt>
+2. <tt>gcli.sh --properties n1=v1 n2=v2 n3=v3</tt>
+3. <tt>gcli.sh --properties n1=v1 --properties n2=v2 --properties n3=v3</tt>
 
 ### Setting properties and tags
 
-Different options are needed to add a tag and set a property of a tag with `gcli tag set`.
+Different options are needed to add a tag and set a property of a tag with `gcli.sh tag set`.
 To add a tag, specify the tag (via `--tag`) and the entity to tag (via `--name`).
 To set the property of a tag (via `--tag`), you need to specify the property (via `--property`)
 and value (via `--value`) you want to set.

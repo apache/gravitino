@@ -9,25 +9,25 @@ license: 'This software is licensed under the Apache License version 2.'
 ### List all users
 
 ```bash
-gcli user list
+gcli.sh user list
 ```
 
 ### Create a user
 
 ```bash
-gcli user create --user new_user
+gcli.sh user create --user new_user
 ```
 
 ### Show a user's details
 
 ```bash
-gcli user details --user new_user
+gcli.sh user details --user new_user
 ```
 
 ### Show a user's audit information
 
 ```bash
-gcli user details --user new_user --audit
+gcli.sh user details --user new_user --audit
 ```
 
 #### Delete a user
