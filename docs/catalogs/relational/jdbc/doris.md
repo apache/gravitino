@@ -1,5 +1,5 @@
 ---
-title: "Apache Doris catalog"
+title: Apache Doris catalog
 slug: /jdbc-doris-catalog
 keywords:
 - jdbc
@@ -13,13 +13,13 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage [Apache Doris](https://doris.apache.org/)
+Apache Gravitino can be used to manage [Apache Doris](https://doris.apache.org/)
 metadata through JDBC connection.
 
 :::caution
 Gravitino saves some system information in schema and table comments,
-like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`,
-please don't change or remove this message.
+like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`.
+**Please don't change or remove this message.**
 :::
 
 ## Catalog
@@ -27,14 +27,15 @@ please don't change or remove this message.
 ### Catalog capabilities
 
 - Gravitino catalog corresponds to the Doris instance.
-- Supports metadata management of Doris (1.2.x).
-- Supports table index.
-- Supports [column default value](../../../metadata/relational.md#table-column-default-value).
+- This can supports managing metadata for Doris (1.2.x).
+- Indexed tables are supported
+- [Column default value](../../../metadata/relational.md#table-column-default-value)
+  are supported.
 
 ### Catalog properties
 
 You can pass to a Doris data source any property that isn't defined by Gravitino
-by adding `gravitino.bypass.` prefix as a catalog property.
+by adding the `gravitino.bypass.` prefix as a catalog property.
 For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis`
 to the data source property.
 
@@ -44,49 +45,122 @@ For more details, you can check the relevant data source configuration in
 Besides the [common catalog properties](../../../admin/server-config.md#gravitino-catalog-properties-configuration),
 the Doris catalog has the following properties:
 
-| Configuration item   | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version    |
-|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0            |
-| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                                                                                                                                                                                                                                         | (none)        | Yes      | 0.5.0            |
-| `jdbc-user`          | The JDBC user name.                                                                                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0            |
-| `jdbc-password`      | The JDBC password.                                                                                                                                                                                                                                                                                                                                                                                               | (none)        | Yes      | 0.5.0            |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                                                                                                                                                                                                                                                                                                   | `2`           | No       | 0.5.0            |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                                                                                                                                                                                                                                                                  | `10`          | No       | 0.5.0            |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                                                                                                                                                                                                                                                                  | `10`          | No       | 0.5.0            |
-| `replication_num`    | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If not specified and the number of backend servers greater or equals to 3, the default value (3) in Doris server will be used. For more, please see the [doc](https://doris.apache.org/docs/1.2/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/) | `1` or `3`    | No       | 0.6.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Configuration item</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>jdbc-url</tt></td>
+  <td>
+    The JDBC URL to use when connecting to the database.
+    For example, `jdbc:mysql://localhost:9030`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-driver</tt></td>
+  <td>
+    The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-user</tt></td>
+  <td>The JDBC user name.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-password</tt></td>
+  <td>The JDBC password.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.min-size</tt></td>
+  <td>The minimum number of connections in the pool.</td>
+  <td>`2`</td>
+  <td>No</td>
+  <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.max-size</tt></td>
+  <td>The maximum number of connections in the pool.</td>
+  <td>`10`</td>
+  <td>No</td>
+  <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.max-size</tt></td>
+  <td>The maximum number of connections in the pool.</td>
+  <td>`10`</td>
+  <td>No</td>
+  <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>replication_num</tt></td>
+  <td>
+    The number of replications for the table.
 
-Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
+    - If not specified and the number of backend servers less than 3, the default value is 1;
+    - If not specified and the number of backend servers greater or equals to 3,
+      the default value (`3`) in Doris server will be used.
+
+    For more details, check the
+    [Doris reference](https://doris.apache.org/docs/1.2/sql-manual/sql-reference/Data-Definition-Statements/Create/CREATE-TABLE/).
+  </td>
+  <td>`1` or `3`</td>
+  <td>No</td>
+  <td>`0.6.0-incubating`</td>
+</tr>
+</tbody>
+</table>
+
+Before using the Doris Catalog, you must download the corresponding JDBC driver
+to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
 
 ### Catalog operations
 
-For more details, refer to
-[Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations).
+Refer to [managing relational metadata](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
 ### Schema capabilities
 
 - Gravitino's schema concept corresponds to the Doris database.
-- Supports creating schema.
-- Supports dropping schema.
+- Creating schema is supported.
+- Dropping schema is supported.
 
 ### Schema properties
 
-- Support schema properties, including Doris database properties and user-defined properties.
+- This catalog supports schema properties, including Doris database properties and user-defined properties.
 
 ### Schema operations
 
-For more details, please refer to
-[Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations).
+Refer to [managing relational metadata](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
 ### Table capabilities
 
 - Gravitino's table concept corresponds to the Doris table.
-- Supports index.
-- Supports [column default value](../../../metadata/relational.md#table-column-default-value).
+- Indexed tables are supported.
+- [Column default value](../../../metadata/relational.md#table-column-default-value)
+  is supported.
 
 #### Table column types
 
@@ -94,18 +168,17 @@ For more details, please refer to
 |----------------|------------|
 | `Boolean`      | `Boolean`  |
 | `Byte`         | `TinyInt`  |
-| `Short`        | `SmallInt` |
+| `Date`         | `Date`     |
+| `Decimal`      | `Decimal`  |
+| `Double`       | `Double`   |
+| `FixedChar`    | `Char`     |
+| `Float`        | `Float`    |
 | `Integer`      | `Int`      |
 | `Long`         | `BigInt`   |
-| `Float`        | `Float`    |
-| `Double`       | `Double`   |
-| `Decimal`      | `Decimal`  |
-| `Date`         | `Date`     |
+| `Short`        | `SmallInt` |
+| `String`       | `String`   |
 | `Timestamp`    | `Datetime` |
 | `VarChar`      | `VarChar`  |
-| `FixedChar`    | `Char`     |
-| `String`       | `String`   |
-
 
 Doris doesn't support Gravitino `Fixed`, `Timestamp_tz`, `IntervalDay`, `IntervalYear`, `Union`, or `UUID` type.
 The data types other than those listed above are mapped to Gravitino's
@@ -119,7 +192,7 @@ because Doris doesn't support these types in JDBC.
 
 ### Table column auto-increment
 
-Unsupported for now.
+Auto-increment columns are not supported for now.
 
 ### Table properties
 
@@ -128,36 +201,36 @@ Unsupported for now.
 
 ### Table indexes
 
-- Supports PRIMARY_KEY
+PRIMARY_KEY is supported
 
-  Please be aware that the index can only apply to a single column.
+Please be aware that the index can only apply to a single column.
 
-  <Tabs groupId='language' queryString>
-  <TabItem value="json" label="Json">
+<Tabs groupId='language' queryString>
+<TabItem value="json" label="Json">
 
-  ```json
-  {
-    "indexes": [
-      {
-        "indexType": "primary_key",
-        "name": "PRIMARY",
-        "fieldNames": [["id"]]
-       }
-    ]
-  }
-  ```
+```json
+{
+  "indexes": [
+    {
+      "indexType": "primary_key",
+      "name": "PRIMARY",
+      "fieldNames": [["id"]]
+     }
+  ]
+}
+```
 
-  </TabItem>
-  <TabItem value="java" label="Java">
+</TabItem>
+<TabItem value="java" label="Java">
 
-  ```java
-  Index[] indexes = new Index[] {
-      Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
-  }
-  ```
+```java
+Index[] indexes = new Index[] {
+    Indexes.of(IndexType.PRIMARY_KEY, "PRIMARY", new String[][]{{"id"}})
+}
+```
 
-  </TabItem>
-  </Tabs>
+</TabItem>
+</Tabs>
 
 ### Table partitioning
 
@@ -183,17 +256,15 @@ Currently, the Doris catalog supports the following distribution strategies:
 - `RANDOM`
 
 For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it.
-More information about the distribution strategy defined in Gravitino can be found
-[here](../distributed-table.md#distribution-strategies).
+More information about the distribution strategy can be found [here](../distributed-table.md#distribution-strategies).
 
 ### Table operations
 
-For more details, please refer to
-[Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations).
+Please refer to [managing relational metadata](../../../metadata/relational.md#table-operations).
 
 #### Alter table operations
 
-Gravitino supports these table alteration operations:
+Gravitino supports the following table alteration operations:
 
 - `RenameTable`
 - `UpdateComment`
@@ -207,11 +278,15 @@ Gravitino supports these table alteration operations:
 Please be aware that:
 
 - Not all table alteration operations can be processed in batches.
+
 - Schema changes, such as adding/modifying/dropping columns can be processed in batches.
-- Supports modifying multiple column comments at the same time.
-- Doesn't support modifying the column type and column comment at the same time.
-- The schema alteration in Doris is asynchronous. You might get an outdated schema
-  if you execute a schema query immediately after the alteration.
+
+- This catalog supports modifying multiple column comments at the same time.
+
+- This catalog doesn't support modifying the column type and column comment at the same time.
+
+- The schema alteration in Doris is asynchronous.
+  You might get an outdated schema if you execute a schema query immediately after the alteration.
   It is recommended to pause briefly after the schema alteration.
   Gravitino will add the schema alteration status into
   the schema information in the upcoming version to solve this problem.
