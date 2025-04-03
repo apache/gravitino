@@ -32,6 +32,9 @@ class ModelUpdatesRequest(RESTRequest):
         metadata=config(field_name="updates"), default_factory=list
     )
 
+    def __init__(self, updates: List[ModelUpdateRequest] = None):
+        self._updates = updates
+
     def validate(self):
         """Validates the update requests.
         Raises:

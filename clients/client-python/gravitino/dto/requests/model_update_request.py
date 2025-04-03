@@ -17,6 +17,8 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from typing import Optional
+
 from dataclasses_json import config
 
 from gravitino.api.model.model_change import ModelChange
@@ -45,7 +47,7 @@ class ModelUpdateRequest:
     class UpdateModelNameRequest(ModelUpdateRequestBase):
         """Request to update model name"""
 
-        _new_name: str = field(metadata=config(field_name="newName"))
+        _new_name: Optional[str] = field(metadata=config(field_name="newName"))
 
         def __init__(self, new_name: str):
             super().__init__("updateName")
