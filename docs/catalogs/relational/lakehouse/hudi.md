@@ -1,5 +1,5 @@
 ---
-title: "Hudi catalog"
+title: Lakehouse Hudi catalog
 slug: /lakehouse-hudi-catalog
 keywords:
   - lakehouse
@@ -13,31 +13,85 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage Apache Hudi metadata.
+Apache Gravitino can be used to manage Apache Hudi metadata.
 
 ### Requirements and limitations
 
-:::info
-Tested and verified with Apache Hudi `0.15.0`.
-:::
+The catalog implementation was tested and verified with Apache Hudi *0.15.0*.
 
 ## Catalog
 
 ### Catalog capabilities
 
-- Works as a catalog proxy, supporting `HMS` as catalog backend.
-- Only support read operations (list and load) for Hudi schemas and tables.
-- Doesn't support timeline management operations now.
+- The catalog works as a proxy, supporting HMS as the backend.
+- This catalog only supports read operations (list and load) for Hudi schemas and tables.
+- Timeline management operations are not supported at the moment.
 
 ### Catalog properties
 
-| Property name                            | Description                                                                                                                                                                                                                            | Default value | Required | Since Version    |
-|------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `catalog-backend`                        | Catalog backend of Gravitino Hudi catalog. Only supports `hms` now.                                                                                                                                                                    | (none)        | Yes      | 0.7.0-incubating |
-| `uri`                                    | The URI associated with the backend. Such as `thrift://127.0.0.1:9083` for HMS backend.                                                                                                                                                | (none)        | Yes      | 0.7.0-incubating |
-| `client.pool-size`                       | For HMS backend. The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                               | 1             | No       | 0.7.0-incubating |
-| `client.pool-cache.eviction-interval-ms` | For HMS backend. The cache pool eviction interval.                                                                                                                                                                                     | 300000        | No       | 0.7.0-incubating |
-| `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls for HMS backend. | (none)        | No       | 0.7.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Property name</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>catalog-backend</tt></td>
+  <td>
+    Catalog backend of Gravitino Hudi catalog. Only supports `hms` now.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>uri</tt></td>
+  <td>
+    The URI associated with the backend.
+    Such as `thrift://127.0.0.1:9083` for HMS backend.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>client.pool-size</tt></td>
+  <td>
+    This is for the HMS backend.
+    The maximum number of Hive metastore clients in the pool for Gravitino.
+  </td>
+  <td>1</td>
+  <td>No</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>client.pool-cache.eviction-interval-ms</tt></td>
+  <td>
+    This is for the HMS backend.
+    The cache pool eviction interval in milliseconds.
+  </td>
+  <td>300000</td>
+  <td>No</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>gravitino.bypass.&#42;</tt></td>
+  <td>
+    Property name with this prefix passed down to the underlying backend client for use.
+    Such as `gravitino.bypass.hive.metastore.failure.retries = 3`
+    indicate 3 times of retries upon failure of Thrift metastore calls for HMS backend.
+  </td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+</tbody>
+</table>
 
 ### Catalog operations
 
@@ -48,22 +102,24 @@ For more details, please refer to
 
 ### Schema capabilities
 
-- Only support read operations: listSchema, loadSchema, and schemaExists.
+- Only support read operations: <tt>listSchema</tt>, <tt>loadSchema</tt>,
+  and <tt>schemaExists</tt>.
 
 ### Schema properties
 
-- The `Location` is an optional property that shows the storage path to the Hudi database
+- The <tt>location</tt> is an optional property that shows the storage path to the Hudi database.
 
 ### Schema operations
 
-Only support read operations: listSchema, loadSchema, and schemaExists.
+Only support read operations: <tt>listSchema</tt>, <tt>loadSchema</tt>,
+and <tt>schemaExists</tt>.
 For more details, please refer to [managing relational metadata](../../../metadata/relational.md#schema-operations).
 
 ## Table 
 
 ### Table capabilities
 
-- Only support read operations: listTable, loadTable, and tableExists.
+- Only support read operations: <tt>listTable</tt>, <tt>loadTable</tt>, and <tt>tableExists</tt>.
 
 ### Table partitions
 
@@ -71,15 +127,15 @@ For more details, please refer to [managing relational metadata](../../../metada
 
 ### Table sort orders
 
-- Doesn't support table sort orders.
+- Sorted tables are not supported.
 
 ### Table distributions
 
-- Doesn't support table distributions.
+- Distributed tables are not supported.
 
 ### Table indexes
 
-- Doesn't support table indexes.
+- Indexed tables are not supported.
 
 ### Table properties
 
@@ -92,22 +148,23 @@ and [Apache Hudi column types](https://hudi.apache.org/docs/sql_ddl#supported-ty
 
 | Gravitino Type | Apache Hudi Type |
 |----------------|------------------|
+| `array`        | `array`          |
+| `binary`       | `bytes`          |
 | `boolean`      | `boolean`        |
+| `date`         | `date`           |
+| `decimal`      | `decimal`        |
+| `double`       | `double`         |
+| `float`        | `float`          |
 | `integer`      | `int`            |
 | `long`         | `long`           |
-| `date`         | `date`           |
-| `timestamp`    | `timestamp`      |
-| `float`        | `float`          |
-| `double`       | `double`         |
-| `string`       | `string`         |
-| `decimal`      | `decimal`        |
-| `binary`       | `bytes`          |
-| `array`        | `array`          |
 | `map`          | `map`            |
+| `string`       | `string`         |
 | `struct`       | `struct`         |
+| `timestamp`    | `timestamp`      |
 
 ### Table operations
 
-Only support read operations: listTable, loadTable, and tableExists.
+Only read operations like <tt>listTable</tt>, <tt>loadTable</tt>,
+and <tt>tableExists</tt> are supported.
 For more details, please refer to [managing relational metadata](../../../metadata/relational.md#table-operations)
 
