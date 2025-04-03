@@ -98,13 +98,13 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> illegalProps = ImmutableMap.of("k2", "v2");
     testPropertyException(
         () -> topicOperationDispatcher.createTopic(topicIdent1, "comment", null, illegalProps),
-        "Properties or property prefixes arerequired and must be set");
+        "Properties or property prefixes are required and must be set");
 
     Map<String, String> illegalProps2 =
         ImmutableMap.of(PROPERTY_KEY1, "v1", PROPERTY_KEY5_PREFIX + "1", "value1", ID_KEY, "test");
     testPropertyException(
         () -> topicOperationDispatcher.createTopic(topicIdent1, "comment", null, illegalProps2),
-        "Properties or property prefixes arereserved and cannot be set",
+        "Properties or property prefixes are reserved and cannot be set",
         "gravitino.identifier");
   }
 

@@ -113,7 +113,7 @@ public class HudiCatalogHMSIT extends BaseIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Properties or property prefixes arerequired and must be set"),
+            .contains("Properties or property prefixes are required and must be set"),
         "Unexpected exception message: " + exception.getMessage());
     Assertions.assertTrue(
         exception.getMessage().contains("catalog-backend"),
@@ -136,7 +136,7 @@ public class HudiCatalogHMSIT extends BaseIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Properties or property prefixes arerequired and must be set"),
+            .contains("Properties or property prefixes are required and must be set"),
         "Unexpected exception message: " + exception.getMessage());
     Assertions.assertTrue(
         exception.getMessage().contains("catalog-backend"),
