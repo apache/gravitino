@@ -118,6 +118,23 @@ public class TestGroupEvent {
   }
 
   @Test
+  void testAddGroupFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.addGroup(METALAKE, groupName));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AddGroupFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.ADD_GROUP, event.operationType());
+
+    AddGroupFailureEvent addGroupFailureEvent = (AddGroupFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, groupName), addGroupFailureEvent.identifier());
+    Assertions.assertEquals(groupName, addGroupFailureEvent.groupName());
+  }
+
+  @Test
   void testGetGroupPreEventWithExistingGroup() {
     dispatcher.getGroup(METALAKE, groupName);
 
@@ -175,6 +192,23 @@ public class TestGroupEvent {
   }
 
   @Test
+  void testGetGroupFailureEvent() {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> failureDispatcher.getGroup(METALAKE, groupName));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetGroupFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_GROUP, event.operationType());
+
+    GetGroupFailureEvent getGroupFailureEvent = (GetGroupFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, groupName), getGroupFailureEvent.identifier());
+    Assertions.assertEquals(groupName, getGroupFailureEvent.groupName());
+  }
+
+  @Test
   void testListGroupsPreEvent() {
     dispatcher.listGroups(METALAKE);
 
@@ -203,6 +237,21 @@ public class TestGroupEvent {
   }
 
   @Test
+  void testListGroupsFailureEvent() {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listGroups(METALAKE));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListGroupsFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_GROUPS, event.operationType());
+
+    ListGroupsFailureEvent listGroupsFailureEvent = (ListGroupsFailureEvent) event;
+    Assertions.assertEquals(identifier, listGroupsFailureEvent.identifier());
+  }
+
+  @Test
   void testListGroupNamesPreEvent() {
     dispatcher.listGroupNames(METALAKE);
 
@@ -228,6 +277,21 @@ public class TestGroupEvent {
 
     ListGroupNamesEvent listGroupNamesEvent = (ListGroupNamesEvent) event;
     Assertions.assertEquals(identifier, listGroupNamesEvent.identifier());
+  }
+
+  @Test
+  void testListGroupNamesFailureEvent() {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listGroupNames(METALAKE));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListGroupNamesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_GROUP_NAMES, event.operationType());
+
+    ListGroupNamesFailureEvent listGroupNamesFailureEvent = (ListGroupNamesFailureEvent) event;
+    Assertions.assertEquals(identifier, listGroupNamesFailureEvent.identifier());
   }
 
   @Test
@@ -281,6 +345,23 @@ public class TestGroupEvent {
   }
 
   @Test
+  void testRemoveGroupFailureEvent() {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> failureDispatcher.removeGroup(METALAKE, groupName));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RemoveGroupFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.REMOVE_GROUP, event.operationType());
+
+    RemoveGroupFailureEvent removeGroupFailureEvent = (RemoveGroupFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, groupName), removeGroupFailureEvent.identifier());
+    Assertions.assertEquals(groupName, removeGroupFailureEvent.groupName());
+  }
+
+  @Test
   void testGrantRolesToGroupPreEvent() {
     dispatcher.grantRolesToGroup(METALAKE, grantedRoles, groupName);
 
@@ -314,6 +395,25 @@ public class TestGroupEvent {
     GroupInfo groupInfo = grantGroupRolesEvent.grantedGroupInfo();
 
     validateGroup(groupInfo, group);
+  }
+
+  @Test
+  void testGrantRolesToGroupFailureEvent() {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.grantRolesToGroup(METALAKE, grantedRoles, groupName));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GrantGroupRolesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.GRANT_GROUP_ROLES, event.operationType());
+
+    GrantGroupRolesFailureEvent grantGroupRolesFailureEvent = (GrantGroupRolesFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, groupName), grantGroupRolesFailureEvent.identifier());
+    Assertions.assertEquals(groupName, grantGroupRolesFailureEvent.groupName());
+    Assertions.assertEquals(grantedRoles, grantGroupRolesFailureEvent.roles());
   }
 
   @Test
@@ -351,6 +451,27 @@ public class TestGroupEvent {
     GroupInfo groupInfo = revokeGroupRolesEvent.revokedGroupInfo();
 
     validateGroup(groupInfo, otherGroup);
+  }
+
+  @Test
+  void testRevokeRolesFromGroupFailureEvent() {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.revokeRolesFromGroup(METALAKE, revokedRoles, otherGroupName));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RevokeGroupRolesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.REVOKE_GROUP_ROLES, event.operationType());
+
+    RevokeGroupRolesFailureEvent revokeGroupRolesFailureEvent =
+        (RevokeGroupRolesFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, otherGroupName),
+        revokeGroupRolesFailureEvent.identifier());
+    Assertions.assertEquals(otherGroupName, revokeGroupRolesFailureEvent.groupName());
+    Assertions.assertEquals(revokedRoles, revokeGroupRolesFailureEvent.roles());
   }
 
   private Group getMockGroup(String name, List<String> roles) {
