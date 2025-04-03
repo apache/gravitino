@@ -13,12 +13,12 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage OceanBase metadata.
+Apache Gravitino can be used to manage OceanBase metadata.
 
 :::caution
 Gravitino saves some system information in schema and table comment, like
-`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`,
-please don't change or remove this message.
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`.
+**Please don't change or remove this message.**
 :::
 
 ## Catalog
@@ -26,97 +26,156 @@ please don't change or remove this message.
 ### Catalog capabilities
 
 - Gravitino catalog corresponds to the OceanBase instance.
-- Supports metadata management of OceanBase (4.x).
-- Supports DDL operation for OceanBase databases and tables.
-- Supports table index.
-- Supports [column default value](../../../metadata/relational.md#table-column-default-value)
-  and [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
+- This catalog supports managing metadata for OceanBase (4.x).
+- DDL operation for OceanBase databases and tables are supported.
+- Indexed tables are supported.
+- [Column default value](../../../metadata/relational.md#table-column-default-value)
+  and [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment)
+  are supported.
 
 ### Catalog properties
 
 You can pass to a OceanBase data source any property that isn't defined by Gravitino
-by adding `gravitino.bypass.` prefix as a catalog property.
-For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+by adding `gravitino.bypass.` as a catalog property name prefix.
+For example, catalog property `gravitino.bypass.maxWaitMillis` passes `maxWaitMillis`
+to the data source property.
 
-Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
+Check the relevant data source configuration in
+[data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
+If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user`,
+ and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](../../../admin/server-config.md#gravitino-catalog-properties-configuration),
 the OceanBase catalog has the following properties:
 
-| Configuration item   | Description                                                                                                                           | Default value | Required | Since Version    |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881` or `jdbc:oceanbase://localhost:2881`              | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` or `com.oceanbase.jdbc.Driver`. | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc-user`          | The JDBC user name.                                                                                                                   | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc-password`      | The JDBC password.                                                                                                                    | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                        | `2`           | No       | 0.7.0-incubating |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                       | `10`          | No       | 0.7.0-incubating |
+<table>
+<thead>
+<tr>
+  <th>Property name</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<tr>
+  <td><tt>jdbc-url</tt></td>
+  <td>
+    The JDBC URL for connecting to the database.
+    For example, `jdbc:mysql://localhost:2881` or `jdbc:oceanbase://localhost:2881`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-driver</tt></td>
+  <td>
+    The driver of the JDBC connection.
+    For example, `com.mysql.jdbc.Driver`, `com.mysql.cj.jdbc.Driver`
+    or `com.oceanbase.jdbc.Driver`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-user</tt></td>
+  <td>The JDBC user name.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-password</tt></td>
+  <td>The JDBC password.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.min-size</tt></td>
+  <td>The minimum number of connections in the pool.</td>
+  <td>`2`</td>
+  <td>No</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.max-size</tt></td>
+  <td>The maximum number of connections in the pool.</td>
+  <td>`10`</td>
+  <td>No</td>
+  <td>`0.7.0-incubating`</td>
+</tr>
+</tbody>
+</table>
 
 :::caution
-Before using the OceanBase Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-oceanbase/libs` directory.
+Before using the OceanBase Catalog, you must download the corresponding JDBC driver
+to the `catalogs/jdbc-oceanbase/libs` directory.
 Gravitino doesn't package the JDBC driver for OceanBase due to licensing issues.
 :::
 
 ### Catalog operations
 
-Refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations)
-for more details.
+Refer to [managing relational metadata](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
 ### Schema capabilities
 
 - Gravitino's schema concept corresponds to the OceanBase database.
-- Supports creating schema, but does not support setting comment.
-- Supports dropping schema.
-- Supports cascade dropping schema.
+- The catalog supports creating schema, but does not support setting comment.
+- Dropping schemas is supported..
+- Cascaded dropping of schemas are supported.
 
 ### Schema properties
 
-- Doesn't support any schema property settings.
+- Schema property settings are not supported.
 
 ### Schema operations
 
-Refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations)
-for more details.
+Refer to [managing relational metadata](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
 ### Table capabilities
 
 - Gravitino's table concept corresponds to the OceanBase table.
-- Supports DDL operation for OceanBase tables.
-- Supports index.
-- Supports [column default value](../../../metadata/relational.md#table-column-default-value) and
-  [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
+- DDL operation for OceanBase tables are supported
+- Indexed tables are supported.
+- [Column default value](../../../metadata/relational.md#table-column-default-value)
+  and [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment)
+  are supported.
 
 ### Table properties
 
-- Doesn't support table properties.
+- Table properties are not supported.
 
 ### Table column types
 
 | Gravitino Type    | OceanBase Type      |
 |-------------------|---------------------|
+| `Binary`          | `Binary`            |
 | `Byte`            | `Tinyint`           |
 | `Byte(false)`     | `Tinyint Unsigned`  |
-| `Short`           | `Smallint`          |
-| `Short(false)`    | `Smallint Unsigned` |
+| `Date`            | `Date`              |
+| `Decimal`         | `Decimal`           |
+| `Double`          | `Double`            |
+| `FixedChar`       | `FixedChar`         |
+| `Float`           | `Float`             |
 | `Integer`         | `Int`               |
 | `Integer(false)`  | `Int Unsigned`      |
 | `Long`            | `Bigint`            |
 | `Long(false)`     | `Bigint Unsigned`   | 
-| `Float`           | `Float`             |
-| `Double`          | `Double`            |
+| `Short`           | `Smallint`          |
+| `Short(false)`    | `Smallint Unsigned` |
 | `String`          | `Text`              |
-| `Date`            | `Date`              |
 | `Time`            | `Time`              |
 | `Timestamp`       | `Timestamp`         |
-| `Decimal`         | `Decimal`           |
 | `VarChar`         | `VarChar`           |
-| `FixedChar`       | `FixedChar`         |
-| `Binary`          | `Binary`            |
 
 :::info
 OceanBase doesn't support Gravitino `Boolean`, `Fixed`, `Struct`, `List`,`Map`,`Timestamp_tz`,
@@ -129,7 +188,8 @@ that represents an unresolvable data type since 0.6.0-incubating.
 ### Table column auto-increment
 
 :::note
-OceanBase setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
+OceanBase setting an auto-increment column requires simultaneously setting a unique index;
+otherwise, an error will occur.
 :::
 
 <Tabs groupId='language' queryString>
@@ -182,7 +242,7 @@ Index[] indexes = new Index[] {
 
 ### Table indexes
 
-- Supports PRIMARY_KEY and UNIQUE_KEY.
+Indexed tables with primary keys and unique keys are supported.
 
 <Tabs groupId='language' queryString>
 <TabItem value="json" label="Json">
@@ -223,12 +283,11 @@ Index[] indexes = new Index[] {
 The OceanBase catalog does not support creating partitioned tables in the current version.
 :::
 
-Refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations)
-for more details.
+Refer to [managing relational metadata](../../../metadata/relational.md#table-operations).
 
 #### Alter table operations
 
-Gravitino supports these table alteration operations:
+Gravitino supports the following table alteration operations:
 
 - `RenameTable`
 - `UpdateComment`
