@@ -13,12 +13,12 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage PostgreSQL metadata.
+Apache Gravitino can be used to manage PostgreSQL metadata.
 
 :::caution
 Gravitino saves some system information in schema and table comment, like
-`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`,
-please don't change or remove this message.
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`.
+**Please don't change or remove this message.**
 :::
 
 ## Catalog
@@ -26,11 +26,12 @@ please don't change or remove this message.
 ### Catalog capabilities
 
 - Gravitino catalog corresponds to the PostgreSQL database.
-- Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
-- Supports DDL operation for PostgreSQL schemas and tables.
-- Supports table index.
-- Supports [column default value](../../../metadata/relational.md#table-column-default-value) and
-  [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
+- This catalog supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
+- DDL operation for PostgreSQL schemas and tables are supported.
+- Indexed tables are supported.
+- [Column default value](../../../metadata/relational.md#table-column-default-value) and
+  [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment).
+  are suuported.
 
 ### Catalog properties
 
@@ -40,87 +41,153 @@ For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWai
 You can check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-When you use the Gravitino with Trino, you can pass the Trino PostgreSQL connector configuration using prefix `trino.bypass.`.
+You can pass the PostgreSQL connector configuration using prefix `trino.bypass.`.
 For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy`
 to the Gravitino PostgreSQL catalog in Trino runtime.
 
-If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password`
-to catalog properties.
+If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`,
+`jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](../../../admin/server-config.md#gravitino-catalog-properties-configuration),
 the PostgreSQL catalog has the following properties:
 
-| Configuration item   | Description                                                                                                                                                        | Default value | Required | Since Version |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. You need to specify the database in the URL. For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`.  | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`        | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                            | (none)        | Yes      | 0.3.0         |
-| `jdbc-database`      | The database of the JDBC connection. Configure it with the same value as the database in the `jdbc-url`. For example `pg_database`.                                | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`          | The JDBC user name.                                                                                                                                                | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`      | The JDBC password.                                                                                                                                                 | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                                                     | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                                                                    | `10`          | No       | 0.3.0         |
+<table>
+<thead>
+<tr>
+  <th>Property name</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>jdbc-url</tt></td>
+  <td>
+    The JDBC URL for connecting to the database.
+    You need to specify the database in the URL.
+    For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-driver</tt></td>
+  <td>
+    The driver of the JDBC connection. For example `org.postgresql.Driver`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-database</tt></td>
+  <td>
+    The database for the JDBC connection.
+    Configure it with the same value as the database in the `jdbc-url`.
+    For example `pg_database`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-user</tt></td>
+  <td>The JDBC user name.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-password</tt></td>
+  <td>The JDBC password.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.min-size</tt></td>
+  <td>The minimum number of connections in the pool.</td>
+  <td>`2`</td>
+  <td>No</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.max-size</tt></td>
+  <td>The maximum number of connections in the pool.</td>
+  <td>`10`</td>
+  <td>No</td>
+  <td>`0.3.0`</td>
+</tr>
+</tbody>
+</table>
 
 :::caution
-You must download the corresponding JDBC driver to the `catalogs/jdbc-postgresql/libs` directory.
-You must explicitly specify the database in both `jdbc-url` and `jdbc-database`. An error may occur if the values in both aren't consistent.
+You must download the corresponding JDBC driver
+to the `catalogs/jdbc-postgresql/libs` directory.
+You must explicitly specify the database in both `jdbc-url` and `jdbc-database`.
+An error may occur if the values in both aren't consistent.
 :::
+
 :::info
-In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema corresponds to the Gravitino schema.
+In PostgreSQL, the database corresponds to the Gravitino catalog,
+and the schema corresponds to the Gravitino schema.
 :::
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#catalog-operations)
-for more details.
+Refer to [managing relational metadata](../../../metadata/relational.md#catalog-operations).
 
 ## Schema
 
 ### Schema capabilities
 
 - Gravitino schema corresponds to the PostgreSQL schema.
-- Supports creating schema with comments.
-- Supports dropping schema.
-- Supports cascade dropping schema.
+- Creating schema with comments is supported.
+- Dropping schemas is supported.
+- Cascaded dropping of schemas is supported.
 
 ### Schema properties
 
-- Doesn't support any schema property settings.
+- Schema property settings are not supported.
 
 ### Schema operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#schema-operations)
-for more details.
+Refer to [managing relational metadata](../../../metadata/relational.md#schema-operations).
 
 ## Table
 
 ### Table capabilities
 
 - The Gravitino table corresponds to the PostgreSQL table.
-- Supports DDL operation for PostgreSQL tables.
-- Supports index.
-- Support [column default value](../../../metadata/relational.md#table-column-default-value) and
-  [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
-- Doesn't support table property settings.
+- DDL operations for PostgreSQL tables are supported
+- lndexed tables are supported.
+- [Column default value](../../../metadata/relational.md#table-column-default-value) and
+  [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment)
+  are suuported.
+- Table property settings are not supported.
 
 ### Table column types
 
 | Gravitino Type | PostgreSQL Type |
 |----------------|-----------------|
+| `Binary`       | `Bytea`         |
 | `Boolean`      | `Bool`          |
-| `Short`        | `Int2`          |
-| `Integer`      | `Int4`          |
-| `Long`         | `Int8`          |
-| `Float`        | `Float4`        |
-| `Double`       | `Float8`        |
-| `String`       | `Text`          |
 | `Date`         | `Date`          |
+| `Decimal`      | `Numeric`       |
+| `Double`       | `Float8`        |
+| `FixedChar`    | `Bpchar`        |
+| `Float`        | `Float4`        |
+| `Integer`      | `Int4`          |
+| `List`         | `Array`         |
+| `Long`         | `Int8`          |
+| `Short`        | `Int2`          |
+| `String`       | `Text`          |
 | `Time`         | `Time`          |
 | `Timestamp`    | `Timestamp`     |
 | `Timestamp_tz` | `Timestamptz`   |
-| `Decimal`      | `Numeric`       |
 | `VarChar`      | `Varchar`       |
-| `FixedChar`    | `Bpchar`        |
-| `Binary`       | `Bytea`         |
-| `List`         | `Array`         |
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed`,`Struct`, `Map`,`IntervalDay`, `IntervalYear`,`Union`, or `UUID` type.
@@ -131,15 +198,15 @@ that represents an unresolvable data type since 0.6.0-incubating.
 
 ### Table column auto-increment
 
-- Supports setting auto-increment.
+- Auto-increment columns are supported.
 
 ### Table properties
 
-- Doesn't support table properties.
+- Table properties are not supported.
 
 ### Table indexes
 
-- Supports PRIMARY_KEY and UNIQUE_KEY.
+Indexed tables with primary keys and/or unique keys are supported.
 
 <Tabs groupId='language' queryString>
 <TabItem value="json" label="Json">
@@ -176,8 +243,7 @@ Index[] indexes = new Index[] {
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](../../../metadata/relational.md#table-operations)
-for more details.
+Refer to [manage relational metadata](../../../metadata/relational.md#table-operations).
 
 #### Alter table operations
 
