@@ -295,7 +295,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         resp = self.rest_client.put(
             self._format_model_version_request_path(model_full_ident),
-            update_requests,
+            req,
             error_handler=MODEL_ERROR_HANDLER,
         )
         model_response = ModelResponse.from_json(resp.body, infer_missing=True)

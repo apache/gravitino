@@ -21,7 +21,7 @@ from typing import Optional
 
 from dataclasses_json import config
 
-from gravitino.api.model.model_change import ModelChange
+from gravitino.api.model_change import ModelChange
 from gravitino.rest.rest_message import RESTRequest
 
 

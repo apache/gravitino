@@ -302,6 +302,112 @@ model: Model = catalog.as_model_catalog().get_model(ident=NameIdentifier.of("mod
 </TabItem>
 </Tabs>
 
+### alter a model 
+
+You can modify a model's metadata (e.g., rename, update comment, or modify properties) by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
+
+<Tabs groupId="language" queryString>
+ <TabItem value="shell" label="Shell">
+
+```shell
+
+
+ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+ -H "Content-Type: application/json" -d '{
+   "updates": [
+     {
+       "@type": "updateComment",
+       "newComment": "Updated model comment"
+     },
+     {
+       "@type": "rename",
+       "newName": "example_model_renamed"
+     },
+     {
+       "@type": "setProperty",
+       "property": "k2",
+       "value": "v2"
+     },
+     {
+       "@type": "removeProperty",
+       "property": "k1"
+     }
+   ]
+ }' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model
+ ```
+
+
+ </TabItem>
+ <TabItem value="java" label="Java">
+
+ ```java
+ // Load the catalog and model
+ GravitinoClient gravitinoClient = GravitinoClient
+     .builder("http://localhost:8090")
+     .withMetalake("example")
+     .build();
+
+ Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+ ModelCatalog modelCatalog = catalog.asModelCatalog();
+
+ // Define modifications
+ ModelChange[] changes = {
+     ModelChange.updateComment("Updated model comment"),
+     ModelChange.rename("example_model_renamed"),
+     ModelChange.setProperty("k2", "v2"),
+     ModelChange.removeProperty("k1")
+ };
+
+ // Apply changes
+ Model updatedModel = modelCatalog.alterModel(
+     NameIdentifier.of("model_schema", "example_model"),
+     changes
+ );
+ ```
+
+ </TabItem>
+<TabItem value="python" label="Python">
+
+ ```python
+ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+ catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+ model_catalog = catalog.as_model_catalog()
+
+ # Define modifications
+ changes = (
+     ModelChange.update_comment("Updated model comment"),
+     ModelChange.rename("example_model_renamed"),
+     ModelChange.set_property("k2", "v2"),
+     ModelChange.remove_property("k1")
+ )
+
+ # Apply changes
+ updated_model = model_catalog.alter_model(
+     ident=NameIdentifier.of("model_schema", "example_model"),
+     *changes
+ )
+ ```
+ </TabItem>
+ </Tabs>
+
+#### Supported modifications
+
+The following operations are supported for altering a model:
+
+
+| Operation               | JSON Example                                                                 | Java Method                               | Python Method                         |
+ |-------------------------|------------------------------------------------------------------------------|-------------------------------------------|---------------------------------------|
+| **Rename model**        | `{"@type":"rename","newName":"new_name"}`                                    | `ModelChange.rename("new_name")`         | `ModelChange.rename("new_name")`      |
+| **Update comment**      | `{"@type":"updateComment","newComment":"new_comment"}`                       | `ModelChange.updateComment("new_comment")` | `ModelChange.update_comment("new_comment")` |
+| **Set property**        | `{"@type":"setProperty","property":"key","value":"value"}`                   | `ModelChange.setProperty("key", "value")` | `ModelChange.set_property("key", "value")` |
+| **Remove property**     | `{"@type":"removeProperty","property":"key"}`                                | `ModelChange.removeProperty("key")`       | `ModelChange.remove_property("key")`  |
+
+:::note
+- Multiple modifications can be applied in a single request.
+- If the target model does not exist, a `404 Not Found` error will be returned.
+  :::
+
 ### Delete a model
 
 You can delete a model by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
