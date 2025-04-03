@@ -226,7 +226,7 @@ please refer to [security documentation](../security/index.md) for more details.
 
 #### Backend authentication
 
-For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc.user` and `gravitino.iceberg-rest.jdbc.password`
+For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password`
 to authenticate the JDBC connection.
 For Hive backend, you can use the `gravitino.iceberg-rest.authentication.type`
 to specify the authentication type, and use the `gravitino.iceberg-rest.authentication.kerberos.principal`
@@ -713,7 +713,7 @@ You can specify a Hive or JDBC catalog backend for production environment.
   <td>`0.5.2`</td>
 </tr>
 <tr>
-  <td><tt>gravitino.iceberg-rest.jdbc.user</tt></td>
+  <td><tt>gravitino.iceberg-rest.jdbc-user</tt></td>
   <td>
     The username of the JDBC connection.
   </td>
@@ -722,7 +722,7 @@ You can specify a Hive or JDBC catalog backend for production environment.
   <td>`0.2.0`</td>
 </tr>
 <tr>
-  <td><tt>gravitino.iceberg-rest.jdbc.password</tt></td>
+  <td><tt>gravitino.iceberg-rest.jdbc-password</tt></td>
   <td>The password of the JDBC connection.</td>
   <td>(none)</td>
   <td>Yes</td>
