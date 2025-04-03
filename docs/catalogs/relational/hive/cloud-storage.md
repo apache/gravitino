@@ -1,5 +1,5 @@
 ---
-title: "Hive catalog with S3, ADLS and GCS"
+title: Hive catalog with S3, ADLS and GCS
 slug: /hive-catalog
 date: 2024-9-24
 keyword: Hive catalog cloud storage S3 ADLS GCS
@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Since Hive 2.x, Hive has supported S3 as a storage backend,
+Starting from version *2.x*, Hive has supported S3 as a storage backend,
 enabling users to store and manage data in Amazon S3 directly through Hive.
 Gravitino enhances this capability by supporting the Hive catalog with S3,
 allowing users to efficiently manage the storage locations of files located in S3.
@@ -88,7 +88,8 @@ It's also applicable for Azure Blob Storage(ADLS) and GCS.
 
 ### Adding Required JARs
 
-After updating the `hive-site.xml`, you need to ensure that the necessary S3-related JARs are included in the Hive classpath.
+After updating the `hive-site.xml`, you need to ensure that
+the necessary S3-related JARs are included in the Hive classpath.
 You can do this by executing the following command:
 
 ```shell
@@ -101,19 +102,24 @@ cp ${HADOOP_HOME}/share/hadoop/tools/lib/*azure* ${HIVE_HOME}/lib
 cp gcs-connector-hadoop3-2.2.22-shaded.jar ${HIVE_HOME}/lib
 ```
 
-[`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop2-2.2.22-shaded.jar)
-is the bundle jar that contains Hadoop GCS connector,
-you need to choose the corresponding gcs connector jar for the version of Hadoop you are using.
+The `gcs-connector-hadoop3-2.2.22-shaded.jar` is the bundle JAR
+that contains Hadoop GCS connector. It can be downloaded
+from the [maven repository](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop2-2.2.22-shaded.jar).
+You need to choose the GCS connector JAR for the version of Hadoop you are using.
 
-Alternatively, you can download the required JARs from the Maven repository and place them in the Hive classpath.
-It is crucial to verify that the JARs are compatible with the version of Hadoop you are using to avoid any compatibility issue.
+Alternatively, you can download the required JARs from the Maven repository
+and place them in the Hive classpath.
+It is crucial to verify that the JARs are compatible with the version of Hadoop
+you are using to avoid any compatibility issue.
 
 ### Restart Hive metastore
 
-Once all configurations have been correctly set, restart the Hive cluster to apply the changes.
-This step is essential to ensure that the new configurations take effect and that the Hive services can communicate with S3.
+Once all configurations have been correctly set,
+restart the Hive cluster to apply the changes.
+This step is essential to ensure that the new configurations take effect
+and that the Hive services can communicate with S3.
 
-## Creating Tables or Databases with S3 Storage using Gravitino
+## Creating Tables or Databases with S3 Storage
 
 Assuming you have already set up a Hive catalog with Gravitino,
 you can proceed to create tables or databases using S3 storage.
@@ -128,22 +134,27 @@ The following is an example of how to create a database in S3 using Gravitino:
 <TabItem value="shell" label="Shell">
 
 ```shell
+cat <<EOF >schema.json
+{
+  "name": "hive_schema",
+  "comment": "comment",
+  "properties": {
+    "location": "s3a://bucket-name/path"
+     
+     # The following line is for Azure Blob Storage(ADLS)
+     # "location": "abfss://container-name@user-account-name.dfs.core.windows.net/path"
+     
+     # The following line is for Google Cloud Storage(GCS)
+     # "location": "gs://bucket-name/path"
+  }
+}
+EOF
+
 curl -X POST \
   -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Content-Type: application/json" -d '{
-    "name": "hive_schema",
-    "comment": "comment",
-    "properties": {
-      "location": "s3a://bucket-name/path"
-       
-       # The following line is for Azure Blob Storage(ADLS)
-       # "location": "abfss://container-name@user-account-name.dfs.core.windows.net/path"
-       
-       # The following line is for Google Cloud Storage(GCS)
-       # "location": "gs://bucket-name/path"
-    }
-  }' \
-  http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas
+  -H "Content-Type: application/json" \
+  -d '@schema.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas
 ```
 
 </TabItem>
@@ -152,11 +163,11 @@ curl -X POST \
 ```java
 GravitinoClient gravitinoClient = GravitinoClient
     .builder("http://localhost:8090")
-    .withMetalake("metalake")
+    .withMetalake("mymetalake")
     .build();
 
-// Assuming you have just created a Hadoop catalog named `catalog`
-Catalog catalog = gravitinoClient.loadCatalog("catalog");
+// Assuming you have a Hadoop catalog named `mycatalog`
+Catalog catalog = gravitinoClient.loadCatalog("mycatalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
@@ -170,11 +181,10 @@ Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     // .put("location", "gs://bucket-name/path")
     
     .build();
-Schema schema = supportsSchemas.createSchema("hive_schema",
+Schema schema = supportsSchemas.createSchema("myschema",
     "This is a schema",
     schemaProperties
 );
-// ...
 ```
 
 </TabItem>
@@ -187,8 +197,8 @@ For further details on table operations, please refer to
 ## Access tables with S3 storage by Hive CLI
 
 Assuming you have already created a table in the section
-[Creating Tables or Databases with S3 Storage using Gravitino](#creating-tables-or-databases-with-s3-storage-using-gravitino),
-let’s say the table is named `hive_table`,
+[Creating Tables or Databases with S3 Storage](#creating-tables-or-databases-with-s3-storage),
+let's say the table is named `hive_table`,
 you can access the database/table and view its details using the Hive CLI as follows:
 
 
@@ -196,14 +206,13 @@ you can access the database/table and view its details using the Hive CLI as fol
 hive> show create database hive_schema;
 OK
 CREATE DATABASE `hive_schema`
-COMMENT
-  'comment'
-LOCATION
-  's3a://my-test-bucket/test-1727168792125'
-WITH DBPROPERTIES (
-  'gravitino.identifier'='gravitino.v1.uid2173913050348296645',
-  'key1'='val1',
-  'key2'='val2')
+  COMMENT 'comment'
+  LOCATION 's3a://my-test-bucket/test-1727168792125'
+  WITH DBPROPERTIES (
+    'gravitino.identifier'='gravitino.v1.uid2173913050348296645',
+    'key1'='val1',
+    'key2'='val2'
+)
 Time taken: 0.019 seconds, Fetched: 9 row(s)
 hive> use hive_schema;
 OK
@@ -213,7 +222,8 @@ OK
 CREATE TABLE `hive_table`(
   `hive_col_name1` tinyint COMMENT 'col_1_comment',
   `hive_col_name2` date COMMENT 'col_2_comment',
-  `hive_col_name3` string COMMENT 'col_3_comment')
+  `hive_col_name3` string COMMENT 'col_3_comment'
+)
 COMMENT 'table_comment'
 ROW FORMAT SERDE
   'org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe'
@@ -262,51 +272,53 @@ To access S3-stored tables using Spark, you need to configure the SparkSession a
 Below is an example of how to set up the SparkSession with the necessary S3 configurations:
 
 ```java
-  SparkSession sparkSession =
-        SparkSession.builder()
-            .config("spark.plugins", "org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin")
-            .config("spark.sql.gravitino.uri", "http://localhost:8090")
-            .config("spark.sql.gravitino.metalake", "xx")
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.access.key", accessKey)
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.secret.key", secretKey)
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.endpoint", getS3Endpoint)
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+SparkSession sparkSession =
+  SparkSession.builder()
+    .config("spark.plugins", "org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin")
+    .config("spark.sql.gravitino.uri", "http://localhost:8090")
+    .config("spark.sql.gravitino.metalake", "xx")
+    .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.access.key", accessKey)
+    .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.secret.key", secretKey)
+    .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.endpoint", getS3Endpoint)
+    .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
-            // This two is for Azure Blob Storage(ADLS) only
-            .config(
-                String.format(
-                    "spark.sql.catalog.{hive_catalog_name}.fs.azure.account.key.%s.dfs.core.windows.net",
-                    ABS_USER_ACCOUNT_NAME),
-                ABS_USER_ACCOUNT_KEY)
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem")
+     // This two is for Azure Blob Storage(ADLS) only
+     .config(
+       String.format(
+         "spark.sql.catalog.{hive_catalog_name}.fs.azure.account.key.%s.dfs.core.windows.net",
+         ABS_USER_ACCOUNT_NAME),
+         ABS_USER_ACCOUNT_KEY)
+     .config("spark.sql.catalog.{hive_catalog_name}.fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem")
   
-            // This two is for Google Cloud Storage(GCS) only
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.gs.auth.service.account.enable", "true")
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.gs.auth.service.account.json.keyfile", "SERVICE_ACCOUNT_FILE")
-            
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.path.style.access", "true")
-            .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.connection.ssl.enabled", "false")
-            .config(
-                "spark.sql.catalog.{hive_catalog_name}.fs.s3a.aws.credentials.provider",
-                "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
-            .config("spark.sql.storeAssignmentPolicy", "LEGACY")
-            .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
-            .enableHiveSupport()
-            .getOrCreate();
+     // This two is for Google Cloud Storage(GCS) only
+     .config("spark.sql.catalog.{hive_catalog_name}.fs.gs.auth.service.account.enable", "true")
+     .config("spark.sql.catalog.{hive_catalog_name}.fs.gs.auth.service.account.json.keyfile", "SERVICE_ACCOUNT_FILE")
+          
+     .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.path.style.access", "true")
+     .config("spark.sql.catalog.{hive_catalog_name}.fs.s3a.connection.ssl.enabled", "false")
+     .config(
+       "spark.sql.catalog.{hive_catalog_name}.fs.s3a.aws.credentials.provider",
+       "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
+     .config("spark.sql.storeAssignmentPolicy", "LEGACY")
+     .config("mapreduce.input.fileinputformat.input.dir.recursive", "true")
+     .enableHiveSupport()
+     .getOrCreate();
 
-    sparkSession.sql("...");
+sparkSession.sql("...");
 ```
 
 :::note
-Please download [Hadoop AWS jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws),
-[aws java sdk jar](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle)
-and place them in the classpath of the Spark.
+Please download [Hadoop AWS JAR](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-aws),
+[AWS Java SDK JAR](https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-bundle)
+and place them into the classpath of the Spark.
 If the JARs are missing, Spark will not be able to access the S3 storage.
-Azure Blob Storage(ADLS) requires the [Hadoop Azure jar](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure),
-[Azure cloud sdk jar](https://mvnrepository.com/artifact/com.azure/azure-storage-blob)
+
+Azure Blob Storage(ADLS) requires the [Hadoop Azure JAR](https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-azure),
+[Azure cloud SDK JAR](https://mvnrepository.com/artifact/com.azure/azure-storage-blob)
 to be placed in the classpath of the Spark.
+
 For Google Cloud Storage(GCS), you need to download the
-[Hadoop GCS jar](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases)
+[Hadoop GCS JAR](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases)
 and place it in the classpath of the Spark.
 :::
 
