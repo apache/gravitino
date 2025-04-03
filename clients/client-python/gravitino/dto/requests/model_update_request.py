@@ -50,7 +50,7 @@ class ModelUpdateRequest:
         _new_name: Optional[str] = field(metadata=config(field_name="newName"))
 
         def __init__(self, new_name: str):
-            super().__init__("updateName")
+            super().__init__("rename")
             self._new_name = new_name
 
         def validate(self):
