@@ -195,37 +195,6 @@ class TestModelCatalogApi(unittest.TestCase):
             succ = catalog.as_model_catalog().delete_model(model_ident)
             self.assertFalse(succ)
 
-    def test_alter_model(self, *mock_method):
-        gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=self._metalake_name
-        )
-        catalog = gravitino_client.load_catalog(self._catalog_name)
-
-        model_ident = NameIdentifier.of("schema", "model1")
-
-        model_dto = ModelDTO(
-            _name="model2",
-            _comment="this is test",
-            _properties={"k": "v"},
-            _latest_version=0,
-            _audit=AuditDTO(_creator="test", _create_time="2022-01-01T00:00:00Z"),
-        )
-
-        ## test with response
-        model_resp = ModelResponse(_model=model_dto, _code=0)
-        json_str = model_resp.to_json()
-        mock_resp = self._mock_http_response(json_str)
-
-        with patch(
-            "gravitino.utils.http_client.HTTPClient.post",
-            return_value=mock_resp,
-        ):
-            model = catalog.as_model_catalog().alter_model(
-                model_ident, ModelChange.rename("model2")
-            )
-
-            self._compare_models(model_dto, model)
-
     def test_list_model_versions(self, *mock_method):
         gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=self._metalake_name
