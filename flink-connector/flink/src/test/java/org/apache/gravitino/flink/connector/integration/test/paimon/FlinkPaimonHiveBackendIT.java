@@ -20,6 +20,7 @@ package org.apache.gravitino.flink.connector.integration.test.paimon;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Tag;
 
@@ -59,8 +60,14 @@ public class FlinkPaimonHiveBackendIT extends FlinkPaimonCatalogIT {
   }
 
   @Override
-  protected String getDefaultPaimonCatalog() {
+  protected String getPaimonCatalogName() {
     return DEFAULT_PAIMON_CATALOG;
+  }
+
+  @Override
+  protected Map<String, String> getPaimonCatalogOptions() {
+    return ImmutableMap.of(
+        PaimonConstants.CATALOG_BACKEND, "hive", "warehouse", warehouse, "uri", hiveMetastoreUri);
   }
 
   @Override

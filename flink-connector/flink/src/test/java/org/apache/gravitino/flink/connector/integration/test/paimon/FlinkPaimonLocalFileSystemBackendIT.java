@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.flink.connector.integration.test.paimon;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.nio.file.Path;
+import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.io.TempDir;
@@ -32,21 +32,6 @@ public class FlinkPaimonLocalFileSystemBackendIT extends FlinkPaimonCatalogIT {
 
   private static final String DEFAULT_PAIMON_CATALOG =
       "test_flink_paimon_filesystem_schema_catalog";
-
-  protected void initPaimonCatalog() {
-    Preconditions.checkNotNull(metalake);
-    catalog =
-        metalake.createCatalog(
-            DEFAULT_PAIMON_CATALOG,
-            org.apache.gravitino.Catalog.Type.RELATIONAL,
-            getProvider(),
-            null,
-            ImmutableMap.of(
-                PaimonConstants.CATALOG_BACKEND,
-                "filesystem",
-                "warehouse",
-                warehouseDir.toString()));
-  }
 
   @Override
   protected void createGravitinoCatalogByFlinkSql(String catalogName) {
@@ -61,8 +46,14 @@ public class FlinkPaimonLocalFileSystemBackendIT extends FlinkPaimonCatalogIT {
   }
 
   @Override
-  protected String getDefaultPaimonCatalog() {
+  protected String getPaimonCatalogName() {
     return DEFAULT_PAIMON_CATALOG;
+  }
+
+  @Override
+  protected Map<String, String> getPaimonCatalogOptions() {
+    return ImmutableMap.of(
+        PaimonConstants.CATALOG_BACKEND, "filesystem", "warehouse", warehouseDir.toString());
   }
 
   @Override

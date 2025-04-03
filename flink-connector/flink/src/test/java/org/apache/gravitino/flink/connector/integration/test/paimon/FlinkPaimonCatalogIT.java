@@ -50,11 +50,22 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
     return catalog;
   }
 
-  protected void initPaimonCatalog() {}
+  protected void initPaimonCatalog() {
+    Preconditions.checkNotNull(metalake);
+    catalog =
+        metalake.createCatalog(
+            getPaimonCatalogName(),
+            org.apache.gravitino.Catalog.Type.RELATIONAL,
+            getProvider(),
+            null,
+            getPaimonCatalogOptions());
+  }
 
   protected abstract void createGravitinoCatalogByFlinkSql(String catalogName);
 
-  protected abstract String getDefaultPaimonCatalog();
+  protected abstract String getPaimonCatalogName();
+
+  protected abstract Map<String, String> getPaimonCatalogOptions();
 
   @BeforeAll
   void paimonSetup() {
@@ -64,7 +75,7 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
   @AfterAll
   void paimonStop() {
     Preconditions.checkNotNull(metalake);
-    metalake.dropCatalog(getDefaultPaimonCatalog(), true);
+    metalake.dropCatalog(getPaimonCatalogName(), true);
   }
 
   protected abstract String getWarehouse();
