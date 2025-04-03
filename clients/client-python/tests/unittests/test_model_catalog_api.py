@@ -22,7 +22,6 @@ from unittest.mock import Mock, patch
 from gravitino import GravitinoClient, NameIdentifier
 from gravitino.api.model.model import Model
 from gravitino.api.model.model_version import ModelVersion
-from gravitino.api.model_change import ModelChange
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.model_dto import ModelDTO
 from gravitino.dto.model_version_dto import ModelVersionDTO
