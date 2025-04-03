@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.RESERVED_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.RESERVED_FILESET_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.RESERVED_SCHEMA_PLACEHOLDER;
@@ -54,6 +55,15 @@ public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
                 RESERVED_FILESET_PLACEHOLDER,
                 "The placeholder will be replaced to fileset name in the location",
                 true /* hidden */))
+        .put(
+            LOCATION_PLACEHOLDER_PREFIX,
+            PropertyEntry.stringImmutablePropertyPrefixEntry(
+                LOCATION_PLACEHOLDER_PREFIX,
+                "The prefix of fileset placeholder property",
+                false /* required */,
+                null /* default value */,
+                false /* hidden */,
+                false /* reserved */))
         .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
         .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
         .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
