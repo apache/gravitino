@@ -217,9 +217,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(0, model.latest_version())
         self.assertEqual(properties, model.properties())
 
-        changes = (ModelChange.rename(model_new_name),)
+        changes = [ModelChange.rename(model_new_name)]
 
-        self._catalog.as_model_catalog().alter_model(model_ident, changes)
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
         model = self._catalog.as_model_catalog().get_model(model_ident)
         self.assertEqual(model_new_name, model.name())
         self.assertEqual(comment, model.comment())
