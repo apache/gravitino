@@ -218,6 +218,22 @@ public class AccessControlIT extends BaseIT {
     Assertions.assertEquals(createdPrivilege.name(), Privilege.Name.CREATE_CATALOG);
     Assertions.assertEquals(createdPrivilege.condition(), Privilege.Condition.ALLOW);
 
+    // Test a metalake object with model privileges
+    SecurableObject metalakeObjectWithModelPrivs =
+        SecurableObjects.ofMetalake(
+            metalakeName,
+            Lists.newArrayList(
+                Privileges.CreateModel.allow(),
+                Privileges.CreateModelVersion.allow(),
+                Privileges.UseModel.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(metalakeObjectWithModelPrivs));
+
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
     // Test a not-existed metadata object
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
