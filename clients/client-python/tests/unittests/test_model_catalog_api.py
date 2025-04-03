@@ -185,7 +185,7 @@ class TestModelCatalogApi(unittest.TestCase):
         mock_resp = self._mock_http_response(json_str)
 
         with patch(
-            "gravitino.utils.http_client.HTTPClient.post",
+            "gravitino.utils.http_client.HTTPClient.put",
             return_value=mock_resp,
         ):
             model = catalog.as_model_catalog().alter_model(
