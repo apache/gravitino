@@ -340,6 +340,7 @@ for more details.
   <th>Description</th>
   <th>Default value</th>
   <th>Required</th>
+  <th>Immutable</th>
   <th>Since Version</th>
 </tr>
 </thead>
@@ -349,6 +350,7 @@ for more details.
   <td>Whether to enable impersonation for the Hadoop catalog fileset.</td>
   <td>The parent(schema) value</td>
   <td>No</td>
+  <td>Yes</td>
   <td>`0.6.0-incubating`</td>
 </tr>
 <tr>
@@ -359,12 +361,14 @@ for more details.
   </td>
   <td>The parent(schema) value</td>
   <td>No</td>
+  <td>No</td>
   <td>`0.6.0-incubating`</td>
 </tr>
 <tr>
   <td><tt>authentication.kerberos.principal</tt></td>
   <td>The principal of the Kerberos authentication for the fileset.</td>
   <td>The parent(schema) value</td>
+  <td>No</td>
   <td>No</td>
   <td>`0.6.0-incubating`</td>
 </tr>
@@ -373,6 +377,7 @@ for more details.
   <td>The URI of The keytab for the Kerberos authentication for the fileset.</td>
   <td>The parent(schema) value</td>
   <td>No</td>
+  <td>No</td>
   <td>`0.6.0-incubating`</td>
 </tr>
 <tr>
@@ -380,7 +385,51 @@ for more details.
   <td>The credential provider types, separated by comma.</td>
   <td>(none)</td>
   <td>No</td>
+  <td>No<td>
   <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>placehoder-&#42;</tt></td>
+  <td>
+    Properties that start with `placeholder-` are used to replace placehoders
+    in the <tt>location</tt>.</td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>Yes<td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+</tbody>
+</table>
+
+Some properties are reserved and cannot be set by users:
+
+<table>
+<thead>
+<tr>
+  <td>Property name</td>
+  <td>Description</td>
+  <td>Default value</td>
+  <td>Since version</td>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>placeholder-catalog</tt></td>
+  <td>The paceholder for the catalog name.</td>
+  <td>Catalog name for the fileset</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>pacehoder-schema</tt></td>
+  <td>The placeholder for the schema name.</td>
+  <td>Schema name for the fileset</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>pacehoder-fileset</tt></td>
+  <td>The placeholder for the fileset name.</td>
+  <td>Fileset name</td>
+  <td>`0.9.0-incubating`</td>
 </tr>
 </tbody>
 </table>

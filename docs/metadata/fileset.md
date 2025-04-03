@@ -16,7 +16,7 @@ Users can leverage filesets to manage non-tabular data like training datasets an
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
 tabular data in Gravitino in a unified way. The examples on this page will use HDFS.
-For other HCFS like S3, OSS, GCS, etc, please refer to the corresponding documentation:
+For other HCFS like S3, OSS, GCS, etc., please refer to the corresponding documentation:
 
 - [hadoop-with-s3](../catalogs/fileset/hadoop/s3.md)
 - [hadoop-with-oss](../catalogs/fileset/hadoop/oss.md)
@@ -361,6 +361,147 @@ The `storageLocation` is the physical location of the fileset.
 Users can specify this location when creating a fileset,
 or follow the rules of the catalog/schema location if not specified.
 
+The `storageLocation` in each level can contain **placeholders**, format as `{{name}}`,
+which will be replaced by the corresponding fileset property value when the fileset object is created.
+The placeholder property in the fileset object is formed as "placeholder-{{name}}".
+For example, if the `storageLocation` is `file:///tmp/{{schema}}-{{fileset}}-{{verion}}`,
+and the fileset object named "catalog1.schema1.fileset1" contains the properties `placeholder-version=v1`, 
+the actual `storageLocation` will be `file:///tmp/schema1-fileset1-v1`.
+
+The following is an example of creating a fileset with placeholders in the `storageLocation`:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+# create a catalog first
+cat <<EOF >catalog.json
+{
+  "name": "mycatalog",
+  "type": "FILESET",
+  "comment": "comment",
+  "provider": "hadoop",
+  "properties": {
+    "location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"
+  }
+}
+EOF
+
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json"
+  -d '@catalog.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs
+
+# create a schema under the catalog
+cat <<EOF >schema.json
+{
+  "name": "myschema",
+  "comment": "comment",
+  "properties": {}
+}
+EOF
+
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@schema.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas
+
+# create a fileset by placeholders
+cat <<EOF >fileset.json
+{
+  "name": "myfileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "properties": {
+    "placeholder-project": "test_project",
+    "placeholder-user": "test_user"
+  }
+}
+EOF
+
+# the actual storage location of the fileset will be:
+# file:///mycatalog/myschema/workspace_test_project/test_user
+curl -X POST \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@fileset.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/filesets
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://localhost:8090")
+    .withMetalake("mymetalake")
+    .build();
+// create a catalog first
+Catalog catalog = gravitinoClient.createCatalog(
+    "mycatalog",
+    Type.FILESET,
+    "hadoop", // provider
+    "comment",
+    ImmutableMap.of("location", "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"));
+FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+
+// create a schema under the catalog
+filesetCatalog.createSchema("myschema", "comment", null);
+
+// create a fileset by placeholders
+// the actual storage location of the fileset will be:
+// file:///test_catalog/test_schema/workspace_test_project/test_user
+filesetCatalog.createFileset(
+  NameIdentifier.of("myschema", "myfileset"),
+  "This is an example fileset",
+  Fileset.Type.MANAGED,
+  null,
+  ImmutableMap.of("placeholder-project", "test_project", "placeholder-user", "test_user")
+);
+
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client = GravitinoClient(uri="http://localhost:8090",
+                         metalake_name="mymetalake")
+
+# create a catalog first
+catalog = client.create_catalog(
+    name="mycatalog",
+    catalog_type=Catalog.Type.FILESET,
+    provider="hadoop",
+    comment="comment",
+    properties={
+        "location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"
+    })
+
+# create a schema under the catalog
+catalog.as_schemas().create_schema(
+    name="myschema",
+    comment="comment",
+    properties={})
+
+# create a fileset by placeholders
+# the actual storage location of the fileset will be:
+# file:///test_catalog/test_schema/workspace_test_project/test_user
+catalog.as_fileset_catalog().create_fileset(
+    ident=NameIdentifier.of("myschema", "myfileset"),
+    type=Fileset.Type.MANAGED,
+    comment="This is an example fileset",
+    storage_location=None,
+    properties={
+        "placeholder-project": "test_project",
+        "placeholder-user": "test_user"
+    })
+```
+</TabItem>
+</Tabs>
+
 The value of `storageLocation` depends on the configuration settings of the catalog:
 
 - For a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
@@ -369,17 +510,36 @@ The value of `storageLocation` depends on the configuration settings of the cata
 For a `MANAGED` fileset, the storage location is determined in the following order:
 
 1. The `storageLocation` specified in the fileset creation request.
+   The placeholders will be replaced by the corresponding fileset property values.
 
-1. If the `location` is specified in the schema, the storage location will be
-   `<schema location>/<fileset name>`.
+1. When the catalog property `location` is specified but the schema property `location` isn't specified,
+   the storage location is:
 
-1. If the `location` in the catalog is specified, the storage location will be
-   `<catalog location>/<schema name>/<fileset name>`.
+   1. `<catalog location>/<schema name>/<fileset name>` if `<catalog location>` does not contain any placeholder. 
+   1. `<catalog location>` - placeholders in the catalog location will be replaced
+      by the corresponding fileset property value.
 
-1. The request is invalid.
+1. When the catalog property `location` isn't specified but the schema property `location` is specified,
+   the storage location is:
+
+   1. `<schema location>/<fileset name>` if `<schema location>` does not contain any placeholder.
+   1. `<schema location>` - placeholders in the schema location will be replaced
+      by the corresponding fileset property value.
+   
+1. When both the catalog property `location` and the schema property `location` are specified,
+   the storage location is:
+
+   1. `<schema location>/<fileset name>` if `<schema location>` does not contain any placeholder.
+   1. `<schema location>` - placeholders in the schema location will be replaced
+      by the corresponding fileset property value.
+
+1. When neither the catalog property `location` nor the schema property `location` is specified,
+   the user should specify the `storageLocation` in the fileset creation.
 
 For `EXTERNAL` filesets, users should specify `storageLocation` during the fileset creation.
 Otherwise, Gravitino will throw an exception.
+If the `storageLocation` contains placeholders, the placeholders will be replaced
+by the corresponding fileset property values.
 
 ### Alter a fileset
 
