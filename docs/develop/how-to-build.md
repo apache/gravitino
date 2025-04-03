@@ -9,7 +9,7 @@ license: "This software is licensed under the Apache License version 2."
 - Linux, macOS or Windows operating system
 - Git
 - JDK 8 (default), 11 or 17 for running Gradle, the build environment for Gravitino.
-- Python 3.8 (default), 3.9, 3.10, or 3.11, for building the Gravitino Python client
+- Python 3.8 (default), 3.9, 3.10, 3.11 or 3.12, for building the Gravitino Python client
 - Docker (optional), for running the integration tests
 
 :::note
@@ -62,7 +62,7 @@ After installing the JDK, you may want to set up your Shell environment to ensur
 ### Install Python
 
 Python 3.8 is the default version for building the Gravitino Python client packages..
-Python 3.9, 3.10, or 3.11 also works.
+Python 3.9, 3.10, 3.11 or 3.12 also works.
 
 Add a repository for the latest Python versions and install Python 3.8:
 
@@ -172,7 +172,7 @@ You can customize the build properties to meet your environment:
   To use Python versions other than the default one (Python 3.8),
   You can customize the `pythonVersion` property in the `gradle.properties` file.
   Alternatively, you can set it on the command line using the `-P` Gradle flag.
-  Python 3.9, 3.10, and 3.11 are all acceptable.
+  Python 3.9, 3.10, 3.11 and 3.12 are all acceptable.
  
   ```shell
   ./gradlew build -PpythonVersion=3.9
