@@ -218,7 +218,8 @@ public class CatalogKafkaIT extends BaseIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Properties are required and must be set: [bootstrap.servers]"));
+            .contains(
+                "Properties or property prefixes are required and must be set: [bootstrap.servers]"));
 
     exception =
         Assertions.assertThrows(
@@ -233,7 +234,8 @@ public class CatalogKafkaIT extends BaseIT {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("Properties are required and must be set: [bootstrap.servers]"));
+            .contains(
+                "Properties or property prefixes are required and must be set: [bootstrap.servers]"));
 
     // Test BOOTSTRAP_SERVERS that cannot be linked
     String catalogName2 = GravitinoITUtils.genRandomName("test_catalog");
