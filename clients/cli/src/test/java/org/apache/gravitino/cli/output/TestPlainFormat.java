@@ -28,6 +28,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
@@ -43,10 +44,12 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.tag.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 
 public class TestPlainFormat {
@@ -257,6 +260,114 @@ public class TestPlainFormat {
   }
 
   @Test
+  void testModelDetailsWithPlainFormat() {
+      CommandContext mockContext = getMockContext();
+      Model mockModel = getMockModel("demo_model", "This is a demo model", 1);
+
+      PlainFormat.output(mockModel, mockContext);
+      String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+      Assertions.assertEquals("Model name demo_model, latest version: 1", output);
+  }
+
+  @Test
+  void testListModelWithPlainFormat() {
+      CommandContext mockContext = getMockContext();
+      Model model1 = getMockModel("model1", "This is a model", 1);
+      Model model2 = getMockModel("model2", "This is another model", 2);
+      Model model3 = getMockModel("model3", "This is a third model", 3);
+
+      PlainFormat.output(new Model[] {model1, model2, model3}, mockContext);
+      String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+      Assertions.assertEquals("model1,model2,model3", output);
+  }
+
+  @Test
+  void testUserDetailsWithPlainFormat() {
+      CommandContext mockContext = getMockContext();
+      User mockUser = getMockUser("demo_user", ImmutableList.of("admin", "user"));
+      PlainFormat.output(mockUser, mockContext);
+      String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+      Assertions.assertEquals("admin,user", output);
+  }
+
+  @Test
+  void testListUsersWithPlainFormat() {
+      CommandContext mockContext = getMockContext();
+      User user1 = getMockUser("user1", ImmutableList.of("admin", "user"));
+      User user2 = getMockUser("user2", ImmutableList.of("admin"));
+      User user3 = getMockUser("user3", ImmutableList.of("user"));
+
+      PlainFormat.output(new User[] {user1, user2, user3}, mockContext);
+      String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+      Assertions.assertEquals("user1,user2,user3", output);
+  }
+
+  @Test
+  void testGroupDetailsWithPlainFormat() {
+      CommandContext mockContext = getMockContext();
+      Group mockGroup = getMockGroup("demo_group", ImmutableList.of("admin", "scientist"));
+      PlainFormat.output(mockGroup, mockContext);
+      String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+      Assertions.assertEquals("admin,scientist", output);
+  }
+
+  @Test
+  void testListGroupsWithPlainFormat() {
+      CommandContext mockContext = getMockContext();
+      Group group1 = getMockGroup("group1", ImmutableList.of("admin", "user"));
+      Group group2 = getMockGroup("group2", ImmutableList.of("admin"));
+      Group group3 = getMockGroup("group3", ImmutableList.of("user"));
+
+      PlainFormat.output(new Group[] {group1, group2, group3}, mockContext);
+      String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+      Assertions.assertEquals("group1,group2,group3", output);
+  }
+
+  @Test
+  void testTagDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    PlainFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("tag1,comment for tag1", output);
+  }
+
+  @Test
+  void testTagDetailsWithPlainFormatWithNullValues() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = getMockTag("tag1", null);
+
+    PlainFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("tag1,N/A", output);
+  }
+
+  @Test
+  void testListAllTagsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1");
+    Tag mockTag2 = getMockTag("tag2", "comment for tag2");
+    Tag mockTag3 = getMockTag("tag3", "comment for tag3");
+
+    PlainFormat.output(new Tag[] {mockTag1, mockTag2, mockTag3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("tag1\n" + "tag2\n" + "tag3", output);
+  }
+
+  @Test
+  void testListTagPropertiesWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    PlainFormat.output(mockTag1.properties(), mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("k1,v1\n" + "k2,v2", output);
+  }
+
+  @Test
   void testOutputWithUnsupportType() {
     CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
@@ -344,70 +455,6 @@ public class TestPlainFormat {
     return mockTable;
   }
 
-  @Test
-  void testModelDetailsWithPlainFormat() {
-    CommandContext mockContext = getMockContext();
-    Model mockModel = getMockModel("demo_model", "This is a demo model", 1);
-
-    PlainFormat.output(mockModel, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("Model name demo_model, latest version: 1", output);
-  }
-
-  @Test
-  void testListModelWithPlainFormat() {
-    CommandContext mockContext = getMockContext();
-    Model model1 = getMockModel("model1", "This is a model", 1);
-    Model model2 = getMockModel("model2", "This is another model", 2);
-    Model model3 = getMockModel("model3", "This is a third model", 3);
-
-    PlainFormat.output(new Model[] {model1, model2, model3}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("model1,model2,model3", output);
-  }
-
-  @Test
-  void testUserDetailsWithPlainFormat() {
-    CommandContext mockContext = getMockContext();
-    User mockUser = getMockUser("demo_user", ImmutableList.of("admin", "user"));
-    PlainFormat.output(mockUser, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("admin,user", output);
-  }
-
-  @Test
-  void testListUsersWithPlainFormat() {
-    CommandContext mockContext = getMockContext();
-    User user1 = getMockUser("user1", ImmutableList.of("admin", "user"));
-    User user2 = getMockUser("user2", ImmutableList.of("admin"));
-    User user3 = getMockUser("user3", ImmutableList.of("user"));
-
-    PlainFormat.output(new User[] {user1, user2, user3}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("user1,user2,user3", output);
-  }
-
-  @Test
-  void testGroupDetailsWithPlainFormat() {
-    CommandContext mockContext = getMockContext();
-    Group mockGroup = getMockGroup("demo_group", ImmutableList.of("admin", "scientist"));
-    PlainFormat.output(mockGroup, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("admin,scientist", output);
-  }
-
-  @Test
-  void testListGroupsWithPlainFormat() {
-    CommandContext mockContext = getMockContext();
-    Group group1 = getMockGroup("group1", ImmutableList.of("admin", "user"));
-    Group group2 = getMockGroup("group2", ImmutableList.of("admin"));
-    Group group3 = getMockGroup("group3", ImmutableList.of("user"));
-
-    PlainFormat.output(new Group[] {group1, group2, group3}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("group1,group2,group3", output);
-  }
-
   private org.apache.gravitino.rel.Column getMockColumn(
       String name,
       Type dataType,
@@ -450,5 +497,18 @@ public class TestPlainFormat {
     when(mockGroup.roles()).thenReturn(roles);
 
     return mockGroup;
+  }
+
+  private Tag getMockTag(String name, String comment) {
+    return getMockTag(name, comment, ImmutableMap.of("k1", "v2", "k2", "v2"));
+  }
+
+  private Tag getMockTag(String name, String comment, Map<String, String> properties) {
+    Tag mockTag = mock(Tag.class);
+    when(mockTag.name()).thenReturn(name);
+    when(mockTag.comment()).thenReturn(comment);
+    when(mockTag.properties()).thenReturn(properties);
+
+    return mockTag;
   }
 }

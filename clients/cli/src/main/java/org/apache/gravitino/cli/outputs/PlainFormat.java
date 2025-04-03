@@ -20,6 +20,7 @@ package org.apache.gravitino.cli.outputs;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
@@ -31,6 +32,7 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.tag.Tag;
 
 /** Plain format to print a pretty string to standard out. */
 public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
@@ -76,8 +78,15 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
       new AuditPlainFormat(context).output((Audit) entity);
     } else if (entity instanceof Column[]) {
       new ColumnListPlainFormat(context).output((Column[]) entity);
+    } else if (entity instanceof Tag) {
+      new TagDetailsPlainFormat(context).output((Tag) entity);
+    } else if (entity instanceof Tag[]) {
+      new TagListPlainFormat(context).output((Tag[]) entity);
+    } else if (entity instanceof Map) {
+      new PropertiesListPlainFormat(context).output((Map<?, ?>) entity);
     } else {
-      throw new IllegalArgumentException("Unsupported object type");
+      throw new IllegalArgumentException(
+          "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
     }
   }
 
@@ -402,6 +411,75 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     @Override
     public String getOutput(Group[] groups) {
       return COMMA_JOINER.join(Arrays.stream(groups).map(Group::name).collect(Collectors.toList()));
+    }
+  }
+
+  /**
+   * Formats tag details ({@link org.apache.gravitino.tag.Tag}) information. Output format: name,
+   * comment
+   */
+  static final class TagDetailsPlainFormat extends PlainFormat<Tag> {
+
+    /**
+     * Creates a new {@link TagDetailsPlainFormat}.
+     *
+     * @param context The command context.
+     */
+    public TagDetailsPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Tag tag) {
+      String comment = tag.comment() == null ? "N/A" : tag.comment();
+      return COMMA_JOINER.join(tag.name(), comment);
+    }
+  }
+
+  /** Formats tags ({@link org.apache.gravitino.tag.Tag}) information. Output format: name */
+  static final class TagListPlainFormat extends PlainFormat<Tag[]> {
+
+    /**
+     * Creates a new {@link TagListPlainFormat}.
+     *
+     * @param context The command context.
+     */
+    public TagListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Tag[] tags) {
+      List<String> tagNames = Arrays.stream(tags).map(Tag::name).collect(Collectors.toList());
+      return NEWLINE_JOINER.join(tagNames);
+    }
+  }
+
+  /** Formats properties ({@link java.util.Map}) information. Output format: key, value */
+  static final class PropertiesListPlainFormat extends PlainFormat<Map<?, ?>> {
+
+    /**
+     * Creates a new {@link PropertiesListPlainFormat}.
+     *
+     * @param context The command context.
+     */
+    public PropertiesListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Map<?, ?> properties) {
+      StringBuilder data = new StringBuilder();
+      properties.forEach(
+          (key, value) -> {
+            data.append(COMMA_JOINER.join(key.toString(), value.toString()));
+            data.append(System.lineSeparator());
+          });
+
+      return data.toString();
     }
   }
 }
