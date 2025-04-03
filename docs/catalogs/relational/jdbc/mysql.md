@@ -1,5 +1,5 @@
 ---
-title: "MySQL catalog"
+title: JDBC MySQL catalog
 slug: /jdbc-mysql-catalog
 keywords:
 - jdbc
@@ -13,12 +13,13 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage MySQL metadata.
+Apache Gravitino can be used to manage MySQL metadata.
 
 :::caution
 Gravitino saves some system information in schema and table comment,
-like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`,
-please don't change or remove this message.
+like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`.
+
+**Please don't change or remove this message.**
 :::
 
 ## Catalog
@@ -26,24 +27,27 @@ please don't change or remove this message.
 ### Catalog capabilities
 
 - Gravitino catalog corresponds to the MySQL instance.
-- Supports metadata management of MySQL (5.7, 8.0).
-- Supports DDL operation for MySQL databases and tables.
-- Supports table index.
-- Supports [column default value](../../../metadata/relational.md#table-column-default-value)
-  and [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
-- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
+- This catalog supports managing metadata for MySQL (5.7, 8.0).
+- The catalog supports DDL operation for MySQL databases and tables.
+- Indexed tables are supported.
+- [Column default value](../../../metadata/relational.md#table-column-default-value)
+  and [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment).
+  are supported.
+- This catalog supports managing MySQL table features though table properties,
+  like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
 
 You can pass to a MySQL data source any property that isn't defined by Gravitino
-by adding `gravitino.bypass.` prefix as a catalog property.
+by adding `gravitino.bypass.` as a catalog property name prefix.
 For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis`
 to the data source property.
 
 Check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-When you use the Gravitino with Trino, you can pass the Trino MySQL connector configuration using prefix `trino.bypass.`.
+When you use the Gravitino with Trino, you can pass the Trino MySQL connector configuration
+using prefix `trino.bypass.`.
 For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy`
 to the Gravitino MySQL catalog in Trino runtime.
 
@@ -52,14 +56,71 @@ and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](../../../admin/server-config.md#gravitino-catalog-properties-configuration),
 the MySQL catalog has the following properties:
 
-| Configuration item   | Description                                                                                            | Default value | Required | Since Version |
-|----------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-driver`        | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
-| `jdbc-user`          | The JDBC user name.                                                                                    | (none)        | Yes      | 0.3.0         |
-| `jdbc-password`      | The JDBC password.                                                                                     | (none)        | Yes      | 0.3.0         |
-| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                         | `2`           | No       | 0.3.0         |
-| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                        | `10`          | No       | 0.3.0         |
+<table>
+<thead>
+<tr>
+  <th>Property name</th>
+  <th>Description</th>
+  <th>Default value</th>
+  <th>Required</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>jdbc-url</tt></td>
+  <td>
+    JDBC URL for connecting to the database.
+    For example, `jdbc:mysql://localhost:3306`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-driver</tt></td>
+  <td>
+    The driver of the JDBC connection.
+    For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`.
+  </td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-user</tt></td>
+  <td>The JDBC user name.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc-password</tt></td>
+  <td>The JDBC password.</td>
+  <td>(none)</td>
+  <td>Yes</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.min-size</tt></td>
+  <td>
+    The minimum number of connections in the pool.
+  </td>
+  <td>`2`</td>
+  <td>No</td>
+  <td>`0.3.0`</td>
+</tr>
+<tr>
+  <td><tt>jdbc.pool.max-size</tt></td>
+  <td>
+    The maximum number of connections in the pool.
+  </td>
+  <td>`10`</td>
+  <td>No</td>
+  <td>`0.3.0`</td>
+</tr>
+</tbody>
+</table>
 
 :::caution
 You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
@@ -74,13 +135,13 @@ Refer to [managing relational metadata](../../../metadata/relational.md#catalog-
 ### Schema capabilities
 
 - Gravitino's schema concept corresponds to the MySQL database.
-- Supports creating schema, but does not support setting comment.
-- Supports dropping schema.
-- Supports cascade dropping schema.
+- This catalog supports creating schema, but does not support setting comment.
+- Dropping schema is supported.
+- Cascaded dropping of schemas is supported.
 
 ### Schema properties
 
-- Doesn't support any schema property settings.
+- No support to schema property settings.
 
 ### Schema operations
 
@@ -91,11 +152,12 @@ Refer to [manage relational metadata](../../../metadata/relational.md#schema-ope
 ### Table capabilities
 
 - Gravitino's table concept corresponds to the MySQL table.
-- Supports DDL operation for MySQL tables.
-- Supports index.
-- Supports [column default value](../../../metadata/relational.md#table-column-default-value)
-  and [auto-increment](../../../metadata/relational.md#table-column-auto-increment).
-- Supports managing MySQL table features though table properties,
+- DDL operation for MySQL tables are supported.
+- Indexed tables are supported.
+- [Column default value](../../../metadata/relational.md#table-column-default-value)
+  and [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment).
+  are supported.
+- This catalog supports managing MySQL table features though table properties,
   like using `engine` to set MySQL storage engine.
 
 ### Table column types
@@ -201,27 +263,64 @@ The supported properties are listed as follows:
 - Doesn't support remove table properties. You can only add or modify properties, not delete properties.
 :::
 
-| Property Name           | Description                                                                                                                                              | Default Value | Required  | Reserved   | Immutable | Since version |
-|-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------|------------|-----------|---------------|
-| `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | `InnoDB`      | No        | No         | Yes       | 0.4.0         |
-| `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No        | No         | Yes       | 0.4.0         |
-
+<table>
+<thead>
+<tr>
+  <th>Property Name</th>
+  <th>Description</th>
+  <th>Default Value</th>
+  <th>Required</th>
+  <th>Reserved</th>
+  <th>Immutable</th>
+  <th>Since version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>engine</tt></td>
+  <td>
+    The engine used by the table.
+    For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`,
+    `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`.
+  </td>
+  <td>`InnoDB`</td>
+  <td>No</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>`0.4.0`</td>
+</tr>
+<tr>
+  <td><tt>auto-increment-offset</tt></td>
+  <td>
+    The starting value of the auto-increment field.
+  </td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>No</td>
+  <td>Yes</td>
+  <td>`0.4.0`</td>
+</tr>
+</tbody>
+</table>
 
 :::note
-Some MySQL storage engines, such as FEDERATED, are not enabled by default and require additional configuration to use.
-For example, to enable the FEDERATED engine, set federated=1 in the MySQL configuration file.
-Similarly, engines like ndbinfo, MRG_MYISAM, and PERFORMANCE_SCHEMA may also require specific prerequisites
-or configurations. For detailed instructions, refer to the
+Some MySQL storage engines, such as "FEDERATED", are not enabled by default
+and require additional configuration to use.
+For example, to enable the "FEDERATED" engine, set `federated=1` in the MySQL configuration file.
+
+Similarly, engines like "ndbinfo", "MRG_MYISAM", and "PERFORMANCE_SCHEMA"
+may also require specific prerequisites or configurations.
+For detailed instructions, refer to the
 [MySQL documentation](https://dev.mysql.com/doc/refman/8.0/en/federated-storage-engine.html).
 :::
 
 ### Table indexes
 
-- Supports PRIMARY_KEY and UNIQUE_KEY.
+Indexed tables with `PRIMARY_KEY` and `UNIQUE_KEY` are supported.
 
 :::note
-The index name of the PRIMARY_KEY must be PRIMARY
-[Create table index](https://dev.mysql.com/doc/refman/8.0/en/create-table.html)
+The index name of the <tt>PRIMARY_KEY</tt> must be `PRIMARY`.
+See [create table index](https://dev.mysql.com/doc/refman/8.0/en/create-table.html).
 :::
 
 <Tabs groupId='language' queryString>
@@ -253,7 +352,6 @@ Index[] indexes = new Index[] {
     Indexes.of(IndexType.UNIQUE_KEY, "id_name_uk", new String[][]{{"id"} , {"name"}}),
 };
 ```
-
 </TabItem>
 </Tabs>
 
@@ -278,6 +376,7 @@ Gravitino supports these table alteration operations:
 - `SetProperty`
 
 :::info
- - You cannot submit the `RenameTable` operation at the same time as other operations.
- - If you update a nullability column to non-nullability, there may be compatibility issues.
+- You cannot submit the `RenameTable` operation at the same time as other operations.
+- If you update a nullability column to non-nullability, there may be compatibility issues.
 :::
+
