@@ -17,20 +17,20 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage.source;
+package org.apache.gravitino.rest;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Map;
 import java.util.Set;
-import org.apache.gravitino.lineage.LineageDispatcher;
-import org.apache.gravitino.rest.SupportsRESTPackages;
 
-public class HTTPLineageSource implements LineageSource, SupportsRESTPackages {
-  @Override
-  public void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
-
-  @Override
-  public Set<String> getRESTPackages() {
-    return ImmutableSet.of();
-  }
+/**
+ * This interface provides a method to retrieve a set of REST package names. These package names can
+ * be used to be injected into a Jetty service, which is helpful for the Jetty service to locate and
+ * handle REST resources.
+ */
+public interface SupportsRESTPackages {
+  /**
+   * Retrieves a set of REST package names.
+   *
+   * @return A set containing the names of REST packages.
+   */
+  Set<String> getRESTPackages();
 }

@@ -19,10 +19,8 @@
 
 package org.apache.gravitino.lineage.source;
 
-import com.google.common.collect.ImmutableSet;
 import java.io.Closeable;
 import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.lineage.LineageDispatcher;
 
 /**
@@ -43,13 +41,4 @@ public interface LineageSource extends Closeable {
   /** Closes the data source and releases related resources. */
   @Override
   default void close() {}
-
-  /**
-   * Retrieves a set of REST packages associated with the data source.
-   *
-   * @return An immutable set containing the names of REST packages.
-   */
-  default Set<String> getRESTPackages() {
-    return ImmutableSet.of();
-  }
 }

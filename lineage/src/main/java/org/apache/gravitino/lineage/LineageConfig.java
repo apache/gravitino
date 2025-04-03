@@ -31,7 +31,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.lineage.processor.NoopProcessor;
-import org.apache.gravitino.lineage.sink.LineageLogSinker;
+import org.apache.gravitino.lineage.sink.LineageLogSink;
 import org.apache.gravitino.lineage.source.HTTPLineageSource;
 
 public class LineageConfig extends Config {
@@ -107,7 +107,7 @@ public class LineageConfig extends Config {
     String logClassConfigKey =
         LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME;
     if (sinks.contains(LINEAGE_LOG_SINK_NAME) && !config.containsKey(logClassConfigKey)) {
-      m.put(logClassConfigKey, LineageLogSinker.class.getName());
+      m.put(logClassConfigKey, LineageLogSink.class.getName());
     }
 
     sinks.stream()

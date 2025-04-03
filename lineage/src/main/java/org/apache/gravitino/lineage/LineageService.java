@@ -19,19 +19,21 @@
 
 package org.apache.gravitino.lineage;
 
+import com.google.common.collect.ImmutableSet;
 import io.openlineage.server.OpenLineage;
 import io.openlineage.server.OpenLineage.RunEvent;
 import java.util.Set;
 import org.apache.gravitino.lineage.processor.LineageProcessor;
 import org.apache.gravitino.lineage.sink.LineageSinkManager;
 import org.apache.gravitino.lineage.source.LineageSource;
+import org.apache.gravitino.rest.SupportsRESTPackages;
 import org.apache.gravitino.utils.ClassUtils;
 
 /**
  * The LineageService manages the life cycle of lineage sinks, sources, and processors. It provides
  * {@code dispatchLineageEvent} method for lineage source to dispatch lineage events to the sinks.
  */
-public class LineageService implements LineageDispatcher {
+public class LineageService implements LineageDispatcher, SupportsRESTPackages {
   private LineageSinkManager sinkManager;
   private LineageSource source;
   private LineageProcessor processor;
@@ -70,7 +72,11 @@ public class LineageService implements LineageDispatcher {
     return true;
   }
 
+  @Override
   public Set<String> getRESTPackages() {
-    return source.getRESTPackages();
+    if (source instanceof SupportsRESTPackages) {
+      return ((SupportsRESTPackages) source).getRESTPackages();
+    }
+    return ImmutableSet.of();
   }
 }

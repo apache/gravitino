@@ -20,6 +20,7 @@
 package org.apache.gravitino.lineage.sink;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -27,12 +28,13 @@ import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.openlineage.server.OpenLineage.Run;
 import io.openlineage.server.OpenLineage.RunEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LineageLogSinker implements LineageSink {
-  private static final Logger LOG = LoggerFactory.getLogger(LineageLogSinker.class);
+public class LineageLogSink implements LineageSink {
+  private static final Logger LOG = LoggerFactory.getLogger(LineageLogSink.class);
   private ObjectMapper objectMapper =
       JsonMapper.builder()
           .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
@@ -43,14 +45,25 @@ public class LineageLogSinker implements LineageSink {
           .registerModule(new JavaTimeModule())
           .registerModule(new Jdk8Module());
 
-  public LineageLogSinker() {}
+  public LineageLogSink() {}
 
   @Override
   public void sink(RunEvent event) {
     try {
-      LOG.info("Open lineage event:{}", objectMapper.writeValueAsString(event));
-    } catch (Exception e) {
-      LOG.warn("Write open lineage event failed,", e);
+      LOG.info("{}", objectMapper.writeValueAsString(event));
+    } catch (JsonProcessingException e) {
+      LOG.warn(
+          "Process open lineage event failed, run id: {}, error message: {}",
+          getRunId(event),
+          e.getMessage());
     }
+  }
+
+  private String getRunId(RunEvent event) {
+    Run run = event.getRun();
+    if (run == null) {
+      return "Unknown";
+    }
+    return run.getRunId().toString();
   }
 }

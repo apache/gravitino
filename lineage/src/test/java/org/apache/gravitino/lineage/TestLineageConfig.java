@@ -21,7 +21,7 @@ package org.apache.gravitino.lineage;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.gravitino.lineage.sink.LineageLogSinker;
+import org.apache.gravitino.lineage.sink.LineageLogSink;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -63,7 +63,7 @@ public class TestLineageConfig {
     String className =
         sinkConfigs.get(
             LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME);
-    Assertions.assertEquals(LineageLogSinker.class.getName(), className);
+    Assertions.assertEquals(LineageLogSink.class.getName(), className);
 
     // config multi sinks
     Map<String, String> config2 =
