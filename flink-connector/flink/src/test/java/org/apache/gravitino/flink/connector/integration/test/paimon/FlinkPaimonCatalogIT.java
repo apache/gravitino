@@ -50,7 +50,7 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
     return catalog;
   }
 
-  protected void initPaimonCatalog() {
+  private void initPaimonCatalog() {
     Preconditions.checkNotNull(metalake);
     catalog =
         metalake.createCatalog(
