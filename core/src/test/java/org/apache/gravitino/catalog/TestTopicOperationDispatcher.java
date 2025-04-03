@@ -24,6 +24,8 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -96,12 +98,13 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> illegalProps = ImmutableMap.of("k2", "v2");
     testPropertyException(
         () -> topicOperationDispatcher.createTopic(topicIdent1, "comment", null, illegalProps),
-        "Properties are required and must be set");
+        "Properties or property prefixes are required and must be set");
 
-    Map<String, String> illegalProps2 = ImmutableMap.of("k1", "v1", ID_KEY, "test");
+    Map<String, String> illegalProps2 =
+        ImmutableMap.of(PROPERTY_KEY1, "v1", PROPERTY_KEY5_PREFIX + "1", "value1", ID_KEY, "test");
     testPropertyException(
         () -> topicOperationDispatcher.createTopic(topicIdent1, "comment", null, illegalProps2),
-        "Properties are reserved and cannot be set",
+        "Properties or property prefixes are reserved and cannot be set",
         "gravitino.identifier");
   }
 
