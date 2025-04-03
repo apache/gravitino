@@ -109,6 +109,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         ImmutableSet.of(
             RangerPrivileges.RangerHdfsPrivilege.READ,
             RangerPrivileges.RangerHdfsPrivilege.WRITE,
+            RangerPrivileges.RangerHdfsPrivilege.EXECUTE),
+        Privilege.Name.CREATE_FILESET,
+        ImmutableSet.of(
+            RangerPrivileges.RangerHdfsPrivilege.READ,
+            RangerPrivileges.RangerHdfsPrivilege.WRITE,
             RangerPrivileges.RangerHdfsPrivilege.EXECUTE));
   }
 
@@ -499,22 +504,35 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       Set<AuthorizationPrivilege> rangerPrivileges,
       boolean isRecursive,
       PathExtractor pathExtractor) {
-    AuthorizationUtils.getMetadataObjectLocation(
-            identifier, MetadataObjectUtil.toEntityType(securableObject))
-        .forEach(
-            locationPath -> {
-              PathBasedMetadataObject pathBaseMetadataObject =
-                  new PathBasedMetadataObject(
-                      securableObject.parent(),
-                      securableObject.name(),
-                      pathExtractor.getPath(
-                          MetadataObjectUtil.toEntityType(securableObject), locationPath),
-                      PathBasedMetadataObject.PathType.get(securableObject.type()),
-                      isRecursive);
-              pathBaseMetadataObject.validateAuthorizationMetadataObject();
-              rangerSecurableObjects.add(
-                  generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
-            });
+    Entity.EntityType type = MetadataObjectUtil.toEntityType(securableObject);
+    List<String> locations = Lists.newArrayList();
+    if (type == Entity.EntityType.METALAKE) {
+      NameIdentifier[] catalogs =
+          GravitinoEnv.getInstance()
+              .catalogDispatcher()
+              .listCatalogs(Namespace.of(identifier.name()));
+      for (NameIdentifier catalog : catalogs) {
+        locations.addAll(
+            AuthorizationUtils.getMetadataObjectLocation(catalog, Entity.EntityType.CATALOG));
+      }
+    } else {
+      locations.addAll(AuthorizationUtils.getMetadataObjectLocation(identifier, type));
+    }
+
+    locations.forEach(
+        locationPath -> {
+          PathBasedMetadataObject pathBaseMetadataObject =
+              new PathBasedMetadataObject(
+                  securableObject.parent(),
+                  securableObject.name(),
+                  pathExtractor.getPath(
+                      MetadataObjectUtil.toEntityType(securableObject), locationPath),
+                  PathBasedMetadataObject.PathType.get(securableObject.type()),
+                  isRecursive);
+          pathBaseMetadataObject.validateAuthorizationMetadataObject();
+          rangerSecurableObjects.add(
+              generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
+        });
   }
 
   private void extractMetalakeLocations(
