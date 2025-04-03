@@ -347,12 +347,19 @@ It also triggers a failure event if the operation failed.
   <td>user operation</td>
   <td>
     `AddUserEvent`<br/>
+    `AddUserFailureEvent`<br/>
     `GetUserEvent`<br/>
+    `GetUserFailureEvent`<br/>
     `GrantUserRolesEvent`<br/>
+    `GrantUserRolesFailureEvent`<br/>
     `ListUserNamesEvent`<br/>
+    `ListUserNamesFailureEvent`<br/>
     `ListUsersEvent`<br/>
+    `ListUsersFailureEvent`<br/>
     `RemoveUserEvent`<br/>
-    `RevokeUserRolesEvent`
+    `RemoveUserFailureEvent`<br/>
+    `RevokeUserRolesEvent`<br/>
+    `RevokeUserRolesFailureEvent`
   </td>
   <td>0.9.0-incubating</td>
 </tr>
@@ -360,17 +367,22 @@ It also triggers a failure event if the operation failed.
   <td>group operation</td>
   <td>
     `AddGroupEvent`<br/>
+    `AddGroupFailureEvent`<br/>
     `GetGroupEvent`<br/>
+    `GetGroupFailureEvent`<br/>
     `GrantGroupRolesEvent`<br/>
+    `GrantGroupRolesFailureEvent`<br/>
     `ListGroupNamesEvent`<br/>
+    `ListGroupNamesFailureEvent`<br/>
     `ListGroupsEvent`<br/>
+    `ListGroupsFailureEvent`<br/>
     `RemoveGroupEvent`<br/>
-    `RevokeGroupRolesEvent`
+    `RemoveGroupFailureEvent`<br/>
+    `RevokeGroupRolesEvent`<br/>
+    `RevokeGroupRolesFailureEvent`
   </td>
   <td>0.9.0-incubating</td>
 </tr>
-
-
 </tbody>
 </table>
 
