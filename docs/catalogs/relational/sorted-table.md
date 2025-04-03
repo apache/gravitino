@@ -45,17 +45,57 @@ SortOrders.of(NamedReference.field("score"), SortDirection.ASCENDING, NullOrderi
 
 ### Sort directions
 
-| Direction  | Description                                 | JSON   | Java                       |
-|------------|---------------------------------------------|--------|----------------------------|
-| ascending  | Sorted by a field or a function ascending.  | `asc`  | `SortDirection.ASCENDING`  |
-| descending | Sorted by a field or a function descending. | `desc` | `SortDirection.DESCENDING` |
+<table>
+<thead>
+<tr>
+  <td>Direction</td>
+  <td>Description</td>
+  <td>JSON</td>
+  <td>Java</td>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>ascending</tt></td>
+  <td>Sort by a field or a function, ascending.</td>
+  <td>`asc`</td>
+  <td>`SortDirection.ASCENDING`</td>
+</tr>
+<tr>
+  <td><tt>descending</tt></td>
+  <td>Sort by a field or a function, descending.</td>
+  <td>`desc`</td>
+  <td>`SortDirection.DESCENDING`</td>
+</tr>
+</tbody>
+</table>
 
 ### Null ordering
 
-| Null ordering Type | Description                             | JSON          | Java                       |
-|--------------------|-----------------------------------------|---------------|----------------------------|
-| null_first         | Puts the null value in the first place. | `nulls_first` | `NullOrdering.NULLS_FIRST` |
-| null_last          | Puts the null value in the last place.  | `nulls_last`  | `NullOrdering.NULLS_LAST`  |
+<table>
+<thead>
+<tr>
+  <td>Null ordering type</td>
+  <td>Description</td>
+  <td>JSON</td>
+  <td>Java</td>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><tt>null_first</tt></td>
+  <td>Puts the null value ahead of other values.</td>
+  <td>`nulls_first`</td>
+  <td>`NullOrdering.NULLS_FIRST`</td>
+</tr>
+<tr>
+  <td><tt>null_last</tt></td>
+  <td>Puts the null value behind all other values.</td>
+  <td>`nulls_last`</td>
+  <td>`NullOrdering.NULLS_LAST`</td>
+</tr>
+</tbody>
+</table>
 
 :::note
 - If the <tt>direction</tt> is `ascending`, the default ordering value is `nulls_first`.
