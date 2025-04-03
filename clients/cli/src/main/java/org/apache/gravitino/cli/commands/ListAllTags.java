@@ -56,7 +56,7 @@ public class ListAllTags extends Command {
     if (tags.length == 0) {
       printInformation("No tags exist.");
     } else {
-      printResults(String.join(",", tags));
+      printResults(tags);
     }
   }
 }

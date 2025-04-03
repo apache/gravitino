@@ -61,7 +61,7 @@ public class TagDetails extends Command {
     }
 
     if (result != null) {
-      printResults(result.name() + "," + result.comment());
+      printResults(result);
     }
   }
 }
