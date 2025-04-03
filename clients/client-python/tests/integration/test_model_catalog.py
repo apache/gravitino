@@ -204,6 +204,7 @@ class TestModelCatalog(IntegrationTestEnv):
         model_name = f"model_it_model{str(randint(0, 1000))}"
         model_new_name = f"model_it_model_new{str(randint(0, 1000))}"
         model_ident = NameIdentifier.of(self._schema_name, model_name)
+        renamed_ident = NameIdentifier.of(self._schema_name, model_new_name)
         comment = "comment"
         properties = {"k1": "v1", "k2": "v2"}
 
@@ -211,20 +212,20 @@ class TestModelCatalog(IntegrationTestEnv):
             model_ident, comment, properties
         )
 
-        model = self._catalog.as_model_catalog().get_model(model_ident)
-        self.assertEqual(model_name, model.name())
-        self.assertEqual(comment, model.comment())
-        self.assertEqual(0, model.latest_version())
-        self.assertEqual(properties, model.properties())
+        renamed_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(model_name, renamed_model.name())
+        self.assertEqual(comment, renamed_model.comment())
+        self.assertEqual(0, renamed_model.latest_version())
+        self.assertEqual(properties, renamed_model.properties())
 
         changes = [ModelChange.rename(model_new_name)]
 
         self._catalog.as_model_catalog().alter_model(model_ident, *changes)
-        model = self._catalog.as_model_catalog().get_model(model_ident)
-        self.assertEqual(model_new_name, model.name())
-        self.assertEqual(comment, model.comment())
-        self.assertEqual(0, model.latest_version())
-        self.assertEqual(properties, model.properties())
+        renamed_model = self._catalog.as_model_catalog().get_model(renamed_ident)
+        self.assertEqual(model_new_name, renamed_model.name())
+        self.assertEqual(comment, renamed_model.comment())
+        self.assertEqual(0, renamed_model.latest_version())
+        self.assertEqual(properties, renamed_model.properties())
 
     def test_link_get_model_version(self):
         model_name = "model_it_model" + str(randint(0, 1000))
