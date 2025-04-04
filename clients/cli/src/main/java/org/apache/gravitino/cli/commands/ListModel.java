@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
 import java.util.Arrays;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cli.CommandContext;
@@ -28,6 +28,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.model.Model;
 
 /** List the names of all models in a schema. */
 public class ListModel extends Command {
@@ -69,11 +70,30 @@ public class ListModel extends Command {
       exitWithError(err.getMessage());
     }
 
-    String output =
-        models.length == 0
-            ? "No models exist."
-            : Joiner.on(",").join(Arrays.stream(models).map(model -> model.name()).iterator());
+    if (models.length == 0) {
+      printInformation("No models exist.");
+    } else {
+      Model[] modelsArr = Arrays.stream(models).map(this::getModel).toArray(Model[]::new);
+      printResults(modelsArr);
+    }
+  }
 
-    printResults(output);
+  private Model getModel(NameIdentifier modelIdent) {
+    return new Model() {
+      @Override
+      public String name() {
+        return modelIdent.name();
+      }
+
+      @Override
+      public int latestVersion() {
+        return 0;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return null;
+      }
+    };
   }
 }
