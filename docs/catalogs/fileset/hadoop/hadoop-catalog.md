@@ -385,17 +385,18 @@ for more details.
   <td>The credential provider types, separated by comma.</td>
   <td>(none)</td>
   <td>No</td>
-  <td>No<td>
+  <td>No</td>
   <td>`0.8.0-incubating`</td>
 </tr>
 <tr>
   <td><tt>placehoder-&#42;</tt></td>
   <td>
     Properties that start with `placeholder-` are used to replace placehoders
-    in the <tt>location</tt>.</td>
+    in the <tt>location</tt>.
+  </td>
   <td>(none)</td>
   <td>No</td>
-  <td>Yes<td>
+  <td>Yes</td>
   <td>`0.9.0-incubating`</td>
 </tr>
 </tbody>

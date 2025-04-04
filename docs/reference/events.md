@@ -151,8 +151,8 @@ It also triggers a failure event if the operation failed.
   <td>
     `AddGroupPreEvent`<br/>
     `GetGroupPreEvent`<br/>
-    `GrantGroupRolesPreEvent`
-    `ListGroupNamesPreEvent`</br>
+    `GrantGroupRolesPreEvent`<br/>
+    `ListGroupNamesPreEvent`<br/>
     `ListGroupsPreEvent`<br/>
     `RemoveGroupPreEvent`<br/>
     `RevokeGroupRolesPreEvent`
@@ -385,5 +385,4 @@ It also triggers a failure event if the operation failed.
 </tr>
 </tbody>
 </table>
-
 
