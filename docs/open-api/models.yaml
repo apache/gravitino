@@ -526,7 +526,7 @@ components:
         "type": "ModelAlreadyExistsException",
         "message": "Model already exists",
         "stack": [
-          "org.apache.gravitino.exceptions.ModelAlreadyExistsException: Model already exists"
+            "org.apache.gravitino.exceptions.ModelAlreadyExistsException: Model already exists"
         ]
       }
 
@@ -536,7 +536,7 @@ components:
         "type": "NoSuchModelException",
         "message": "Model does not exist",
         "stack": [
-          "org.apache.gravitino.exceptions.NoSuchModelException: Model does not exist"
+            "org.apache.gravitino.exceptions.NoSuchModelException: Model does not exist"
         ]
       }
 
