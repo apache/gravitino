@@ -109,33 +109,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-    put:
-      tags:
-        - model
-      summary: Update model
-      operationId: updateModel
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ModelUpdatesRequest"
-      responses:
-        "200":
-          $ref: "#/components/responses/ModelResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The target model does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchModelException:
-                  $ref: "#/components/examples/NoSuchModelException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
     delete:
       tags:
         - model
@@ -393,42 +366,6 @@ components:
           additionalProperties:
             type: string
 
-    ModelUpdatesRequest:
-          type: object
-          required:
-            - updates
-          properties:
-            updates:
-              type: array
-              items:
-                $ref: "#/components/schemas/ModelUpdateRequest"
-
-    ModelUpdateRequest:
-      oneOf:
-        - $ref: "#/components/schemas/RenameModelRequest"
-      discriminator:
-        propertyName: "@type"
-        mapping:
-          rename: "#/components/schemas/RenameModelRequest"
-
-    RenameModelRequest:
-      type: object
-      required:
-        - "@type"
-        - newName
-      properties:
-        "@type":
-          type: string
-          enum:
-            - "rename"
-        newName:
-          type: string
-          description: The new name of the model
-      example: {
-        "@type": "rename",
-        "newName": "my_model_new"
-      }
-
     ModelVersionLinkRequest:
       type: object
       required:
@@ -589,7 +526,7 @@ components:
         "type": "ModelAlreadyExistsException",
         "message": "Model already exists",
         "stack": [
-            "org.apache.gravitino.exceptions.ModelAlreadyExistsException: Model already exists"
+          "org.apache.gravitino.exceptions.ModelAlreadyExistsException: Model already exists"
         ]
       }
 
@@ -599,7 +536,7 @@ components:
         "type": "NoSuchModelException",
         "message": "Model does not exist",
         "stack": [
-            "org.apache.gravitino.exceptions.NoSuchModelException: Model does not exist"
+          "org.apache.gravitino.exceptions.NoSuchModelException: Model does not exist"
         ]
       }
 

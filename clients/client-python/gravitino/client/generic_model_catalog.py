@@ -293,10 +293,6 @@ class GenericModelCatalog(BaseSchemaCatalog):
         req = ModelUpdatesRequest(update_requests)
         req.validate()
 
-        print(
-            f"{self._format_model_request_path(model_full_ns)}/{encode_string(model_ident.name())}"
-        )
-
         resp = self.rest_client.put(
             f"{self._format_model_request_path(model_full_ns)}/{encode_string(model_ident.name())}",
             req,
@@ -304,7 +300,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         )
         model_response = ModelResponse.from_json(resp.body, infer_missing=True)
         model_response.validate()
-        return model_response.model()
+        return GenericModel(model_response.model())
 
     def link_model_version(
         self,
