@@ -23,19 +23,19 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 
-/** Displays the details of a table's distirbution. */
+/** Displays the details of a table's distribution. */
 public class TableDistribution extends TableCommand {
 
   protected final String schema;
   protected final String table;
 
   /**
-   * Displays the details of a table's distirbution.
+   * Displays the details of a table's distribution.
    *
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param table The name of the table.
    */
   public TableDistribution(
@@ -45,7 +45,7 @@ public class TableDistribution extends TableCommand {
     this.table = table;
   }
 
-  /** Displays the strategy and bucket number of distirbution. */
+  /** Displays the strategy and bucket number of distribution. */
   @Override
   public void handle() {
     Distribution distribution = null;
