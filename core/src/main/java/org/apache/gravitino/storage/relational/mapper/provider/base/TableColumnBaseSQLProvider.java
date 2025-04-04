@@ -133,7 +133,7 @@ public class TableColumnBaseSQLProvider {
         + " ORDER BY table_version DESC LIMIT 1";
   }
 
-  public String listColumnPOsByTableIds(@Param("columnIds") List<Long> columnIds) {
+  public String listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds) {
     return "<script>"
         + " SELECT c.column_id AS columnId, c.column_name AS columnName,"
         + " c.column_position AS columnPosition, c.metalake_id AS metalakeId, c.catalog_id AS catalogId,"

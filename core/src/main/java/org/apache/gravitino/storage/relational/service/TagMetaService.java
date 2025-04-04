@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -232,32 +231,35 @@ public class TagMetaService {
                   mapper.listTagMetadataObjectRelsByMetalakeAndTagName(metalakeName, tagName));
 
       List<MetadataObject> metadataObjects = Lists.newArrayList();
-      tagMetadataObjectRelPOs.stream()
-          .collect(
-              Collectors.groupingBy(t -> MetadataObject.Type.valueOf(t.getMetadataObjectType())))
-          .forEach(
-              (type, rels) -> {
-                List<Long> metadataObjectIds =
-                    rels.stream()
-                        .map(TagMetadataObjectRelPO::getMetadataObjectId)
-                        .collect(Collectors.toList());
-                Map<Long, String> metadataObjectNames =
-                    Optional.of(MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP.get(type))
-                        .map(f -> f.apply(metadataObjectIds))
-                        .orElseThrow(
-                            () ->
-                                new IllegalArgumentException(
-                                    "Unexpected to reach here for metadata object type: " + type));
+      Map<String, List<TagMetadataObjectRelPO>> tagMetadataObjectRelPOsByType =
+          tagMetadataObjectRelPOs.stream()
+              .collect(Collectors.groupingBy(TagMetadataObjectRelPO::getMetadataObjectType));
 
-                metadataObjectNames.forEach(
-                    (id, fullName) -> {
-                      // Metadata object may be deleted asynchronously when we query the name, so it
-                      // will return null, we should skip this metadata object.
-                      if (fullName != null) {
-                        metadataObjects.add(MetadataObjects.parse(fullName, type));
-                      }
-                    });
-              });
+      for (Map.Entry<String, List<TagMetadataObjectRelPO>> entry :
+          tagMetadataObjectRelPOsByType.entrySet()) {
+        String metadataObjectType = entry.getKey();
+        List<TagMetadataObjectRelPO> rels = entry.getValue();
+
+        List<Long> metadataObjectIds =
+            rels.stream()
+                .map(TagMetadataObjectRelPO::getMetadataObjectId)
+                .collect(Collectors.toList());
+        Map<Long, String> metadataObjectNames =
+            MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP
+                .get(MetadataObject.Type.valueOf(metadataObjectType))
+                .apply(metadataObjectIds);
+
+        for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
+          String fullName = metadataObjectName.getValue();
+
+          // Metadata object may be deleted asynchronously when we query the name, so it will
+          // return null, we should skip this metadata object.
+          if (fullName != null) {
+            metadataObjects.add(
+                MetadataObjects.parse(fullName, MetadataObject.Type.valueOf(metadataObjectType)));
+          }
+        }
+      }
 
       return metadataObjects;
     } catch (RuntimeException e) {

@@ -59,7 +59,7 @@ public class MetadataObjectService {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectService.class);
 
-  public static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
+  static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
       TYPE_TO_FULLNAME_FUNCTION_MAP =
           ImmutableMap.of(
               MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,

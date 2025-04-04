@@ -92,6 +92,6 @@ public class TableColumnSQLProviderFactory {
   }
 
   public static String listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds) {
-    return getProvider().listColumnPOsByTableIds(columnIds);
+    return getProvider().listColumnPOsByColumnIds(columnIds);
   }
 }
