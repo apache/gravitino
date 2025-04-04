@@ -546,7 +546,7 @@ components:
         "type": "ModelVersionAliasesAlreadyExistException",
         "message": "Model version aliases already exist",
         "stack": [
-          "org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException: Model version aliases already exist"
+            "org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException: Model version aliases already exist"
         ]
       }
 
@@ -556,6 +556,6 @@ components:
         "type": "NoSuchModelVersionException",
         "message": "Model version does not exist",
         "stack": [
-          "org.apache.gravitino.exceptions.NoSuchModelVersionException: Model version does not exist"
+            "org.apache.gravitino.exceptions.NoSuchModelVersionException: Model version does not exist"
         ]
       }
