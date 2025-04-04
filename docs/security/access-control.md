@@ -224,6 +224,14 @@ and `USE_SCHEMA` privileges on its parent schema.
 | WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Write a fileset (including alter a fileset) |
 | READ_FILESET   | Metalake, Catalog, Schema, Fileset | read a fileset                              |
 
+### Model privileges
+
+| Name                 | Supports Securable Object        | Operation                                                          |
+|----------------------|----------------------------------|--------------------------------------------------------------------|
+| CREATE_MODEL         | Metalake, Catalog, Schema        | Create a model                                                     |
+| CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Create a model version                                             |
+| USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions |
+
 ## Inheritance Model
 
 Securable objects in Gravitino are hierarchical and privileges are inherited downward.

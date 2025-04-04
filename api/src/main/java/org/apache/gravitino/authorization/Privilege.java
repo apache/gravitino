@@ -84,7 +84,13 @@ public interface Privilege {
     /** The privilege to create a role */
     CREATE_ROLE(0L, 1L << 16),
     /** The privilege to grant or revoke a role for the user or the group. */
-    MANAGE_GRANTS(0L, 1L << 17);
+    MANAGE_GRANTS(0L, 1L << 17),
+    /** The privilege to create a model */
+    CREATE_MODEL(0L, 1L << 18),
+    /** The privilege to create a model version */
+    CREATE_MODEL_VERSION(0L, 1L << 19),
+    /** The privilege to view the metadata of the model and download all the model versions */
+    USE_MODEL(0L, 1L << 20);
 
     private final long highBits;
     private final long lowBits;

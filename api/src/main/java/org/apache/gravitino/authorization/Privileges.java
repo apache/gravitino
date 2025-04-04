@@ -32,6 +32,14 @@ public class Privileges {
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE);
+
+  private static final Set<MetadataObject.Type> MODEL_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.MODEL);
+
   private static final Set<MetadataObject.Type> TOPIC_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
           MetadataObject.Type.METALAKE,
@@ -118,6 +126,14 @@ public class Privileges {
       case MANAGE_GRANTS:
         return ManageGrants.allow();
 
+        //  Model
+      case CREATE_MODEL:
+        return CreateModel.allow();
+      case CREATE_MODEL_VERSION:
+        return CreateModelVersion.allow();
+      case USE_MODEL:
+        return UseModel.allow();
+
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
     }
@@ -191,6 +207,14 @@ public class Privileges {
         return CreateRole.deny();
       case MANAGE_GRANTS:
         return ManageGrants.deny();
+
+        // Model
+      case CREATE_MODEL:
+        return CreateModel.deny();
+      case CREATE_MODEL_VERSION:
+        return CreateModelVersion.deny();
+      case USE_MODEL:
+        return UseModel.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -701,6 +725,85 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return type == MetadataObject.Type.METALAKE;
+    }
+  }
+
+  /** The privilege to create a model */
+  public static class CreateModel extends GenericPrivilege<CreateModel> {
+    private static final CreateModel ALLOW_INSTANCE =
+        new CreateModel(Condition.ALLOW, Name.CREATE_MODEL);
+    private static final CreateModel DENY_INSTANCE =
+        new CreateModel(Condition.DENY, Name.CREATE_MODEL);
+
+    private CreateModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /** @return The instance with allow condition of the privilege. */
+    public static CreateModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny condition of the privilege. */
+    public static CreateModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to view the metadata of the model and download all the model versions */
+  public static class UseModel extends GenericPrivilege<UseModel> {
+    private static final UseModel ALLOW_INSTANCE = new UseModel(Condition.ALLOW, Name.USE_MODEL);
+    private static final UseModel DENY_INSTANCE = new UseModel(Condition.DENY, Name.USE_MODEL);
+
+    private UseModel(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /** @return The instance with allow condition of the privilege. */
+    public static UseModel allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny condition of the privilege. */
+    public static UseModel deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return MODEL_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to create a model version */
+  public static class CreateModelVersion extends GenericPrivilege<CreateModelVersion> {
+    private static final CreateModelVersion ALLOW_INSTANCE =
+        new CreateModelVersion(Condition.ALLOW, Name.CREATE_MODEL_VERSION);
+    private static final CreateModelVersion DENY_INSTANCE =
+        new CreateModelVersion(Condition.DENY, Name.CREATE_MODEL_VERSION);
+
+    private CreateModelVersion(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /** @return The instance with allow condition of the privilege. */
+    public static CreateModelVersion allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /** @return The instance with deny condition of the privilege. */
+    public static CreateModelVersion deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return MODEL_SUPPORTED_TYPES.contains(type);
     }
   }
 }
