@@ -25,6 +25,7 @@ import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.FilesetAuditConstants;
@@ -46,6 +47,14 @@ public class Utils {
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  public static Response created() {
+    return Response.status(Response.Status.CREATED).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  public static Response tooManyRequests() {
+    return Response.status(Status.TOO_MANY_REQUESTS).type(MediaType.APPLICATION_JSON).build();
   }
 
   public static Response ok() {

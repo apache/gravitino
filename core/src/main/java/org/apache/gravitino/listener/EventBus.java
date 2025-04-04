@@ -21,6 +21,7 @@ package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
@@ -39,6 +40,8 @@ public class EventBus {
   // asynchronous event processing.
   private final List<EventListenerPlugin> eventListeners;
 
+  private final List<AsyncQueueListener> asyncQueueListeners;
+
   /**
    * Constructs an EventBus with a predefined list of event listeners.
    *
@@ -47,6 +50,11 @@ public class EventBus {
    */
   public EventBus(List<EventListenerPlugin> eventListeners) {
     this.eventListeners = eventListeners;
+    this.asyncQueueListeners =
+        eventListeners.stream()
+            .filter(AsyncQueueListener.class::isInstance)
+            .map(AsyncQueueListener.class::cast)
+            .collect(Collectors.toList());
   }
 
   /**
@@ -65,6 +73,11 @@ public class EventBus {
     }
   }
 
+  /** */
+  public boolean isHighWaterMark() {
+    return asyncQueueListeners.stream().anyMatch(AsyncQueueListener::isHighWaterMark);
+  }
+
   /**
    * Retrieves the list of registered post-event listeners. This method is primarily intended for
    * testing purposes to verify the correct registration and functioning of event listeners.
@@ -73,7 +86,7 @@ public class EventBus {
    *     EventBus.
    */
   @VisibleForTesting
-  List<EventListenerPlugin> getEventListeners() {
+  public List<EventListenerPlugin> getEventListeners() {
     return eventListeners;
   }
 
