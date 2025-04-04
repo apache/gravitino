@@ -60,19 +60,22 @@ class HiveProxyPlugin implements ProxyPlugin {
         // The http authentication use one KDC server, the Hive catalog may use another KDC server.
         // The KerberosAuthenticator will remove realm of principal.
         // And then we add the realm of Hive catalog to the user.
+        final String finalPrincipalName;
         String proxyKerberosPrincipalName = principal.getName();
         if (!proxyKerberosPrincipalName.contains("@")) {
-          proxyKerberosPrincipalName =
+          finalPrincipalName =
               String.format("%s@%s", proxyKerberosPrincipalName, ops.getKerberosRealm());
+        } else {
+          finalPrincipalName = proxyKerberosPrincipalName;
         }
 
-        proxyUser = UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, realUser);
+        proxyUser = UserGroupInformation.createProxyUser(finalPrincipalName, realUser);
 
         String token =
             ops.getClientPool()
                 .run(
                     client -> {
-                      return client.getDelegationToken(principal.getName(), realUser.getUserName());
+                      return client.getDelegationToken(finalPrincipalName, realUser.getUserName());
                     });
 
         Token<DelegationTokenIdentifier> delegationToken = new Token<DelegationTokenIdentifier>();
