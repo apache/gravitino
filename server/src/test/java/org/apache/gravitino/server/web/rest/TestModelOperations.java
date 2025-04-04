@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -36,6 +37,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.dto.requests.ModelRegisterRequest;
+import org.apache.gravitino.dto.requests.ModelUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -50,6 +53,7 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -790,6 +794,70 @@ public class TestModelOperations extends JerseyTest {
     ErrorResponse errorResp2 = resp5.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testAlterModel() {
+    String oldName = "model1";
+    String newName = "newModel1";
+    String comment = "comment";
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, oldName);
+    Model updatedModel = mockModel(newName, comment, 0);
+
+    // Mock alterModel to return updated model
+    when(modelDispatcher.alterModel(modelId, new ModelChange[] {ModelChange.rename(newName)}))
+        .thenReturn(updatedModel);
+
+    // Build update request
+    ModelUpdatesRequest req =
+        new ModelUpdatesRequest(
+            Collections.singletonList(new ModelUpdateRequest.RenameModelRequest(newName)));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelResponse modelResp = resp.readEntity(ModelResponse.class);
+    Assertions.assertEquals(comment, modelResp.getModel().comment());
+    Assertions.assertEquals(newName, modelResp.getModel().name());
+
+    // Test NoSuchModelException
+    doThrow(new NoSuchModelException("mock error"))
+        .when(modelDispatcher)
+        .alterModel(modelId, new ModelChange[] {ModelChange.rename(newName)});
+
+    Response resp1 =
+        target(modelPath())
+            .path("model1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+
+    // Test RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(modelDispatcher)
+        .alterModel(modelId, new ModelChange[] {ModelChange.rename(newName)});
+
+    Response resp2 =
+        target(modelPath())
+            .path("model1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+    ErrorResponse errorResp1 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
   }
 
   private String modelPath() {
