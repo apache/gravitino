@@ -17,15 +17,17 @@
 
 from typing import Dict, List
 
-from gravitino.name_identifier import NameIdentifier
 from gravitino.api.catalog import Catalog
 from gravitino.api.model.model import Model
 from gravitino.api.model.model_version import ModelVersion
+from gravitino.api.model_change import ModelChange
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_model import GenericModel
 from gravitino.client.generic_model_version import GenericModelVersion
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.requests.model_register_request import ModelRegisterRequest
+from gravitino.dto.requests.model_update_request import ModelUpdateRequest
+from gravitino.dto.requests.model_updates_request import ModelUpdatesRequest
 from gravitino.dto.requests.model_version_link_request import ModelVersionLinkRequest
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.drop_response import DropResponse
@@ -34,6 +36,7 @@ from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
 from gravitino.exceptions.handlers.model_error_handler import MODEL_ERROR_HANDLER
+from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
@@ -269,6 +272,36 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         return GenericModelVersion(model_version_resp.model_version())
 
+    def alter_model(self, model_ident: NameIdentifier, *changes: ModelChange) -> Model:
+        """Alter the schema by applying the changes.
+        Args:
+            model_ident: The identifier of the model.
+            changes: The changes to apply to the model.
+        Raises:
+            NoSuchSchemaException: If the schema does not exist.
+            IllegalArgumentException: If the changes are invalid.
+        Returns:
+            The updated schema object.
+        """
+        self._check_model_ident(model_ident)
+        model_full_ns = self._model_full_namespace(model_ident.namespace())
+
+        update_requests = [
+            GenericModelCatalog.to_model_update_request(change) for change in changes
+        ]
+
+        req = ModelUpdatesRequest(update_requests)
+        req.validate()
+
+        resp = self.rest_client.put(
+            f"{self._format_model_request_path(model_full_ns)}/{encode_string(model_ident.name())}",
+            req,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+        model_response = ModelResponse.from_json(resp.body, infer_missing=True)
+        model_response.validate()
+        return GenericModel(model_response.model())
+
     def link_model_version(
         self,
         model_ident: NameIdentifier,
@@ -390,6 +423,13 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model = self.register_model(ident, comment, properties)
         self.link_model_version(ident, uri, aliases, comment, properties)
         return model
+
+    @staticmethod
+    def to_model_update_request(change: ModelChange):
+        if isinstance(change, ModelChange.RenameModel):
+            return ModelUpdateRequest.UpdateModelNameRequest(change.new_name())
+
+        raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def _check_model_namespace(self, namespace: Namespace):
         """Check the validity of the model namespace.
