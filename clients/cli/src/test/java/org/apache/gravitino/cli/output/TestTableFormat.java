@@ -590,7 +590,7 @@ public class TestTableFormat {
         "+------+---------+\n"
             + "| Name | Comment |\n"
             + "+------+---------+\n"
-            + "| tag2 | N/A     |\n"
+            + "| tag1 | N/A     |\n"
             + "+------+---------+",
         output);
   }
