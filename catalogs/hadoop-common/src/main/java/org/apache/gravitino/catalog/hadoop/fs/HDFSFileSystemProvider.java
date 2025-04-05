@@ -33,7 +33,7 @@ public class HDFSFileSystemProvider implements FileSystemProvider {
   public FileSystem getFileSystem(@Nonnull Path path, @Nonnull Map<String, String> config)
       throws IOException {
     Configuration configuration = FileSystemUtils.createConfiguration(GRAVITINO_BYPASS, config);
-    return FileSystem.newInstance(path.toUri(), configuration);
+    return FileSystem.get(path.toUri(), configuration);
   }
 
   @Override

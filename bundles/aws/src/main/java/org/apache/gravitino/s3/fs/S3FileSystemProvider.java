@@ -73,7 +73,7 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     checkAndSetCredentialProvider(hadoopConfMap);
 
     Configuration configuration = FileSystemUtils.createConfiguration(hadoopConfMap);
-    return S3AFileSystem.newInstance(path.toUri(), configuration);
+    return S3AFileSystem.get(path.toUri(), configuration);
   }
 
   @Override
