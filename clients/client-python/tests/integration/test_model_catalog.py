@@ -16,20 +16,20 @@
 # under the License.
 from random import randint
 
-from gravitino import GravitinoAdminClient, GravitinoClient, Catalog, NameIdentifier
+from gravitino import Catalog, GravitinoAdminClient, GravitinoClient, NameIdentifier
+from gravitino.api.model_change import ModelChange
 from gravitino.exceptions.base import (
     ModelAlreadyExistsException,
-    NoSuchSchemaException,
-    NoSuchModelException,
     ModelVersionAliasesAlreadyExistException,
+    NoSuchModelException,
     NoSuchModelVersionException,
+    NoSuchSchemaException,
 )
 from gravitino.namespace import Namespace
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 
 class TestModelCatalog(IntegrationTestEnv):
-
     _metalake_name: str = "model_it_metalake" + str(randint(0, 1000))
     _catalog_name: str = "model_it_catalog" + str(randint(0, 1000))
     _schema_name: str = "model_it_schema" + str(randint(0, 1000))
@@ -132,7 +132,6 @@ class TestModelCatalog(IntegrationTestEnv):
             )
 
     def test_register_list_models(self):
-
         model_name1 = "model_it_model1" + str(randint(0, 1000))
         model_name2 = "model_it_model2" + str(randint(0, 1000))
         model_ident1 = NameIdentifier.of(self._schema_name, model_name1)
@@ -200,6 +199,33 @@ class TestModelCatalog(IntegrationTestEnv):
                 NameIdentifier.of(self._schema_name, "non_existent_model")
             )
         )
+
+    def test_register_alter_model(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_new_name = f"model_it_model_new{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        renamed_ident = NameIdentifier.of(self._schema_name, model_new_name)
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+
+        renamed_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(model_name, renamed_model.name())
+        self.assertEqual(comment, renamed_model.comment())
+        self.assertEqual(0, renamed_model.latest_version())
+        self.assertEqual(properties, renamed_model.properties())
+
+        changes = [ModelChange.rename(model_new_name)]
+
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
+        renamed_model = self._catalog.as_model_catalog().get_model(renamed_ident)
+        self.assertEqual(model_new_name, renamed_model.name())
+        self.assertEqual(comment, renamed_model.comment())
+        self.assertEqual(0, renamed_model.latest_version())
+        self.assertEqual(properties, renamed_model.properties())
 
     def test_link_get_model_version(self):
         model_name = "model_it_model" + str(randint(0, 1000))

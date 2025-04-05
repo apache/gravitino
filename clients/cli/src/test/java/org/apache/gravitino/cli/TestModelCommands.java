@@ -46,6 +46,7 @@ import org.apache.gravitino.cli.commands.ListModel;
 import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.RegisterModel;
+import org.apache.gravitino.cli.commands.UpdateModelName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -567,5 +568,34 @@ public class TestModelCommands {
     doReturn(linkModelMock).when(linkModelMock).validate();
     commandLine.handleCommandLine();
     verify(linkModelMock).handle();
+  }
+
+  @Test
+  void testUpdateModelNameCommand() {
+    UpdateModelName mockUpdate = mock(UpdateModelName.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.RENAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.RENAME)).thenReturn("new_model_name");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
+
+    doReturn(mockUpdate)
+        .when(commandLine)
+        .newUpdateModelName(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            eq("new_model_name"));
+    doReturn(mockUpdate).when(mockUpdate).validate();
+    commandLine.handleCommandLine();
+    verify(mockUpdate).handle();
   }
 }

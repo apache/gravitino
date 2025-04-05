@@ -207,8 +207,8 @@ if [[ "$1" == "package" ]]; then
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.rest
   rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.trino
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.trino
-  rm -f gravitino-$GRAVITINO_VERSION-src/web/LICENSE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/web/NOTICE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web/web/LICENSE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web/web/NOTICE.bin
 
   rm -f *.asc
   tar cvzf gravitino-$GRAVITINO_VERSION-src.tar.gz --exclude gravitino-$GRAVITINO_VERSION-src/.git gravitino-$GRAVITINO_VERSION-src

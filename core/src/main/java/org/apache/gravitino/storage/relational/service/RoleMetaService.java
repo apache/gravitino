@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -364,28 +363,10 @@ public class RoleMetaService {
                       .map(SecurableObjectPO::getMetadataObjectId)
                       .collect(Collectors.toList());
 
-              Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
-                  objectFullNameGetterFnMap =
-                      ImmutableMap.of(
-                          MetadataObject.Type.METALAKE,
-                          MetadataObjectService::getMetalakeObjectsFullName,
-                          MetadataObject.Type.CATALOG,
-                          MetadataObjectService::getCatalogObjectsFullName,
-                          MetadataObject.Type.SCHEMA,
-                          MetadataObjectService::getSchemaObjectsFullName,
-                          MetadataObject.Type.TABLE,
-                          MetadataObjectService::getTableObjectsFullName,
-                          MetadataObject.Type.FILESET,
-                          MetadataObjectService::getFilesetObjectsFullName,
-                          MetadataObject.Type.MODEL,
-                          MetadataObjectService::getModelObjectsFullName,
-                          MetadataObject.Type.TOPIC,
-                          MetadataObjectService::getTopicObjectsFullName);
-
               // dynamically calling getter function based on type
               Map<Long, String> objectIdAndNameMap =
                   Optional.of(MetadataObject.Type.valueOf(type))
-                      .map(objectFullNameGetterFnMap::get)
+                      .map(MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP::get)
                       .map(getter -> getter.apply(objectIds))
                       .orElseThrow(
                           () ->

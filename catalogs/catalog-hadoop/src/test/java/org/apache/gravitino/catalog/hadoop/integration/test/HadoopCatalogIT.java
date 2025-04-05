@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.Type.MANAGED;
 
 import com.google.common.collect.ImmutableMap;
@@ -253,6 +254,32 @@ public class HadoopCatalogIT extends BaseIT {
         createFileset(filesetName3, "comment", null, storageLocation3, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName3);
     Assertions.assertEquals(MANAGED, fileset3.type(), "fileset type should be MANAGED by default");
+  }
+
+  @Test
+  public void testAlterFileset() {
+    // create fileset with placeholder in storage location
+    String filesetName = "test_alter_fileset";
+    String storageLocation = storageLocation(filesetName) + "/{{user}}";
+    String placeholderKey = LOCATION_PLACEHOLDER_PREFIX + "user";
+    createFileset(
+        filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of(placeholderKey, "test"));
+
+    // alter fileset
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asFilesetCatalog()
+                    .alterFileset(
+                        NameIdentifier.of(schemaName, filesetName),
+                        FilesetChange.setProperty(placeholderKey, "test2")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Property placeholder-user is immutable or reserved, cannot be set"),
+        exception.getMessage());
   }
 
   @Test

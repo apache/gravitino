@@ -90,4 +90,8 @@ public class TableColumnSQLProviderFactory {
   public static String selectColumnPOById(@Param("columnId") Long columnId) {
     return getProvider().selectColumnPOById(columnId);
   }
+
+  public static String listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds) {
+    return getProvider().listColumnPOsByColumnIds(columnIds);
+  }
 }

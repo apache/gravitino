@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -326,6 +327,37 @@ public class ModelCatalogOperationsIT extends BaseIT {
         gravitinoCatalog.asModelCatalog().listModelVersions(modelIdent);
 
     Assertions.assertEquals(0, modelVersionsAfterDeleteAll.length);
+  }
+
+  @Test
+  public void testRegisterAndUpdateModel() {
+    String comment = "comment";
+    String modelName = RandomNameUtils.genRandomName("alter_name_model");
+    String newName = RandomNameUtils.genRandomName("new_name");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> properties = ImmutableMap.of("owner", "data-team");
+
+    Model createdModel =
+        gravitinoCatalog.asModelCatalog().registerModel(modelIdent, comment, properties);
+
+    ModelChange updateName = ModelChange.rename(newName);
+    Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, updateName);
+
+    Assertions.assertEquals(newName, alteredModel.name());
+    Assertions.assertEquals(createdModel.properties(), alteredModel.properties());
+    Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+
+    NameIdentifier nonExistIdent = NameIdentifier.of(schemaName, "non_exist_model");
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> gravitinoCatalog.asModelCatalog().alterModel(nonExistIdent, updateName));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            gravitinoCatalog
+                .asModelCatalog()
+                .alterModel(NameIdentifier.of(schemaName, null), updateName));
   }
 
   private void createMetalake() {

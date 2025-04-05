@@ -20,17 +20,19 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
@@ -56,6 +58,18 @@ public class MetadataObjectService {
   private static final Splitter DOT_SPLITTER = Splitter.on(DOT);
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectService.class);
+
+  static final Map<MetadataObject.Type, Function<List<Long>, Map<Long, String>>>
+      TYPE_TO_FULLNAME_FUNCTION_MAP =
+          ImmutableMap.of(
+              MetadataObject.Type.METALAKE, MetadataObjectService::getMetalakeObjectsFullName,
+              MetadataObject.Type.CATALOG, MetadataObjectService::getCatalogObjectsFullName,
+              MetadataObject.Type.SCHEMA, MetadataObjectService::getSchemaObjectsFullName,
+              MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName,
+              MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName,
+              MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName,
+              MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName,
+              MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
 
   private MetadataObjectService() {}
 
@@ -103,134 +117,6 @@ public class MetadataObjectService {
     }
 
     throw new IllegalArgumentException(String.format("Doesn't support the type %s", type));
-  }
-
-  // Metadata object may be null because the metadata object can be deleted
-  // asynchronously.
-  @Nullable
-  public static String getMetadataObjectFullName(String type, long metadataObjectId) {
-    MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type);
-    String fullName = null;
-    long objectId = metadataObjectId;
-
-    do {
-      switch (metadataType) {
-        case METALAKE:
-          MetalakePO metalakePO = MetalakeMetaService.getInstance().getMetalakePOById(objectId);
-          if (metalakePO != null) {
-            fullName = metalakePO.getMetalakeName();
-            metadataType = null;
-          } else {
-            return null;
-          }
-          break;
-
-        case CATALOG:
-          CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(objectId);
-          if (catalogPO != null) {
-            fullName =
-                fullName != null
-                    ? DOT_JOINER.join(catalogPO.getCatalogName(), fullName)
-                    : catalogPO.getCatalogName();
-            metadataType = null;
-          } else {
-            return null;
-          }
-          break;
-
-        case SCHEMA:
-          SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(objectId);
-          if (schemaPO != null) {
-            fullName =
-                fullName != null
-                    ? DOT_JOINER.join(schemaPO.getSchemaName(), fullName)
-                    : schemaPO.getSchemaName();
-            objectId = schemaPO.getCatalogId();
-            metadataType = MetadataObject.Type.CATALOG;
-          } else {
-            return null;
-          }
-          break;
-
-        case TABLE:
-          TablePO tablePO = TableMetaService.getInstance().getTablePOById(objectId);
-          // if fullName is null:
-          // fullName = catalogPO.getSchemaName(),schemaPO.getTableName()
-          if (tablePO != null) {
-            fullName =
-                fullName != null
-                    ? DOT_JOINER.join(tablePO.getTableName(), fullName)
-                    : tablePO.getTableName();
-            objectId = tablePO.getSchemaId();
-            metadataType = MetadataObject.Type.SCHEMA;
-          } else {
-            return null;
-          }
-          break;
-
-        case TOPIC:
-          TopicPO topicPO = TopicMetaService.getInstance().getTopicPOById(objectId);
-          if (topicPO != null) {
-            fullName =
-                fullName != null
-                    ? DOT_JOINER.join(topicPO.getTopicName(), fullName)
-                    : topicPO.getTopicName();
-            objectId = topicPO.getSchemaId();
-            metadataType = MetadataObject.Type.SCHEMA;
-          } else {
-            return null;
-          }
-          break;
-
-        case FILESET:
-          FilesetPO filesetPO = FilesetMetaService.getInstance().getFilesetPOById(objectId);
-          if (filesetPO != null) {
-            fullName =
-                fullName != null
-                    ? DOT_JOINER.join(filesetPO.getFilesetName(), fullName)
-                    : filesetPO.getFilesetName();
-            objectId = filesetPO.getSchemaId();
-            metadataType = MetadataObject.Type.SCHEMA;
-          } else {
-            return null;
-          }
-          break;
-
-        case MODEL:
-          ModelPO modelPO = ModelMetaService.getInstance().getModelPOById(objectId);
-          if (modelPO != null) {
-            fullName =
-                fullName != null
-                    ? DOT_JOINER.join(modelPO.getModelName(), fullName)
-                    : modelPO.getModelName();
-            objectId = modelPO.getSchemaId();
-            metadataType = MetadataObject.Type.SCHEMA;
-          } else {
-            return null;
-          }
-          break;
-
-        case COLUMN:
-          ColumnPO columnPO = TableColumnMetaService.getInstance().getColumnPOById(objectId);
-          if (columnPO != null) {
-            fullName =
-                fullName != null
-                    ? DOT_JOINER.join(columnPO.getColumnName(), fullName)
-                    : columnPO.getColumnName();
-            objectId = columnPO.getTableId();
-            metadataType = MetadataObject.Type.TABLE;
-          } else {
-            return null;
-          }
-          break;
-
-        default:
-          throw new IllegalArgumentException(
-              String.format("Doesn't support the type %s", metadataType));
-      }
-    } while (metadataType != null);
-
-    return fullName;
   }
 
   /**
@@ -387,6 +273,51 @@ public class MetadataObjectService {
         });
 
     return tableIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of column object IDs to their full names.
+   *
+   * @param columnsIds A list of column object IDs to fetch names for.
+   * @return A Map where the key is the column ID and the value is the column full name. The map may
+   *     contain null values for the names if its parent object is deleted. Returns an empty map if
+   *     no column objects are found for the given IDs. {@code @example} value of table full name:
+   *     "catalog1.schema1.table1.column1"
+   */
+  public static Map<Long, String> getColumnObjectsFullName(List<Long> columnsIds) {
+    List<ColumnPO> columnPOs =
+        SessionUtils.getWithoutCommit(
+            TableColumnMapper.class, mapper -> mapper.listColumnPOsByColumnIds(columnsIds));
+
+    if (columnPOs == null || columnPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> tableIds = columnPOs.stream().map(ColumnPO::getTableId).collect(Collectors.toList());
+    Map<Long, String> tableIdAndNameMap = getTableObjectsFullName(tableIds);
+
+    HashMap<Long, String> columnIdAndNameMap = new HashMap<>();
+
+    columnPOs.forEach(
+        columnPO -> {
+          // since the table can be deleted, we need to check the null value,
+          // and when the table is deleted, we will set fullName of column to
+          // null
+          String tableName = tableIdAndNameMap.getOrDefault(columnPO.getTableId(), null);
+          if (tableName == null) {
+            LOG.warn(
+                "The table '{}' of column '{}' may be deleted",
+                columnPO.getTableId(),
+                columnPO.getColumnId());
+            columnIdAndNameMap.put(columnPO.getColumnId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(tableName, columnPO.getColumnName());
+          columnIdAndNameMap.put(columnPO.getColumnId(), fullName);
+        });
+
+    return columnIdAndNameMap;
   }
 
   /**

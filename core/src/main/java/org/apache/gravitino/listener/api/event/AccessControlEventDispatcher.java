@@ -77,7 +77,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new AddUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -94,7 +94,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return isExists;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -112,7 +112,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new GetUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -129,7 +129,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return users;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListUsersFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -146,7 +146,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userNames;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListUserNamesFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -164,7 +164,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new AddGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
   }
@@ -181,7 +181,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return isExists;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
   }
@@ -199,7 +199,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new GetGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
   }
@@ -216,7 +216,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groups;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListGroupsFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -233,7 +233,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupNames;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListGroupNamesFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -252,7 +252,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new GrantUserRolesFailureEvent(initiator, metalake, e, user, roles));
       throw e;
     }
   }
@@ -271,7 +271,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new GrantGroupRolesFailureEvent(initiator, metalake, e, group, roles));
       throw e;
     }
   }
@@ -290,7 +290,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return groupObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(
+          new RevokeGroupRolesFailureEvent(initiator, metalake, e, group, roles));
       throw e;
     }
   }
@@ -309,7 +310,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return userObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new RevokeUserRolesFailureEvent(initiator, metalake, e, user, roles));
       throw e;
     }
   }

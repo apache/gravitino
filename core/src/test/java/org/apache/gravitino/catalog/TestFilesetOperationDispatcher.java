@@ -83,14 +83,14 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
         () ->
             filesetOperationDispatcher.createFileset(
                 filesetIdent1, "comment", Fileset.Type.MANAGED, "test", illegalProps),
-        "Properties are required and must be set");
+        "Properties or property prefixes are required and must be set");
 
     Map<String, String> illegalProps2 = ImmutableMap.of("k1", "v1", ID_KEY, "test");
     testPropertyException(
         () ->
             filesetOperationDispatcher.createFileset(
                 filesetIdent1, "comment", Fileset.Type.MANAGED, "test", illegalProps2),
-        "Properties are reserved and cannot be set",
+        "Properties or property prefixes are reserved and cannot be set",
         "gravitino.identifier");
   }
 
