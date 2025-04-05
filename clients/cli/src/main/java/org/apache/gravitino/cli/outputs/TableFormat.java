@@ -737,8 +737,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
   }
 
   /**
-   * Formats a single {@link org.apache.gravitino.tag.Tag} instance into a two-column table display. Displays tag details
-   * including name and comment information.
+   * Formats a single {@link org.apache.gravitino.tag.Tag} instance into a two-column table display.
+   * Displays tag details including name and comment information.
    */
   static final class TagDetailsTableFormat extends TableFormat<Tag> {
     public TagDetailsTableFormat(CommandContext context) {
@@ -759,9 +759,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     }
   }
 
-  /**
-   * Formats an array of {@link org.apache.gravitino.tag.Tag} names into table display.
-   */
+  /** Formats an array of {@link org.apache.gravitino.tag.Tag} names into table display. */
   static final class TagListTableFormat extends TableFormat<Tag[]> {
 
     /**
