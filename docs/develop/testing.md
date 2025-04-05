@@ -204,3 +204,8 @@ To retrieve the archive:
    In this case, the logs will be uploaded to the PR page regardless of the CI workflow result.
    ![upload log](../assets/upload-log-tag.png)
 
+## E2E testing of Web UI
+
+For instructions on end-to-end testing of the Web UI,
+please check the [details](./webui-testing.md).
+
