@@ -260,7 +260,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(mockTag, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("tag1,comment for tag1", output);
+    Assertions.assertEquals("name,comment\n" + "tag1,comment for tag1", output);
   }
 
   @Test

@@ -300,8 +300,13 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Tag tag) {
+      String header = COMMA_JOINER.join("name", "comment");
       String comment = tag.comment() == null ? "N/A" : tag.comment();
-      return COMMA_JOINER.join(new String[] {tag.name(), comment});
+
+      StringBuilder data = new StringBuilder();
+      data.append(COMMA_JOINER.join(tag.name(), comment));
+
+      return NEWLINE_JOINER.join(header, data.toString());
     }
   }
 
