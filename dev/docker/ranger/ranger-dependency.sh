@@ -19,7 +19,10 @@
 #
 set -ex
 ranger_dir="$(dirname "${BASH_SOURCE-$0}")"
-ranger_dir="$(cd "${ranger_dir}">/dev/null; pwd)"
+ranger_dir="$(
+	cd "${ranger_dir}" >/dev/null
+	pwd
+)"
 
 # Environment variables definition
 RANGER_VERSION=2.4.0
@@ -32,13 +35,40 @@ MYSQL_CONNECTOR_DOWNLOAD_URL=https://search.maven.org/remotecontent?filepath=mys
 
 # Prepare download packages
 if [[ ! -d "${ranger_dir}/packages" ]]; then
-  mkdir -p "${ranger_dir}/packages"
+	mkdir -p "${ranger_dir}/packages"
 fi
 
 if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
-  curl -L -s -o "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ${RANGER_DOWNLOAD_URL}
+	# curl -L -s -o "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ${RANGER_DOWNLOAD_URL}
+
+	if [ ! -d "${ranger_dir}/packages/apache-ranger" ]; then
+		git clone https://github.com/apache/ranger --branch master --single-branch ${ranger_dir}/packages/apache-ranger
+	fi
+
+	cp ${ranger_dir}/.env ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
+
+	cd ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
+
+  # Prevent buildx to pull remote image
+  # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
+  docker builder prune -f
+  docker builder use default
+
+	export DOCKER_BUILDKIT=1
+	export COMPOSE_DOCKER_CLI_BUILD=1
+	export RANGER_DB_TYPE=mysql
+
+	docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
+
+	# copy package from volume to host
+	docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
+
+	cp ./dist/${RANGER_PACKAGE_NAME} ${ranger_dir}/packages
+
+	# Change back to gravitino-builder
+  docker buildx use gravitino-builder
 fi
 
 if [ ! -f "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ]; then
-  curl -L -s -o "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ${MYSQL_CONNECTOR_DOWNLOAD_URL}
+	curl -L -s -o "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ${MYSQL_CONNECTOR_DOWNLOAD_URL}
 fi
