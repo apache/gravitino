@@ -22,17 +22,7 @@ import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlC
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class SparkJdbcPostgreSqlCatalogIT33 extends SparkJdbcMysqlCatalogIT {
-
-  @Override
-  protected String getCatalogName() {
-    return "jdbc_postgresql";
-  }
-
-  @Override
-  protected String getProvider() {
-    return "jdbc-postgresql";
-  }
+public class SparkJdbcPostgreSqlCatalogIT33 extends SparkJdbcPostgreSqlCatalogIT {
 
   @Test
   void testCatalogClassName() {
