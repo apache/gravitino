@@ -116,6 +116,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the role {@link NameIdentifier} with the given metalake and role name.
+   *
+   * @param metalake The metalake name
+   * @param roleName The role name
+   * @return the created role {@link NameIdentifier}
+   */
+  public static NameIdentifier ofRole(String metalake, String roleName) {
+    return NameIdentifier.of(NamespaceUtil.ofRole(metalake), roleName);
+  }
+
+  /**
    * Create the column {@link NameIdentifier} with the given metalake, catalog, schema, table and
    * column name.
    *
