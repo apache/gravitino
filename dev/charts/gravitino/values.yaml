@@ -320,6 +320,21 @@ extraExposePorts:
     name: http1
     targetPort: 9001
 
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-gravitino.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-gravitino-tls
+  #    hosts:
+  #      - chart-gravitino.local
+
 ## Deployment annotations
 ##
 annotations: {}

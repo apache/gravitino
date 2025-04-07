@@ -27,7 +27,7 @@ dependencies:
     name: mysql
     repository: https://charts.bitnami.com/bitnami
     version: 10.2.1
-kubeVersion: '>=1.30.0-0'
+kubeVersion: '>=1.29.0-0'
 maintainers:
   - name: Gravitino
     email: dev@gravitino.apache.org
@@ -35,4 +35,4 @@ maintainers:
 name: gravitino
 sources:
   - https://github.com/apache/gravitino
-version: 0.9.0-incubating-SNAPSHOT
+version: 0.9.0
