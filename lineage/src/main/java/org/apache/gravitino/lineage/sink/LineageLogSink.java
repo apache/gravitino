@@ -44,13 +44,20 @@ public class LineageLogSink implements LineageSink {
           .setSerializationInclusion(JsonInclude.Include.NON_NULL)
           .registerModule(new JavaTimeModule())
           .registerModule(new Jdk8Module());
+  private LineageLogger logger = new LineageLogger();
 
-  public LineageLogSink() {}
+  private static class LineageLogger {
+    private static final Logger LINEAGE_LOG = LoggerFactory.getLogger(LineageLogger.class);
+
+    public void log(String lineageString) {
+      LINEAGE_LOG.info(lineageString);
+    }
+  }
 
   @Override
   public void sink(RunEvent event) {
     try {
-      LOG.info("{}", objectMapper.writeValueAsString(event));
+      logger.log(objectMapper.writeValueAsString(event));
     } catch (JsonProcessingException e) {
       LOG.warn(
           "Process open lineage event failed, run id: {}, error message: {}",

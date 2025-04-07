@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.rest;
+package org.apache.gravitino.server.web;
 
 import java.util.Set;
 

@@ -26,7 +26,7 @@ import java.util.Set;
 import org.apache.gravitino.lineage.processor.LineageProcessor;
 import org.apache.gravitino.lineage.sink.LineageSinkManager;
 import org.apache.gravitino.lineage.source.LineageSource;
-import org.apache.gravitino.rest.SupportsRESTPackages;
+import org.apache.gravitino.server.web.SupportsRESTPackages;
 import org.apache.gravitino.utils.ClassUtils;
 
 /**
