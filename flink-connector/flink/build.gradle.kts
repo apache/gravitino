@@ -42,7 +42,7 @@ val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion
 
 dependencies {
   implementation(project(":core")) {
-    exclude("org.apache.logging.log4j")
+    exclude("*")
   }
   implementation(project(":catalogs:catalog-common")) {
     exclude("org.apache.logging.log4j")

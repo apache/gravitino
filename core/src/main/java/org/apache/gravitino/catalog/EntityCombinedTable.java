@@ -59,6 +59,10 @@ public final class EntityCombinedTable implements Table {
     this.imported = false;
   }
 
+  public TableEntity getTableEntity() {
+    return tableEntity;
+  }
+
   public static EntityCombinedTable of(Table table, TableEntity tableEntity) {
     return new EntityCombinedTable(table, tableEntity);
   }

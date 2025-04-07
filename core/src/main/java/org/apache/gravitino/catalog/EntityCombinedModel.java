@@ -40,6 +40,14 @@ public final class EntityCombinedModel implements Model {
     this.modelEntity = modelEntity;
   }
 
+  public ModelEntity getModelEntity() {
+    return modelEntity;
+  }
+
+  public Model getModel() {
+    return model;
+  }
+
   public static EntityCombinedModel of(Model model, ModelEntity modelEntity) {
     return new EntityCombinedModel(model, modelEntity);
   }

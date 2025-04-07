@@ -22,6 +22,7 @@ import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -418,7 +419,24 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Case 1: The schema is not created by Gravitino or the external system does not support
     // storing string identifiers.
     if (stringId == null) {
-      return EntityCombinedSchema.of(schema)
+      SchemaEntity schemaEntity = null;
+      try {
+        schemaEntity = store.get(ident, SCHEMA, SchemaEntity.class);
+      } catch (NoSuchEntityException | IOException e) {
+        LOG.debug("Failed to load {} form storage", ident, e);
+      }
+
+      if (schemaEntity == null) {
+        return EntityCombinedSchema.of(schema)
+            .withHiddenProperties(
+                getHiddenPropertyNames(
+                    catalogIdentifier,
+                    HasPropertyMetadata::schemaPropertiesMetadata,
+                    schema.properties()))
+            .withImported(false);
+      }
+
+      return EntityCombinedSchema.of(schema, schemaEntity)
           .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,

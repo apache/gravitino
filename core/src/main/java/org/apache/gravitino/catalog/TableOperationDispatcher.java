@@ -26,6 +26,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -464,7 +465,27 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Case 1: The table is not created by Gravitino or the external system does not support storing
     // string identifier.
     if (stringId == null) {
-      return EntityCombinedTable.of(table)
+      TableEntity tableEntity = null;
+      try {
+        tableEntity = store.get(ident, TABLE, TableEntity.class);
+      } catch (NoSuchEntityException | IOException e) {
+        LOG.debug("Failed to load {} form storage", ident, e);
+      }
+
+      if (tableEntity == null) {
+        return EntityCombinedTable.of(table)
+            .withHiddenProperties(
+                getHiddenPropertyNames(
+                    catalogIdentifier,
+                    HasPropertyMetadata::tablePropertiesMetadata,
+                    table.properties()))
+            // Some tables don't have properties or are not created by Gravitino,
+            // we can't use stringIdentifier to judge whether schema is ever imported or not.
+            // We need to check whether the entity exists.
+            .withImported(false);
+      }
+
+      return EntityCombinedTable.of(table, tableEntity)
           .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
