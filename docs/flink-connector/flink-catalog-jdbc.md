@@ -19,8 +19,8 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 
 Place the following JAR files in the lib directory of your Flink installation:
 
-- `flink-connector-jdbc-${flinkJdbcConnectorVersion}.jar`
-- `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`
+- [flink-connector-jdbc-${flinkJdbcConnectorVersion}.jar](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/connectors/table/jdbc/)
+- [gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar](flink-connector.md)
 - JDBC driver
 
 ### SQL Example
