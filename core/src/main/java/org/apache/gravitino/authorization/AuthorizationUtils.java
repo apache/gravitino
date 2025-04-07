@@ -77,6 +77,12 @@ public class AuthorizationUtils {
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
 
+  private static final Set<Privilege.Name> MODEL_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_MODEL,
+          Privilege.Name.USE_MODEL,
+          Privilege.Name.CREATE_MODEL_VERSION);
+
   private AuthorizationUtils() {}
 
   public static void checkCurrentUser(String metalake, String user) {
@@ -244,6 +250,10 @@ public class AuthorizationUtils {
 
         if (TOPIC_PRIVILEGES.contains(privilege.name())) {
           checkCatalogType(catalogIdent, Catalog.Type.MESSAGING, privilege);
+        }
+
+        if (MODEL_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.MODEL, privilege);
         }
       } catch (NoSuchCatalogException ne) {
         throw new NoSuchMetadataObjectException(
