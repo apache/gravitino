@@ -90,7 +90,7 @@ if [ ! -f "${hive_dir}/packages/${ZOOKEEPER_PACKAGE_NAME}" ]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" ]; then
-   # ranger-hdfs plugin not exist, run ranger-dependency.sh to build from source
+  # ranger-hdfs plugin not exist, run ranger-dependency.sh to build from source
   . ${ranger_dir}/ranger-dependency.sh
   cp "${ranger_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" "${hive_dir}/packages"
 fi
