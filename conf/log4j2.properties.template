@@ -56,10 +56,6 @@ appender.lineage_file.filePattern=${basePath}/gravitino_lineage_%d{yyyyMMdd}.log
 appender.lineage_file.layout.type=PatternLayout
 appender.lineage_file.layout.pattern=[%d{yyyy-MM-dd HH:mm:ss}] %m%n
 appender.lineage_file.policies.type = Policies
-appender.lineage_file.filter.threshold.type = ThresholdFilter
-appender.lineage_file.filter.threshold.level = INFO
-appender.lineage_file.filter.threshold.onMatch = ACCEPT
-appender.lineage_file.filter.threshold.onMismatch = DENY
 
 appender.lineage_file.policies.time.type = TimeBasedTriggeringPolicy
 appender.lineage_file.policies.time.interval = 1
