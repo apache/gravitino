@@ -27,7 +27,8 @@ import org.apache.gravitino.server.ServerConfig;
  */
 public class GravitinoAuthorizerProvider {
 
-  private static final GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
+  // TODO Single instance
+  // private static final GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
 
   private GravitinoAuthorizerProvider() {}
 

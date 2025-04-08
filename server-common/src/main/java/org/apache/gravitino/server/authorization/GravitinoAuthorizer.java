@@ -17,6 +17,9 @@
 
 package org.apache.gravitino.server.authorization;
 
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
+
 /** Used for metadata authorization. */
 public interface GravitinoAuthorizer {
 
@@ -29,5 +32,6 @@ public interface GravitinoAuthorizer {
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @return authorization result.
    */
-  boolean authorize(long userId, String resourceType, long resourceId, String privilege);
+  boolean authorize(
+      long userId, MetadataObject.Type resourceType, long resourceId, Privilege.Name privilege);
 }
