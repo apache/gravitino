@@ -65,7 +65,7 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
 	cp ./dist/* ${ranger_dir}/packages
 
 	# change back to gravitino-builder
-  docker buildx use gravitino-builder
+  docker builder use gravitino-builder
 fi
 
 if [ ! -f "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ]; then
