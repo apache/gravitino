@@ -45,7 +45,6 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
 	fi
 
 	cp ${ranger_dir}/.env ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
-
 	cd ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
 
   # Prevent builder to pull remote image
@@ -57,8 +56,8 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
 	export COMPOSE_DOCKER_CLI_BUILD=1
 	export RANGER_DB_TYPE=mysql
 
+  # run docker compose command to build packages
 	docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
-
 	# copy packages from volume to host
 	docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
 
