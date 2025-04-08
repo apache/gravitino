@@ -17,27 +17,23 @@
 
 package org.apache.gravitino.server.authorization;
 
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.Config;
 
-/** Used for metadata authorization. */
-public interface GravitinoAuthorizer {
-
-  /**
-   * After instantiating the GravitinoAuthorizer, execute the initialize method to perform a series
-   * of initialization operations, such as loading privilege policies and so on.
-   */
-  void initialize();
+/** The Factory of the {@link GravitinoAuthorizer}. */
+public interface GravitinoAuthorizerFactory {
 
   /**
-   * Perform authorization and return the authorization result.
+   * Identify of GravitinoAuthorizerFactory.
    *
-   * @param userId the user id in use_meta table
-   * @param resourceType for example, CATALOG, SCHEMA,TABLE, etc.
-   * @param resourceId the resource id.
-   * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
-   * @return authorization result.
+   * @return identify
    */
-  boolean authorize(
-      long userId, MetadataObject.Type resourceType, long resourceId, Privilege.Name privilege);
+  String identify();
+
+  /**
+   * Create GravitinoAuthorizer instance.
+   *
+   * @param config Gravitino configuration file
+   * @return GravitinoAuthorizer instance
+   */
+  GravitinoAuthorizer create(Config config);
 }

@@ -27,17 +27,31 @@ import org.apache.gravitino.server.ServerConfig;
  */
 public class GravitinoAuthorizerProvider {
 
-  // TODO Single instance
-  // private static final GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
+  private static final GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
 
   private GravitinoAuthorizerProvider() {}
 
   private GravitinoAuthorizer gravitinoAuthorizer;
 
+  /**
+   * Use Java SPI to obtain the {@link GravitinoAuthorizerFactory}, instantiate the {@link
+   * GravitinoAuthorizer}, and then execute the initialize method in the GravitinoAuthorizer.
+   *
+   * @param serverConfig Gravitino server config
+   */
   public void initialize(ServerConfig serverConfig) {
     // TODO
   }
 
+  public static GravitinoAuthorizerProvider getInstance() {
+    return INSTANCE;
+  }
+
+  /**
+   * Retrieve GravitinoAuthorizer instance.
+   *
+   * @return GravitinoAuthorizer instance
+   */
   public GravitinoAuthorizer getGravitinoAuthorizer() {
     return gravitinoAuthorizer;
   }
