@@ -514,7 +514,7 @@ class TestOwnerMetaService extends TestJDBCBackend {
         .setOwner(model.nameIdentifier(), model.type(), user.nameIdentifier(), user.type());
 
     UserMetaService.getInstance().deleteUser(user.nameIdentifier());
-    Assertions.assertEquals(22, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(25, countAllOwnerRel(user.id()));
     Assertions.assertEquals(0, countActiveOwnerRel(user.id()));
   }
 }
