@@ -30,14 +30,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.*;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.junit.jupiter.api.Assertions;
@@ -192,6 +185,16 @@ public class TestSecurableObjects extends TestJDBCBackend {
             "topic",
             auditInfo);
     backend.insert(topic, false);
+    ModelEntity model =
+       createModelEntity(
+               RandomIdGenerator.INSTANCE.nextId(),
+               Namespace.of("metalake", "catalog", "schema"),
+               "model",
+               "comment",
+               1,
+               null,
+               auditInfo);
+    backend.insert(model, false);
 
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
@@ -210,6 +213,9 @@ public class TestSecurableObjects extends TestJDBCBackend {
     SecurableObject topicObject =
         SecurableObjects.ofTopic(
             schemaObject, "topic", Lists.newArrayList(Privileges.ConsumeTopic.deny()));
+    SecurableObject modelObject =
+        SecurableObjects.ofM
+
 
     RoleEntity role1 =
         createRoleEntity(
