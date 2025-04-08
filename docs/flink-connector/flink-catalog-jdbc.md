@@ -26,17 +26,21 @@ Place the following JAR files in the lib directory of your Flink installation:
 ### SQL Example
 
 ```sql
-show databases;
+-- Suppose jdbc_catalog is the JDBC catalog name managed by Gravitino
+
+USE CATALOG jdbc_catalog;
+
+SHOW DATABASES;
 -- +------------------+
 -- |    database name |
 -- +------------------+
 -- |          mysql   |
 -- +------------------+
      
-create database jdbc_database;
+CREATE DATABASE jdbc_database;
 -- [INFO] Execute statement succeed.
 
-show databases;
+SHOW DATABASES;
 -- +------------------+
 -- |    database name |
 -- +------------------+
@@ -44,7 +48,7 @@ show databases;
 -- |  jdbc_database   |
 -- +------------------+
 
-use jdbc_database;
+USE jdbc_database;
 -- [INFO] Execute statement succeed.
     
 SET 'execution.runtime-mode' = 'batch';
@@ -53,10 +57,10 @@ SET 'execution.runtime-mode' = 'batch';
 SET 'sql-client.execution.result-mode' = 'tableau';
 -- [INFO] Execute statement succeed.
      
-use jdbc_database;
+USE jdbc_database;
 -- [INFO] Execute statement succeed.
 
-show tables;
+SHOW TABLES;
 -- Empty set
 
 CREATE TABLE jdbc_table_a (
@@ -65,7 +69,7 @@ CREATE TABLE jdbc_table_a (
 );
 -- [INFO] Execute statement succeed.
 
-show tables;
+SHOW TABLES;
 -- +--------------+
 -- |   table name |
 -- +--------------+
@@ -73,9 +77,9 @@ show tables;
 -- +--------------+
 -- 1 row in set
 
-insert into jdbc_table_a values(1,2);
+INSERT INTO jdbc_table_a VALUES(1,2);
 
-select * from jdbc_table_a;
+SELECT * FROM jdbc_table_a;
 -- +----+----+
 -- | aa | bb |
 -- +----+----+
@@ -83,17 +87,17 @@ select * from jdbc_table_a;
 -- +----+----+
 -- 1 row in set
 
-insert into jdbc_table_a values(2,3);
+INSERT INTO jdbc_table_a VALUES(2,3);
 -- [INFO] Submitting SQL update statement to the cluster...
 -- [INFO] SQL update statement has been successfully submitted to the cluster:
 -- Job ID: bc320828d49b97b684ed9f622f1b8aca
 
-insert into jdbc_table_a values(1,4);
+INSERT INTO jdbc_table_a VALUES(1,4);
 -- [INFO] Submitting SQL update statement to the cluster...
 -- [INFO] SQL update statement has been successfully submitted to the cluster:
 -- Job ID: bc320828d49b97b684ed9f622f1b8aca
 
-select * from jdbc_table_a;
+SELECT * FROM jdbc_table_a;
 -- +----+----+
 -- | aa | bb |
 -- +----+----+
