@@ -243,14 +243,10 @@ public abstract class OperationDispatcher {
   }
 
   protected <E extends Entity & HasIdentifier> E getEntity(
-      NameIdentifier ident, Entity.EntityType type, Class<E> entityClass, boolean throwException) {
+      NameIdentifier ident, Entity.EntityType type, Class<E> entityClass) {
     try {
       return store.get(ident, type, entityClass);
     } catch (Exception e) {
-      if (throwException) {
-        LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e);
-        throw new RuntimeException("Fail to check if entity is existed", e);
-      }
       LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e.getMessage(), e);
       return null;
     }

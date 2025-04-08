@@ -235,7 +235,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           if (stringId != null) {
             tableId = stringId.id();
           } else {
-            tableId = getEntity(ident, TABLE, TableEntity.class, true).id();
+            TableEntity tableEntity = getEntity(ident, TABLE, TableEntity.class);
+            if (tableEntity == null) {
+              throw new RuntimeException("Fail to check if entity is existed");
+            }
+            tableId = tableEntity.id();
           }
 
           TableEntity updatedTableEntity =
@@ -464,7 +468,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Case 1: The table is not created by Gravitino or the external system does not support storing
     // string identifier.
     if (stringId == null) {
-      TableEntity tableEntity = getEntity(ident, TABLE, TableEntity.class, false);
+      TableEntity tableEntity = getEntity(ident, TABLE, TableEntity.class);
       if (tableEntity == null) {
         return EntityCombinedTable.of(table)
             .withHiddenProperties(

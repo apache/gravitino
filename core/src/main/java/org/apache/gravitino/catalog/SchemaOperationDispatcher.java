@@ -254,7 +254,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           if (stringId != null) {
             schemaId = stringId.id();
           } else {
-            schemaId = getEntity(ident, SCHEMA, SchemaEntity.class, true).id();
+            SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
+            if (schemaEntity == null) {
+              throw new RuntimeException("Fail to check if entity is existed");
+            }
+            schemaId = schemaEntity.id();
           }
 
           SchemaEntity updatedSchemaEntity =
@@ -418,7 +422,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Case 1: The schema is not created by Gravitino or the external system does not support
     // storing string identifiers.
     if (stringId == null) {
-      SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class, false);
+      SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
       if (schemaEntity == null) {
         return EntityCombinedSchema.of(schema)
             .withHiddenProperties(
