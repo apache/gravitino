@@ -40,11 +40,11 @@ public final class EntityCombinedModel implements Model {
     this.modelEntity = modelEntity;
   }
 
-  public ModelEntity getModelEntity() {
+  public ModelEntity modelEntity() {
     return modelEntity;
   }
 
-  public Model getModel() {
+  public Model model() {
     return model;
   }
 

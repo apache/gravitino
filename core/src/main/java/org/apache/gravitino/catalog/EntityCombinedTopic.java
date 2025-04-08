@@ -52,7 +52,7 @@ public class EntityCombinedTopic implements Topic {
     this.imported = false;
   }
 
-  public TopicEntity getTopicEntity() {
+  public TopicEntity topicEntity() {
     return topicEntity;
   }
 

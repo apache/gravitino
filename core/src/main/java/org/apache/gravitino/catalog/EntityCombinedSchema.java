@@ -53,11 +53,11 @@ public final class EntityCombinedSchema implements Schema {
     this.imported = false;
   }
 
-  public SchemaEntity getSchemaEntity() {
+  public SchemaEntity schemaEntity() {
     return schemaEntity;
   }
 
-  public Schema getSchema() {
+  public Schema schema() {
     return schema;
   }
 

@@ -40,11 +40,11 @@ public final class EntityCombinedFileset implements Fileset {
     this.filesetEntity = filesetEntity;
   }
 
-  public FilesetEntity getFilesetEntity() {
+  public FilesetEntity filesetEntity() {
     return filesetEntity;
   }
 
-  public Fileset getFileset() {
+  public Fileset fileset() {
     return fileset;
   }
 

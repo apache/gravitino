@@ -26,7 +26,6 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -236,7 +235,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           if (stringId != null) {
             tableId = stringId.id();
           } else {
-            tableId = getEntity(ident, TABLE, TableEntity.class).id();
+            tableId = getEntity(ident, TABLE, TableEntity.class, true).id();
           }
 
           TableEntity updatedTableEntity =
@@ -465,13 +464,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Case 1: The table is not created by Gravitino or the external system does not support storing
     // string identifier.
     if (stringId == null) {
-      TableEntity tableEntity = null;
-      try {
-        tableEntity = store.get(ident, TABLE, TableEntity.class);
-      } catch (NoSuchEntityException | IOException e) {
-        LOG.debug("Failed to load {} form storage", ident, e);
-      }
-
+      TableEntity tableEntity = getEntity(ident, TABLE, TableEntity.class, false);
       if (tableEntity == null) {
         return EntityCombinedTable.of(table)
             .withHiddenProperties(

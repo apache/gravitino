@@ -59,7 +59,7 @@ public final class EntityCombinedTable implements Table {
     this.imported = false;
   }
 
-  public TableEntity getTableEntity() {
+  public TableEntity tableEntity() {
     return tableEntity;
   }
 
