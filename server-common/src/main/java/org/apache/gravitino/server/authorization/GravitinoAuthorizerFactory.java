@@ -23,11 +23,11 @@ import org.apache.gravitino.Config;
 public interface GravitinoAuthorizerFactory {
 
   /**
-   * Identify of GravitinoAuthorizerFactory.
+   * Identifier of GravitinoAuthorizerFactory.
    *
-   * @return identify
+   * @return factoryIdentifier
    */
-  String identify();
+  String factoryIdentifier();
 
   /**
    * Create GravitinoAuthorizer instance.
