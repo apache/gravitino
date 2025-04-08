@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import com.google.common.collect.ImmutableList;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Collections;
@@ -43,7 +44,7 @@ public class GravitinoInterceptionService implements InterceptionService {
 
   @Override
   public List<MethodInterceptor> getMethodInterceptors(Method method) {
-    return Collections.emptyList();
+    return ImmutableList.of(new MetadataAuthorizationMethodInterceptor());
   }
 
   @Override
