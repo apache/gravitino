@@ -55,11 +55,9 @@ public class LineageService implements LineageDispatcher, SupportsRESTPackages {
   public void close() {
     if (source != null) {
       source.close();
-      source = null;
     }
     if (sinkManager != null) {
       sinkManager.close();
-      sinkManager = null;
     }
   }
 

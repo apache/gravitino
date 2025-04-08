@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.lineage.LineageDispatcher;
-import org.apache.gravitino.lineage.source.rest.LineageOperations;
 import org.apache.gravitino.server.web.SupportsRESTPackages;
 
 public class HTTPLineageSource implements LineageSource, SupportsRESTPackages {
@@ -32,6 +31,6 @@ public class HTTPLineageSource implements LineageSource, SupportsRESTPackages {
 
   @Override
   public Set<String> getRESTPackages() {
-    return ImmutableSet.of(LineageOperations.class.getPackage().getName());
+    return ImmutableSet.of();
   }
 }

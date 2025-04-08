@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.lineage;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import java.util.HashMap;
@@ -39,7 +38,6 @@ public class LineageConfig extends Config {
 
   public static final String LINEAGE_CONFIG_PREFIX = "gravitino.lineage.";
   public static final String LINEAGE_CONFIG_SINKS = "sinks";
-  public static final String LINEAGE_SINK_QUEUE_CAPACITY = "sinkQueueCapacity";
   public static final String LINEAGE_CONFIG_SOURCE = "source";
   public static final String LINEAGE_SOURCE_CLASS_NAME = "sourceClass";
   public static final String LINEAGE_PROCESSOR_CLASS_NAME = "processorClass";
@@ -48,8 +46,6 @@ public class LineageConfig extends Config {
 
   public static final String LINEAGE_LOG_SINK_NAME = "log";
   public static final String LINEAGE_HTTP_SOURCE_NAME = "http";
-
-  @VisibleForTesting static final int LINEAGE_SINK_QUEUE_CAPACITY_DEFAULT = 10000;
 
   private static final Splitter splitter = Splitter.on(",");
 
@@ -73,13 +69,6 @@ public class LineageConfig extends Config {
           .version(ConfigConstants.VERSION_0_9_0)
           .stringConf()
           .createWithDefault(LINEAGE_LOG_SINK_NAME);
-
-  public static final ConfigEntry<Integer> SINK_QUEUE_CAPACITY =
-      new ConfigBuilder(LINEAGE_SINK_QUEUE_CAPACITY)
-          .doc("The capacity of the total lineage sink queue")
-          .version(ConfigConstants.VERSION_0_9_0)
-          .intConf()
-          .createWithDefault(LINEAGE_SINK_QUEUE_CAPACITY_DEFAULT);
 
   public LineageConfig(Map<String, String> properties) {
     super(false);
@@ -113,10 +102,6 @@ public class LineageConfig extends Config {
     String sinkString = get(SINKS);
     if (!m.containsKey(LINEAGE_CONFIG_SINKS)) {
       m.put(LINEAGE_CONFIG_SINKS, sinkString);
-    }
-
-    if (!m.containsKey(LINEAGE_SINK_QUEUE_CAPACITY)) {
-      m.put(LINEAGE_SINK_QUEUE_CAPACITY, String.valueOf(get(SINK_QUEUE_CAPACITY)));
     }
 
     String logClassConfigKey =
