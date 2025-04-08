@@ -183,4 +183,18 @@ public class TestNameIdentifierUtil {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> NameIdentifierUtil.ofGroup(null, groupName));
   }
+
+  @Test
+  void testOfRole() {
+    String roleName = "roleA";
+    String metalake = "demo_metalake";
+
+    NameIdentifier nameIdentifier = NameIdentifierUtil.ofRole(metalake, roleName);
+    Assertions.assertEquals(
+        Joiner.on(".")
+            .join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME, roleName),
+        nameIdentifier.toString());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> NameIdentifierUtil.ofRole(null, roleName));
+  }
 }

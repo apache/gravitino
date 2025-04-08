@@ -74,11 +74,20 @@ public class AccessControlIT extends BaseIT {
     Catalog filesetCatalog =
         metalake.createCatalog(
             "fileset_catalog", Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
+
+    Catalog modelCatalog =
+        metalake.createCatalog(
+            "model_catalog", Catalog.Type.MODEL, "comment", Collections.emptyMap());
+
     NameIdentifier fileIdent = NameIdentifier.of("fileset_schema", "fileset");
     filesetCatalog.asSchemas().createSchema("fileset_schema", "comment", Collections.emptyMap());
     filesetCatalog
         .asFilesetCatalog()
         .createFileset(fileIdent, "comment", Fileset.Type.EXTERNAL, "tmp", Collections.emptyMap());
+
+    NameIdentifier modelIdent = NameIdentifier.of("model_schema", "model");
+    modelCatalog.asSchemas().createSchema("model_schema", "comment", Collections.emptyMap());
+    modelCatalog.asModelCatalog().registerModel(modelIdent, "comment", Collections.emptyMap());
   }
 
   @Test
@@ -218,6 +227,75 @@ public class AccessControlIT extends BaseIT {
     Assertions.assertEquals(createdPrivilege.name(), Privilege.Name.CREATE_CATALOG);
     Assertions.assertEquals(createdPrivilege.condition(), Privilege.Condition.ALLOW);
 
+    // Test a metalake object with model privileges
+    SecurableObject metalakeObjectWithModelPrivs =
+        SecurableObjects.ofMetalake(
+            metalakeName,
+            Lists.newArrayList(
+                Privileges.CreateModel.allow(),
+                Privileges.CreateModelVersion.allow(),
+                Privileges.UseModel.allow()));
+
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(metalakeObjectWithModelPrivs));
+
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject catalogObjectWithModelPrivs =
+        SecurableObjects.ofCatalog(
+            "model_catalog",
+            Lists.newArrayList(
+                Privileges.CreateModel.allow(),
+                Privileges.CreateModelVersion.allow(),
+                Privileges.UseModel.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(catalogObjectWithModelPrivs));
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject schemaObjectWithModelPrivs =
+        SecurableObjects.ofSchema(
+            catalogObjectWithModelPrivs,
+            "model_schema",
+            Lists.newArrayList(
+                Privileges.CreateModel.allow(),
+                Privileges.CreateModelVersion.allow(),
+                Privileges.UseModel.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(schemaObjectWithModelPrivs));
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject modelObjectWithCorrectPriv =
+        SecurableObjects.ofModel(
+            schemaObjectWithModelPrivs,
+            "model",
+            Lists.newArrayList(Privileges.CreateModelVersion.allow(), Privileges.UseModel.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(modelObjectWithCorrectPriv));
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject modelObjectWithWrongPriv =
+        SecurableObjects.ofModel(
+            schemaObjectWithModelPrivs,
+            "model",
+            Lists.newArrayList(Privileges.CreateModel.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                "model_name", properties, Lists.newArrayList(modelObjectWithWrongPriv)));
+
     // Test a not-existed metadata object
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
@@ -256,6 +334,16 @@ public class AccessControlIT extends BaseIT {
         IllegalArgumentException.class,
         () ->
             metalake.createRole("not-existed", properties, Lists.newArrayList(wrongCatalogObject)));
+
+    // Create a role with wrong model privilege
+    SecurableObject wrongCatalogObject2 =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog", Lists.newArrayList(Privileges.CreateModel.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                "not-existed", properties, Lists.newArrayList(wrongCatalogObject2)));
 
     // Create a role with duplicated privilege
     SecurableObject duplicatedCatalogObject =
