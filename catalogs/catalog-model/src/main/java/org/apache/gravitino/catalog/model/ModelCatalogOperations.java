@@ -49,6 +49,7 @@ import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -293,6 +294,28 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     }
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    NameIdentifierUtil.checkModel(ident);
+    NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, version);
+
+    return internalUpdateModelVersion(modelVersionIdent, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    NameIdentifierUtil.checkModel(ident);
+    NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, alias);
+
+    return internalUpdateModelVersion(modelVersionIdent, changes);
+  }
+
   private ModelEntity updateModelEntity(
       NameIdentifier ident, ModelEntity modelEntity, ModelChange... changes) {
 
@@ -324,6 +347,81 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         .withNamespace(entityNamespace)
         .withProperties(entityProperties)
         .withLatestVersion(entityLatestVersion)
+        .build();
+  }
+
+  private ModelVersion internalUpdateModelVersion(
+      NameIdentifier ident, ModelVersionChange... changes) {
+    NameIdentifier modelIdent = NameIdentifierUtil.toModelIdentifier(ident);
+    try {
+      if (!store.exists(modelIdent, Entity.EntityType.MODEL)) {
+        throw new NoSuchModelException("Model %s does not exist", modelIdent);
+      }
+
+      if (!store.exists(ident, Entity.EntityType.MODEL_VERSION)) {
+        throw new NoSuchModelVersionException("Model version %s does not exist", ident);
+      }
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to alter model " + ident, ioe);
+    }
+
+    try {
+      ModelVersionEntity updatedModelVersionEntity =
+          store.update(
+              ident,
+              ModelVersionEntity.class,
+              Entity.EntityType.MODEL_VERSION,
+              e -> updateModelVersionEntity(e, changes));
+
+      return toModelVersionImpl(updatedModelVersionEntity);
+
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to load model " + ident, ioe);
+    } catch (NoSuchEntityException nsee) {
+      throw new NoSuchModelVersionException(nsee, "Model Version %s does not exist", ident);
+    }
+  }
+
+  private ModelVersionEntity updateModelVersionEntity(
+      ModelVersionEntity modelVersionEntity, ModelVersionChange... changes) {
+
+    NameIdentifier entityModelIdentifier = modelVersionEntity.modelIdentifier();
+    int entityVersion = modelVersionEntity.version();
+    String entityComment = modelVersionEntity.comment();
+    List<String> entityAliases =
+        modelVersionEntity.aliases() == null
+            ? Lists.newArrayList()
+            : Lists.newArrayList(modelVersionEntity.aliases());
+    String entityUri = modelVersionEntity.uri();
+    Map<String, String> entityProperties =
+        modelVersionEntity.properties() == null
+            ? Maps.newHashMap()
+            : Maps.newHashMap(modelVersionEntity.properties());
+    AuditInfo entityAuditInfo = modelVersionEntity.auditInfo();
+
+    for (ModelVersionChange change : changes) {
+      if (change instanceof ModelVersionChange.UpdateComment) {
+        entityComment = ((ModelVersionChange.UpdateComment) change).newComment();
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported model version change: " + change.getClass().getSimpleName());
+      }
+    }
+
+    return ModelVersionEntity.builder()
+        .withVersion(entityVersion)
+        .withModelIdentifier(entityModelIdentifier)
+        .withAliases(entityAliases)
+        .withComment(entityComment)
+        .withUri(entityUri)
+        .withProperties(entityProperties)
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(entityAuditInfo.creator())
+                .withCreateTime(entityAuditInfo.createTime())
+                .withLastModifier(entityAuditInfo.lastModifier())
+                .withLastModifiedTime(entityAuditInfo.lastModifiedTime())
+                .build())
         .build();
   }
 

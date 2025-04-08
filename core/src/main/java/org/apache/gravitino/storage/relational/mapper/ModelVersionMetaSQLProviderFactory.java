@@ -102,4 +102,10 @@ public class ModelVersionMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteModelVersionMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String updateModelVersionMeta(
+      @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
+      @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO) {
+    return getProvider().updateModelVersionMeta(newModelVersionPO, oldModelVersionPO);
+  }
 }

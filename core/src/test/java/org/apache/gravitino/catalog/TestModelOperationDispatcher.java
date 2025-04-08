@@ -41,6 +41,7 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -276,6 +277,37 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(newModelName, alteredModel.name());
     Assertions.assertEquals(modelComment, alteredModel.comment());
     Assertions.assertEquals(model.properties(), alteredModel.properties());
+  }
+
+  @Test
+  public void testUpdateModelComment() {
+    String schemaName = randomSchemaName();
+    String schemaComment = "schema which tests update";
+
+    String modelName = randomModelName();
+    String modelComment = "model which tests update";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    String versionUri = "s3://test-bucket/test-path/model.json";
+    String[] versionAliases = {"alias1", "alias2"};
+    String versionComment = "version which tests update";
+    String versionNewComment = "new version comment";
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    modelOperationDispatcher.linkModelVersion(
+        modelIdent, versionUri, versionAliases, versionComment, props);
+    ModelVersionChange changeComment = ModelVersionChange.updateComment(versionNewComment);
+    ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, "alias1");
+    ModelVersion alteredModelVersion =
+        modelOperationDispatcher.alterModelVersion(modelIdent, "alias1", changeComment);
+
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
   }
 
   private String randomSchemaName() {
