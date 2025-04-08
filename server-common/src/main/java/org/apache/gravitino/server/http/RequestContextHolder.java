@@ -23,7 +23,8 @@ package org.apache.gravitino.server.http;
  */
 public class RequestContextHolder {
 
-  private static final RequestContextHolder INSTANCE = new RequestContextHolder();
+  // TODO Single instance
+  // public static final RequestContextHolder INSTANCE = new RequestContextHolder();
 
   private RequestContextHolder() {}
 
