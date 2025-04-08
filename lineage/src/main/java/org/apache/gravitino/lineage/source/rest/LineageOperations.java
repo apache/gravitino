@@ -54,8 +54,7 @@ public class LineageOperations {
   @ResponseMetered(name = "update-lineage", absolute = true)
   public Response updateLineage(OpenLineage.RunEvent event) {
     LOG.info(
-        "Open lineage event:{}, run id:{}, job name:{}",
-        event,
+        "Open lineage event, run id:{}, job name:{}",
         org.apache.gravitino.lineage.Utils.getRunID(event),
         org.apache.gravitino.lineage.Utils.getJobName(event));
 
