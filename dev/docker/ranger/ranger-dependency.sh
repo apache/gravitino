@@ -19,10 +19,7 @@
 #
 set -ex
 ranger_dir="$(dirname "${BASH_SOURCE-$0}")"
-ranger_dir="$(
-	cd "${ranger_dir}" >/dev/null
-	pwd
-)"
+ranger_dir="$(cd "${ranger_dir}">/dev/null; pwd)"
 
 # Environment variables definition
 RANGER_VERSION=2.4.0
@@ -35,7 +32,7 @@ MYSQL_CONNECTOR_DOWNLOAD_URL=https://search.maven.org/remotecontent?filepath=mys
 
 # Prepare download packages
 if [[ ! -d "${ranger_dir}/packages" ]]; then
-	mkdir -p "${ranger_dir}/packages"
+  mkdir -p "${ranger_dir}/packages"
 fi
 
 if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
@@ -51,7 +48,7 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
 
 	cd ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
 
-  # Prevent buildx to pull remote image
+  # Prevent builder to pull remote image
   # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
   docker builder prune -f
   docker builder use default
@@ -72,5 +69,5 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
 fi
 
 if [ ! -f "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ]; then
-	curl -L -s -o "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ${MYSQL_CONNECTOR_DOWNLOAD_URL}
+  curl -L -s -o "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ${MYSQL_CONNECTOR_DOWNLOAD_URL}
 fi
