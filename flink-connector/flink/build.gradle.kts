@@ -46,6 +46,7 @@ dependencies {
   }
   implementation(project(":catalogs:catalog-common")) {
     exclude("org.apache.logging.log4j")
+    exclude("org.opensearch.client")
   }
   implementation(libs.guava)
 
