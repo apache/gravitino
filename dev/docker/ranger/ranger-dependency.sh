@@ -39,10 +39,12 @@ if [[ ! -d "${ranger_dir}/packages" ]]; then
 fi
 
 if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
-	# curl -L -s -o "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ${RANGER_DOWNLOAD_URL}
-
+  # Package not exist, we need to build them from source
 	if [ ! -d "${ranger_dir}/packages/apache-ranger" ]; then
 		git clone https://github.com/apache/ranger --branch master --single-branch ${ranger_dir}/packages/apache-ranger
+		# set the commit to RANGER-5146: 500 API Error When Deleting TagDef with a Linked Tag
+		# https://github.com/apache/ranger/commit/ff36aabe36169b94862c51a5b403f59c9d728b94
+		git reset --hard ff36aabe36169b94862c51a5b403f59c9d728b94
 	fi
 
 	cp ${ranger_dir}/.env ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
@@ -60,12 +62,12 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
 
 	docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
 
-	# copy package from volume to host
+	# copy packages from volume to host
 	docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
 
-	cp ./dist/${RANGER_PACKAGE_NAME} ${ranger_dir}/packages
+	cp ./dist/* ${ranger_dir}/packages
 
-	# Change back to gravitino-builder
+	# change back to gravitino-builder
   docker buildx use gravitino-builder
 fi
 
