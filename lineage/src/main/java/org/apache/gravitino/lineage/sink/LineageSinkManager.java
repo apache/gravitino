@@ -30,7 +30,7 @@ public class LineageSinkManager implements Closeable {
   public void initialize(List<String> sinks, Map<String, String> LineageConfigs) {}
 
   // Checks if the sink queue size surpasses the threshold to avoid overwhelming lineage sinks.
-  public boolean isHighWaterMark() {
+  public boolean isHighWatermark() {
     return false;
   }
 

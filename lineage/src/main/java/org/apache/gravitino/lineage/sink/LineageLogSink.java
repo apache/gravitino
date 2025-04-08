@@ -68,9 +68,6 @@ public class LineageLogSink implements LineageSink {
 
   private String getRunId(RunEvent event) {
     Run run = event.getRun();
-    if (run == null) {
-      return "Unknown";
-    }
-    return run.getRunId().toString();
+    return run == null ? "Unknown" : run.getRunId().toString();
   }
 }

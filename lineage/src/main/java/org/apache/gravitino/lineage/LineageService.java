@@ -63,7 +63,7 @@ public class LineageService implements LineageDispatcher, SupportsRESTPackages {
 
   @Override
   public boolean dispatchLineageEvent(OpenLineage.RunEvent runEvent) {
-    if (sinkManager.isHighWaterMark()) {
+    if (sinkManager.isHighWatermark()) {
       return false;
     }
 

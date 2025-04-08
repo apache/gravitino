@@ -30,7 +30,9 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
-  implementation(libs.openlineage.java)
+  implementation(libs.openlineage.java) {
+    isTransitive = false
+  }
 
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
