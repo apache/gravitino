@@ -375,7 +375,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         throw new NoSuchModelVersionException("Model version %s does not exist", ident);
       }
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to alter model version " + ident, ioe);
+      throw new RuntimeException("Failed to alter model " + ident, ioe);
     }
 
     try {
@@ -389,7 +389,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       return toModelVersionImpl(updatedModelVersionEntity);
 
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load model version " + ident, ioe);
+      throw new RuntimeException("Failed to load model " + ident, ioe);
     } catch (NoSuchEntityException nsee) {
       throw new NoSuchModelVersionException(nsee, "Model Version %s does not exist", ident);
     }
@@ -397,6 +397,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
 
   private ModelVersionEntity updateModelVersionEntity(
       ModelVersionEntity modelVersionEntity, ModelVersionChange... changes) {
+
     NameIdentifier entityModelIdentifier = modelVersionEntity.modelIdentifier();
     int entityVersion = modelVersionEntity.version();
     String entityComment = modelVersionEntity.comment();
@@ -410,7 +411,6 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             ? Maps.newHashMap()
             : Maps.newHashMap(modelVersionEntity.properties());
     AuditInfo entityAuditInfo = modelVersionEntity.auditInfo();
-    String modifier = PrincipalUtils.getCurrentPrincipal().getName();
 
     for (ModelVersionChange change : changes) {
       if (change instanceof ModelVersionChange.UpdateComment) {
@@ -432,8 +432,8 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             AuditInfo.builder()
                 .withCreator(entityAuditInfo.creator())
                 .withCreateTime(entityAuditInfo.createTime())
-                .withLastModifier(modifier)
-                .withLastModifiedTime(Instant.now())
+                .withLastModifier(entityAuditInfo.lastModifier())
+                .withLastModifiedTime(entityAuditInfo.lastModifiedTime())
                 .build())
         .build();
   }

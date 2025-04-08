@@ -36,12 +36,10 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.model.Model;
-import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.ThrowableFunction;
 
 public class ModelOperationDispatcher extends OperationDispatcher implements ModelDispatcher {
 
@@ -216,7 +214,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   /** {@inheritDoc} */
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
-      throws NoSuchModelException, IllegalArgumentException {
+      throws NoSuchModelVersionException, IllegalArgumentException {
     validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
@@ -245,23 +243,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
       NameIdentifier ident, int version, ModelVersionChange... changes)
       throws NoSuchModelVersionException, IllegalArgumentException {
     validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
-    return executeAlterModelVersion(ident, f -> f.alterModelVersion(ident, version, changes));
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public ModelVersion alterModelVersion(
-      NameIdentifier ident, String alias, ModelVersionChange... changes)
-      throws NoSuchModelException, IllegalArgumentException {
-    validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
-    return executeAlterModelVersion(ident, f -> f.alterModelVersion(ident, alias, changes));
-  }
-
-  private ModelVersion executeAlterModelVersion(
-      NameIdentifier ident, ThrowableFunction<ModelCatalog, ModelVersion> fn) {
-
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-
     ModelVersion alteredModelVersion =
         TreeLockUtils.doWithTreeLock(
             ident,
@@ -269,7 +251,27 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
             () ->
                 doWithCatalog(
                     catalogIdent,
-                    c -> c.doWithModelOps(fn),
+                    c -> c.doWithModelOps(f -> f.alterModelVersion(ident, version, changes)),
+                    NoSuchModelVersionException.class,
+                    IllegalArgumentException.class));
+
+    return internalUpdateModelVersion(catalogIdent, alteredModelVersion);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    ModelVersion alteredModelVersion =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.WRITE,
+            () ->
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithModelOps(f -> f.alterModelVersion(ident, alias, changes)),
                     NoSuchModelVersionException.class,
                     IllegalArgumentException.class));
 
