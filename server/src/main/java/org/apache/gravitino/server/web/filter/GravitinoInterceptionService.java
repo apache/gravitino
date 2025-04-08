@@ -55,7 +55,7 @@ public class GravitinoInterceptionService implements InterceptionService {
    * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
    * metadata authorization.
    */
-  private class MetadataAuthorizationMehodInterceptor implements MethodInterceptor {
+  private static class MetadataAuthorizationMethodInterceptor implements MethodInterceptor {
 
     /**
      * Determine whether authorization is required and the rules via the {@link AuthorizeApi}
