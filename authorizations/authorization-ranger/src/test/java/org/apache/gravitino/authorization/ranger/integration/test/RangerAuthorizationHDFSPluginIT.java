@@ -195,7 +195,7 @@ public class RangerAuthorizationHDFSPluginIT {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
                             return pathBasedMetadataObject.path().equals("/test/*/*/")
-                                && pathBasedMetadataObject.isRecursive();
+                                && pathBasedMetadataObject.recursive();
                           })
                       .count());
 
@@ -208,7 +208,7 @@ public class RangerAuthorizationHDFSPluginIT {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
                             return pathBasedMetadataObject.path().equals("/test/*/")
-                                && !pathBasedMetadataObject.isRecursive();
+                                && !pathBasedMetadataObject.recursive();
                           })
                       .count());
 
@@ -235,7 +235,7 @@ public class RangerAuthorizationHDFSPluginIT {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
                             return pathBasedMetadataObject.path().equals("/test/*/")
-                                && pathBasedMetadataObject.isRecursive();
+                                && pathBasedMetadataObject.recursive();
                           })
                       .count());
 
@@ -248,7 +248,7 @@ public class RangerAuthorizationHDFSPluginIT {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
                             return pathBasedMetadataObject.path().equals("/test")
-                                && !pathBasedMetadataObject.isRecursive();
+                                && !pathBasedMetadataObject.recursive();
                           })
                       .count());
 

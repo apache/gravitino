@@ -313,7 +313,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         new RangerPolicy.RangerPolicyResource(
             getAuthorizationPath(pathBasedMetadataObject),
             false,
-            pathBasedMetadataObject.isRecursive());
+            pathBasedMetadataObject.recursive());
     policy.getResources().put(RangerDefines.PolicyResource.PATH.getName(), policyResource);
     return policy;
   }
@@ -330,7 +330,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         metadataObject.name(),
         metadataObject.path(),
         metadataObject.type(),
-        metadataObject.isRecursive(),
+        metadataObject.recursive(),
         privileges);
   }
 
@@ -502,7 +502,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       List<AuthorizationSecurableObject> rangerSecurableObjects,
       NameIdentifier identifier,
       Set<AuthorizationPrivilege> rangerPrivileges,
-      boolean isRecursive,
+      boolean recursive,
       PathExtractor pathExtractor) {
     Entity.EntityType type = MetadataObjectUtil.toEntityType(securableObject);
     List<String> locations = Lists.newArrayList();
@@ -528,7 +528,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   pathExtractor.getPath(
                       MetadataObjectUtil.toEntityType(securableObject), locationPath),
                   PathBasedMetadataObject.PathType.get(securableObject.type()),
-                  isRecursive);
+                  recursive);
           pathBaseMetadataObject.validateAuthorizationMetadataObject();
           rangerSecurableObjects.add(
               generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
@@ -540,7 +540,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       NameIdentifier identifier,
       List<AuthorizationSecurableObject> rangerSecurableObjects,
       Set<AuthorizationPrivilege> rangerPrivileges,
-      boolean isRecursive) {
+      boolean recursive) {
     NameIdentifier[] catalogs =
         GravitinoEnv.getInstance()
             .catalogDispatcher()
@@ -554,7 +554,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       locationPath,
                       rangerSecurableObjects,
                       rangerPrivileges,
-                      isRecursive));
+                      recursive));
     }
   }
 
@@ -563,14 +563,14 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       String locationPath,
       List<AuthorizationSecurableObject> rangerSecurableObjects,
       Set<AuthorizationPrivilege> rangerPrivileges,
-      boolean isRecursive) {
+      boolean recursive) {
     PathBasedMetadataObject pathBaseMetadataObject =
         new PathBasedMetadataObject(
             securableObject.parent(),
             securableObject.name(),
             locationPath,
             PathBasedMetadataObject.PathType.get(securableObject.type()),
-            isRecursive);
+            recursive);
     pathBaseMetadataObject.validateAuthorizationMetadataObject();
     rangerSecurableObjects.add(
         generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
@@ -781,7 +781,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     String getPath(Entity.EntityType type, String location);
   }
 
+  /** The extractor will extra the table or fileset level location path for this entity */
   private static class TableOrFilesetPathExtractor implements PathExtractor {
+    /**
+     * This method will return table or fileset level path for this entity
+     *
+     * @param type The entity type
+     * @param location The location of this entity
+     * @return The table or file locations of this entity
+     */
     @Override
     public String getPath(Entity.EntityType type, String location) {
       if (type == Entity.EntityType.CATALOG) {
@@ -793,12 +801,21 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         return location;
       } else {
         throw new AuthorizationPluginException(
-            "Don't support %s to get table or fileset location", type);
+            "It's not allowed to extract table or fileset path from entity %s", type);
       }
     }
   }
 
+  /** The extractor will extra the schema level location path for this entity */
   private static class SchemaPathExtractor implements PathExtractor {
+
+    /**
+     * This method will return schema level path for this entity
+     *
+     * @param type The entity type
+     * @param location The location of this entity
+     * @return The schema locations of this entity
+     */
     @Override
     public String getPath(Entity.EntityType type, String location) {
       if (type == Entity.EntityType.CATALOG) {
@@ -807,7 +824,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         return location;
       } else {
         throw new AuthorizationPluginException(
-            "Don't support %s to get table or fileset location", type);
+            "It's not allowed to extract table or fileset path from entity %s", type);
       }
     }
   }

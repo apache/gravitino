@@ -35,9 +35,9 @@ public class PathBasedSecurableObject extends PathBasedMetadataObject
       String name,
       String path,
       AuthorizationMetadataObject.Type type,
-      boolean isRecursive,
+      boolean recursive,
       Set<AuthorizationPrivilege> privileges) {
-    super(parent, name, path, type, isRecursive);
+    super(parent, name, path, type, recursive);
     this.privileges = ImmutableList.copyOf(privileges);
   }
 
