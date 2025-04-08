@@ -98,7 +98,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   }
 
   @Override
-  public String sotDeleteOwnerRelBySchemaId(Long schemaId) {
+  public String softDeleteOwnerRelBySchemaId(Long schemaId) {
     return "UPDATE  "
         + OWNER_TABLE_NAME
         + " ot SET deleted_at = floor(extract(epoch from((current_timestamp - timestamp '1970-01-01 00:00:00')*1000))) "

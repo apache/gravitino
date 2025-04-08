@@ -27,8 +27,10 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -36,6 +38,9 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -102,8 +107,10 @@ public class ModelMetaService {
     NameIdentifierUtil.checkModel(ident);
 
     Long schemaId;
+    Long modelId;
     try {
       schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+      modelId = getModelIdBySchemaIdAndModelName(schemaId, ident.name());
     } catch (NoSuchEntityException e) {
       LOG.warn("Failed to delete model: {}", ident, e);
       return false;
@@ -132,7 +139,25 @@ public class ModelMetaService {
                 SessionUtils.doWithoutCommitAndFetchResult(
                     ModelMetaMapper.class,
                     mapper ->
-                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))));
+                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        modelId, MetadataObject.Type.MODEL.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        modelId, MetadataObject.Type.MODEL.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                        modelId, MetadataObject.Type.MODEL.name())));
 
     return modelDeletedCount.get() > 0;
   }

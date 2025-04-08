@@ -157,7 +157,7 @@ public class OwnerMetaBaseSQLProvider {
         + ")";
   }
 
-  public String sotDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
+  public String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE  "
         + OWNER_TABLE_NAME
         + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
