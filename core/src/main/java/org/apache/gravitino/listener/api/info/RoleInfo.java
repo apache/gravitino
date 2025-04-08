@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
@@ -39,8 +41,8 @@ public class RoleInfo {
    */
   public RoleInfo(Role roleObject) {
     this.roleName = roleObject.name();
-    this.properties = roleObject.properties();
-    this.securableObjects = roleObject.securableObjects();
+    this.properties = ImmutableMap.copyOf(roleObject.properties());
+    this.securableObjects = ImmutableList.copyOf(roleObject.securableObjects());
   }
 
   /**
