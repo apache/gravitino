@@ -17,40 +17,21 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage.sink;
+package org.apache.gravitino.lineage;
 
+import io.openlineage.server.OpenLineage.Job;
+import io.openlineage.server.OpenLineage.Run;
 import io.openlineage.server.OpenLineage.RunEvent;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import lombok.Getter;
-import org.awaitility.Awaitility;
 
-@Getter
-public class LineageSinkForTest implements LineageSink {
-  private Map<String, String> configs;
-  private List<RunEvent> runEvents = new LinkedList<>();
+public class Utils {
 
-  @Override
-  public void initialize(Map<String, String> configs) {
-    this.configs = configs;
+  public static String getRunID(RunEvent event) {
+    Run run = event.getRun();
+    return run == null ? "Unknown" : run.getRunId().toString();
   }
 
-  @Override
-  public void sink(RunEvent event) {
-    this.runEvents.add(event);
-  }
-
-  public List<RunEvent> tryGetEvents() {
-    Awaitility.await()
-        .atMost(20, TimeUnit.SECONDS)
-        .pollInterval(10, TimeUnit.MILLISECONDS)
-        .until(() -> getEvents().size() > 0);
-    return getEvents();
-  }
-
-  private List<RunEvent> getEvents() {
-    return runEvents;
+  public static String getJobName(RunEvent event) {
+    Job job = event.getJob();
+    return job == null ? "Unknown" : job.getName().toString();
   }
 }

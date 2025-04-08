@@ -54,7 +54,6 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final AtomicLong lastDropEventCounters = new AtomicLong(0);
   private Instant lastRecordDropEventTime;
   private final String asyncQueueListenerName;
-  private final int highWaterMarkThreshold;
 
   public AsyncQueueListener(
       List<EventListenerPlugin> listeners,
@@ -66,7 +65,6 @@ public class AsyncQueueListener implements EventListenerPlugin {
     this.queue = new LinkedBlockingQueue<>(queueCapacity);
     this.asyncProcessor = new Thread(() -> processEvents());
     this.dispatcherJoinSeconds = dispatcherJoinSeconds;
-    this.highWaterMarkThreshold = (int) (queueCapacity * 0.9);
     asyncProcessor.setDaemon(true);
     asyncProcessor.setName(asyncQueueListenerName);
   }
@@ -106,12 +104,8 @@ public class AsyncQueueListener implements EventListenerPlugin {
     eventListeners.forEach(listenerPlugin -> listenerPlugin.stop());
   }
 
-  public boolean isHighWaterMark() {
-    return queue.size() > highWaterMarkThreshold;
-  }
-
   @VisibleForTesting
-  public List<EventListenerPlugin> getEventListeners() {
+  List<EventListenerPlugin> getEventListeners() {
     return this.eventListeners;
   }
 

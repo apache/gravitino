@@ -54,7 +54,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
-public class TestOpenLineageOperations extends JerseyTest {
+public class TestLineageOperations extends JerseyTest {
 
   private ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
 

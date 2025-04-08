@@ -56,8 +56,8 @@ public class LineageOperations {
     LOG.info(
         "Open lineage event:{}, run id:{}, job name:{}",
         event,
-        event.getRun().getRunId(),
-        event.getJob().getName());
+        org.apache.gravitino.lineage.Utils.getRunID(event),
+        org.apache.gravitino.lineage.Utils.getJobName(event));
 
     try {
       return Utils.doAs(

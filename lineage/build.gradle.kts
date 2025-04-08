@@ -22,8 +22,8 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":core"))
   implementation(project(":common"))
+  implementation(project(":core"))
   implementation(project(":server-common"))
   implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
@@ -42,7 +42,6 @@ dependencies {
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
-  testImplementation(libs.awaitility)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }

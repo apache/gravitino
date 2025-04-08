@@ -95,7 +95,7 @@ public class EventListenerPluginWrapper implements EventListenerPlugin {
   }
 
   @VisibleForTesting
-  public EventListenerPlugin getUserEventListener() {
+  EventListenerPlugin getUserEventListener() {
     return userEventListener;
   }
 

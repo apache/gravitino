@@ -64,9 +64,6 @@ public class TestLineageConfig {
         sinkConfigs.get(
             LineageConfig.LINEAGE_LOG_SINK_NAME + "." + LineageConfig.LINEAGE_SINK_CLASS_NAME);
     Assertions.assertEquals(LineageLogSink.class.getName(), className);
-    String capacity = sinkConfigs.get(LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY);
-    Assertions.assertEquals(
-        LineageConfig.LINEAGE_SINK_QUEUE_CAPACITY_DEFAULT, Integer.parseInt(capacity));
 
     // config multi sinks
     Map<String, String> config2 =
