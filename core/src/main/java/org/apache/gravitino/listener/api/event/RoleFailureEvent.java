@@ -21,18 +21,23 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.EventDispatcher;
 
-/** Represents a post event. */
+/**
+ * Represents an event that occurs when a role operation fails due to an exception. This event
+ * contains the role information, a unique identifier for the operation, and the exception that
+ * caused the failure.
+ */
 @DeveloperApi
-public abstract class Event extends BaseEvent {
-  protected Event(String user, NameIdentifier identifier) {
-    super(user, identifier);
-  }
+public abstract class RoleFailureEvent extends FailureEvent {
 
-  /** {@inheritDoc} */
-  @Override
-  public void accept(EventDispatcher dispatcher) {
-    dispatcher.dispatchPostEvent(this);
+  /**
+   * Constructs a new {@code RoleFailureEvent} instance.
+   *
+   * @param user the user who initiated the operation
+   * @param identifier the unique identifier associated with the operation
+   * @param exception the exception that caused the failure
+   */
+  protected RoleFailureEvent(String user, NameIdentifier identifier, Exception exception) {
+    super(user, identifier, exception);
   }
 }
