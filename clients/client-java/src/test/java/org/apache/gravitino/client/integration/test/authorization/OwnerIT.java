@@ -325,6 +325,62 @@ public class OwnerIT extends BaseIT {
   }
 
   @Test
+  public void testCreateModel() {
+    String metalakeNameF = RandomNameUtils.genRandomName("metalakeF");
+    GravitinoMetalake metalake =
+        client.createMetalake(metalakeNameF, "metalake F comment", Collections.emptyMap());
+    String catalogNameF = RandomNameUtils.genRandomName("catalogF");
+    Map<String, String> properties = Maps.newHashMap();
+    Catalog catalog =
+        metalake.createCatalog(catalogNameF, Catalog.Type.MODEL, "catalog comment", properties);
+
+    NameIdentifier modelIdent = NameIdentifier.of("schema_owner", "model_owner");
+    catalog.asSchemas().createSchema("schema_owner", "comment", Collections.emptyMap());
+    catalog.asModelCatalog().registerModel(modelIdent, "comment", Collections.emptyMap());
+
+    MetadataObject metalakeObject =
+        MetadataObjects.of(null, metalakeNameF, MetadataObject.Type.METALAKE);
+    Owner owner = metalake.getOwner(metalakeObject).get();
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    MetadataObject catalogObject =
+        MetadataObjects.of(Lists.newArrayList(catalogNameF), MetadataObject.Type.CATALOG);
+    owner = metalake.getOwner(catalogObject).get();
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    MetadataObject schemaObject =
+        MetadataObjects.of(
+            Lists.newArrayList(catalogNameF, "schema_owner"), MetadataObject.Type.SCHEMA);
+    owner = metalake.getOwner(schemaObject).get();
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    MetadataObject modelObject =
+        MetadataObjects.of(
+            Lists.newArrayList(catalogNameF, "schema_owner", "model_owner"),
+            MetadataObject.Type.MODEL);
+    owner = metalake.getOwner(modelObject).get();
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    // Set another owner
+    String anotherUser = "another";
+    metalake.addUser(anotherUser);
+    metalake.setOwner(modelObject, anotherUser, Owner.Type.USER);
+    owner = metalake.getOwner(modelObject).get();
+    Assertions.assertEquals(anotherUser, owner.name());
+    Assertions.assertEquals(Owner.Type.USER, owner.type());
+
+    // Clean up
+    catalog.asModelCatalog().deleteModel(modelIdent);
+    catalog.asSchemas().dropSchema("schema_owner", true);
+    metalake.dropCatalog(catalogNameF, true);
+    client.dropMetalake(metalakeNameF, true);
+  }
+
+  @Test
   public void testOwnerWithException() {
     String metalakeNameE = RandomNameUtils.genRandomName("metalakeE");
     String catalogNameE = RandomNameUtils.genRandomName("catalogE");
