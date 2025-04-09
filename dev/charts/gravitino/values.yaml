@@ -381,6 +381,8 @@ containerSecurityContext:
 env:
   - name: GRAVITINO_HOME
     value: /root/gravitino
+  - name: GRAVITINO_MEM
+    value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
 
 ## The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
 ## This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"
@@ -397,12 +399,12 @@ envFrom: []
 ## Resource limits & requests
 ##
 resources: {}
-  # limits:
-  #   cpu: 500m
-  #   memory: 512Mi
-  # requests:
-  #   cpu: 500m
-  #   memory: 512Mi
+#   requests:
+#     cpu: 1000m
+#     memory: 2Gi
+#   limits:
+#     cpu: 2000m
+#     memory: 3Gi
 
 ## Node labels for pod assignment
 ## ref: https://kubernetes.io/docs/user-guide/node-selection/
