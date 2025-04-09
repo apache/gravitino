@@ -577,7 +577,7 @@ tasks.cyclonedxBom {
 }
 
 jacoco {
-  toolVersion = "0.8.10"
+  toolVersion = "0.8.1"
   reportsDirectory.set(layout.buildDirectory.dir("JacocoReport"))
 }
 
