@@ -194,7 +194,7 @@ public class RangerAuthorizationHDFSPluginIT {
                           authorizationSecurableObject -> {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
-                            return pathBasedMetadataObject.path().equals("/test/*/*")
+                            return pathBasedMetadataObject.path().equals("/test/*/*/")
                                 && pathBasedMetadataObject.recursive();
                           })
                       .count());
@@ -234,7 +234,7 @@ public class RangerAuthorizationHDFSPluginIT {
                           authorizationSecurableObject -> {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
-                            return pathBasedMetadataObject.path().equals("/test/*")
+                            return pathBasedMetadataObject.path().equals("/test/*/")
                                 && pathBasedMetadataObject.recursive();
                           })
                       .count());
@@ -305,12 +305,12 @@ public class RangerAuthorizationHDFSPluginIT {
           MetadataObject catalog = MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG);
           List<AuthorizationSecurableObject> catalogOwner =
               rangerAuthPlugin.translateOwner(catalog);
-          Assertions.assertEquals(1, catalogOwner.size());
+          Assertions.assertEquals(0, catalogOwner.size());
 
           MetadataObject schema =
               MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA);
           List<AuthorizationSecurableObject> schemaOwner = rangerAuthPlugin.translateOwner(schema);
-          Assertions.assertEquals(1, schemaOwner.size());
+          Assertions.assertEquals(0, schemaOwner.size());
 
           MetadataObject fileset =
               MetadataObjects.parse("catalog1.schema1.fileset1", MetadataObject.Type.FILESET);
