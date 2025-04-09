@@ -24,6 +24,7 @@ import io.openlineage.server.OpenLineage.Run;
 import io.openlineage.server.OpenLineage.RunEvent;
 
 public class Utils {
+  private Utils() {}
 
   public static String getRunID(RunEvent event) {
     Run run = event.getRun();

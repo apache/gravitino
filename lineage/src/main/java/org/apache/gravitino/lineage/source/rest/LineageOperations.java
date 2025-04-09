@@ -52,7 +52,7 @@ public class LineageOperations {
   @Produces("application/json")
   @Timed(name = "update-lineage." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-lineage", absolute = true)
-  public Response updateLineage(OpenLineage.RunEvent event) {
+  public Response postLineage(OpenLineage.RunEvent event) {
     LOG.info(
         "Open lineage event, run id:{}, job name:{}",
         org.apache.gravitino.lineage.Utils.getRunID(event),
