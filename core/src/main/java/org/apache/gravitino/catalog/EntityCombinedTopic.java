@@ -56,6 +56,10 @@ public class EntityCombinedTopic implements Topic {
     return topicEntity;
   }
 
+  public Topic topic() {
+    return topic;
+  }
+
   public static EntityCombinedTopic of(Topic topic, TopicEntity topicEntity) {
     return new EntityCombinedTopic(topic, topicEntity);
   }
