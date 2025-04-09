@@ -15,31 +15,20 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization.expression;
+package org.apache.gravitino.converter;
 
-import java.util.Map;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 
-/** Authorization through expressions. */
-public class AuthorizationExpressionExecutor {
-
-  /**
-   * Use {@link AuthorizationExpressionConverter} to convert the authorization expression into an
-   * OGNL expression, and then call {@link GravitinoAuthorizer} to perform permission verification.
-   *
-   * @param expression authorization expression
-   */
-  public AuthorizationExpressionExecutor(String expression) {}
+/** Persist and instantiate the MetadataIdConverter */
+public class MetadataIdConverterFactory {
 
   /**
-   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of resource
-   * IDs.
+   * Retrieve the corresponding MetadataIdConverter based on the metadata type.
    *
-   * @param resourceIds key-metadata type, value-resource id
-   * @return authorization result
+   * @param metadataType metadata‘s type
+   * @return MetadataIdConverter
    */
-  public boolean authorize(Map<MetadataObject.Type, Long> resourceIds) {
-    return false;
+  public static MetadataIdConverter createConverter(MetadataObject.Type metadataType) {
+    return null;
   }
 }
