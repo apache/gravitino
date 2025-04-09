@@ -50,7 +50,6 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
-    ImmutableMap.copyOf()
     Preconditions.checkArgument(properties != null, "Jdbc Catalog properties should not be null");
     HashMap<String, String> jdbcProperties = new HashMap<>();
     properties.forEach(
