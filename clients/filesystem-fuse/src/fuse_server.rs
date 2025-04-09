@@ -19,12 +19,12 @@
 use crate::utils::GvfsResult;
 use fuse3::raw::{Filesystem, Session};
 use fuse3::MountOptions;
-use log::{error, info};
 use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
 use tokio::select;
 use tokio::sync::Notify;
+use tracing::{error, info};
 
 /// Represents a FUSE server capable of starting and stopping the FUSE filesystem.
 pub struct FuseServer {

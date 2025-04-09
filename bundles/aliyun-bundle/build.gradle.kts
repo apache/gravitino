@@ -39,6 +39,10 @@ tasks.withType(ShadowJar::class.java) {
   archiveClassifier.set("")
   mergeServiceFiles()
 
+  dependencies {
+    exclude(dependency("org.slf4j:slf4j-api"))
+  }
+
   // Relocate dependencies to avoid conflicts
   relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
   relocate("org.apache.commons.lang3", "org.apache.gravitino.aliyun.shaded.org.apache.commons.lang3")

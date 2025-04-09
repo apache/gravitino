@@ -40,6 +40,9 @@ public interface ModelMetaMapper {
   @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "listModelPOsBySchemaId")
   List<ModelPO> listModelPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "listModelPOsByModelIds")
+  List<ModelPO> listModelPOsByModelIds(@Param("modelIds") List<Long> modelIds);
+
   @SelectProvider(
       type = ModelMetaSQLProviderFactory.class,
       method = "selectModelMetaBySchemaIdAndModelName")
@@ -84,4 +87,8 @@ public interface ModelMetaMapper {
 
   @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelLatestVersion")
   Integer updateModelLatestVersion(@Param("modelId") Long modelId);
+
+  @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelMeta")
+  Integer updateModelMeta(
+      @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO);
 }

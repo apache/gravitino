@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
-import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 
@@ -100,7 +99,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
     // Check the catalog properties.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(hiveMetastoreUri, properties.get(IcebergConstants.URI));
+    Assertions.assertEquals(getUri(), properties.get(IcebergConstants.URI));
 
     // Get the created catalog.
     Optional<org.apache.flink.table.catalog.Catalog> catalog = tableEnv.getCatalog(catalogName);
@@ -153,14 +152,14 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
             catalogName,
             GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
             getCatalogBackend(),
-            hiveMetastoreUri,
+            getUri(),
             warehouse));
     Assertions.assertTrue(metalake.catalogExists(catalogName));
 
     // Check the properties of the created catalog.
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
-    Assertions.assertEquals(hiveMetastoreUri, properties.get(IcebergConstants.URI));
+    Assertions.assertEquals(getUri(), properties.get(IcebergConstants.URI));
 
     // Get the created catalog.
     Optional<org.apache.flink.table.catalog.Catalog> catalog = tableEnv.getCatalog(catalogName);
@@ -499,4 +498,6 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
   }
 
   protected abstract String getCatalogBackend();
+
+  protected abstract String getUri();
 }

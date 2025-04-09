@@ -22,6 +22,8 @@ package org.apache.gravitino.spark.connector.iceberg;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -58,6 +60,16 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    String jdbcDriver = properties.get(IcebergConstants.GRAVITINO_JDBC_DRIVER);
+    if (StringUtils.isNotBlank(jdbcDriver)) {
+      // If `spark.sql.hive.metastore.jars` is set, Spark will use an isolated client class loader
+      // to load JDBC drivers, which makes Iceberg could not find corresponding JDBC driver.
+      try {
+        Class.forName(jdbcDriver);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
     String catalogBackendName = IcebergPropertiesUtils.getCatalogBackendName(properties);
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);

@@ -21,15 +21,18 @@ package org.apache.gravitino.authorization.ranger;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.sun.jersey.api.client.ClientResponse;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationMetadataObject;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
@@ -43,6 +46,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.common.ErrorMessages;
 import org.apache.gravitino.authorization.common.RangerAuthorizationProperties;
 import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
@@ -56,6 +60,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerService;
 import org.apache.ranger.plugin.util.GrantRevokeRoleRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +79,8 @@ import org.slf4j.LoggerFactory;
 public abstract class RangerAuthorizationPlugin
     implements AuthorizationPlugin, AuthorizationPrivilegesMappingProvider {
   private static final Logger LOG = LoggerFactory.getLogger(RangerAuthorizationPlugin.class);
+  protected static final String HDFS_SERVICE_TYPE = "hdfs";
+  protected static final String HADOOP_SQL_SERVICE_TYPE = "hive";
 
   protected String metalake;
   protected final String rangerServiceName;
@@ -87,12 +94,18 @@ public abstract class RangerAuthorizationPlugin
         new RangerAuthorizationProperties(config);
     rangerAuthorizationProperties.validate();
     String rangerUrl = config.get(RangerAuthorizationProperties.RANGER_ADMIN_URL);
+
     String authType = config.get(RangerAuthorizationProperties.RANGER_AUTH_TYPE);
+
     rangerAdminName = config.get(RangerAuthorizationProperties.RANGER_USERNAME);
+
     // Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
+
     rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
+
+    createRangerServiceIfNecessary(config, rangerServiceName);
 
     rangerHelper =
         new RangerHelper(
@@ -561,8 +574,7 @@ public abstract class RangerAuthorizationPlugin
         break;
       default:
         throw new AuthorizationPluginException(
-            "The owner privilege is not supported for the securable object: %s",
-            metadataObject.type());
+            ErrorMessages.OWNER_PRIVILEGE_NOT_SUPPORTED, metadataObject.type());
     }
 
     return Boolean.TRUE;
@@ -712,35 +724,40 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public Boolean onUserAdded(User user) throws AuthorizationPluginException {
-    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
-    if (list.getListSize() > 0) {
-      LOG.warn("The user({}) already exists in the Ranger!", user.name());
-      return Boolean.FALSE;
-    }
-
-    VXUser rangerUser = VXUser.builder().withName(user.name()).withDescription(user.name()).build();
-    return rangerClient.createUser(rangerUser);
+    return getUserId(user.name())
+        .map(
+            id -> {
+              LOG.warn("The user({}) already exists in the Ranger!", user.name());
+              return Boolean.FALSE;
+            })
+        .orElseGet(
+            () -> {
+              VXUser rangerUser =
+                  VXUser.builder().withName(user.name()).withDescription(user.name()).build();
+              return rangerClient.createUser(rangerUser);
+            });
   }
 
   @Override
   public Boolean onUserRemoved(User user) throws AuthorizationPluginException {
-    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
-    if (list.getListSize() == 0) {
-      LOG.warn("The user({}) doesn't exist in the Ranger!", user);
-      return Boolean.FALSE;
-    }
-    rangerClient.deleteUser(list.getList().get(0).getId());
-    return Boolean.TRUE;
+    return getUserId(user.name())
+        .map(id -> rangerClient.deleteUser(id))
+        .orElseGet(
+            () -> {
+              LOG.warn("The user({}) doesn't exist in the Ranger!", user.name());
+              return Boolean.FALSE;
+            });
   }
 
   @Override
   public Boolean onUserAcquired(User user) throws AuthorizationPluginException {
-    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", user.name()));
-    if (list.getListSize() == 0) {
-      LOG.warn("The user({}) doesn't exist in the Ranger!", user);
-      return Boolean.FALSE;
-    }
-    return Boolean.TRUE;
+    return getUserId(user.name())
+        .map(id -> Boolean.TRUE)
+        .orElseGet(
+            () -> {
+              LOG.warn("The user({}) doesn't exist in the Ranger!", user);
+              return Boolean.FALSE;
+            });
   }
 
   @Override
@@ -751,22 +768,53 @@ public abstract class RangerAuthorizationPlugin
 
   @Override
   public Boolean onGroupRemoved(Group group) throws AuthorizationPluginException {
-    VXGroupList list = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
-    if (list.getListSize() == 0) {
-      LOG.warn("The group({}) doesn't exist in the Ranger!", group);
-      return Boolean.FALSE;
-    }
-    return rangerClient.deleteGroup(list.getList().get(0).getId());
+    Optional<Long> groupId = getGroupId(group.name());
+    return groupId
+        .map(id -> rangerClient.deleteGroup(id))
+        .orElseGet(
+            () -> {
+              LOG.warn("The group({}) doesn't exist in the Ranger!", group.name());
+              return Boolean.FALSE;
+            });
   }
 
   @Override
   public Boolean onGroupAcquired(Group group) {
-    VXGroupList vxGroupList = rangerClient.searchGroup(ImmutableMap.of("name", group.name()));
-    if (vxGroupList.getListSize() == 0) {
+    if (!getGroupId(group.name()).isPresent()) {
       LOG.warn("The group({}) doesn't exist in the Ranger!", group);
       return Boolean.FALSE;
     }
     return Boolean.TRUE;
+  }
+
+  private void createRangerServiceIfNecessary(Map<String, String> config, String serviceName) {
+    try {
+      rangerClient.getService(serviceName);
+    } catch (RangerServiceException rse) {
+      if (Boolean.parseBoolean(
+              config.get(RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT))
+          && ClientResponse.Status.NOT_FOUND.equals(rse.getStatus())) {
+        try {
+          RangerService rangerService = new RangerService();
+          rangerService.setType(getServiceType());
+          rangerService.setName(serviceName);
+          rangerService.setConfigs(getServiceConfigs(config));
+          rangerClient.createService(rangerService);
+          // We should remove some default policies, they will cause users to get more policies
+          // than they should do.
+          List<RangerPolicy> policies = rangerClient.getPoliciesInService(serviceName);
+          for (RangerPolicy policy : policies) {
+            rangerClient.deletePolicy(policy.getId());
+          }
+        } catch (RangerServiceException crse) {
+          throw new AuthorizationPluginException(
+              "Fail to create ranger service %s, exception: %s", serviceName, crse.getMessage());
+        }
+      } else {
+        throw new AuthorizationPluginException(
+            "Fail to get ranger service name %s, exception: %s", serviceName, rse.getMessage());
+      }
+    }
   }
 
   /**
@@ -959,15 +1007,28 @@ public abstract class RangerAuthorizationPlugin
     }
   }
 
+  protected String getConfValue(Map<String, String> conf, String key, String defaultValue) {
+    if (conf.containsKey(key)) {
+      return conf.get(key);
+    }
+    return defaultValue;
+  }
+
+  protected abstract String getServiceType();
+
+  protected abstract Map<String, String> getServiceConfigs(Map<String, String> config);
+
+  protected int getPrefixLength() {
+    // We should consider `.`. We need to add 1
+    return RangerAuthorizationProperties.RANGER_PREFIX.length() + 1;
+  }
+
   @Override
   public void close() throws IOException {}
 
   /** Generate authorization securable object */
   public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      List<String> names,
-      String path,
-      AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges);
+      AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges);
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()
@@ -987,5 +1048,32 @@ public abstract class RangerAuthorizationPlugin
                       });
               return match.get();
             });
+  }
+
+  private Optional<Long> getUserId(String name) {
+    VXUserList list = rangerClient.searchUser(ImmutableMap.of("name", name));
+    if (list.getListSize() > 0) {
+      for (VXUser vxUser : list.getList()) {
+        if (vxUser.getName().equals(name)) {
+          return Optional.of(vxUser.getId());
+        }
+      }
+    }
+    return Optional.empty();
+  }
+
+  private Optional<Long> getGroupId(String name) {
+    VXGroupList vxGroupList = rangerClient.searchGroup(ImmutableMap.of("name", name));
+    try {
+      for (VXGroup group : vxGroupList.getList()) {
+        String value = (String) FieldUtils.readField(group, "name", true);
+        if (name.equals(value)) {
+          return Optional.of(group.getId());
+        }
+      }
+    } catch (Exception e) {
+      throw new AuthorizationPluginException("Fail to get the field name of class VXGroup");
+    }
+    return Optional.empty();
   }
 }

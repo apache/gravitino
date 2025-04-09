@@ -51,6 +51,7 @@ import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.MetalakeHookDispatcher;
+import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
@@ -59,11 +60,13 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
 import org.apache.gravitino.listener.MetalakeEventDispatcher;
+import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
+import org.apache.gravitino.listener.api.event.AccessControlEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metalake.MetalakeManager;
@@ -93,6 +96,8 @@ public class GravitinoEnv {
   private CatalogDispatcher catalogDispatcher;
 
   private CatalogManager catalogManager;
+
+  private MetalakeManager metalakeManager;
 
   private SchemaDispatcher schemaDispatcher;
 
@@ -390,6 +395,10 @@ public class GravitinoEnv {
       eventListenerManager.stop();
     }
 
+    if (metalakeManager != null) {
+      metalakeManager.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
@@ -414,10 +423,13 @@ public class GravitinoEnv {
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
 
+    // Tree lock
+    this.lockManager = new LockManager(config);
+
     // Create and initialize metalake related modules, the operation chain is:
     // MetalakeEventDispatcher -> MetalakeNormalizeDispatcher -> MetalakeHookDispatcher ->
     // MetalakeManager
-    MetalakeDispatcher metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
     MetalakeHookDispatcher metalakeHookDispatcher = new MetalakeHookDispatcher(metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeHookDispatcher);
@@ -472,21 +484,22 @@ public class GravitinoEnv {
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
-    // TODO(jerryshao). Add Hook and event dispatcher support for Model.
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
+    ModelHookDispatcher modelHookDispatcher = new ModelHookDispatcher(modelOperationDispatcher);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
-        new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
-    this.modelDispatcher = modelNormalizeDispatcher;
+        new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
+    this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
+      AccessControlManager accessControlManager =
+          new AccessControlManager(entityStore, idGenerator, config);
       AccessControlHookDispatcher accessControlHookDispatcher =
-          new AccessControlHookDispatcher(
-              new AccessControlManager(entityStore, idGenerator, config));
-
-      this.accessControlDispatcher = accessControlHookDispatcher;
+          new AccessControlHookDispatcher(accessControlManager);
+      this.accessControlDispatcher =
+          new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
       this.ownerManager = new OwnerManager(entityStore);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
@@ -497,9 +510,6 @@ public class GravitinoEnv {
 
     this.auxServiceManager = new AuxiliaryServiceManager();
     this.auxServiceManager.serviceInit(config);
-
-    // Tree lock
-    this.lockManager = new LockManager(config);
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));

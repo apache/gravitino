@@ -20,10 +20,12 @@ package org.apache.gravtitino.catalog.model;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
@@ -65,6 +67,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -106,6 +109,8 @@ public class TestModelCatalogOperations {
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
 
     when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
@@ -650,6 +655,38 @@ public class TestModelCatalogOperations {
 
     // Test list model versions after deletion
     Assertions.assertThrows(NoSuchModelException.class, () -> ops.listModelVersions(modelIdent));
+  }
+
+  @Test
+  public void testRename() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model";
+    String newModelName = "new_model";
+    String comment = "comment";
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
+
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
+
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
+
+    ModelChange change = ModelChange.rename(newModelName);
+    Model alteredModel = ops.alterModel(modelIdent, change);
+
+    Assertions.assertEquals(newModelName, alteredModel.name());
+    Assertions.assertEquals(comment, alteredModel.comment());
+    Assertions.assertEquals(properties, alteredModel.properties());
   }
 
   private String randomSchemaName() {

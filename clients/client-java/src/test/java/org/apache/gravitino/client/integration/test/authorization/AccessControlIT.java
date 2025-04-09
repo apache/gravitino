@@ -74,11 +74,20 @@ public class AccessControlIT extends BaseIT {
     Catalog filesetCatalog =
         metalake.createCatalog(
             "fileset_catalog", Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
+
+    Catalog modelCatalog =
+        metalake.createCatalog(
+            "model_catalog", Catalog.Type.MODEL, "comment", Collections.emptyMap());
+
     NameIdentifier fileIdent = NameIdentifier.of("fileset_schema", "fileset");
     filesetCatalog.asSchemas().createSchema("fileset_schema", "comment", Collections.emptyMap());
     filesetCatalog
         .asFilesetCatalog()
         .createFileset(fileIdent, "comment", Fileset.Type.EXTERNAL, "tmp", Collections.emptyMap());
+
+    NameIdentifier modelIdent = NameIdentifier.of("model_schema", "model");
+    modelCatalog.asSchemas().createSchema("model_schema", "comment", Collections.emptyMap());
+    modelCatalog.asModelCatalog().registerModel(modelIdent, "comment", Collections.emptyMap());
   }
 
   @Test
@@ -218,6 +227,75 @@ public class AccessControlIT extends BaseIT {
     Assertions.assertEquals(createdPrivilege.name(), Privilege.Name.CREATE_CATALOG);
     Assertions.assertEquals(createdPrivilege.condition(), Privilege.Condition.ALLOW);
 
+    // Test a metalake object with model privileges
+    SecurableObject metalakeObjectWithModelPrivs =
+        SecurableObjects.ofMetalake(
+            metalakeName,
+            Lists.newArrayList(
+                Privileges.CreateModel.allow(),
+                Privileges.CreateModelVersion.allow(),
+                Privileges.UseModel.allow()));
+
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(metalakeObjectWithModelPrivs));
+
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject catalogObjectWithModelPrivs =
+        SecurableObjects.ofCatalog(
+            "model_catalog",
+            Lists.newArrayList(
+                Privileges.CreateModel.allow(),
+                Privileges.CreateModelVersion.allow(),
+                Privileges.UseModel.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(catalogObjectWithModelPrivs));
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject schemaObjectWithModelPrivs =
+        SecurableObjects.ofSchema(
+            catalogObjectWithModelPrivs,
+            "model_schema",
+            Lists.newArrayList(
+                Privileges.CreateModel.allow(),
+                Privileges.CreateModelVersion.allow(),
+                Privileges.UseModel.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(schemaObjectWithModelPrivs));
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject modelObjectWithCorrectPriv =
+        SecurableObjects.ofModel(
+            schemaObjectWithModelPrivs,
+            "model",
+            Lists.newArrayList(Privileges.CreateModelVersion.allow(), Privileges.UseModel.allow()));
+    role =
+        metalake.createRole(
+            "model_name", properties, Lists.newArrayList(modelObjectWithCorrectPriv));
+    Assertions.assertEquals("model_name", role.name());
+    Assertions.assertEquals(properties, role.properties());
+    metalake.deleteRole("model_name");
+
+    SecurableObject modelObjectWithWrongPriv =
+        SecurableObjects.ofModel(
+            schemaObjectWithModelPrivs,
+            "model",
+            Lists.newArrayList(Privileges.CreateModel.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                "model_name", properties, Lists.newArrayList(modelObjectWithWrongPriv)));
+
     // Test a not-existed metadata object
     SecurableObject catalogObject =
         SecurableObjects.ofCatalog(
@@ -256,6 +334,16 @@ public class AccessControlIT extends BaseIT {
         IllegalArgumentException.class,
         () ->
             metalake.createRole("not-existed", properties, Lists.newArrayList(wrongCatalogObject)));
+
+    // Create a role with wrong model privilege
+    SecurableObject wrongCatalogObject2 =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog", Lists.newArrayList(Privileges.CreateModel.allow()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metalake.createRole(
+                "not-existed", properties, Lists.newArrayList(wrongCatalogObject2)));
 
     // Create a role with duplicated privilege
     SecurableObject duplicatedCatalogObject =
@@ -577,5 +665,48 @@ public class AccessControlIT extends BaseIT {
             actualPrivileges.get(priIndex).condition(), actualPrivileges.get(priIndex).condition());
       }
     }
+  }
+
+  @Test
+  void testRevokeRolePermissions() {
+    String roleName = "role#124";
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("k1", "v1");
+    metalake.createRole(roleName, properties, Lists.newArrayList());
+
+    MetadataObject metadataObject =
+        MetadataObjects.of("fileset_catalog", "fileset_schema", MetadataObject.Type.SCHEMA);
+
+    // Multiple privileges (CreateFileset、ReadFileset、WriteFileset) are granted
+    // to the role here to better find errors, see (#6682).
+    Role role =
+        metalake.grantPrivilegesToRole(
+            roleName,
+            metadataObject,
+            Sets.newHashSet(
+                Privileges.CreateFileset.allow(),
+                Privileges.ReadFileset.allow(),
+                Privileges.WriteFileset.allow()));
+    Assertions.assertEquals(1, role.securableObjects().size());
+
+    // Then revoke
+    Role revokedRole =
+        metalake.revokePrivilegesFromRole(
+            roleName,
+            metadataObject,
+            Sets.newHashSet(
+                Privileges.CreateFileset.allow(),
+                Privileges.ReadFileset.allow(),
+                Privileges.WriteFileset.allow()));
+
+    // Confirm the return data has no securable objects.
+    Assertions.assertEquals(0, revokedRole.securableObjects().size());
+
+    // Confirm the role securable objects in memory has been actually soft deleted.
+    Role newRole = metalake.getRole(roleName);
+    Assertions.assertEquals(0, newRole.securableObjects().size());
+
+    // Cleanup.
+    metalake.deleteRole(roleName);
   }
 }

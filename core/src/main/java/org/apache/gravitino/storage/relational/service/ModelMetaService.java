@@ -19,12 +19,17 @@
 
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -32,6 +37,9 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -98,8 +106,10 @@ public class ModelMetaService {
     NameIdentifierUtil.checkModel(ident);
 
     Long schemaId;
+    Long modelId;
     try {
       schemaId = CommonMetaService.getInstance().getParentEntityIdByNamespace(ident.namespace());
+      modelId = getModelIdBySchemaIdAndModelName(schemaId, ident.name());
     } catch (NoSuchEntityException e) {
       LOG.warn("Failed to delete model: {}", ident, e);
       return false;
@@ -128,7 +138,25 @@ public class ModelMetaService {
                 SessionUtils.doWithoutCommitAndFetchResult(
                     ModelMetaMapper.class,
                     mapper ->
-                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))));
+                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        modelId, MetadataObject.Type.MODEL.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        modelId, MetadataObject.Type.MODEL.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                        modelId, MetadataObject.Type.MODEL.name())));
 
     return modelDeletedCount.get() > 0;
   }
@@ -195,5 +223,39 @@ public class ModelMetaService {
           ident.toString());
     }
     return modelPO;
+  }
+
+  public <E extends Entity & HasIdentifier> ModelEntity updateModel(
+      NameIdentifier identifier, Function<E, E> updater) throws IOException {
+    NameIdentifierUtil.checkModel(identifier);
+
+    ModelPO oldModelPO = getModelPOByIdentifier(identifier);
+    ModelEntity oldModelEntity = POConverters.fromModelPO(oldModelPO, identifier.namespace());
+    ModelEntity newEntity = (ModelEntity) updater.apply((E) oldModelEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldModelEntity.id(), newEntity.id()),
+        "The updated model entity id: %s should be same with the table entity id before: %s",
+        newEntity.id(),
+        oldModelEntity.id());
+
+    Integer updateResult;
+    try {
+      updateResult =
+          SessionUtils.doWithCommitAndFetchResult(
+              ModelMetaMapper.class,
+              mapper ->
+                  mapper.updateModelMeta(
+                      POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
+      throw re;
+    }
+
+    if (updateResult > 0) {
+      return newEntity;
+    } else {
+      throw new IOException("Failed to update the entity: " + identifier);
+    }
   }
 }

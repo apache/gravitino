@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.hive.HiveConstants.IMPERSONATION_ENAB
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
@@ -35,6 +36,7 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.kyuubi.plugin.spark.authz.AccessControlException;
+import org.apache.ranger.plugin.model.RangerService;
 import org.apache.spark.SparkUnsupportedOperationException;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.SparkSession;
@@ -133,35 +135,35 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void checkUpdateSQLWithReadWritePrivileges() {
+  protected void checkUpdateSQLWithSelectModifyPrivileges() {
     Assertions.assertThrows(
         SparkUnsupportedOperationException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkUpdateSQLWithReadPrivileges() {
+  protected void checkUpdateSQLWithSelectPrivileges() {
     Assertions.assertThrows(
         SparkUnsupportedOperationException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkUpdateSQLWithWritePrivileges() {
+  protected void checkUpdateSQLWithModifyPrivileges() {
     Assertions.assertThrows(
         SparkUnsupportedOperationException.class, () -> sparkSession.sql(SQL_UPDATE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithReadWritePrivileges() {
+  protected void checkDeleteSQLWithSelectModifyPrivileges() {
     Assertions.assertThrows(AnalysisException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithReadPrivileges() {
+  protected void checkDeleteSQLWithSelectPrivileges() {
     Assertions.assertThrows(AnalysisException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
   @Override
-  protected void checkDeleteSQLWithWritePrivileges() {
+  protected void checkDeleteSQLWithModifyPrivileges() {
     Assertions.assertThrows(AnalysisException.class, () -> sparkSession.sql(SQL_DELETE_TABLE));
   }
 
@@ -196,6 +198,84 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
     catalog = metalake.loadCatalog(catalogName);
     LOG.info("Catalog created: {}", catalog);
+
+    // Test to create catalog automatically
+    Map<String, String> uuidProperties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_NAME,
+            "test555",
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true");
+
+    try {
+      List<RangerService> serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
+      int expectServiceCount = serviceList.size() + 1;
+      Catalog catalogTest =
+          metalake.createCatalog(
+              "test", Catalog.Type.RELATIONAL, provider, "comment", uuidProperties);
+      Map<String, String> newProperties = catalogTest.properties();
+      Assertions.assertTrue(newProperties.containsKey("authorization.ranger.service.name"));
+      serviceList = RangerITEnv.rangerClient.findServices(Maps.newHashMap());
+      Assertions.assertEquals(expectServiceCount, serviceList.size());
+      metalake.dropCatalog("test", true);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    // Test to create a catalog with wrong properties which lacks Ranger service name,
+    // It will throw RuntimeException with message that Ranger service name is required.
+    Map<String, String> wrongProperties =
+        ImmutableMap.of(
+            HiveConstants.METASTORE_URIS,
+            HIVE_METASTORE_URIS,
+            IMPERSONATION_ENABLE,
+            "true",
+            AUTHORIZATION_PROVIDER,
+            "ranger",
+            RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
+            "HadoopSQL",
+            RangerAuthorizationProperties.RANGER_ADMIN_URL,
+            RangerITEnv.RANGER_ADMIN_URL,
+            RangerAuthorizationProperties.RANGER_AUTH_TYPE,
+            RangerContainer.authType,
+            RangerAuthorizationProperties.RANGER_USERNAME,
+            RangerContainer.rangerUserName,
+            RangerAuthorizationProperties.RANGER_PASSWORD,
+            RangerContainer.rangerPassword,
+            RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+            "true");
+
+    int catalogSize = metalake.listCatalogs().length;
+    Exception exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                metalake.createCatalog(
+                    "wrongTestProperties",
+                    Catalog.Type.RELATIONAL,
+                    provider,
+                    "comment",
+                    wrongProperties));
+    Assertions.assertTrue(
+        exception.getMessage().contains("authorization.ranger.service.name is required"));
+
+    Assertions.assertEquals(catalogSize, metalake.listCatalogs().length);
   }
 
   protected void checkTableAllPrivilegesExceptForCreating() {

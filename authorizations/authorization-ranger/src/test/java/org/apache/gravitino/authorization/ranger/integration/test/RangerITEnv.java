@@ -84,8 +84,8 @@ public class RangerITEnv {
   public static final String SEARCH_FILTER_COLUMN = SearchFilter.RESOURCE_PREFIX + RESOURCE_COLUMN;
   // Search filter prefix file path constants
   public static final String SEARCH_FILTER_PATH = SearchFilter.RESOURCE_PREFIX + RESOURCE_PATH;
-  public static RangerAuthorizationPlugin rangerAuthHivePlugin;
-  public static RangerAuthorizationPlugin rangerAuthHDFSPlugin;
+  public static RangerAuthorizationHadoopSQLPlugin rangerAuthHivePlugin;
+  public static RangerAuthorizationHDFSPlugin rangerAuthHDFSPlugin;
   protected static RangerHelper rangerHelper;
   protected static RangerHelper rangerHDFSHelper;
   public static String RANGER_ADMIN_URL = null;
@@ -116,7 +116,9 @@ public class RangerITEnv {
                 RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
                 "HadoopSQL",
                 RangerAuthorizationProperties.RANGER_SERVICE_NAME,
-                RangerITEnv.RANGER_HIVE_REPO_NAME));
+                RangerITEnv.RANGER_HIVE_REPO_NAME,
+                RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+                "true"));
 
     RangerAuthorizationHDFSPlugin spyRangerAuthorizationHDFSPlugin =
         Mockito.spy(
@@ -137,7 +139,9 @@ public class RangerITEnv {
                     RangerAuthorizationProperties.RANGER_SERVICE_TYPE,
                     "HDFS",
                     RangerAuthorizationProperties.RANGER_SERVICE_NAME,
-                    RangerITEnv.RANGER_HDFS_REPO_NAME)));
+                    RangerITEnv.RANGER_HDFS_REPO_NAME,
+                    RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
+                    "true")));
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;
 
     rangerHelper =
@@ -158,9 +162,6 @@ public class RangerITEnv {
 
     if (!initRangerService) {
       synchronized (RangerITEnv.class) {
-        // No IP address set, no impact on testing
-        createRangerHdfsRepository("", true);
-        createRangerHiveRepository("", true);
         if (allowAnyoneAccessHDFS) {
           allowAnyoneAccessHDFS();
         }
@@ -296,117 +297,6 @@ public class RangerITEnv {
       Assertions.assertEquals(usernameVal, services.get(0).getConfigs().get(usernameKey));
       Assertions.assertEquals(jdbcVal, services.get(0).getConfigs().get(jdbcKey));
       Assertions.assertEquals(jdbcUrlVal, services.get(0).getConfigs().get(jdbcUrlKey));
-    } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static void createRangerHiveRepository(String hiveIp, boolean cleanAllPolicy) {
-    try {
-      if (null != rangerClient.getService(RANGER_HIVE_REPO_NAME)) {
-        return;
-      }
-    } catch (RangerServiceException e) {
-      LOG.warn("Error while fetching service: {}", e.getMessage());
-    }
-
-    String usernameKey = "username";
-    String usernameVal = "admin";
-    String passwordKey = "password";
-    String passwordVal = "admin";
-    String jdbcKey = "jdbc.driverClassName";
-    String jdbcVal = "org.apache.hive.jdbc.HiveDriver";
-    String jdbcUrlKey = "jdbc.url";
-    String jdbcUrlVal =
-        String.format("jdbc:hive2://%s:%d", hiveIp, HiveContainer.HIVE_SERVICE_PORT);
-
-    RangerService service = new RangerService();
-    service.setType(RANGER_HIVE_TYPE);
-    service.setName(RANGER_HIVE_REPO_NAME);
-    service.setConfigs(
-        ImmutableMap.<String, String>builder()
-            .put(usernameKey, usernameVal)
-            .put(passwordKey, passwordVal)
-            .put(jdbcKey, jdbcVal)
-            .put(jdbcUrlKey, jdbcUrlVal)
-            .build());
-
-    try {
-      RangerService createdService = rangerClient.createService(service);
-      Assertions.assertNotNull(createdService);
-
-      Map<String, String> filter =
-          ImmutableMap.of(SearchFilter.SERVICE_NAME, RANGER_HIVE_REPO_NAME);
-      List<RangerService> services = rangerClient.findServices(filter);
-      Assertions.assertEquals(RANGER_HIVE_TYPE, services.get(0).getType());
-      Assertions.assertEquals(RANGER_HIVE_REPO_NAME, services.get(0).getName());
-      Assertions.assertEquals(usernameVal, services.get(0).getConfigs().get(usernameKey));
-      Assertions.assertEquals(jdbcVal, services.get(0).getConfigs().get(jdbcKey));
-      Assertions.assertEquals(jdbcUrlVal, services.get(0).getConfigs().get(jdbcUrlKey));
-
-      if (cleanAllPolicy) {
-        cleanAllPolicy(RANGER_HIVE_REPO_NAME);
-      }
-    } catch (RangerServiceException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  public static void createRangerHdfsRepository(String hdfsIp, boolean cleanAllPolicy) {
-    try {
-      if (null != rangerClient.getService(RANGER_HDFS_REPO_NAME)) {
-        return;
-      }
-    } catch (RangerServiceException e) {
-      LOG.warn("Error while fetching service: {}", e.getMessage());
-    }
-
-    String usernameKey = "username";
-    String usernameVal = "admin";
-    String passwordKey = "password";
-    String passwordVal = "admin";
-    String authenticationKey = "hadoop.security.authentication";
-    String authenticationVal = "simple";
-    String protectionKey = "hadoop.rpc.protection";
-    String protectionVal = "authentication";
-    String authorizationKey = "hadoop.security.authorization";
-    String authorizationVal = "false";
-    String fsDefaultNameKey = "fs.default.name";
-    String fsDefaultNameVal =
-        String.format("hdfs://%s:%d", hdfsIp, HiveContainer.HDFS_DEFAULTFS_PORT);
-
-    RangerService service = new RangerService();
-    service.setType(RANGER_HDFS_TYPE);
-    service.setName(RANGER_HDFS_REPO_NAME);
-    service.setConfigs(
-        ImmutableMap.<String, String>builder()
-            .put(usernameKey, usernameVal)
-            .put(passwordKey, passwordVal)
-            .put(authenticationKey, authenticationVal)
-            .put(protectionKey, protectionVal)
-            .put(authorizationKey, authorizationVal)
-            .put(fsDefaultNameKey, fsDefaultNameVal)
-            .build());
-
-    try {
-      RangerService createdService = rangerClient.createService(service);
-      Assertions.assertNotNull(createdService);
-
-      Map<String, String> filter =
-          ImmutableMap.of(SearchFilter.SERVICE_NAME, RANGER_HDFS_REPO_NAME);
-      List<RangerService> services = rangerClient.findServices(filter);
-      Assertions.assertEquals(RANGER_HDFS_TYPE, services.get(0).getType());
-      Assertions.assertEquals(RANGER_HDFS_REPO_NAME, services.get(0).getName());
-      Assertions.assertEquals(usernameVal, services.get(0).getConfigs().get(usernameKey));
-      Assertions.assertEquals(
-          authenticationVal, services.get(0).getConfigs().get(authenticationKey));
-      Assertions.assertEquals(protectionVal, services.get(0).getConfigs().get(protectionKey));
-      Assertions.assertEquals(authorizationVal, services.get(0).getConfigs().get(authorizationKey));
-      Assertions.assertEquals(fsDefaultNameVal, services.get(0).getConfigs().get(fsDefaultNameKey));
-
-      if (cleanAllPolicy) {
-        cleanAllPolicy(RANGER_HDFS_REPO_NAME);
-      }
     } catch (RangerServiceException e) {
       throw new RuntimeException(e);
     }

@@ -202,11 +202,11 @@ and `USE_SCHEMA` privileges on its parent schema.
 
 ### Table privileges
 
-| Name         | Supports Securable Object         | Operation                                        |
-|--------------|-----------------------------------|--------------------------------------------------|
-| CREATE_TABLE | Metalake, Catalog, Schema         | Create a table                                   |
-| MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Write data to a table or modify the table schema |
-| SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                         |
+| Name         | Supports Securable Object         | Operation                                                                 |
+|--------------|-----------------------------------|---------------------------------------------------------------------------|
+| CREATE_TABLE | Metalake, Catalog, Schema         | Create a table                                                            |
+| MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Select data from a data, write data to a table or modify the table schema |
+| SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
 ### Topic privileges
 
@@ -223,6 +223,14 @@ and `USE_SCHEMA` privileges on its parent schema.
 | CREATE_FILESET | Metalake, Catalog, Schema          | Create a fileset                            |
 | WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Write a fileset (including alter a fileset) |
 | READ_FILESET   | Metalake, Catalog, Schema, Fileset | read a fileset                              |
+
+### Model privileges
+
+| Name                 | Supports Securable Object        | Operation                                                          |
+|----------------------|----------------------------------|--------------------------------------------------------------------|
+| CREATE_MODEL         | Metalake, Catalog, Schema        | Create a model                                                     |
+| CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Create a model version                                             |
+| USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions |
 
 ## Inheritance Model
 

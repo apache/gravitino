@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelMetaBaseSQLProvider;
@@ -62,6 +63,10 @@ public class ModelMetaSQLProviderFactory {
     return getProvider().listModelPOsBySchemaId(schemaId);
   }
 
+  public static String listModelPOsByModelIds(@Param("modelIds") List<Long> modelIds) {
+    return getProvider().listModelPOsByModelIds(modelIds);
+  }
+
   public static String selectModelMetaBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return getProvider().selectModelMetaBySchemaIdAndModelName(schemaId, modelName);
@@ -100,5 +105,10 @@ public class ModelMetaSQLProviderFactory {
 
   public static String updateModelLatestVersion(@Param("modelId") Long modelId) {
     return getProvider().updateModelLatestVersion(modelId);
+  }
+
+  public static String updateModelMeta(
+      @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
+    return getProvider().updateModelMeta(newModelPO, oldModelPO);
   }
 }

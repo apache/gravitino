@@ -221,14 +221,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   IllegalArgumentException.class);
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
-          // Case 1: The table is not created by Gravitino.
-          if (stringId == null) {
+          // Case 1: The table is not created by Gravitino and this table is never imported.
+          if (stringId == null && !isEntityExist(ident, TABLE)) {
             return EntityCombinedTable.of(alteredTable)
                 .withHiddenProperties(
                     getHiddenPropertyNames(
                         getCatalogIdentifier(ident),
                         HasPropertyMetadata::tablePropertiesMetadata,
                         alteredTable.properties()));
+          }
+
+          long tableId;
+          if (stringId != null) {
+            tableId = stringId.id();
+          } else {
+            tableId = getEntity(ident, TABLE, TableEntity.class).id();
           }
 
           TableEntity updatedTableEntity =
@@ -266,7 +273,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .build();
                           }),
                   "UPDATE",
-                  stringId.id());
+                  tableId);
 
           return EntityCombinedTable.of(alteredTable, updatedTableEntity)
               .withHiddenProperties(

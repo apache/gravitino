@@ -23,14 +23,18 @@ use clap::Parser;
 use daemonize::Daemonize;
 use gvfs_fuse::config::AppConfig;
 use gvfs_fuse::{gvfs_mount, gvfs_unmount, LOG_FILE_NAME, PID_FILE_NAME};
-use log::{error, info};
 use std::fs::{create_dir, OpenOptions};
-use std::io;
 use std::path::Path;
 use std::process::Command;
+use std::{env, io};
 use tokio::runtime::Runtime;
 use tokio::signal;
 use tokio::signal::unix::{signal, SignalKind};
+use tracing::level_filters::LevelFilter;
+use tracing::{error, info};
+use tracing_subscriber::fmt::Layer;
+use tracing_subscriber::layer::Layered;
+use tracing_subscriber::{filter, fmt, prelude::*, reload, EnvFilter, Registry};
 
 fn init_dirs(config: &mut AppConfig, mount_point: &str) -> io::Result<()> {
     let data_dir_name = Path::new(&config.fuse.data_dir).to_path_buf();
@@ -165,15 +169,36 @@ fn do_umount(_mp: &str, _force: bool) -> std::io::Result<()> {
     ))
 }
 
+/// init tracing subscriber with directives, and returns reload handle to allow us to modify filter dynamically.
+fn init_tracing_subscriber(
+    directives: &str,
+) -> reload::Handle<EnvFilter, Layered<Layer<Registry>, Registry>> {
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .parse(directives)
+        .unwrap();
+
+    let (filter, reload_handle) = reload::Layer::new(env_filter);
+
+    // Initialize the subscriber
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(filter)
+        .init();
+
+    reload_handle
+}
+
 fn main() -> Result<(), i32> {
-    tracing_subscriber::fmt().init();
+    let directives = env::var("RUST_LOG").unwrap_or("".to_string());
     let args = command_args::Arguments::parse();
+    let reload_handle = init_tracing_subscriber(directives.as_str());
     match args.command {
         Commands::Mount {
             mount_point,
             fileset_location,
             config,
-            debug: _,
+            debug: debug_level,
             foreground,
         } => {
             let app_config = AppConfig::from_file(config);
@@ -193,6 +218,28 @@ fn main() -> Result<(), i32> {
                 path.to_string_lossy().to_string()
             };
 
+            // if debug > 0, it means that we needs fuse_debug.
+            app_config.fuse.fuse_debug = debug_level > 0 || app_config.fuse.fuse_debug;
+            match debug_level {
+                0 => {
+                    // Use the value in RUST_LOG, no need to modify filter
+                }
+                1 => {
+                    // debug feature of gvfs_fuse is enabled.
+                    reload_handle
+                        .modify(|filter| {
+                            *filter = filter::EnvFilter::builder()
+                                .parse([directives.as_str(), "gvfs_fuse=debug"].join(",").as_str())
+                                .unwrap();
+                        })
+                        .unwrap();
+                }
+                _ => {
+                    error!("Unsupported debug level: {}", debug_level);
+                    return Err(-1);
+                }
+            }
+
             let result = init_dirs(&mut app_config, &mount_point);
             if let Err(e) = result {
                 error!("Failed to initialize working directories: {:?}", e);
@@ -203,6 +250,7 @@ fn main() -> Result<(), i32> {
                 mount_fuse(app_config, mount_point, fileset_location)
             } else {
                 let result = make_daemon(&app_config);
+                info!("Making daemon");
                 if let Err(e) = result {
                     error!("Failed to daemonize: {:?}", e);
                     return Err(-1);

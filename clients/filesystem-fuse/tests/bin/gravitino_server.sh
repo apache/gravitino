@@ -60,11 +60,11 @@ create_resource() {
 start_gravitino_server() {
   echo "Starting Gravitino Server"
   # copy the aws-bundle to the server
-  if ls $GRAVITINO_SERVER_DIR/catalogs/hadoop/libs/gravitino-aws-bundle-*-incubating-SNAPSHOT.jar 1>/dev/null 2>&1; then
+  if ls $GRAVITINO_SERVER_DIR/catalogs/hadoop/libs/gravitino-aws-bundle-*.jar 1>/dev/null 2>&1; then
      echo "File exists, skipping copy."
   else
     echo "Copying the aws-bundle to the server"
-    cp $GRAVITINO_HOME/bundles/aws-bundle/build/libs/gravitino-aws-bundle-*-incubating-SNAPSHOT.jar \
+    cp $GRAVITINO_HOME/bundles/aws-bundle/build/libs/gravitino-aws-bundle-*.jar \
       $GRAVITINO_SERVER_DIR/catalogs/hadoop/libs
   fi
 

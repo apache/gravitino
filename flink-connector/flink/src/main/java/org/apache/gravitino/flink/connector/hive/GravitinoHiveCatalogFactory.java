@@ -63,6 +63,7 @@ public class GravitinoHiveCatalogFactory implements BaseCatalogFactory {
     return new GravitinoHiveCatalog(
         context.getName(),
         helper.getOptions().get(HiveCatalogFactoryOptions.DEFAULT_DATABASE),
+        context.getOptions(),
         propertiesConverter(),
         partitionConverter(),
         hiveConf,

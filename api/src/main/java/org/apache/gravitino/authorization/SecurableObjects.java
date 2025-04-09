@@ -22,9 +22,11 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.MetadataObjects.MetadataObjectImpl;
@@ -105,7 +107,7 @@ public class SecurableObjects {
   }
 
   /**
-   * Create the table {@link SecurableObject} with the given securable schema object, fileset name
+   * Create the fileset {@link SecurableObject} with the given securable schema object, fileset name
    * and privileges.
    *
    * @param schema The schema securable object
@@ -118,6 +120,22 @@ public class SecurableObjects {
     List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
     names.add(fileset);
     return of(MetadataObject.Type.FILESET, names, privileges);
+  }
+
+  /**
+   * Create the model {@link SecurableObject} with the given securable schema object, model name and
+   * privileges.
+   *
+   * @param schema The schema securable object
+   * @param model The model name
+   * @param privileges The privileges of the fileset
+   * @return The created model {@link SecurableObject}
+   */
+  public static SecurableObject ofModel(
+      SecurableObject schema, String model, List<Privilege> privileges) {
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
+    names.add(model);
+    return of(MetadataObject.Type.MODEL, names, privileges);
   }
 
   private static class SecurableObjectImpl extends MetadataObjectImpl implements SecurableObject {
@@ -168,7 +186,18 @@ public class SecurableObjects {
       }
 
       SecurableObject otherSecurableObject = (SecurableObject) other;
-      return super.equals(other) && Objects.equals(privileges, otherSecurableObject.privileges());
+      return super.equals(other)
+          && isEqualCollection(privileges, otherSecurableObject.privileges());
+    }
+
+    private boolean isEqualCollection(Collection<?> c1, Collection<?> c2) {
+      if (c1 == c2) {
+        return true;
+      }
+      if (c1 == null || c2 == null) {
+        return false;
+      }
+      return CollectionUtils.isEqualCollection(c1, c2);
     }
   }
 

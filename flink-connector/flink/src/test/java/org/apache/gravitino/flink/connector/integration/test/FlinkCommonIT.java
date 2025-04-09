@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.flink.connector.integration.test;
 
-import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.assertColumns;
 import static org.apache.gravitino.flink.connector.integration.test.utils.TestUtils.toFlinkPhysicalColumn;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -51,6 +50,7 @@ import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -77,12 +77,22 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
     return true;
   }
 
-  protected abstract String getProvider();
-
   protected abstract boolean supportDropCascade();
 
   protected boolean supportsPrimaryKey() {
     return true;
+  }
+
+  protected boolean supportTablePropertiesOperation() {
+    return true;
+  }
+
+  protected boolean defaultValueWithNullLiterals() {
+    return false;
+  }
+
+  protected String defaultDatabaseName() {
+    return "default";
   }
 
   @Test
@@ -177,7 +187,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             TestUtils.assertTableResult(
                 sql("SHOW DATABASES"),
                 ResultKind.SUCCESS_WITH_CONTENT,
-                Row.of("default"),
+                Row.of(defaultDatabaseName()),
                 Row.of(schema),
                 Row.of(schema2),
                 Row.of(schema3));
@@ -185,7 +195,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             String[] schemas = catalog.asSchemas().listSchemas();
             Arrays.sort(schemas);
             Assertions.assertEquals(4, schemas.length);
-            Assertions.assertEquals("default", schemas[0]);
+            Assertions.assertEquals(defaultDatabaseName(), schemas[0]);
             Assertions.assertEquals(schema, schemas[1]);
             Assertions.assertEquals(schema2, schemas[2]);
             Assertions.assertEquals(schema3, schemas[3]);
@@ -219,7 +229,6 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
             Assertions.assertEquals("test comment", loadedSchema.comment());
             Assertions.assertEquals("value1", loadedSchema.properties().get("key1"));
             Assertions.assertEquals("value2", loadedSchema.properties().get("key2"));
-            Assertions.assertNotNull(loadedSchema.properties().get("location"));
 
             TestUtils.assertTableResult(
                 sql("ALTER DATABASE %s SET ('key1'='new-value', 'key3'='value3')", schema),
@@ -262,7 +271,9 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertNotNull(table);
           Assertions.assertEquals(comment, table.comment());
-          Assertions.assertEquals(value, table.properties().get(key));
+          if (supportTablePropertiesOperation()) {
+            Assertions.assertEquals(value, table.properties().get(key));
+          }
           Column[] columns =
               new Column[] {
                 Column.of("string_type", Types.StringType.get(), "string_type", true, false, null),
@@ -667,13 +678,14 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
                       + "'%s' = '%s')",
                   tableName, "test key", "test value");
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s MODIFY order_amount INT COMMENT 'new comment2'", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
           result =
               sql("ALTER TABLE %s MODIFY order_amount BIGINT COMMENT 'new comment2'", tableName);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
-          result =
-              sql(
-                  "ALTER TABLE %s MODIFY user_id BIGINT COMMENT 'new comment' AFTER order_amount",
-                  tableName);
+          result = sql("ALTER TABLE %s MODIFY user_id BIGINT COMMENT 'new comment'", tableName);
+          TestUtils.assertTableResult(result, ResultKind.SUCCESS);
+          result = sql("ALTER TABLE %s MODIFY user_id BIGINT AFTER order_amount", tableName);
           TestUtils.assertTableResult(result, ResultKind.SUCCESS);
           Column[] actual =
               catalog
@@ -721,7 +733,7 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
   }
 
   @Test
-  @EnabledIf("supportTableOperation")
+  @EnabledIf("supportTablePropertiesOperation")
   public void testAlterTableProperties() {
     String databaseName = "test_alter_table_properties_db";
     String tableName = "test_alter_table_properties";
@@ -762,5 +774,24 @@ public abstract class FlinkCommonIT extends FlinkEnvIT {
         },
         true,
         supportDropCascade());
+  }
+
+  public void assertColumns(Column[] expected, Column[] actual) {
+    Assertions.assertEquals(expected.length, actual.length);
+    for (int i = 0; i < expected.length; i++) {
+      Assertions.assertEquals(expected[i].name(), actual[i].name());
+      Assertions.assertEquals(expected[i].comment(), actual[i].comment());
+      Assertions.assertEquals(
+          expected[i].dataType().simpleString(), actual[i].dataType().simpleString());
+      if (expected[i].defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)
+          && expected[i].nullable()
+          && defaultValueWithNullLiterals()) {
+        Assertions.assertEquals(Literals.NULL, actual[i].defaultValue());
+      } else {
+        Assertions.assertEquals(expected[i].defaultValue(), actual[i].defaultValue());
+      }
+      Assertions.assertEquals(expected[i].autoIncrement(), actual[i].autoIncrement());
+      Assertions.assertEquals(expected[i].nullable(), actual[i].nullable());
+    }
   }
 }

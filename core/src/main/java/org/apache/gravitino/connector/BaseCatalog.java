@@ -209,8 +209,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             BaseAuthorization<?> authorization =
                 BaseAuthorization.createAuthorization(classLoader, authorizationProvider);
 
-            // Load the authorization plugin with the class loader of the catalog.
-            // Because the JDBC authorization plugin may load JDBC driver using the class loader.
             authorizationPlugin =
                 classLoader.withClassLoader(
                     cl ->
@@ -354,6 +352,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+
           properties = tempProperties;
         }
       }

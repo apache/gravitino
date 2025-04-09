@@ -40,6 +40,9 @@ public interface TopicMetaMapper {
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "listTopicPOsBySchemaId")
   List<TopicPO> listTopicPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "listTopicPOsByTopicIds")
+  List<TopicPO> listTopicPOsByTopicIds(@Param("topicIds") List<Long> topicIds);
+
   @SelectProvider(
       type = TopicMetaSQLProviderFactory.class,
       method = "selectTopicMetaBySchemaIdAndName")

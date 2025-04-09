@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.Type.MANAGED;
 
 import com.google.common.collect.ImmutableMap;
@@ -52,6 +53,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -147,8 +149,10 @@ public class HadoopCatalogIT extends BaseIT {
   }
 
   @Test
-  void testAlterCatalogLocation() {
+  void testAlterCatalogLocation() throws IOException {
+    Assumptions.assumeTrue(getClass() == HadoopCatalogIT.class);
     String catalogName = GravitinoITUtils.genRandomName("test_alter_catalog_location");
+    String filesetName = "test_fileset1";
     String location = defaultBaseLocation();
     String newLocation = location + "/new_location";
 
@@ -157,14 +161,26 @@ public class HadoopCatalogIT extends BaseIT {
     Catalog filesetCatalog =
         metalake.createCatalog(
             catalogName, Catalog.Type.FILESET, provider, "comment", catalogProperties);
+    filesetCatalog.asSchemas().createSchema(schemaName, null, null);
+    filesetCatalog
+        .asFilesetCatalog()
+        .createFileset(NameIdentifier.of(schemaName, filesetName), null, MANAGED, null, null);
 
     Assertions.assertEquals(location, filesetCatalog.properties().get("location"));
+    Assertions.assertTrue(
+        fileSystem.exists(new Path(location + "/" + schemaName + "/" + filesetName)));
 
     // Now try to alter the location and change it to `newLocation`.
     Catalog modifiedCatalog =
         metalake.alterCatalog(catalogName, CatalogChange.setProperty("location", newLocation));
+    String newFilesetName = "test_fileset2";
+    modifiedCatalog
+        .asFilesetCatalog()
+        .createFileset(NameIdentifier.of(schemaName, newFilesetName), null, MANAGED, null, null);
 
     Assertions.assertEquals(newLocation, modifiedCatalog.properties().get("location"));
+    Assertions.assertTrue(
+        fileSystem.exists(new Path(newLocation + "/" + schemaName + "/" + newFilesetName)));
 
     metalake.dropCatalog(catalogName, true);
   }
@@ -210,6 +226,21 @@ public class HadoopCatalogIT extends BaseIT {
         "storage location should be created");
     Assertions.assertEquals(ImmutableMap.of(), fileset2.properties(), "properties should be empty");
 
+    // create fileset with placeholder in storage location
+    String filesetName4 = "test_create_fileset_with_placeholder";
+    String storageLocation4 = defaultBaseLocation() + "/{{fileset}}";
+    String expectedStorageLocation4 = defaultBaseLocation() + "/" + filesetName4;
+    Assertions.assertFalse(
+        fileSystem.exists(new Path(expectedStorageLocation4)),
+        "storage location should not exists");
+    Fileset fileset4 = createFileset(filesetName4, "comment", MANAGED, storageLocation4, null);
+    assertFilesetExists(filesetName4);
+    Assertions.assertNotNull(fileset4, "fileset should be created");
+    Assertions.assertEquals("comment", fileset4.comment());
+    Assertions.assertEquals(MANAGED, fileset4.type());
+    Assertions.assertEquals(expectedStorageLocation4, fileset4.storageLocation());
+    Assertions.assertEquals(0, fileset4.properties().size(), "properties should be empty");
+
     // create fileset with null fileset name
     Assertions.assertThrows(
         IllegalNameIdentifierException.class,
@@ -223,6 +254,32 @@ public class HadoopCatalogIT extends BaseIT {
         createFileset(filesetName3, "comment", null, storageLocation3, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName3);
     Assertions.assertEquals(MANAGED, fileset3.type(), "fileset type should be MANAGED by default");
+  }
+
+  @Test
+  public void testAlterFileset() {
+    // create fileset with placeholder in storage location
+    String filesetName = "test_alter_fileset";
+    String storageLocation = storageLocation(filesetName) + "/{{user}}";
+    String placeholderKey = LOCATION_PLACEHOLDER_PREFIX + "user";
+    createFileset(
+        filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of(placeholderKey, "test"));
+
+    // alter fileset
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asFilesetCatalog()
+                    .alterFileset(
+                        NameIdentifier.of(schemaName, filesetName),
+                        FilesetChange.setProperty(placeholderKey, "test2")));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Property placeholder-user is immutable or reserved, cannot be set"),
+        exception.getMessage());
   }
 
   @Test

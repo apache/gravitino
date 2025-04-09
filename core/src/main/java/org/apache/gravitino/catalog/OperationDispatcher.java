@@ -242,6 +242,16 @@ public abstract class OperationDispatcher {
     }
   }
 
+  protected <E extends Entity & HasIdentifier> E getEntity(
+      NameIdentifier ident, Entity.EntityType type, Class<E> entityClass) {
+    try {
+      return store.get(ident, type, entityClass);
+    } catch (Exception e) {
+      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e);
+      throw new RuntimeException("Fail to check if entity is existed", e);
+    }
+  }
+
   private <T> Map<String, String> getPropertiesForSet(T... t) {
     Map<String, String> properties = Maps.newHashMap();
     for (T item : t) {

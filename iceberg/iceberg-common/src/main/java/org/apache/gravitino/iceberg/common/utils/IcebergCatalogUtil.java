@@ -22,7 +22,6 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -59,7 +58,9 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
     InMemoryCatalog memoryCatalog = new InMemoryCatalog();
     Map<String, String> resultProperties = icebergConfig.getIcebergCatalogProperties();
-    resultProperties.put(CatalogProperties.WAREHOUSE_LOCATION, "/tmp");
+    if (!resultProperties.containsKey(IcebergConstants.WAREHOUSE)) {
+      resultProperties.put(IcebergConstants.WAREHOUSE, "/tmp");
+    }
     memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
   }
@@ -121,12 +122,6 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
-    Preconditions.checkNotNull(
-        properties.get(IcebergConstants.ICEBERG_JDBC_USER),
-        IcebergConstants.ICEBERG_JDBC_USER + " is null");
-    Preconditions.checkNotNull(
-        properties.get(IcebergConstants.ICEBERG_JDBC_PASSWORD),
-        IcebergConstants.ICEBERG_JDBC_PASSWORD + " is null");
     try {
       // Load the jdbc driver
       Class.forName(driverClassName);

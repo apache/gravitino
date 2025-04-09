@@ -44,7 +44,8 @@ public class TableColumnBaseSQLProvider {
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE table_id = #{tableId} AND table_version <= #{tableVersion} AND deleted_at = 0"
         + " GROUP BY column_id) t2"
-        + " ON t1.column_id = t2.column_id AND t1.table_version = t2.max_table_version";
+        + " ON t1.column_id = t2.column_id AND t1.table_version = t2.max_table_version"
+        + " AND t1.table_id = #{tableId}";
   }
 
   public String insertColumnPOs(@Param("columnPOs") List<ColumnPO> columnPOs) {
@@ -130,5 +131,38 @@ public class TableColumnBaseSQLProvider {
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " WHERE column_id = #{columnId} AND deleted_at = 0"
         + " ORDER BY table_version DESC LIMIT 1";
+  }
+
+  public String listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds) {
+    return "<script>"
+        + " SELECT c.column_id AS columnId, c.column_name AS columnName,"
+        + " c.column_position AS columnPosition, c.metalake_id AS metalakeId, c.catalog_id AS catalogId,"
+        + " c.schema_id AS schemaId, c.table_id AS tableId,"
+        + " c.table_version AS tableVersion, c.column_type AS columnType,"
+        + " c.column_comment AS columnComment, c.column_nullable AS nullable,"
+        + " c.column_auto_increment AS autoIncrement,"
+        + " c.column_default_value AS defaultValue, c.column_op_type AS columnOpType,"
+        + " c.deleted_at AS deletedAt, c.audit_info AS auditInfo"
+        + " FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " c "
+        + "JOIN ("
+        + "    SELECT column_id, MAX(table_version) AS max_version"
+        + "    FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + "    WHERE column_id IN ("
+        + "        <foreach collection='columnIds' item='columnId' separator=','>"
+        + "          #{columnId}"
+        + "        </foreach>"
+        + "    ) AND deleted_at = 0 GROUP BY column_id"
+        + ") latest "
+        + "ON c.column_id = latest.column_id AND c.table_version = latest.max_version"
+        + " WHERE c.column_id IN ("
+        + "<foreach collection='columnIds' item='columnId' separator=','>"
+        + "#{columnId}"
+        + "</foreach>"
+        + ") "
+        + " AND c.deleted_at = 0"
+        + "</script>";
   }
 }

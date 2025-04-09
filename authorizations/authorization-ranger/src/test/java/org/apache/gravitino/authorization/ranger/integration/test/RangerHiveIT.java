@@ -49,7 +49,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerAuthorizationPlugin;
+import org.apache.gravitino.authorization.ranger.RangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.authorization.ranger.RangerClientExtension;
 import org.apache.gravitino.authorization.ranger.RangerHadoopSQLMetadataObject;
 import org.apache.gravitino.authorization.ranger.RangerHadoopSQLSecurableObject;
@@ -81,7 +81,7 @@ import org.slf4j.LoggerFactory;
 public class RangerHiveIT {
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveIT.class);
 
-  private static RangerAuthorizationPlugin rangerAuthHivePlugin;
+  private static RangerAuthorizationHadoopSQLPlugin rangerAuthHivePlugin;
   private static RangerHelper rangerHelper;
   private final AuditInfo auditInfo =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
@@ -390,7 +390,6 @@ public class RangerHiveIT {
     AuthorizationSecurableObject rangerSecurableObject =
         rangerAuthHivePlugin.generateAuthorizationSecurableObject(
             ImmutableList.of(String.format("%s3", dbName), "tab1"),
-            "",
             RangerHadoopSQLMetadataObject.Type.TABLE,
             ImmutableSet.of(
                 new RangerPrivileges.RangerHivePrivilegeImpl(
@@ -749,7 +748,7 @@ public class RangerHiveIT {
     MetadataObject newMetadataObject = MetadataObjects.parse(newMetalake, oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
             newMetadataObject.fullName(),
@@ -792,7 +791,7 @@ public class RangerHiveIT {
             String.format("catalog-new-%s", currentFunName), oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
             newMetadataObject.fullName(),
@@ -834,7 +833,7 @@ public class RangerHiveIT {
             String.format("catalog.new-%s", currentFunName), oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     assertFindManagedPolicyItems(role, false);
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(
@@ -877,7 +876,7 @@ public class RangerHiveIT {
             String.format("catalog.schema1.new-%s", currentFunName), oldMetadataObject.type());
     Assertions.assertTrue(
         rangerAuthHivePlugin.onMetadataUpdated(
-            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject)));
+            MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, null)));
     assertFindManagedPolicyItems(role, false);
     SecurableObject newSecurableObject1 =
         SecurableObjects.parse(

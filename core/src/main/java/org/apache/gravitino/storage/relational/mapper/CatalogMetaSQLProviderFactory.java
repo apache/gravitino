@@ -85,6 +85,11 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().selectCatalogMetaByName(metalakeName, catalogName);
   }
 
+  public static String selectCatalogIdByMetalakeNameAndCatalogName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return getProvider().selectCatalogIdByMetalakeNameAndCatalogName(metalakeName, catalogName);
+  }
+
   public static String selectCatalogMetaById(@Param("catalogId") Long catalogId) {
     return getProvider().selectCatalogMetaById(catalogId);
   }

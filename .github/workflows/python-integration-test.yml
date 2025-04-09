@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v3.0.2
         id: filter
         with:
           filters: |
@@ -73,7 +73,7 @@ jobs:
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}
 
-          for pythonVersion in "3.8" "3.9" "3.10" "3.11"
+          for pythonVersion in "3.8" "3.9" "3.10" "3.11" "3.12"
           do
             echo "Use Python version ${pythonVersion} to test the Python client."
             ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${pythonVersion} -PskipDockerTests=false :clients:client-python:test

@@ -103,6 +103,29 @@ public class NameIdentifierUtil {
   public static NameIdentifier ofTag(String metalake, String tagName) {
     return NameIdentifier.of(NamespaceUtil.ofTag(metalake), tagName);
   }
+
+  /**
+   * Create the user {@link NameIdentifier} with the given metalake and username.
+   *
+   * @param metalake The metalake name
+   * @param userName The username
+   * @return the created user {@link NameIdentifier}
+   */
+  public static NameIdentifier ofUser(String metalake, String userName) {
+    return NameIdentifier.of(NamespaceUtil.ofUser(metalake), userName);
+  }
+
+  /**
+   * Create the role {@link NameIdentifier} with the given metalake and role name.
+   *
+   * @param metalake The metalake name
+   * @param roleName The role name
+   * @return the created role {@link NameIdentifier}
+   */
+  public static NameIdentifier ofRole(String metalake, String roleName) {
+    return NameIdentifier.of(NamespaceUtil.ofRole(metalake), roleName);
+  }
+
   /**
    * Create the column {@link NameIdentifier} with the given metalake, catalog, schema, table and
    * column name.
@@ -496,5 +519,16 @@ public class NameIdentifierUtil {
     } else {
       return identifier.name();
     }
+  }
+
+  /**
+   * Create the group {@link NameIdentifier} with the given metalake and group name.
+   *
+   * @param metalake The metalake name
+   * @param groupName The group name
+   * @return the created group {@link NameIdentifier}
+   */
+  public static NameIdentifier ofGroup(String metalake, String groupName) {
+    return NameIdentifier.of(NamespaceUtil.ofGroup(metalake), groupName);
   }
 }

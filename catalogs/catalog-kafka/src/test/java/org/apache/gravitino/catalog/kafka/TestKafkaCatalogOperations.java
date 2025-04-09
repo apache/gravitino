@@ -21,10 +21,12 @@ package org.apache.gravitino.catalog.kafka;
 import static org.apache.gravitino.Catalog.Type.MESSAGING;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
@@ -67,6 +69,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.kafka.common.config.TopicConfig;
@@ -138,6 +141,8 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("gravitino");
     when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
 
     File f = FileUtils.getFile(STORE_PATH);
     f.deleteOnExit();
@@ -156,6 +161,9 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     doReturn(1L)
         .when(spyCatalogMetaService)
         .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
+    doReturn(new CatalogIds(1L, 1L))
+        .when(spyCatalogMetaService)
+        .getCatalogIdByMetalakeAndCatalogName(Mockito.anyString(), Mockito.anyString());
 
     MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
         Mockito.mockStatic(MetalakeMetaService.class);

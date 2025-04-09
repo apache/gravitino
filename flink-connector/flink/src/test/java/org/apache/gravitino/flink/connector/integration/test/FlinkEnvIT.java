@@ -24,6 +24,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -37,11 +38,13 @@ import org.apache.flink.types.Row;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.flink.connector.PropertiesConverter;
+import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -51,6 +54,9 @@ import org.slf4j.LoggerFactory;
 public abstract class FlinkEnvIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
+
+  protected static final String icebergRestServiceName = "iceberg-rest";
+
   protected static final String GRAVITINO_METALAKE = "flink";
   protected static final String DEFAULT_CATALOG = "default_catalog";
 
@@ -65,32 +71,76 @@ public abstract class FlinkEnvIT extends BaseIT {
 
   private static String gravitinoUri = "http://127.0.0.1:8090";
 
+  private final String lakeHouseIcebergProvider = "lakehouse-iceberg";
+
+  protected String icebergRestServiceUri;
+
   @BeforeAll
-  void startUp() {
+  void startUp() throws Exception {
+    initHiveEnv();
+    if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
+      initIcebergRestServiceEnv();
+    }
     // Start Gravitino server
+    super.startIntegrationTest();
     initGravitinoEnv();
     initMetalake();
-    initHiveEnv();
     initHdfsEnv();
     initFlinkEnv();
+    initCatalogEnv();
     LOG.info("Startup Flink env successfully, Gravitino uri: {}.", gravitinoUri);
   }
 
   @AfterAll
-  static void stop() {
+  void stop() throws Exception {
+    stopCatalogEnv();
     stopFlinkEnv();
     stopHdfsEnv();
+    super.stopIntegrationTest();
     LOG.info("Stop Flink env successfully.");
   }
 
+  protected void initCatalogEnv() throws Exception {};
+
+  protected void stopCatalogEnv() throws Exception {}
+
   protected String flinkByPass(String key) {
     return PropertiesConverter.FLINK_PROPERTY_PREFIX + key;
+  }
+
+  protected abstract String getProvider();
+
+  private void initIcebergRestServiceEnv() {
+    ignoreIcebergRestService = false;
+    Map<String, String> icebergRestServiceConfigs = new HashMap<>();
+    icebergRestServiceConfigs.put(
+        "gravitino."
+            + icebergRestServiceName
+            + "."
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE);
+    icebergRestServiceConfigs.put(
+        "gravitino."
+            + icebergRestServiceName
+            + "."
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+        hiveMetastoreUri);
+    icebergRestServiceConfigs.put(
+        "gravitino."
+            + icebergRestServiceName
+            + "."
+            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+        warehouse);
+    registerCustomConfigs(icebergRestServiceConfigs);
   }
 
   private void initGravitinoEnv() {
     // Gravitino server is already started by AbstractIT, just construct gravitinoUrl
     int gravitinoPort = getGravitinoServerPort();
     gravitinoUri = String.format("http://127.0.0.1:%d", gravitinoPort);
+    if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
+      this.icebergRestServiceUri = getIcebergRestServiceUri();
+    }
   }
 
   private void initMetalake() {
@@ -211,5 +261,13 @@ public abstract class FlinkEnvIT extends BaseIT {
       TableResult deleteResult = sql("DROP TABLE IF EXISTS %s", tableName);
       TestUtils.assertTableResult(deleteResult, ResultKind.SUCCESS);
     }
+  }
+
+  private String getIcebergRestServiceUri() {
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(
+            serverConfig, String.format("gravitino.%s.", icebergRestServiceName));
+    return String.format(
+        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }
 }
