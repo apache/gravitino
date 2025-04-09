@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.info.GroupInfo;
+import org.apache.gravitino.listener.api.info.RoleInfo;
 import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -340,8 +341,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(
         new CreateRolePreEvent(initiator, metalake, role, properties, securableObjects));
     try {
-      // TODO: add Event
-      return dispatcher.createRole(metalake, role, properties, securableObjects);
+      Role roleObject = dispatcher.createRole(metalake, role, properties, securableObjects);
+      eventBus.dispatchEvent(new CreateRoleEvent(initiator, metalake, new RoleInfo(roleObject)));
+
+      return roleObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -356,8 +359,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new GetRolePreEvent(initiator, metalake, role));
     try {
-      // TODO: add Event
-      return dispatcher.getRole(metalake, role);
+      Role roleObject = dispatcher.getRole(metalake, role);
+      eventBus.dispatchEvent(new GetRoleEvent(initiator, metalake, new RoleInfo(roleObject)));
+
+      return roleObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -371,8 +376,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new DeleteRolePreEvent(initiator, metalake, role));
     try {
-      // TODO: add Event
-      return dispatcher.deleteRole(metalake, role);
+      boolean isExists = dispatcher.deleteRole(metalake, role);
+      eventBus.dispatchEvent(new DeleteRoleEvent(initiator, metalake, role, isExists));
+
+      return isExists;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -386,8 +393,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new ListRoleNamesPreEvent(initiator, metalake));
     try {
-      // TODO: add Event
-      return dispatcher.listRoleNames(metalake);
+      String[] roleNames = dispatcher.listRoleNames(metalake);
+      eventBus.dispatchEvent(new ListRoleNamesEvent(initiator, metalake));
+
+      return roleNames;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -402,8 +411,10 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
     eventBus.dispatchEvent(new ListRoleNamesPreEvent(initiator, metalake, object));
     try {
-      // TODO: add Event
-      return dispatcher.listRoleNamesByObject(metalake, object);
+      String[] roleNames = dispatcher.listRoleNamesByObject(metalake, object);
+      eventBus.dispatchEvent(new ListRoleNamesEvent(initiator, metalake, object));
+
+      return roleNames;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -420,8 +431,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(
         new GrantPrivilegesPreEvent(initiator, metalake, role, object, privileges));
     try {
-      // TODO: add Event
-      return dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
+      Role roleObject = dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
+      eventBus.dispatchEvent(
+          new GrantPrivilegesEvent(
+              initiator, metalake, new RoleInfo(roleObject), privileges, object));
+
+      return roleObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;
@@ -438,8 +453,12 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(
         new RevokePrivilegesPreEvent(initiator, metalake, role, object, privileges));
     try {
-      // TODO: add Event
-      return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
+      Role roleObject = dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
+      eventBus.dispatchEvent(
+          new RevokePrivilegesEvent(
+              initiator, metalake, new RoleInfo(roleObject), object, privileges));
+
+      return roleObject;
     } catch (Exception e) {
       // TODO: add failure event
       throw e;

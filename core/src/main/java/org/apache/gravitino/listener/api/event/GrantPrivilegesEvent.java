@@ -23,63 +23,60 @@ import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.listener.api.info.RoleInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/**
- * Represents an event generated before granting a set of privileges to a role. This class
- * encapsulates the details of the privilege granting event prior to its execution.
- */
+/** Represents an event triggered after privileges are granted to a role. */
 @DeveloperApi
-public class GrantPrivilegesPreEvent extends RolePreEvent {
-  private final String roleName;
-  private final MetadataObject metadataObject;
+public class GrantPrivilegesEvent extends RoleEvent {
+  private final RoleInfo grantedRoleInfo;
+  private final MetadataObject object;
   private final Set<Privilege> privileges;
 
   /**
-   * Constructs a new {@link GrantPrivilegesPreEvent} instance with the specified initiator,
-   * identifier, role name, object, and privileges.
+   * Constructs a new {@code GrantPrivilegesEvent} instance.
    *
-   * @param initiator The name of the user who initiated the event.
-   * @param metalake The name of the metalake.
-   * @param roleName The name of the role to which privileges will be granted.
-   * @param metadataObject The {@link MetadataObject} instance related to the role.
-   * @param privileges The set of privileges to grant to the role.
+   * @param initiator the user who initiated the event.
+   * @param metalake the metalake name where the event occurred.
+   * @param grantedRoleInfo the {@code RoleInfo} of the role that was granted privileges.
+   * @param privileges the set of privileges granted to the role.
+   * @param object the {@code MetadataObject} associated with the role.
    */
-  public GrantPrivilegesPreEvent(
+  public GrantPrivilegesEvent(
       String initiator,
       String metalake,
-      String roleName,
-      MetadataObject metadataObject,
-      Set<Privilege> privileges) {
-    super(initiator, NameIdentifierUtil.ofRole(metalake, roleName));
+      RoleInfo grantedRoleInfo,
+      Set<Privilege> privileges,
+      MetadataObject object) {
+    super(initiator, NameIdentifierUtil.ofRole(metalake, grantedRoleInfo.roleName()));
 
-    this.roleName = roleName;
-    this.metadataObject = metadataObject;
+    this.grantedRoleInfo = grantedRoleInfo;
     this.privileges = privileges;
+    this.object = object;
   }
 
   /**
-   * Returns the name of the role.
+   * Returns the role information of the role that was granted privileges.
    *
-   * @return The name of the role to which privileges will be granted.
+   * @return the {@code RoleInfo} instance containing details of the granted role.
    */
-  public String roleName() {
-    return roleName;
+  public RoleInfo grantedRoleInfo() {
+    return grantedRoleInfo;
   }
 
   /**
-   * Returns the {@link MetadataObject} instance.
+   * Returns the metadata object associated with the role.
    *
-   * @return The {@link MetadataObject} instance related to the role.
+   * @return the {@code MetadataObject} instance.
    */
   public MetadataObject object() {
-    return metadataObject;
+    return object;
   }
 
   /**
-   * Returns the set of privileges to grant.
+   * Returns the set of privileges granted to the role.
    *
-   * @return The set of privileges to grant to the role.
+   * @return a set of {@code Privilege} instances.
    */
   public Set<Privilege> privileges() {
     return privileges;
