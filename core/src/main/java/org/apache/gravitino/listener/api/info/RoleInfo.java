@@ -41,8 +41,14 @@ public class RoleInfo {
    */
   public RoleInfo(Role roleObject) {
     this.roleName = roleObject.name();
-    this.properties = ImmutableMap.copyOf(roleObject.properties());
-    this.securableObjects = ImmutableList.copyOf(roleObject.securableObjects());
+    this.properties =
+        roleObject.properties() == null
+            ? ImmutableMap.of()
+            : ImmutableMap.copyOf(roleObject.properties());
+    this.securableObjects =
+        roleObject.securableObjects() == null
+            ? ImmutableList.of()
+            : ImmutableList.copyOf(roleObject.securableObjects());
   }
 
   /**
