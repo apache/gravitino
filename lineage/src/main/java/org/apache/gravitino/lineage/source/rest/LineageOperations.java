@@ -35,7 +35,7 @@ import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path("v1/lineage")
+@Path("/lineage")
 public class LineageOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(LineageOperations.class);
@@ -50,8 +50,8 @@ public class LineageOperations {
 
   @POST
   @Produces("application/json")
-  @Timed(name = "update-lineage." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "update-lineage", absolute = true)
+  @Timed(name = "post-lineage." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "post-lineage", absolute = true)
   public Response postLineage(OpenLineage.RunEvent event) {
     LOG.info(
         "Open lineage event, run id:{}, job name:{}",
