@@ -68,20 +68,27 @@ public class ModelDetails extends Command {
       ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
       gModel = modelCatalog.getModel(name);
       versions = modelCatalog.listModelVersions(name);
-    } catch (NoSuchMetalakeException noSuchMetalakeException) {
+
+    } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException noSuchCatalogException) {
+    } catch (NoSuchCatalogException err) {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (NoSuchSchemaException noSuchSchemaException) {
+    } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchModelException noSuchModelException) {
+    } catch (NoSuchModelException err) {
       exitWithError(ErrorMessages.UNKNOWN_MODEL);
     } catch (Exception err) {
       exitWithError(err.getMessage());
     }
+
+    if (gModel == null) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL);
+    }
+
     String basicInfo =
-        String.format("Model name %s, latest version: %s%n", gModel.name(), gModel.latestVersion());
-    String versionInfo = Arrays.toString(versions);
+        String.format(
+            "Model Name: %s, Latest Version: %s%n", gModel.name(), gModel.latestVersion());
+    String versionInfo = "Versions: " + Arrays.toString(versions);
     printResults(basicInfo + "versions: " + versionInfo);
   }
 }
