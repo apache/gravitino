@@ -48,4 +48,4 @@ Metrics with the `gravitino-server` prefix pertain to the Gravitino server, whil
 #### JVM metrics
 
 JVM metrics source uses [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet, and MemoryUsageGaugeSet.
-These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, `jvm_head_used` in Prometheus format.
+These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, `jvm_heap_used` in Prometheus format.
