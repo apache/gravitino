@@ -28,6 +28,7 @@ import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lineage.LineageDispatcher;
 import org.apache.gravitino.metrics.MetricNames;
@@ -49,7 +50,7 @@ public class LineageOperations {
   }
 
   @POST
-  @Produces("application/vnd.gravitino.v1+json")
+  @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "post-lineage." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "post-lineage", absolute = true)
   public Response postLineage(OpenLineage.RunEvent event) {
