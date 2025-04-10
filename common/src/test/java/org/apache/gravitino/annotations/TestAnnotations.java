@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.web.auth.annotations;
+package org.apache.gravitino.annotations;
 
 import java.lang.reflect.Method;
 import org.apache.gravitino.MetadataObject;

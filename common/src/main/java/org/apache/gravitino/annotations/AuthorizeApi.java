@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server.web.auth.annotations;
+package org.apache.gravitino.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
