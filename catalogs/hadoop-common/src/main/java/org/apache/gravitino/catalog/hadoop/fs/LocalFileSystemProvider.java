@@ -33,7 +33,7 @@ public class LocalFileSystemProvider implements FileSystemProvider {
   public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     Configuration configuration =
         FileSystemUtils.createConfiguration(BUILTIN_HDFS_FS_PROVIDER, config);
-    return FileSystem.newInstance(path.toUri(), configuration);
+    return FileSystem.get(path.toUri(), configuration);
   }
 
   @Override
