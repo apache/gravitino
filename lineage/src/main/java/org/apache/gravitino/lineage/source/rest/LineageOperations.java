@@ -49,7 +49,7 @@ public class LineageOperations {
   }
 
   @POST
-  @Produces("application/json")
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "post-lineage." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "post-lineage", absolute = true)
   public Response postLineage(OpenLineage.RunEvent event) {
