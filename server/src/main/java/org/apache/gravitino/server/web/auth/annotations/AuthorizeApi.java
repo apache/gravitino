@@ -22,6 +22,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 
 /**
  * This annotation is used to implement unified authentication in AOP.
@@ -31,9 +33,9 @@ import java.lang.annotation.Target;
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface AuthorizeApi {
-  String privileges();
+  Privilege.Name[] privileges() default {};
 
-  String resourceType();
+  MetadataObject.Type resourceType() default MetadataObject.Type.UNKNOWN;
 
   String expression() default "";
 

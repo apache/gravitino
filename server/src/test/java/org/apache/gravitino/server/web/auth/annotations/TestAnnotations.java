@@ -20,6 +20,8 @@
 package org.apache.gravitino.server.web.auth.annotations;
 
 import java.lang.reflect.Method;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -35,8 +37,10 @@ public class TestAnnotations {
     AuthorizeApi annotation = method.getAnnotation(AuthorizeApi.class);
     Assertions.assertNotNull(annotation);
 
-    Assertions.assertEquals("USE_CATALOG", annotation.privileges());
-    Assertions.assertEquals("CATALOG", annotation.resourceType());
+    Assertions.assertArrayEquals(
+        new Privilege.Name[] {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
+        annotation.privileges());
+    Assertions.assertEquals(MetadataObject.Type.CATALOG, annotation.resourceType());
     Assertions.assertEquals("", annotation.expression());
     Assertions.assertEquals(AuthorizeApi.AuthorizeType.RESOURCE_TYPE, annotation.rule());
   }
@@ -52,8 +56,8 @@ public class TestAnnotations {
     AuthorizeApi annotation = method.getAnnotation(AuthorizeApi.class);
     Assertions.assertNotNull(annotation);
 
-    Assertions.assertEquals("", annotation.privileges());
-    Assertions.assertEquals("", annotation.resourceType());
+    Assertions.assertArrayEquals(new Privilege.Name[] {}, annotation.privileges());
+    Assertions.assertEquals(MetadataObject.Type.UNKNOWN, annotation.resourceType());
     Assertions.assertEquals(
         "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE", annotation.expression());
     Assertions.assertEquals(AuthorizeApi.AuthorizeType.EXPRESSION, annotation.rule());
@@ -61,12 +65,12 @@ public class TestAnnotations {
 }
 
 class TestClass {
-  @AuthorizeApi(privileges = "USE_CATALOG", resourceType = "CATALOG")
+  @AuthorizeApi(
+      privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
+      resourceType = MetadataObject.Type.CATALOG)
   public void testAuthedMethodUseResourceType() {}
 
   @AuthorizeApi(
-      privileges = "",
-      resourceType = "",
       expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE",
       rule = AuthorizeApi.AuthorizeType.EXPRESSION)
   public void testAuthedMethodUseExpression() {}
