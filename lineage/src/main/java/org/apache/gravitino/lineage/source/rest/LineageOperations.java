@@ -71,7 +71,7 @@ public class LineageOperations {
           });
     } catch (Exception e) {
       LOG.warn("Process lineage failed,", e);
-      return Utils.internalError(e.getMessage());
+      return Utils.internalError(e.getMessage(), e);
     }
   }
 }
