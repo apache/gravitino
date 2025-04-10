@@ -5,7 +5,7 @@ license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
-This document describes how to upgrade the schema of backed
+This document describes how to upgrade the schema of backend
 Gravitino instance from one release version of Gravitino to another
 release version of Gravitino. For example, by following the steps listed
 below it is possible to upgrade a Gravitino 0.6.0 schema to a
