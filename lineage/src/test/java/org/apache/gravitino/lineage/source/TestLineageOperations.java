@@ -108,7 +108,7 @@ public class TestLineageOperations extends JerseyTest {
     RunEvent runEvent = createRunEvent();
     Mockito.when(lineageDispatcher.dispatchLineageEvent(ArgumentMatchers.any())).thenReturn(true);
     Response resp =
-        target("/v1/lineage")
+        target("/lineage")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(runEvent, MediaType.APPLICATION_JSON_TYPE));
@@ -121,7 +121,7 @@ public class TestLineageOperations extends JerseyTest {
     RunEvent runEvent = createRunEvent();
     Mockito.when(lineageDispatcher.dispatchLineageEvent(ArgumentMatchers.any())).thenReturn(false);
     Response resp =
-        target("/v1/lineage")
+        target("/lineage")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(runEvent, MediaType.APPLICATION_JSON_TYPE));
