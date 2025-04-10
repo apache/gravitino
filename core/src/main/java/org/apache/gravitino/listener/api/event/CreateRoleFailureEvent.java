@@ -29,20 +29,20 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 @DeveloperApi
 public class CreateRoleFailureEvent extends RoleFailureEvent {
-  private final RoleInfo roleInfo;
+  private final RoleInfo createRoleRequest;
   /**
    * Constructs a new {@code CreateRoleFailureEvent} instance.
    *
    * @param initiator the user who initiated the event.
    * @param metalake the target metalake context for the role creation
    * @param exception the exception that caused the failure
-   * @param roleInfo the role information that failed to be created
+   * @param createRoleRequest the role information that failed to be created
    */
   public CreateRoleFailureEvent(
-      String initiator, String metalake, Exception exception, RoleInfo roleInfo) {
-    super(initiator, NameIdentifierUtil.ofRole(metalake, roleInfo.roleName()), exception);
+      String initiator, String metalake, Exception exception, RoleInfo createRoleRequest) {
+    super(initiator, NameIdentifierUtil.ofRole(metalake, createRoleRequest.roleName()), exception);
 
-    this.roleInfo = roleInfo;
+    this.createRoleRequest = createRoleRequest;
   }
 
   /**
@@ -50,8 +50,8 @@ public class CreateRoleFailureEvent extends RoleFailureEvent {
    *
    * @return The {@link RoleInfo} instance.
    */
-  public RoleInfo roleInfo() {
-    return roleInfo;
+  public RoleInfo createRoleRequest() {
+    return createRoleRequest;
   }
 
   /**

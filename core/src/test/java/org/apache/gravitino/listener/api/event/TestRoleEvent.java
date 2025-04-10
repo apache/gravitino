@@ -175,7 +175,7 @@ public class TestRoleEvent {
     CreateRoleFailureEvent createRoleFailureEvent = (CreateRoleFailureEvent) event;
     Assertions.assertEquals(
         NameIdentifierUtil.ofRole(METALAKE, roleName), createRoleFailureEvent.identifier());
-    RoleInfo roleInfo = createRoleFailureEvent.roleInfo();
+    RoleInfo roleInfo = createRoleFailureEvent.createRoleRequest();
     Assertions.assertEquals(roleName, roleInfo.roleName());
     Assertions.assertEquals(properties, roleInfo.properties());
     Assertions.assertEquals(securableObjects, roleInfo.securableObjects());
@@ -195,7 +195,7 @@ public class TestRoleEvent {
     Assertions.assertEquals(
         NameIdentifierUtil.ofRole(METALAKE, roleName), createRoleFailureEvent.identifier());
 
-    RoleInfo roleInfo = createRoleFailureEvent.roleInfo();
+    RoleInfo roleInfo = createRoleFailureEvent.createRoleRequest();
     Assertions.assertEquals(roleName, roleInfo.roleName());
     Assertions.assertEquals(properties, roleInfo.properties());
     Assertions.assertNotNull(roleInfo.securableObjects());
