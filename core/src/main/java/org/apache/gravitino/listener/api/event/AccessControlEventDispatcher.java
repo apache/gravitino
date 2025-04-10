@@ -341,7 +341,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return roleObject;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new CreateRoleFailureEvent(initiator, metalake, e, role, properties, securableObjects));
+          new CreateRoleFailureEvent(
+              initiator, metalake, e, new RoleInfo(role, properties, securableObjects)));
       throw e;
     }
   }

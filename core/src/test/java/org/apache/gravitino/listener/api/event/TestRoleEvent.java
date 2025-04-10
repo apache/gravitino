@@ -110,6 +110,18 @@ public class TestRoleEvent {
   }
 
   @Test
+  void testRoleInfoWithNullSecurableObjects() {
+    RoleInfo roleInfo = new RoleInfo("test_role", ImmutableMap.of("comment", "test comment"), null);
+    Assertions.assertEquals("test_role", roleInfo.roleName());
+    Assertions.assertEquals(ImmutableMap.of("comment", "test comment"), roleInfo.properties());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> roleInfo.properties().put("testKey", "testVal"));
+    Assertions.assertEquals(Collections.emptyList(), roleInfo.securableObjects());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> roleInfo.securableObjects().add(null));
+  }
+
+  @Test
   void testCreateRole() {
     dispatcher.createRole(
         METALAKE, roleName, ImmutableMap.of("comment", "test comment"), securableObjects);
@@ -163,9 +175,10 @@ public class TestRoleEvent {
     CreateRoleFailureEvent createRoleFailureEvent = (CreateRoleFailureEvent) event;
     Assertions.assertEquals(
         NameIdentifierUtil.ofRole(METALAKE, roleName), createRoleFailureEvent.identifier());
-    Assertions.assertEquals(roleName, createRoleFailureEvent.roleName());
-    Assertions.assertEquals(properties, createRoleFailureEvent.properties());
-    Assertions.assertEquals(securableObjects, createRoleFailureEvent.securableObjects());
+    RoleInfo roleInfo = createRoleFailureEvent.roleInfo();
+    Assertions.assertEquals(roleName, roleInfo.roleName());
+    Assertions.assertEquals(properties, roleInfo.properties());
+    Assertions.assertEquals(securableObjects, roleInfo.securableObjects());
   }
 
   @Test
@@ -181,13 +194,14 @@ public class TestRoleEvent {
     CreateRoleFailureEvent createRoleFailureEvent = (CreateRoleFailureEvent) event;
     Assertions.assertEquals(
         NameIdentifierUtil.ofRole(METALAKE, roleName), createRoleFailureEvent.identifier());
-    Assertions.assertEquals(roleName, createRoleFailureEvent.roleName());
-    Assertions.assertEquals(properties, createRoleFailureEvent.properties());
-    Assertions.assertNotNull(createRoleFailureEvent.securableObjects());
-    Assertions.assertTrue(createRoleFailureEvent.securableObjects().isEmpty());
+
+    RoleInfo roleInfo = createRoleFailureEvent.roleInfo();
+    Assertions.assertEquals(roleName, roleInfo.roleName());
+    Assertions.assertEquals(properties, roleInfo.properties());
+    Assertions.assertNotNull(roleInfo.securableObjects());
+    Assertions.assertTrue(roleInfo.securableObjects().isEmpty());
     Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> createRoleFailureEvent.securableObjects().add(null));
+        UnsupportedOperationException.class, () -> roleInfo.securableObjects().add(null));
   }
 
   @Test

@@ -19,12 +19,8 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.listener.api.info.RoleInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
@@ -33,62 +29,29 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 @DeveloperApi
 public class CreateRoleFailureEvent extends RoleFailureEvent {
-  private final String roleName;
-  private final Map<String, String> properties;
-  private final List<SecurableObject> securableObjects;
-
+  private final RoleInfo roleInfo;
   /**
    * Constructs a new {@code CreateRoleFailureEvent} instance.
    *
    * @param initiator the user who initiated the event.
    * @param metalake the target metalake context for the role creation
    * @param exception the exception that caused the failure
-   * @param roleName the name of the role attempted to be created
-   * @param properties the properties associated with the role; if {@code null}, an empty map is
-   *     used
-   * @param securableObjects the list of securable objects associated with the role; if {@code
-   *     null}, an empty list is used
+   * @param roleInfo the role information that failed to be created
    */
-  protected CreateRoleFailureEvent(
-      String initiator,
-      String metalake,
-      Exception exception,
-      String roleName,
-      Map<String, String> properties,
-      List<SecurableObject> securableObjects) {
-    super(initiator, NameIdentifierUtil.ofRole(metalake, roleName), exception);
+  public CreateRoleFailureEvent(
+      String initiator, String metalake, Exception exception, RoleInfo roleInfo) {
+    super(initiator, NameIdentifierUtil.ofRole(metalake, roleInfo.roleName()), exception);
 
-    this.roleName = roleName;
-    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
-    this.securableObjects =
-        securableObjects == null ? ImmutableList.of() : ImmutableList.copyOf(securableObjects);
+    this.roleInfo = roleInfo;
   }
 
   /**
-   * Returns the name of the role that failed to be created.
+   * Returns the role information that failed to be created.
    *
-   * @return the name of the role
+   * @return The {@link RoleInfo} instance.
    */
-  public String roleName() {
-    return roleName;
-  }
-
-  /**
-   * Returns the properties associated with the role.
-   *
-   * @return an immutable map of role properties
-   */
-  protected Map<String, String> properties() {
-    return properties;
-  }
-
-  /**
-   * Returns the list of securable objects associated with the role.
-   *
-   * @return an immutable list of securable objects
-   */
-  protected List<SecurableObject> securableObjects() {
-    return securableObjects;
+  public RoleInfo roleInfo() {
+    return roleInfo;
   }
 
   /**
