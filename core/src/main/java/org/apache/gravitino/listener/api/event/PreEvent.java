@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.EventDispatcher;
 
 /** Represents a pre event. */
 @DeveloperApi
@@ -29,6 +30,13 @@ public abstract class PreEvent extends BaseEvent {
     super(user, identifier);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public void accept(EventDispatcher visitor) {
+    visitor.dispatchPreEvent(this);
+  }
+
+  /** {@inheritDoc} */
   @Override
   public OperationStatus operationStatus() {
     return OperationStatus.UNPROCESSED;

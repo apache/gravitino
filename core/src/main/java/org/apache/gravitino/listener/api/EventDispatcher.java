@@ -17,22 +17,27 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.EventDispatcher;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.PreEvent;
 
-/** Represents a post event. */
-@DeveloperApi
-public abstract class Event extends BaseEvent {
-  protected Event(String user, NameIdentifier identifier) {
-    super(user, identifier);
-  }
+/** Defines the contract for dispatching events to registered listeners. */
+public interface EventDispatcher {
 
-  /** {@inheritDoc} */
-  @Override
-  public void accept(EventDispatcher visitor) {
-    visitor.dispatchPostEvent(this);
-  }
+  /**
+   * Dispatches a {@link PreEvent} to the appropriate listener.
+   *
+   * @param event the pre-event to be dispatched.
+   * @throws ForbiddenException if the dispatch is not permitted by the plugin.
+   */
+  void dispatchPreEvent(PreEvent event) throws ForbiddenException;
+
+  /**
+   * Dispatches a {@link Event} (post-event) to the appropriate listener.
+   *
+   * @param event the post-event to be dispatched.
+   */
+  void dispatchPostEvent(Event event);
 }
