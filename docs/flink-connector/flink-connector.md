@@ -13,9 +13,10 @@ This capability allows users to perform federation queries, accessing data from 
 ## Capabilities
 
 1. Supports [Hive catalog](flink-catalog-hive.md)
-1. Supports [Iceberg catalog](flink-catalog-iceberg.md)
-1. Supports [Paimon catalog](flink-catalog-paimon.md)
-2. Supports most DDL and DML SQLs.
+2. Supports [Iceberg catalog](flink-catalog-iceberg.md)
+3. Supports [Paimon catalog](flink-catalog-paimon.md)
+4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
+5. Supports most DDL and DML SQLs.
 
 ## Requirement
 

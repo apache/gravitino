@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapp
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
@@ -128,6 +129,11 @@ public class SecurableObjectBaseSQLProvider {
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.catalog_id = #{catalogId} AND"
         + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " UNION "
+        + " SELECT mt.catalog_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.catalog_id = #{catalogId} AND"
+        + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
         + ")";
   }
 
@@ -156,6 +162,11 @@ public class SecurableObjectBaseSQLProvider {
         + FilesetMetaMapper.META_TABLE_NAME
         + " ft WHERE ft.schema_id = #{schemaId} AND "
         + " ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " UNION "
+        + " SELECT mt.schema_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.schema_id = #{schemaId} AND "
+        + " mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
         + ")";
   }
 

@@ -20,6 +20,7 @@
 set -ex
 hive_dir="$(dirname "${BASH_SOURCE-$0}")"
 hive_dir="$(cd "${hive_dir}">/dev/null; pwd)"
+ranger_dir="${hive_dir}/../ranger"
 
 # Environment variables definition
 HADOOP2_VERSION="2.7.3"
@@ -89,7 +90,9 @@ if [ ! -f "${hive_dir}/packages/${ZOOKEEPER_PACKAGE_NAME}" ]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" ]; then
-  bash ${hive_dir}/download-release.sh "v${RANGER_VERSION}" ${RANGER_HDFS_PACKAGE_NAME} "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}"
+  # ranger-hdfs plugin not exist, run ranger-dependency.sh to build from source
+  . ${ranger_dir}/ranger-dependency.sh
+  cp "${ranger_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" "${hive_dir}/packages"
 fi
 
 if [[ $? -ne 0 ]]; then
@@ -98,7 +101,9 @@ if [[ $? -ne 0 ]]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ]; then
-  bash ${hive_dir}/download-release.sh "v${RANGER_VERSION}" ${RANGER_HIVE_PACKAGE_NAME} "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}"
+  # ranger-hive plugin not exist, run ranger-dependency.sh to build from source
+  . ${ranger_dir}/ranger-dependency.sh
+  cp "${ranger_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" "${hive_dir}/packages"
 fi
 
 if [[ $? -ne 0 ]]; then

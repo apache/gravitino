@@ -177,6 +177,9 @@ public class TestSecurableObjects {
     Privilege manageUsers = Privileges.ManageUsers.allow();
     Privilege manageGroups = Privileges.ManageGroups.allow();
     Privilege manageGrants = Privileges.ManageGrants.allow();
+    Privilege createModel = Privileges.CreateModel.allow();
+    Privilege createModelVersion = Privileges.CreateModelVersion.allow();
+    Privilege useModel = Privileges.UseModel.allow();
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
@@ -347,5 +350,37 @@ public class TestSecurableObjects {
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test create model
+    Assertions.assertTrue(createModel.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createModel.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createModel.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createModel.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createModel.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createModel.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createModel.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createModel.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(createModel.canBindTo(MetadataObject.Type.MODEL));
+    // Test create model version
+    Assertions.assertTrue(createModelVersion.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(createModelVersion.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(createModelVersion.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(createModelVersion.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(createModelVersion.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(createModelVersion.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(createModelVersion.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(createModelVersion.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertTrue(createModelVersion.canBindTo(MetadataObject.Type.MODEL));
+
+    // Test use model
+    Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(useModel.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertTrue(useModel.canBindTo(MetadataObject.Type.MODEL));
   }
 }
