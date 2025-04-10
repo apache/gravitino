@@ -42,6 +42,15 @@ Gravitino aims to provide several key features:
 * Multi-Engine Support: Gravitino supports query engines enabling metadata access without modifying SQL dialects.
 * AI Asset Management (WIP): Gravitino is expanding to manage both data and AI assets, with support for AI models and features currently in development.
 
+## Support matrix
+
+| | Metadata management | Sources | SDK support | Engine support | Authorization |
+|---------------|----------------------------------------------------------------|------------------------------------------|-----------------------------------------------|----------------------------|----------------------------------------|
+| **Table** | table<br>column<br>expression<br>partition<br>sort order<br>distribution<br>index | Hive<br>Iceberg<br>Hudi<br>Paimon<br>MySQL<br>PostgreSQL<br>Doris | Java client | Trino<br>Spark<br>Flink | Kerberos (proxy/non-proxy)<br>AK/SK<br>credential vending |
+| **Fileset** | file/directory | HDFS<br>S3<br>GCS | Java/Python client<br>Java Python GVFS | Spark<br>Python libraries | Kerberos<br>AK/SK |
+| **Topic** | topic | Kafka | Java client | Trino<br>Spark<br>Flink | |
+| **Model** | model version | sklearn | Java/Python client | Spark<br>Python libraries | |
+
 ## Contributing to Apache Gravitino
 
 Gravitino is open source software available under the Apache 2.0 license. For information on contributing to Gravitino, please see the [Contribution guidelines](https://gravitino.apache.org/contrib/).
