@@ -222,24 +222,24 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.
-          if (stringId == null && !isEntityExist(ident, TABLE)) {
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenProperties(
-                    getHiddenPropertyNames(
-                        getCatalogIdentifier(ident),
-                        HasPropertyMetadata::tablePropertiesMetadata,
-                        alteredTable.properties()));
+          TableEntity te = null;
+          if (stringId == null) {
+            te = getEntity(ident, TABLE, TableEntity.class);
+            if (te == null) {
+              return EntityCombinedTable.of(alteredTable)
+                  .withHiddenProperties(
+                      getHiddenPropertyNames(
+                          getCatalogIdentifier(ident),
+                          HasPropertyMetadata::tablePropertiesMetadata,
+                          alteredTable.properties()));
+            }
           }
 
           long tableId;
           if (stringId != null) {
             tableId = stringId.id();
           } else {
-            TableEntity tableEntity = getEntity(ident, TABLE, TableEntity.class);
-            if (tableEntity == null) {
-              throw new RuntimeException("Fail to check if entity is existed");
-            }
-            tableId = tableEntity.id();
+            tableId = te.id();
           }
 
           TableEntity updatedTableEntity =
@@ -491,7 +491,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // Some tables don't have properties or are not created by Gravitino,
           // we can't use stringIdentifier to judge whether schema is ever imported or not.
           // We need to check whether the entity exists.
-          .withImported(isEntityExist(ident, TABLE));
+          .withImported(true);
     }
 
     TableEntity tableEntity =

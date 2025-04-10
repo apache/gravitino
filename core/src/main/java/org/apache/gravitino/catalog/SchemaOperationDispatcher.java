@@ -241,24 +241,24 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
           StringIdentifier stringId = getStringIdFromProperties(alteredSchema.properties());
           // Case 1: The schema is not created by Gravitino and this schema is never imported.
-          if (stringId == null && !isEntityExist(ident, SCHEMA)) {
-            return EntityCombinedSchema.of(alteredSchema)
-                .withHiddenProperties(
-                    getHiddenPropertyNames(
-                        catalogIdent,
-                        HasPropertyMetadata::schemaPropertiesMetadata,
-                        alteredSchema.properties()));
+          SchemaEntity se = null;
+          if (stringId == null) {
+            se = getEntity(ident, SCHEMA, SchemaEntity.class);
+            if (se == null) {
+              return EntityCombinedSchema.of(alteredSchema)
+                  .withHiddenProperties(
+                      getHiddenPropertyNames(
+                          catalogIdent,
+                          HasPropertyMetadata::schemaPropertiesMetadata,
+                          alteredSchema.properties()));
+            }
           }
 
           long schemaId;
           if (stringId != null) {
             schemaId = stringId.id();
           } else {
-            SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
-            if (schemaEntity == null) {
-              throw new RuntimeException("Fail to check if entity is existed");
-            }
-            schemaId = schemaEntity.id();
+            schemaId = se.id();
           }
 
           SchemaEntity updatedSchemaEntity =
@@ -442,7 +442,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // For some catalogs like PG, the identifier information is not stored in the schema's
           // metadata, we need to check if this schema is existed in the store, if so we don't
           // need to import.
-          .withImported(isEntityExist(ident, SCHEMA));
+          .withImported(true);
     }
 
     SchemaEntity schemaEntity =
