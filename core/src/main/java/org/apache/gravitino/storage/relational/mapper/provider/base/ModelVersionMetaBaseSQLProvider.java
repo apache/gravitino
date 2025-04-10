@@ -147,4 +147,33 @@ public class ModelVersionMetaBaseSQLProvider {
         + ModelVersionMetaMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String updateModelVersionMeta(
+      @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
+      @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO) {
+
+    return "UPDATE "
+        + ModelVersionMetaMapper.TABLE_NAME
+        + " SET "
+        + "metalake_id = #{newModelVersionMeta.metalakeId}, "
+        + "catalog_id = #{newModelVersionMeta.catalogId}, "
+        + "schema_id = #{newModelVersionMeta.schemaId}, "
+        + "model_id = #{newModelVersionMeta.modelId}, "
+        + "version = #{newModelVersionMeta.modelVersion}, "
+        + "model_version_comment = #{newModelVersionMeta.modelVersionComment}, "
+        + "model_version_properties = #{newModelVersionMeta.modelVersionProperties}, "
+        + "model_version_uri = #{newModelVersionMeta.modelVersionUri}, "
+        + "audit_info = #{newModelVersionMeta.auditInfo}, "
+        + "deleted_at = #{newModelVersionMeta.deletedAt} "
+        + "WHERE model_id = #{oldModelVersionMeta.modelId} "
+        + "AND metalake_id = #{oldModelVersionMeta.metalakeId} "
+        + "AND catalog_id = #{oldModelVersionMeta.catalogId} "
+        + "AND schema_id = #{oldModelVersionMeta.schemaId} "
+        + "AND version = #{oldModelVersionMeta.modelVersion} "
+        + "AND model_version_comment = #{oldModelVersionMeta.modelVersionComment} "
+        + "AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties} "
+        + "AND model_version_uri = #{oldModelVersionMeta.modelVersionUri} "
+        + "AND audit_info = #{oldModelVersionMeta.auditInfo} "
+        + "AND deleted_at = 0";
+  }
 }

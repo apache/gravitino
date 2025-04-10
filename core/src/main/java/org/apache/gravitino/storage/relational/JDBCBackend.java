@@ -205,6 +205,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) TagMetaService.getInstance().updateTag(ident, updater);
       case MODEL:
         return (E) ModelMetaService.getInstance().updateModel(ident, updater);
+      case MODEL_VERSION:
+        return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
