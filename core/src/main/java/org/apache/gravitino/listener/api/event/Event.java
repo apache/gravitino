@@ -21,18 +21,11 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.EventDispatcher;
 
 /** Represents a post event. */
 @DeveloperApi
 public abstract class Event extends BaseEvent {
   protected Event(String user, NameIdentifier identifier) {
     super(user, identifier);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public void accept(EventDispatcher dispatcher) {
-    dispatcher.dispatchPostEvent(this);
   }
 }
