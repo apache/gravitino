@@ -21,6 +21,7 @@ package org.apache.gravitino.annotations;
 
 import java.lang.reflect.Method;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.auth.annotations.AuthorizeApi;
 import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

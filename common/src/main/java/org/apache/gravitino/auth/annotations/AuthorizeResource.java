@@ -16,33 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.annotations;
+package org.apache.gravitino.auth.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
 
-/**
- * This annotation is used to implement unified authentication in AOP.
- *
- * @author pancx
- */
-@Target({ElementType.METHOD})
+/** This annotation identify which parameters in the request are to be used for authorization. */
+@Target({ElementType.PARAMETER, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface AuthorizeApi {
-  Privilege.Name[] privileges() default {};
-
-  MetadataObject.Type resourceType() default MetadataObject.Type.UNKNOWN;
-
-  String expression() default "";
-
-  AuthorizeType rule() default AuthorizeType.RESOURCE_TYPE;
-
-  enum AuthorizeType {
-    EXPRESSION,
-    RESOURCE_TYPE
-  }
+public @interface AuthorizeResource {
+  /**
+   * The name of the parameter to be used for authorization.
+   *
+   * @return the name of the parameter to be used for authorization.
+   */
+  String value();
 }
