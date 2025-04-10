@@ -87,6 +87,17 @@ public abstract class MetricsSource {
   }
 
   /**
+   * Register a Gauge with timestamp
+   *
+   * @param name The name for the gauge, should be unique in metrics source.
+   * @param gauge The function to get gauge value.
+   */
+  public void registerGaugeWithTimestamp(String name, Gauge<?> gauge) {
+    registerGauge(name, gauge);
+    registerGauge(name + ".timestamp", (Gauge<Long>) System::currentTimeMillis);
+  }
+
+  /**
    * Get or create a Counter
    *
    * @param name The name for the counter, should be unique in metrics source.

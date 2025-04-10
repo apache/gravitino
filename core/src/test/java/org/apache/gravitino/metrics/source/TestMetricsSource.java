@@ -64,6 +64,10 @@ public class TestMetricsSource extends MetricsSource {
     return gaugeValue;
   }
 
+  private int getTestGaugeValue() {
+    return 1;
+  }
+
   @Test
   void testGauge() {
     registerGauge("a.gauge", () -> getGaugeValue());
@@ -75,6 +79,24 @@ public class TestMetricsSource extends MetricsSource {
         (Integer)
             metricsSystem.getMetricRegistry().gauge(TEST_METRICS_SOURCE + ".a.gauge").getValue();
     Assertions.assertEquals(2, v.intValue());
+  }
+
+  @Test
+  void testGaugeWithTimestamp() {
+    registerGaugeWithTimestamp("b.gauge", () -> getTestGaugeValue());
+    Integer v =
+        (Integer)
+            metricsSystem.getMetricRegistry().gauge(TEST_METRICS_SOURCE + ".b.gauge").getValue();
+
+    Assertions.assertEquals(1, v.intValue());
+    Long timestamp =
+        (Long)
+            metricsSystem
+                .getMetricRegistry()
+                .gauge(TEST_METRICS_SOURCE + ".b.gauge.timestamp")
+                .getValue();
+
+    Assertions.assertTrue(System.currentTimeMillis() - timestamp < 1000);
   }
 
   @Test

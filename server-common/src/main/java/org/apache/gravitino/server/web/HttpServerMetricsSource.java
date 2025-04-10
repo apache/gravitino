@@ -38,7 +38,7 @@ public class HttpServerMetricsSource extends MetricsSource {
             () ->
                 new SlidingTimeWindowArrayReservoir(
                     getTimeSlidingWindowSeconds(), TimeUnit.SECONDS)));
-    registerGauge(
+    registerGaugeWithTimestamp(
         MetricNames.SERVER_IDLE_THREAD_NUM, () -> server.getThreadPool().getIdleThreads());
   }
 }

@@ -27,13 +27,13 @@ public class RelationDatasourceMetricsSource extends MetricsSource {
 
   public RelationDatasourceMetricsSource(BasicDataSource dataSource) {
     super(MetricsSource.GRAVITINO_SERVER_METRIC_NAME);
-    registerGauge(
+    registerGaugeWithTimestamp(
         MetricNames.ENTITY_STORE_RELATION_DATASOURCE_ACTIVE_CONNECTIONS,
         (Gauge<Integer>) dataSource::getNumActive);
-    registerGauge(
+    registerGaugeWithTimestamp(
         MetricNames.ENTITY_STORE_RELATION_DATASOURCE_IDLE_CONNECTIONS,
         (Gauge<Integer>) dataSource::getNumIdle);
-    registerGauge(
+    registerGaugeWithTimestamp(
         MetricNames.ENTITY_STORE_RELATION_DATASOURCE_MAX_CONNECTIONS,
         (Gauge<Integer>) dataSource::getMaxTotal);
   }
