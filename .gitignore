@@ -27,6 +27,8 @@ replay_pid*
 **/.gradle
 **/.idea
 !/.idea/icon.svg
+!.idea/vcs.xml
+**/.vscode
 **/build
 gen
 **/.DS_Store

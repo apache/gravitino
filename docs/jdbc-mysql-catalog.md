@@ -28,7 +28,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports DDL operation for MySQL databases and tables.
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
-- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
+- Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
 
@@ -83,7 +83,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Supports DDL operation for MySQL tables.
 - Supports index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
-- Supports managing MySQL table features though table properties, like using `engine` to set MySQL storage engine.
+- Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
 ### Table column types
 
