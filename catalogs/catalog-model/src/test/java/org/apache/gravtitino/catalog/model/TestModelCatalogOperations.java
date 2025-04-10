@@ -714,7 +714,7 @@ public class TestModelCatalogOperations {
 
     ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
-    // validade loaded model
+    // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
     Assertions.assertEquals(1, loadedModel.latestVersion());
 
