@@ -909,7 +909,7 @@ The following types that Gravitino supports:
 | Union                     | `Types.UnionType.of([type1, type2, ...])`                                | `{"type": "union", "types": [type JSON, ...]}`                                                                                       | Union type, indicates a union of types                                                                                                                                     |
 | UUID                      | `Types.UUIDType.get()`                                                   | `uuid`                                                                                                                               | UUID type, indicates a universally unique identifier                                                                                                                       |
 
-The related java doc is [here](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/types/Type.html).
+The related java doc is [here](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/java/org/apache/gravitino/rel/types/Type.html).
 
 ##### External type
 
