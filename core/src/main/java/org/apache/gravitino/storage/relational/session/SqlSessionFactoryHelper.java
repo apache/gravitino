@@ -98,8 +98,8 @@ public class SqlSessionFactoryHelper {
     dataSource.setRemoveAbandonedOnBorrow(true);
     dataSource.setRemoveAbandonedTimeout(60);
     dataSource.setTimeBetweenEvictionRunsMillis(Duration.ofMillis(10 * 60 * 1000L).toMillis());
-    dataSource.setTestOnBorrow(BaseObjectPoolConfig.DEFAULT_TEST_ON_BORROW);
-    dataSource.setTestWhileIdle(BaseObjectPoolConfig.DEFAULT_TEST_WHILE_IDLE);
+    dataSource.setTestOnBorrow(true);
+    dataSource.setTestWhileIdle(true);
     dataSource.setMinEvictableIdleTimeMillis(1000);
     dataSource.setNumTestsPerEvictionRun(BaseObjectPoolConfig.DEFAULT_NUM_TESTS_PER_EVICTION_RUN);
     dataSource.setTestOnReturn(BaseObjectPoolConfig.DEFAULT_TEST_ON_RETURN);
