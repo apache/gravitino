@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Map;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -61,7 +60,8 @@ public class ListTagProperties extends ListProperties {
       exitWithError(exp.getMessage());
     }
 
-    Map<String, String> properties = gTag.properties();
-    printProperties(properties);
+    if (gTag != null) {
+      printProperties(gTag.properties());
+    }
   }
 }
