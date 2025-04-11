@@ -17,21 +17,22 @@
  *  under the License.
  */
 
-package org.apache.gravitino.lineage.source;
+package org.apache.gravitino.lineage;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Map;
-import java.util.Set;
-import org.apache.gravitino.lineage.LineageDispatcher;
-import org.apache.gravitino.lineage.source.rest.LineageOperations;
-import org.apache.gravitino.server.web.SupportsRESTPackages;
+import io.openlineage.server.OpenLineage.Job;
+import io.openlineage.server.OpenLineage.Run;
+import io.openlineage.server.OpenLineage.RunEvent;
 
-public class HTTPLineageSource implements LineageSource, SupportsRESTPackages {
-  @Override
-  public void initialize(Map<String, String> configs, LineageDispatcher dispatcher) {}
+public class Utils {
+  private Utils() {}
 
-  @Override
-  public Set<String> getRESTPackages() {
-    return ImmutableSet.of(LineageOperations.class.getPackage().getName());
+  public static String getRunID(RunEvent event) {
+    Run run = event.getRun();
+    return run == null ? "Unknown" : run.getRunId().toString();
+  }
+
+  public static String getJobName(RunEvent event) {
+    Job job = event.getJob();
+    return job == null ? "Unknown" : job.getName().toString();
   }
 }
