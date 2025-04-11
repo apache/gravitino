@@ -22,6 +22,7 @@ package org.apache.gravitino.listener;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.listener.api.EventDispatcher;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
@@ -38,6 +39,7 @@ public class EventBus {
   // which are meant for synchronous event listening, or AsyncQueueListener, designed for
   // asynchronous event processing.
   private final List<EventListenerPlugin> eventListeners;
+  private final InternalVisitor internalVisitor;
 
   /**
    * Constructs an EventBus with a predefined list of event listeners.
@@ -47,6 +49,7 @@ public class EventBus {
    */
   public EventBus(List<EventListenerPlugin> eventListeners) {
     this.eventListeners = eventListeners;
+    this.internalVisitor = new InternalVisitor();
   }
 
   /**
@@ -56,13 +59,7 @@ public class EventBus {
    * @param baseEvent The event to be dispatched to all registered listeners.
    */
   public void dispatchEvent(BaseEvent baseEvent) {
-    if (baseEvent instanceof PreEvent) {
-      dispatchPreEvent((PreEvent) baseEvent);
-    } else if (baseEvent instanceof Event) {
-      dispatchPostEvent((Event) baseEvent);
-    } else {
-      throw new RuntimeException("Unknown event type:" + baseEvent.getClass().getSimpleName());
-    }
+    baseEvent.accept(internalVisitor);
   }
 
   /**
@@ -77,11 +74,18 @@ public class EventBus {
     return eventListeners;
   }
 
-  private void dispatchPostEvent(Event postEvent) {
-    eventListeners.forEach(eventListener -> eventListener.onPostEvent(postEvent));
-  }
+  /** Internal visitor is an inner private class that dispatches events to registered listeners. */
+  private class InternalVisitor implements EventDispatcher {
+    /** {@inheritDoc} */
+    @Override
+    public void dispatchPreEvent(PreEvent event) throws ForbiddenException {
+      eventListeners.forEach(eventListener -> eventListener.onPreEvent(event));
+    }
 
-  private void dispatchPreEvent(PreEvent preEvent) throws ForbiddenException {
-    eventListeners.forEach(eventListener -> eventListener.onPreEvent(preEvent));
+    /** {@inheritDoc} */
+    @Override
+    public void dispatchPostEvent(Event event) {
+      eventListeners.forEach(eventListener -> eventListener.onPostEvent(event));
+    }
   }
 }
