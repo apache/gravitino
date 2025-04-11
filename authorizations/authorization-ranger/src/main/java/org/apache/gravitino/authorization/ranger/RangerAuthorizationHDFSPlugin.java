@@ -281,7 +281,12 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
-    // TODO: The remove schema logic will be implemented when schema is supported
+    Preconditions.checkArgument(
+        authzMetadataObject.names().size() == 2, "The metadata object's name size must be 2");
+    Preconditions.checkArgument(
+        authzMetadataObject.type().equals(PathBasedMetadataObject.SCHEMA_PATH),
+        "The metadata object type must be a path");
+    removePolicyByMetadataObject(authzMetadataObject);
   }
 
   /**
@@ -478,6 +483,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                           rangerPrivileges,
                           false,
                           new SchemaPathExtractor());
+
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -583,7 +589,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       case METALAKE:
       case CATALOG:
       case SCHEMA:
-        break;
       case FILESET:
       case TABLE:
         translateMetadataObject(gravitinoMetadataObject)
@@ -615,7 +620,20 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         metadataObject.type().equals(MetadataObject.Type.METALAKE)
             ? NameIdentifier.of(metadataObject.fullName())
             : NameIdentifier.parse(String.join(".", metalake, metadataObject.fullName()));
-    List<String> locations = AuthorizationUtils.getMetadataObjectLocation(identifier, entityType);
+
+    List<String> locations = Lists.newArrayList();
+    if (metadataObject.type() == MetadataObject.Type.METALAKE) {
+      NameIdentifier[] catalogs =
+          GravitinoEnv.getInstance()
+              .catalogDispatcher()
+              .listCatalogs(Namespace.of(identifier.name()));
+      for (NameIdentifier catalog : catalogs) {
+        locations.addAll(
+            AuthorizationUtils.getMetadataObjectLocation(catalog, Entity.EntityType.CATALOG));
+      }
+    } else {
+      locations.addAll(AuthorizationUtils.getMetadataObjectLocation(identifier, entityType));
+    }
 
     locations.forEach(
         locationPath -> {

@@ -319,13 +319,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   /** {@inheritDoc} */
   @Override
   public boolean isServiceAdmin(String user) {
-    try {
-      // TODO: add Event
-      return dispatcher.isServiceAdmin(user);
-    } catch (Exception e) {
-      // TODO: add failure event
-      throw e;
-    }
+    return dispatcher.isServiceAdmin(user);
   }
 
   /** {@inheritDoc} */
@@ -346,7 +340,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(
+          new CreateRoleFailureEvent(
+              initiator, metalake, e, new RoleInfo(role, properties, securableObjects)));
       throw e;
     }
   }
@@ -364,7 +360,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new GetRoleFailureEvent(initiator, metalake, e, role));
       throw e;
     }
   }
@@ -381,7 +377,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return isExists;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new DeleteRoleFailureEvent(initiator, metalake, e, role));
       throw e;
     }
   }
@@ -398,7 +394,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleNames;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListRoleNamesFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -416,7 +412,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleNames;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(new ListRoleNamesFailureEvent(initiator, metalake, e, object));
       throw e;
     }
   }
@@ -438,7 +434,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(
+          new GrantPrivilegesFailureEvent(initiator, metalake, e, role, object, privileges));
       throw e;
     }
   }
@@ -460,7 +457,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
       return roleObject;
     } catch (Exception e) {
-      // TODO: add failure event
+      eventBus.dispatchEvent(
+          new RevokePrivilegesFailureEvent(initiator, metalake, e, role, object, privileges));
       throw e;
     }
   }

@@ -155,7 +155,7 @@ public class RangerFilesetIT extends BaseIT {
     Assertions.assertTrue(fileSystem.exists(new Path(storageLocation(filename))));
     List<RangerPolicy> policies =
         rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
-    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(2, policies.size());
     Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
 
     Assertions.assertEquals(
@@ -208,11 +208,11 @@ public class RangerFilesetIT extends BaseIT {
     metalake.createRole(filesetRole, Collections.emptyMap(), Lists.newArrayList(securableObject));
 
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
-    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(2, policies.size());
     Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
     Assertions.assertEquals(
         1,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -227,7 +227,7 @@ public class RangerFilesetIT extends BaseIT {
             .count());
     Assertions.assertEquals(
         0,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -242,7 +242,7 @@ public class RangerFilesetIT extends BaseIT {
             .count());
     Assertions.assertEquals(
         1,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -266,11 +266,11 @@ public class RangerFilesetIT extends BaseIT {
         Sets.newHashSet(Privileges.WriteFileset.allow()));
 
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
-    Assertions.assertEquals(1, policies.size());
-    Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
+    Assertions.assertEquals(2, policies.size());
+    Assertions.assertEquals(3, policies.get(1).getPolicyItems().size());
     Assertions.assertEquals(
         1,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -285,7 +285,7 @@ public class RangerFilesetIT extends BaseIT {
             .count());
     Assertions.assertEquals(
         1,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -300,7 +300,7 @@ public class RangerFilesetIT extends BaseIT {
             .count());
     Assertions.assertEquals(
         1,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -323,11 +323,11 @@ public class RangerFilesetIT extends BaseIT {
             MetadataObject.Type.FILESET),
         Sets.newHashSet(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
-    Assertions.assertEquals(1, policies.size());
+    Assertions.assertEquals(2, policies.size());
     Assertions.assertEquals(3, policies.get(0).getPolicyItems().size());
     Assertions.assertEquals(
         0,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -342,7 +342,7 @@ public class RangerFilesetIT extends BaseIT {
             .count());
     Assertions.assertEquals(
         0,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -357,7 +357,7 @@ public class RangerFilesetIT extends BaseIT {
             .count());
     Assertions.assertEquals(
         0,
-        policies.get(0).getPolicyItems().stream()
+        policies.get(1).getPolicyItems().stream()
             .filter(
                 item ->
                     item.getRoles().contains(rangerHelper.generateGravitinoRoleName(filesetRole)))
@@ -374,7 +374,7 @@ public class RangerFilesetIT extends BaseIT {
 
     catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, fileset.name()));
     policies = rangerClient.getPoliciesInService(RangerITEnv.RANGER_HDFS_REPO_NAME);
-    Assertions.assertEquals(0, policies.size());
+    Assertions.assertEquals(1, policies.size());
   }
 
   @Test

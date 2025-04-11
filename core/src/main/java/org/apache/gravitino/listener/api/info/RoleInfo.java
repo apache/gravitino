@@ -52,6 +52,21 @@ public class RoleInfo {
   }
 
   /**
+   * Constructs a new {@code RoleInfo} instance using the given arguments.
+   *
+   * @param roleName The role name.
+   * @param properties The properties associated with the role.
+   * @param securableObjects The securable objects that belong to the role.
+   */
+  public RoleInfo(
+      String roleName, Map<String, String> properties, List<SecurableObject> securableObjects) {
+    this.roleName = roleName;
+    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+    this.securableObjects =
+        securableObjects == null ? ImmutableList.of() : ImmutableList.copyOf(securableObjects);
+  }
+
+  /**
    * Returns the role name.
    *
    * @return the role name.

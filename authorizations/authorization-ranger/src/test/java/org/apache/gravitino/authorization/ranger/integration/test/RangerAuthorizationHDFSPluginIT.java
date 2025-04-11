@@ -305,12 +305,12 @@ public class RangerAuthorizationHDFSPluginIT {
           MetadataObject catalog = MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG);
           List<AuthorizationSecurableObject> catalogOwner =
               rangerAuthPlugin.translateOwner(catalog);
-          Assertions.assertEquals(0, catalogOwner.size());
+          Assertions.assertEquals(1, catalogOwner.size());
 
           MetadataObject schema =
               MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA);
           List<AuthorizationSecurableObject> schemaOwner = rangerAuthPlugin.translateOwner(schema);
-          Assertions.assertEquals(0, schemaOwner.size());
+          Assertions.assertEquals(1, schemaOwner.size());
 
           MetadataObject fileset =
               MetadataObjects.parse("catalog1.schema1.fileset1", MetadataObject.Type.FILESET);
