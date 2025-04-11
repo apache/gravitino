@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop.integration.test;
 
-import static org.apache.gravitino.file.Fileset.LOCATION_PLACEHOLDER_PREFIX;
+import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.Type.MANAGED;
 
 import com.google.common.collect.ImmutableMap;
@@ -261,7 +261,7 @@ public class HadoopCatalogIT extends BaseIT {
     // create fileset with placeholder in storage location
     String filesetName = "test_alter_fileset";
     String storageLocation = storageLocation(filesetName) + "/{{user}}";
-    String placeholderKey = LOCATION_PLACEHOLDER_PREFIX + "user";
+    String placeholderKey = PROPERTY_LOCATION_PLACEHOLDER_PREFIX + "user";
     createFileset(
         filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of(placeholderKey, "test"));
 
