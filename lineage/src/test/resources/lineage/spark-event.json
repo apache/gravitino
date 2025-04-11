@@ -1,0 +1,195 @@
+{
+  "eventTime": "2025-03-07T09:49:39.719Z",
+  "producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+  "schemaURL": "https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunEvent",
+  "eventType": "COMPLETE",
+  "run": {
+    "runId": "01956fcb-c4f8-1234-a151-1d699950225d",
+    "facets": {
+      "spark_properties": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+        "_schemaURL": "https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunFacet",
+        "properties": {
+          "spark.master": "local[*]",
+          "spark.app.name": "SparkSQL::192.168.31.176"
+        }
+      },
+      "processing_engine": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-1-1/ProcessingEngineRunFacet.json#/$defs/ProcessingEngineRunFacet",
+        "version": "3.5.3",
+        "name": "spark",
+        "openlineageAdapterVersion": "1.30.0-SNAPSHOT"
+      },
+      "environment-properties": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+        "_schemaURL": "https://openlineage.io/spec/2-0-2/OpenLineage.json#/$defs/RunFacet",
+        "environment-properties": {
+          
+        }
+      }
+    }
+  },
+  "job": {
+    "namespace": "test",
+    "name": "spark_demo_for_gravitino11",
+    "facets": {
+      "jobType": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+        "_schemaURL": "https://openlineage.io/spec/facets/2-0-3/JobTypeJobFacet.json#/$defs/JobTypeJobFacet",
+        "processingType": "BATCH",
+        "integration": "SPARK",
+        "jobType": "SQL_JOB"
+      },
+      "sql": {
+        "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+        "_schemaURL": "https://openlineage.io/spec/facets/1-0-1/SQLJobFacet.json#/$defs/SQLJobFacet",
+        "query": " \ncreate table iceberg.test1.abc2 as select name, sum(age) as age from parquet.`gvfs://fileset/catalog1/schema/fileset/a` group by name"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "namespace": "test",
+      "name": "catalog1.schema.fileset1",
+      "facets": {
+         "datasetType": {
+           "_producer": "https://github.com/OpenLineage/OpenLineage/blob/main/spec/OpenLineage.json", 
+           "_schemaURL": "https://github.com/OpenLineage/OpenLineage/blob/main/spec/facets/DatasetTypeDatasetFacet.json", 
+           "datasetType": "FILE" 
+         },
+        "dataSource": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-1/DatasourceDatasetFacet.json#/$defs/DatasourceDatasetFacet",
+          "name": "test",
+          "uri": "test"
+        },
+        "schema": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-1-1/SchemaDatasetFacet.json#/$defs/SchemaDatasetFacet",
+          "fields": [
+            {
+              "name": "Name",
+              "type": "string"
+            },
+            {
+              "name": "Age",
+              "type": "long"
+            }
+          ]
+        },
+        "locations": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://raw.githubusercontent.com/OpenLineage/OpenLineage/main/spec/OpenLineage.json#/definitions/BaseFacet",
+          "locations": [
+            "catalog1.schema.fileset"
+          ]
+        }
+      },
+      "inputFacets": {
+        "inputStatistics": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-0/InputStatisticsInputDatasetFacet.json#/$defs/InputStatisticsInputDatasetFacet",
+          "size": 2532,
+          "fileCount": 4
+        }
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "namespace": "test",
+      "name": "iceberg.test1.abc21",
+      "facets": {
+         "datasetType": {
+           "_producer": "https://github.com/OpenLineage/OpenLineage/blob/main/spec/OpenLineage.json",
+           "_schemaURL": "https://github.com/OpenLineage/OpenLineage/blob/main/spec/facets/DatasetTypeDatasetFacet.json",
+           "datasetType": "MODEL"
+         },
+        "dataSource": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-1/DatasourceDatasetFacet.json#/$defs/DatasourceDatasetFacet",
+          "name": "test",
+          "uri": "test"
+        },
+        "columnLineage": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-2-0/ColumnLineageDatasetFacet.json#/$defs/ColumnLineageDatasetFacet",
+          "fields": {
+            "name": {
+              "inputFields": [
+                {
+                  "namespace": "test",
+                  "name": "catalog1.schema.fileset1",
+                  "field": "Name",
+                  "transformations": [
+                    {
+                      "type": "DIRECT",
+                      "subtype": "IDENTITY",
+                      "description": "",
+                      "masking": false
+                    }
+                  ]
+                }
+              ]
+            },
+            "age": {
+              "inputFields": [
+                {
+                  "namespace": "test",
+                  "name": "catalog1.schema.fileset1",
+                  "field": "Age",
+                  "transformations": [
+                    {
+                      "type": "DIRECT",
+                      "subtype": "AGGREGATION",
+                      "description": "",
+                      "masking": false
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "dataset": [
+            {
+              "namespace": "test",
+              "name": "catalog1.schema.fileset1",
+              "field": "Name",
+              "transformations": [
+                {
+                  "type": "INDIRECT",
+                  "subtype": "GROUP_BY",
+                  "description": "",
+                  "masking": false
+                }
+              ]
+            }
+          ]
+        },
+        "lifecycleStateChange": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-0-1/LifecycleStateChangeDatasetFacet.json#/$defs/LifecycleStateChangeDatasetFacet",
+          "lifecycleStateChange": "CREATE"
+        },
+        "schema": {
+          "_producer": "https://github.com/OpenLineage/OpenLineage/tree/1.30.0-SNAPSHOT/integration/spark",
+          "_schemaURL": "https://openlineage.io/spec/facets/1-1-1/SchemaDatasetFacet.json#/$defs/SchemaDatasetFacet",
+          "fields": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "age",
+              "type": "long"
+            }
+          ]
+        }
+      },
+      "outputFacets": {
+        
+      }
+    }
+  ]
+}
