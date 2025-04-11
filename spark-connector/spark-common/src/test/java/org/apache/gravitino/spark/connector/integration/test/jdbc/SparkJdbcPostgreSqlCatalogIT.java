@@ -90,19 +90,19 @@ public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
   protected void initCatalogEnv() throws Exception {
     ContainerSuite containerSuite = ContainerSuite.getInstance();
     containerSuite.startPostgreSQLContainer(PG_CATALOG_PG_IT);
-    pgUrl = containerSuite.getPostgreSQLContainer().getJdbcUrl();
-    pgUsername = containerSuite.getPostgreSQLContainer().getUsername();
-    pgPassword = containerSuite.getPostgreSQLContainer().getPassword();
-    pgDriver = containerSuite.getPostgreSQLContainer().getDriverClassName(PG_CATALOG_PG_IT);
+    this.pgUrl = containerSuite.getPostgreSQLContainer().getJdbcUrl();
+    this.pgUsername = containerSuite.getPostgreSQLContainer().getUsername();
+    this.pgPassword = containerSuite.getPostgreSQLContainer().getPassword();
+    this.pgDriver = containerSuite.getPostgreSQLContainer().getDriverClassName(PG_CATALOG_PG_IT);
   }
 
   @Override
   protected Map<String, String> getCatalogConfigs() {
     Map<String, String> catalogProperties = Maps.newHashMap();
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, pgUrl);
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, pgUsername);
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, pgPassword);
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, pgDriver);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, this.pgUrl);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, this.pgUsername);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, this.pgPassword);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, this.pgDriver);
     return catalogProperties;
   }
 }
