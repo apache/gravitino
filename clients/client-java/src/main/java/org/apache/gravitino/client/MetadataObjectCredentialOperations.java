@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 import java.util.Collections;
 import java.util.Locale;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.dto.responses.CredentialResponse;
@@ -49,14 +50,19 @@ class MetadataObjectCredentialOperations implements SupportsCredentials {
 
   @Override
   public Credential[] getCredentials() {
-    CredentialResponse resp =
-        restClient.get(
-            credentialRequestPath,
-            CredentialResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.credentialErrorHandler());
-
-    resp.validate();
-    return DTOConverters.fromDTO(resp.getCredentials());
+    try {
+      CallerContext callerContext = CallerContext.CallerContextHolder.get();
+      CredentialResponse resp =
+          restClient.get(
+              credentialRequestPath,
+              CredentialResponse.class,
+              callerContext != null ? callerContext.context() : Collections.emptyMap(),
+              ErrorHandlers.credentialErrorHandler());
+      resp.validate();
+      return DTOConverters.fromDTO(resp.getCredentials());
+    } finally {
+      // Clear the caller context
+      CallerContext.CallerContextHolder.remove();
+    }
   }
 }
