@@ -17,18 +17,15 @@
   under the License.
 -->
 
-# Apache Gravitino
+# Apache Gravitino Chart
 
-Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the
-metadata directly in
-different sources, types, and regions. It also provides users with unified metadata access
-for data and AI assets.
+This Helm chart deploys Apache Gravitino on Kubernetes with customizable configurations.
 
 **Homepage:** <https://gravitino.apache.org/>
 
 ## Prerequisites
 
-- Kubernetes 1.30+
+- Kubernetes 1.29+
 - Helm 3+
 
 ## Maintainers
@@ -40,7 +37,6 @@ for data and AI assets.
 ## Source Code
 
 * <https://github.com/apache/gravitino>
-* <https://github.com/apache/gravitino-playground>
 
 ## Update Chart Dependency
 

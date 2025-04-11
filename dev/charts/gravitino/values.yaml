@@ -182,7 +182,7 @@ authenticators: simple
 authenticator:
   oauth:
     serviceAudience: test
-    defaultSignKey: MIIAIjBNBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqmmqfSy8vH9BMKZLIjPHNTClH7yyykV/J/dfNwwicoYCBQgLOLRq59nAiJ9/WOkIq7zIXQ8iZU5XmI0bRSo3Ah7G4uF6CUbpny+n4zxwTfEEJ3dVC1Aa1g3DZbf8mN76B2ykf6z4FEbTWVBp0xMZ14YBOIuOUkN4F/x8bQNYRPl0yepLBZf6uY26f2o5+yKBcpAk7K/pGoD4v+DKpt/A8bvf4fy3JpZERsMPS/veeyIqR6f+455KLjRabBpxl5xIo8iUer5O0Ci8xbQMci4ErRRemm5n1e74Kqpz5u/TcLIPdMLXJ57fLl9t7V9BtLyRTjyooJpnl/lz+kJ+VIt1kQICNPMB
+    defaultSignKey: ""
     serverUri: http://57.185.211.74:8080
     tokenPath: /realms/myrealm/protocol/openid-connect/token
 

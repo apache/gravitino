@@ -79,3 +79,6 @@ resources:
   requests:
     cpu: 500m
     memory: 512Mi
+
+ingress:
+  enabled: true
