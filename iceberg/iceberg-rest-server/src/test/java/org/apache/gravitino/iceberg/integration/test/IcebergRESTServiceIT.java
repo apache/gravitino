@@ -70,7 +70,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql("DROP database " + namespace);
   }
 
-  private void purgeAllIcebergTestNamespaces() {
+  protected void purgeAllIcebergTestNamespaces() {
     List<Object[]> databases =
         sql(String.format("SHOW DATABASES like '%s*'", ICEBERG_REST_NS_PREFIX));
     Set<String> databasesString = convertToStringSet(databases, 0);
