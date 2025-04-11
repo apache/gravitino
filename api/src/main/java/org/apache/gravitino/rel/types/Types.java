@@ -330,14 +330,31 @@ public class Types {
 
   /** The time type in Gravitino. */
   public static class TimeType extends Type.DateTimeType {
-    private static final TimeType INSTANCE = new TimeType();
+    private static final TimeType INSTANCE = new TimeType(0);
 
     /** @return The singleton instance of {@link TimeType}. */
     public static TimeType get() {
       return INSTANCE;
     }
 
-    private TimeType() {}
+    /**
+     * @param precision The precision of the time type.
+     * @return A {@link TimeType} with the given precision.
+     */
+    public static TimeType of(int precision) {
+      return new TimeType(precision);
+    }
+
+    private final int precision;
+
+    private TimeType(int precision) {
+      this.precision = precision;
+    }
+
+    /** @return The precision of the time type. */
+    public int precision() {
+      return precision;
+    }
 
     @Override
     public Name name() {
@@ -346,14 +363,27 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "time";
+      return precision == 0 ? "time" : String.format("time(%d)", precision);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof TimeType)) return false;
+      TimeType that = (TimeType) o;
+      return precision == that.precision;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(precision);
     }
   }
 
   /** The timestamp type in Gravitino. */
   public static class TimestampType extends Type.DateTimeType {
-    private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false);
-    private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true);
+    private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false, 0);
+    private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true, 0);
 
     /** @return A {@link TimestampType} with time zone. */
     public static TimestampType withTimeZone() {
@@ -365,15 +395,38 @@ public class Types {
       return INSTANCE_WITHOUT_TIME_ZONE;
     }
 
-    private final boolean withTimeZone;
+    /**
+     * @param precision The precision of the timestamp type.
+     * @return A {@link TimestampType} with the given precision and time zone.
+     */
+    public static TimestampType withTimeZone(int precision) {
+      return new TimestampType(true, precision);
+    }
 
-    private TimestampType(boolean withTimeZone) {
+    /**
+     * @param precision The precision of the timestamp type.
+     * @return A {@link TimestampType} with the given precision and without time zone.
+     */
+    public static TimestampType withoutTimeZone(int precision) {
+      return new TimestampType(false, precision);
+    }
+
+    private final boolean withTimeZone;
+    private final int precision;
+
+    private TimestampType(boolean withTimeZone, int precision) {
       this.withTimeZone = withTimeZone;
+      this.precision = precision;
     }
 
     /** @return True if the timestamp type has time zone, false otherwise. */
     public boolean hasTimeZone() {
       return withTimeZone;
+    }
+
+    /** @return The precision of the timestamp type. */
+    public int precision() {
+      return precision;
     }
 
     @Override
@@ -384,7 +437,25 @@ public class Types {
     /** @return The simple string representation of the timestamp type. */
     @Override
     public String simpleString() {
-      return withTimeZone ? "timestamp_tz" : "timestamp";
+      if (precision == 0) {
+        return withTimeZone ? "timestamp_tz" : "timestamp";
+      }
+      return withTimeZone
+          ? String.format("timestamp_tz(%d)", precision)
+          : String.format("timestamp(%d)", precision);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof TimestampType)) return false;
+      TimestampType that = (TimestampType) o;
+      return withTimeZone == that.withTimeZone && precision == that.precision;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(withTimeZone, precision);
     }
   }
 
