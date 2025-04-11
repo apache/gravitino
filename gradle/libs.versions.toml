@@ -118,6 +118,7 @@ datanucleus-jdo = "3.2.0-m3"
 hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
+openlineage = "1.29.0"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -279,6 +280,7 @@ google-auth-credentials = { group = "com.google.auth", name = "google-auth-libra
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
+openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
@@ -299,6 +301,6 @@ rat = { id = "org.nosphere.apache.rat", version.ref = "rat-plugin" }
 shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow-plugin" }
 node = { id = "com.github.node-gradle.node", version.ref = "node-plugin" }
 tasktree = {id = "com.dorongold.task-tree", version = "2.1.1"}
-dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.5"}
+dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.9"}
 bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
 errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}

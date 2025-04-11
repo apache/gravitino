@@ -106,4 +106,15 @@ public class TestNamespaceUtil {
         namespace.toString());
     Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.ofGroup(null));
   }
+
+  @Test
+  void testOfRole() {
+    String metalake = "metalake";
+    Namespace namespace = NamespaceUtil.ofRole(metalake);
+
+    Assertions.assertEquals(
+        Joiner.on(".").join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME),
+        namespace.toString());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.ofRole(null));
+  }
 }
