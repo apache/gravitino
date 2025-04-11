@@ -28,8 +28,8 @@ import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.openlineage.server.OpenLineage.Run;
 import io.openlineage.server.OpenLineage.RunEvent;
+import org.apache.gravitino.lineage.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,13 +61,8 @@ public class LineageLogSink implements LineageSink {
     } catch (JsonProcessingException e) {
       LOG.warn(
           "Process open lineage event failed, run id: {}, error message: {}",
-          getRunId(event),
+          Utils.getRunID(event),
           e.getMessage());
     }
-  }
-
-  private String getRunId(RunEvent event) {
-    Run run = event.getRun();
-    return run == null ? "Unknown" : run.getRunId().toString();
   }
 }

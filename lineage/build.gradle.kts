@@ -22,20 +22,36 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":server-common"))
+  implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.slf4j.api)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
+  implementation(libs.metrics.jersey2)
   implementation(libs.openlineage.java) {
     isTransitive = false
   }
+  implementation(libs.slf4j.api)
 
+  annotationProcessor(libs.lombok)
+  compileOnly(libs.lombok)
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
+
+  testImplementation(libs.jersey.test.framework.core) {
+    exclude(group = "org.junit.jupiter")
+  }
+  testImplementation(libs.jersey.test.framework.provider.jetty) {
+    exclude(group = "org.junit.jupiter")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
