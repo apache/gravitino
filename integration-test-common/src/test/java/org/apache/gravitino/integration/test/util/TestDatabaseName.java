@@ -102,4 +102,12 @@ public enum TestDatabaseName {
       return this.name().toLowerCase();
     }
   },
+
+  PG_CATALOG_PG_IT {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
 }
