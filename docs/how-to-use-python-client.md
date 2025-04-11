@@ -63,7 +63,7 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## How to development Apache Gravitino Python Client
+## How to develop Apache Gravitino Python Client
 
 You can ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 
@@ -116,6 +116,32 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
     ```shell
     ./gradlew :clients:client-python:deploy
     ```
+   
+### IDE specific settings
+
+#### JetBrains Intellij IDEA
+
+We use conda environment to manage python environment, to configure Python
+SDK, you need to:
+
+1. Make sure you followed the step to build python module in [Build and testing](#build-and-testing)
+
+2. Find conda binary by executing this command
+
+```shell
+ls $(pwd)/.gradle/python/*/Miniforge3/bin/conda
+
+# example output
+repo/gravitino/.gradle/python/MacOSX/Miniforge3/bin/conda*
+```
+
+3. Follow steps in [Create a conda environment](https://www.jetbrains.com/help/idea/configuring-python-sdk.html#gdizlj_44), 
+and at step 5, choose [Existing conda environment](https://www.jetbrains.com/help/idea/configuring-python-sdk.html#existing-conda-environment)
+
+4. Fill in the output into *Conda executable* field
+5. Done! Now, select any python files and start developing Gravitino Python Client.
+
+![Configure Conda Environment](./assets/intellij-conda-environment.png)
 
 ## Resources
 
