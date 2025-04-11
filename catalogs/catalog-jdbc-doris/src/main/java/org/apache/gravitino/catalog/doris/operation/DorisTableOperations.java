@@ -159,7 +159,8 @@ public class DorisTableOperations extends JdbcTableOperations {
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
     if (!resultMap.containsKey(REPLICATION_FACTOR)) {
-      // Try to check the number of backend servers using show backends command
+      // Try to check the number of backend servers using `show backends`, this SQL is supported by
+      // all versions of Doris
       String query = "show backends";
 
       try (Connection connection = dataSource.getConnection();
