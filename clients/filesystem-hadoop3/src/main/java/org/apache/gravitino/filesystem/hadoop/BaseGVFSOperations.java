@@ -130,6 +130,8 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final long defaultBlockSize;
 
+  private final boolean enableCredentialVending;
+
   /**
    * Constructs a new {@link BaseGVFSOperations} with the given {@link Configuration}.
    *
@@ -165,6 +167,10 @@ public abstract class BaseGVFSOperations implements Closeable {
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE,
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE_DEFAULT);
 
+    this.enableCredentialVending =
+        configuration.getBoolean(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING,
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT);
     this.conf = configuration;
   }
 
@@ -370,6 +376,15 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   /**
+   * Whether to enable credential vending.
+   *
+   * @return true if credential vending is enabled, false otherwise.
+   */
+  protected boolean enableCredentialVending() {
+    return enableCredentialVending;
+  }
+
+  /**
    * Get the actual file path by the given virtual path and location name.
    *
    * @param gvfsPath the virtual path.
@@ -385,15 +400,15 @@ public abstract class BaseGVFSOperations implements Closeable {
     String subPath = getSubPathFromGvfsPath(filesetIdent, gvfsPath.toString());
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
-    setCallerContext(operation);
     String fileLocation;
     try {
+      FilesetCatalog filesetCatalog = getFilesetCatalog(catalogIdent);
+      setCallerContextForGetFileLocation(operation);
       fileLocation =
-          getFilesetCatalog(catalogIdent)
-              .getFileLocation(
-                  NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name()),
-                  subPath,
-                  locationName);
+          filesetCatalog.getFileLocation(
+              NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name()),
+              subPath,
+              locationName);
     } catch (NoSuchCatalogException | CatalogNotInUseException e) {
       String message = String.format("Cannot get fileset catalog by identifier: %s", catalogIdent);
       LOG.warn(message, e);
@@ -527,12 +542,19 @@ public abstract class BaseGVFSOperations implements Closeable {
     return internalFileSystemCache;
   }
 
-  private void setCallerContext(FilesetDataOperation operation) {
+  private void setCallerContextForGetFileLocation(FilesetDataOperation operation) {
     Map<String, String> contextMap = Maps.newHashMap();
     contextMap.put(
         FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE,
         InternalClientType.HADOOP_GVFS.name());
     contextMap.put(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION, operation.name());
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+    CallerContext.CallerContextHolder.set(callerContext);
+  }
+
+  private void setCallerContextForGetCredentials(String locationName) {
+    Map<String, String> contextMap = Maps.newHashMap();
+    contextMap.put(Credential.HTTP_HEADER_CURRENT_LOCATION_NAME, locationName);
     CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
     CallerContext.CallerContextHolder.set(callerContext);
   }
@@ -560,7 +582,8 @@ public abstract class BaseGVFSOperations implements Closeable {
 
               Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
               Map<String, String> allProperties =
-                  getAllProperties(cacheKey.getLeft(), targetLocation.toUri().getScheme());
+                  getAllProperties(
+                      cacheKey.getLeft(), targetLocation.toUri().getScheme(), targetLocationName);
 
               FileSystem actualFileSystem =
                   getActualFileSystemByPath(targetLocation, allProperties);
@@ -689,7 +712,8 @@ public abstract class BaseGVFSOperations implements Closeable {
     return cacheBuilder.build();
   }
 
-  private Map<String, String> getAllProperties(NameIdentifier filesetIdent, String scheme) {
+  private Map<String, String> getAllProperties(
+      NameIdentifier filesetIdent, String scheme, String locationName) {
     Catalog catalog =
         (Catalog)
             getFilesetCatalog(
@@ -698,8 +722,11 @@ public abstract class BaseGVFSOperations implements Closeable {
 
     Map<String, String> allProperties = getNecessaryProperties(catalog.properties());
     allProperties.putAll(getConfigMap(conf));
-    allProperties.putAll(
-        getCredentialProperties(getFileSystemProviderByScheme(scheme), filesetIdent));
+    if (enableCredentialVending()) {
+      allProperties.putAll(
+          getCredentialProperties(
+              getFileSystemProviderByScheme(scheme), filesetIdent, locationName));
+    }
     return allProperties;
   }
 
@@ -710,7 +737,9 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   private Map<String, String> getCredentialProperties(
-      FileSystemProvider fileSystemProvider, NameIdentifier filesetIdentifier) {
+      FileSystemProvider fileSystemProvider,
+      NameIdentifier filesetIdentifier,
+      String locationName) {
     // Do not support credential vending, we do not need to add any credential properties.
     if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
       return ImmutableMap.of();
@@ -719,6 +748,7 @@ public abstract class BaseGVFSOperations implements Closeable {
     ImmutableMap.Builder<String, String> mapBuilder = ImmutableMap.builder();
     try {
       Fileset fileset = getFileset(filesetIdentifier);
+      setCallerContextForGetCredentials(locationName);
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
       if (credentials.length > 0) {
         mapBuilder.put(
@@ -734,6 +764,8 @@ public abstract class BaseGVFSOperations implements Closeable {
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
+    } finally {
+      CallerContext.CallerContextHolder.remove();
     }
 
     return mapBuilder.build();
