@@ -1,0 +1,98 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+import re
+from types import MappingProxyType
+from typing import ClassVar, Mapping, Pattern, Set
+
+from gravitino.api.types.type import Name
+from gravitino.api.types.types import Types
+
+
+class SerdesUtils:
+    EXPRESSION_TYPE: ClassVar[str] = "type"
+    DATA_TYPE: ClassVar[str] = "dataType"
+    LITERAL_VALUE: ClassVar[str] = "value"
+    FIELD_NAME: ClassVar[str] = "fieldName"
+    FUNCTION_NAME: ClassVar[str] = "funcName"
+    FUNCTION_ARGS: ClassVar[str] = "funcArgs"
+    UNPARSED_EXPRESSION: ClassVar[str] = "unparsedExpression"
+    TYPE: ClassVar[str] = "type"
+    STRUCT: ClassVar[str] = "struct"
+    FIELDS: ClassVar[str] = "fields"
+    STRUCT_FIELD_NAME: ClassVar[str] = "name"
+    STRUCT_FIELD_NULLABLE: ClassVar[str] = "nullable"
+    STRUCT_FIELD_COMMENT: ClassVar[str] = "comment"
+    LIST: ClassVar[str] = "list"
+    LIST_ELEMENT_TYPE: ClassVar[str] = "elementType"
+    LIST_ELEMENT_NULLABLE: ClassVar[str] = "containsNull"
+    MAP: ClassVar[str] = "map"
+    MAP_KEY_TYPE: ClassVar[str] = "keyType"
+    MAP_VALUE_TYPE: ClassVar[str] = "valueType"
+    MAP_VALUE_NULLABLE: ClassVar[str] = "valueContainsNull"
+    UNION: ClassVar[str] = "union"
+    UNION_TYPES: ClassVar[str] = "types"
+    UNPARSED: ClassVar[str] = "unparsed"
+    UNPARSED_TYPE: ClassVar[str] = "unparsedType"
+    EXTERNAL: ClassVar[str] = "external"
+    CATALOG_STRING: ClassVar[str] = "catalogString"
+
+    NON_PRIMITIVE_TYPES: ClassVar[Set[Name]] = {
+        Name.STRUCT,
+        Name.LIST,
+        Name.MAP,
+        Name.UNION,
+        Name.UNPARSED,
+        Name.EXTERNAL,
+    }
+    PRIMITIVE_AND_NULL_TYPES: ClassVar[Set[Name]] = (
+        set(list(Name)) - NON_PRIMITIVE_TYPES
+    )
+
+    DECIMAL_PATTERN: ClassVar[Pattern[str]] = re.compile(
+        r"decimal\(\s*(\d+)\s*,\s*(\d+)\s*\)"
+    )
+    FIXED_PATTERN: ClassVar[Pattern[str]] = re.compile(r"fixed\(\s*(\d+)\s*\)")
+    FIXEDCHAR_PATTERN: ClassVar[Pattern[str]] = re.compile(r"char\(\s*(\d+)\s*\)")
+    VARCHAR_PATTERN: ClassVar[Pattern[str]] = re.compile(r"varchar\(\s*(\d+)\s*\)")
+    TYPES: ClassVar[Mapping] = MappingProxyType(
+        {
+            type_instance.simple_string(): type_instance
+            for type_instance in {
+                Types.NullType.get(),
+                Types.BooleanType.get(),
+                Types.ByteType.get(),
+                Types.ByteType.unsigned(),
+                Types.IntegerType.get(),
+                Types.IntegerType.unsigned(),
+                Types.ShortType.get(),
+                Types.ShortType.unsigned(),
+                Types.LongType.get(),
+                Types.LongType.unsigned(),
+                Types.FloatType.get(),
+                Types.DoubleType.get(),
+                Types.DateType.get(),
+                Types.TimeType.get(),
+                Types.TimestampType.with_time_zone(),
+                Types.TimestampType.without_time_zone(),
+                Types.IntervalYearType.get(),
+                Types.IntervalDayType.get(),
+                Types.StringType.get(),
+                Types.UUIDType.get(),
+            }
+        }
+    )
