@@ -124,6 +124,9 @@ class SerdesUtils:
         if type_name is Name.UNION:
             return cls.write_union_type(data_type)
 
+        if type_name is Name.EXTERNAL:
+            return cls.write_external_type(data_type)
+
         return cls.write_unparsed_type(data_type.simple_string())
 
     @classmethod
@@ -176,3 +179,11 @@ class SerdesUtils:
             ],
         }
         return union_data
+
+    @classmethod
+    def write_external_type(cls, external_type: Types.ExternalType) -> Dict[str, str]:
+        external_data = {
+            cls.TYPE: cls.EXTERNAL,
+            cls.CATALOG_STRING: external_type.catalog_string(),
+        }
+        return external_data
