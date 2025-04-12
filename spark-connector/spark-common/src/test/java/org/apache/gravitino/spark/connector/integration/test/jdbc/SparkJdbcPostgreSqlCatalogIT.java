@@ -103,6 +103,8 @@ public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, this.pgUsername);
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, this.pgPassword);
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, this.pgDriver);
+    catalogProperties.put(
+        JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, PG_CATALOG_PG_IT.toString());
     return catalogProperties;
   }
 }

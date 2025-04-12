@@ -64,8 +64,13 @@ public class PostgreSqlPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
-    // PG doesn't support table properties.
-    return new HashMap<>();
+    HashMap<String, String> ret = new HashMap<>();
+    for (String key : properties.keySet()) {
+      if (!key.equals("owner")) {
+        ret.put(key, properties.get(key));
+      }
+    }
+    return ret;
   }
 
   @Override
