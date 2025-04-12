@@ -17,9 +17,9 @@
 
 import re
 from types import MappingProxyType
-from typing import ClassVar, Mapping, Pattern, Set
+from typing import Any, ClassVar, Dict, Mapping, Pattern, Set, Union
 
-from gravitino.api.types.type import Name
+from gravitino.api.types.type import Name, Type
 from gravitino.api.types.types import Types
 
 
@@ -96,3 +96,18 @@ class SerdesUtils:
             }
         }
     )
+
+    @classmethod
+    def write_data_type(cls, data_type: Type) -> Union[str, Dict[str, Any]]:
+        """Write Gravitino Type to JSON data. Used for Gravitino Type JSON Serialization.
+
+        Args:
+            data_type (Any): The Gravitino Type.
+
+        Returns:
+            Union[str, Dict[str, Any]]: The serialized data.
+        """
+
+        type_name = data_type.name()
+        if type_name in cls.PRIMITIVE_AND_NULL_TYPES:
+            return data_type.simple_string()
