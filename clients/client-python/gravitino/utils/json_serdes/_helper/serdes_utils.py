@@ -17,7 +17,7 @@
 
 import re
 from types import MappingProxyType
-from typing import Any, ClassVar, Dict, Mapping, Pattern, Set, Union
+from typing import Any, ClassVar, Dict, Mapping, Pattern, Set, Union, overload
 
 from gravitino.api.types.type import Name, Type
 from gravitino.api.types.types import Types
@@ -127,6 +127,9 @@ class SerdesUtils:
         if type_name is Name.EXTERNAL:
             return cls.write_external_type(data_type)
 
+        if type_name is Name.UNPARSED:
+            return cls.write_unparsed_type(data_type)
+
         return cls.write_unparsed_type(data_type.simple_string())
 
     @classmethod
@@ -187,3 +190,22 @@ class SerdesUtils:
             cls.CATALOG_STRING: external_type.catalog_string(),
         }
         return external_data
+
+    @classmethod
+    @overload
+    def write_unparsed_type(cls, unparsed_type: str) -> Dict[str, str]: ...
+
+    @classmethod
+    @overload
+    def write_unparsed_type(cls, unparsed_type: Type) -> Dict[str, str]: ...
+
+    @classmethod
+    def write_unparsed_type(cls, unparsed_type) -> Dict[str, str]:
+        return {
+            cls.TYPE: cls.UNPARSED,
+            cls.UNPARSED_TYPE: (
+                unparsed_type.unparsed_type()
+                if isinstance(unparsed_type, Types.UnparsedType)
+                else unparsed_type
+            ),
+        }
