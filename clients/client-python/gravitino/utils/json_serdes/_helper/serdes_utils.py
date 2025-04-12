@@ -121,6 +121,9 @@ class SerdesUtils:
         if type_name is Name.MAP:
             return cls.write_map_type(data_type)
 
+        if type_name is Name.UNION:
+            return cls.write_union_type(data_type)
+
         return cls.write_unparsed_type(data_type.simple_string())
 
     @classmethod
@@ -163,3 +166,13 @@ class SerdesUtils:
             cls.MAP_VALUE_TYPE: cls.write_data_type(data_type=map_type.value_type()),
         }
         return map_data
+
+    @classmethod
+    def write_union_type(cls, union_type: Types.UnionType) -> Dict[str, Any]:
+        union_data = {
+            cls.TYPE: cls.UNION,
+            cls.UNION_TYPES: [
+                cls.write_data_type(data_type=type_) for type_ in union_type.types()
+            ],
+        }
+        return union_data
