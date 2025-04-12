@@ -115,6 +115,9 @@ class SerdesUtils:
         if type_name is Name.STRUCT:
             return cls.write_struct_type(data_type)
 
+        if type_name is Name.LIST:
+            return cls.write_list_type(data_type)
+
         return cls.write_unparsed_type(data_type.simple_string())
 
     @classmethod
@@ -138,3 +141,12 @@ class SerdesUtils:
         if comment is not None:
             struct_field_data.update({cls.STRUCT_FIELD_COMMENT: comment})
         return struct_field_data
+
+    @classmethod
+    def write_list_type(cls, list_type: Types.ListType) -> Dict[str, Any]:
+        list_data = {
+            cls.TYPE: cls.LIST,
+            cls.LIST_ELEMENT_TYPE: cls.write_data_type(list_type.element_type()),
+            cls.LIST_ELEMENT_NULLABLE: list_type.element_nullable(),
+        }
+        return list_data
