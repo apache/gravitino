@@ -118,6 +118,9 @@ class SerdesUtils:
         if type_name is Name.LIST:
             return cls.write_list_type(data_type)
 
+        if type_name is Name.MAP:
+            return cls.write_map_type(data_type)
+
         return cls.write_unparsed_type(data_type.simple_string())
 
     @classmethod
@@ -150,3 +153,13 @@ class SerdesUtils:
             cls.LIST_ELEMENT_NULLABLE: list_type.element_nullable(),
         }
         return list_data
+
+    @classmethod
+    def write_map_type(cls, map_type: Types.MapType) -> Dict[str, Any]:
+        map_data = {
+            cls.TYPE: cls.MAP,
+            cls.MAP_VALUE_NULLABLE: map_type.is_value_nullable(),
+            cls.MAP_KEY_TYPE: cls.write_data_type(data_type=map_type.key_type()),
+            cls.MAP_VALUE_TYPE: cls.write_data_type(data_type=map_type.value_type()),
+        }
+        return map_data
