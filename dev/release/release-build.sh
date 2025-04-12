@@ -22,6 +22,7 @@
 
 SELF=$(cd $(dirname $0) && pwd)
 . "$SELF/release-util.sh"
+RELEASE_BRANCH=${RELEASE_BRANCH:-release}
 
 function exit_with_usage {
   cat << EOF
@@ -113,7 +114,8 @@ if [[ "$1" == "finalize" ]]; then
     echo "v$RELEASE_VERSION already exists. Skip creating it."
   else
     rm -rf gravitino
-    git clone "https://$ASF_USERNAME:$ENCODED_ASF_PASSWORD@$ASF_GRAVITINO_REPO" -b main
+    git clone "https://$ASF_USERNAME:$ENCODED_ASF_PASSWORD@$ASF_GRAVITINO_REPO" -b "$RELEASE_BRANCH"
+
     cd gravitino
     git tag "v$RELEASE_VERSION" "$RELEASE_TAG"
     git push origin "v$RELEASE_VERSION"
