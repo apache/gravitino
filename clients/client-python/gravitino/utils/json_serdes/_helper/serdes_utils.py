@@ -111,3 +111,30 @@ class SerdesUtils:
         type_name = data_type.name()
         if type_name in cls.PRIMITIVE_AND_NULL_TYPES:
             return data_type.simple_string()
+
+        if type_name is Name.STRUCT:
+            return cls.write_struct_type(data_type)
+
+        return cls.write_unparsed_type(data_type.simple_string())
+
+    @classmethod
+    def write_struct_type(cls, struct_type: Types.StructType) -> Dict[str, Any]:
+        struct_data = {
+            cls.TYPE: cls.STRUCT,
+            cls.FIELDS: [
+                cls.write_struct_field(field) for field in struct_type.fields()
+            ],
+        }
+        return struct_data
+
+    @classmethod
+    def write_struct_field(cls, struct_field: Types.StructType.Field) -> Dict[str, Any]:
+        struct_field_data = {
+            cls.STRUCT_FIELD_NAME: struct_field.name(),
+            cls.TYPE: cls.write_data_type(struct_field.type()),
+            cls.STRUCT_FIELD_NULLABLE: struct_field.nullable(),
+        }
+        comment = struct_field.comment()
+        if comment is not None:
+            struct_field_data.update({cls.STRUCT_FIELD_COMMENT: comment})
+        return struct_field_data
