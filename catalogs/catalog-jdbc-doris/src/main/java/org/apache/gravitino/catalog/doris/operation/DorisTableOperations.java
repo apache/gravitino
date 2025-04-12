@@ -159,23 +159,28 @@ public class DorisTableOperations extends JdbcTableOperations {
     // If the backend server is less than DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE (3), we need to
     // set the property 'replication_num' to 1 explicitly.
     if (!resultMap.containsKey(REPLICATION_FACTOR)) {
-      // Try to check the number of backend servers.
-      String query = "select count(*) from information_schema.backends where Alive = 'true'";
+      // Try to check the number of backend servers using `show backends`, this SQL is supported by
+      // all versions of Doris
+      String query = "show backends";
 
       try (Connection connection = dataSource.getConnection();
           Statement statement = connection.createStatement();
           ResultSet resultSet = statement.executeQuery(query)) {
+        int backendCount = 0;
         while (resultSet.next()) {
-          int backendCount = resultSet.getInt(1);
-          if (backendCount < DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE) {
-            resultMap.put(
-                REPLICATION_FACTOR,
-                DORIS_TABLE_PROPERTIES_META
-                    .propertyEntries()
-                    .get(REPLICATION_FACTOR)
-                    .getDefaultValue()
-                    .toString());
+          String alive = resultSet.getString("Alive");
+          if ("true".equalsIgnoreCase(alive)) {
+            backendCount++;
           }
+        }
+        if (backendCount < DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE) {
+          resultMap.put(
+              REPLICATION_FACTOR,
+              DORIS_TABLE_PROPERTIES_META
+                  .propertyEntries()
+                  .get(REPLICATION_FACTOR)
+                  .getDefaultValue()
+                  .toString());
         }
       } catch (Exception e) {
         throw new RuntimeException("Failed to get the number of backend servers", e);
