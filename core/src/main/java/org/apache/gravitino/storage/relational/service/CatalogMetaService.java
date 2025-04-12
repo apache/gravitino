@@ -66,11 +66,11 @@ public class CatalogMetaService {
 
   private CatalogMetaService() {}
 
-  public CatalogPO getCatalogPOByMetalakeIdAndName(Long metalakeId, String catalogName) {
+  public CatalogPO getCatalogPOByName(String metalakeName, String catalogName) {
     CatalogPO catalogPO =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogMetaByMetalakeIdAndName(metalakeId, catalogName));
+            mapper -> mapper.selectCatalogMetaByName(metalakeName, catalogName));
 
     if (catalogPO == null) {
       throw new NoSuchEntityException(
@@ -112,26 +112,36 @@ public class CatalogMetaService {
     return catalogId;
   }
 
+  public Long getCatalogIdByName(String metalakeName, String catalogName) {
+    Long catalogId =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class,
+            mapper -> mapper.selectCatalogIdByName(metalakeName, catalogName));
+
+    if (catalogId == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          catalogName);
+    }
+    return catalogId;
+  }
+
   public CatalogEntity getCatalogByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkCatalog(identifier);
     String catalogName = identifier.name();
 
-    Long metalakeId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    CatalogPO catalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
+    CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
 
     return POConverters.fromCatalogPO(catalogPO, identifier.namespace());
   }
 
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {
     NamespaceUtil.checkCatalog(namespace);
-
-    Long metalakeId = CommonMetaService.getInstance().getParentEntityIdByNamespace(namespace);
-
     List<CatalogPO> catalogPOS =
         SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalakeId));
+            CatalogMetaMapper.class,
+            mapper -> mapper.listCatalogPOsByMetalakeName(namespace.level(0)));
 
     return POConverters.fromCatalogPOs(catalogPOS, namespace);
   }
@@ -165,10 +175,8 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
-    Long metalakeId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
 
-    CatalogPO oldCatalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
+    CatalogPO oldCatalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
 
     CatalogEntity oldCatalogEntity =
         POConverters.fromCatalogPO(oldCatalogPO, identifier.namespace());
@@ -186,7 +194,8 @@ public class CatalogMetaService {
               CatalogMetaMapper.class,
               mapper ->
                   mapper.updateCatalogMeta(
-                      POConverters.updateCatalogPOWithVersion(oldCatalogPO, newEntity, metalakeId),
+                      POConverters.updateCatalogPOWithVersion(
+                          oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
                       oldCatalogPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -204,11 +213,9 @@ public class CatalogMetaService {
   public boolean deleteCatalog(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkCatalog(identifier);
 
+    String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.name();
-    Long metalakeId =
-        CommonMetaService.getInstance().getParentEntityIdByNamespace(identifier.namespace());
-
-    Long catalogId = getCatalogIdByMetalakeIdAndName(metalakeId, catalogName);
+    long catalogId = getCatalogIdByName(metalakeName, catalogName);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(

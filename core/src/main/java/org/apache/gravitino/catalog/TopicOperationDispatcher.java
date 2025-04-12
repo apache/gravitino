@@ -321,11 +321,20 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     StringIdentifier stringId = getStringIdFromProperties(topic.properties());
     if (stringId == null) {
-      return EntityCombinedTopic.of(topic)
+      TopicEntity topicEntity = getEntity(ident, TOPIC, TopicEntity.class);
+      if (topicEntity == null) {
+        return EntityCombinedTopic.of(topic)
+            .withHiddenProperties(
+                getHiddenPropertyNames(
+                    catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
+            .withImported(false);
+      }
+
+      return EntityCombinedTopic.of(topic, topicEntity)
           .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdent, HasPropertyMetadata::topicPropertiesMetadata, topic.properties()))
-          .withImported(isEntityExist(ident, TOPIC));
+          .withImported(true);
     }
 
     TopicEntity topicEntity =
