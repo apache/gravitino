@@ -113,3 +113,11 @@ class TestTypeSerializer(unittest.TestCase):
                 serialized_result.get(SerdesUtils.UNION_TYPES),
                 [type_.simple_string() for type_ in types],
             )
+
+    def test_serialize_external_type(self):
+        external_type = Types.ExternalType.of(catalog_string="catalog_string")
+        serialized_result = TypeSerializer.serialize(external_type)
+        self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.EXTERNAL)
+        self.assertEqual(
+            serialized_result.get(SerdesUtils.CATALOG_STRING), "catalog_string"
+        )
