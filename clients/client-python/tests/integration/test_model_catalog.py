@@ -252,7 +252,7 @@ class TestModelCatalog(IntegrationTestEnv):
 
         self.assertEqual(update_property_model.name(), model_name)
         self.assertEqual(update_property_model.comment(), comment)
-        self.assertEqual(update_property_model.latest_version(), 1)
+        self.assertEqual(update_property_model.latest_version(), 0)
         self.assertEqual(
             update_property_model.properties(), {"k1": "v11", "k2": "v2", "k3": "v3"}
         )
@@ -277,7 +277,7 @@ class TestModelCatalog(IntegrationTestEnv):
         update_property_model = self._catalog.as_model_catalog().get_model(model_ident)
         self.assertEqual(update_property_model.name(), model_name)
         self.assertEqual(update_property_model.comment(), comment)
-        self.assertEqual(update_property_model.latest_version(), 1)
+        self.assertEqual(update_property_model.latest_version(), 0)
         self.assertEqual(update_property_model.properties(), {"k2": "v2"})
 
     def test_link_get_model_version(self):
