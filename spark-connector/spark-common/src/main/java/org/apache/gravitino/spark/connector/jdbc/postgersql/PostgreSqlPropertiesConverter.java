@@ -64,13 +64,13 @@ public class PostgreSqlPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
-    HashMap<String, String> ret = new HashMap<>();
+    HashMap<String, String> filteredProperties = new HashMap<>();
     for (String key : properties.keySet()) {
       if (!key.equals("owner")) {
-        ret.put(key, properties.get(key));
+        filteredProperties.put(key, properties.get(key));
       }
     }
-    return ret;
+    return filteredProperties;
   }
 
   @Override
