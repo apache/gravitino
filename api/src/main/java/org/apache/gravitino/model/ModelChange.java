@@ -120,6 +120,7 @@ public interface ModelChange {
     }
   }
 
+  /** A ModelChange to set a property and value of a model. */
   final class SetProperty implements ModelChange {
     private final String property;
     private final String value;
