@@ -18,9 +18,21 @@
 import unittest
 from itertools import combinations, product
 
+from gravitino.api.types.type import PrimitiveType
 from gravitino.api.types.types import Types
 from gravitino.utils.json_serdes import TypeSerializer
 from gravitino.utils.json_serdes._helper.serdes_utils import SerdesUtils
+
+
+class MockType(PrimitiveType):
+    def __init__(self, name: str):
+        self._name = name
+
+    def name(self) -> str:
+        return self._name
+
+    def simple_string(self):
+        return "mock_type"
 
 
 class TestTypeSerializer(unittest.TestCase):
@@ -120,4 +132,19 @@ class TestTypeSerializer(unittest.TestCase):
         self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.EXTERNAL)
         self.assertEqual(
             serialized_result.get(SerdesUtils.CATALOG_STRING), "catalog_string"
+        )
+
+    def test_write_unparsed_type(self):
+        unparsed_type = Types.UnparsedType.of(unparsed_type="unparsed_type")
+        serialized_result = TypeSerializer.serialize(unparsed_type)
+        self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.UNPARSED)
+        self.assertEqual(
+            serialized_result.get(SerdesUtils.UNPARSED_TYPE), "unparsed_type"
+        )
+
+        mock_type = MockType(name="mock")
+        result = TypeSerializer.serialize(mock_type)
+        self.assertEqual(result.get(SerdesUtils.TYPE), SerdesUtils.UNPARSED)
+        self.assertEqual(
+            result.get(SerdesUtils.UNPARSED_TYPE), mock_type.simple_string()
         )
