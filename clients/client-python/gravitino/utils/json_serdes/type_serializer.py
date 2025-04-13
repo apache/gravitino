@@ -15,10 +15,25 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.utils.json_serdes.base import (
-    GenericJsonDeserializer,
-    GenericJsonSerializer,
-)
-from gravitino.utils.json_serdes.type_serializer import TypeSerializer
+from typing import Any, Dict, Union
 
-__all__ = ["GenericJsonDeserializer", "GenericJsonSerializer", "TypeSerializer"]
+from gravitino.api.types.type import Type
+from gravitino.utils.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.utils.json_serdes.base import GenericJsonSerializer
+
+
+class TypeSerializer(GenericJsonSerializer[Type, Union[str, Dict[str, Any]]]):
+    """Custom JSON serializer for Gravitino Type objects."""
+
+    @classmethod
+    def serialize(cls, data: Type) -> Union[str, Dict[str, Any]]:
+        """Serialize the given Gravitino Type.
+
+        Args:
+            data (Type): The Gravitino Type to be serialized.
+
+        Returns:
+            Union[str, Dict[str, Any]]: The serialized data corresponding to the given Gravitino Type.
+        """
+
+        return SerdesUtils.write_data_type(data)
