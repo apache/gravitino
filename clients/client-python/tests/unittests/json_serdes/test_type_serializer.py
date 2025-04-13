@@ -16,7 +16,7 @@
 # under the License.
 
 import unittest
-from itertools import product
+from itertools import combinations, product
 
 from gravitino.api.types.types import Types
 from gravitino.utils.json_serdes import TypeSerializer
@@ -101,4 +101,15 @@ class TestTypeSerializer(unittest.TestCase):
             )
             self.assertEqual(
                 serialized_result.get(SerdesUtils.MAP_VALUE_NULLABLE), False
+            )
+
+    def test_serialize_union_type_of_primitive_and_none_types(self):
+        types = self._primitive_and_none_types.values()
+        for types in combinations(types, 2):
+            union_type = Types.UnionType.of(*types)
+            serialized_result = TypeSerializer.serialize(union_type)
+            self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.UNION)
+            self.assertListEqual(
+                serialized_result.get(SerdesUtils.UNION_TYPES),
+                [type_.simple_string() for type_ in types],
             )
