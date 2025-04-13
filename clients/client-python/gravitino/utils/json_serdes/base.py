@@ -18,39 +18,39 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-GravitinoType = TypeVar("GravitinoType")
-DeserializedType = TypeVar("DeserializedType")
+GravitinoTypeT = TypeVar("GravitinoTypeT")
+DeserializedTypeT = TypeVar("DeserializedTypeT")
 
 
-class GenericJsonSerializer(ABC, Generic[GravitinoType, DeserializedType]):
+class GenericJsonSerializer(ABC, Generic[GravitinoTypeT, DeserializedTypeT]):
     """Customized generic Serializer for DataClassJson."""
 
     @classmethod
     @abstractmethod
-    def serialize(cls, data: GravitinoType) -> DeserializedType:
+    def serialize(cls, data: GravitinoTypeT) -> DeserializedTypeT:
         """To serialize the given `data`.
 
         Args:
-            data (GravitinoType): The data to be serialized.
+            data (GravitinoTypeT): The data to be serialized.
 
         Returns:
-            DeserializedType: The serialized data.
+            DeserializedTypeT: The serialized data.
         """
         pass
 
 
-class GenericJsonDeserializer(ABC, Generic[DeserializedType, GravitinoType]):
+class GenericJsonDeserializer(ABC, Generic[DeserializedTypeT, GravitinoTypeT]):
     """Customized generic Deserializer for DataClassJson."""
 
     @classmethod
     @abstractmethod
-    def deserialize(cls, data: DeserializedType) -> GravitinoType:
+    def deserialize(cls, data: DeserializedTypeT) -> GravitinoTypeT:
         """To deserialize the given `data`.
 
         Args:
-            data (DeserializedType): The data to be deserialized.
+            data (DeserializedTypeT): The data to be deserialized.
 
         Returns:
-            GravitinoType: The deserialized data.
+            GravitinoTypeT: The deserialized data.
         """
         pass
