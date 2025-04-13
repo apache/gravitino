@@ -123,6 +123,8 @@ public abstract class SparkCommonIT extends SparkEnvIT {
 
   protected abstract boolean supportsComplexType();
 
+  protected abstract boolean supportsUpdateColumnPosition();
+
   protected SparkTableInfoChecker getTableInfoChecker() {
     return SparkTableInfoChecker.create();
   }
@@ -496,6 +498,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsUpdateColumnPosition")
   void testUpdateColumnPosition() {
     String tableName = "test_column_position";
     dropTableIfExists(tableName);
