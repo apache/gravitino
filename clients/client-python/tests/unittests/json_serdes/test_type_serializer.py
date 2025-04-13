@@ -69,3 +69,15 @@ class TestTypeSerializer(unittest.TestCase):
             self.assertEqual(
                 serialized_field.get(SerdesUtils.STRUCT_FIELD_COMMENT), field.comment()
             )
+
+    def test_serialize_list_type_of_primitive_and_none_types(self):
+        for simple_string, type_ in self._primitive_and_none_types.items():
+            list_type = Types.ListType.of(element_type=type_, element_nullable=False)
+            serialized_result = TypeSerializer.serialize(list_type)
+            self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.LIST)
+            self.assertEqual(
+                serialized_result.get(SerdesUtils.LIST_ELEMENT_TYPE), simple_string
+            )
+            self.assertEqual(
+                serialized_result.get(SerdesUtils.LIST_ELEMENT_NULLABLE), False
+            )
