@@ -227,6 +227,59 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(0, renamed_model.latest_version())
         self.assertEqual(properties, renamed_model.properties())
 
+    def test_register_alter_model_with_set_property(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        origin_model = self._catalog.as_model_catalog().get_model(model_ident)
+
+        self.assertEqual(origin_model.name(), model_name)
+        self.assertEqual(origin_model.comment(), comment)
+        self.assertEqual(origin_model.latest_version(), 0)
+        self.assertEqual(origin_model.properties(), properties)
+
+        changes = [
+            ModelChange.set_property("k1", "v11"),
+            ModelChange.set_property("k3", "v3"),
+        ]
+
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
+        update_property_model = self._catalog.as_model_catalog().get_model(model_ident)
+
+        self.assertEqual(update_property_model.name(), model_name)
+        self.assertEqual(update_property_model.comment(), comment)
+        self.assertEqual(update_property_model.latest_version(), 1)
+        self.assertEqual(
+            update_property_model.properties(), {"k1": "v11", "k2": "v2", "k3": "v3"}
+        )
+
+    def test_register_alter_model_with_remove_property(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        origin_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(origin_model.name(), model_name)
+        self.assertEqual(origin_model.comment(), comment)
+        self.assertEqual(origin_model.latest_version(), 0)
+        self.assertEqual(origin_model.properties(), properties)
+
+        changes = [ModelChange.remove_property("k1")]
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
+        update_property_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(update_property_model.name(), model_name)
+        self.assertEqual(update_property_model.comment(), comment)
+        self.assertEqual(update_property_model.latest_version(), 1)
+        self.assertEqual(update_property_model.properties(), {"k2": "v2"})
+
     def test_link_get_model_version(self):
         model_name = "model_it_model" + str(randint(0, 1000))
         model_ident = NameIdentifier.of(self._schema_name, model_name)
