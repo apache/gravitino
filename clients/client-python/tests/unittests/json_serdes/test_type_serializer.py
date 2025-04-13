@@ -16,6 +16,7 @@
 # under the License.
 
 import unittest
+from itertools import product
 
 from gravitino.api.types.types import Types
 from gravitino.utils.json_serdes import TypeSerializer
@@ -80,4 +81,24 @@ class TestTypeSerializer(unittest.TestCase):
             )
             self.assertEqual(
                 serialized_result.get(SerdesUtils.LIST_ELEMENT_NULLABLE), False
+            )
+
+    def test_serialize_map_type_of_primitive_and_none_types(self):
+        types = self._primitive_and_none_types.values()
+        for key_type, value_type in product(types, types):
+            map_type = Types.MapType.of(
+                key_type=key_type, value_type=value_type, value_nullable=False
+            )
+            serialized_result = TypeSerializer.serialize(map_type)
+            self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.MAP)
+            self.assertEqual(
+                serialized_result.get(SerdesUtils.MAP_KEY_TYPE),
+                key_type.simple_string(),
+            )
+            self.assertEqual(
+                serialized_result.get(SerdesUtils.MAP_VALUE_TYPE),
+                value_type.simple_string(),
+            )
+            self.assertEqual(
+                serialized_result.get(SerdesUtils.MAP_VALUE_NULLABLE), False
             )
