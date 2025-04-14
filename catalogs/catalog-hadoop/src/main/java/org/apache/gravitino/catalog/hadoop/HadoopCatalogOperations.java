@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
@@ -301,7 +302,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             // Store the storageLocation to the store. If the "storageLocation" is null for managed
             // fileset, Gravitino will get and store the location based on the catalog/schema's
             // location and store it to the store.
-            .withStorageLocation(filesetPath.toString())
+            .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetPath.toString()))
             .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
@@ -699,7 +700,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
         .withId(filesetEntity.id())
         .withComment(newComment)
         .withFilesetType(filesetEntity.filesetType())
-        .withStorageLocation(filesetEntity.storageLocation())
+        .withStorageLocations(
+            ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetEntity.storageLocation()))
         .withProperties(props)
         .withAuditInfo(
             AuditInfo.builder()
