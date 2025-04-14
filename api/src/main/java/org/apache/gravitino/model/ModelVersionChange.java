@@ -87,7 +87,7 @@ public interface ModelVersionChange {
      */
     @Override
     public int hashCode() {
-      return newComment.hashCode();
+      return Objects.hash(newComment);
     }
 
     /**
