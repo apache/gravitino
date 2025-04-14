@@ -374,24 +374,23 @@ curl -X PUT \
 <TabItem value="python" label="Python">
 
  ```python
- gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+client = GravitinoClient(uri="http://localhost:8090", 
+                         metalake_name="mymetalake")
 
- catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
- model_catalog = catalog.as_model_catalog()
+catalog = client.load_catalog(name="mycatalog").as_model_catalog()
 
- # Define modifications
- changes = (
-     ModelChange.update_comment("Updated model comment"),
-     ModelChange.rename("example_model_renamed"),
-     ModelChange.set_property("k2", "v2"),
-     ModelChange.remove_property("k1")
- )
+# Define modifications
+changes = (
+    ModelChange.update_comment("Updated model comment"),
+    ModelChange.rename("renamed"),
+    ModelChange.set_property("k2", "v2"),
+    ModelChange.remove_property("k1"),
+)
 
- # Apply changes
- updated_model = model_catalog.alter_model(
-     ident=NameIdentifier.of("model_schema", "example_model"),
-     *changes
- )
+# Apply changes
+updated_model = model_catalog.alter_model(
+    ident=NameIdentifier.of("myschema", "mymodel"), *changes
+)
  ```
  </TabItem>
  </Tabs>

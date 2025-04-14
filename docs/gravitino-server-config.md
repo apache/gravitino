@@ -118,22 +118,106 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 
 ##### Post-event
 
-| Operation type                      | Post-event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Since Version    |
-|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| table operation                     | `CreateTableEvent`, `AlterTableEvent`, `DropTableEvent`, `LoadTableEvent`, `ListTableEvent`, `PurgeTableFailureEvent`, `CreateTableFailureEvent`, `AlterTableFailureEvent`, `DropTableFailureEvent`, `LoadTableFailureEvent`, `ListTableFailureEvent`, `PurgeTableFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                  | 0.5.0            |
-| fileset operation                   | `CreateFileSetEvent`, `AlterFileSetEvent`, `DropFileSetEvent`, `LoadFileSetEvent`, `ListFileSetEvent`, `CreateFileSetFailureEvent`, `AlterFileSetFailureEvent`, `DropFileSetFailureEvent`, `LoadFileSetFailureEvent`, `ListFileSetFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                  | 0.5.0            |
-| topic operation                     | `CreateTopicEvent`, `AlterTopicEvent`, `DropTopicEvent`, `LoadTopicEvent`, `ListTopicEvent`, `CreateTopicFailureEvent`, `AlterTopicFailureEvent`, `DropTopicFailureEvent`, `LoadTopicFailureEvent`, `ListTopicFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                                      | 0.5.0            |
-| schema operation                    | `CreateSchemaEvent`, `AlterSchemaEvent`, `DropSchemaEvent`, `LoadSchemaEvent`, `ListSchemaEvent`, `CreateSchemaFailureEvent`, `AlterSchemaFailureEvent`, `DropSchemaFailureEvent`, `LoadSchemaFailureEvent`, `ListSchemaFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                            | 0.5.0            |
-| catalog operation                   | `CreateCatalogEvent`, `AlterCatalogEvent`, `DropCatalogEvent`, `LoadCatalogEvent`, `ListCatalogEvent`, `CreateCatalogFailureEvent`, `AlterCatalogFailureEvent`, `DropCatalogFailureEvent`, `LoadCatalogFailureEvent`, `ListCatalogFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                  | 0.5.0            |
-| metalake operation                  | `CreateMetalakeEvent`, `AlterMetalakeEvent`, `DropMetalakeEvent`, `LoadMetalakeEvent`, `ListMetalakeEvent`, `CreateMetalakeFailureEvent`, `AlterMetalakeFailureEvent`, `DropMetalakeFailureEvent`, `LoadMetalakeFailureEvent`, `ListMetalakeFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                        | 0.5.0            |
-| Iceberg REST server table operation | `IcebergCreateTableEvent`, `IcebergUpdateTableEvent`, `IcebergDropTableEvent`, `IcebergLoadTableEvent`, `IcebergListTableEvent`, `IcebergTableExistsEvent`, `IcebergRenameTableEvent`, `IcebergCreateTableFailureEvent`, `IcebergUpdateTableFailureEvent`, `IcebergDropTableFailureEvent`, `IcebergLoadTableFailureEvent`, `IcebergListTableFailureEvent`, `IcebergRenameTableFailureEvent`, `IcebergTableExistsFailureEvent`                                                                                                                                                                                                                                    | 0.7.0-incubating |
-| tag operation                       | `ListTagsEvent`, `ListTagsInfoEvent`, `CreateTagEvent`, `GetTagEvent`, `AlterTagEvent`, `DeleteTagEvent`, `ListMetadataObjectsForTagEvent`, `ListTagsForMetadataObjectEvent`, `ListTagsInfoForMetadataObjectEvent`, `AssociateTagsForMetadataObjectEvent`, `GetTagForMetadataObjectEvent`, `ListTagsFailureEvent`, `ListTagInfoFailureEvent`, `CreateTagFailureEvent`, `GetTagFailureEvent`, `AlterTagFailureEvent`, `DeleteTagFailureEvent`, `ListMetadataObjectsForTagFailureEvent`, `ListTagsForMetadataObjectFailureEvent`, `ListTagsInfoForMetadataObjectFailureEvent`, `AssociateTagsForMetadataObjectFailureEvent`, `GetTagForMetadataObjectFailureEvent` | 0.9.0-incubating |
-| model operation                     | `DeleteModelEvent`,  `DeleteModelVersionEvent`,  `GetModelEvent`, `GetModelVersionEvent`, `LinkModelVersionEvent`, `ListModelEvent`, `ListModelVersionsEvent`,  `RegisterAndLinkModelEvent`, `RegisterModelEvent`,  `DeleteModelFailureEvent`, `DeleteModelVersionFailureEvent`, `GetModelFailureEvent`, `GetModelVersionFailureEvent`, `LinkModelVersionFailureEvent`, `ListModelFailureEvent`, `ListModelVersionFailureEvent`, `RegisterAndLinkModelFailureEvent`, `RegisterModelFailureEvent`                                                                                                                                                                 | 0.9.0-incubating |
-| user operation                      | `AddUserEvent`, `GetUserEvent`, `ListUserNamesEvent`, `ListUsersEvent`, `RemoveUserEvent`, `GrantUserRolesEvent`, `RevokeUserRolesEvent`, `AddUserFailureEvent`, `GetUserFailureEvent`, `GrantUserRolesFailureEvent`, `ListUserNamesFailureEvent`, `ListUsersFailureEvent`, `RemoveUserFailureEvent`, `RevokeUserRolesFailureEvent`                                                                                                                                                                                                                                                                                                                              | 0.9.0-incubating |
-| group operation                     | `AddGroupEvent`, `GetGroupEvent`, `ListGroupNamesEvent`, `ListGroupsEvent`, `RemoveGroupEvent`, `GrantGroupRolesEvent`, `RevokeGroupRolesEvent`, `AddGroupFailureEvent`, `GetGroupFailureEvent`, `GrantGroupRolesFailureEvent`, `ListGroupNamesFailureEvent`, `ListGroupsFailureEvent`, `RemoveGroupFailureEvent`, `RevokeGroupRolesFailureEvent`                                                                                                                                                                                                                                                                                                                | 0.9.0-incubating |
-| role operation                      | `CreateRoleEvent`, `DeleteRoleEvent`, `GetRoleEvent`, `GrantPrivilegesEvent`, `ListRoleNamesEvent`, `RevokePrivilegesEvent`, `CreateRoleFailureEvent`, `DeleteRoleFailureEvent`, `GetRoleFailureEvent`, `GrantPrivilegesFailureEvent`, `ListRoleNamesFailureEvent`, `RevokePrivilegesFailureEvent`                                                                                                                                                                                                                                                                                                                                                               | 0.9.0-incubating |
-
-
+<table>
+  <thead>
+    <tr>
+      <th>Operation type</th>
+      <th>Post-event</th>
+      <th>Since Version</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>table operation</td>
+      <td>
+        <code>CreateTableEvent</code>, <code>AlterTableEvent</code>, <code>DropTableEvent</code>, <code>LoadTableEvent</code>, <code>ListTableEvent</code>, <code>PurgeTableFailureEvent</code>, <code>CreateTableFailureEvent</code>, <code>AlterTableFailureEvent</code>, <code>DropTableFailureEvent</code>, <code>LoadTableFailureEvent</code>, <code>ListTableFailureEvent</code>, <code>PurgeTableFailureEvent</code>
+      </td>
+      <td>0.5.0</td>
+    </tr>
+    <tr>
+      <td>fileset operation</td>
+      <td>
+        <code>CreateFileSetEvent</code>, <code>AlterFileSetEvent</code>, <code>DropFileSetEvent</code>, <code>LoadFileSetEvent</code>, <code>ListFileSetEvent</code>, <code>CreateFileSetFailureEvent</code>, <code>AlterFileSetFailureEvent</code>, <code>DropFileSetFailureEvent</code>, <code>LoadFileSetFailureEvent</code>, <code>ListFileSetFailureEvent</code>
+      </td>
+      <td>0.5.0</td>
+    </tr>
+    <tr>
+      <td>topic operation</td>
+      <td>
+        <code>CreateTopicEvent</code>, <code>AlterTopicEvent</code>, <code>DropTopicEvent</code>, <code>LoadTopicEvent</code>, <code>ListTopicEvent</code>, <code>CreateTopicFailureEvent</code>, <code>AlterTopicFailureEvent</code>, <code>DropTopicFailureEvent</code>, <code>LoadTopicFailureEvent</code>, <code>ListTopicFailureEvent</code>
+      </td>
+      <td>0.5.0</td>
+    </tr>
+    <tr>
+      <td>schema operation</td>
+      <td>
+        <code>CreateSchemaEvent</code>, <code>AlterSchemaEvent</code>, <code>DropSchemaEvent</code>, <code>LoadSchemaEvent</code>, <code>ListSchemaEvent</code>, <code>CreateSchemaFailureEvent</code>, <code>AlterSchemaFailureEvent</code>, <code>DropSchemaFailureEvent</code>, <code>LoadSchemaFailureEvent</code>, <code>ListSchemaFailureEvent</code>
+      </td>
+      <td>0.5.0</td>
+    </tr>
+    <tr>
+      <td>catalog operation</td>
+      <td>
+        <code>CreateCatalogEvent</code>, <code>AlterCatalogEvent</code>, <code>DropCatalogEvent</code>, <code>LoadCatalogEvent</code>, <code>ListCatalogEvent</code>, <code>CreateCatalogFailureEvent</code>, <code>AlterCatalogFailureEvent</code>, <code>DropCatalogFailureEvent</code>, <code>LoadCatalogFailureEvent</code>, <code>ListCatalogFailureEvent</code>
+      </td>
+      <td>0.5.0</td>
+    </tr>
+    <tr>
+      <td>metalake operation</td>
+      <td>
+        <code>CreateMetalakeEvent</code>, <code>AlterMetalakeEvent</code>, <code>DropMetalakeEvent</code>, <code>LoadMetalakeEvent</code>, <code>ListMetalakeEvent</code>, <code>CreateMetalakeFailureEvent</code>, <code>AlterMetalakeFailureEvent</code>, <code>DropMetalakeFailureEvent</code>, <code>LoadMetalakeFailureEvent</code>, <code>ListMetalakeFailureEvent</code>
+      </td>
+      <td>0.5.0</td>
+    </tr>
+    <tr>
+      <td>Iceberg REST server table operation</td>
+      <td>
+        <code>IcebergCreateTableEvent</code>, <code>IcebergUpdateTableEvent</code>, <code>IcebergDropTableEvent</code>, <code>IcebergLoadTableEvent</code>, <code>IcebergListTableEvent</code>, <code>IcebergTableExistsEvent</code>, <code>IcebergRenameTableEvent</code>, <code>IcebergCreateTableFailureEvent</code>, <code>IcebergUpdateTableFailureEvent</code>, <code>IcebergDropTableFailureEvent</code>, <code>IcebergLoadTableFailureEvent</code>, <code>IcebergListTableFailureEvent</code>, <code>IcebergRenameTableFailureEvent</code>, <code>IcebergTableExistsFailureEvent</code>
+      </td>
+      <td>0.7.0-incubating</td>
+    </tr>
+    <tr>
+      <td>tag operation</td>
+      <td>
+        <code>ListTagsEvent</code>, <code>ListTagsInfoEvent</code>, <code>CreateTagEvent</code>, <code>GetTagEvent</code>, <code>AlterTagEvent</code>, <code>DeleteTagEvent</code>, <code>ListMetadataObjectsForTagEvent</code>, <code>ListTagsForMetadataObjectEvent</code>, <code>ListTagsInfoForMetadataObjectEvent</code>, <code>AssociateTagsForMetadataObjectEvent</code>, <code>GetTagForMetadataObjectEvent</code>,
+        <code>ListTagsFailureEvent</code>, <code>ListTagInfoFailureEvent</code>, <code>CreateTagFailureEvent</code>, <code>GetTagFailureEvent</code>, <code>AlterTagFailureEvent</code>, <code>DeleteTagFailureEvent</code>, <code>ListMetadataObjectsForTagFailureEvent</code>, <code>ListTagsForMetadataObjectFailureEvent</code>, <code>ListTagsInfoForMetadataObjectFailureEvent</code>, <code>AssociateTagsForMetadataObjectFailureEvent</code>, <code>GetTagForMetadataObjectFailureEvent</code>
+      </td>
+      <td>0.9.0-incubating</td>
+    </tr>
+    <tr>
+      <td>model operation</td>
+      <td>
+        <code>DeleteModelEvent</code>, <code>DeleteModelVersionEvent</code>, <code>GetModelEvent</code>, <code>GetModelVersionEvent</code>, <code>LinkModelVersionEvent</code>, <code>ListModelEvent</code>, <code>ListModelVersionsEvent</code>, <code>RegisterAndLinkModelEvent</code>, <code>RegisterModelEvent</code>, 
+        <code>DeleteModelFailureEvent</code>, <code>DeleteModelVersionFailureEvent</code>, <code>GetModelFailureEvent</code>, <code>GetModelVersionFailureEvent</code>, <code>LinkModelVersionFailureEvent</code>, <code>ListModelFailureEvent</code>, <code>ListModelVersionFailureEvent</code>, <code>RegisterAndLinkModelFailureEvent</code>, <code>RegisterModelFailureEvent</code>
+      </td>
+      <td>0.9.0-incubating</td>
+    </tr>
+    <tr>
+      <td>user operation</td>
+      <td>
+        <code>AddUserEvent</code>, <code>GetUserEvent</code>, <code>ListUserNamesEvent</code>, <code>ListUsersEvent</code>, <code>RemoveUserEvent</code>, <code>GrantUserRolesEvent</code>, <code>RevokeUserRolesEvent</code>, 
+        <code>AddUserFailureEvent</code>, <code>GetUserFailureEvent</code>, <code>GrantUserRolesFailureEvent</code>, <code>ListUserNamesFailureEvent</code>, <code>ListUsersFailureEvent</code>, <code>RemoveUserFailureEvent</code>, <code>RevokeUserRolesFailureEvent</code>
+      </td>
+      <td>0.9.0-incubating</td>
+    </tr>
+    <tr>
+      <td>group operation</td>
+      <td>
+        <code>AddGroupEvent</code>, <code>GetGroupEvent</code>, <code>ListGroupNamesEvent</code>, <code>ListGroupsEvent</code>, <code>RemoveGroupEvent</code>, <code>GrantGroupRolesEvent</code>, <code>RevokeGroupRolesEvent</code>, 
+        <code>AddGroupFailureEvent</code>, <code>GetGroupFailureEvent</code>, <code>GrantGroupRolesFailureEvent</code>, <code>ListGroupNamesFailureEvent</code>, <code>ListGroupsFailureEvent</code>, <code>RemoveGroupFailureEvent</code>, <code>RevokeGroupRolesFailureEvent</code>
+      </td>
+      <td>0.9.0-incubating</td>
+    </tr>
+    <tr>
+      <td>role operation</td>
+      <td>
+        <code>CreateRoleEvent</code>, <code>DeleteRoleEvent</code>, <code>GetRoleEvent</code>, <code>GrantPrivilegesEvent</code>, <code>ListRoleNamesEvent</code>, <code>RevokePrivilegesEvent</code>,
+        <code>CreateRoleFailureEvent</code>, <code>DeleteRoleFailureEvent</code>, <code>GetRoleFailureEvent</code>, <code>GrantPrivilegesFailureEvent</code>, <code>ListRoleNamesFailureEvent</code>, <code>RevokePrivilegesFailureEvent</code>
+      </td>
+      <td>0.9.0-incubating</td>
+    </tr>
+  </tbody>
+</table>
 
 ##### Pre-event
 
