@@ -32,6 +32,7 @@ import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -1468,7 +1469,7 @@ public class TestEntityStorage {
         .withName(name)
         .withNamespace(namespace)
         .withFilesetType(Fileset.Type.MANAGED)
-        .withStorageLocation("/tmp")
+        .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "/tmp"))
         .withComment("")
         .withProperties(null)
         .withAuditInfo(auditInfo)
