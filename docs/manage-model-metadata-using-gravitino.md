@@ -310,28 +310,35 @@ You can modify a model's metadata (e.g., rename, update comment, or modify prope
  <TabItem value="shell" label="Shell">
 
 ```shell
- curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
- -H "Content-Type: application/json" -d '{
-   "updates": [
-     {
-       "@type": "updateComment",
-       "newComment": "Updated model comment"
-     },
-     {
-       "@type": "rename",
-       "newName": "example_model_renamed"
-     },
-     {
-       "@type": "setProperty",
-       "property": "k2",
-       "value": "v2"
-     },
-     {
-       "@type": "removeProperty",
-       "property": "k1"
-     }
-   ]
- }' http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model
+cat <<EOF >model.json
+{
+  "updates": [
+    {
+      "@type": "updateComment",
+      "newComment": "Updated model comment"
+    },
+    {
+      "@type": "rename",
+      "newName": "new_name"
+    },
+    {
+      "@type": "setProperty",
+      "property": "k2",
+      "value": "v2"
+    },
+    {
+      "@type": "removeProperty",
+      "property": "k1"
+    }
+  ]
+}
+EOF
+ 
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@model.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/models/mymodel
  ```
 
 
