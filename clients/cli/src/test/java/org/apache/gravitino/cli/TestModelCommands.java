@@ -647,6 +647,7 @@ public class TestModelCommands {
         spy(
             new GravitinoCommandLine(
                 mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.REMOVE));
+
     doReturn(mockRemoveProperty)
         .when(commandLine)
         .newRemoveModelProperty(
