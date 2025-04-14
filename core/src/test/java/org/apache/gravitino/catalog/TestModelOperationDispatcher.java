@@ -278,6 +278,91 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(model.properties(), alteredModel.properties());
   }
 
+  @Test
+  void testAddModelProperty() {
+    String schemaName = "schema";
+    String modelName = "test_update_model_property";
+    String modelComment = "model which tests update property";
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "schema comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Model model = modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    // validate registered model
+    Assertions.assertEquals(modelName, model.name());
+    Assertions.assertEquals(modelComment, model.comment());
+    Assertions.assertEquals(props, model.properties());
+
+    ModelChange[] addProperty = new ModelChange[] {ModelChange.setProperty("k3", "v3")};
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, addProperty);
+
+    // validate updated model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(modelComment, alteredModel.comment());
+    Assertions.assertEquals(
+        ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3"), alteredModel.properties());
+  }
+
+  @Test
+  void testUpdateModelProperty() {
+    String schemaName = "test_update_model_property_schema";
+    String modelName = "test_update_model_property";
+    String modelComment = "model which tests update property";
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "schema comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Model model = modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    // validate registered model
+    Assertions.assertEquals(modelName, model.name());
+    Assertions.assertEquals(modelComment, model.comment());
+    Assertions.assertEquals(props, model.properties());
+
+    ModelChange[] updateProperty = new ModelChange[] {ModelChange.setProperty("k1", "v3")};
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, updateProperty);
+
+    // validate updated model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(modelComment, alteredModel.comment());
+    Assertions.assertEquals(ImmutableMap.of("k1", "v3", "k2", "v2"), alteredModel.properties());
+  }
+
+  @Test
+  void testRemoveModelProperty() {
+    String schemaName = "test_remove_model_property_schema";
+    String modelName = "test_update_model_property";
+    String modelComment = "model which tests update property";
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "schema comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Model model = modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    // validate registered model
+    Assertions.assertEquals(modelName, model.name());
+    Assertions.assertEquals(modelComment, model.comment());
+    Assertions.assertEquals(props, model.properties());
+
+    ModelChange[] removeProperty = new ModelChange[] {ModelChange.removeProperty("k1")};
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, removeProperty);
+
+    // validate updated model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(modelComment, alteredModel.comment());
+    Assertions.assertEquals(ImmutableMap.of("k2", "v2"), alteredModel.properties());
+  }
+
   private String randomSchemaName() {
     return "schema_" + UUID.randomUUID().toString().replace("-", "");
   }
