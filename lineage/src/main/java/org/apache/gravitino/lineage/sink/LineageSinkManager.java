@@ -54,10 +54,11 @@ public class LineageSinkManager implements Closeable {
   }
 
   /**
-   * The lineage event is dispatched by a dedicated event listener system. The lineage sink is
-   * wrapped within the {@link LineageSinkEventListener}. Consequently, we must convert the lineage
-   * configuration into event listener configurations. This conversion includes details such as
-   * event listener names, event listener classes, and the capacity of the asynchronous event queue.
+   * The lineage event is dispatched by event listener system with a dedicated async event listener
+   * {@link LineageSinkEventListener} which wrap the lineage sink class. Consequently, we must
+   * convert the lineage configuration into event listener configurations. This conversion includes
+   * details such as event listener names, event listener classes, and the capacity of the
+   * asynchronous event queue.
    */
   @VisibleForTesting
   static Map<String, String> transformToEventListenerConfigs(
