@@ -92,9 +92,9 @@ public interface ModelChange {
     @Override
     public boolean equals(Object obj) {
       if (obj == this) return true;
-      if (obj == null || getClass() != obj.getClass()) return false;
+      if (!(obj instanceof RenameModel)) return false;
       RenameModel other = (RenameModel) obj;
-      return newName.equals(other.newName);
+      return Objects.equals(newName, other.newName);
     }
 
     /**
@@ -165,9 +165,9 @@ public interface ModelChange {
     @Override
     public boolean equals(Object obj) {
       if (obj == this) return true;
-      if (obj == null || getClass() != obj.getClass()) return false;
+      if (!(obj instanceof SetProperty)) return false;
       SetProperty other = (SetProperty) obj;
-      return property.equals(other.property) && value.equals(other.value);
+      return Objects.equals(property, other.property) && Objects.equals(value, other.value);
     }
 
     /**
@@ -226,9 +226,9 @@ public interface ModelChange {
     @Override
     public boolean equals(Object obj) {
       if (obj == this) return true;
-      if (obj == null || getClass() != obj.getClass()) return false;
+      if (!(obj instanceof RemoveProperty)) return false;
       RemoveProperty other = (RemoveProperty) obj;
-      return property.equals(other.property);
+      return Objects.equals(property, other.property);
     }
 
     /**
