@@ -41,7 +41,6 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
-import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -280,34 +279,88 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testUpdateModelComment() {
-    String schemaName = randomSchemaName();
-    String schemaComment = "schema which tests update";
-
-    String modelName = randomModelName();
-    String modelComment = "model which tests update";
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-
-    String versionUri = "s3://test-bucket/test-path/model.json";
-    String[] versionAliases = {"alias1", "alias2"};
-    String versionComment = "version which tests update";
-    String versionNewComment = "new version comment";
-
+  void testAddModelProperty() {
+    String schemaName = "schema";
+    String modelName = "test_update_model_property";
+    String modelComment = "model which tests update property";
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "schema comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
 
     NameIdentifier modelIdent =
         NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
-    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Model model = modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
-    modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUri, versionAliases, versionComment, props);
-    ModelVersionChange changeComment = ModelVersionChange.updateComment(versionNewComment);
-    ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, "alias1");
-    ModelVersion alteredModelVersion =
-        modelOperationDispatcher.alterModelVersion(modelIdent, "alias1", changeComment);
+    // validate registered model
+    Assertions.assertEquals(modelName, model.name());
+    Assertions.assertEquals(modelComment, model.comment());
+    Assertions.assertEquals(props, model.properties());
 
-    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
+    ModelChange[] addProperty = new ModelChange[] {ModelChange.setProperty("k3", "v3")};
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, addProperty);
+
+    // validate updated model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(modelComment, alteredModel.comment());
+    Assertions.assertEquals(
+        ImmutableMap.of("k1", "v1", "k2", "v2", "k3", "v3"), alteredModel.properties());
+  }
+
+  @Test
+  void testUpdateModelProperty() {
+    String schemaName = "test_update_model_property_schema";
+    String modelName = "test_update_model_property";
+    String modelComment = "model which tests update property";
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "schema comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Model model = modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    // validate registered model
+    Assertions.assertEquals(modelName, model.name());
+    Assertions.assertEquals(modelComment, model.comment());
+    Assertions.assertEquals(props, model.properties());
+
+    ModelChange[] updateProperty = new ModelChange[] {ModelChange.setProperty("k1", "v3")};
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, updateProperty);
+
+    // validate updated model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(modelComment, alteredModel.comment());
+    Assertions.assertEquals(ImmutableMap.of("k1", "v3", "k2", "v2"), alteredModel.properties());
+  }
+
+  @Test
+  void testRemoveModelProperty() {
+    String schemaName = "test_remove_model_property_schema";
+    String modelName = "test_update_model_property";
+    String modelComment = "model which tests update property";
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "schema comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Model model = modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    // validate registered model
+    Assertions.assertEquals(modelName, model.name());
+    Assertions.assertEquals(modelComment, model.comment());
+    Assertions.assertEquals(props, model.properties());
+
+    ModelChange[] removeProperty = new ModelChange[] {ModelChange.removeProperty("k1")};
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, removeProperty);
+
+    // validate updated model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(modelComment, alteredModel.comment());
+    Assertions.assertEquals(ImmutableMap.of("k2", "v2"), alteredModel.properties());
   }
 
   private String randomSchemaName() {

@@ -34,6 +34,7 @@ import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -69,7 +70,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
-import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -659,7 +659,7 @@ public class TestModelCatalogOperations {
   }
 
   @Test
-  public void testRename() {
+  public void testRenameModel() {
     String schemaName = randomSchemaName();
     createSchema(schemaName);
 
@@ -691,99 +691,111 @@ public class TestModelCatalogOperations {
   }
 
   @Test
-  void testUpdateVersionCommentViaVersion() {
+  void testAddModelProperty() {
     String schemaName = randomSchemaName();
     createSchema(schemaName);
 
-    String modelName = "model1";
-    String modelComment = "model1 comment";
-
-    String versionComment = "version1 comment";
-    String versionNewComment = "new version1 comment";
-    String versionUri = "model_version_path";
-    String[] versionAliases = new String[] {"alias1", "alias2"};
-
+    String modelName = "model";
+    String comment = "comment";
     NameIdentifier modelIdent =
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
     StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
+    Map<String, String> properties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value1"));
+    Map<String, String> newProperties =
+        ImmutableMap.<String, String>builder().putAll(properties).put("key2", "value2").build();
 
-    ops.registerModel(modelIdent, modelComment, properties);
-    StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
-
-    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
+    // validate registered model
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
-    Assertions.assertEquals(1, loadedModel.latestVersion());
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
 
-    // validate loaded version
-    ModelVersion loadedVersion = ops.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(0, loadedVersion.version());
-    Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
-    Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(versionUri, loadedVersion.uri());
-    Assertions.assertEquals(versionProperties, loadedVersion.properties());
+    ModelChange change = ModelChange.setProperty("key2", "value2");
+    Model alteredModel = ops.alterModel(modelIdent, change);
 
-    // update comment via version and validate
-    ModelVersionChange updateCommentChange = ModelVersionChange.updateComment(versionNewComment);
-    ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, 0, updateCommentChange);
-
-    Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(versionNewComment, updatedModelVersion.comment());
-    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
-    Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
+    // validate altered model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(comment, alteredModel.comment());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
   }
 
   @Test
-  void testUpdateVersionCommentViaAlias() {
+  void testUpdateModelProperty() {
     String schemaName = randomSchemaName();
     createSchema(schemaName);
 
-    String modelName = "model1";
-    String modelComment = "model1 comment";
-
-    String versionComment = "version1 comment";
-    String versionNewComment = "new version1 comment";
-    String versionUri = "model_version_path";
-    String[] versionAliases = new String[] {"alias1", "alias2"};
-    String versionAlias = versionAliases[0];
-
+    String modelName = "model";
+    String comment = "comment";
     NameIdentifier modelIdent =
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
     StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
+    Map<String, String> properties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value1"));
+    Map<String, String> newProperties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value2"));
 
-    ops.registerModel(modelIdent, modelComment, properties);
-    StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
-
-    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
-
-    Model loadedModel = ops.getModel(modelIdent);
+    // validate registered model
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
 
     // validate loaded model
-    Assertions.assertEquals(1, loadedModel.latestVersion());
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
 
-    // validate loaded version via alias
-    ModelVersion loadedVersion = ops.getModelVersion(modelIdent, versionAlias);
-    Assertions.assertEquals(0, loadedVersion.version());
-    Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
-    Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(versionUri, loadedVersion.uri());
-    Assertions.assertEquals(versionProperties, loadedVersion.properties());
+    ModelChange change = ModelChange.setProperty("key1", "value2");
+    Model alteredModel = ops.alterModel(modelIdent, change);
 
-    // update comment via alias and validate
-    ModelVersionChange updateCommentChange = ModelVersionChange.updateComment(versionNewComment);
-    ModelVersion updatedModelVersion =
-        ops.alterModelVersion(modelIdent, versionAlias, updateCommentChange);
+    // validate altered model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(comment, alteredModel.comment());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
+  }
 
-    Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
-    Assertions.assertEquals(versionNewComment, updatedModelVersion.comment());
-    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
-    Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
+  @Test
+  void testRemoveModelProperty() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model";
+    String comment = "comment";
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value1"));
+    Map<String, String> newProperties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of());
+
+    // validate registered model
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
+
+    // validate loaded model
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
+
+    ModelChange change = ModelChange.removeProperty("key1");
+    Model alteredModel = ops.alterModel(modelIdent, change);
+
+    // validate altered model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(comment, alteredModel.comment());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
   }
 
   private String randomSchemaName() {
