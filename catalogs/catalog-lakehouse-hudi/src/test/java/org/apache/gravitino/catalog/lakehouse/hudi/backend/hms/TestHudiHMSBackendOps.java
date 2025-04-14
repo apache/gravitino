@@ -59,7 +59,7 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
   public static void prepare() throws TException {
     Map<String, String> props = Maps.newHashMap();
     props.put(URI, hiveConf.get(HiveConf.ConfVars.METASTOREURIS.varname));
-    ops.initialize(props);
+    ops.initialize(props, null);
 
     // create a hive table
     Table table = new Table();
@@ -100,7 +100,7 @@ public class TestHudiHMSBackendOps extends MiniHiveMetastoreService {
   @Test
   public void testInitialize() {
     try (HudiHMSBackendOps ops = new HudiHMSBackendOps()) {
-      ops.initialize(ImmutableMap.of());
+      ops.initialize(ImmutableMap.of(), null);
       Assertions.assertNotNull(ops.clientPool);
     }
   }

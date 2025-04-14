@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.hudi.backend;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
+import org.apache.gravitino.connector.CatalogInfo;
 
 /** Base class for Hudi catalog backends. */
 public abstract class HudiCatalogBackend {
@@ -28,7 +29,7 @@ public abstract class HudiCatalogBackend {
 
   private final HudiCatalogBackendOps backendOps;
 
-  public abstract void initialize(Map<String, String> properties);
+  public abstract void initialize(Map<String, String> properties, CatalogInfo info);
 
   protected HudiCatalogBackend(BackendType backendType, HudiCatalogBackendOps backendOps) {
     this.backendType = backendType;

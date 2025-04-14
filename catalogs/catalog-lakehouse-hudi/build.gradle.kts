@@ -45,6 +45,7 @@ dependencies {
   implementation(libs.commons.configuration1)
   implementation(libs.htrace.core4)
   implementation(libs.guava)
+  implementation(libs.commons.io)
   implementation(libs.hadoop2.auth) {
     exclude("*")
   }

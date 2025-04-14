@@ -39,6 +39,21 @@ Tested and verified with Apache Hudi `0.15.0`.
 | `client.pool-cache.eviction-interval-ms` | For HMS backend. The cache pool eviction interval.                                                                                                                                                                                     | 300000        | No       | 0.7.0-incubating |
 | `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls for HMS backend. | (none)        | No       | 0.7.0-incubating |
 
+#### Catalog backend security
+
+Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+
+| Property name                                      | Description                                                                                                                                                    | Default value | Required                                                    | Since Version    |
+|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|------------------|
+| `authentication.type`                              | The type of authentication for hudi catalog backend. This configuration only applicable for for hms backend, and only supports `Kerberos`, `simple` currently. | `simple`      | No                                                          | 0.9.0-incubating |
+| `authentication.impersonation-enable`              | Whether to enable impersonation for the hudi catalog                                                                                                           | `false`       | No                                                          | 0.9.0-incubating |
+| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                   | (none)        | required if the value of `authentication.type` is Kerberos. | 0.9.0-incubating |
+| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                         | (none)        | required if the value of `authentication.type` is Kerberos. | 0.9.0-incubating |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for hudi catalog.                                                                                                    | 60            | No                                                          | 0.9.0-incubating |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                     | 60            | No                                                          | 0.9.0-incubating |
+Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.kerberos.principal=XXXX`、`gravitino.bypass.hadoop.security.authentication=Kerberos`、`gravitino.bypass.hive.metastore.sasl.enabled=ture` And so on.
+
+
 ### Catalog operations
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
