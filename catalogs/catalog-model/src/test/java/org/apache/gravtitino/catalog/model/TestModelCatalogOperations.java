@@ -34,6 +34,7 @@ import static org.apache.gravitino.Configs.STORE_TRANSACTION_MAX_SKEW_TIME;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
@@ -658,7 +659,7 @@ public class TestModelCatalogOperations {
   }
 
   @Test
-  public void testRename() {
+  public void testRenameModel() {
     String schemaName = randomSchemaName();
     createSchema(schemaName);
 
@@ -687,6 +688,114 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(newModelName, alteredModel.name());
     Assertions.assertEquals(comment, alteredModel.comment());
     Assertions.assertEquals(properties, alteredModel.properties());
+  }
+
+  @Test
+  void testAddModelProperty() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model";
+    String comment = "comment";
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value1"));
+    Map<String, String> newProperties =
+        ImmutableMap.<String, String>builder().putAll(properties).put("key2", "value2").build();
+
+    // validate registered model
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
+
+    // validate loaded model
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
+
+    ModelChange change = ModelChange.setProperty("key2", "value2");
+    Model alteredModel = ops.alterModel(modelIdent, change);
+
+    // validate altered model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(comment, alteredModel.comment());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
+  }
+
+  @Test
+  void testUpdateModelProperty() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model";
+    String comment = "comment";
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value1"));
+    Map<String, String> newProperties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value2"));
+
+    // validate registered model
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
+
+    // validate loaded model
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
+
+    ModelChange change = ModelChange.setProperty("key1", "value2");
+    Model alteredModel = ops.alterModel(modelIdent, change);
+
+    // validate altered model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(comment, alteredModel.comment());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
+  }
+
+  @Test
+  void testRemoveModelProperty() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model";
+    String comment = "comment";
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value1"));
+    Map<String, String> newProperties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of());
+
+    // validate registered model
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
+
+    // validate loaded model
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
+
+    ModelChange change = ModelChange.removeProperty("key1");
+    Model alteredModel = ops.alterModel(modelIdent, change);
+
+    // validate altered model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(comment, alteredModel.comment());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
   }
 
   private String randomSchemaName() {
