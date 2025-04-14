@@ -61,6 +61,7 @@ import org.apache.gravitino.listener.api.event.RegisterAndLinkModelPreEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelFailureEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelPreEvent;
+import org.apache.gravitino.listener.api.info.Either;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 import org.apache.gravitino.model.Model;
@@ -309,7 +310,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
       throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new AlterModelVersionPreEvent(initiator, ident, null, version, changes));
+    eventBus.dispatchEvent(
+        new AlterModelVersionPreEvent(initiator, ident, Either.right(version), changes));
     try {
       ModelVersion modelVersion = dispatcher.alterModelVersion(ident, version, changes);
       eventBus.dispatchEvent(
@@ -319,7 +321,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
       return modelVersion;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new AlterModelVersionFailureEvent(initiator, ident, e, null, version, changes));
+          new AlterModelVersionFailureEvent(initiator, ident, e, Either.right(version), changes));
       throw e;
     }
   }
@@ -331,7 +333,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
       throws NoSuchModelException, IllegalArgumentException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
-    eventBus.dispatchEvent(new AlterModelVersionPreEvent(initiator, ident, alias, null, changes));
+    eventBus.dispatchEvent(
+        new AlterModelVersionPreEvent(initiator, ident, Either.left(alias), changes));
     try {
       ModelVersion modelVersion = dispatcher.alterModelVersion(ident, alias, changes);
       eventBus.dispatchEvent(
@@ -341,7 +344,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
       return modelVersion;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new AlterModelVersionFailureEvent(initiator, ident, e, alias, null, changes));
+          new AlterModelVersionFailureEvent(initiator, ident, e, Either.left(alias), changes));
       throw e;
     }
   }

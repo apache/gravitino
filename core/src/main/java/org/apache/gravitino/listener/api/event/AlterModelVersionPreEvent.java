@@ -19,16 +19,16 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.Either;
 import org.apache.gravitino.model.ModelVersionChange;
 
 /** Represents an event triggered before a model version is successfully altered. */
 @DeveloperApi
 public class AlterModelVersionPreEvent extends ModelPreEvent {
-  private final Optional<String> alias;
-  private final Optional<Integer> version;
+
+  private final Either<String, Integer> aliasOrVersion;
   private ModelVersionChange[] modelVersionChanges;
 
   /**
@@ -37,21 +37,18 @@ public class AlterModelVersionPreEvent extends ModelPreEvent {
    *
    * @param user the user who triggered the event
    * @param identifier the identifier of the model involved in the event
-   * @param alias the alias of the model version, or {@code null} if not specified
-   * @param version the version of the model, or {@code null} if not specified
+   * @param aliasOrVersion the alias or version of the model version involved in the event
    * @param modelVersionChanges an array of {@code ModelVersionChange} instances representing the
    *     changes to apply
    */
   public AlterModelVersionPreEvent(
       String user,
       NameIdentifier identifier,
-      String alias,
-      Integer version,
+      Either<String, Integer> aliasOrVersion,
       ModelVersionChange[] modelVersionChanges) {
     super(user, identifier);
 
-    this.alias = Optional.ofNullable(alias);
-    this.version = Optional.ofNullable(version);
+    this.aliasOrVersion = aliasOrVersion;
     this.modelVersionChanges = modelVersionChanges;
   }
 
@@ -61,8 +58,8 @@ public class AlterModelVersionPreEvent extends ModelPreEvent {
    * @return an {@code Optional} containing the alias if specified, otherwise an empty {@code
    *     Optional}
    */
-  public Optional<String> alias() {
-    return alias;
+  public String alias() {
+    return aliasOrVersion.getLeft();
   }
 
   /**
@@ -71,8 +68,8 @@ public class AlterModelVersionPreEvent extends ModelPreEvent {
    * @return an {@code Optional} containing the version if specified, otherwise an empty {@code
    *     Optional}
    */
-  public Optional<Integer> version() {
-    return version;
+  public Integer version() {
+    return aliasOrVersion.getRight();
   }
 
   /**

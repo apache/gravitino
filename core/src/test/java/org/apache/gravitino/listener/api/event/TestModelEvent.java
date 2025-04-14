@@ -823,9 +823,7 @@ public class TestModelEvent {
     Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
 
     // validate alias and version fields
-    Assertions.assertFalse(alterModelVersionPreEvent.alias().isPresent());
-    Assertions.assertTrue(alterModelVersionPreEvent.version().isPresent());
-    Assertions.assertEquals(1, alterModelVersionPreEvent.version().get());
+    Assertions.assertEquals(1, alterModelVersionPreEvent.version());
   }
 
   @Test
@@ -844,9 +842,7 @@ public class TestModelEvent {
     Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
 
     // validate alias and version fields
-    Assertions.assertTrue(alterModelVersionPreEvent.alias().isPresent());
-    Assertions.assertEquals("aliasTest", alterModelVersionPreEvent.alias().get());
-    Assertions.assertFalse(alterModelVersionPreEvent.version().isPresent());
+    Assertions.assertEquals("aliasTest", alterModelVersionPreEvent.alias());
   }
 
   @Test
@@ -922,9 +918,7 @@ public class TestModelEvent {
     Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
 
     // validate alias and version fields
-    Assertions.assertFalse(alterModelVersionFailureEvent.alias().isPresent());
-    Assertions.assertTrue(alterModelVersionFailureEvent.version().isPresent());
-    Assertions.assertEquals(1, alterModelVersionFailureEvent.version().get());
+    Assertions.assertEquals(1, alterModelVersionFailureEvent.version());
   }
 
   @Test
@@ -951,9 +945,7 @@ public class TestModelEvent {
     Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
 
     // validate alias and version fields
-    Assertions.assertTrue(alterModelVersionFailureEvent.alias().isPresent());
-    Assertions.assertEquals("aliasTest", alterModelVersionFailureEvent.alias().get());
-    Assertions.assertFalse(alterModelVersionFailureEvent.version().isPresent());
+    Assertions.assertEquals("aliasTest", alterModelVersionFailureEvent.alias());
   }
 
   private ModelDispatcher mockModelDispatcher() {

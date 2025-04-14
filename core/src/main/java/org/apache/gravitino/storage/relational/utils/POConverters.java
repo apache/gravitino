@@ -1387,11 +1387,11 @@ public class POConverters {
   public static ModelPO updateModelPO(ModelPO oldModelPO, ModelEntity newModel) {
     try {
       return ModelPO.builder()
+          .withModelId(newModel.id())
+          .withModelName(newModel.name())
           .withMetalakeId(oldModelPO.getMetalakeId())
           .withCatalogId(oldModelPO.getCatalogId())
           .withSchemaId(oldModelPO.getSchemaId())
-          .withModelId(newModel.id())
-          .withModelName(newModel.name())
           .withModelComment(newModel.comment())
           .withModelLatestVersion(newModel.latestVersion())
           .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(newModel.properties()))

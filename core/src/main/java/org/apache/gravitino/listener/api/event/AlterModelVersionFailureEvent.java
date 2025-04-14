@@ -19,16 +19,15 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.info.Either;
 import org.apache.gravitino.model.ModelVersionChange;
 
 /** Represents an event triggered when a model version alteration operation fails. */
 @DeveloperApi
 public class AlterModelVersionFailureEvent extends ModelFailureEvent {
-  private final Optional<String> alias;
-  private final Optional<Integer> version;
+  private final Either<String, Integer> aliasOrVersion;
   private ModelVersionChange[] modelVersionChanges;
 
   /**
@@ -38,10 +37,7 @@ public class AlterModelVersionFailureEvent extends ModelFailureEvent {
    * @param user the user who triggered the event
    * @param identifier the identifier of the model involved in the event
    * @param exception the exception that caused the failure
-   * @param alias the alias of the model version involved in the event, or {@code null} if not
-   *     specified
-   * @param version the version of the model version involved in the event, or {@code null} if not
-   *     specified
+   * @param aliasOrVersion the alias or version of the model version involved in the event
    * @param modelVersionChanges an array of {@code ModelVersionChange} instances that were attempted
    *     to be applied
    */
@@ -49,13 +45,11 @@ public class AlterModelVersionFailureEvent extends ModelFailureEvent {
       String user,
       NameIdentifier identifier,
       Exception exception,
-      String alias,
-      Integer version,
+      Either<String, Integer> aliasOrVersion,
       ModelVersionChange[] modelVersionChanges) {
     super(user, identifier, exception);
 
-    this.alias = Optional.ofNullable(alias);
-    this.version = Optional.ofNullable(version);
+    this.aliasOrVersion = aliasOrVersion;
     this.modelVersionChanges = modelVersionChanges;
   }
 
@@ -64,8 +58,8 @@ public class AlterModelVersionFailureEvent extends ModelFailureEvent {
    *
    * @return an {@code Optional} containing the alias, or an empty {@code Optional} if not specified
    */
-  public Optional<String> alias() {
-    return alias;
+  public String alias() {
+    return aliasOrVersion.getLeft();
   }
 
   /**
@@ -74,8 +68,8 @@ public class AlterModelVersionFailureEvent extends ModelFailureEvent {
    * @return an {@code Optional} containing the version, or an empty {@code Optional} if not
    *     specified
    */
-  public Optional<Integer> version() {
-    return version;
+  public Integer version() {
+    return aliasOrVersion.getRight();
   }
 
   /**

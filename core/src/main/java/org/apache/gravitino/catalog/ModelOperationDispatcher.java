@@ -259,7 +259,6 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
   private ModelVersion executeAlterModelVersion(
       NameIdentifier ident, ThrowableFunction<ModelCatalog, ModelVersion> fn) {
-
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     ModelVersion alteredModelVersion =
@@ -273,11 +272,6 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                     NoSuchModelVersionException.class,
                     IllegalArgumentException.class));
 
-    return internalUpdateModelVersion(catalogIdent, alteredModelVersion);
-  }
-
-  private ModelVersion internalUpdateModelVersion(
-      NameIdentifier catalogIdent, ModelVersion alteredModelVersion) {
     return EntityCombinedModelVersion.of(alteredModelVersion)
         .withHiddenProperties(
             getHiddenPropertyNames(
