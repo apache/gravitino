@@ -29,6 +29,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.SupportsRelationOperations.Type.OWNER_REL;
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,21 +95,23 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.mockito.Mockito;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestJDBCBackend {
-  private static final String JDBC_STORE_PATH =
+  private final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
-  private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
-  private static final String H2_FILE = DB_DIR + ".mv.db";
-  private static final Config config = Mockito.mock(Config.class);
-  public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
+  private final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private final String H2_FILE = DB_DIR + ".mv.db";
+  private final Config config = Mockito.mock(Config.class);
+  public final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
           Configs.DEFAULT_ENTITY_RELATIONAL_STORE, JDBCBackend.class.getCanonicalName());
-  public static RelationalBackend backend;
+  protected RelationalBackend backend;
 
   @BeforeAll
-  public static void setup() {
+  public void setup() {
     File dir = new File(DB_DIR);
     dir.deleteOnExit();
     if (dir.exists() || !dir.isDirectory()) {
@@ -139,7 +142,7 @@ public class TestJDBCBackend {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public void tearDown() throws IOException {
     dropAllTables();
     File dir = new File(DB_DIR);
     if (dir.exists()) {
@@ -1355,7 +1358,7 @@ public class TestJDBCBackend {
         .withName(name)
         .withNamespace(namespace)
         .withFilesetType(Fileset.Type.MANAGED)
-        .withStorageLocation("/tmp")
+        .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "/tmp"))
         .withComment("")
         .withProperties(new HashMap<>())
         .withAuditInfo(auditInfo)
