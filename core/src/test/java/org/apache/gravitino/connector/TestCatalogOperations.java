@@ -19,6 +19,7 @@
 package org.apache.gravitino.connector;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -913,7 +914,9 @@ public class TestCatalogOperations
 
     TestModel model = models.get(ident);
     Map<String, String> newProps =
-        model.properties() != null ? Maps.newHashMap(model.properties()) : Maps.newHashMap();
+        model.properties() == null ? ImmutableMap.of() : new HashMap<>(model.properties());
+    String newComment = model.comment();
+    int newLatestVersion = model.latestVersion();
 
     NameIdentifier newIdent = ident;
     for (ModelChange change : changes) {
@@ -923,15 +926,21 @@ public class TestCatalogOperations
         if (models.containsKey(newIdent)) {
           throw new ModelAlreadyExistsException("Model %s already exists", ident);
         }
+      } else if (change instanceof ModelChange.RemoveProperty) {
+        ModelChange.RemoveProperty removeProperty = (ModelChange.RemoveProperty) change;
+        newProps.remove(removeProperty.property());
+      } else if (change instanceof ModelChange.SetProperty) {
+        ModelChange.SetProperty setProperty = (ModelChange.SetProperty) change;
+        newProps.put(setProperty.property(), setProperty.value());
       }
     }
     TestModel updatedModel =
         TestModel.builder()
             .withName(newIdent.name())
-            .withComment(model.comment())
+            .withComment(newComment)
             .withProperties(new HashMap<>(newProps))
             .withAuditInfo(updatedAuditInfo)
-            .withLatestVersion(model.latestVersion())
+            .withLatestVersion(newLatestVersion)
             .build();
 
     models.put(ident, updatedModel);
