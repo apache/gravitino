@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
@@ -48,6 +51,21 @@ public class HadoopSchemaPropertiesMetadata extends BasePropertiesMetadata {
                   true /* immutable */,
                   null,
                   false /* hidden */))
+          .put(
+              PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
+              PropertyEntry.stringReservedPropertyEntry(
+                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
+                  "The storage location equivalent to property 'location'",
+                  true /* hidden */))
+          .put(
+              PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
+              PropertyEntry.stringImmutablePropertyPrefixEntry(
+                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
+                  "The prefix of the location name",
+                  false /* required */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
           .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
