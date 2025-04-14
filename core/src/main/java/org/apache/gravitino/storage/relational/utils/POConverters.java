@@ -544,19 +544,24 @@ public class POConverters {
   public static FilesetPO initializeFilesetPOWithVersion(
       FilesetEntity filesetEntity, FilesetPO.Builder builder) {
     try {
-      FilesetVersionPO filesetVersionPO =
-          FilesetVersionPO.builder()
-              .withMetalakeId(builder.getFilesetMetalakeId())
-              .withCatalogId(builder.getFilesetCatalogId())
-              .withSchemaId(builder.getFilesetSchemaId())
-              .withFilesetId(filesetEntity.id())
-              .withVersion(INIT_VERSION)
-              .withFilesetComment(filesetEntity.comment())
-              .withStorageLocation(filesetEntity.storageLocation())
-              .withProperties(
-                  JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.properties()))
-              .withDeletedAt(DEFAULT_DELETED_AT)
-              .build();
+      String props = JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.properties());
+      List<FilesetVersionPO> filesetVersionPOs =
+          filesetEntity.storageLocations().entrySet().stream()
+              .map(
+                  entry ->
+                      FilesetVersionPO.builder()
+                          .withMetalakeId(builder.getFilesetMetalakeId())
+                          .withCatalogId(builder.getFilesetCatalogId())
+                          .withSchemaId(builder.getFilesetSchemaId())
+                          .withFilesetId(filesetEntity.id())
+                          .withVersion(INIT_VERSION)
+                          .withFilesetComment(filesetEntity.comment())
+                          .withLocationName(entry.getKey())
+                          .withStorageLocation(entry.getValue())
+                          .withProperties(props)
+                          .withDeletedAt(DEFAULT_DELETED_AT)
+                          .build())
+              .collect(Collectors.toList());
       return builder
           .withFilesetId(filesetEntity.id())
           .withFilesetName(filesetEntity.name())
@@ -565,7 +570,7 @@ public class POConverters {
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
-          .withFilesetVersionPO(filesetVersionPO)
+          .withFilesetVersionPOs(filesetVersionPOs)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -584,27 +589,32 @@ public class POConverters {
     try {
       Long lastVersion = oldFilesetPO.getLastVersion();
       Long currentVersion;
-      FilesetVersionPO newFilesetVersionPO;
+      List<FilesetVersionPO> newFilesetVersionPOs;
       // Will set the version to the last version + 1
       if (needUpdateVersion) {
         lastVersion++;
         currentVersion = lastVersion;
-        newFilesetVersionPO =
-            FilesetVersionPO.builder()
-                .withMetalakeId(oldFilesetPO.getMetalakeId())
-                .withCatalogId(oldFilesetPO.getCatalogId())
-                .withSchemaId(oldFilesetPO.getSchemaId())
-                .withFilesetId(newFileset.id())
-                .withVersion(currentVersion)
-                .withFilesetComment(newFileset.comment())
-                .withStorageLocation(newFileset.storageLocation())
-                .withProperties(
-                    JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties()))
-                .withDeletedAt(DEFAULT_DELETED_AT)
-                .build();
+        String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
+        newFilesetVersionPOs =
+            newFileset.storageLocations().entrySet().stream()
+                .map(
+                    entry ->
+                        FilesetVersionPO.builder()
+                            .withMetalakeId(oldFilesetPO.getMetalakeId())
+                            .withCatalogId(oldFilesetPO.getCatalogId())
+                            .withSchemaId(oldFilesetPO.getSchemaId())
+                            .withFilesetId(newFileset.id())
+                            .withVersion(currentVersion)
+                            .withFilesetComment(newFileset.comment())
+                            .withLocationName(entry.getKey())
+                            .withStorageLocation(entry.getValue())
+                            .withProperties(props)
+                            .withDeletedAt(DEFAULT_DELETED_AT)
+                            .build())
+                .collect(Collectors.toList());
       } else {
         currentVersion = oldFilesetPO.getCurrentVersion();
-        newFilesetVersionPO = oldFilesetPO.getFilesetVersionPO();
+        newFilesetVersionPOs = oldFilesetPO.getFilesetVersionPOs();
       }
       return FilesetPO.builder()
           .withFilesetId(newFileset.id())
@@ -617,7 +627,7 @@ public class POConverters {
           .withCurrentVersion(currentVersion)
           .withLastVersion(lastVersion)
           .withDeletedAt(DEFAULT_DELETED_AT)
-          .withFilesetVersionPO(newFilesetVersionPO)
+          .withFilesetVersionPOs(newFilesetVersionPOs)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
@@ -625,16 +635,21 @@ public class POConverters {
   }
 
   public static boolean checkFilesetVersionNeedUpdate(
-      FilesetVersionPO oldFilesetVersionPO, FilesetEntity newFileset) {
-    if (!StringUtils.equals(oldFilesetVersionPO.getFilesetComment(), newFileset.comment())
-        || !StringUtils.equals(
-            oldFilesetVersionPO.getStorageLocation(), newFileset.storageLocation())) {
+      List<FilesetVersionPO> oldFilesetVersionPOs, FilesetEntity newFileset) {
+    Map<String, String> storageLocations =
+        oldFilesetVersionPOs.stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
+    if (!StringUtils.equals(oldFilesetVersionPOs.get(0).getFilesetComment(), newFileset.comment())
+        || !Objects.equals(storageLocations, newFileset.storageLocations())) {
       return true;
     }
 
     try {
       Map<String, String> oldProperties =
-          JsonUtils.anyFieldMapper().readValue(oldFilesetVersionPO.getProperties(), Map.class);
+          JsonUtils.anyFieldMapper()
+              .readValue(oldFilesetVersionPOs.get(0).getProperties(), Map.class);
       if (oldProperties == null) {
         return newFileset.properties() != null;
       }
@@ -652,17 +667,22 @@ public class POConverters {
    * @return FilesetEntity object from FilesetPO object
    */
   public static FilesetEntity fromFilesetPO(FilesetPO filesetPO, Namespace namespace) {
+    Map<String, String> storageLocations =
+        filesetPO.getFilesetVersionPOs().stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
     try {
       return FilesetEntity.builder()
           .withId(filesetPO.getFilesetId())
           .withName(filesetPO.getFilesetName())
           .withNamespace(namespace)
-          .withComment(filesetPO.getFilesetVersionPO().getFilesetComment())
+          .withComment(filesetPO.getFilesetVersionPOs().get(0).getFilesetComment())
           .withFilesetType(Fileset.Type.valueOf(filesetPO.getType()))
-          .withStorageLocation(filesetPO.getFilesetVersionPO().getStorageLocation())
+          .withStorageLocations(storageLocations)
           .withProperties(
               JsonUtils.anyFieldMapper()
-                  .readValue(filesetPO.getFilesetVersionPO().getProperties(), Map.class))
+                  .readValue(filesetPO.getFilesetVersionPOs().get(0).getProperties(), Map.class))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(filesetPO.getAuditInfo(), AuditInfo.class))
           .build();
