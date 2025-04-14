@@ -93,7 +93,8 @@ public class TestFilesetMetaService {
               new File(
                   gravitinoHome
                       + String.format(
-                          "/scripts/mysql/schema-%s-mysql.sql", ConfigConstants.VERSION_0_8_0)),
+                          "/scripts/mysql/schema-%s-mysql.sql",
+                          ConfigConstants.CURRENT_SCRIPT_VERSION)),
               "UTF-8");
       String[] initMySQLBackendSqls =
           Arrays.stream(mysqlContent.split(";"))
