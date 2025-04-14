@@ -114,7 +114,7 @@ public class TestEntityCombinedObject {
         EntityCombinedFileset.of(originFileset).withHiddenProperties(hiddenProperties);
     Assertions.assertEquals(originFileset.name(), entityCombinedFileset.name());
     Assertions.assertEquals(originFileset.comment(), entityCombinedFileset.comment());
-    Map<String, String> filterProp = new HashMap<>(originTopic.properties());
+    Map<String, String> filterProp = new HashMap<>(originFileset.properties());
     filterProp.remove("k3");
     filterProp.remove(null);
     filterProp.remove("k5");
