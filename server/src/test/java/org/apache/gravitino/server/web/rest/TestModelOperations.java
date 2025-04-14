@@ -797,7 +797,7 @@ public class TestModelOperations extends JerseyTest {
   }
 
   @Test
-  public void testAlterModel() {
+  public void testRenameModel() {
     String oldName = "model1";
     String newName = "newModel1";
     String comment = "comment";
@@ -860,11 +860,129 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
   }
 
+  @Test
+  void testAddModelProperty() {
+    String modelName = "model1";
+    String comment = "comment";
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    Model updatedModel =
+        mockModel(
+            modelName,
+            comment,
+            0,
+            ImmutableMap.<String, String>builder()
+                .putAll(properties)
+                .put("key2", "value2")
+                .build());
+
+    // Mock alterModel to return updated model
+    when(modelDispatcher.alterModel(
+            modelId, new ModelChange[] {ModelChange.setProperty("key2", "value2")}))
+        .thenReturn(updatedModel);
+
+    // Build update request
+    ModelUpdatesRequest req =
+        new ModelUpdatesRequest(
+            Collections.singletonList(
+                new ModelUpdateRequest.SetModelPropertyRequest("key2", "value2")));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelResponse modelResp = resp.readEntity(ModelResponse.class);
+    Assertions.assertEquals(comment, modelResp.getModel().comment());
+    Assertions.assertEquals(modelName, modelResp.getModel().name());
+    Assertions.assertEquals(2, modelResp.getModel().properties().size());
+    Assertions.assertEquals("value2", modelResp.getModel().properties().get("key2"));
+  }
+
+  @Test
+  void testUpdateModelProperty() {
+    String modelName = "model1";
+    String comment = "comment";
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    Model updatedModel = mockModel(modelName, comment, 0, ImmutableMap.of("key1", "updatedValue1"));
+
+    // Mock alterModel to return updated model
+    when(modelDispatcher.alterModel(modelId, ModelChange.setProperty("key1", "updatedValue1")))
+        .thenReturn(updatedModel);
+
+    // Build update request
+    ModelUpdatesRequest req =
+        new ModelUpdatesRequest(
+            Collections.singletonList(
+                new ModelUpdateRequest.SetModelPropertyRequest("key1", "updatedValue1")));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelResponse modelResp = resp.readEntity(ModelResponse.class);
+    Assertions.assertEquals(comment, modelResp.getModel().comment());
+    Assertions.assertEquals(modelName, modelResp.getModel().name());
+    Assertions.assertEquals(1, modelResp.getModel().properties().size());
+    Assertions.assertEquals("updatedValue1", modelResp.getModel().properties().get("key1"));
+  }
+
+  @Test
+  void testRemoveModelProperty() {
+    String modelName = "model1";
+    String comment = "comment";
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    Model updatedModel = mockModel(modelName, comment, 0, ImmutableMap.of());
+
+    // Mock alterModel to return updated model
+    when(modelDispatcher.alterModel(modelId, ModelChange.removeProperty("key1")))
+        .thenReturn(updatedModel);
+
+    // Build update request
+    ModelUpdatesRequest req =
+        new ModelUpdatesRequest(
+            Collections.singletonList(new ModelUpdateRequest.RemoveModelPropertyRequest("key1")));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelResponse modelResp = resp.readEntity(ModelResponse.class);
+    Assertions.assertEquals(comment, modelResp.getModel().comment());
+    Assertions.assertEquals(modelName, modelResp.getModel().name());
+    Assertions.assertEquals(0, modelResp.getModel().properties().size());
+    Assertions.assertFalse(modelResp.getModel().properties().containsKey("key1"));
+  }
+
   private String modelPath() {
     return "/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/" + schema + "/models";
   }
 
   private Model mockModel(String modelName, String comment, int latestVersion) {
+    Model mockModel = mock(Model.class);
+    when(mockModel.name()).thenReturn(modelName);
+    when(mockModel.comment()).thenReturn(comment);
+    when(mockModel.latestVersion()).thenReturn(latestVersion);
+    when(mockModel.properties()).thenReturn(properties);
+    when(mockModel.auditInfo()).thenReturn(testAuditInfo);
+    return mockModel;
+  }
+
+  private Model mockModel(
+      String modelName, String comment, int latestVersion, Map<String, String> properties) {
     Model mockModel = mock(Model.class);
     when(mockModel.name()).thenReturn(modelName);
     when(mockModel.comment()).thenReturn(comment);

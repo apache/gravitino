@@ -363,6 +363,15 @@ class DTOConverters {
       return new ModelUpdateRequest.RenameModelRequest(
           ((ModelChange.RenameModel) change).newName());
 
+    } else if (change instanceof ModelChange.RemoveProperty) {
+      return new ModelUpdateRequest.RemoveModelPropertyRequest(
+          ((ModelChange.RemoveProperty) change).property());
+
+    } else if (change instanceof ModelChange.SetProperty) {
+      return new ModelUpdateRequest.SetModelPropertyRequest(
+          ((ModelChange.SetProperty) change).property(),
+          ((ModelChange.SetProperty) change).value());
+
     } else {
       throw new IllegalArgumentException(
           "Unknown model change type: " + change.getClass().getSimpleName());

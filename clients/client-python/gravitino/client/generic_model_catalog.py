@@ -429,6 +429,14 @@ class GenericModelCatalog(BaseSchemaCatalog):
         if isinstance(change, ModelChange.RenameModel):
             return ModelUpdateRequest.UpdateModelNameRequest(change.new_name())
 
+        if isinstance(change, ModelChange.SetProperty):
+            return ModelUpdateRequest.ModelSetPropertyRequest(
+                change.property(), change.value()
+            )
+
+        if isinstance(change, ModelChange.RemoveProperty):
+            return ModelUpdateRequest.ModelRemovePropertyRequest(change.property())
+
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def _check_model_namespace(self, namespace: Namespace):
