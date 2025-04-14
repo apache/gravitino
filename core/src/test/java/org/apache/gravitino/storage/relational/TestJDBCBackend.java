@@ -40,7 +40,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
@@ -52,9 +51,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
-import org.apache.commons.io.IOUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -157,25 +154,6 @@ public class TestJDBCBackend {
   @BeforeEach
   public void init() {
     truncateAllTables();
-  }
-
-  private static void prepareJdbcTable() {
-    // Read the ddl sql to create table
-    String scriptPath = "h2/schema-0.8.0-h2.sql";
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement()) {
-      StringBuilder ddlBuilder = new StringBuilder();
-      IOUtils.readLines(
-              Objects.requireNonNull(
-                  TestJDBCBackend.class.getClassLoader().getResourceAsStream(scriptPath)),
-              StandardCharsets.UTF_8)
-          .forEach(line -> ddlBuilder.append(line).append("\n"));
-      statement.execute(ddlBuilder.toString());
-    } catch (Exception e) {
-      throw new IllegalStateException("Create tables failed", e);
-    }
   }
 
   private static void truncateAllTables() {
