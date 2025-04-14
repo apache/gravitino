@@ -34,12 +34,17 @@ import org.apache.gravitino.listener.api.event.PreEvent;
  * within its internal management.
  */
 public class EventBus {
-  // Holds instances of EventListenerPlugin. These instances can either be
-  // EventListenerPluginWrapper,
-  // which are meant for synchronous event listening, or AsyncQueueListener, designed for
-  // asynchronous event processing.
+  /**
+   * Holds all instances of {@link EventListenerPlugin}. These instances can either be {@link
+   * EventListenerPluginWrapper} which are used for synchronous event process, or {@link
+   * AsyncQueueListener} for asynchronous event processing.
+   */
   private final List<EventListenerPlugin> eventListeners;
 
+  /**
+   * Holds instances of {@link AsyncQueueListener}, mainly used to check the status of async queue,
+   * like {@link #isHighWatermark()}.
+   */
   private final List<AsyncQueueListener> asyncQueueListeners;
 
   /**

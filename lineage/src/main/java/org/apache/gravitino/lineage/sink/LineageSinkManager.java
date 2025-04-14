@@ -53,6 +53,12 @@ public class LineageSinkManager implements Closeable {
     return eventBus.isHighWatermark();
   }
 
+  /**
+   * The lineage event is dispatched by a dedicated event listener system. The lineage sink is
+   * wrapped within the {@link LineageSinkEventListener}. Consequently, we must convert the lineage
+   * configuration into event listener configurations. This conversion includes details such as
+   * event listener names, event listener classes, and the capacity of the asynchronous event queue.
+   */
   @VisibleForTesting
   static Map<String, String> transformToEventListenerConfigs(
       List<String> sinks, Map<String, String> lineageConfigs) {

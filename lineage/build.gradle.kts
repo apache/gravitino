@@ -24,14 +24,10 @@ plugins {
 dependencies {
   implementation(project(":common"))
   implementation(project(":core"))
-  implementation(project(":common"))
   implementation(project(":server-common"))
   implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.jackson.datatype.jdk8)
-  implementation(libs.jackson.datatype.jsr310)
-  implementation(libs.jackson.databind)
   implementation(libs.metrics.jersey2)
   implementation(libs.openlineage.java) {
     isTransitive = false

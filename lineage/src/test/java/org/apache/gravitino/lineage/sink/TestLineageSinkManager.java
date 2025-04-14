@@ -60,7 +60,7 @@ public class TestLineageSinkManager {
               Assertions.assertTrue(userListener instanceof LineageSinkEventListener);
               LineageSink sink = ((LineageSinkEventListener) userListener).lineageSink();
               Assertions.assertTrue(sink instanceof LineageSinkForTest);
-              checkLineSink((LineageSinkForTest) sink);
+              checkLineageSink((LineageSinkForTest) sink);
             });
   }
 
@@ -91,7 +91,7 @@ public class TestLineageSinkManager {
     Assertions.assertEquals("b", configs.get("sink2.a"));
   }
 
-  private void checkLineSink(LineageSinkForTest sink) {
+  private void checkLineageSink(LineageSinkForTest sink) {
     Map<String, String> configs = sink.getConfigs();
     Assertions.assertTrue(configs.containsKey("name"));
 
