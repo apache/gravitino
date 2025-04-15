@@ -136,8 +136,6 @@ catalog:
   ## The interval in milliseconds to evict the catalog cache
   ##
   cacheEvictionIntervalMs: 3600000
-  classloader:
-    isolated: true
 
 ## THE CONFIGURATION FOR authorization
 ##
@@ -183,7 +181,7 @@ authenticator:
   oauth:
     serviceAudience: test
     defaultSignKey: ""
-    serverUri: http://57.185.211.74:8080
+    serverUri: ""
     tokenPath: /realms/myrealm/protocol/openid-connect/token
 
 ## Audit log configuration
@@ -191,13 +189,10 @@ authenticator:
 audit:
   enabled: false
   writer:
-    className: org.apache.gravitino.audit.FileAuditWriter
     file:
       fileName: gravitino_audit.log
       flushIntervalSecs: 10
       append: true
-  formatter:
-    className: org.apache.gravitino.audit.SimpleFormatter
 
 ## Metrics configuration
 ##
