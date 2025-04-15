@@ -251,4 +251,36 @@ public interface ModelCatalog {
    */
   Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException;
+
+  /**
+   * Applies the specified {@link ModelVersionChange changes} to a model version identified by its
+   * version number.
+   *
+   * <p>If any change is rejected by the implementation, no changes will be applied.
+   *
+   * @param ident the {@link NameIdentifier} of the model to be altered
+   * @param version the version number of the model version to be altered
+   * @param changes one or more {@link ModelVersionChange} instances to apply
+   * @return the updated {@link ModelVersion} instance
+   * @throws NoSuchModelVersionException if the specified model version does not exist
+   * @throws IllegalArgumentException if any change is rejected by the implementation
+   */
+  ModelVersion alterModelVersion(NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException;
+
+  /**
+   * Applies the specified {@link ModelVersionChange changes} to a model version identified by its
+   * alias.
+   *
+   * <p>If any change is rejected by the implementation, no changes will be applied.
+   *
+   * @param ident the {@link NameIdentifier} of the model to be altered
+   * @param alias the alias of the model version to be altered
+   * @param changes one or more {@link ModelVersionChange} instances to apply
+   * @return the updated {@link ModelVersion} instance
+   * @throws NoSuchModelVersionException if the specified model version does not exist
+   * @throws IllegalArgumentException if any change is rejected by the implementation
+   */
+  ModelVersion alterModelVersion(NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException;
 }
