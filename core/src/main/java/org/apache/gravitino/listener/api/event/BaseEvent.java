@@ -24,6 +24,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.EventDispatcher;
 
 /**
  * The abstract base class for all events. It encapsulates common information such as the user who
@@ -49,6 +50,13 @@ public abstract class BaseEvent {
     this.identifier = identifier;
     this.eventTime = System.currentTimeMillis();
   }
+
+  /**
+   * Accept a visitor to process the event itself.
+   *
+   * @param visitor the implementation of the visitor interface.
+   */
+  public abstract void accept(EventDispatcher visitor);
 
   /**
    * Retrieves the user associated with this event.
