@@ -367,7 +367,10 @@ public class HadoopUserImpersonationIT extends BaseIT {
     Assertions.assertEquals("comment", fileset.comment());
     Assertions.assertEquals(Fileset.Type.MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
-    Assertions.assertEquals(1, fileset.properties().size());
+    Assertions.assertEquals(2, fileset.properties().size());
+    Assertions.assertTrue(
+        fileset.properties().containsKey(Fileset.PROPERTY_DEFAULT_LOCATION_NAME),
+        "properties should contain default location name");
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
 
     // test create a fileset that already exist
@@ -394,7 +397,9 @@ public class HadoopUserImpersonationIT extends BaseIT {
         storageLocation(filesetName2),
         fileset2.storageLocation(),
         "storage location should be created");
-    Assertions.assertEquals(ImmutableMap.of(), fileset2.properties(), "properties should be empty");
+    Assertions.assertTrue(
+        fileset2.properties().containsKey(Fileset.PROPERTY_DEFAULT_LOCATION_NAME),
+        "properties should contain default location name");
 
     // create fileset with null fileset name
     Assertions.assertThrows(
