@@ -50,6 +50,7 @@ import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rest.RESTUtils;
 
 class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
@@ -279,6 +280,22 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
 
     resp.validate();
     return new GenericModel(resp.getModel(), restClient, modelFullNs);
+  }
+
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
+    // TODO implement
+    return null;
+  }
+
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    // TODO implement
+    return null;
   }
 
   /** @return A new builder instance for {@link GenericModelCatalog}. */
