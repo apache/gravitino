@@ -36,8 +36,6 @@ import org.apache.gravitino.dto.requests.ModelRegisterRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
-import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
-import org.apache.gravitino.dto.requests.ModelVersionUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
@@ -307,55 +305,16 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
   public ModelVersion alterModelVersion(
       NameIdentifier ident, int version, ModelVersionChange... changes)
       throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
-    checkModelNameIdentifier(ident);
-
-    List<ModelVersionUpdateRequest> updateRequests =
-        Arrays.stream(changes)
-            .map(DTOConverters::toModelVersionUpdateRequest)
-            .collect(Collectors.toList());
-
-    ModelVersionUpdatesRequest req = new ModelVersionUpdatesRequest(updateRequests);
-    req.validate();
-
-    NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
-    ModelVersionResponse resp =
-        restClient.put(
-            formatModelVersionRequestPath(modelFullIdent) + "/versions/" + version,
-            req,
-            ModelVersionResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.modelErrorHandler());
-
-    resp.validate();
-    return new GenericModelVersion(resp.getModelVersion());
+    // TODO implement
+    return null;
   }
 
   @Override
   public ModelVersion alterModelVersion(
       NameIdentifier ident, String alias, ModelVersionChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    checkModelNameIdentifier(ident);
-    Preconditions.checkArgument(StringUtils.isNotBlank(alias), "Model alias must be non-empty");
-
-    List<ModelVersionUpdateRequest> updateRequests =
-        Arrays.stream(changes)
-            .map(DTOConverters::toModelVersionUpdateRequest)
-            .collect(Collectors.toList());
-
-    ModelVersionUpdatesRequest req = new ModelVersionUpdatesRequest(updateRequests);
-    req.validate();
-
-    NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
-    ModelVersionResponse resp =
-        restClient.put(
-            formatModelVersionRequestPath(modelFullIdent) + "/aliases/" + alias,
-            req,
-            ModelVersionResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.modelErrorHandler());
-
-    resp.validate();
-    return new GenericModelVersion(resp.getModelVersion());
+    // TODO implement
+    return null;
   }
 
   /** @return A new builder instance for {@link GenericModelCatalog}. */
