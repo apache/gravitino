@@ -65,7 +65,7 @@ class GravitinoVersion(VersionDTO):
         for (a, b) in version_cmp:
             if a > b:
                 return True
-            elif a < b:
+            if a < b:
                 return False
         # self, other is the same
         return False
