@@ -31,8 +31,8 @@ class FilesetCreateRequest(RESTRequest):
     _name: str = field(metadata=config(field_name="name"))
     _comment: Optional[str] = field(metadata=config(field_name="comment"))
     _type: Optional[Fileset.Type] = field(metadata=config(field_name="type"))
-    _storage_location: Optional[str] = field(
-        metadata=config(field_name="storageLocation")
+    _storage_locations: Optional[Dict[str, str]] = field(
+        metadata=config(field_name="storageLocations")
     )
     _properties: Optional[Dict[str, str]] = field(
         metadata=config(field_name="properties")
@@ -43,13 +43,13 @@ class FilesetCreateRequest(RESTRequest):
         name: str,
         comment: Optional[str] = None,
         fileset_type: Fileset.Type = None,
-        storage_location: Optional[str] = None,
+        storage_locations: Optional[Dict[str, str]] = None,
         properties: Optional[Dict[str, str]] = None,
     ):
         self._name = name
         self._comment = comment
         self._type = fileset_type
-        self._storage_location = storage_location
+        self._storage_locations = storage_locations
         self._properties = properties
 
     def validate(self):

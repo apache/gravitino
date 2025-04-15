@@ -94,8 +94,11 @@ def mock_load_fileset(name: str, location: str):
         _name=name,
         _type=Fileset.Type.MANAGED,
         _comment="this is test",
-        _properties={"k": "v"},
-        _storage_location=location,
+        _properties={
+            "k": "v",
+            Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
+        },
+        _storage_locations={Fileset.LOCATION_NAME_UNKNOWN: location},
         _audit=audit_dto,
     )
     return fileset

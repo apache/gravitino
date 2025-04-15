@@ -44,9 +44,13 @@ class FilesetResponse(BaseResponse):
             raise IllegalArgumentException("fileset must not be null")
         if not self._fileset.name():
             raise IllegalArgumentException("fileset 'name' must not be null and empty")
-        if not self._fileset.storage_location():
+        if not self._fileset.storage_locations():
             raise IllegalArgumentException(
-                "fileset 'storageLocation' must not be null and empty"
+                "fileset 'storageLocations' must not be null"
+            )
+        if not self._fileset.storage_locations():
+            raise IllegalArgumentException(
+                "fileset 'storageLocations' must not be empty. At least one location is required."
             )
         if self._fileset.type() is None:
             raise IllegalArgumentException("fileset 'type' must not be null and empty")
