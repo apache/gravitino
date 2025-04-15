@@ -180,7 +180,14 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.type(), Fileset.Type.MANAGED)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(fileset.properties(), self.fileset_properties)
+        self.assertEqual(
+            fileset.properties(),
+            {
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
+                **self.fileset_properties,
+            },
+        )
+        self.assertEqual(fileset.storage_location(), f"file:{self.fileset_location}")
 
     def test_drop_fileset(self):
         self.create_fileset()
@@ -207,7 +214,13 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.name(), self.fileset_name)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(fileset.properties(), self.fileset_properties)
+        self.assertEqual(
+            fileset.properties(),
+            {
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
+                **self.fileset_properties,
+            },
+        )
         self.assertEqual(fileset.audit_info().creator(), "anonymous")
 
     def test_failed_load_fileset(self):
