@@ -34,6 +34,27 @@ class ModelChange(ABC):
         """
         return ModelChange.RenameModel(new_name)
 
+    @staticmethod
+    def set_property(pro, value):
+        """Creates a new model change to set the property and value pairs for the model.
+        Args:
+            property: The name of the property to be set.
+            value: The value of the property to be set.
+        Returns:
+            The model change.
+        """
+        return ModelChange.SetProperty(pro, value)
+
+    @staticmethod
+    def remove_property(pro):
+        """Creates a new model change to remove the property and value pairs for the model.
+        Args:
+            property: The name of the property to be removed.
+        Returns:
+            The model change.
+        """
+        return ModelChange.RemoveProperty(pro)
+
     class RenameModel:
         """A model change to rename the model."""
 
@@ -78,3 +99,97 @@ class ModelChange(ABC):
                 A string summary of this renaming operation.
             """
             return f"RENAMEMODEL {self.new_name()}"
+
+    class SetProperty:
+        """
+        A model change to set the property and value pairs for the model.
+        """
+
+        def __init__(self, pro, value):
+            self._property = pro
+            self._value = value
+
+        def property(self):
+            """Retrieves the name of the property to be set.
+            Returns:
+                The name of the property.
+            """
+            return self._property
+
+        def value(self):
+            """Retrieves the value of the property to be set.
+            Returns:
+                The value of the property.
+            """
+            return self._value
+
+        def __eq__(self, other) -> bool:
+            """Compares this SetProperty instance with another object for equality. Two instances are
+            considered equal if they designate the same property and value for the model.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model property setting operation; false otherwise.
+            """
+            if not isinstance(other, ModelChange.SetProperty):
+                return False
+            return self.property() == other.property() and self.value() == other.value()
+
+        def __hash__(self):
+            """Generates a hash code for this SetProperty instance. The hash code is primarily based on
+            the property and value for the model.
+            Returns:
+                A hash code value for this property setting operation.
+            """
+            return hash(self.property(), self.value())
+
+        def __str__(self):
+            """Provides a string representation of the SetProperty instance. This string includes the
+            class name followed by the property and value of the model.
+            Returns:
+                A string summary of this property setting operation.
+            """
+            return f"SETPROPERTY {self.property()}={self.value()}"
+
+    class RemoveProperty:
+        """
+        A model change to remove the property and value pairs for the model.
+        """
+
+        def __init__(self, pro):
+            self._property = pro
+
+        def property(self):
+            """Retrieves the name of the property to be removed.
+            Returns:
+                The name of the property.
+            """
+            return self._property
+
+        def __eq__(self, other) -> bool:
+            """Compares this RemoveProperty instance with another object for equality. Two instances are
+            considered equal if they designate the same property for the model.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model property removal operation; false otherwise.
+            """
+            if not isinstance(other, ModelChange.RemoveProperty):
+                return False
+            return self.property() == other.property()
+
+        def __hash__(self):
+            """Generates a hash code for this RemoveProperty instance. The hash code is primarily based on
+            the property for the model.
+            Returns:
+                A hash code value for this property removal operation.
+            """
+            return hash(self.property())
+
+        def __str__(self):
+            """Provides a string representation of the RemoveProperty instance. This string includes the
+            class name followed by the property of the model.
+            Returns:
+                A string summary of this property removal operation.
+            """
+            return f"REMOVEPROPERTY {self.property()}"

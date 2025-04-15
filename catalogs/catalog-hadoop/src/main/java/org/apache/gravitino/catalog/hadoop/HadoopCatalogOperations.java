@@ -19,10 +19,11 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-import static org.apache.gravitino.file.Fileset.LOCATION_PLACEHOLDER_PREFIX;
-import static org.apache.gravitino.file.Fileset.RESERVED_CATALOG_PLACEHOLDER;
-import static org.apache.gravitino.file.Fileset.RESERVED_FILESET_PLACEHOLDER;
-import static org.apache.gravitino.file.Fileset.RESERVED_SCHEMA_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
+import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -301,7 +302,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             // Store the storageLocation to the store. If the "storageLocation" is null for managed
             // fileset, Gravitino will get and store the location based on the catalog/schema's
             // location and store it to the store.
-            .withStorageLocation(filesetPath.toString())
+            .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetPath.toString()))
             .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
@@ -699,7 +700,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
         .withId(filesetEntity.id())
         .withComment(newComment)
         .withFilesetType(filesetEntity.filesetType())
-        .withStorageLocation(filesetEntity.storageLocation())
+        .withStorageLocations(
+            ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetEntity.storageLocation()))
         .withProperties(props)
         .withAuditInfo(
             AuditInfo.builder()
@@ -776,17 +778,19 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     Map<String, String> placeholderMapping = new HashMap<>();
     properties.forEach(
         (k, v) -> {
-          if (k.startsWith(LOCATION_PLACEHOLDER_PREFIX)) {
-            placeholderMapping.put(k.substring(LOCATION_PLACEHOLDER_PREFIX.length()), v);
+          if (k.startsWith(PROPERTY_LOCATION_PLACEHOLDER_PREFIX)) {
+            placeholderMapping.put(k.substring(PROPERTY_LOCATION_PLACEHOLDER_PREFIX.length()), v);
           }
         });
     placeholderMapping.put(
-        RESERVED_CATALOG_PLACEHOLDER.substring(LOCATION_PLACEHOLDER_PREFIX.length()),
+        PROPERTY_CATALOG_PLACEHOLDER.substring(PROPERTY_LOCATION_PLACEHOLDER_PREFIX.length()),
         catalogInfo.name());
     placeholderMapping.put(
-        RESERVED_SCHEMA_PLACEHOLDER.substring(LOCATION_PLACEHOLDER_PREFIX.length()), schemaName);
+        PROPERTY_SCHEMA_PLACEHOLDER.substring(PROPERTY_LOCATION_PLACEHOLDER_PREFIX.length()),
+        schemaName);
     placeholderMapping.put(
-        RESERVED_FILESET_PLACEHOLDER.substring(LOCATION_PLACEHOLDER_PREFIX.length()), filesetName);
+        PROPERTY_FILESET_PLACEHOLDER.substring(PROPERTY_LOCATION_PLACEHOLDER_PREFIX.length()),
+        filesetName);
 
     // case 2: storageLocation is not empty and contains placeholder
     if (StringUtils.isNotBlank(storageLocation)) {
