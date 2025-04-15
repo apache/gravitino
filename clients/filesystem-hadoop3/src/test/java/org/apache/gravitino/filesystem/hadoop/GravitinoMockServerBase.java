@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -184,11 +185,15 @@ public abstract class GravitinoMockServerBase {
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s",
             metalakeName, catalogName, schemaName, filesetName);
+    Map<String, String> locations =
+        location == null
+            ? Collections.emptyMap()
+            : ImmutableMap.of(LOCATION_NAME_UNKNOWN, location);
     FilesetDTO mockFileset =
         FilesetDTO.builder()
             .name(fileset.name())
             .type(type)
-            .storageLocation(location)
+            .storageLocations(locations)
             .comment("comment")
             .properties(ImmutableMap.of("k1", "v1"))
             .audit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
