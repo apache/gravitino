@@ -19,6 +19,9 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getSubPathFromGvfsPath;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -42,8 +45,6 @@ import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -98,12 +99,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache;
   private ScheduledThreadPoolExecutor internalFileSystemCleanScheduler;
 
-  // The pattern is used to match gvfs path. The scheme prefix (gvfs://fileset) is optional.
-  // The following path can be match:
-  //     gvfs://fileset/fileset_catalog/fileset_schema/fileset1/file.txt
-  //     /fileset_catalog/fileset_schema/fileset1/sub_dir/
-  private static final Pattern IDENTIFIER_PATTERN =
-      Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
   private static final String SLASH = "/";
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
   private String currentLocationEnvVar;
@@ -258,26 +253,10 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return fileStatus;
   }
 
-  @VisibleForTesting
-  NameIdentifier extractIdentifier(URI virtualUri) {
-    String virtualPath = virtualUri.toString();
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(virtualPath),
-        "Uri which need be extracted cannot be null or empty.");
-
-    Matcher matcher = IDENTIFIER_PATTERN.matcher(virtualPath);
-    Preconditions.checkArgument(
-        matcher.matches() && matcher.groupCount() == 3,
-        "URI %s doesn't contains valid identifier",
-        virtualPath);
-
-    return NameIdentifier.of(metalakeName, matcher.group(1), matcher.group(2), matcher.group(3));
-  }
-
   private FilesetContextPair getFilesetContext(Path virtualPath, FilesetDataOperation operation) {
-    NameIdentifier identifier = extractIdentifier(virtualPath.toUri());
+    NameIdentifier identifier = extractIdentifier(metalakeName, virtualPath.toString());
     String virtualPathString = virtualPath.toString();
-    String subPath = getSubPathFromVirtualPath(identifier, virtualPathString);
+    String subPath = getSubPathFromGvfsPath(identifier, virtualPathString);
 
     NameIdentifier catalogIdent = NameIdentifier.of(metalakeName, identifier.namespace().level(1));
     FilesetCatalog filesetCatalog =
@@ -402,31 +381,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     }
   }
 
-  private Map<String, String> getConfigMap(Configuration configuration) {
-    Map<String, String> maps = Maps.newHashMap();
-    configuration.forEach(entry -> maps.put(entry.getKey(), entry.getValue()));
-    return maps;
-  }
-
-  private String getSubPathFromVirtualPath(NameIdentifier identifier, String virtualPathString) {
-    return virtualPathString.startsWith(GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX)
-        ? virtualPathString.substring(
-            String.format(
-                    "%s/%s/%s/%s",
-                    GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
-                    identifier.namespace().level(1),
-                    identifier.namespace().level(2),
-                    identifier.name())
-                .length())
-        : virtualPathString.substring(
-            String.format(
-                    "/%s/%s/%s",
-                    identifier.namespace().level(1),
-                    identifier.namespace().level(2),
-                    identifier.name())
-                .length());
-  }
-
   @Override
   public URI getUri() {
     return this.uri;
@@ -484,8 +438,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   public boolean rename(Path src, Path dst) throws IOException {
     // Fileset identifier is not allowed to be renamed, only its subdirectories can be renamed
     // which not in the storage location of the fileset;
-    NameIdentifier srcIdentifier = extractIdentifier(src.toUri());
-    NameIdentifier dstIdentifier = extractIdentifier(dst.toUri());
+    NameIdentifier srcIdentifier = extractIdentifier(metalakeName, src.toString());
+    NameIdentifier dstIdentifier = extractIdentifier(metalakeName, dst.toString());
     Preconditions.checkArgument(
         srcIdentifier.equals(dstIdentifier),
         "Destination path fileset identifier: %s should be same with src path fileset identifier: %s.",
@@ -510,8 +464,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   public FileStatus getFileStatus(Path path) throws IOException {
     FilesetContextPair context = getFilesetContext(path, FilesetDataOperation.GET_FILE_STATUS);
     FileStatus fileStatus = context.getFileSystem().getFileStatus(context.getActualFileLocation());
-    NameIdentifier identifier = extractIdentifier(path.toUri());
-    String subPath = getSubPathFromVirtualPath(identifier, path.toString());
+    NameIdentifier identifier = extractIdentifier(metalakeName, path.toString());
+    String subPath = getSubPathFromGvfsPath(identifier, path.toString());
     String storageLocation =
         context
             .getActualFileLocation()
@@ -526,8 +480,8 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     FilesetContextPair context = getFilesetContext(path, FilesetDataOperation.LIST_STATUS);
     FileStatus[] fileStatusResults =
         context.getFileSystem().listStatus(context.getActualFileLocation());
-    NameIdentifier identifier = extractIdentifier(path.toUri());
-    String subPath = getSubPathFromVirtualPath(identifier, path.toString());
+    NameIdentifier identifier = extractIdentifier(metalakeName, path.toString());
+    String subPath = getSubPathFromGvfsPath(identifier, path.toString());
     String storageLocation =
         context
             .getActualFileLocation()
