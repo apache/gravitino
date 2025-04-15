@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.listener;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
@@ -51,9 +50,9 @@ import org.slf4j.LoggerFactory;
 public class EventListenerManager {
   private static final Logger LOG = LoggerFactory.getLogger(EventListenerManager.class);
   public static final String GRAVITINO_EVENT_LISTENER_PREFIX = "gravitino.eventListener.";
-  static final String GRAVITINO_EVENT_LISTENER_NAMES = "names";
-  @VisibleForTesting static final String GRAVITINO_EVENT_LISTENER_CLASS = "class";
-  static final String GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY = "queueCapacity";
+  public static final String GRAVITINO_EVENT_LISTENER_NAMES = "names";
+  public static final String GRAVITINO_EVENT_LISTENER_CLASS = "class";
+  public static final String GRAVITINO_EVENT_LISTENER_QUEUE_CAPACITY = "queueCapacity";
   static final String GRAVITINO_EVENT_LISTENER_DISPATCHER_JOIN_SECONDS = "dispatcherJoinSeconds";
   private static final Splitter splitter = Splitter.on(",");
   private static final Joiner DOT = Joiner.on(".");
