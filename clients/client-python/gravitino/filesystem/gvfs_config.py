@@ -52,3 +52,11 @@ class GVFSConfig:
 
     # The default value of the credential_expired_time_ratio is 0.5
     DEFAULT_CREDENTIAL_EXPIRED_TIME_RATIO = 0.5
+
+    # The configuration key for the fileset with multiple locations, on which the file system will operate.
+    # The default value is "default".
+    GVFS_FILESYSTEM_CURRENT_LOCATION_NAME = "current_location_name"
+
+    # The configuration key for the env variable name that indicates the current location name. If
+    # not set, the file system will read the location name from CURRENT_LOCATION_NAME env variable.
+    GVFS_FILESYSTEM_CURRENT_LOCATION_NAME_ENV_VAR = "current_location_name_env_var"
