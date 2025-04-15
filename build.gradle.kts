@@ -377,8 +377,7 @@ subprojects {
         if (name == "sourcesJar") {
           include("LICENSE")
           include("NOTICE")
-        }
-        else if (project.name == "web") {
+        } else if (project.name == "web") {
           include("web/web/LICENSE.bin")
           rename("LICENSE.bin", "LICENSE")
           include("web/web/NOTICE.bin")
