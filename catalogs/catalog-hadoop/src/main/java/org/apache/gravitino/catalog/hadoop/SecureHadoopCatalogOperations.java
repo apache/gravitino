@@ -50,6 +50,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -105,11 +106,11 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public Fileset createFileset(
+  public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,
       Fileset.Type type,
-      String storageLocation,
+      Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     String apiUser = PrincipalUtils.getCurrentUserName();
@@ -120,8 +121,8 @@ public class SecureHadoopCatalogOperations
     return userContext.doAs(
         () -> {
           setUser(apiUser);
-          return hadoopCatalogOperations.createFileset(
-              ident, comment, type, storageLocation, properties);
+          return hadoopCatalogOperations.createMultipleLocationFileset(
+              ident, comment, type, storageLocations, properties);
         },
         ident);
   }
@@ -233,9 +234,9 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public String getFileLocation(NameIdentifier ident, String subPath)
-      throws NoSuchFilesetException {
-    return hadoopCatalogOperations.getFileLocation(ident, subPath);
+  public String getFileLocation(NameIdentifier ident, String subPath, String locationName)
+      throws NoSuchFilesetException, NoSuchLocationNameException {
+    return hadoopCatalogOperations.getFileLocation(ident, subPath, locationName);
   }
 
   @Override
@@ -260,7 +261,16 @@ public class SecureHadoopCatalogOperations
   @Override
   public List<PathContext> getPathContext(NameIdentifier filesetIdentifier) {
     Fileset fileset = loadFileset(filesetIdentifier);
-    String path = fileset.storageLocation();
+    Map<String, String> locations = fileset.storageLocations();
+    Preconditions.checkArgument(
+        locations != null && !locations.isEmpty(),
+        "No storage locations found for fileset: " + filesetIdentifier);
+
+    // todo: support multiple storage locations
+    Preconditions.checkArgument(
+        locations.size() == 1, "Only one storage location is supported for fileset now");
+
+    String path = locations.values().iterator().next();
     Preconditions.checkState(
         StringUtils.isNotBlank(path), "The location of fileset should not be empty.");
 
