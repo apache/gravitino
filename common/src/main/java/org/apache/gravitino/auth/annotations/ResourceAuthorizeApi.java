@@ -48,11 +48,4 @@ public @interface ResourceAuthorizeApi {
    * @return the resource type of the API.
    */
   MetadataObject.Type resourceType();
-
-  /**
-   * The rule to use for authorization.
-   *
-   * @return the rule to use for authorization.
-   */
-  AuthorizeType rule() default AuthorizeType.RESOURCE_TYPE;
 }

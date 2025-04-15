@@ -38,12 +38,4 @@ public @interface ExpressionsAuthorizeApi {
    * @return the expression to evaluate for authorization.
    */
   String expression() default "";
-
-  /**
-   * The rule to use for authorization. ether {@link AuthorizeType#EXPRESSION} or {@link
-   * AuthorizeType#RESOURCE_TYPE}.
-   *
-   * @return the rule to use for authorization.
-   */
-  AuthorizeType rule() default AuthorizeType.EXPRESSION;
 }

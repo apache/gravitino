@@ -23,7 +23,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.auth.annotations.AuthorizeResource;
-import org.apache.gravitino.auth.annotations.AuthorizeType;
 import org.apache.gravitino.auth.annotations.ExpressionsAuthorizeApi;
 import org.apache.gravitino.auth.annotations.ResourceAuthorizeApi;
 import org.apache.gravitino.authorization.Privilege;
@@ -74,7 +73,6 @@ public class TestAnnotations {
         new Privilege.Name[] {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
         annotation.privileges());
     Assertions.assertEquals(MetadataObject.Type.CATALOG, annotation.resourceType());
-    Assertions.assertEquals(AuthorizeType.RESOURCE_TYPE, annotation.rule());
   }
 
   @Test
@@ -90,7 +88,6 @@ public class TestAnnotations {
 
     Assertions.assertEquals(
         "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE", annotation.expression());
-    Assertions.assertEquals(AuthorizeType.EXPRESSION, annotation.rule());
   }
 
   @Test
