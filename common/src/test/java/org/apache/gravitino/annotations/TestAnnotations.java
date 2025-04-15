@@ -20,59 +20,104 @@
 package org.apache.gravitino.annotations;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.auth.annotations.AuthorizeApi;
+import org.apache.gravitino.auth.annotations.AuthorizeResource;
+import org.apache.gravitino.auth.annotations.AuthorizeType;
+import org.apache.gravitino.auth.annotations.ExpressionsAuthorizeApi;
+import org.apache.gravitino.auth.annotations.ResourceAuthorizeApi;
 import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestAnnotations {
+
+  // This class is used to test the AuthorizeResource annotation.
+  static class TestResourceAnnotationClass {
+
+    public void methodWithAnnotatedParam(@AuthorizeResource("tableName") String table) {
+      // dummy method
+    }
+
+    public void listSchemas(
+        @AuthorizeResource("metalake") String metalake,
+        @AuthorizeResource("catalog") String catalog) {
+      // dummy method
+    }
+  }
+
+  // This class is used to test the AuthorizeApi annotation.
+  // 1. ResourceAuthorizeApi
+  // 2. ExpressionsAuthorizeApi
+  static class TestAuthorizeAnnotationClass {
+    @ResourceAuthorizeApi(
+        privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
+        resourceType = MetadataObject.Type.CATALOG)
+    public void testAuthedMethodUseResourceType() {}
+
+    @ExpressionsAuthorizeApi(expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE")
+    public void testAuthedMethodUseExpression() {}
+  }
+
   @Test
   void testAuthorizeApiWithResourceType() throws NoSuchMethodException {
-    Class<TestClass> testClass = TestClass.class;
+    Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
     Method method = testClass.getMethod("testAuthedMethodUseResourceType");
 
-    boolean hasAnnotation = method.isAnnotationPresent(AuthorizeApi.class);
+    boolean hasAnnotation = method.isAnnotationPresent(ResourceAuthorizeApi.class);
     Assertions.assertTrue(hasAnnotation);
 
-    AuthorizeApi annotation = method.getAnnotation(AuthorizeApi.class);
+    ResourceAuthorizeApi annotation = method.getAnnotation(ResourceAuthorizeApi.class);
     Assertions.assertNotNull(annotation);
 
     Assertions.assertArrayEquals(
         new Privilege.Name[] {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
         annotation.privileges());
     Assertions.assertEquals(MetadataObject.Type.CATALOG, annotation.resourceType());
-    Assertions.assertEquals("", annotation.expression());
-    Assertions.assertEquals(AuthorizeApi.AuthorizeType.RESOURCE_TYPE, annotation.rule());
+    Assertions.assertEquals(AuthorizeType.RESOURCE_TYPE, annotation.rule());
   }
 
   @Test
   void testAuthorizeApiWithExpression() throws NoSuchMethodException {
-    Class<TestClass> testClass = TestClass.class;
+    Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
     Method method = testClass.getMethod("testAuthedMethodUseExpression");
 
-    boolean hasAnnotation = method.isAnnotationPresent(AuthorizeApi.class);
+    boolean hasAnnotation = method.isAnnotationPresent(ExpressionsAuthorizeApi.class);
     Assertions.assertTrue(hasAnnotation);
 
-    AuthorizeApi annotation = method.getAnnotation(AuthorizeApi.class);
+    ExpressionsAuthorizeApi annotation = method.getAnnotation(ExpressionsAuthorizeApi.class);
     Assertions.assertNotNull(annotation);
 
-    Assertions.assertArrayEquals(new Privilege.Name[] {}, annotation.privileges());
-    Assertions.assertEquals(MetadataObject.Type.UNKNOWN, annotation.resourceType());
     Assertions.assertEquals(
         "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE", annotation.expression());
-    Assertions.assertEquals(AuthorizeApi.AuthorizeType.EXPRESSION, annotation.rule());
+    Assertions.assertEquals(AuthorizeType.EXPRESSION, annotation.rule());
   }
-}
 
-class TestClass {
-  @AuthorizeApi(
-      privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
-      resourceType = MetadataObject.Type.CATALOG)
-  public void testAuthedMethodUseResourceType() {}
+  @Test
+  void testParameterAnnotationPresent() throws NoSuchMethodException {
+    Parameter argument =
+        TestResourceAnnotationClass.class.getMethod("methodWithAnnotatedParam", String.class)
+            .getParameters()[0];
+    AuthorizeResource annotation = argument.getAnnotation(AuthorizeResource.class);
+    Assertions.assertNotNull(annotation);
+    Assertions.assertEquals("tableName", annotation.value());
+  }
 
-  @AuthorizeApi(
-      expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE",
-      rule = AuthorizeApi.AuthorizeType.EXPRESSION)
-  public void testAuthedMethodUseExpression() {}
+  @Test
+  void testAnnotateListSchemas() throws NoSuchMethodException {
+    Parameter[] arguments =
+        TestResourceAnnotationClass.class
+            .getMethod("listSchemas", String.class, String.class)
+            .getParameters();
+
+    Parameter argumentMetalake = arguments[0];
+    AuthorizeResource metalakeAnnotation = argumentMetalake.getAnnotation(AuthorizeResource.class);
+    Assertions.assertNotNull(metalakeAnnotation);
+    Assertions.assertEquals("metalake", metalakeAnnotation.value());
+
+    Parameter argumentCatalog = arguments[1];
+    AuthorizeResource catalogAnnotation = argumentCatalog.getAnnotation(AuthorizeResource.class);
+    Assertions.assertNotNull(catalogAnnotation);
+    Assertions.assertEquals("catalog", catalogAnnotation.value());
+  }
 }

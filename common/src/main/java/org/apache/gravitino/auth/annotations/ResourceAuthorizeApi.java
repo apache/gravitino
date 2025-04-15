@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.apache.gravitino.auth.annotations;
 
 import java.lang.annotation.ElementType;
@@ -26,47 +27,32 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 
 /**
- * This annotation is used to implement unified authentication in AOP.
+ * Defines the annotation for authorizing access to an API. Use the resourceType and privileges
+ * fields to define the required privileges and resource type for the API.
  *
  * @author pancx
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface AuthorizeApi {
+public @interface ResourceAuthorizeApi {
   /**
    * The list of privileges required to access the API.
    *
    * @return the list of privileges required to access the API.
    */
-  Privilege.Name[] privileges() default {};
+  Privilege.Name[] privileges();
 
   /**
    * The resource type of the API.
    *
    * @return the resource type of the API.
    */
-  MetadataObject.Type resourceType() default MetadataObject.Type.UNKNOWN;
+  MetadataObject.Type resourceType();
 
   /**
-   * The expression to evaluate for authorization.
-   *
-   * @return the expression to evaluate for authorization.
-   */
-  String expression() default "";
-
-  /**
-   * The rule to use for authorization. ether {@link AuthorizeType#EXPRESSION} or {@link
-   * AuthorizeType#RESOURCE_TYPE}.
+   * The rule to use for authorization.
    *
    * @return the rule to use for authorization.
    */
   AuthorizeType rule() default AuthorizeType.RESOURCE_TYPE;
-
-  /** The type of the authorization rule. */
-  enum AuthorizeType {
-    /** Use the expression to evaluate for authorization. */
-    EXPRESSION,
-    /** Use the resource type to evaluate for authorization. */
-    RESOURCE_TYPE
-  }
 }

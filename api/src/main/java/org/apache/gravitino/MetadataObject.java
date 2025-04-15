@@ -61,9 +61,7 @@ public interface MetadataObject {
     /** A role is an object contains specific securable objects with privileges */
     ROLE,
     /** A model is mapped to the model artifact in ML. */
-    MODEL,
-    /** Unknown type of object. */
-    UNKNOWN
+    MODEL
   }
 
   /**
