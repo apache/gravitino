@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
@@ -64,6 +65,14 @@ public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
                 null /* default value */,
                 false /* hidden */,
                 false /* reserved */))
+        .put(
+            PROPERTY_DEFAULT_LOCATION_NAME,
+            PropertyEntry.stringOptionalPropertyEntry(
+                PROPERTY_DEFAULT_LOCATION_NAME,
+                "The default location name for the fileset",
+                true /* immutable */,
+                null,
+                false /* hidden */))
         .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
         .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
         .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
