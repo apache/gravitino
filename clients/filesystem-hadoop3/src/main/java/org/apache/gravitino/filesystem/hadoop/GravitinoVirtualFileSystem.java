@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
@@ -34,6 +36,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -42,8 +45,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.CallerContext;
@@ -88,9 +93,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   private String metalakeName;
   private Cache<NameIdentifier, FilesetCatalog> catalogCache;
   private ScheduledThreadPoolExecutor catalogCleanScheduler;
-  // Fileset name identifier and its corresponding FileSystem cache, the name identifier has
-  // four levels, the first level is metalake name.
-  private Cache<NameIdentifier, FileSystem> internalFileSystemCache;
+  // Fileset nameIdentifier-locationName Pair and its corresponding FileSystem cache, the name
+  // identifier has four levels, the first level is metalake name.
+  private Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache;
   private ScheduledThreadPoolExecutor internalFileSystemCleanScheduler;
 
   // The pattern is used to match gvfs path. The scheme prefix (gvfs://fileset) is optional.
@@ -101,6 +106,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       Pattern.compile("^(?:gvfs://fileset)?/([^/]+)/([^/]+)/([^/]+)(?>/[^/]+)*/?$");
   private static final String SLASH = "/";
   private final Map<String, FileSystemProvider> fileSystemProvidersMap = Maps.newHashMap();
+  private String currentLocationEnvVar;
+
+  @Nullable private String currentLocationName;
 
   private static final Set<String> CATALOG_NECESSARY_PROPERTIES_TO_KEEP =
       Sets.newHashSet(
@@ -155,6 +163,13 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     // Register the default local and HDFS FileSystemProvider
     fileSystemProvidersMap.putAll(getFileSystemProviders());
 
+    this.currentLocationEnvVar =
+        configuration.get(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR,
+            GravitinoVirtualFileSystemConfiguration
+                .FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT);
+    this.currentLocationName = initCurrentLocationName(configuration);
+
     this.workingDirectory = new Path(name);
     this.uri = URI.create(name.getScheme() + "://" + name.getAuthority());
 
@@ -163,7 +178,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @VisibleForTesting
-  Cache<NameIdentifier, FileSystem> internalFileSystemCache() {
+  Cache<Pair<NameIdentifier, String>, FileSystem> internalFileSystemCache() {
     return internalFileSystemCache;
   }
 
@@ -282,7 +297,9 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
     String actualFileLocation =
         filesetCatalog.getFileLocation(
-            NameIdentifier.of(identifier.namespace().level(2), identifier.name()), subPath);
+            NameIdentifier.of(identifier.namespace().level(2), identifier.name()),
+            subPath,
+            currentLocationName);
 
     Path filePath = new Path(actualFileLocation);
     URI uri = filePath.toUri();
@@ -292,7 +309,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         StringUtils.isNotBlank(scheme), "Scheme of the actual file location cannot be null.");
     FileSystem fs =
         internalFileSystemCache.get(
-            identifier,
+            Pair.of(identifier, currentLocationName),
             ident -> {
               try {
                 FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
@@ -578,6 +595,13 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     catalogCleanScheduler.shutdownNow();
     internalFileSystemCleanScheduler.shutdownNow();
     super.close();
+  }
+
+  private String initCurrentLocationName(Configuration configuration) {
+    // get from configuration first, otherwise use the env variable
+    // if both are not set, return null which means use the default location
+    return Optional.ofNullable(configuration.get(FS_GRAVITINO_CURRENT_LOCATION_NAME))
+        .orElse(System.getenv(currentLocationEnvVar));
   }
 
   private static class FilesetContextPair {
