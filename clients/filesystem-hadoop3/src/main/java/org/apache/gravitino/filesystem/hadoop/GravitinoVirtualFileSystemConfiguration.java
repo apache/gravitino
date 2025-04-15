@@ -98,5 +98,23 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
       1000L * 60 * 60;
 
+  /**
+   * The configuration key for the fileset with multiple locations, on which the file system will
+   * operate. If not set, the file system will operate on the default location.
+   */
+  public static final String FS_GRAVITINO_CURRENT_LOCATION_NAME =
+      "fs.gravitino.current.location.name";
+
+  /**
+   * The configuration key for the env variable name that indicates the current location name. If
+   * not set, the file system will read the location name from CURRENT_LOCATION_NAME env variable.
+   */
+  public static final String FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR =
+      "fs.gravitino.current.location.name.env.var";
+
+  /** The default env variable to read from to get current location name. */
+  public static final String FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT =
+      "CURRENT_LOCATION_NAME";
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }
