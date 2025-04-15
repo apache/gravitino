@@ -63,6 +63,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.testcontainers.shaded.org.apache.commons.lang3.tuple.Pair;
 
 public class TestGvfsBase extends GravitinoMockServerBase {
   protected static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
@@ -159,7 +160,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               ((GravitinoVirtualFileSystem) gravitinoFileSystem)
                   .internalFileSystemCache()
                   .getIfPresent(
-                      NameIdentifier.of(metalakeName, catalogName, schemaName, "testFSCache")));
+                      Pair.of(
+                          NameIdentifier.of(metalakeName, catalogName, schemaName, "testFSCache"),
+                          null)));
 
       String anotherFilesetName = "test_new_fs";
       Path diffLocalPath =
@@ -213,7 +216,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
               .internalFileSystemCache()
-              .getIfPresent(NameIdentifier.of("file")));
+              .getIfPresent(Pair.of(NameIdentifier.of("file"), null)));
     }
   }
 
