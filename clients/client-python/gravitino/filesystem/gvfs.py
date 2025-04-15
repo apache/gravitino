@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import logging
+import os
 import sys
 
 # Disable C0302: Too many lines in module
@@ -104,10 +105,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     access the underlying storage.
     """
 
+    # Disable R0902: Too many instance attributes
+    # pylint: disable=R0902
+
     # Override the parent variable
     protocol = PROTOCOL_NAME
     _identifier_pattern = re.compile("^fileset/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$")
     SLASH = "/"
+    ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
 
     def __init__(
         self,
@@ -180,6 +185,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         self._catalog_cache = LRUCache(maxsize=100)
         self._catalog_cache_lock = rwlock.RWLockFair()
         self._options = options
+        self._current_location_name = self._init_current_location_name()
 
         super().__init__(**kwargs)
 
@@ -576,6 +582,24 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             **kwargs,
         )
 
+    def _init_current_location_name(self):
+        """Initialize the current location name.
+         get from configuration first, otherwise use the env variable
+         if both are not set, return null which means use the default location
+        :return: The current location name
+        """
+        current_location_name_env_var = (
+            self._options.get(GVFSConfig.GVFS_FILESYSTEM_CURRENT_LOCATION_NAME_ENV_VAR)
+            if self._options
+            else None
+        ) or self.ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT
+
+        return (
+            self._options.get(GVFSConfig.GVFS_FILESYSTEM_CURRENT_LOCATION_NAME)
+            if self._options
+            else None
+        ) or os.environ.get(current_location_name_env_var)
+
     def _convert_actual_path(
         self,
         actual_path: str,
@@ -702,11 +726,17 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         ) = fileset_catalog.as_fileset_catalog().get_file_location(
             NameIdentifier.of(identifier.namespace().level(2), identifier.name()),
             sub_path,
+            self._current_location_name,
         )
 
         return FilesetContextPair(
             actual_file_location,
-            self._get_filesystem(actual_file_location, fileset_catalog, identifier),
+            self._get_filesystem(
+                actual_file_location,
+                fileset_catalog,
+                identifier,
+                self._current_location_name,
+            ),
         )
 
     def _extract_identifier(self, path):
@@ -904,13 +934,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         actual_file_location: str,
         fileset_catalog: Catalog,
         name_identifier: NameIdentifier,
+        location_name: str,
     ):
         storage_type = self._recognize_storage_type(actual_file_location)
         read_lock = self._cache_lock.gen_rlock()
         try:
             read_lock.acquire()
             cache_value: Tuple[int, AbstractFileSystem] = self._cache.get(
-                name_identifier
+                (name_identifier, location_name)
             )
             if cache_value is not None:
                 if not self._file_system_expired(cache_value[0]):
@@ -958,7 +989,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 raise GravitinoRuntimeException(
                     f"Storage type: `{storage_type}` doesn't support now."
                 )
-            self._cache[name_identifier] = new_cache_value
+            self._cache[(name_identifier, location_name)] = new_cache_value
             return new_cache_value[1]
         finally:
             write_lock.release()
