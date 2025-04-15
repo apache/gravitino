@@ -29,4 +29,4 @@ ossfs==2023.12.0
 adlfs==2023.12.0
 black==24.4.2
 flake8==7.0.0
-pre-commit==3.7.0
+pre-commit==3.5.0
