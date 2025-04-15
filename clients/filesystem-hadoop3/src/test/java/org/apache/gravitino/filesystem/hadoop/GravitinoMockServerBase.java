@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -40,7 +41,6 @@ import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
@@ -179,33 +179,28 @@ public abstract class GravitinoMockServerBase {
       String schemaName,
       String filesetName,
       Fileset.Type type,
-      Map<String, String> locations,
-      Map<String, String> properties) {
+      String location) {
     NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
-    String filesetEndpoint =
+    String filesetPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s",
-            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
+            metalakeName, catalogName, schemaName, filesetName);
+    Map<String, String> locations =
+        location == null
+            ? Collections.emptyMap()
+            : ImmutableMap.of(LOCATION_NAME_UNKNOWN, location);
     FilesetDTO mockFileset =
         FilesetDTO.builder()
             .name(fileset.name())
             .type(type)
             .storageLocations(locations)
             .comment("comment")
-            .properties(properties)
+            .properties(ImmutableMap.of("k1", "v1"))
             .audit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     FilesetResponse filesetResponse = new FilesetResponse(mockFileset);
     try {
-      buildMockResource(Method.GET, filesetEndpoint, null, filesetResponse, SC_OK);
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  protected String getJsonString(Object obj) {
-    try {
-      return MAPPER.writeValueAsString(obj);
+      buildMockResource(Method.GET, filesetPath, null, filesetResponse, SC_OK);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
