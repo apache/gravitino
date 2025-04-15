@@ -39,6 +39,9 @@ dependencies {
   implementation(libs.bundles.metrics)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jackson.databind)
   implementation(libs.prometheus.servlet)
 
   testImplementation(libs.commons.io)
