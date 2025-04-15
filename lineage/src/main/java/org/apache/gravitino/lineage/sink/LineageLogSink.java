@@ -19,31 +19,17 @@
 
 package org.apache.gravitino.lineage.sink;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.cfg.EnumFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.openlineage.server.OpenLineage.RunEvent;
 import org.apache.gravitino.lineage.Utils;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class LineageLogSink implements LineageSink {
   private static final Logger LOG = LoggerFactory.getLogger(LineageLogSink.class);
-  private ObjectMapper objectMapper =
-      JsonMapper.builder()
-          .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-          .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
-          .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-          .build()
-          .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-          .registerModule(new JavaTimeModule())
-          .registerModule(new Jdk8Module());
+  private ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
   private LineageLogger logger = new LineageLogger();
 
   private static class LineageLogger {
