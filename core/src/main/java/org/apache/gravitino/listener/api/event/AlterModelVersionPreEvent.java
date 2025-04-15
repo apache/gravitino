@@ -55,8 +55,8 @@ public class AlterModelVersionPreEvent extends ModelPreEvent {
   /**
    * Returns the alias of the model version involved in the event.
    *
-   * @return if left value of {@code aliasOrVersion} is not null, returns the left value, otherwise
-   *     throw an IllegalStateException exception.
+   * @return if the left value of {@code aliasOrVersion} is not null, returns the left value,
+   *     otherwise throw an IllegalStateException exception.
    */
   public String alias() {
     return aliasOrVersion.getLeft();
@@ -65,7 +65,7 @@ public class AlterModelVersionPreEvent extends ModelPreEvent {
   /**
    * Returns the version of the model involved in the event.
    *
-   * @return if right value of {@code aliasOrVersion} is not null, returns the right value,
+   * @return if the right value of {@code aliasOrVersion} is not null, returns the right value,
    *     otherwise throw an IllegalStateException exception.
    */
   public Integer version() {

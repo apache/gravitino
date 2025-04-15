@@ -41,7 +41,7 @@ public final class Either<L, R> {
    * @param <R> Right type
    */
   public static <L, R> Either<L, R> left(L value) {
-    Preconditions.checkNotNull(value, "Left value cannot be null");
+    Preconditions.checkArgument(value != null, "Left value cannot be null");
     return new Either<>(Optional.of(value), Optional.empty());
   }
 
@@ -54,7 +54,7 @@ public final class Either<L, R> {
    * @param <R> Right type
    */
   public static <L, R> Either<L, R> right(R value) {
-    Preconditions.checkNotNull(value, "Right value cannot be null");
+    Preconditions.checkArgument(value != null, "Right value cannot be null");
     return new Either<>(Optional.empty(), Optional.of(value));
   }
 
