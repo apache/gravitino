@@ -377,6 +377,12 @@ subprojects {
         if (name == "sourcesJar") {
           include("LICENSE")
           include("NOTICE")
+        }
+        else if (project.name == "web") {
+          include("web/web/LICENSE.bin")
+          rename("LICENSE.bin", "LICENSE")
+          include("web/web/NOTICE.bin")
+          rename("NOTICE.bin", "NOTICE")
         } else {
           include("LICENSE.bin")
           rename("LICENSE.bin", "LICENSE")
@@ -615,6 +621,10 @@ tasks {
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
         from(projectDir.file("DISCLAIMER.txt")) { into("package") }
+        from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
+        from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
+        from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
+
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
