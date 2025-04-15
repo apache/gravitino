@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.List;
 
 public class FilesetPO {
   private Long filesetId;
@@ -32,7 +33,7 @@ public class FilesetPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
-  private FilesetVersionPO filesetVersionPO;
+  private List<FilesetVersionPO> filesetVersionPOs;
 
   public Long getFilesetId() {
     return filesetId;
@@ -74,8 +75,8 @@ public class FilesetPO {
     return deletedAt;
   }
 
-  public FilesetVersionPO getFilesetVersionPO() {
-    return filesetVersionPO;
+  public List<FilesetVersionPO> getFilesetVersionPOs() {
+    return filesetVersionPOs;
   }
 
   @Override
@@ -97,7 +98,7 @@ public class FilesetPO {
         && Objects.equal(getCurrentVersion(), filesetPO.getCurrentVersion())
         && Objects.equal(getLastVersion(), filesetPO.getLastVersion())
         && Objects.equal(getDeletedAt(), filesetPO.getDeletedAt())
-        && Objects.equal(getFilesetVersionPO(), filesetPO.getFilesetVersionPO());
+        && Objects.equal(getFilesetVersionPOs(), filesetPO.getFilesetVersionPOs());
   }
 
   @Override
@@ -113,7 +114,7 @@ public class FilesetPO {
         getCurrentVersion(),
         getLastVersion(),
         getDeletedAt(),
-        getFilesetVersionPO());
+        getFilesetVersionPOs());
   }
 
   public static class Builder {
@@ -173,8 +174,8 @@ public class FilesetPO {
       return this;
     }
 
-    public FilesetPO.Builder withFilesetVersionPO(FilesetVersionPO filesetVersionPO) {
-      filesetPO.filesetVersionPO = filesetVersionPO;
+    public FilesetPO.Builder withFilesetVersionPOs(List<FilesetVersionPO> filesetVersionPOs) {
+      filesetPO.filesetVersionPOs = filesetVersionPOs;
       return this;
     }
 
@@ -204,7 +205,8 @@ public class FilesetPO {
       Preconditions.checkArgument(filesetPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(filesetPO.deletedAt != null, "Deleted at is required");
       Preconditions.checkArgument(
-          filesetPO.filesetVersionPO != null, "Fileset version is required");
+          filesetPO.filesetVersionPOs != null && !filesetPO.filesetVersionPOs.isEmpty(),
+          "Fileset version is required");
     }
 
     public FilesetPO build() {

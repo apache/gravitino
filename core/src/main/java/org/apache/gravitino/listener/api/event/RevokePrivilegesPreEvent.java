@@ -32,7 +32,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 @DeveloperApi
 public class RevokePrivilegesPreEvent extends RolePreEvent {
   private final String roleName;
-  private final MetadataObject object;
+  private final MetadataObject metadataObject;
   private final Set<Privilege> privileges;
 
   /**
@@ -42,18 +42,18 @@ public class RevokePrivilegesPreEvent extends RolePreEvent {
    * @param initiator The user who initiated the event.
    * @param metalake The name of the metalake.
    * @param roleName The name of the role from which privileges will be revoked.
-   * @param object The {@link MetadataObject} instance related to the role.
+   * @param metadataObject The {@link MetadataObject} instance related to the role.
    * @param privileges The set of privileges to revoke from the role.
    */
   public RevokePrivilegesPreEvent(
       String initiator,
       String metalake,
       String roleName,
-      MetadataObject object,
+      MetadataObject metadataObject,
       Set<Privilege> privileges) {
     super(initiator, NameIdentifierUtil.ofRole(metalake, roleName));
     this.roleName = roleName;
-    this.object = object;
+    this.metadataObject = metadataObject;
     this.privileges = privileges;
   }
 
@@ -72,7 +72,7 @@ public class RevokePrivilegesPreEvent extends RolePreEvent {
    * @return The {@link MetadataObject} instance associated with the role.
    */
   public MetadataObject object() {
-    return object;
+    return metadataObject;
   }
 
   /**

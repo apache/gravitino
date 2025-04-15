@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.storage.memory;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -209,7 +212,7 @@ public class TestMemoryEntityStore {
             .withId(1L)
             .withName("fileset")
             .withFilesetType(Fileset.Type.MANAGED)
-            .withStorageLocation("file:/tmp")
+            .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "file:/tmp"))
             .withNamespace(Namespace.of("metalake", "catalog", "db"))
             .withAuditInfo(auditInfo)
             .build();

@@ -46,6 +46,10 @@ class FilesetDTO(Fileset, DataClassJsonMixin):
     def storage_location(self) -> str:
         return self._storage_location
 
+    def storage_locations(self) -> Dict[str, str]:
+        # todo: implement this method and remove storage_location method
+        pass
+
     def comment(self) -> Optional[str]:
         return self._comment
 

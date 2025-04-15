@@ -36,6 +36,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -731,6 +732,17 @@ public class TestTagMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(fileset, false);
 
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "model1",
+            "comment",
+            1,
+            null,
+            auditInfo);
+    backend.insert(model, false);
+
     TagMetaService tagMetaService = TagMetaService.getInstance();
     TagEntity tagEntity1 =
         TagEntity.builder()
@@ -774,34 +786,44 @@ public class TestTagMetaService extends TestJDBCBackend {
         column.type(),
         new NameIdentifier[] {tagEntity1.nameIdentifier()},
         new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        model.nameIdentifier(),
+        model.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
 
+    Assertions.assertEquals(7, countActiveTagRel(tagEntity1.id()));
+    Assertions.assertEquals(7, countAllTagRel(tagEntity1.id()));
+
+    // Test to delete a model
+    ModelMetaService.getInstance().deleteModel(model.nameIdentifier());
     Assertions.assertEquals(6, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(7, countAllTagRel(tagEntity1.id()));
 
     // Test to drop a table
     TableMetaService.getInstance().deleteTable(table.nameIdentifier());
     Assertions.assertEquals(4, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(7, countAllTagRel(tagEntity1.id()));
 
     // Test to drop a topic
     TopicMetaService.getInstance().deleteTopic(topic.nameIdentifier());
     Assertions.assertEquals(3, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(7, countAllTagRel(tagEntity1.id()));
 
     // Test to drop a fileset
     FilesetMetaService.getInstance().deleteFileset(fileset.nameIdentifier());
     Assertions.assertEquals(2, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(7, countAllTagRel(tagEntity1.id()));
 
     // Test to drop a schema
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false);
     Assertions.assertEquals(1, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(7, countAllTagRel(tagEntity1.id()));
 
     // Test to drop a catalog
     CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false);
     Assertions.assertEquals(0, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(6, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(7, countAllTagRel(tagEntity1.id()));
 
     // Test to drop a catalog using cascade mode
     catalog =
@@ -858,6 +880,17 @@ public class TestTagMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(fileset, false);
 
+    model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "model1",
+            "comment",
+            1,
+            null,
+            auditInfo);
+    backend.insert(model, false);
+
     tagMetaService.associateTagsWithMetadataObject(
         catalog.nameIdentifier(),
         catalog.type(),
@@ -890,10 +923,15 @@ public class TestTagMetaService extends TestJDBCBackend {
         column.type(),
         new NameIdentifier[] {tagEntity1.nameIdentifier()},
         new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        model.nameIdentifier(),
+        model.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
 
     CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true);
     Assertions.assertEquals(0, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(12, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(14, countAllTagRel(tagEntity1.id()));
 
     // Test to drop a schema using cascade mode
     catalog =
@@ -950,6 +988,17 @@ public class TestTagMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(fileset, false);
 
+    model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(metalakeName, catalog.name(), schema.name()),
+            "model1",
+            "comment",
+            1,
+            null,
+            auditInfo);
+    backend.insert(model, false);
+
     tagMetaService.associateTagsWithMetadataObject(
         catalog.nameIdentifier(),
         catalog.type(),
@@ -982,10 +1031,15 @@ public class TestTagMetaService extends TestJDBCBackend {
         column.type(),
         new NameIdentifier[] {tagEntity1.nameIdentifier()},
         new NameIdentifier[0]);
+    tagMetaService.associateTagsWithMetadataObject(
+        model.nameIdentifier(),
+        model.type(),
+        new NameIdentifier[] {tagEntity1.nameIdentifier()},
+        new NameIdentifier[0]);
 
     // Test to drop a schema
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
     Assertions.assertEquals(1, countActiveTagRel(tagEntity1.id()));
-    Assertions.assertEquals(18, countAllTagRel(tagEntity1.id()));
+    Assertions.assertEquals(21, countAllTagRel(tagEntity1.id()));
   }
 }

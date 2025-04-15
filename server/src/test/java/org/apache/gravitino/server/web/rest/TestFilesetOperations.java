@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -60,6 +61,7 @@ import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
@@ -204,6 +206,8 @@ public class TestFilesetOperations extends JerseyTest {
     Assertions.assertEquals(fileset.type(), filesetDTO.type());
     Assertions.assertEquals(fileset.comment(), filesetDTO.comment());
     Assertions.assertEquals(fileset.properties(), filesetDTO.properties());
+    Assertions.assertEquals(fileset.storageLocation(), filesetDTO.storageLocation());
+    Assertions.assertEquals(fileset.storageLocations(), filesetDTO.storageLocations());
 
     // Test throw NoSuchFilesetException
     doThrow(new NoSuchFilesetException("no found")).when(dispatcher).loadFileset(any());
@@ -242,7 +246,8 @@ public class TestFilesetOperations extends JerseyTest {
             "mock comment",
             "mock location",
             ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createFileset(any(), any(), any(), any(), any())).thenReturn(fileset);
+    when(dispatcher.createMultipleLocationFileset(any(), any(), any(), any(), any()))
+        .thenReturn(fileset);
 
     FilesetCreateRequest req =
         FilesetCreateRequest.builder()
@@ -268,12 +273,59 @@ public class TestFilesetOperations extends JerseyTest {
     Assertions.assertEquals("mock comment", filesetDTO.comment());
     Assertions.assertEquals(Fileset.Type.MANAGED, filesetDTO.type());
     Assertions.assertEquals("mock location", filesetDTO.storageLocation());
+    Assertions.assertEquals(
+        ImmutableMap.of(LOCATION_NAME_UNKNOWN, "mock location"), filesetDTO.storageLocations());
     Assertions.assertEquals(ImmutableMap.of("k1", "v1"), filesetDTO.properties());
+
+    // test multiple locations
+    Map<String, String> locations =
+        ImmutableMap.of(
+            LOCATION_NAME_UNKNOWN,
+            "mock default",
+            "location1",
+            "mock location1",
+            "location2",
+            "mock location2");
+    fileset =
+        mockMultipleLocationsFileset(
+            "fileset1",
+            Fileset.Type.MANAGED,
+            "mock comment",
+            locations,
+            ImmutableMap.of("k1", "v1"));
+    when(dispatcher.createMultipleLocationFileset(any(), any(), any(), any(), any()))
+        .thenReturn(fileset);
+
+    req =
+        FilesetCreateRequest.builder()
+            .name("fileset1")
+            .comment("mock comment")
+            .storageLocations(locations)
+            .properties(ImmutableMap.of("k1", "v1"))
+            .build();
+
+    resp =
+        target(filesetPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    filesetResp = resp.readEntity(FilesetResponse.class);
+    Assertions.assertEquals(0, filesetResp.getCode());
+
+    filesetDTO = filesetResp.getFileset();
+    Assertions.assertEquals("fileset1", filesetDTO.name());
+    Assertions.assertEquals("mock comment", filesetDTO.comment());
+    Assertions.assertEquals(Fileset.Type.MANAGED, filesetDTO.type());
+    Assertions.assertEquals("mock default", filesetDTO.storageLocation());
+    Assertions.assertEquals(locations, filesetDTO.storageLocations());
 
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
         .when(dispatcher)
-        .createFileset(any(), any(), any(), any(), any());
+        .createMultipleLocationFileset(any(), any(), any(), any(), any());
 
     Response resp1 =
         target(filesetPath(metalake, catalog, schema))
@@ -290,7 +342,7 @@ public class TestFilesetOperations extends JerseyTest {
     // Test throw FilesetAlreadyExistsException
     doThrow(new FilesetAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createFileset(any(), any(), any(), any(), any());
+        .createMultipleLocationFileset(any(), any(), any(), any(), any());
 
     Response resp2 =
         target(filesetPath(metalake, catalog, schema))
@@ -308,7 +360,7 @@ public class TestFilesetOperations extends JerseyTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(dispatcher)
-        .createFileset(any(), any(), any(), any(), any());
+        .createMultipleLocationFileset(any(), any(), any(), any(), any());
 
     Response resp3 =
         target(filesetPath(metalake, catalog, schema))
@@ -444,7 +496,7 @@ public class TestFilesetOperations extends JerseyTest {
     // Test encoded subPath
     NameIdentifier fullIdentifier = NameIdentifier.of(metalake, catalog, schema, "fileset1");
     String subPath = "/test/1";
-    when(dispatcher.getFileLocation(fullIdentifier, subPath)).thenReturn(subPath);
+    when(dispatcher.getFileLocation(fullIdentifier, subPath, null)).thenReturn(subPath);
     Response resp =
         target(filesetPath(metalake, catalog, schema) + "fileset1/location")
             .queryParam("sub_path", RESTUtils.encodeString(subPath))
@@ -458,10 +510,27 @@ public class TestFilesetOperations extends JerseyTest {
 
     Assertions.assertEquals(subPath, contextResponse.getFileLocation());
 
+    // test specify location name
+    String locationName = "location1";
+    String location1 = "/test/location1";
+    when(dispatcher.getFileLocation(fullIdentifier, subPath, locationName)).thenReturn(location1);
+    resp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString(subPath))
+            .queryParam("location_name", locationName)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    contextResponse = resp.readEntity(FileLocationResponse.class);
+    Assertions.assertEquals(0, contextResponse.getCode());
+    Assertions.assertEquals(location1, contextResponse.getFileLocation());
+
     // Test throw NoSuchFilesetException
     doThrow(new NoSuchFilesetException("no found"))
         .when(dispatcher)
-        .getFileLocation(fullIdentifier, subPath);
+        .getFileLocation(fullIdentifier, subPath, null);
     Response resp1 =
         target(filesetPath(metalake, catalog, schema) + "fileset1/location")
             .queryParam("sub_path", RESTUtils.encodeString(subPath))
@@ -477,7 +546,7 @@ public class TestFilesetOperations extends JerseyTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("internal error"))
         .when(dispatcher)
-        .getFileLocation(fullIdentifier, subPath);
+        .getFileLocation(fullIdentifier, subPath, null);
     Response resp2 =
         target(filesetPath(metalake, catalog, schema) + "fileset1/location")
             .queryParam("sub_path", RESTUtils.encodeString(subPath))
@@ -494,7 +563,7 @@ public class TestFilesetOperations extends JerseyTest {
     // Test not encoded subPath
     NameIdentifier fullIdentifier1 = NameIdentifier.of(metalake, catalog, schema, "fileset2");
     String subPath1 = "/test/2";
-    when(dispatcher.getFileLocation(fullIdentifier1, subPath1)).thenReturn(subPath1);
+    when(dispatcher.getFileLocation(fullIdentifier1, subPath1, null)).thenReturn(subPath1);
     Response resp3 =
         target(filesetPath(metalake, catalog, schema) + "fileset2/location")
             .queryParam("sub_path", subPath1)
@@ -508,12 +577,30 @@ public class TestFilesetOperations extends JerseyTest {
 
     Assertions.assertEquals(subPath1, contextResponse1.getFileLocation());
 
+    // test throw NoSuchLocationNameException
+    doThrow(new NoSuchLocationNameException("no found"))
+        .when(dispatcher)
+        .getFileLocation(fullIdentifier, subPath, "not_exist");
+    Response noNameResp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/location")
+            .queryParam("sub_path", RESTUtils.encodeString(subPath))
+            .queryParam("location_name", "not_exist")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), noNameResp.getStatus());
+
+    ErrorResponse errorResp4 = noNameResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp4.getCode());
+    Assertions.assertEquals(
+        NoSuchLocationNameException.class.getSimpleName(), errorResp4.getType());
+
     // Test header to caller context
     try {
       Map<String, String> callerContextMap = Maps.newHashMap();
       NameIdentifier fullIdentifier2 = NameIdentifier.of(metalake, catalog, schema, "fileset3");
       String subPath2 = "/test/3";
-      when(dispatcher.getFileLocation(fullIdentifier2, subPath2))
+      when(dispatcher.getFileLocation(fullIdentifier2, subPath2, null))
           .thenAnswer(
               (Answer<String>)
                   invocation -> {
@@ -561,10 +648,10 @@ public class TestFilesetOperations extends JerseyTest {
     CallerContext context = CallerContext.builder().withContext(testContextMap).build();
     CallerContext.CallerContextHolder.set(context);
     FilesetOperations mockOperations = Mockito.mock(FilesetOperations.class);
-    Mockito.when(mockOperations.getFileLocation(any(), any(), any(), any(), any()))
+    Mockito.when(mockOperations.getFileLocation(any(), any(), any(), any(), any(), any()))
         .thenCallRealMethod();
     mockOperations.getFileLocation(
-        "test_metalake", "test_catalog", "test_schema", "fileset4", "/test");
+        "test_metalake", "test_catalog", "test_schema", "fileset4", "/test", "default");
     Assertions.assertNull(CallerContext.CallerContextHolder.get());
   }
 
@@ -610,7 +697,31 @@ public class TestFilesetOperations extends JerseyTest {
     when(mockFileset.name()).thenReturn(filesetName);
     when(mockFileset.type()).thenReturn(type);
     when(mockFileset.comment()).thenReturn(comment);
-    when(mockFileset.storageLocation()).thenReturn(storageLocation);
+    when(mockFileset.storageLocation()).thenCallRealMethod();
+    when(mockFileset.storageLocations())
+        .thenReturn(ImmutableMap.of(LOCATION_NAME_UNKNOWN, storageLocation));
+    when(mockFileset.properties()).thenReturn(properties);
+
+    Audit mockAudit = mock(Audit.class);
+    when(mockAudit.creator()).thenReturn("gravitino");
+    when(mockAudit.createTime()).thenReturn(Instant.now());
+    when(mockFileset.auditInfo()).thenReturn(mockAudit);
+
+    return mockFileset;
+  }
+
+  private static Fileset mockMultipleLocationsFileset(
+      String filesetName,
+      Fileset.Type type,
+      String comment,
+      Map<String, String> storageLocations,
+      Map<String, String> properties) {
+    Fileset mockFileset = mock(Fileset.class);
+    when(mockFileset.name()).thenReturn(filesetName);
+    when(mockFileset.type()).thenReturn(type);
+    when(mockFileset.comment()).thenReturn(comment);
+    when(mockFileset.storageLocation()).thenCallRealMethod();
+    when(mockFileset.storageLocations()).thenReturn(storageLocations);
     when(mockFileset.properties()).thenReturn(properties);
 
     Audit mockAudit = mock(Audit.class);

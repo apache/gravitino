@@ -46,6 +46,8 @@ import org.apache.gravitino.cli.commands.ListModel;
 import org.apache.gravitino.cli.commands.ModelAudit;
 import org.apache.gravitino.cli.commands.ModelDetails;
 import org.apache.gravitino.cli.commands.RegisterModel;
+import org.apache.gravitino.cli.commands.RemoveModelProperty;
+import org.apache.gravitino.cli.commands.SetModelProperty;
 import org.apache.gravitino.cli.commands.UpdateModelName;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -597,5 +599,66 @@ public class TestModelCommands {
     doReturn(mockUpdate).when(mockUpdate).validate();
     commandLine.handleCommandLine();
     verify(mockUpdate).handle();
+  }
+
+  @Test
+  void testSetModelProperty() {
+    SetModelProperty mockSetProperty = mock(SetModelProperty.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("key");
+    when(mockCommandLine.hasOption(GravitinoOptions.VALUE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VALUE)).thenReturn("value");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.SET));
+
+    doReturn(mockSetProperty)
+        .when(commandLine)
+        .newSetModelProperty(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            eq("key"),
+            eq("value"));
+    doReturn(mockSetProperty).when(mockSetProperty).validate();
+    commandLine.handleCommandLine();
+    verify(mockSetProperty).handle();
+  }
+
+  @Test
+  void testRemoveModelProperty() {
+    RemoveModelProperty mockRemoveProperty = mock(RemoveModelProperty.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTY)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.PROPERTY)).thenReturn("key");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.REMOVE));
+
+    doReturn(mockRemoveProperty)
+        .when(commandLine)
+        .newRemoveModelProperty(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            eq("key"));
+    doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
+    commandLine.handleCommandLine();
+    verify(mockRemoveProperty).handle();
   }
 }

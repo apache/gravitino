@@ -612,7 +612,7 @@ public class DTOConverters {
         .name(fileset.name())
         .comment(fileset.comment())
         .type(fileset.type())
-        .storageLocation(fileset.storageLocation())
+        .storageLocations(fileset.storageLocations())
         .properties(fileset.properties())
         .audit(toDTO(fileset.auditInfo()))
         .build();

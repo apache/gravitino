@@ -306,10 +306,17 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     AuditInfo entityAuditInfo = modelEntity.auditInfo();
     Namespace entityNamespace = modelEntity.namespace();
     Integer entityLatestVersion = modelEntity.latestVersion();
+    String modifier = PrincipalUtils.getCurrentPrincipal().getName();
 
     for (ModelChange change : changes) {
       if (change instanceof ModelChange.RenameModel) {
         entityName = ((ModelChange.RenameModel) change).newName();
+      } else if (change instanceof ModelChange.SetProperty) {
+        ModelChange.SetProperty setPropertyChange = (ModelChange.SetProperty) change;
+        doSetProperty(entityProperties, setPropertyChange);
+      } else if (change instanceof ModelChange.RemoveProperty) {
+        ModelChange.RemoveProperty removePropertyChange = (ModelChange.RemoveProperty) change;
+        doRemoveProperty(entityProperties, removePropertyChange);
       } else {
         throw new IllegalArgumentException(
             "Unsupported model change: " + change.getClass().getSimpleName());
@@ -320,7 +327,13 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         .withName(entityName)
         .withId(entityId)
         .withComment(entityComment)
-        .withAuditInfo(entityAuditInfo)
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(entityAuditInfo.creator())
+                .withCreateTime(entityAuditInfo.createTime())
+                .withLastModifier(modifier)
+                .withLastModifiedTime(Instant.now())
+                .build())
         .withNamespace(entityNamespace)
         .withProperties(entityProperties)
         .withLatestVersion(entityLatestVersion)
@@ -367,5 +380,14 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete model version " + ident, ioe);
     }
+  }
+
+  private void doRemoveProperty(
+      Map<String, String> entityProperties, ModelChange.RemoveProperty change) {
+    entityProperties.remove(change.property());
+  }
+
+  private void doSetProperty(Map<String, String> entityProperties, ModelChange.SetProperty change) {
+    entityProperties.put(change.property(), change.value());
   }
 }

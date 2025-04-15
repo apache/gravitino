@@ -26,6 +26,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 @DeveloperApi
 public final class GetFileLocationPreEvent extends FilesetPreEvent {
   private final String subPath;
+  private final String locationName;
 
   /**
    * Constructs a new {@code GetFileLocationPreEvent}, recording the intent to get a file location.
@@ -35,8 +36,22 @@ public final class GetFileLocationPreEvent extends FilesetPreEvent {
    * @param subPath The accessing sub path of the get file location operation.
    */
   public GetFileLocationPreEvent(String user, NameIdentifier identifier, String subPath) {
+    this(user, identifier, subPath, null);
+  }
+
+  /**
+   * Constructs a new {@code GetFileLocationPreEvent}, recording the intent to get a file location.
+   *
+   * @param user The user who initiated the get file location operation.
+   * @param identifier The identifier of the file location to be accessed.
+   * @param subPath The accessing sub path of the get file location operation.
+   * @param locationName The name of the location to be accessed.
+   */
+  public GetFileLocationPreEvent(
+      String user, NameIdentifier identifier, String subPath, String locationName) {
     super(user, identifier);
     this.subPath = subPath;
+    this.locationName = locationName;
   }
 
   /**
@@ -46,6 +61,15 @@ public final class GetFileLocationPreEvent extends FilesetPreEvent {
    */
   public String subPath() {
     return subPath;
+  }
+
+  /**
+   * Get the name of the location to be accessed.
+   *
+   * @return The name of the location.
+   */
+  public String locationName() {
+    return locationName;
   }
 
   /**

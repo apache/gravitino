@@ -30,6 +30,7 @@ import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
@@ -59,18 +60,20 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public Fileset createFileset(
+  public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,
       Fileset.Type type,
-      String storageLocation,
+      Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     // Check whether the current user exists or not
     AuthorizationUtils.checkCurrentUser(
         ident.namespace().level(0), PrincipalUtils.getCurrentUserName());
 
-    Fileset fileset = dispatcher.createFileset(ident, comment, type, storageLocation, properties);
+    Fileset fileset =
+        dispatcher.createMultipleLocationFileset(
+            ident, comment, type, storageLocations, properties);
 
     // Set the creator as the owner of the fileset.
     OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
@@ -118,8 +121,8 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public String getFileLocation(NameIdentifier ident, String subPath)
-      throws NoSuchFilesetException {
-    return dispatcher.getFileLocation(ident, subPath);
+  public String getFileLocation(NameIdentifier ident, String subPath, String locationName)
+      throws NoSuchFilesetException, NoSuchLocationNameException {
+    return dispatcher.getFileLocation(ident, subPath, locationName);
   }
 }

@@ -177,6 +177,13 @@ paths:
           schema:
             type: string
           description: The sub path to the file or directory
+        - name: location_name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "default"
+          description: The location name in the fileset
       responses:
         "200":
           $ref: "#/components/responses/FileLocationResponse"
@@ -249,6 +256,14 @@ components:
           description: The location of the fileset. If the storage location of managed fileset is empty, it will \
             use the location of namespace. The storage location of external fileset must be set.
           nullable: true
+        storageLocations:
+          type: object
+          description: The storage locations of the fileset. If the storage location of managed fileset is empty, \
+            it will use the location of namespace. The storage locations of external fileset must be set.
+          nullable: true
+          default: { }
+          additionalProperties:
+            type: string
         properties:
           type: object
           description: The properties of the fileset. Can be empty.

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.utils;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -622,8 +623,10 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
-    assertEquals(1, initPO.getFilesetVersionPO().getVersion());
-    assertEquals("hdfs://localhost/test", initPO.getFilesetVersionPO().getStorageLocation());
+    assertEquals(1, initPO.getFilesetVersionPOs().get(0).getVersion());
+    assertEquals(1, initPO.getFilesetVersionPOs().size());
+    assertEquals(
+        "hdfs://localhost/test", initPO.getFilesetVersionPOs().get(0).getStorageLocation());
   }
 
   @Test
@@ -726,32 +729,42 @@ public class TestPOConverters {
 
     // map has updated
     boolean checkNeedUpdate1 =
-        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPO(), updatedFileset);
+        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPOs(), updatedFileset);
     FilesetPO updatePO1 =
         POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, checkNeedUpdate1);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
-    assertEquals(
-        updatedFileset.storageLocation(), updatePO1.getFilesetVersionPO().getStorageLocation());
+    Map<String, String> storageLocations =
+        updatePO1.getFilesetVersionPOs().stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
+    assertEquals(updatedFileset.storageLocation(), storageLocations.get(LOCATION_NAME_UNKNOWN));
+    assertEquals(updatedFileset.storageLocations(), storageLocations);
     assertEquals(2, updatePO1.getCurrentVersion());
     assertEquals(2, updatePO1.getLastVersion());
-    assertEquals(2, updatePO1.getFilesetVersionPO().getVersion());
+    assertEquals(2, updatePO1.getFilesetVersionPOs().get(0).getVersion());
     Map<String, String> updatedProperties =
         JsonUtils.anyFieldMapper()
-            .readValue(updatePO1.getFilesetVersionPO().getProperties(), Map.class);
+            .readValue(updatePO1.getFilesetVersionPOs().get(0).getProperties(), Map.class);
     assertEquals("value1", updatedProperties.get("key"));
 
     // will not update version, but update the fileset name
     boolean checkNeedUpdate2 =
-        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPO(), updatedFileset1);
+        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPOs(), updatedFileset1);
     FilesetPO updatePO2 =
         POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, checkNeedUpdate2);
-    assertEquals(
-        filesetEntity.storageLocation(), updatePO2.getFilesetVersionPO().getStorageLocation());
+    Map<String, String> storageLocations2 =
+        updatePO2.getFilesetVersionPOs().stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
+    assertEquals(filesetEntity.storageLocation(), storageLocations2.get(LOCATION_NAME_UNKNOWN));
+    assertEquals(filesetEntity.storageLocations(), storageLocations2);
     assertEquals(1, updatePO2.getCurrentVersion());
     assertEquals(1, updatePO2.getLastVersion());
-    assertEquals(1, updatePO2.getFilesetVersionPO().getVersion());
+    assertEquals(1, updatePO2.getFilesetVersionPOs().get(0).getVersion());
     assertEquals("test1", updatePO2.getFilesetName());
   }
 
@@ -1424,7 +1437,7 @@ public class TestPOConverters {
         .withName(name)
         .withNamespace(namespace)
         .withFilesetType(Fileset.Type.MANAGED)
-        .withStorageLocation(storageLocation)
+        .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, storageLocation))
         .withProperties(properties)
         .withComment(comment)
         .withAuditInfo(auditInfo)
@@ -1454,7 +1467,7 @@ public class TestPOConverters {
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)
-        .withFilesetVersionPO(filesetVersionPO)
+        .withFilesetVersionPOs(ImmutableList.of(filesetVersionPO))
         .build();
   }
 
@@ -1475,6 +1488,7 @@ public class TestPOConverters {
         .withSchemaId(schemaId)
         .withFilesetId(filesetId)
         .withFilesetComment(comment)
+        .withLocationName(LOCATION_NAME_UNKNOWN)
         .withStorageLocation(storageLocation)
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withVersion(1L)

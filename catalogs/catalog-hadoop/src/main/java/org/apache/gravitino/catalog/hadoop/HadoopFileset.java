@@ -31,7 +31,7 @@ public class HadoopFileset extends BaseFileset {
       HadoopFileset fileset = new HadoopFileset();
       fileset.name = name;
       fileset.comment = comment;
-      fileset.storageLocation = storageLocation;
+      fileset.storageLocations = storageLocations;
       fileset.type = type;
       fileset.properties = properties;
       fileset.auditInfo = auditInfo;

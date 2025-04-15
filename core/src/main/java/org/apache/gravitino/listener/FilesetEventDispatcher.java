@@ -27,6 +27,7 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
@@ -97,19 +98,21 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public Fileset createFileset(
+  public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,
       Fileset.Type type,
-      String storageLocation,
+      Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     FilesetInfo createFileRequest =
-        new FilesetInfo(ident.name(), comment, type, storageLocation, properties, null);
+        new FilesetInfo(ident.name(), comment, type, storageLocations, properties, null);
     eventBus.dispatchEvent(
         new CreateFilesetPreEvent(PrincipalUtils.getCurrentUserName(), ident, createFileRequest));
     try {
-      Fileset fileset = dispatcher.createFileset(ident, comment, type, storageLocation, properties);
+      Fileset fileset =
+          dispatcher.createMultipleLocationFileset(
+              ident, comment, type, storageLocations, properties);
       eventBus.dispatchEvent(
           new CreateFilesetEvent(
               PrincipalUtils.getCurrentUserName(), ident, new FilesetInfo(fileset)));
@@ -120,7 +123,7 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
               PrincipalUtils.getCurrentUserName(),
               ident,
               e,
-              new FilesetInfo(ident.name(), comment, type, storageLocation, properties, null)));
+              new FilesetInfo(ident.name(), comment, type, storageLocations, properties, null)));
       throw e;
     }
   }
@@ -159,12 +162,13 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public String getFileLocation(NameIdentifier ident, String subPath)
-      throws NoSuchFilesetException {
+  public String getFileLocation(NameIdentifier ident, String subPath, String locationName)
+      throws NoSuchFilesetException, NoSuchLocationNameException {
     eventBus.dispatchEvent(
-        new GetFileLocationPreEvent(PrincipalUtils.getCurrentUserName(), ident, subPath));
+        new GetFileLocationPreEvent(
+            PrincipalUtils.getCurrentUserName(), ident, subPath, locationName));
     try {
-      String actualFileLocation = dispatcher.getFileLocation(ident, subPath);
+      String actualFileLocation = dispatcher.getFileLocation(ident, subPath, locationName);
       // get the audit info from the thread local context
       ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
       CallerContext callerContext = CallerContext.CallerContextHolder.get();
@@ -177,11 +181,13 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
               ident,
               actualFileLocation,
               subPath,
+              locationName,
               builder.build()));
       return actualFileLocation;
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new GetFileLocationFailureEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, e));
+          new GetFileLocationFailureEvent(
+              PrincipalUtils.getCurrentUserName(), ident, subPath, locationName, e));
       throw e;
     }
   }

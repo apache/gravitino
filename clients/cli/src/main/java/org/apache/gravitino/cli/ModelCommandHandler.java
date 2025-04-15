@@ -111,6 +111,14 @@ public class ModelCommandHandler extends CommandHandler {
         handleUpdateCommand();
         return true;
 
+      case CommandActions.SET:
+        handleSetCommand();
+        return true;
+
+      case CommandActions.REMOVE:
+        handleRemoveCommand();
+        return true;
+
       default:
         return false;
     }
@@ -177,5 +185,23 @@ public class ModelCommandHandler extends CommandHandler {
   /** Handles the "LIST" command. */
   private void handleListCommand() {
     gravitinoCommandLine.newListModel(context, metalake, catalog, schema).validate().handle();
+  }
+
+  /** Handles the "SET" command. */
+  private void handleSetCommand() {
+    String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+    String value = line.getOptionValue(GravitinoOptions.VALUE);
+    gravitinoCommandLine
+        .newSetModelProperty(context, metalake, catalog, schema, model, property, value)
+        .validate()
+        .handle();
+  }
+
+  private void handleRemoveCommand() {
+    String property = line.getOptionValue(GravitinoOptions.PROPERTY);
+    gravitinoCommandLine
+        .newRemoveModelProperty(context, metalake, catalog, schema, model, property)
+        .validate()
+        .handle();
   }
 }

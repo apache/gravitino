@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -32,7 +34,7 @@ public final class FilesetInfo {
   private final String name;
   @Nullable private final String comment;
   private final Fileset.Type type;
-  private final String storageLocation;
+  private final Map<String, String> storageLocations;
   private final Map<String, String> properties;
   @Nullable private final Audit audit;
 
@@ -46,7 +48,7 @@ public final class FilesetInfo {
         fileset.name(),
         fileset.comment(),
         fileset.type(),
-        fileset.storageLocation(),
+        fileset.storageLocations(),
         fileset.properties(),
         fileset.auditInfo());
   }
@@ -71,7 +73,36 @@ public final class FilesetInfo {
     this.name = name;
     this.comment = comment;
     this.type = type;
-    this.storageLocation = storageLocation;
+    this.storageLocations =
+        storageLocation == null
+            ? ImmutableMap.of()
+            : ImmutableMap.of(LOCATION_NAME_UNKNOWN, storageLocation);
+    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+    this.audit = audit;
+  }
+
+  /**
+   * Constructs a FilesetInfo object with specified details.
+   *
+   * @param name The name of the fileset.
+   * @param comment An optional comment about the fileset. Can be {@code null}.
+   * @param type The type of the fileset.
+   * @param storageLocations The storage locations of the fileset.
+   * @param properties A map of properties associated with the fileset. Can be {@code null}.
+   * @param audit Optional audit information. Can be {@code null}.
+   */
+  public FilesetInfo(
+      String name,
+      String comment,
+      Fileset.Type type,
+      Map<String, String> storageLocations,
+      Map<String, String> properties,
+      Audit audit) {
+    this.name = name;
+    this.comment = comment;
+    this.type = type;
+    this.storageLocations =
+        storageLocations == null ? ImmutableMap.of() : ImmutableMap.copyOf(storageLocations);
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     this.audit = audit;
   }
@@ -110,7 +141,12 @@ public final class FilesetInfo {
    * @return The storage location.
    */
   public String storageLocation() {
-    return storageLocation;
+    return storageLocations.get(LOCATION_NAME_UNKNOWN);
+  }
+
+  /** @return The storage locations of the fileset. */
+  public Map<String, String> storageLocations() {
+    return storageLocations;
   }
 
   /**

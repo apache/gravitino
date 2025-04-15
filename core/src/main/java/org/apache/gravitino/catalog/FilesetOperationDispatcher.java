@@ -30,6 +30,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.Fileset;
@@ -101,26 +102,27 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   /**
    * Create a fileset metadata in the catalog.
    *
-   * <p>If the type of the fileset object is "MANAGED", the underlying storageLocation can be null,
-   * and Gravitino will manage the storage location based on the location of the schema.
+   * <p>If the type of the fileset object is "MANAGED", the underlying storageLocations can be
+   * empty, and Gravitino will manage the storage location based on the locations of the schema.
    *
-   * <p>If the type of the fileset object is "EXTERNAL", the underlying storageLocation must be set.
+   * <p>If the type of the fileset object is "EXTERNAL", the underlying storageLocations must be
+   * set.
    *
    * @param ident A fileset identifier.
    * @param comment The comment of the fileset.
    * @param type The type of the fileset.
-   * @param storageLocation The storage location of the fileset.
+   * @param storageLocations The location names and corresponding storage locations of the fileset.
    * @param properties The properties of the fileset.
    * @return The created fileset metadata
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FilesetAlreadyExistsException If the fileset already exists.
    */
   @Override
-  public Fileset createFileset(
+  public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,
       Fileset.Type type,
-      String storageLocation,
+      Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
@@ -148,8 +150,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                     c ->
                         c.doWithFilesetOps(
                             f ->
-                                f.createFileset(
-                                    ident, comment, type, storageLocation, updatedProperties)),
+                                f.createMultipleLocationFileset(
+                                    ident, comment, type, storageLocations, updatedProperties)),
                     NoSuchSchemaException.class,
                     FilesetAlreadyExistsException.class));
     return EntityCombinedFileset.of(createdFileset)
@@ -228,15 +230,17 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
 
   /**
    * Get the actual location of a file or directory based on the storage location of Fileset and the
-   * sub path.
+   * sub path by the location name.
    *
    * @param ident A fileset identifier.
    * @param subPath The sub path to the file or directory.
+   * @param locationName The location name.
    * @return The actual location of the file or directory.
    * @throws NoSuchFilesetException If the fileset does not exist.
+   * @throws NoSuchLocationNameException If the location name does not exist.
    */
   @Override
-  public String getFileLocation(NameIdentifier ident, String subPath)
+  public String getFileLocation(NameIdentifier ident, String subPath, String locationName)
       throws NoSuchFilesetException {
     return TreeLockUtils.doWithTreeLock(
         ident,
@@ -244,7 +248,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         () ->
             doWithCatalog(
                 getCatalogIdentifier(ident),
-                c -> c.doWithFilesetOps(f -> f.getFileLocation(ident, subPath)),
+                c -> c.doWithFilesetOps(f -> f.getFileLocation(ident, subPath, locationName)),
                 NonEmptyEntityException.class));
   }
 }

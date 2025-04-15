@@ -18,6 +18,10 @@
  */
 package org.apache.gravitino.meta;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -41,9 +45,9 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
       Field.optional("comment", String.class, "The comment or description of the fileset entity.");
   public static final Field TYPE =
       Field.required("type", Fileset.Type.class, "The type of the fileset entity.");
-  public static final Field STORAGE_LOCATION =
+  public static final Field STORAGE_LOCATIONS =
       Field.required(
-          "storage_location", String.class, "The storage location of the fileset entity.");
+          "storage_locations", Map.class, "The storage locations of the fileset entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the fileset entity.");
   public static final Field PROPERTIES =
@@ -59,7 +63,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
 
   private Fileset.Type type;
 
-  private String storageLocation;
+  private Map<String, String> storageLocations = Maps.newHashMap();
 
   private AuditInfo auditInfo;
 
@@ -79,7 +83,7 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     fields.put(NAME, name);
     fields.put(COMMENT, comment);
     fields.put(TYPE, type);
-    fields.put(STORAGE_LOCATION, storageLocation);
+    fields.put(STORAGE_LOCATIONS, storageLocations);
     fields.put(AUDIT_INFO, auditInfo);
     fields.put(PROPERTIES, properties);
 
@@ -154,13 +158,14 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     return type;
   }
 
-  /**
-   * Returns the storage location of the fileset entity.
-   *
-   * @return The storage location of the fileset entity.
-   */
+  /** @return The unnamed storage location of the fileset entity. */
   public String storageLocation() {
-    return storageLocation;
+    return storageLocations.get(LOCATION_NAME_UNKNOWN);
+  }
+
+  /** @return The storage locations of this fileset entity. */
+  public Map<String, String> storageLocations() {
+    return storageLocations;
   }
 
   /**
@@ -170,6 +175,14 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
    */
   public Map<String, String> properties() {
     return properties;
+  }
+
+  @Override
+  public void validate() throws IllegalArgumentException {
+    Entity.super.validate();
+    Preconditions.checkArgument(
+        !storageLocations.isEmpty(),
+        "The storage locations of the fileset entity must not be empty.");
   }
 
   @Override
@@ -183,14 +196,14 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(namespace, that.namespace)
         && Objects.equals(comment, that.comment)
         && Objects.equals(type, that.type)
-        && Objects.equals(storageLocation, that.storageLocation)
+        && Objects.equals(storageLocations, that.storageLocations)
         && Objects.equals(auditInfo, that.auditInfo)
         && Objects.equals(properties, that.properties);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, comment, type, storageLocation, auditInfo, properties);
+    return Objects.hash(id, name, comment, type, storageLocations, auditInfo, properties);
   }
 
   public static class Builder {
@@ -257,15 +270,13 @@ public class FilesetEntity implements Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the storage location of the fileset entity.
+     * Sets the storage locations of the fileset entity.
      *
-     * <p>Only the EXTERNAL type of fileset entity requires a storage location.
-     *
-     * @param storageLocation The storage location of the fileset entity.
+     * @param storageLocations The storage locations of the fileset entity.
      * @return The builder instance.
      */
-    public Builder withStorageLocation(String storageLocation) {
-      fileset.storageLocation = storageLocation;
+    public Builder withStorageLocations(Map<String, String> storageLocations) {
+      fileset.storageLocations = ImmutableMap.copyOf(storageLocations);
       return this;
     }
 

@@ -36,7 +36,7 @@ public class TestFileset extends BaseFileset {
       fileset.properties = properties;
       fileset.auditInfo = auditInfo;
       fileset.type = type;
-      fileset.storageLocation = storageLocation;
+      fileset.storageLocations = storageLocations;
       return fileset;
     }
   }

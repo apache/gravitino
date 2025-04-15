@@ -51,6 +51,7 @@ import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.MetalakeHookDispatcher;
+import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
@@ -483,11 +484,11 @@ public class GravitinoEnv {
         new TopicNormalizeDispatcher(topicHookDispatcher, catalogManager);
     this.topicDispatcher = new TopicEventDispatcher(eventBus, topicNormalizeDispatcher);
 
-    // TODO(jerryshao). Add Hook support for Model.
     ModelOperationDispatcher modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
+    ModelHookDispatcher modelHookDispatcher = new ModelHookDispatcher(modelOperationDispatcher);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
-        new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
+        new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
     // Create and initialize access control related modules

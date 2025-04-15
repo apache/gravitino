@@ -333,7 +333,7 @@ The following is an example of creating a fileset with placeholders in the `stor
 <TabItem value="shell" label="Shell">
 
 ```shell
-# create a calota first
+# create a catalog first
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "test_catalog",

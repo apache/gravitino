@@ -73,21 +73,19 @@ public class HiveBackendProxy implements MethodInterceptor {
   @Override
   public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy)
       throws Throwable {
-
+    final String finalPrincipalName;
     String proxyKerberosPrincipalName = PrincipalUtils.getCurrentPrincipal().getName();
     if (!proxyKerberosPrincipalName.contains("@")) {
-      proxyKerberosPrincipalName =
-          String.format("%s@%s", proxyKerberosPrincipalName, kerberosRealm);
+      finalPrincipalName = String.format("%s@%s", proxyKerberosPrincipalName, kerberosRealm);
+    } else {
+      finalPrincipalName = proxyKerberosPrincipalName;
     }
-
     UserGroupInformation realUser =
-        UserGroupInformation.createProxyUser(proxyKerberosPrincipalName, proxyUser);
+        UserGroupInformation.createProxyUser(finalPrincipalName, proxyUser);
 
     String token =
         newClientPool.run(
-            client ->
-                client.getDelegationToken(
-                    PrincipalUtils.getCurrentPrincipal().getName(), proxyUser.getShortUserName()));
+            client -> client.getDelegationToken(finalPrincipalName, proxyUser.getShortUserName()));
 
     Token<DelegationTokenIdentifier> delegationToken = new Token<>();
     delegationToken.decodeFromUrlString(token);

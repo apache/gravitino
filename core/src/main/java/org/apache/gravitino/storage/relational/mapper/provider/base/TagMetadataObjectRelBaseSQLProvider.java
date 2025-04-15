@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -198,6 +199,11 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.catalog_id = #{catalogId} AND"
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
+        + " UNION "
+        + " SELECT mt.catalog_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.catalog_id = #{catalogId} AND"
+        + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
         + ")";
   }
 
@@ -231,6 +237,11 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " cot WHERE cot.schema_id = #{schemaId} AND "
         + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
+        + " UNION "
+        + " SELECT mt.schema_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.schema_id = #{schemaId} AND "
+        + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
         + ")";
   }
 

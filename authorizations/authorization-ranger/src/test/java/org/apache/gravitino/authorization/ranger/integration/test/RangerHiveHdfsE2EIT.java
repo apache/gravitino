@@ -55,10 +55,12 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Tag("gravitino-docker-test")
 public class RangerHiveHdfsE2EIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(RangerHiveHdfsE2EIT.class);

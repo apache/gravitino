@@ -35,6 +35,10 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalog.CATALOG_PROPERTIES_META;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalog.FILESET_PROPERTIES_META;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalog.SCHEMA_PROPERTIES_META;
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.LOCATION;
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
@@ -281,6 +285,17 @@ public class TestHadoopCatalogOperations {
                       Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
             });
 
+    multipleLocationsArguments()
+        .forEach(
+            arguments -> {
+              String name = (String) arguments.get()[0];
+              long schemaId = idGenerator.nextId();
+              doReturn(new SchemaIds(1L, 1L, schemaId))
+                  .when(spySchemaMetaService)
+                  .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                      Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
+            });
+
     MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic =
         Mockito.mockStatic(MetalakeMetaService.class);
     MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
@@ -323,21 +338,21 @@ public class TestHadoopCatalogOperations {
     String value = conf.get("fs.defaultFS");
     Assertions.assertEquals("file:///", value);
 
-    emptyProps.put(HadoopCatalogPropertiesMetadata.LOCATION, "file:///tmp/catalog");
+    emptyProps.put(LOCATION, "file:///tmp/catalog");
     ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
-    Assertions.assertTrue(ops.catalogStorageLocation.isPresent());
+    Assertions.assertEquals(1, ops.catalogStorageLocations.size());
     Path expectedPath = new Path("file:///tmp/catalog");
-    Assertions.assertEquals(expectedPath, ops.catalogStorageLocation.get());
+    Assertions.assertEquals(expectedPath, ops.catalogStorageLocations.get(LOCATION_NAME_UNKNOWN));
 
     // test placeholder in location
-    emptyProps.put(HadoopCatalogPropertiesMetadata.LOCATION, "file:///tmp/{{catalog}}");
+    emptyProps.put(LOCATION, "file:///tmp/{{catalog}}");
     ops.initialize(emptyProps, catalogInfo, HADOOP_PROPERTIES_METADATA);
-    Assertions.assertTrue(ops.catalogStorageLocation.isPresent());
+    Assertions.assertEquals(1, ops.catalogStorageLocations.size());
     expectedPath = new Path("file:///tmp/{{catalog}}");
-    Assertions.assertEquals(expectedPath, ops.catalogStorageLocation.get());
+    Assertions.assertEquals(expectedPath, ops.catalogStorageLocations.get(LOCATION_NAME_UNKNOWN));
 
     // test illegal placeholder in location
-    emptyProps.put(HadoopCatalogPropertiesMetadata.LOCATION, "file:///tmp/{{}}");
+    emptyProps.put(LOCATION, "file:///tmp/{{}}");
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
@@ -572,7 +587,7 @@ public class TestHadoopCatalogOperations {
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(
-          ImmutableMap.of(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath),
+          ImmutableMap.of(LOCATION, catalogPath),
           randomCatalogInfo("m1", "c1"),
           HADOOP_PROPERTIES_METADATA);
       Schema schema1 = ops.loadSchema(id);
@@ -639,7 +654,7 @@ public class TestHadoopCatalogOperations {
     String comment = "comment_s1";
     Map<String, String> catalogProps = Maps.newHashMap();
     if (catalogPath != null) {
-      catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+      catalogProps.put(LOCATION, catalogPath);
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
@@ -763,7 +778,7 @@ public class TestHadoopCatalogOperations {
     String comment = "comment_s24";
     Map<String, String> catalogProps = Maps.newHashMap();
     if (catalogPath != null) {
-      catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+      catalogProps.put(LOCATION, catalogPath);
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
@@ -972,7 +987,7 @@ public class TestHadoopCatalogOperations {
 
       String location = "hdfs://localhost:9000";
       Map<String, String> catalogProperties = Maps.newHashMap();
-      catalogProperties.put(HadoopCatalogPropertiesMetadata.LOCATION, location);
+      catalogProperties.put(LOCATION, location);
 
       ops.initialize(catalogProperties, randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
 
@@ -980,7 +995,7 @@ public class TestHadoopCatalogOperations {
       NameIdentifier nameIdentifier = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
       Map<String, String> schemaProperties = Maps.newHashMap();
-      schemaProperties.put(HadoopCatalogPropertiesMetadata.LOCATION, "hdfs://localhost:9000/user1");
+      schemaProperties.put(LOCATION, "hdfs://localhost:9000/user1");
       StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
       schemaProperties =
           Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProperties));
@@ -1106,6 +1121,10 @@ public class TestHadoopCatalogOperations {
     Fileset mockFileset = Mockito.mock(Fileset.class);
     when(mockFileset.name()).thenReturn(filesetName4);
     when(mockFileset.storageLocation()).thenReturn(filesetLocation4);
+    when(mockFileset.storageLocations())
+        .thenReturn(ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetLocation4));
+    when(mockFileset.properties())
+        .thenReturn(ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, LOCATION_NAME_UNKNOWN));
 
     try (HadoopCatalogOperations mockOps = Mockito.mock(HadoopCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
@@ -1113,6 +1132,7 @@ public class TestHadoopCatalogOperations {
       when(mockOps.getConf()).thenReturn(Maps.newHashMap());
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
+      when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
       when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
@@ -1177,7 +1197,7 @@ public class TestHadoopCatalogOperations {
     String comment = "comment_s1";
     Map<String, String> catalogProps = Maps.newHashMap();
     if (catalogPath != null) {
-      catalogProps.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+      catalogProps.put(LOCATION, catalogPath);
     }
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
@@ -1219,6 +1239,679 @@ public class TestHadoopCatalogOperations {
       // Test drop non-existent fileset
       Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
     }
+  }
+
+  @ParameterizedTest
+  @MethodSource("multipleLocationsArguments")
+  public void testMultipleLocations(
+      String name,
+      Fileset.Type type,
+      Map<String, String> catalogPaths,
+      Map<String, String> schemaPaths,
+      Map<String, String> storageLocations,
+      Map<String, String> filesetProps,
+      Map<String, String> expect)
+      throws IOException {
+    String schemaName = "s1_" + name;
+    String comment = "comment_s1";
+
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(catalogPaths, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+      if (!ops.schemaExists(schemaIdent)) {
+        createMultiLocationSchema(schemaName, comment, catalogPaths, schemaPaths);
+      }
+      Fileset fileset =
+          createMultiLocationFileset(
+              name, schemaName, "comment", type, catalogPaths, storageLocations, filesetProps);
+
+      Assertions.assertEquals(name, fileset.name());
+      Assertions.assertEquals(type, fileset.type());
+      Assertions.assertEquals("comment", fileset.comment());
+      Assertions.assertEquals(expect, fileset.storageLocations());
+      Assertions.assertEquals(
+          fileset.storageLocation(), fileset.storageLocations().get(LOCATION_NAME_UNKNOWN));
+      Assertions.assertNotNull(fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
+      if (filesetProps != null && filesetProps.containsKey(PROPERTY_DEFAULT_LOCATION_NAME)) {
+        Assertions.assertEquals(
+            filesetProps.get(PROPERTY_DEFAULT_LOCATION_NAME),
+            fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
+      }
+      if (filesetProps == null || !filesetProps.containsKey(PROPERTY_DEFAULT_LOCATION_NAME)) {}
+
+      // Test load
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      Fileset loadedFileset = ops.loadFileset(filesetIdent);
+      Assertions.assertEquals(name, loadedFileset.name());
+      Assertions.assertEquals(type, loadedFileset.type());
+      Assertions.assertEquals("comment", loadedFileset.comment());
+      Assertions.assertEquals(expect, loadedFileset.storageLocations());
+      Assertions.assertEquals(
+          loadedFileset.storageLocation(),
+          loadedFileset.storageLocations().get(LOCATION_NAME_UNKNOWN));
+
+      // Test drop
+      ops.dropFileset(filesetIdent);
+      for (Map.Entry<String, String> location : expect.entrySet()) {
+        Path expectedPath = new Path(location.getValue());
+        FileSystem fs = expectedPath.getFileSystem(new Configuration());
+        if (type == Fileset.Type.MANAGED) {
+          Assertions.assertFalse(fs.exists(expectedPath));
+        } else {
+          Assertions.assertTrue(
+              fs.exists(expectedPath),
+              "location with name "
+                  + location.getKey()
+                  + " should exist, path: "
+                  + location.getValue());
+        }
+      }
+
+      // clean expected path if exist
+      try (FileSystem fs = FileSystem.newInstance(new Configuration())) {
+        for (String location : expect.values()) {
+          fs.delete(new Path(location), true);
+        }
+      }
+
+      // Test drop non-existent fileset
+      Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
+    }
+  }
+
+  @Test
+  public void testCreateMultipleLocationsWithExceptions() throws IOException {
+    // empty location name in catalog location
+    Map<String, String> illegalLocations =
+        ImmutableMap.of(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "", TEST_ROOT_PATH + "/catalog31_1");
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      Exception exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.initialize(
+                      illegalLocations, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA));
+      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // empty location name in schema location
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationSchema("s1", "comment", ImmutableMap.of(), illegalLocations));
+      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // empty location name in storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
+                      null));
+      Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // storage location is parent of schema location
+      Schema multipLocationSchema =
+          createMultiLocationSchema(
+              "s1",
+              "comment",
+              ImmutableMap.of(),
+              ImmutableMap.of(
+                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1", TEST_ROOT_PATH + "/s1/a/b/c"));
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      multipLocationSchema.name(),
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of(LOCATION_NAME_UNKNOWN, TEST_ROOT_PATH + "/s1/a"),
+                      null));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains(
+                  "Default location name must be set and must be one of the fileset locations"),
+          "Exception message: " + exception.getMessage());
+    }
+  }
+
+  private static Stream<Arguments> multipleLocationsArguments() {
+    return Stream.of(
+        // Honor the catalog location
+        Arguments.of(
+            "fileset51",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/catalog31_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog31_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/catalog31_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/catalog31_1/s1_fileset51/fileset51",
+                "v1",
+                TEST_ROOT_PATH + "/catalog31_1/s1_fileset51/fileset51",
+                "v2",
+                TEST_ROOT_PATH + "/catalog31_2/s1_fileset51/fileset51")),
+        Arguments.of(
+            // honor the schema location
+            "fileset52",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/s1_fileset52_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/s1_fileset52_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/s1_fileset52_2/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v2"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/s1_fileset52_1/fileset52",
+                "v1",
+                TEST_ROOT_PATH + "/s1_fileset52_1/fileset52",
+                "v2",
+                TEST_ROOT_PATH + "/s1_fileset52_2/fileset52")),
+        Arguments.of(
+            // honor the schema location
+            "fileset53",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/catalog32_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog32_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/catalog32_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/s1_fileset53_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/s1_fileset53_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/s1_fileset53_2/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "unknown"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/s1_fileset53_1/fileset53",
+                "v1",
+                TEST_ROOT_PATH + "/s1_fileset53_1/fileset53",
+                "v2",
+                TEST_ROOT_PATH + "/s1_fileset53_2/fileset53")),
+        Arguments.of(
+            // honor the storage location
+            "fileset54",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/catalog33_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog33_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/catalog33_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/s1_fileset54_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/s1_fileset54_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/s1_fileset54_2/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset54_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset54_1",
+                "v2",
+                TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset54_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset54_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset54_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset55",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(),
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset55_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset55_1",
+                "v2",
+                TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset55_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset55_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset55_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset56",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/catalog34_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog34_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/catalog34_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset56_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset56_1",
+                "v2",
+                TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset56_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset56_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset56_2")),
+        Arguments.of(
+            // honor partial catalog/schema/fileset locations
+            "fileset510",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog34_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/catalog34_2",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v3",
+                TEST_ROOT_PATH + "/catalog34_3"),
+            ImmutableMap.of(
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/s1_fileset510_2",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v3",
+                TEST_ROOT_PATH + "/s1_{{fileset}}_3",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v4",
+                TEST_ROOT_PATH + "/s1_fileset510_4"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset510",
+                "v3",
+                TEST_ROOT_PATH + "/fileset510_3",
+                "v4",
+                TEST_ROOT_PATH + "/fileset510_4",
+                "v5",
+                TEST_ROOT_PATH + "/{{fileset}}_5"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v5"),
+            ImmutableMap.<String, String>builder()
+                .put(LOCATION_NAME_UNKNOWN, TEST_ROOT_PATH + "/fileset510")
+                .put("v1", TEST_ROOT_PATH + "/catalog34_1/s1_fileset510/fileset510")
+                .put("v2", TEST_ROOT_PATH + "/s1_fileset510_2/fileset510")
+                .put("v3", TEST_ROOT_PATH + "/fileset510_3")
+                .put("v4", TEST_ROOT_PATH + "/fileset510_4")
+                .put("v5", TEST_ROOT_PATH + "/fileset510_5")
+                .build()),
+        Arguments.of(
+            // test without unnamed storage location
+            "fileset511",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog34_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/catalog34_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                "v1", TEST_ROOT_PATH + "/fileset511_1", "v2", TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                "v1", TEST_ROOT_PATH + "/fileset511_1", "v2", TEST_ROOT_PATH + "/fileset511_2")),
+        Arguments.of(
+            // test single location without unnamed storage location
+            "fileset512",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog34_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of("v1", TEST_ROOT_PATH + "/{{fileset}}_2"),
+            null,
+            ImmutableMap.of("v1", TEST_ROOT_PATH + "/fileset512_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset57",
+            Fileset.Type.EXTERNAL,
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/catalog35_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/catalog35_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/catalog35_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/s1_fileset57_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/s1_fileset57_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/s1_fileset57_2/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset57_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset57_1",
+                "v2",
+                TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset57_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset57_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset57_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset58",
+            Fileset.Type.EXTERNAL,
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION,
+                TEST_ROOT_PATH + "/s1_fileset58_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                TEST_ROOT_PATH + "/s1_fileset58_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                TEST_ROOT_PATH + "/s1_fileset58_2/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset58_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset58_1",
+                "v2",
+                TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset58_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset58_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset58_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset59",
+            Fileset.Type.EXTERNAL,
+            ImmutableMap.of(),
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset59",
+                "v1",
+                TEST_ROOT_PATH + "/fileset59",
+                "v2",
+                TEST_ROOT_PATH + "/{{fileset}}"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset59",
+                "v1",
+                TEST_ROOT_PATH + "/fileset59",
+                "v2",
+                TEST_ROOT_PATH + "/fileset59")),
+        // Honor the catalog location
+        Arguments.of(
+            "fileset501",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog301_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog301_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog301_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/catalog301_1/s1_fileset501/fileset501",
+                "v1",
+                TEST_ROOT_PATH + "/catalog301_1/s1_fileset501/fileset501",
+                "v2",
+                TEST_ROOT_PATH + "/catalog301_2/s1_fileset501/fileset501")),
+        Arguments.of(
+            // honor the schema location
+            "fileset502",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset502_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset502_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset502_2/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/s1_fileset502_1/fileset502",
+                "v1",
+                TEST_ROOT_PATH + "/s1_fileset502_1/fileset502",
+                "v2",
+                TEST_ROOT_PATH + "/s1_fileset502_2/fileset502")),
+        Arguments.of(
+            // honor the schema location
+            "fileset503",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog302_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog302_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog302_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset503_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset503_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset503_2/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/s1_fileset503_1/fileset503",
+                "v1",
+                TEST_ROOT_PATH + "/s1_fileset503_1/fileset503",
+                "v2",
+                TEST_ROOT_PATH + "/s1_fileset503_2/fileset503")),
+        Arguments.of(
+            // honor the storage location
+            "fileset504",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog303_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog303_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog303_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset504_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset504_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset504_2/{{fileset}}"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset504_1",
+                "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset504_1",
+                "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset504_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset504_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset504_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset505",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(),
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset505_1",
+                "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset505_1",
+                "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset505_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset505_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset505_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset506",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog304_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog304_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog304_2/{{schema}}/{{fileset}}"),
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset506_1",
+                "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset506_1",
+                "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset506_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset506_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset506_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset507",
+            Fileset.Type.EXTERNAL,
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog305_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog305_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/catalog305_2"),
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset507_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset507_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset507_2"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset507_1",
+                "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset507_1",
+                "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset507_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset507_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset507_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset508",
+            Fileset.Type.EXTERNAL,
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION,
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset508_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset508_1",
+                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/s1_fileset508_2"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset508_1",
+                "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset508_1",
+                "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset508_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset508_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset508_2")),
+        Arguments.of(
+            // honor the storage location
+            "fileset509",
+            Fileset.Type.EXTERNAL,
+            ImmutableMap.of(),
+            ImmutableMap.of(),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset509_1",
+                "v1",
+                UNFORMALIZED_TEST_ROOT_PATH + "/fileset509_1",
+                "v2",
+                UNFORMALIZED_TEST_ROOT_PATH + "/{{fileset}}_2"),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v1"),
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN,
+                TEST_ROOT_PATH + "/fileset509_1",
+                "v1",
+                TEST_ROOT_PATH + "/fileset509_1",
+                "v2",
+                TEST_ROOT_PATH + "/fileset509_2")));
   }
 
   private static Stream<Arguments> locationWithPlaceholdersArguments() {
@@ -1687,7 +2380,7 @@ public class TestHadoopCatalogOperations {
       throws IOException {
     Map<String, String> props = Maps.newHashMap();
     if (catalogPath != null) {
-      props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+      props.put(LOCATION, catalogPath);
     }
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
@@ -1706,6 +2399,47 @@ public class TestHadoopCatalogOperations {
     }
   }
 
+  private Schema createMultiLocationSchema(
+      String name,
+      String comment,
+      Map<String, String> catalogPaths,
+      Map<String, String> schemaPaths)
+      throws IOException {
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(catalogPaths, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+
+      NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", name);
+      Map<String, String> schemaProps = Maps.newHashMap();
+      StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+      schemaProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProps));
+      schemaProps.putAll(schemaPaths);
+
+      return ops.createSchema(schemaIdent, comment, schemaProps);
+    }
+  }
+
+  private Fileset createMultiLocationFileset(
+      String name,
+      String schemaName,
+      String comment,
+      Fileset.Type type,
+      Map<String, String> catalogPaths,
+      Map<String, String> storageLocations,
+      Map<String, String> filesetProps)
+      throws IOException {
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(catalogPaths, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+      Map<String, String> newFilesetProps =
+          Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, filesetProps));
+
+      return ops.createMultipleLocationFileset(
+          filesetIdent, comment, type, storageLocations, newFilesetProps);
+    }
+  }
+
   private Fileset createFileset(
       String name,
       String schemaName,
@@ -1716,7 +2450,7 @@ public class TestHadoopCatalogOperations {
       throws IOException {
     Map<String, String> props = Maps.newHashMap();
     if (catalogPath != null) {
-      props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+      props.put(LOCATION, catalogPath);
     }
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
@@ -1742,7 +2476,7 @@ public class TestHadoopCatalogOperations {
       throws IOException {
     Map<String, String> props = Maps.newHashMap();
     if (catalogPath != null) {
-      props.put(HadoopCatalogPropertiesMetadata.LOCATION, catalogPath);
+      props.put(LOCATION, catalogPath);
     }
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {

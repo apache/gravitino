@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.connector;
 
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
@@ -38,7 +39,7 @@ public abstract class BaseFileset implements Fileset {
 
   protected Type type;
 
-  protected String storageLocation;
+  protected Map<String, String> storageLocations;
 
   @Nullable protected Map<String, String> properties;
 
@@ -63,10 +64,9 @@ public abstract class BaseFileset implements Fileset {
     return type;
   }
 
-  /** @return The storage location string of the fileset. */
-  @Override
-  public String storageLocation() {
-    return storageLocation;
+  /** @return The storage locations of the fileset. */
+  public Map<String, String> storageLocations() {
+    return storageLocations;
   }
 
   /** @return The audit information for the fileset. */
@@ -90,7 +90,7 @@ public abstract class BaseFileset implements Fileset {
 
     SELF withType(Type type);
 
-    SELF withStorageLocation(String storageLocation);
+    SELF withStorageLocations(Map<String, String> storageLocations);
 
     SELF withProperties(Map<String, String> properties);
 
@@ -113,6 +113,7 @@ public abstract class BaseFileset implements Fileset {
     protected String comment;
     protected Type type;
     protected String storageLocation;
+    protected Map<String, String> storageLocations = new HashMap<>();
     protected Map<String, String> properties;
     protected AuditInfo auditInfo;
 
@@ -153,14 +154,14 @@ public abstract class BaseFileset implements Fileset {
     }
 
     /**
-     * Sets the storage location of the fileset.
+     * Sets the storage locations of the fileset.
      *
-     * @param storageLocation The storage location of the fileset.
+     * @param storageLocations The storage locations of the fileset.
      * @return The builder instance.
      */
     @Override
-    public SELF withStorageLocation(String storageLocation) {
-      this.storageLocation = storageLocation;
+    public SELF withStorageLocations(Map<String, String> storageLocations) {
+      this.storageLocations.putAll(storageLocations);
       return self();
     }
 

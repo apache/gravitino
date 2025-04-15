@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -124,12 +129,21 @@ public class FilesetOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofFileset(metalake, catalog, schema, request.getName());
 
+            // set storageLocation value as unnamed location if provided
+            Map<String, String> tmpLocations =
+                new HashMap<>(
+                    Optional.ofNullable(request.getStorageLocations())
+                        .orElse(Collections.emptyMap()));
+            Optional.ofNullable(request.getStorageLocation())
+                .ifPresent(loc -> tmpLocations.put(LOCATION_NAME_UNKNOWN, loc));
+            Map<String, String> storageLocations = ImmutableMap.copyOf(tmpLocations);
+
             Fileset fileset =
-                dispatcher.createFileset(
+                dispatcher.createMultipleLocationFileset(
                     ident,
                     request.getComment(),
                     Optional.ofNullable(request.getType()).orElse(Fileset.Type.MANAGED),
-                    request.getStorageLocation(),
+                    storageLocations,
                     request.getProperties());
             Response response = Utils.ok(new FilesetResponse(DTOConverters.toDTO(fileset)));
             LOG.info("Fileset created: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
@@ -242,14 +256,16 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset,
-      @QueryParam("sub_path") @NotNull String subPath) {
+      @QueryParam("sub_path") @NotNull String subPath,
+      @QueryParam("location_name") String locationName) {
     LOG.info(
-        "Received get file location request: {}.{}.{}.{}, sub path:{}",
+        "Received get file location request: {}.{}.{}.{}, sub path:{}, location name:{}",
         metalake,
         catalog,
         schema,
         fileset,
-        RESTUtils.decodeString(subPath));
+        RESTUtils.decodeString(subPath),
+        Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
     try {
       return Utils.doAs(
           httpRequest,
@@ -263,7 +279,10 @@ public class FilesetOperations {
               CallerContext.CallerContextHolder.set(context);
             }
             String actualFileLocation =
-                dispatcher.getFileLocation(ident, RESTUtils.decodeString(subPath));
+                dispatcher.getFileLocation(
+                    ident,
+                    RESTUtils.decodeString(subPath),
+                    Optional.ofNullable(locationName).map(RESTUtils::decodeString).orElse(null));
             return Utils.ok(new FileLocationResponse(actualFileLocation));
           });
     } catch (Exception e) {

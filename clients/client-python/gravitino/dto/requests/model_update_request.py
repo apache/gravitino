@@ -59,3 +59,41 @@ class ModelUpdateRequest:
 
         def model_change(self) -> ModelChange:
             return ModelChange.rename(self._new_name)
+
+    @dataclass
+    class ModelSetPropertyRequest(ModelUpdateRequestBase):
+        """Request to set model property"""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+        _value: Optional[str] = field(metadata=config(field_name="value"))
+
+        def __init__(self, pro: str, value: str):
+            super().__init__("setProperty")
+            self._property = pro
+            self._value = value
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required')
+            if not self._value:
+                raise ValueError('"value" field is required')
+
+        def model_change(self) -> ModelChange:
+            return ModelChange.set_property(self._property, self._value)
+
+    @dataclass
+    class ModelRemovePropertyRequest(ModelUpdateRequestBase):
+        """Request to remove model property"""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+
+        def __init__(self, pro: str):
+            super().__init__("removeProperty")
+            self._property = pro
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required')
+
+        def model_change(self) -> ModelChange:
+            return ModelChange.remove_property(self._property)

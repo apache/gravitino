@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Locale;
 import org.apache.gravitino.Catalog;
@@ -142,7 +144,7 @@ public class TestSupportRoles extends TestBase {
                 .name("fileset1")
                 .comment("comment1")
                 .type(Fileset.Type.EXTERNAL)
-                .storageLocation("s3://bucket/path")
+                .storageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "s3://bucket/path"))
                 .properties(Collections.emptyMap())
                 .audit(AuditDTO.builder().withCreator("test").build())
                 .build(),

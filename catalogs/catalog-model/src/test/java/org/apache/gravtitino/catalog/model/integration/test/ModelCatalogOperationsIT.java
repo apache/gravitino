@@ -360,6 +360,63 @@ public class ModelCatalogOperationsIT extends BaseIT {
                 .alterModel(NameIdentifier.of(schemaName, null), updateName));
   }
 
+  @Test
+  void testRegisterAndAddModelProperty() {
+    String comment = "comment";
+    String modelName = RandomNameUtils.genRandomName("alter_name_model");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> properties = ImmutableMap.of("owner", "data-team", "key1", "val1");
+    Map<String, String> newProperties =
+        ImmutableMap.of("owner", "data-team", "key1", "val1", "key2", "val2");
+
+    Model createdModel =
+        gravitinoCatalog.asModelCatalog().registerModel(modelIdent, comment, properties);
+
+    ModelChange addProperty = ModelChange.setProperty("key2", "val2");
+    Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, addProperty);
+
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertNotEquals(createdModel.properties(), alteredModel.properties());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
+    Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+  }
+
+  @Test
+  void testRegisterAndUpdateModelProperty() {
+    String comment = "comment";
+    String modelName = RandomNameUtils.genRandomName("alter_name_model");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> properties = ImmutableMap.of("owner", "data-team", "key1", "val1");
+    Map<String, String> newProperties = ImmutableMap.of("owner", "data-team", "key1", "val3");
+
+    Model createdModel =
+        gravitinoCatalog.asModelCatalog().registerModel(modelIdent, comment, properties);
+    ModelChange addProperty = ModelChange.setProperty("key1", "val3");
+    Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, addProperty);
+
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
+    Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+  }
+
+  @Test
+  void testRegisterAndRemoveModelProperty() {
+    String comment = "comment";
+    String modelName = RandomNameUtils.genRandomName("alter_name_model");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> properties = ImmutableMap.of("owner", "data-team", "key1", "val1");
+    Map<String, String> newProperties = ImmutableMap.of("owner", "data-team");
+
+    Model createdModel =
+        gravitinoCatalog.asModelCatalog().registerModel(modelIdent, comment, properties);
+    ModelChange addProperty = ModelChange.removeProperty("key1");
+    Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, addProperty);
+
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(newProperties, alteredModel.properties());
+    Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+  }
+
   private void createMetalake() {
     GravitinoMetalake[] gravitinoMetalakes = client.listMetalakes();
     Assertions.assertEquals(0, gravitinoMetalakes.length);

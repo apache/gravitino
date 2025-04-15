@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -335,17 +336,18 @@ public class TestFilesetEvent {
     when(fileset.properties()).thenReturn(ImmutableMap.of("a", "b"));
     when(fileset.name()).thenReturn("fileset");
     when(fileset.auditInfo()).thenReturn(null);
-    when(fileset.storageLocation()).thenReturn("location");
+    when(fileset.storageLocation()).thenCallRealMethod();
+    when(fileset.storageLocations()).thenReturn(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "location"));
     return fileset;
   }
 
   private FilesetDispatcher mockFilesetDispatcher() {
     FilesetDispatcher dispatcher = mock(FilesetDispatcher.class);
-    when(dispatcher.createFileset(
+    when(dispatcher.createMultipleLocationFileset(
             any(NameIdentifier.class),
             any(String.class),
             any(Fileset.Type.class),
-            any(String.class),
+            any(Map.class),
             any(Map.class)))
         .thenReturn(fileset);
     when(dispatcher.loadFileset(any(NameIdentifier.class))).thenReturn(fileset);

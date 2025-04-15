@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.meta;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
@@ -165,7 +167,7 @@ public class TestEntity {
             .withName(fileName)
             .withAuditInfo(auditInfo)
             .withFilesetType(Fileset.Type.MANAGED)
-            .withStorageLocation("testLocation")
+            .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "testLocation"))
             .withProperties(map)
             .build();
 
@@ -176,7 +178,10 @@ public class TestEntity {
     Assertions.assertEquals(Fileset.Type.MANAGED, fields.get(FilesetEntity.TYPE));
     Assertions.assertEquals(map, fields.get(FilesetEntity.PROPERTIES));
     Assertions.assertNull(fields.get(FilesetEntity.COMMENT));
-    Assertions.assertEquals("testLocation", fields.get(FilesetEntity.STORAGE_LOCATION));
+    Assertions.assertEquals(
+        "testLocation",
+        ((Map<String, String>) fields.get(FilesetEntity.STORAGE_LOCATIONS))
+            .get(LOCATION_NAME_UNKNOWN));
 
     FilesetEntity testFile1 =
         FilesetEntity.builder()
@@ -185,7 +190,7 @@ public class TestEntity {
             .withAuditInfo(auditInfo)
             .withFilesetType(Fileset.Type.MANAGED)
             .withComment("testComment")
-            .withStorageLocation("testLocation")
+            .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "testLocation"))
             .build();
     Assertions.assertEquals("testComment", testFile1.comment());
     Assertions.assertNull(testFile1.properties());
@@ -193,17 +198,17 @@ public class TestEntity {
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> {
-              FilesetEntity.builder()
-                  .withId(fileId)
-                  .withName(fileName)
-                  .withAuditInfo(auditInfo)
-                  .withFilesetType(Fileset.Type.EXTERNAL)
-                  .withProperties(map)
-                  .withComment("testComment")
-                  .build();
-            });
-    Assertions.assertEquals("Field storage_location is required", exception.getMessage());
+            () ->
+                FilesetEntity.builder()
+                    .withId(fileId)
+                    .withName(fileName)
+                    .withAuditInfo(auditInfo)
+                    .withFilesetType(Fileset.Type.EXTERNAL)
+                    .withProperties(map)
+                    .withComment("testComment")
+                    .build());
+    Assertions.assertEquals(
+        "The storage locations of the fileset entity must not be empty.", exception.getMessage());
   }
 
   @Test

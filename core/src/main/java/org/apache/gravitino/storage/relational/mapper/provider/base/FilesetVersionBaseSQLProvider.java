@@ -20,57 +20,55 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper.VERSION_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.ibatis.annotations.Param;
 
 public class FilesetVersionBaseSQLProvider {
-  public String insertFilesetVersion(@Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
-    return "INSERT INTO "
+
+  public String insertFilesetVersions(
+      @Param("filesetVersions") List<FilesetVersionPO> filesetVersionPOs) {
+    return "<script>"
+        + "INSERT INTO "
         + VERSION_TABLE_NAME
-        + "(metalake_id, catalog_id, schema_id, fileset_id,"
-        + " version, fileset_comment, properties, storage_location,"
+        + " (metalake_id, catalog_id, schema_id, fileset_id,"
+        + " version, fileset_comment, properties, storage_location_name, storage_location,"
         + " deleted_at)"
-        + " VALUES("
-        + " #{filesetVersion.metalakeId},"
-        + " #{filesetVersion.catalogId},"
-        + " #{filesetVersion.schemaId},"
-        + " #{filesetVersion.filesetId},"
-        + " #{filesetVersion.version},"
-        + " #{filesetVersion.filesetComment},"
-        + " #{filesetVersion.properties},"
-        + " #{filesetVersion.storageLocation},"
-        + " #{filesetVersion.deletedAt}"
-        + " )";
+        + " VALUES "
+        + "<foreach collection='filesetVersions' item='version' separator=','>"
+        + " (#{version.metalakeId}, #{version.catalogId}, #{version.schemaId}, #{version.filesetId},"
+        + " #{version.version}, #{version.filesetComment}, #{version.properties},"
+        + " #{version.locationName}, #{version.storageLocation}, #{version.deletedAt})"
+        + "</foreach>"
+        + "</script>";
   }
 
-  public String insertFilesetVersionOnDuplicateKeyUpdate(
-      @Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
-    return "INSERT INTO "
+  public String insertFilesetVersionsOnDuplicateKeyUpdate(
+      @Param("filesetVersions") List<FilesetVersionPO> filesetVersionPOs) {
+    return "<script>"
+        + "INSERT INTO "
         + VERSION_TABLE_NAME
-        + "(metalake_id, catalog_id, schema_id, fileset_id,"
-        + " version, fileset_comment, properties, storage_location,"
+        + " (metalake_id, catalog_id, schema_id, fileset_id,"
+        + " version, fileset_comment, properties, storage_location_name, storage_location,"
         + " deleted_at)"
-        + " VALUES("
-        + " #{filesetVersion.metalakeId},"
-        + " #{filesetVersion.catalogId},"
-        + " #{filesetVersion.schemaId},"
-        + " #{filesetVersion.filesetId},"
-        + " #{filesetVersion.version},"
-        + " #{filesetVersion.filesetComment},"
-        + " #{filesetVersion.properties},"
-        + " #{filesetVersion.storageLocation},"
-        + " #{filesetVersion.deletedAt}"
-        + " )"
+        + " VALUES "
+        + "<foreach collection='filesetVersions' item='version' separator=','>"
+        + " (#{version.metalakeId}, #{version.catalogId}, #{version.schemaId}, #{version.filesetId},"
+        + " #{version.version}, #{version.filesetComment}, #{version.properties},"
+        + " #{version.locationName}, #{version.storageLocation}, #{version.deletedAt})"
+        + "</foreach>"
         + " ON DUPLICATE KEY UPDATE"
-        + " metalake_id = #{filesetVersion.metalakeId},"
-        + " catalog_id = #{filesetVersion.catalogId},"
-        + " schema_id = #{filesetVersion.schemaId},"
-        + " fileset_id = #{filesetVersion.filesetId},"
-        + " version = #{filesetVersion.version},"
-        + " fileset_comment = #{filesetVersion.filesetComment},"
-        + " properties = #{filesetVersion.properties},"
-        + " storage_location = #{filesetVersion.storageLocation},"
-        + " deleted_at = #{filesetVersion.deletedAt}";
+        + " metalake_id = VALUES(metalake_id),"
+        + " catalog_id = VALUES(catalog_id),"
+        + " schema_id = VALUES(schema_id),"
+        + " fileset_id = VALUES(fileset_id),"
+        + " version = VALUES(version),"
+        + " fileset_comment = VALUES(fileset_comment),"
+        + " properties = VALUES(properties),"
+        + " storage_location_name = VALUES(storage_location_name),"
+        + " storage_location = VALUES(storage_location),"
+        + " deleted_at = VALUES(deleted_at)"
+        + "</script>";
   }
 
   public String softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {

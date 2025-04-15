@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
@@ -544,11 +545,13 @@ public class TestFilesetCatalog extends TestBase {
       String comment,
       String location,
       Map<String, String> properties) {
+    Map<String, String> locations =
+        location == null ? ImmutableMap.of() : ImmutableMap.of(LOCATION_NAME_UNKNOWN, location);
     return FilesetDTO.builder()
         .name(name)
         .type(type)
         .comment(comment)
-        .storageLocation(location)
+        .storageLocations(locations)
         .properties(properties)
         .audit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

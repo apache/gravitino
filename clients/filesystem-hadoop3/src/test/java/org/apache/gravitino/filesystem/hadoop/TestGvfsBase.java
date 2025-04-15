@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -341,7 +342,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                 .comment("comment")
                 .type(Fileset.Type.MANAGED)
                 .audit(AuditDTO.builder().build())
-                .storageLocation(filesetLocation.toString())
+                .storageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetLocation))
                 .build());
     CredentialResponse credentialResponse = new CredentialResponse(new CredentialDTO[] {});
 

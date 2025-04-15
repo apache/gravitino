@@ -31,6 +31,7 @@ public class FilesetVersionPO {
   private Long version;
   private String filesetComment;
   private String properties;
+  private String locationName;
   private String storageLocation;
   private Long deletedAt;
 
@@ -66,6 +67,10 @@ public class FilesetVersionPO {
     return properties;
   }
 
+  public String getLocationName() {
+    return locationName;
+  }
+
   public String getStorageLocation() {
     return storageLocation;
   }
@@ -91,6 +96,7 @@ public class FilesetVersionPO {
         && Objects.equal(getVersion(), that.getVersion())
         && Objects.equal(getFilesetComment(), that.getFilesetComment())
         && Objects.equal(getProperties(), that.getProperties())
+        && Objects.equal(getLocationName(), that.getLocationName())
         && Objects.equal(getStorageLocation(), that.getStorageLocation())
         && Objects.equal(getDeletedAt(), that.getDeletedAt());
   }
@@ -106,6 +112,7 @@ public class FilesetVersionPO {
         getVersion(),
         getFilesetComment(),
         getProperties(),
+        getLocationName(),
         getStorageLocation(),
         getDeletedAt());
   }
@@ -162,6 +169,11 @@ public class FilesetVersionPO {
       return this;
     }
 
+    public Builder withLocationName(String locationName) {
+      filesetVersionPO.locationName = locationName;
+      return this;
+    }
+
     public Builder withDeletedAt(Long deletedAt) {
       filesetVersionPO.deletedAt = deletedAt;
       return this;
@@ -173,6 +185,8 @@ public class FilesetVersionPO {
       Preconditions.checkArgument(filesetVersionPO.schemaId != null, "Schema id is required");
       Preconditions.checkArgument(filesetVersionPO.filesetId != null, "Fileset id is required");
       Preconditions.checkArgument(filesetVersionPO.version != null, "Fileset version is required");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(filesetVersionPO.locationName), "Location name is required");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(filesetVersionPO.storageLocation), "Storage location is required");
       Preconditions.checkArgument(filesetVersionPO.deletedAt != null, "Deleted at is required");
