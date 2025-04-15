@@ -159,28 +159,14 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         Returns:
             The created fileset metadata
         """
-        # todo: call create_multiple_location_fileset if multiple storage locations are supported
-        self.check_fileset_name_identifier(ident)
-
-        full_namespace = self._get_fileset_full_namespace(ident.namespace())
-
-        req = FilesetCreateRequest(
-            name=encode_string(ident.name()),
-            comment=comment,
-            fileset_type=fileset_type,
-            storage_location=storage_location,
-            properties=properties,
+        locations = (
+            {Fileset.LOCATION_NAME_UNKNOWN: storage_location}
+            if storage_location
+            else {}
         )
-
-        resp = self.rest_client.post(
-            self.format_fileset_request_path(full_namespace),
-            req,
-            error_handler=FILESET_ERROR_HANDLER,
+        return self.create_multiple_location_fileset(
+            ident, comment, fileset_type, locations, properties
         )
-        fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
-        fileset_resp.validate()
-
-        return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
     def create_multiple_location_fileset(
         self,
@@ -206,7 +192,28 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         Returns:
             The created fileset metadata
         """
-        raise NotImplementedError("Multiple storage locations are not supported yet")
+        self.check_fileset_name_identifier(ident)
+
+        full_namespace = self._get_fileset_full_namespace(ident.namespace())
+
+        req = FilesetCreateRequest(
+            name=encode_string(ident.name()),
+            comment=comment,
+            fileset_type=fileset_type,
+            storage_locations=storage_locations,
+            properties=properties,
+        )
+        req.validate()
+
+        resp = self.rest_client.post(
+            self.format_fileset_request_path(full_namespace),
+            req,
+            error_handler=FILESET_ERROR_HANDLER,
+        )
+        fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
+        fileset_resp.validate()
+
+        return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
     def alter_fileset(self, ident: NameIdentifier, *changes) -> Fileset:
         """Update a fileset metadata in the catalog.
@@ -279,7 +286,8 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         Args:
              ident: A fileset identifier, which should be "schema.fileset" format.
              sub_path: The sub path of the file or directory.
-             location_name: The location name of the fileset.
+             location_name: The location name of the fileset, if not specified,
+                           the default location will be used.
 
         Raises:
             NoSuchLocationNameException If the location name does not exist.
@@ -292,8 +300,11 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
         try:
             caller_context: CallerContext = CallerContextHolder.get()
-            # todo: add location name to the request
-            params = {"sub_path": encode_string(sub_path)}
+            params = {
+                "sub_path": encode_string(sub_path),
+            }
+            if location_name is not None:
+                params["location_name"] = encode_string(location_name)
 
             resp = self.rest_client.get(
                 self.format_file_location_request_path(full_namespace, ident.name()),
