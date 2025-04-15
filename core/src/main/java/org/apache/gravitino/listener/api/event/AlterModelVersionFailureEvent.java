@@ -56,7 +56,8 @@ public class AlterModelVersionFailureEvent extends ModelFailureEvent {
   /**
    * Returns the alias of the model version involved in the event.
    *
-   * @return an {@code Optional} containing the alias, or an empty {@code Optional} if not specified
+   * @return if left value of {@code aliasOrVersion} is not null, returns the left value, otherwise
+   *     throw IllegalStateException.
    */
   public String alias() {
     return aliasOrVersion.getLeft();
@@ -65,8 +66,8 @@ public class AlterModelVersionFailureEvent extends ModelFailureEvent {
   /**
    * Returns the version of the model version involved in the event.
    *
-   * @return an {@code Optional} containing the version, or an empty {@code Optional} if not
-   *     specified
+   * @return if right value of {@code aliasOrVersion} is not null, returns the right value,
+   *     otherwise throw IllegalStateException.
    */
   public Integer version() {
     return aliasOrVersion.getRight();

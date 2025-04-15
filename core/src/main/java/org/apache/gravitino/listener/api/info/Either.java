@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.info;
 
 import java.util.Optional;
+import org.glassfish.jersey.internal.guava.Preconditions;
 
 /**
  * Either represents a value of two possible types (a disjoint union).
@@ -40,6 +41,7 @@ public final class Either<L, R> {
    * @param <R> Right type
    */
   public static <L, R> Either<L, R> left(L value) {
+    Preconditions.checkNotNull(value, "Left value cannot be null");
     return new Either<>(Optional.of(value), Optional.empty());
   }
 
@@ -52,6 +54,7 @@ public final class Either<L, R> {
    * @param <R> Right type
    */
   public static <L, R> Either<L, R> right(R value) {
+    Preconditions.checkNotNull(value, "Right value cannot be null");
     return new Either<>(Optional.empty(), Optional.of(value));
   }
 
