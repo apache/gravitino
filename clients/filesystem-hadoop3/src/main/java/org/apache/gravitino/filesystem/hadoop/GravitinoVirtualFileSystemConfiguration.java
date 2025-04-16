@@ -129,5 +129,11 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The default block size of the GVFS file. */
   public static final long FS_GRAVITINO_BLOCK_SIZE_DEFAULT = 32 * 1024 * 1024;
 
+  /** The configuration key for the Gravitino hook class. */
+  public static final String FS_GRAVITINO_HOOK_CLASS = "fs.gravitino.hook.class";
+
+  /** The default value for the Gravitino hook class. */
+  public static final String FS_GRAVITINO_HOOK_CLASS_DEFAULT = NoOpHook.class.getCanonicalName();
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }
