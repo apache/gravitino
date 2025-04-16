@@ -90,7 +90,10 @@ You can ues any IDE to develop Gravitino Python Client. Directly open the client
     # add `-PpythonVersion` with version number:
     ./gradlew :clients:client-python:build -PpythonVersion=3.10
     ```
-   
+   Some computer may encounter this error: `fatal error: 'cstdlib' file not found` while setting up Python,
+   this might because default Python version (3.8) is too
+   old, use version 3.9 or newer version instead.
+ 
 3. Run unit tests
 
     ```shell
