@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -29,7 +31,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -50,6 +51,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -105,11 +107,11 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public Fileset createFileset(
+  public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,
       Fileset.Type type,
-      String storageLocation,
+      Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     String apiUser = PrincipalUtils.getCurrentUserName();
@@ -120,8 +122,8 @@ public class SecureHadoopCatalogOperations
     return userContext.doAs(
         () -> {
           setUser(apiUser);
-          return hadoopCatalogOperations.createFileset(
-              ident, comment, type, storageLocation, properties);
+          return hadoopCatalogOperations.createMultipleLocationFileset(
+              ident, comment, type, storageLocations, properties);
         },
         ident);
   }
@@ -233,9 +235,9 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public String getFileLocation(NameIdentifier ident, String subPath)
-      throws NoSuchFilesetException {
-    return hadoopCatalogOperations.getFileLocation(ident, subPath);
+  public String getFileLocation(NameIdentifier ident, String subPath, String locationName)
+      throws NoSuchFilesetException, NoSuchLocationNameException {
+    return hadoopCatalogOperations.getFileLocation(ident, subPath, locationName);
   }
 
   @Override
@@ -260,9 +262,13 @@ public class SecureHadoopCatalogOperations
   @Override
   public List<PathContext> getPathContext(NameIdentifier filesetIdentifier) {
     Fileset fileset = loadFileset(filesetIdentifier);
-    String path = fileset.storageLocation();
-    Preconditions.checkState(
-        StringUtils.isNotBlank(path), "The location of fileset should not be empty.");
+    Map<String, String> locations = fileset.storageLocations();
+    Preconditions.checkArgument(
+        locations != null && !locations.isEmpty(),
+        "No storage locations found for fileset: " + filesetIdentifier);
+
+    // todo: support multiple storage locations
+    String path = locations.get(fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
     Set<String> providers =
         CredentialUtils.getCredentialProvidersByOrder(
