@@ -318,7 +318,9 @@ class TestModelCatalog(IntegrationTestEnv):
 
         changes = [ModelVersionChange.update_comment("new comment")]
         self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
-        updated_model_version = self._catalog.as_model_catalog().get_model(model_ident)
+        updated_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
 
         self.assertEqual(0, updated_model_version.version())
         self.assertEqual("new comment", updated_model_version.comment())
