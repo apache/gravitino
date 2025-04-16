@@ -20,9 +20,7 @@ By leveraging OpenLineage Spark plugin, Gravitino provides a separate Spark plug
 
 The Gravitino OpenLineage Spark plugin transforms the Gravitino metalake name into the dataset namespace. The dataset name varies by dataset type when generating lineage information.
 
-If you are using to access the table managed by Gravitino, the dataset name is as follows:
 When using the [Gravitino Spark connector](/spark-connector/spark-connector.md) to access tables managed by Gravitino, the dataset name follows this format:
-
 
 | Dataset Type    | Dataset name                                   | Example                    | Since Version |
 |-----------------|------------------------------------------------|----------------------------|---------------|
@@ -47,7 +45,7 @@ When accessing datasets by location (e.g., `SELECT * FROM parquet.$dataset_path`
 | GVFS location  | `$GravitinoCatalogName.$schemaName.$filesetName` | `fileset_catalog.schema.fileset_a`    | 0.9.0         |
 | Other location | location path                                    | `hdfs://127.0.0.1:9000/tmp/a/student` | 0.9.0         |
 
-For fileset dataset, the plugin add `fileset-location` facets which contains the location path.
+For GVFS location, the plugin add `fileset-location` facets which contains the location path.
 
 ```json
 "fileset-location" :
@@ -61,7 +59,7 @@ For fileset dataset, the plugin add `fileset-location` facets which contains the
 ## How to use 
 
 1. Download Gravitino OpenLineage plugin jar and place it to the classpath of Spark.
-2. Add configuration to the Spark to enable lineage collect.
+2. Add configuration to the Spark to enable lineage collection.
 
 Configuration example For Spark shell:
 
