@@ -19,6 +19,8 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE_DEFAULT;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
@@ -28,10 +30,16 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyShort;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -51,7 +59,9 @@ import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -61,6 +71,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.Method;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -68,6 +79,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 public class TestGvfsBase extends GravitinoMockServerBase {
   protected static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
@@ -109,6 +121,115 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   public void init() {
     mockMetalakeDTO(metalakeName, "comment");
     mockCatalogDTO(catalogName, provider, "comment");
+  }
+
+  @Test
+  public void testOpsException() throws IOException, NoSuchFieldException, IllegalAccessException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    Configuration newConf = new Configuration(conf);
+    try (GravitinoVirtualFileSystem fs =
+        (GravitinoVirtualFileSystem) new Path("gvfs://fileset/").getFileSystem(newConf)) {
+      BaseGVFSOperations mockOps = Mockito.mock(BaseGVFSOperations.class);
+      // inject the mockOps
+      Field operationsField = GravitinoVirtualFileSystem.class.getDeclaredField("operations");
+      operationsField.setAccessible(true);
+      operationsField.set(fs, mockOps);
+
+      // test setWorkingDirectory
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .setWorkingDirectory(any());
+      assertThrows(
+          RuntimeException.class, () -> fs.setWorkingDirectory(new Path("gvfs://fileset/")));
+
+      // test open
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .open(any(), anyInt());
+      assertThrows(
+          FilesetPathNotFoundException.class, () -> fs.open(new Path("gvfs://fileset/"), 1024));
+
+      // test create
+      Mockito.doThrow(new NoSuchCatalogException("fileset catalog not found"))
+          .when(mockOps)
+          .create(any(), any(), anyBoolean(), anyInt(), anyShort(), anyLong(), any());
+      Exception exception =
+          assertThrows(IOException.class, () -> fs.create(new Path("gvfs://fileset/"), true));
+      assertTrue(
+          exception.getMessage().contains("please check the fileset metadata in Gravitino"),
+          "The expected message is: " + exception.getMessage());
+
+      // test append
+      Mockito.doThrow(new NoSuchLocationNameException("location name not found"))
+          .when(mockOps)
+          .append(any(), anyInt(), any());
+      assertThrows(
+          FilesetPathNotFoundException.class, () -> fs.append(new Path("gvfs://fileset/"), 1024));
+
+      // test rename
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .rename(any(), any());
+      assertThrows(
+          FilesetPathNotFoundException.class,
+          () -> fs.rename(new Path("gvfs://fileset/"), new Path("gvfs://fileset/new")));
+
+      // test delete
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .delete(any(), anyBoolean());
+      assertEquals(false, fs.delete(new Path("gvfs://fileset/"), true));
+
+      // test getFileStatus
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .getFileStatus(any());
+      assertThrows(
+          FilesetPathNotFoundException.class, () -> fs.getFileStatus(new Path("gvfs://fileset/")));
+
+      // test listStatus
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .listStatus(any());
+      assertThrows(
+          FilesetPathNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
+
+      // test listStatus
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .listStatus(any());
+      assertThrows(
+          FilesetPathNotFoundException.class, () -> fs.listStatus(new Path("gvfs://fileset/")));
+
+      // test mkdirs
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .mkdirs(any(), any());
+      exception = assertThrows(IOException.class, () -> fs.mkdirs(new Path("gvfs://fileset/")));
+      assertTrue(
+          exception.getMessage().contains("please check the fileset metadata in Gravitino"),
+          "The expected message is: " + exception.getMessage());
+
+      // test getDefaultReplication
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .getDefaultReplication(any());
+      assertEquals(1, fs.getDefaultReplication(new Path("gvfs://fileset/")));
+
+      // test getDefaultBlockSize
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .getDefaultBlockSize(any());
+      Mockito.doReturn(FS_GRAVITINO_BLOCK_SIZE_DEFAULT).when(mockOps).defaultBlockSize();
+      assertEquals(
+          FS_GRAVITINO_BLOCK_SIZE_DEFAULT, fs.getDefaultBlockSize(new Path("gvfs://fileset/")));
+
+      // test addDelegationTokens
+      Mockito.doThrow(new NoSuchFilesetException("fileset not found"))
+          .when(mockOps)
+          .addDelegationTokens(any(), any());
+      assertThrows(NoSuchFilesetException.class, () -> fs.addDelegationTokens("renewer", null));
+    }
   }
 
   @Test
@@ -158,6 +279,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileSystem proxyLocalFs =
           Objects.requireNonNull(
               ((GravitinoVirtualFileSystem) gravitinoFileSystem)
+                  .getOperations()
                   .internalFileSystemCache()
                   .getIfPresent(
                       Pair.of(
@@ -206,12 +328,17 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               () ->
                   assertEquals(
                       0,
-                      ((GravitinoVirtualFileSystem) fs).internalFileSystemCache().asMap().size()));
+                      ((GravitinoVirtualFileSystem) fs)
+                          .getOperations()
+                          .internalFileSystemCache()
+                          .asMap()
+                          .size()));
 
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
+              .getOperations()
               .internalFileSystemCache()
-              .getIfPresent(Pair.of(NameIdentifier.of("file"), null)));
+              .getIfPresent(Pair.of(NameIdentifier.of("file"), LOCATION_NAME_UNKNOWN)));
     }
   }
 
@@ -235,6 +362,14 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
       assertTrue(localFileSystem.exists(localPath));
       // test gvfs normal create
+      mockFilesetDTO(
+          metalakeName,
+          catalogName,
+          schemaName,
+          filesetName,
+          Fileset.Type.MANAGED,
+          ImmutableMap.of("location1", localPath.toString()),
+          ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location1"));
       FileLocationResponse fileLocationResponse = new FileLocationResponse(localPath + "/test.txt");
       Map<String, String> queryParams = new HashMap<>();
       queryParams.put("sub_path", RESTUtils.encodeString("/test.txt"));
@@ -321,32 +456,6 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           RuntimeException.class,
           () -> FileSystemTestUtils.append(localPrefixPath, gravitinoFileSystem));
     }
-  }
-
-  private void buildMockResourceForCredential(String filesetName, String filesetLocation)
-      throws JsonProcessingException {
-    String filesetPath =
-        String.format(
-            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s",
-            metalakeName, catalogName, schemaName, filesetName);
-    String credentialsPath =
-        String.format(
-            "/api/metalakes/%s/objects/fileset/%s.%s.%s/credentials",
-            metalakeName, catalogName, schemaName, filesetName);
-    FilesetResponse filesetResponse =
-        new FilesetResponse(
-            FilesetDTO.builder()
-                .name(filesetName)
-                .comment("comment")
-                .type(Fileset.Type.MANAGED)
-                .audit(AuditDTO.builder().build())
-                .storageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetLocation))
-                .build());
-    CredentialResponse credentialResponse = new CredentialResponse(new CredentialDTO[] {});
-
-    buildMockResource(Method.GET, filesetPath, ImmutableMap.of(), null, filesetResponse, SC_OK);
-    buildMockResource(
-        Method.GET, credentialsPath, ImmutableMap.of(), null, credentialResponse, SC_OK);
   }
 
   @ParameterizedTest
@@ -743,7 +852,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       String storageLocation = "hdfs://hive:9000/";
       String virtualLocation = "gvfs://fileset/test_catalog/tmp/test_fileset";
       FileStatus convertedStatus =
-          fs.convertFileStatusPathPrefix(fileStatus, storageLocation, virtualLocation);
+          fs.getOperations()
+              .convertFileStatusPathPrefix(fileStatus, storageLocation, virtualLocation);
       Path expectedPath = new Path("gvfs://fileset/test_catalog/tmp/test_fileset/test");
       assertEquals(expectedPath, convertedStatus.getPath());
     }
@@ -786,9 +896,34 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertThrows(IOException.class, () -> fs.mkdirs(testPath));
 
       assertEquals(1, fs.getDefaultReplication(testPath));
-      assertEquals(
-          GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE_DEFAULT,
-          fs.getDefaultBlockSize(testPath));
+      assertEquals(FS_GRAVITINO_BLOCK_SIZE_DEFAULT, fs.getDefaultBlockSize(testPath));
     }
+  }
+
+  private void buildMockResourceForCredential(String filesetName, String filesetLocation)
+      throws JsonProcessingException {
+    String filesetPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s",
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
+    String credentialsPath =
+        String.format(
+            "/api/metalakes/%s/objects/fileset/%s.%s.%s/credentials",
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
+    FilesetResponse filesetResponse =
+        new FilesetResponse(
+            FilesetDTO.builder()
+                .name(filesetName)
+                .comment("comment")
+                .type(Fileset.Type.MANAGED)
+                .audit(AuditDTO.builder().build())
+                .storageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetLocation))
+                .properties(ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, LOCATION_NAME_UNKNOWN))
+                .build());
+    CredentialResponse credentialResponse = new CredentialResponse(new CredentialDTO[] {});
+
+    buildMockResource(Method.GET, filesetPath, ImmutableMap.of(), null, filesetResponse, SC_OK);
+    buildMockResource(
+        Method.GET, credentialsPath, ImmutableMap.of(), null, credentialResponse, SC_OK);
   }
 }
