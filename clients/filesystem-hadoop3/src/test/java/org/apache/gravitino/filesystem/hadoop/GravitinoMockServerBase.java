@@ -41,6 +41,7 @@ import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
@@ -184,7 +185,7 @@ public abstract class GravitinoMockServerBase {
     String filesetPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     Map<String, String> locations =
         location == null
             ? Collections.emptyMap()
