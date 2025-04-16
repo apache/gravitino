@@ -117,6 +117,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
   private FileSystemProvider defaultFileSystemProvider;
 
+  private boolean disableFSOps;
+
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
@@ -150,34 +152,33 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throws RuntimeException {
     this.propertiesMetadata = propertiesMetadata;
     this.catalogInfo = info;
-
     this.conf = config;
 
-    String fileSystemProviders =
-        (String)
+    this.disableFSOps =
+        (boolean)
             propertiesMetadata
                 .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
-    this.fileSystemProvidersMap =
-        ImmutableMap.<String, FileSystemProvider>builder()
-            .putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders))
-            .build();
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS);
+    if (!disableFSOps) {
+      String fileSystemProviders =
+          (String)
+              propertiesMetadata
+                  .catalogPropertiesMetadata()
+                  .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESYSTEM_PROVIDERS);
+      this.fileSystemProvidersMap =
+          ImmutableMap.<String, FileSystemProvider>builder()
+              .putAll(FileSystemUtils.getFileSystemProviders(fileSystemProviders))
+              .build();
 
-    String defaultFileSystemProviderName =
-        (String)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
-    this.defaultFileSystemProvider =
-        FileSystemUtils.getFileSystemProviderByName(
-            fileSystemProvidersMap, defaultFileSystemProviderName);
-
-    String catalogLocation =
-        (String)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(config, HadoopCatalogPropertiesMetadata.LOCATION);
-    checkPlaceholderValue(catalogLocation);
+      String defaultFileSystemProviderName =
+          (String)
+              propertiesMetadata
+                  .catalogPropertiesMetadata()
+                  .getOrDefault(config, HadoopCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER);
+      this.defaultFileSystemProvider =
+          FileSystemUtils.getFileSystemProviderByName(
+              fileSystemProvidersMap, defaultFileSystemProviderName);
+    }
 
     this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
   }
@@ -291,40 +292,59 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     properties = setDefaultLocationIfAbsent(properties, filesetPaths);
 
     ImmutableMap.Builder<String, Path> filesetPathsBuilder = ImmutableMap.builder();
-    try {
-      // formalize the path to avoid path without scheme, uri, authority, etc.
-      for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-        Path formalizePath = formalizePath(entry.getValue(), conf);
-        filesetPathsBuilder.put(entry.getKey(), formalizePath);
+    if (disableFSOps) {
+      filesetPaths.forEach(
+          (locationName, location) -> {
+            // If the location does not have scheme and filesystem operations are disabled in the
+            // server side, we cannot formalize the path by filesystem, neither can we do in the
+            // client side, so we should throw an exception here.
+            if (location.toUri().getScheme() == null) {
+              throw new IllegalArgumentException(
+                  "Storage location must have scheme for fileset if filesystem operations are "
+                      + "disabled in the server side, location: "
+                      + location
+                      + ", location name: "
+                      + locationName);
+            }
 
-        FileSystem fs = getFileSystem(formalizePath, conf);
-        if (!fs.exists(formalizePath)) {
-          if (!fs.mkdirs(formalizePath)) {
-            throw new RuntimeException(
-                "Failed to create fileset "
-                    + ident
-                    + " location "
-                    + formalizePath
-                    + " with location name "
-                    + entry.getKey());
+            filesetPathsBuilder.put(locationName, location);
+          });
+    } else {
+      try {
+        // formalize the path to avoid path without scheme, uri, authority, etc.
+        for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
+          Path formalizePath = formalizePath(entry.getValue(), conf);
+          filesetPathsBuilder.put(entry.getKey(), formalizePath);
+
+          FileSystem fs = getFileSystem(formalizePath, conf);
+          if (!fs.exists(formalizePath)) {
+            if (!fs.mkdirs(formalizePath)) {
+              throw new RuntimeException(
+                  "Failed to create fileset "
+                      + ident
+                      + " location "
+                      + formalizePath
+                      + " with location name "
+                      + entry.getKey());
+            }
+
+            LOG.info(
+                "Created fileset {} location {} with location name {}",
+                ident,
+                formalizePath,
+                entry.getKey());
+          } else {
+            LOG.info(
+                "Fileset {} manages the existing location {} with location name {}",
+                ident,
+                formalizePath,
+                entry.getKey());
           }
-
-          LOG.info(
-              "Created fileset {} location {} with location name {}",
-              ident,
-              formalizePath,
-              entry.getKey());
-        } else {
-          LOG.info(
-              "Fileset {} manages the existing location {} with location name {}",
-              ident,
-              formalizePath,
-              entry.getKey());
         }
-      }
 
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to create fileset " + ident, ioe);
+      } catch (IOException ioe) {
+        throw new RuntimeException("Failed to create fileset " + ident, ioe);
+      }
     }
 
     Map<String, String> formattedStorageLocations =
@@ -456,7 +476,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
 
       // For managed fileset, we should delete the related files.
-      if (filesetEntity.filesetType() == Fileset.Type.MANAGED) {
+      if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
         AtomicReference<IOException> exception = new AtomicReference<>();
         Map<String, Path> storageLocations =
             Maps.transformValues(filesetEntity.storageLocations(), Path::new);
@@ -524,7 +544,18 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           "Location name %s does not exist in fileset %s", locationName, ident);
     }
 
-    boolean isSingleFile = checkSingleFile(fileset, locationName);
+    boolean isSingleFile = false;
+    if (disableFSOps) {
+      LOG.warn(
+          "Filesystem operations are disabled in the server side, we cannot check if the "
+              + "storage location mounts to a directory or single file, we assume it is a directory"
+              + "(in most of the cases). If it happens to be a single file, then the generated "
+              + "file location may be a wrong path. Please avoid using Fileset to manage a single"
+              + " file path.");
+    } else {
+      isSingleFile = checkSingleFile(fileset, locationName);
+    }
+
     // if the storage location is a single file, it cannot have sub path to access.
     if (isSingleFile && StringUtils.isNotBlank(processedSubPath)) {
       throw new GravitinoRuntimeException(
@@ -583,6 +614,10 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    if (disableFSOps) {
+      return super.createSchema(ident, comment, properties);
+    }
+
     try {
       if (store.exists(ident, Entity.EntityType.SCHEMA)) {
         throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
@@ -667,6 +702,10 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
 
       boolean dropped = super.dropSchema(ident, cascade);
+      if (disableFSOps) {
+        return dropped;
+      }
+
       // If the schema entity is failed to be deleted, we should not delete the storage location
       // and return false immediately.
       if (!dropped) {
