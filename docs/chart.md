@@ -1,5 +1,5 @@
 ---
-title: "Helm Chart"
+title: "Apache Gravitino Helm Chart"
 slug: /chart
 keyword: chart
 license: "This software is licensed under the Apache License version 2."
@@ -9,15 +9,26 @@ license: "This software is licensed under the Apache License version 2."
 
 This Helm chart deploys Apache Gravitino on Kubernetes with customizable configurations.
 
+**Homepage:** <https://gravitino.apache.org/>
+
 ## Prerequisites
 
 - Kubernetes 1.29+
 - Helm 3+
 
+## Maintainers
+
+| Name             | Email                    | Url                          |
+|------------------|--------------------------|------------------------------|
+| Apache Gravitino | dev@gravitino.apache.org | https://gravitino.apache.org |
+
+## Source Code
+
+* <https://github.com/apache/gravitino>
+
 ## Update Chart Dependency
 
-The Gravitino Helm chart has not yet been officially released.   
-To proceed, please clone the repository, navigate to the chart directory `/path/to/gravitino/dev/charts`, and execute the Helm dependency update command.
+If the chart has not been released yet, navigate to the chart directory and update its dependencies:
 
 ```console
 helm dependency update [CHART]
@@ -41,10 +52,10 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino using the default settings, specify container image versions using --set image.tag=x.y.z (replace x, y, z with the expected version numbers):
+Run the following command to deploy Gravitino using the default settings:
 
 ```console
-helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set image.tag=<x.y.z>
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
 ```
 
 ### Deploy with Custom Configuration
@@ -115,4 +126,10 @@ Ensure the target MySQL database (gravitino) exists before deployment._
 
 ```console
 helm uninstall [RELEASE_NAME] -n [NAMESPACE]
+```
+
+## Package Helm Chart
+
+```console
+helm package [CHART_PATH]
 ```
