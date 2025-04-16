@@ -33,12 +33,12 @@ When using the [Gravitino Spark connector](/spark-connector/spark-connector.md) 
 
 For datasets not managed by Gravitino, the dataset name is as follows:
 
-| Dataset Type | Dataset name                       | Example                    | Since Version |
-|--------------|------------------------------------|----------------------------|---------------|
-| Hive         | `spark_catalog.$dbName.$tableName` | `spark_catalog.db.table`   | 0.9.0         |
-| Iceberg      | `$catalogName.$dbName.$tableName`  | `iceberg_catalog.db.table` | 0.9.0         |
-| JDBC v2      | `$catalogName.$dbName.$tableName`  | `jdbc_catalog.db.table`    | 0.9.0         |
-| JDBC v1      | `spark_catalog.$dbName.$tableName` | `spark_catalog.db.table`   | 0.9.0         |
+| Dataset Type | Dataset name                           | Example                               | Since Version |
+|--------------|----------------------------------------|---------------------------------------|---------------|
+| Hive         | `spark_catalog.$schemaName.$tableName` | `spark_catalog.db.table`              | 0.9.0         |
+| Iceberg      | `$catalogName.$schemaName.$tableName`  | `iceberg_catalog.db.table`            | 0.9.0         |
+| JDBC v2      | `$catalogName.$schemaName.$tableName`  | `jdbc_catalog.db.table`               | 0.9.0         |
+| JDBC v1      | `spark_catalog.$schemaName.$tableName` | `spark_catalog.postgres.public.table` | 0.9.0         |
 
 When accessing datasets by location (e.g., `SELECT * FROM parquet.$dataset_path`), the name is derived from the physical path:
 
