@@ -98,7 +98,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     TYPE = "hms";
     WAREHOUSE =
         String.format(
-            "hdfs://%s:%d/user/hive/warehouse-catalog-hudi/",
+            "hdfs://%s:%d/user/hive/warehouse",
             kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     try {
@@ -230,7 +230,6 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
     properties.put("warehouse", WAREHOUSE);
     properties.put("location", WAREHOUSE);
-
     Catalog catalog =
         gravitinoMetalake.createCatalog(
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-hudi", "comment", properties);
@@ -248,9 +247,9 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-hudi");
+        "hadoop", "fs", "-mkdir", "/user/hive/warehouse");
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-hudi");
+        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse");
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -317,7 +316,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, TYPE);
     properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
-    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
+    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -332,12 +331,6 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     // Make sure the real user is 'cli' because no impersonation here.
     Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
-  }
-
-  @AfterAll
-  static void restoreFilePermission() {
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "755", "/user/hive/warehouse-catalog-hudi");
   }
 
   private static Column[] createColumns() {
