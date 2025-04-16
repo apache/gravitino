@@ -180,6 +180,26 @@ public class ModelCommandHandler extends CommandHandler {
           .validate()
           .handle();
     }
+
+    if (!line.hasOption(GravitinoOptions.URI)
+        && line.hasOption(GravitinoOptions.COMMENT)
+        && (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {
+      String comment = line.getOptionValue(GravitinoOptions.COMMENT);
+      Integer version =
+          line.hasOption(GravitinoOptions.VERSION)
+              ? Integer.parseInt(line.getOptionValue(GravitinoOptions.VERSION))
+              : null;
+      String alias =
+          line.hasOption(GravitinoOptions.ALIAS)
+              ? getOneAlias(line.getOptionValues(GravitinoOptions.ALIAS))
+              : null;
+
+      gravitinoCommandLine
+          .newUpdateModelVersionComment(
+              context, metalake, catalog, schema, model, version, alias, comment)
+          .validate()
+          .handle();
+    }
   }
 
   /** Handles the "LIST" command. */
@@ -203,5 +223,13 @@ public class ModelCommandHandler extends CommandHandler {
         .newRemoveModelProperty(context, metalake, catalog, schema, model, property)
         .validate()
         .handle();
+  }
+
+  private String getOneAlias(String[] aliases) {
+    if (aliases == null || aliases.length > 1) {
+      System.err.println(ErrorMessages.MULTIPLE_ALIASES_COMMAND_ERROR);
+      Main.exit(-1);
+    }
+    return aliases[0];
   }
 }
