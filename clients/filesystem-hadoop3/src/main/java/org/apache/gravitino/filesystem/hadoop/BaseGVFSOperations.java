@@ -125,6 +125,8 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final Map<String, FileSystemProvider> fileSystemProvidersMap;
 
+  private final String currentLocationEnvVar;
+
   @Nullable private final String currentLocationName;
 
   private final long defaultBlockSize;
@@ -152,6 +154,11 @@ public abstract class BaseGVFSOperations implements Closeable {
 
     this.fileSystemProvidersMap = ImmutableMap.copyOf(getFileSystemProviders());
 
+    this.currentLocationEnvVar =
+        configuration.get(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR,
+            GravitinoVirtualFileSystemConfiguration
+                .FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT);
     this.currentLocationName = initCurrentLocationName(configuration);
 
     this.defaultBlockSize =
@@ -771,6 +778,6 @@ public abstract class BaseGVFSOperations implements Closeable {
     // get from configuration first, otherwise use the env variable
     // if both are not set, return null which means use the default location
     return Optional.ofNullable(configuration.get(FS_GRAVITINO_CURRENT_LOCATION_NAME))
-        .orElse(System.getenv(ENV_CURRENT_LOCATION_NAME));
+        .orElse(System.getenv(currentLocationEnvVar));
   }
 }
