@@ -246,8 +246,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to permit the user to create the schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/warehouse");
+    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hive/warehouse");
     kerberosHiveContainer.executeInContainer(
         "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse");
     Assertions.assertDoesNotThrow(
