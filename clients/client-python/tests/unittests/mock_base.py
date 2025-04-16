@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 from gravitino import GravitinoMetalake, Catalog, Fileset
 from gravitino.client.fileset_catalog import FilesetCatalog
+from gravitino.client.generic_fileset import GenericFileset
 from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.audit_dto import AuditDTO
@@ -101,7 +102,9 @@ def mock_load_fileset(name: str, location: str):
         _storage_locations={Fileset.LOCATION_NAME_UNKNOWN: location},
         _audit=audit_dto,
     )
-    return fileset
+    return GenericFileset(
+        fileset, None, Namespace.of("metalake_demo", "fileset_catalog", "tmp")
+    )
 
 
 def mock_data(cls):
