@@ -36,4 +36,15 @@ public class FilesetPathNotFoundException extends FileNotFoundException {
   public FilesetPathNotFoundException(String message) {
     super(message);
   }
+
+  /**
+   * Creates a new FilesetPathNotFoundException instance with the given message and cause.
+   *
+   * @param message The message of the exception.
+   * @param cause The cause of the exception.
+   */
+  public FilesetPathNotFoundException(String message, Throwable cause) {
+    super(message);
+    initCause(cause);
+  }
 }
