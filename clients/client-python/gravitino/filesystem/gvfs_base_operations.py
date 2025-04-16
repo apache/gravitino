@@ -74,8 +74,6 @@ class BaseGVFSOperations(ABC):
 
     SLASH = "/"
 
-    ENABLE_CREDENTIAL_VENDING_DEFAULT = False
-
     ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
 
     def __init__(
@@ -272,9 +270,10 @@ class BaseGVFSOperations(ABC):
     @staticmethod
     def _pre_process_path(virtual_path):
         """Pre-process the path.
-         We will uniformly process `gvfs://fileset/{catalog}/{schema}/{fileset_name}/xxx`
+         This method uniformly processes `gvfs://fileset/{catalog}/{schema}/{fileset_name}/xxx`
          into the format of `fileset/{catalog}/{schema}/{fileset_name}/xxx`.
-         This is because some implementations of `PyArrow` and `fsspec` can only recognize this format.
+         The conversion is necessary because some implementations of `PyArrow` and `fsspec`
+         can only recognize this format.
         :param virtual_path: The virtual path
         :return The pre-processed path
         """
@@ -364,29 +363,7 @@ class BaseGVFSOperations(ABC):
         actual_fs = self._get_filesystem(
             actual_location, catalog, fileset_ident, target_location_name
         )
-        self._create_fileset_location_if_needed(
-            catalog.properties(), actual_fs, actual_location
-        )
         return actual_fs
-
-    def _create_fileset_location_if_needed(
-        self,
-        catalog_props: Dict[str, str],
-        actual_fs: AbstractFileSystem,
-        fileset_path: str,
-    ):
-        # If the server-side filesystem ops are disabled, the fileset directory may not exist. In
-        # such case the operations like create, open, list files under this directory will fail.
-        # So we need to check the existence of the fileset directory beforehand.
-        fs_ops_disabled = catalog_props.get("disable-filesystem-ops", "false")
-        if fs_ops_disabled.lower() == "true":
-            if not actual_fs.exists(fileset_path):
-                actual_fs.makedir(fileset_path, create_parents=True)
-                logger.info(
-                    "Automatically created a directory for fileset path: %s when "
-                    "disable-filesystem-ops sets to true in the server side",
-                    fileset_path,
-                )
 
     def _get_actual_file_path(
         self, gvfs_path: str, location_name: str, operation: FilesetDataOperation
