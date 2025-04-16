@@ -20,11 +20,12 @@ package org.apache.gravitino.server.authorization;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionExecutor;
 
 /**
  * MetadataFilterHelper performs permission checks on the list data returned by the REST API based
- * on expressions or resource types, and calls {@link GravitinoAuthorizer} for authorization,
+ * on expressions or metadata types, and calls {@link GravitinoAuthorizer} for authorization,
  * returning only the metadata that the user has permission to access.
  */
 public class MetadataFilterHelper {
@@ -34,7 +35,7 @@ public class MetadataFilterHelper {
   /**
    * Call {@link GravitinoAuthorizer} to filter the metadata list
    *
-   * @param resourceType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @param metadataList metaData list.
    * @param metadataIdExtractor extract the metadata id from list items.
@@ -42,7 +43,7 @@ public class MetadataFilterHelper {
    * @param <E> metadata object.
    */
   public static <E> List<E> filter(
-      String resourceType,
+      MetadataObject.Type metadataType,
       String privilege,
       List<E> metadataList,
       Function<E, Long> metadataIdExtractor) {

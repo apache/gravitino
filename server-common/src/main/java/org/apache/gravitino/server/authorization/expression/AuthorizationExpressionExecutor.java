@@ -33,13 +33,13 @@ public class AuthorizationExpressionExecutor {
   public AuthorizationExpressionExecutor(String expression) {}
 
   /**
-   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of resource
+   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of metadata
    * IDs.
    *
-   * @param resourceIds key-metadata type, value-resource id
+   * @param metadataIds key-metadata type, value-metadata id
    * @return authorization result
    */
-  public boolean authorize(Map<MetadataObject.Type, Long> resourceIds) {
+  public boolean authorize(Map<MetadataObject.Type, Long> metadataIds) {
     return false;
   }
 }

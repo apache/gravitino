@@ -25,8 +25,6 @@ import java.util.List;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-import org.apache.gravitino.server.authorization.annotations.AuthorizeApi;
-import org.apache.gravitino.server.authorization.annotations.AuthorizeResource;
 import org.glassfish.hk2.api.Filter;
 import org.glassfish.hk2.api.InterceptionService;
 
@@ -59,9 +57,8 @@ public class GravitinoInterceptionService implements InterceptionService {
   private static class MetadataAuthorizationMethodInterceptor implements MethodInterceptor {
 
     /**
-     * Determine whether authorization is required and the rules via the {@link AuthorizeApi}
-     * annotation, and obtain the resource ID that requires authorization via the {@link
-     * AuthorizeResource} annotation.
+     * Determine whether authorization is required and the rules via the authorization annotation ,
+     * and obtain the metadata ID that requires authorization via the authorization annotation.
      *
      * @param methodInvocation methodInvocation with the Method object
      * @return the return result of the original method.
