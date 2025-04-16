@@ -116,6 +116,13 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT =
       "CURRENT_LOCATION_NAME";
 
+  /** The configuration key for the GVFS operations class. */
+  public static final String FS_GRAVITINO_OPERATIONS_CLASS = "fs.gravitino.operations.class";
+
+  /** The default value for the GVFS operations class. */
+  public static final String FS_GRAVITINO_OPERATIONS_CLASS_DEFAULT =
+      DefaultGVFSOperations.class.getCanonicalName();
+
   /** The configuration key for the block size of the GVFS file. */
   public static final String FS_GRAVITINO_BLOCK_SIZE = "fs.gravitino.block.size";
 
