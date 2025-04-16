@@ -14,8 +14,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import importlib
 import logging
 import os
+import re
 import sys
 
 # Disable C0302: Too many lines in module
@@ -24,45 +26,42 @@ import time
 from enum import Enum
 from pathlib import PurePosixPath
 from typing import Dict, Tuple, List
-import re
-import importlib
-import fsspec
 
+import fsspec
 from cachetools import TTLCache, LRUCache
 from fsspec import AbstractFileSystem
-from fsspec.implementations.local import LocalFileSystem
 from fsspec.implementations.arrow import ArrowFSWrapper
+from fsspec.implementations.local import LocalFileSystem
 from fsspec.utils import infer_storage_options
-
 from readerwriterlock import rwlock
 
 from gravitino.api.catalog import Catalog
-from gravitino.api.credential.credential import Credential
-from gravitino.audit.caller_context import CallerContext, CallerContextHolder
-from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
-from gravitino.audit.fileset_data_operation import FilesetDataOperation
-from gravitino.audit.internal_client_type import InternalClientType
-from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
-from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
-from gravitino.auth.simple_auth_provider import SimpleAuthProvider
-from gravitino.client.generic_fileset import GenericFileset
-from gravitino.client.fileset_catalog import FilesetCatalog
-from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.exceptions.base import (
-    GravitinoRuntimeException,
-)
-from gravitino.filesystem.gvfs_config import GVFSConfig
-from gravitino.name_identifier import NameIdentifier
-
 from gravitino.api.credential.adls_token_credential import ADLSTokenCredential
 from gravitino.api.credential.azure_account_key_credential import (
     AzureAccountKeyCredential,
 )
+from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.gcs_token_credential import GCSTokenCredential
 from gravitino.api.credential.oss_secret_key_credential import OSSSecretKeyCredential
 from gravitino.api.credential.oss_token_credential import OSSTokenCredential
 from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredential
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
+from gravitino.audit.caller_context import CallerContext, CallerContextHolder
+from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
+from gravitino.audit.fileset_data_operation import FilesetDataOperation
+from gravitino.audit.internal_client_type import InternalClientType
+from gravitino.client.fileset_catalog import FilesetCatalog
+from gravitino.client.generic_fileset import GenericFileset
+from gravitino.exceptions.base import (
+    GravitinoRuntimeException,
+)
+from gravitino.filesystem.gvfs_config import GVFSConfig
+from gravitino.filesystem.gvfs_utils import (
+    create_client,
+    extract_identifier,
+    get_sub_path_from_virtual_path,
+)
+from gravitino.name_identifier import NameIdentifier
 
 logger = logging.getLogger(__name__)
 
@@ -128,46 +127,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :param kwargs: Extra args for super filesystem
         """
         self._metalake = metalake_name
-        auth_type = (
-            GVFSConfig.SIMPLE_AUTH_TYPE
-            if options is None
-            else options.get(GVFSConfig.AUTH_TYPE, GVFSConfig.SIMPLE_AUTH_TYPE)
-        )
-        if auth_type == GVFSConfig.SIMPLE_AUTH_TYPE:
-            self._client = GravitinoClient(
-                uri=server_uri,
-                metalake_name=metalake_name,
-                auth_data_provider=SimpleAuthProvider(),
-            )
-        elif auth_type == GVFSConfig.OAUTH2_AUTH_TYPE:
-            oauth2_server_uri = options.get(GVFSConfig.OAUTH2_SERVER_URI)
-            self._check_auth_config(
-                auth_type, GVFSConfig.OAUTH2_SERVER_URI, oauth2_server_uri
-            )
-
-            oauth2_credential = options.get(GVFSConfig.OAUTH2_CREDENTIAL)
-            self._check_auth_config(
-                auth_type, GVFSConfig.OAUTH2_CREDENTIAL, oauth2_credential
-            )
-
-            oauth2_path = options.get(GVFSConfig.OAUTH2_PATH)
-            self._check_auth_config(auth_type, GVFSConfig.OAUTH2_PATH, oauth2_path)
-
-            oauth2_scope = options.get(GVFSConfig.OAUTH2_SCOPE)
-            self._check_auth_config(auth_type, GVFSConfig.OAUTH2_SCOPE, oauth2_scope)
-
-            oauth2_token_provider: OAuth2TokenProvider = DefaultOAuth2TokenProvider(
-                oauth2_server_uri, oauth2_credential, oauth2_path, oauth2_scope
-            )
-            self._client = GravitinoClient(
-                uri=server_uri,
-                metalake_name=metalake_name,
-                auth_data_provider=oauth2_token_provider,
-            )
-        else:
-            raise GravitinoRuntimeException(
-                f"Authentication type {auth_type} is not supported."
-            )
+        self._client = create_client(options, server_uri, metalake_name)
         cache_size = (
             GVFSConfig.DEFAULT_CACHE_SIZE
             if options is None
@@ -216,10 +176,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         pre_process_path: str = self._pre_process_path(path)
-        identifier: NameIdentifier = self._extract_identifier(pre_process_path)
-        sub_path: str = self._get_sub_path_from_virtual_path(
-            identifier, pre_process_path
+        identifier: NameIdentifier = extract_identifier(
+            self._metalake, pre_process_path
         )
+        sub_path: str = get_sub_path_from_virtual_path(identifier, pre_process_path)
         storage_location: str = actual_path[: len(actual_path) - len(sub_path)]
         # return entries with details
         if detail:
@@ -259,10 +219,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         pre_process_path: str = self._pre_process_path(path)
-        identifier: NameIdentifier = self._extract_identifier(pre_process_path)
-        sub_path: str = self._get_sub_path_from_virtual_path(
-            identifier, pre_process_path
+        identifier: NameIdentifier = extract_identifier(
+            self._metalake, pre_process_path
         )
+        sub_path: str = get_sub_path_from_virtual_path(identifier, pre_process_path)
         storage_location: str = actual_path[: len(actual_path) - len(sub_path)]
         actual_info: Dict = context_pair.filesystem().info(
             self._strip_storage_protocol(storage_type, actual_path)
@@ -294,8 +254,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         """
         src_path = self._pre_process_path(path1)
         dst_path = self._pre_process_path(path2)
-        src_identifier: NameIdentifier = self._extract_identifier(src_path)
-        dst_identifier: NameIdentifier = self._extract_identifier(dst_path)
+        src_identifier: NameIdentifier = extract_identifier(self._metalake, src_path)
+        dst_identifier: NameIdentifier = extract_identifier(self._metalake, dst_path)
         if src_identifier != dst_identifier:
             raise GravitinoRuntimeException(
                 f"Destination file path identifier: `{dst_identifier}` should be same with src file path "
@@ -329,8 +289,8 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         """
         src_path = self._pre_process_path(path1)
         dst_path = self._pre_process_path(path2)
-        src_identifier: NameIdentifier = self._extract_identifier(src_path)
-        dst_identifier: NameIdentifier = self._extract_identifier(dst_path)
+        src_identifier: NameIdentifier = extract_identifier(self._metalake, src_path)
+        dst_identifier: NameIdentifier = extract_identifier(self._metalake, dst_path)
         if src_identifier != dst_identifier:
             raise GravitinoRuntimeException(
                 f"Destination file path identifier: `{dst_identifier}`"
@@ -705,7 +665,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         :return A fileset context pair
         """
         virtual_path: str = self._pre_process_path(virtual_path)
-        identifier: NameIdentifier = self._extract_identifier(virtual_path)
+        identifier: NameIdentifier = extract_identifier(self._metalake, virtual_path)
         catalog_ident: NameIdentifier = NameIdentifier.of(
             self._metalake, identifier.namespace().level(1)
         )
@@ -714,7 +674,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             raise GravitinoRuntimeException(
                 f"Loaded fileset catalog: {catalog_ident} is null."
             )
-        sub_path: str = self._get_sub_path_from_virtual_path(identifier, virtual_path)
+        sub_path: str = get_sub_path_from_virtual_path(identifier, virtual_path)
         context = {
             FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION: operation.name,
             FilesetAuditConstants.HTTP_HEADER_INTERNAL_CLIENT_TYPE: InternalClientType.PYTHON_GVFS.name,
@@ -737,25 +697,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 identifier,
                 self._current_location_name,
             ),
-        )
-
-    def _extract_identifier(self, path):
-        """Extract the fileset identifier from the path.
-        :param path: The virtual fileset path
-        :return The fileset identifier
-        """
-        if path is None:
-            raise GravitinoRuntimeException(
-                "path which need be extracted cannot be null or empty."
-            )
-
-        match = self._identifier_pattern.match(path)
-        if match and len(match.groups()) == 3:
-            return NameIdentifier.of(
-                self._metalake, match.group(1), match.group(2), match.group(3)
-            )
-        raise GravitinoRuntimeException(
-            f"path: `{path}` doesn't contains valid identifier."
         )
 
     @staticmethod
@@ -816,14 +757,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         )
 
     @staticmethod
-    def _get_sub_path_from_virtual_path(identifier: NameIdentifier, virtual_path: str):
-        return virtual_path[
-            len(
-                f"fileset/{identifier.namespace().level(1)}/{identifier.namespace().level(2)}/{identifier.name()}"
-            ) :
-        ]
-
-    @staticmethod
     def _strip_storage_protocol(storage_type: StorageType, path: str):
         """Strip the storage protocol from the path.
           Before passing the path to the underlying file system for processing,
@@ -867,7 +800,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         if storage_type == StorageType.LOCAL:
             return path[len(f"{StorageType.LOCAL.value}:") :]
 
-        ## We need to remove the protocol and accout from the path, for instance,
+        ## We need to remove the protocol and account from the path, for instance,
         # the path can be converted from 'abfss://container@account/path' to
         # 'container/path'.
         if storage_type == StorageType.ABS:
@@ -884,19 +817,6 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         raise GravitinoRuntimeException(
             f"Storage type:{storage_type} doesn't support now."
         )
-
-    @staticmethod
-    def _check_auth_config(auth_type: str, config_key: str, config_value: str):
-        """Check if the config value is null.
-        :param auth_type: The auth type
-        :param config_key: The config key
-        :param config_value: The config value
-        """
-        if config_value is None:
-            raise GravitinoRuntimeException(
-                f"{config_key} should not be null"
-                f" if {GVFSConfig.AUTH_TYPE} is set to {auth_type}."
-            )
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
         read_lock = self._catalog_cache_lock.gen_rlock()
