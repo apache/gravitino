@@ -33,14 +33,11 @@ import org.apache.gravitino.rest.RESTRequest;
 
 /** Request to update a model version. */
 @JsonIgnoreProperties(ignoreUnknown = true)
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY)
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME)
 @JsonSubTypes({
   @JsonSubTypes.Type(
       value = ModelVersionUpdateRequest.UpdateModelVersionComment.class,
-      name = "updateComment"),
-  @JsonSubTypes.Type(
-      value = ModelVersionUpdateRequest.RemoveModelVersionComment.class,
-      name = "removeComment"),
+      name = "updateComment")
 })
 public interface ModelVersionUpdateRequest extends RESTRequest {
 
@@ -65,23 +62,6 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
     @Override
     public ModelVersionChange modelVersionChange() {
       return ModelVersionChange.updateComment(newComment);
-    }
-
-    /** Validates the fields of the request. Always pass. */
-    @Override
-    public void validate() throws IllegalArgumentException {}
-  }
-
-  /** Request to remove comment from a model version */
-  @EqualsAndHashCode
-  @NoArgsConstructor(force = true)
-  @ToString
-  class RemoveModelVersionComment implements ModelVersionUpdateRequest {
-
-    /** {@inheritDoc} */
-    @Override
-    public ModelVersionChange modelVersionChange() {
-      return ModelVersionChange.removeComment();
     }
 
     /** Validates the fields of the request. Always pass. */

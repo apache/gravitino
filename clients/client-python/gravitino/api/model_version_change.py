@@ -76,35 +76,3 @@ class ModelVersionChange(ABC):
                 A string summary of this comment update operation.
             """
             return f"UpdateComment {self._new_comment}"
-
-    class RemoveComment:
-        """A model version change to remove the comment of the model version."""
-
-        def __init__(self):
-            pass
-
-        def __eq__(self, other):
-            """Compares this RemoveComment instance with another object for equality. Two instances are
-            considered equal if they designate the same new comment for the model version.
-            Args:
-                other: The object to compare with this instance.
-            Returns:
-                true if the given object represents an identical model version comment update operation;
-                false otherwise.
-            """
-            return isinstance(other, ModelVersionChange.RemoveComment)
-
-        def __hash__(self):
-            """Generates a hash code for this RemoveComment instance. The hash code is primarily based one
-            Returns:
-                A hash code value for this comment update operation.
-            """
-            return hash("RemoveComment")
-
-        def __str__(self):
-            """Provides a string representation of the RemoveComment instance. This string includes the
-            class name followed by the new comment of the model version.
-            Returns:
-                A string summary of this comment update operation.
-            """
-            return "RemoveComment"

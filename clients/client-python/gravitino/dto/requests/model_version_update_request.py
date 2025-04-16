@@ -61,17 +61,3 @@ class ModelVersionUpdateRequest:
 
         def model_version_change(self):
             return ModelVersionChange.update_comment(self._new_comment)
-
-    @dataclass
-    class RemoveModelVersionComment(ModelVersionUpdateRequestBase):
-        """Request to remove model version comment"""
-
-        def __init__(self):
-            super().__init__("removeComment")
-
-        def validate(self):
-            """Validates the fields of the request. Always pass."""
-            pass
-
-        def model_version_change(self):
-            return ModelVersionChange.remove_comment()

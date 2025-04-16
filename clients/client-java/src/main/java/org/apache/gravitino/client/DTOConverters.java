@@ -391,9 +391,6 @@ class DTOConverters {
       return new ModelVersionUpdateRequest.UpdateModelVersionComment(
           ((ModelVersionChange.UpdateComment) change).newComment());
 
-    } else if (change instanceof ModelVersionChange.RemoveComment) {
-      return new ModelVersionUpdateRequest.RemoveModelVersionComment();
-
     } else {
       throw new IllegalArgumentException(
           "Unknown model version change type: " + change.getClass().getSimpleName());

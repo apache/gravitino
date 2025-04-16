@@ -398,39 +398,6 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
   }
 
-  @Test
-  void testRemoveModelVersionComment() {
-    String schemaName = randomSchemaName();
-    String schemaComment = "schema which tests update";
-
-    String modelName = randomModelName();
-    String modelComment = "model which tests update";
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-
-    String versionUri = "s3://test-bucket/test-path/model.json";
-    String[] versionAliases = {"alias1", "alias2"};
-    String versionComment = "version which tests update";
-
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
-
-    NameIdentifier modelIdent =
-        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
-    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
-
-    modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUri, versionAliases, versionComment, props);
-    ModelVersionChange changeRemoveComment = ModelVersionChange.removeComment();
-    ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, "alias1");
-    ModelVersion alteredModelVersion =
-        modelOperationDispatcher.alterModelVersion(modelIdent, "alias1", changeRemoveComment);
-
-    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
-    Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
-    Assertions.assertNull(alteredModelVersion.comment());
-    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
-  }
-
   private String randomSchemaName() {
     return "schema_" + UUID.randomUUID().toString().replace("-", "");
   }

@@ -395,68 +395,6 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
-  void testLinkAndRemoveModelVersionCommentViaVersion() {
-    String modelName = RandomNameUtils.genRandomName("model1");
-    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
-    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
-
-    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
-
-    gravitinoCatalog
-        .asModelCatalog()
-        .linkModelVersion(modelIdent, "uri", new String[] {"alias1"}, "comment", properties);
-
-    ModelVersion modelVersion = gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
-
-    Assertions.assertEquals(0, modelVersion.version());
-    Assertions.assertEquals("uri", modelVersion.uri());
-    Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersion.aliases());
-    Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
-
-    ModelVersionChange updateComment = ModelVersionChange.removeComment();
-    ModelVersion updatedModelVersion =
-        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, 0, updateComment);
-
-    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
-    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
-    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
-    Assertions.assertNull(updatedModelVersion.comment());
-    Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
-  }
-
-  @Test
-  void testLinkAndRemoveModelVersionCommentViaAlias() {
-    String modelName = RandomNameUtils.genRandomName("model1");
-    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
-    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
-
-    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
-
-    gravitinoCatalog
-        .asModelCatalog()
-        .linkModelVersion(modelIdent, "uri", new String[] {"alias1"}, "comment", properties);
-
-    ModelVersion modelVersion =
-        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias1");
-    Assertions.assertEquals(0, modelVersion.version());
-    Assertions.assertEquals("uri", modelVersion.uri());
-    Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersion.aliases());
-    Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
-
-    ModelVersionChange updateComment = ModelVersionChange.removeComment();
-    ModelVersion updatedModelVersion =
-        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, "alias1", updateComment);
-
-    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
-    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
-    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
-    Assertions.assertNull(updatedModelVersion.comment());
-    Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
-  }
-
-  @Test
   public void testRegisterAndUpdateModel() {
     String comment = "comment";
     String modelName = RandomNameUtils.genRandomName("alter_name_model");
