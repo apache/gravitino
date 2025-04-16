@@ -41,8 +41,6 @@ public class EventBus {
    */
   private final List<EventListenerPlugin> eventListeners;
 
-  private final List<AsyncQueueListener> asyncQueueListeners;
-
   /**
    * Holds instances of {@link AsyncQueueListener}, mainly used to check the status of async queue,
    * like {@link #isHighWatermark()}.
