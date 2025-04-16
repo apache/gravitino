@@ -34,12 +34,17 @@ public interface ModelVersionChange {
    * Create a ModelVersionChange for updating the comment of a model version.
    *
    * @param newComment new comment to be set for the model version
-   * @return a new ModelVersionChange instance for updating the comment of a model version
+   * @return A new ModelVersionChange instance for updating the comment of a model version
    */
   static ModelVersionChange updateComment(String newComment) {
     return new ModelVersionChange.UpdateComment(newComment);
   }
 
+  /**
+   * Create a ModelVersionChange for removing the comment of a model version.
+   *
+   * @return A new ModelVersionChange instance for removing the comment of a model version
+   */
   static ModelVersionChange removeComment() {
     return RemoveComment.INSTANCE;
   }
