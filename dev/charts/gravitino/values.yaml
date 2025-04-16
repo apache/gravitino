@@ -1,0 +1,417 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+image:
+  repository: apache/gravitino
+  tag: 0.9.0-incubating-SNAPSHOT
+  pullPolicy: IfNotPresent
+  ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ## Example:
+  ## pullSecrets:
+  ##   - myRegistryKeySecretName
+  ##
+  pullSecrets: []
+
+## MySQL chart configuration
+## ref: https://github.com/bitnami/charts/blob/main/bitnami/mysql/values.yaml
+##
+mysql:
+  ## @param mysql.enabled Deploy MySQL container(s)
+  ##
+  enabled: false
+  ## Bitnami MySQL image version
+  ## ref: https://hub.docker.com/r/bitnami/mysql/tags/
+  ## @param image.registry MySQL image registry
+  ## @param image.repository MySQL image repository
+  ## @param image.tag MySQL image tag
+  ##
+  image:
+    tag: 8.0.36-debian-12-r12
+  ## @param initdbScriptsConfigMap ConfigMap with the initdb scripts
+  ##
+  initdbScriptsConfigMap: gravitino-mysql-init
+  ## MySQL Authentication parameters
+  ##
+  auth:
+    ## @param auth.rootPassword Password for the `root` user.
+    ##
+    rootPassword: admin
+    ## @param auth.createDatabase Whether to create the .Values.auth.database or not
+    ##
+    createDatabase: true
+    ## @param auth.database Name for a custom database to create
+    ##
+    database: gravitino
+    ## @param auth.username Name for a custom user to create
+    ##
+    username: gravitino
+    ## @param auth.password Password for the new user.
+    ##
+    password: gravitino
+
+## THE CONFIGURATION FOR Gravitino ENTITY STORE
+##
+entity:
+  ## The entity store to use, we only supports relational
+  ##
+  store: relational
+  maxTransactionSkewTimeMs: 2000
+  deleteAfterTimeMs: 604800000
+  versionRetentionCount: 1
+  ## The backend for the entity store, we only supports JDBC
+  ##
+  relationalBackend: JDBCBackend
+  ## The JDBC URL for the entity store
+  ##
+  jdbcUrl: jdbc:h2
+  ## The JDBC driver class name
+  ##
+  jdbcDriver: org.h2.Driver
+  ## The JDBC user name
+  ##
+  jdbcUser: gravitino
+  ## The JDBC password
+  ##
+  jdbcPassword: gravitino
+  storagePath: /root/gravitino/data/jdbc
+
+## THE CONFIGURATION FOR Gravitino SERVER
+##
+server:
+  shutdownTimeout: 3000
+  rest:
+    extensionPackages: ""
+## THE CONFIGURATION FOR Gravitino WEB SERVER
+##
+webserver:
+  ## The host name of the built-in web server
+  ##
+  host: 0.0.0.0
+  ## The http port number of the built-in web server
+  ##
+  httpPort: 8090
+  ## The min thread size of the built-in web server
+  ##
+  minThreads: 24
+  ## The max thread size of the built-in web server
+  ##
+  maxThreads: 200
+  ## The stop timeout of the built-in web server
+  ##
+  stopTimeout: 30000
+  ## The timeout of idle connections
+  ##
+  idleTimeout: 30000
+  ## The executor thread pool work queue size of the built-in web server
+  ##
+  threadPoolWorkQueueSize: 100
+  ## The request header size of the built-in web server
+  ##
+  requestHeaderSize: 131072
+  ## The response header size of the built-in web server
+  ##
+  responseHeaderSize: 131072
+  customFilters: ""
+
+## THE CONFIGURATION FOR Gravitino CATALOG
+##
+catalog:
+  ## The interval in milliseconds to evict the catalog cache
+  ##
+  cacheEvictionIntervalMs: 3600000
+
+## THE CONFIGURATION FOR authorization
+##
+authorization:
+  ## Whether Gravitino enable authorization or not
+  ##
+  enable: false
+  ## The admins of Gravitino service, multiple admins are spitted by comma.
+  ##
+  serviceAdmins: anonymous
+
+## THE CONFIGURATION FOR AUXILIARY SERVICE
+##
+auxService:
+  ## Auxiliary service names, separate by ','
+  ##
+  names: iceberg-rest
+
+icebergRest:
+  ## Iceberg REST service classpath
+  ##
+  classpath: "iceberg-rest-server/libs, iceberg-rest-server/conf"
+  ## Iceberg REST service host
+  ##
+  host: 0.0.0.0
+  ## Iceberg REST service http port
+  ##
+  httpPort: 9001
+  ## The backend Iceberg catalog for Iceberg REST service, it's recommended to change to hive or jdbc
+  ##
+  catalogBackend: memory
+  ## The warehouse directory of Iceberg catalog for Iceberg REST service
+  ##
+  warehouse: /tmp/
+
+## Authentication mechanisms configuration. Support simple, OAuth and Kerberos.
+##
+authenticators: simple
+
+## OAuth mode configuration
+##
+authenticator:
+  oauth:
+    serviceAudience: test
+    defaultSignKey: ""
+    serverUri: ""
+    tokenPath: /realms/myrealm/protocol/openid-connect/token
+
+## Audit log configuration
+##
+audit:
+  enabled: false
+  writer:
+    file:
+      fileName: gravitino_audit.log
+      flushIntervalSecs: 10
+      append: true
+
+## Metrics configuration
+##
+metrics:
+  timeSlidingWindowSecs: 60
+
+## Custom Gravitino configuration items
+##
+visibleConfigs: ""
+# visibleConfigs: "gravitino.datastrato.custom.authorization.ranger.admin.url,gravitino.datastrato.custom.authorization.ranger.username,gravitino.datastrato.custom.authorization.ranger.password,gravitino.datastrato.custom.authorization.ranger.auth.type"
+
+visibleConfigsItems: {}
+  # gravitino.datastrato.custom.authorization.ranger.admin.url: "http://ranger:6080"
+  # gravitino.datastrato.custom.authorization.ranger.username: admin
+  # gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
+  # gravitino.datastrato.custom.authorization.ranger.auth.type: simple
+
+## Additional Gravitino configuration items in gravitino.conf can be added
+##
+additionalConfigItems: {}
+#  gravitino.eventListener.names: "audit,sync"
+
+## Additional volumes
+##
+extraVolumes:
+  - name: gravitino-log
+    emptyDir: {}
+
+## Additional volume mounts
+##
+extraVolumeMounts:
+  - name: gravitino-log
+    mountPath: /root/gravitino/logs
+
+## ref: https://kubernetes.io/docs/concepts/storage/persistent-volumes/
+## If you set enabled as "True", you need :
+## - create a pv which above 10Gi
+## - keep storageClassName same with below setting
+##
+persistence:
+  enabled: false
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  labels: {}
+  annotations: {}
+  # existingClaim:
+  # storageClassName:
+
+## Whether redirect the log files to the container stdout and stderr
+##
+log:
+  containerStdout: false
+
+## Gravitino log4j2 configuration items in log4j2.properties can be customized
+##
+log4j2Properties: {}
+  # status: warn
+
+  ## Log files location
+  # basePath: "${sys:gravitino.log.path}"
+  # serverName: "${sys:gravitino.server.name}"
+
+  ## RollingFileAppender name, pattern, path and rollover policy
+  # rollingAppenderType: RollingFile
+  # rollingAppenderName: fileLogger
+  # rollingAppenderFileName: "${basePath}/${serverName}.log"
+  # rollingAppenderFilePattern: "${basePath}/${serverName}_%d{yyyyMMdd}.log.gz"
+  # rollingAppenderLayoutType: PatternLayout
+  # rollingAppenderLayoutPattern: "%d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] [%l] - %msg%n"
+  # rollingAppenderPoliciesType: Policies
+
+  ## RollingFileAppender rotation policy
+  # rollingAppenderPoliciesSizeType: SizeBasedTriggeringPolicy
+  # rollingAppenderPoliciesSizeSize: 10MB
+  # rollingAppenderPoliciesTimeType: TimeBasedTriggeringPolicy
+  # rollingAppenderPoliciesTimeInterval: 1
+  # rollingAppenderPoliciesTimeModulate: true
+  # rollingAppenderStrategyType: DefaultRolloverStrategy
+  # rollingAppenderStrategyDeleteType: Delete
+  # rollingAppenderStrategyDeleteBasePath: "${basePath}"
+  # rollingAppenderStrategyDeleteMaxDepth: 10
+  # rollingAppenderStrategyDeleteIfLastModifiedType: IfLastModified
+
+  ## Delete all files older than 30 days
+  # rollingAppenderStrategyDeleteIfLastModifiedAge: 30d
+
+  ## Configure root logger
+  # rootLoggerLevel: info
+  # rootLoggerAppenderRefRollingRef: fileLogger
+
+## Additional log4j2 configuration items in log4j2.properties can be added
+##
+additionalLog4j2Properties: {}
+  # appender.console.type: Console
+  # appender.console.name: console
+  # appender.console.layout.type: PatternLayout
+  # appender.console.layout.pattern: "%d{HH:mm:ss.SSS} %level %msg%n"
+  # rootLogger.appenderRef.console.ref: console
+
+## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
+## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.
+## ref: http://kubernetes.io/docs/user-guide/services/
+##
+service:
+  name: gravitino
+  type: ClusterIP
+  port: 8090
+  targetPort: 8090
+  annotations: {}
+  labels: {}
+  portName: http
+  nodePort: ""
+
+## Additional ports to the gravitino services. Useful to expose extra container ports.
+##
+extraExposePorts:
+  - port: 9001
+    protocol: TCP
+    name: http1
+    targetPort: 9001
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-gravitino.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-gravitino-tls
+  #    hosts:
+  #      - chart-gravitino.local
+
+## Deployment annotations
+##
+annotations: {}
+
+## Deployment replicas
+##
+replicas: 1
+
+## Pod Annotations
+##
+podAnnotations: {}
+
+## Pod Labels
+##
+podLabels: {}
+
+## Readiness probe for the Gravitino deployment
+##
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 20
+  timeoutSeconds: 5
+
+## Liveness probe for the Gravitino deployment
+##
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 20
+  timeoutSeconds: 5
+
+## Container-specific security context configuration
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+##
+containerSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+
+## Container Environment
+##
+env:
+  - name: GRAVITINO_HOME
+    value: /root/gravitino
+  - name: GRAVITINO_MEM
+    value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+
+## The envWithTpl array below has the same usage as "env", but is using the tpl function to support templatable string.
+## This can be useful when you want to pass dynamic values to the Chart using the helm argument "--set <variable>=<value>"
+## https://helm.sh/docs/howto/charts_tips_and_tricks/#using-the-tpl-function
+##
+envWithTpl: []
+#  - name: FOO_2
+#    value: "{{ .Values.foo2 }}"
+
+# foo2: bar2
+
+envFrom: []
+
+## Resource limits & requests
+##
+resources: {}
+#   requests:
+#     cpu: 1000m
+#     memory: 2Gi
+#   limits:
+#     cpu: 2000m
+#     memory: 3Gi
+
+## Node labels for pod assignment
+## ref: https://kubernetes.io/docs/user-guide/node-selection/
+##
+nodeSelector: {}
+
+## Tolerations for pod assignment
+## ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+##
+tolerations: []
+
+## Affinity for pod assignment (evaluated as template)
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+##
+affinity: {}
