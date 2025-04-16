@@ -86,6 +86,7 @@ class TestGravitinoVersion(unittest.TestCase):
         version2 = GravitinoVersion(VersionDTO("0.7.0", "2023-01-01", "1234567"))
 
         self.assertFalse(version1 > version2)
+        self.assertGreater(version2, version1)
 
         # test equal with suffix
         version1 = GravitinoVersion(
