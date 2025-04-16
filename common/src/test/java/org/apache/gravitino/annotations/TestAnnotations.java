@@ -22,9 +22,9 @@ package org.apache.gravitino.annotations;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.auth.annotations.AuthorizeResource;
+import org.apache.gravitino.auth.annotations.AuthorizeMetadata;
 import org.apache.gravitino.auth.annotations.ExpressionsAuthorizeApi;
-import org.apache.gravitino.auth.annotations.ResourceAuthorizeApi;
+import org.apache.gravitino.auth.annotations.MetadataAuthorizeApi;
 import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -34,13 +34,13 @@ public class TestAnnotations {
   // This class is used to test the AuthorizeResource annotation.
   static class TestResourceAnnotationClass {
 
-    public void methodWithAnnotatedParam(@AuthorizeResource("tableName") String table) {
+    public void methodWithAnnotatedParam(@AuthorizeMetadata("tableName") String table) {
       // dummy method
     }
 
     public void listSchemas(
-        @AuthorizeResource("metalake") String metalake,
-        @AuthorizeResource("catalog") String catalog) {
+        @AuthorizeMetadata("metalake") String metalake,
+        @AuthorizeMetadata("catalog") String catalog) {
       // dummy method
     }
   }
@@ -49,9 +49,9 @@ public class TestAnnotations {
   // 1. ResourceAuthorizeApi
   // 2. ExpressionsAuthorizeApi
   static class TestAuthorizeAnnotationClass {
-    @ResourceAuthorizeApi(
+    @MetadataAuthorizeApi(
         privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
-        resourceType = MetadataObject.Type.CATALOG)
+        metadataType = MetadataObject.Type.CATALOG)
     public void testAuthedMethodUseResourceType() {}
 
     @ExpressionsAuthorizeApi(expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE")
@@ -63,16 +63,16 @@ public class TestAnnotations {
     Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
     Method method = testClass.getMethod("testAuthedMethodUseResourceType");
 
-    boolean hasAnnotation = method.isAnnotationPresent(ResourceAuthorizeApi.class);
+    boolean hasAnnotation = method.isAnnotationPresent(MetadataAuthorizeApi.class);
     Assertions.assertTrue(hasAnnotation);
 
-    ResourceAuthorizeApi annotation = method.getAnnotation(ResourceAuthorizeApi.class);
+    MetadataAuthorizeApi annotation = method.getAnnotation(MetadataAuthorizeApi.class);
     Assertions.assertNotNull(annotation);
 
     Assertions.assertArrayEquals(
         new Privilege.Name[] {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
         annotation.privileges());
-    Assertions.assertEquals(MetadataObject.Type.CATALOG, annotation.resourceType());
+    Assertions.assertEquals(MetadataObject.Type.CATALOG, annotation.metadataType());
   }
 
   @Test
@@ -95,7 +95,7 @@ public class TestAnnotations {
     Parameter argument =
         TestResourceAnnotationClass.class.getMethod("methodWithAnnotatedParam", String.class)
             .getParameters()[0];
-    AuthorizeResource annotation = argument.getAnnotation(AuthorizeResource.class);
+    AuthorizeMetadata annotation = argument.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(annotation);
     Assertions.assertEquals("tableName", annotation.value());
   }
@@ -108,12 +108,12 @@ public class TestAnnotations {
             .getParameters();
 
     Parameter argumentMetalake = arguments[0];
-    AuthorizeResource metalakeAnnotation = argumentMetalake.getAnnotation(AuthorizeResource.class);
+    AuthorizeMetadata metalakeAnnotation = argumentMetalake.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(metalakeAnnotation);
     Assertions.assertEquals("metalake", metalakeAnnotation.value());
 
     Parameter argumentCatalog = arguments[1];
-    AuthorizeResource catalogAnnotation = argumentCatalog.getAnnotation(AuthorizeResource.class);
+    AuthorizeMetadata catalogAnnotation = argumentCatalog.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(catalogAnnotation);
     Assertions.assertEquals("catalog", catalogAnnotation.value());
   }

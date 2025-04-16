@@ -16,36 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.auth.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
 
-/**
- * Defines the annotation for authorizing access to an API. Use the resourceType and privileges
- * fields to define the required privileges and resource type for the API.
- *
- * @author pancx
- */
-@Target({ElementType.METHOD})
+/** This annotation identify which parameters in the request are to be used for authorization. */
+@Target({ElementType.PARAMETER, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface ResourceAuthorizeApi {
+public @interface AuthorizeMetadata {
   /**
-   * The list of privileges required to access the API.
+   * The name of the parameter to be used for authorization.
    *
-   * @return the list of privileges required to access the API.
+   * @return the name of the parameter to be used for authorization.
    */
-  Privilege.Name[] privileges();
-
-  /**
-   * The resource type of the API.
-   *
-   * @return the resource type of the API.
-   */
-  MetadataObject.Type resourceType();
+  String value();
 }

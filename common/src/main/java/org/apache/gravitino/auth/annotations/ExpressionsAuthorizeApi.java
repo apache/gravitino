@@ -26,8 +26,6 @@ import java.lang.annotation.Target;
 /**
  * This annotation is used to implement unified authentication in AOP. Use Expressions to define the
  * required privileges for an API.
- *
- * @author pancx
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
