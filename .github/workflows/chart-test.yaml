@@ -55,7 +55,7 @@ jobs:
       - name: List changed
         id: list-changed
         run: |
-          changed=$(ct list-changed --chart-dirs=dev/charts --target-branch ${{ github.event.repository.default_branch }})
+          changed=$(ct list-changed --chart-dirs=dev/charts --target-branch ${{ github.event.pull_request.base.ref }})
           if [[ -n "$changed" ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
@@ -64,7 +64,7 @@ jobs:
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          ct lint --chart-dirs=dev/charts --chart-yaml-schema=dev/ci/chart_schema.yaml --lint-conf=dev/ci/lintconf.yaml --target-branch ${{ github.event.repository.default_branch }} 
+          ct lint --chart-dirs=dev/charts --chart-yaml-schema=dev/ci/chart_schema.yaml --lint-conf=dev/ci/lintconf.yaml --target-branch ${{ github.event.pull_request.base.ref }} 
 
       - name: Set up kind cluster
         if: steps.list-changed.outputs.changed == 'true'
@@ -78,8 +78,8 @@ jobs:
 
       - name: Run chart-testing (install default)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts --target-branch ${{ github.event.repository.default_branch }}
+        run: ct install --chart-dirs=dev/charts --target-branch ${{ github.event.pull_request.base.ref }}
 
       - name: Run chart-testing (install mysql enable)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml" --target-branch ${{ github.event.repository.default_branch }}
+        run: ct install --chart-dirs=dev/charts --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml" --target-branch ${{ github.event.pull_request.base.ref }}
