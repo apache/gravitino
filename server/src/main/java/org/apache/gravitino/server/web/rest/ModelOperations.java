@@ -38,6 +38,8 @@ import org.apache.gravitino.dto.requests.ModelRegisterRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
+import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelVersionUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
@@ -49,6 +51,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -402,6 +405,97 @@ public class ModelOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleModelException(
           OperationType.DELETE, aliasString(model, alias), schema, e);
+    }
+  }
+
+  @PUT
+  @Path("{model}/versions/{version}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-model-version", absolute = true)
+  public Response alterModelVersion(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      @PathParam("model") String model,
+      @PathParam("version") int version,
+      ModelVersionUpdatesRequest request) {
+    LOG.info(
+        "Received alter model version request: {}.{}.{}.{}.{}",
+        metalake,
+        catalog,
+        schema,
+        model,
+        version);
+    request.validate();
+
+    try {
+      NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
+
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            ModelVersionChange[] changes =
+                request.getUpdates().stream()
+                    .map(ModelVersionUpdateRequest::modelVersionChange)
+                    .toArray(ModelVersionChange[]::new);
+
+            ModelVersion modelVersion =
+                modelDispatcher.alterModelVersion(modelId, version, changes);
+            Response response =
+                Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(modelVersion)));
+            LOG.info("Model version got: {}.{}", modelId, version);
+            return response;
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER, versionString(model, version), schema, e);
+    }
+  }
+
+  @PUT
+  @Path("{model}/aliases/{alias}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "alter-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "alter-model-alias", absolute = true)
+  public Response alterModelVersionByAlias(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      @PathParam("model") String model,
+      @PathParam("alias") String alias,
+      ModelVersionUpdatesRequest request) {
+    LOG.info(
+        "Received alter model version request: {}.{}.{}.{}.{}",
+        metalake,
+        catalog,
+        schema,
+        model,
+        alias);
+    request.validate();
+
+    try {
+      NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            ModelVersionChange[] changes =
+                request.getUpdates().stream()
+                    .map(ModelVersionUpdateRequest::modelVersionChange)
+                    .toArray(ModelVersionChange[]::new);
+
+            ModelVersion modelVersion = modelDispatcher.alterModelVersion(modelId, alias, changes);
+            Response response =
+                Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(modelVersion)));
+            LOG.info("Model version got: {}.{}", modelId, alias);
+            return response;
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER, aliasString(model, alias), schema, e);
     }
   }
 

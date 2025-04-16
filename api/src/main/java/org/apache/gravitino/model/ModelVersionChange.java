@@ -40,7 +40,11 @@ public interface ModelVersionChange {
     return new ModelVersionChange.UpdateComment(newComment);
   }
 
-  /** A ModelVersionChange to update the modelve version comment. */
+  static ModelVersionChange removeComment() {
+    return RemoveComment.INSTANCE;
+  }
+
+  /** A ModelVersionChange to update the model version comment. */
   final class UpdateComment implements ModelVersionChange {
 
     private final String newComment;
@@ -99,6 +103,57 @@ public interface ModelVersionChange {
     @Override
     public String toString() {
       return "UpdateComment " + newComment;
+    }
+  }
+
+  /** A ModelVersionChange to remove the comment of a model version. */
+  final class RemoveComment implements ModelVersionChange {
+    private static final ModelVersionChange.RemoveComment INSTANCE =
+        new ModelVersionChange.RemoveComment();
+
+    /**
+     * Retrieves the singleton instance of {@link RemoveComment}.
+     *
+     * @return the singleton instance of {@link RemoveComment}
+     */
+    public static ModelVersionChange.RemoveComment getInstance() {
+      return INSTANCE;
+    }
+
+    /**
+     * Compares this RemoveComment instance with another object for equality. Two instances are
+     * considered equal if they are RemoveComment instance.
+     *
+     * @param obj The object to compare with this instance.
+     * @return {@code true} if the given object represents remove comment change; {@code false}
+     *     otherwise.
+     */
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == this) return true;
+      return obj instanceof RemoveComment;
+    }
+
+    /**
+     * Generates a hash code for this RemoveComment instance. The hash code is based on the
+     * RemoveComment instance name.
+     *
+     * @return A hash code value for instance.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash("REMOVECOMMENT");
+    }
+
+    /**
+     * Returns a string representation of the {@link RemoveComment} instance. This string format
+     * includes the class name.
+     *
+     * @return A string summary of the {@link RemoveComment} instance.
+     */
+    @Override
+    public String toString() {
+      return "REMOVECOMMENT";
     }
   }
 }

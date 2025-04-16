@@ -895,6 +895,100 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
   }
 
+  @Test
+  void testRemoveVersionComment() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model1";
+    String modelComment = "model1 comment";
+
+    String versionComment = "version1 comment";
+    String versionUri = "model_version_path";
+    String[] versionAliases = new String[] {"alias1", "alias2"};
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
+
+    ops.registerModel(modelIdent, modelComment, properties);
+    StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
+
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
+
+    // validate loaded model
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(1, loadedModel.latestVersion());
+
+    // validate loaded version
+    ModelVersion loadedVersion = ops.getModelVersion(modelIdent, 0);
+    Assertions.assertEquals(0, loadedVersion.version());
+    Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
+    Assertions.assertEquals(versionComment, loadedVersion.comment());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
+    Assertions.assertEquals(versionProperties, loadedVersion.properties());
+
+    // remove comment
+    ModelVersionChange change = ModelVersionChange.removeComment();
+    ModelVersion alteredModelVersion = ops.alterModelVersion(modelIdent, 0, change);
+
+    // validate altered model
+    Assertions.assertEquals(0, alteredModelVersion.version());
+    Assertions.assertNull(alteredModelVersion.comment());
+    Assertions.assertEquals(versionUri, alteredModelVersion.uri());
+    Assertions.assertEquals(versionProperties, alteredModelVersion.properties());
+    Assertions.assertArrayEquals(versionAliases, alteredModelVersion.aliases());
+  }
+
+  @Test
+  void testRemoveVersionCommentByAlias() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model1";
+    String modelComment = "model1 comment";
+
+    String versionComment = "version1 comment";
+    String versionUri = "model_version_path";
+    String[] versionAliases = new String[] {"alias1", "alias2"};
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
+
+    ops.registerModel(modelIdent, modelComment, properties);
+    StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
+
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
+
+    // validate loaded model
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(1, loadedModel.latestVersion());
+
+    // validate loaded version
+    ModelVersion loadedVersion = ops.getModelVersion(modelIdent, 0);
+    Assertions.assertEquals(0, loadedVersion.version());
+    Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
+    Assertions.assertEquals(versionComment, loadedVersion.comment());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
+    Assertions.assertEquals(versionProperties, loadedVersion.properties());
+
+    // remove comment
+    ModelVersionChange change = ModelVersionChange.removeComment();
+    ModelVersion alteredModelVersion = ops.alterModelVersion(modelIdent, "alias1", change);
+
+    // validate altered model
+    Assertions.assertEquals(0, alteredModelVersion.version());
+    Assertions.assertNull(alteredModelVersion.comment());
+    Assertions.assertEquals(versionUri, alteredModelVersion.uri());
+    Assertions.assertEquals(versionProperties, alteredModelVersion.properties());
+    Assertions.assertArrayEquals(versionAliases, alteredModelVersion.aliases());
+  }
+
   private String randomSchemaName() {
     return "schema_" + UUID.randomUUID().toString().replace("-", "");
   }
