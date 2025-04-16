@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -29,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
@@ -61,6 +63,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestGvfsBase extends GravitinoMockServerBase {
@@ -158,7 +161,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               ((GravitinoVirtualFileSystem) gravitinoFileSystem)
                   .internalFileSystemCache()
                   .getIfPresent(
-                      NameIdentifier.of(metalakeName, catalogName, schemaName, "testFSCache")));
+                      Pair.of(
+                          NameIdentifier.of(metalakeName, catalogName, schemaName, "testFSCache"),
+                          null)));
 
       String anotherFilesetName = "test_new_fs";
       Path diffLocalPath =
@@ -212,21 +217,25 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertNull(
           ((GravitinoVirtualFileSystem) fs)
               .internalFileSystemCache()
-              .getIfPresent(NameIdentifier.of("file")));
+              .getIfPresent(Pair.of(NameIdentifier.of("file"), null)));
     }
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testCreate(boolean withScheme) throws IOException {
-    String filesetName = "testCreate";
+  @CsvSource({
+    "true, testCreate",
+    "false, testCreate",
+    "true, testCreate%2Fabc",
+    "false, testCreate%2Fabc"
+  })
+  public void testCreate(boolean withScheme, String filesetName) throws IOException {
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
     Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
     String locationPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
@@ -268,17 +277,21 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
+  @CsvSource({
+    "true, testAppend",
+    "false, testAppend",
+    "true, testAppend%2Fabc",
+    "false, testAppend%2Fabc"
+  })
   @Disabled("Append operation is not supported in LocalFileSystem. We can't test it now.")
-  public void testAppend(boolean withScheme) throws IOException {
-    String filesetName = "testAppend";
+  public void testAppend(boolean withScheme, String filesetName) throws IOException {
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
     Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
     String locationPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
@@ -341,7 +354,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                 .comment("comment")
                 .type(Fileset.Type.MANAGED)
                 .audit(AuditDTO.builder().build())
-                .storageLocation(filesetLocation.toString())
+                .storageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, filesetLocation))
                 .build());
     CredentialResponse credentialResponse = new CredentialResponse(new CredentialDTO[] {});
 
@@ -351,16 +364,20 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testRename(boolean withScheme) throws IOException {
-    String filesetName = "testRename";
+  @CsvSource({
+    "true, testRename",
+    "false, testRename",
+    "true, testRename%2Fabc",
+    "false, testRename%2Fabc"
+  })
+  public void testRename(boolean withScheme, String filesetName) throws IOException {
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
     Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
     String locationPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
@@ -429,16 +446,20 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testDelete(boolean withScheme) throws IOException {
-    String filesetName = "testDelete";
+  @CsvSource({
+    "true, testDelete",
+    "false, testDelete",
+    "true, testDelete%2Fabc",
+    "false, testDelete%2Fabc"
+  })
+  public void testDelete(boolean withScheme, String filesetName) throws IOException {
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
     Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
     String locationPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
@@ -478,16 +499,16 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  @Test
-  public void testGetStatus() throws IOException {
-    String filesetName = "testGetStatus";
+  @ParameterizedTest
+  @ValueSource(strings = {"testGetFileStatus", "testGetFileStatus%2Fabc"})
+  public void testGetStatus(String filesetName) throws IOException {
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
     Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
     String locationPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
@@ -516,16 +537,16 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  @Test
-  public void testListStatus() throws IOException {
-    String filesetName = "testListStatus";
+  @ParameterizedTest
+  @ValueSource(strings = {"testListStatus", "testListStatus%2Fabc"})
+  public void testListStatus(String filesetName) throws IOException {
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
     Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
     String locationPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
@@ -572,16 +593,16 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  @Test
-  public void testMkdirs() throws IOException {
-    String filesetName = "testMkdirs";
+  @ParameterizedTest
+  @ValueSource(strings = {"testMkdirs", "testMkdirs%2Fabc"})
+  public void testMkdirs(String filesetName) throws IOException {
     Path managedFilesetPath =
         FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
     Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
     String locationPath =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
-            metalakeName, catalogName, schemaName, filesetName);
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
     try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(conf);
         FileSystem localFileSystem = localPath.getFileSystem(conf)) {
       FileSystemTestUtils.mkdirs(localPath, localFileSystem);
@@ -628,40 +649,41 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     try (GravitinoVirtualFileSystem fs =
         (GravitinoVirtualFileSystem) managedFilesetPath.getFileSystem(conf)) {
       NameIdentifier identifier =
-          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1"));
+          extractIdentifier(metalakeName, "gvfs://fileset/catalog1/schema1/fileset1");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier);
 
       NameIdentifier identifier2 =
-          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/"));
+          extractIdentifier(metalakeName, "gvfs://fileset/catalog1/schema1/fileset1/");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier2);
 
       NameIdentifier identifier3 =
-          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/files"));
+          extractIdentifier(metalakeName, "gvfs://fileset/catalog1/schema1/fileset1/files");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier3);
 
       NameIdentifier identifier4 =
-          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir"));
+          extractIdentifier(metalakeName, "gvfs://fileset/catalog1/schema1/fileset1/dir/dir");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier4);
 
       NameIdentifier identifier5 =
-          fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1/dir/dir/"));
+          extractIdentifier(metalakeName, "gvfs://fileset/catalog1/schema1/fileset1/dir/dir/");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier5);
 
-      NameIdentifier identifier6 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1"));
+      NameIdentifier identifier6 = extractIdentifier(metalakeName, "/catalog1/schema1/fileset1");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier6);
 
-      NameIdentifier identifier7 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/"));
+      NameIdentifier identifier7 = extractIdentifier(metalakeName, "/catalog1/schema1/fileset1/");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier7);
 
-      NameIdentifier identifier8 = fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir"));
+      NameIdentifier identifier8 =
+          extractIdentifier(metalakeName, "/catalog1/schema1/fileset1/dir");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier8);
 
       NameIdentifier identifier9 =
-          fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir/"));
+          extractIdentifier(metalakeName, "/catalog1/schema1/fileset1/dir/dir/");
       assertEquals(NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier9);
 
       NameIdentifier identifier10 =
-          fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir/dir"));
+          extractIdentifier(metalakeName, "/catalog1/schema1/fileset1/dir/dir");
       assertEquals(
           NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier10);
 
@@ -669,29 +691,35 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       for (int i = 0; i < 1500; i++) {
         longUri.append("/dir");
       }
-      NameIdentifier identifier11 = fs.extractIdentifier(new URI(longUri.toString()));
+      NameIdentifier identifier11 = extractIdentifier(metalakeName, longUri.toString());
       assertEquals(
           NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier11);
 
-      NameIdentifier identifier12 = fs.extractIdentifier(new URI(longUri.delete(0, 14).toString()));
+      NameIdentifier identifier12 =
+          extractIdentifier(metalakeName, longUri.delete(0, 14).toString());
       assertEquals(
           NameIdentifier.of(metalakeName, "catalog1", "schema1", "fileset1"), identifier12);
 
+      NameIdentifier identifier13 =
+          extractIdentifier(metalakeName, "gvfs://fileset/catalog1/schema1/abc%2Fdef%2Fghi");
+      assertEquals(
+          NameIdentifier.of(metalakeName, "catalog1", "schema1", "abc%2Fdef%2Fghi"), identifier13);
+
       assertThrows(
           IllegalArgumentException.class,
-          () -> fs.extractIdentifier(new URI("gvfs://fileset/catalog1/")));
+          () -> extractIdentifier(metalakeName, "gvfs://fileset/catalog1/"));
       assertThrows(
           IllegalArgumentException.class,
-          () -> fs.extractIdentifier(new URI("hdfs://fileset/catalog1/schema1/fileset1")));
+          () -> extractIdentifier(metalakeName, "hdfs://fileset/catalog1/schema1/fileset1"));
       assertThrows(
           IllegalArgumentException.class,
-          () -> fs.extractIdentifier(new URI("/catalog1/schema1/")));
+          () -> extractIdentifier(metalakeName, "/catalog1/schema1/"));
       assertThrows(
           IllegalArgumentException.class,
-          () -> fs.extractIdentifier(new URI("gvfs://fileset/catalog1/schema1/fileset1//")));
+          () -> extractIdentifier(metalakeName, "gvfs://fileset/catalog1/schema1/fileset1//"));
       assertThrows(
           IllegalArgumentException.class,
-          () -> fs.extractIdentifier(new URI("/catalog1/schema1/fileset1/dir//")));
+          () -> extractIdentifier(metalakeName, "/catalog1/schema1/fileset1/dir//"));
     }
   }
 

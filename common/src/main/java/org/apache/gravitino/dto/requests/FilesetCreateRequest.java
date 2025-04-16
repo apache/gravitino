@@ -57,6 +57,10 @@ public class FilesetCreateRequest implements RESTRequest {
   private String storageLocation;
 
   @Nullable
+  @JsonProperty("storageLocations")
+  private Map<String, String> storageLocations;
+
+  @Nullable
   @JsonProperty("properties")
   private Map<String, String> properties;
 
