@@ -17,14 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino.audit.annotations;
+package org.apache.gravitino.server.authorization.annotations;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.auth.annotations.AuthorizeMetadata;
-import org.apache.gravitino.auth.annotations.ExpressionsAuthorizeApi;
-import org.apache.gravitino.auth.annotations.MetadataAuthorizeApi;
 import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -34,13 +31,14 @@ public class TestAnnotations {
   // This class is used to test the AuthorizeResource annotation.
   static class TestResourceAnnotationClass {
 
-    public void methodWithAnnotatedParam(@AuthorizeMetadata("tableName") String table) {
+    public void methodWithAnnotatedParam(
+        @AuthorizeMetadata(MetadataObject.Type.TABLE) String table) {
       // dummy method
     }
 
     public void listSchemas(
-        @AuthorizeMetadata("metalake") String metalake,
-        @AuthorizeMetadata("catalog") String catalog) {
+        @AuthorizeMetadata(MetadataObject.Type.METALAKE) String metalake,
+        @AuthorizeMetadata(MetadataObject.Type.CATALOG) String catalog) {
       // dummy method
     }
   }
@@ -97,7 +95,7 @@ public class TestAnnotations {
             .getParameters()[0];
     AuthorizeMetadata annotation = argument.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(annotation);
-    Assertions.assertEquals("tableName", annotation.value());
+    Assertions.assertEquals(MetadataObject.Type.TABLE, annotation.value());
   }
 
   @Test
@@ -110,11 +108,11 @@ public class TestAnnotations {
     Parameter argumentMetalake = arguments[0];
     AuthorizeMetadata metalakeAnnotation = argumentMetalake.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(metalakeAnnotation);
-    Assertions.assertEquals("metalake", metalakeAnnotation.value());
+    Assertions.assertEquals(MetadataObject.Type.METALAKE, metalakeAnnotation.value());
 
     Parameter argumentCatalog = arguments[1];
     AuthorizeMetadata catalogAnnotation = argumentCatalog.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(catalogAnnotation);
-    Assertions.assertEquals("catalog", catalogAnnotation.value());
+    Assertions.assertEquals(MetadataObject.Type.CATALOG, catalogAnnotation.value());
   }
 }
