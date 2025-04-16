@@ -37,7 +37,7 @@ public class MetadataFilterHelper {
    * @param resourceType for example, CATALOG, SCHEMA,TABLE, etc.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @param metadataList metaData list.
-   * @param resourceIdExtractor extract the resource id from list items.
+   * @param metadataIdExtractor extract the metadata id from list items.
    * @return metadata List that the user has permission to access.
    * @param <E> metadata object.
    */
@@ -45,7 +45,7 @@ public class MetadataFilterHelper {
       String resourceType,
       String privilege,
       List<E> metadataList,
-      Function<E, Long> resourceIdExtractor) {
+      Function<E, Long> metadataIdExtractor) {
     return null;
   }
 
@@ -54,14 +54,14 @@ public class MetadataFilterHelper {
    *
    * @param expression authorization expression
    * @param metadataList metaData list.
-   * @param resourceContextExtractor extract the resource context from list items.
+   * @param metadataContextExtractor extract the metadata context from list items.
    * @return metadata List that the user has permission to access.
    * @param <E> metadata object.
    */
   public static <E> List<E> filterByExpression(
       String expression,
       List<E> metadataList,
-      Function<E, Map<String, Long>> resourceContextExtractor) {
+      Function<E, Map<String, Long>> metadataContextExtractor) {
     return null;
   }
 }

@@ -47,18 +47,6 @@ public class NameIdentifierUtil {
   private NameIdentifierUtil() {}
 
   /**
-   * Create a NameIdentifier for any metadata type
-   *
-   * @param metadataType metadataType
-   * @param metadataNames metadata names, such as metalake-a,catalog-b,schema-c
-   * @return NameIdentifier
-   */
-  public static NameIdentifier of(
-      MetadataObject.Type metadataType, Map<String, String> metadataNames) {
-    return null;
-  }
-
-  /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
    *
    * @param metalake The metalake name

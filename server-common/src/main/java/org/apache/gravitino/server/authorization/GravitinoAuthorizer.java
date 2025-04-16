@@ -33,11 +33,11 @@ public interface GravitinoAuthorizer {
    * Perform authorization and return the authorization result.
    *
    * @param userId the user id in use_meta table
-   * @param resourceType for example, CATALOG, SCHEMA,TABLE, etc.
-   * @param resourceId the resource id.
+   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param metadataId the metadata id.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @return authorization result.
    */
   boolean authorize(
-      long userId, MetadataObject.Type resourceType, long resourceId, Privilege.Name privilege);
+      long userId, MetadataObject.Type metadataType, long metadataId, Privilege.Name privilege);
 }
