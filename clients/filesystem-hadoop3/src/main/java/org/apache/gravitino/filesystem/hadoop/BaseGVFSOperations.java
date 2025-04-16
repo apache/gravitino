@@ -100,7 +100,6 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseGVFSOperations implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(BaseGVFSOperations.class);
   private static final String SLASH = "/";
-  private static final String ENV_CURRENT_LOCATION_NAME = "CURRENT_LOCATION_NAME";
   private static final Set<String> CATALOG_NECESSARY_PROPERTIES_TO_KEEP =
       Sets.newHashSet(
           OSSProperties.GRAVITINO_OSS_ENDPOINT,
