@@ -25,8 +25,7 @@ import sys
 import time
 from enum import Enum
 from pathlib import PurePosixPath
-from typing import Dict, Tuple, List
-
+from typing import Dict, Tuple, List, Optional
 import fsspec
 from cachetools import TTLCache, LRUCache
 from fsspec import AbstractFileSystem
@@ -54,6 +53,9 @@ from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_fileset import GenericFileset
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
+    NoSuchCatalogException,
+    CatalogNotInUseException,
+    NoSuchFilesetException,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_utils import (
@@ -77,6 +79,10 @@ class StorageType(Enum):
     S3A = "s3a"
     OSS = "oss"
     ABS = "abfss"
+
+
+class FilesetPathNotFoundError(FileNotFoundError):
+    """Exception raised when the catalog, schema or fileset is not found in the GVFS path."""
 
 
 class FilesetContextPair:
@@ -173,6 +179,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.LIST_STATUS
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.LIST_STATUS
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         pre_process_path: str = self._pre_process_path(path)
@@ -216,6 +226,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.GET_FILE_STATUS
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.GET_FILE_STATUS
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         pre_process_path: str = self._pre_process_path(path)
@@ -240,6 +254,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.EXISTS
         )
+        if context_pair is None:
+            return False
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         return context_pair.filesystem().exists(
@@ -264,6 +281,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         src_context_pair: FilesetContextPair = self._get_fileset_context(
             src_path, FilesetDataOperation.COPY_FILE
         )
+        self._throw_fileset_path_not_found_error_if(
+            src_context_pair is None, src_path, FilesetDataOperation.COPY_FILE
+        )
+
         src_actual_path = src_context_pair.actual_file_location()
 
         dst_context_pair: FilesetContextPair = self._get_fileset_context(
@@ -296,11 +317,17 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                 f"Destination file path identifier: `{dst_identifier}`"
                 f" should be same with src file path identifier: `{src_identifier}`."
             )
+
         src_context_pair: FilesetContextPair = self._get_fileset_context(
             src_path, FilesetDataOperation.RENAME
         )
+        self._throw_fileset_path_not_found_error_if(
+            src_context_pair is None, src_path, FilesetDataOperation.RENAME
+        )
+
         src_actual_path = src_context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(src_actual_path)
+
         dst_context_pair: FilesetContextPair = self._get_fileset_context(
             dst_path, FilesetDataOperation.RENAME
         )
@@ -350,6 +377,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.DELETE
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.DELETE
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         fs = context_pair.filesystem()
@@ -371,6 +402,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.DELETE
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.DELETE
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         context_pair.filesystem().rm_file(
@@ -386,6 +421,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.DELETE
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.DELETE
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         context_pair.filesystem().rmdir(
@@ -416,9 +455,20 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             data_operation = FilesetDataOperation.OPEN_AND_APPEND
         else:
             data_operation = FilesetDataOperation.OPEN
+
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, data_operation
         )
+        if context_pair is None:
+            if mode in ("w", "wb", "x", "xb", "a", "ab"):
+                raise OSError(
+                    f"Fileset is not found for path: {path} for operation OPEN. This "
+                    f"may be caused by fileset related metadata not found or not in use "
+                    f"in Gravitino,"
+                )
+
+            raise FilesetPathNotFoundError(f"Path {path} not found for operation OPEN.")
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         return context_pair.filesystem().open(
@@ -441,6 +491,13 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.MKDIRS
         )
+        if context_pair is None:
+            raise OSError(
+                f"Fileset is not found for path: {path} for operation MKDIRS. This "
+                f"may be caused by fileset related metadata not found or not in use "
+                f"in Gravitino,"
+            )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         context_pair.filesystem().mkdir(
@@ -457,6 +514,13 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.MKDIRS
         )
+        if context_pair is None:
+            raise OSError(
+                f"Fileset is not found for path: {path} for operation MKDIRS. This "
+                f"may be caused by fileset related metadata not found or not in use "
+                f"in Gravitino,"
+            )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         context_pair.filesystem().makedirs(
@@ -473,6 +537,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.CREATED_TIME
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.CREATED_TIME
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         if storage_type == StorageType.LOCAL:
@@ -491,6 +559,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.MODIFIED_TIME
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.MODIFIED_TIME
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         return context_pair.filesystem().modified(
@@ -508,6 +580,10 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         context_pair: FilesetContextPair = self._get_fileset_context(
             path, FilesetDataOperation.CAT_FILE
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, path, FilesetDataOperation.CAT_FILE
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         return context_pair.filesystem().cat_file(
@@ -531,9 +607,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             raise GravitinoRuntimeException(
                 "Doesn't support copy a remote gvfs file to an another remote file."
             )
+
         context_pair: FilesetContextPair = self._get_fileset_context(
             rpath, FilesetDataOperation.GET_FILE
         )
+        self._throw_fileset_path_not_found_error_if(
+            context_pair is None, rpath, FilesetDataOperation.GET_FILE
+        )
+
         actual_path = context_pair.actual_file_location()
         storage_type = self._recognize_storage_type(actual_path)
         context_pair.filesystem().get_file(
@@ -658,7 +739,9 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             "mtime": last_modified,
         }
 
-    def _get_fileset_context(self, virtual_path: str, operation: FilesetDataOperation):
+    def _get_fileset_context(
+        self, virtual_path: str, operation: FilesetDataOperation
+    ) -> Optional[FilesetContextPair]:
         """Get a fileset context from the cache or the Gravitino server
         :param virtual_path: The virtual path
         :param operation: The data operation
@@ -669,7 +752,17 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         catalog_ident: NameIdentifier = NameIdentifier.of(
             self._metalake, identifier.namespace().level(1)
         )
-        fileset_catalog = self._get_fileset_catalog(catalog_ident)
+
+        try:
+            fileset_catalog = self._get_fileset_catalog(catalog_ident)
+        except (NoSuchCatalogException, CatalogNotInUseException):
+            logger.warning(
+                "Cannot get fileset catalog by identifier: %s",
+                catalog_ident,
+                exc_info=True,
+            )
+            return None
+
         if fileset_catalog is None:
             raise GravitinoRuntimeException(
                 f"Loaded fileset catalog: {catalog_ident} is null."
@@ -681,13 +774,23 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
         }
         caller_context: CallerContext = CallerContext(context)
         CallerContextHolder.set(caller_context)
-        actual_file_location: (
-            str
-        ) = fileset_catalog.as_fileset_catalog().get_file_location(
-            NameIdentifier.of(identifier.namespace().level(2), identifier.name()),
-            sub_path,
-            self._current_location_name,
-        )
+
+        try:
+            actual_file_location: (
+                str
+            ) = fileset_catalog.as_fileset_catalog().get_file_location(
+                NameIdentifier.of(identifier.namespace().level(2), identifier.name()),
+                sub_path,
+                self._current_location_name,
+            )
+        except NoSuchFilesetException:
+            logger.warning(
+                "Cannot get file location by identifier: %s, sub_path: %s",
+                identifier,
+                sub_path,
+                exc_info=True,
+            )
+            return None
 
         return FilesetContextPair(
             actual_file_location,
@@ -1164,6 +1267,14 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
             )
         )
         return time.time() * 1000 + (expire_time - time.time() * 1000) * ratio
+
+    def _throw_fileset_path_not_found_error_if(
+        self, condition: bool, path: str, op: FilesetDataOperation
+    ):
+        if condition:
+            raise FilesetPathNotFoundError(
+                f"Path [{path}] not found for operation [{op}]"
+            )
 
 
 fsspec.register_implementation(PROTOCOL_NAME, GravitinoVirtualFileSystem)
