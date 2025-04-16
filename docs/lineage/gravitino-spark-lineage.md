@@ -47,7 +47,16 @@ When accessing datasets by location (e.g., `SELECT * FROM parquet.$dataset_path`
 | GVFS location  | `$GravitinoCatalogName.$schemaName.$filesetName` | `fileset_catalog.schema.fileset_a`    | 0.9.0         |
 | Other location | location path                                    | `hdfs://127.0.0.1:9000/tmp/a/student` | 0.9.0         |
 
-For fileset dataset, the plugin add location facets which contains the location path.
+For fileset dataset, the plugin add `fileset-location` facets which contains the location path.
+
+```json
+"fileset-location" :
+{
+"location":"/path/xx",
+"_producer":"https://github.com/datastrato/...",
+"_schemaURL":"https://raw.githubusercontent...."
+}
+```
 
 ## How to use 
 
