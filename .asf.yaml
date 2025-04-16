@@ -67,3 +67,4 @@ notifications:
   commits: commits@gravitino.apache.org
   issues: commits@gravitino.apache.org
   pullrequests: commits@gravitino.apache.org
+  discussions: dev@gravitino.apache.org
