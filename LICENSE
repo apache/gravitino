@@ -305,6 +305,10 @@
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUser.java
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUserList.java
 
+   Helm chart-testing
+   ./dev/ci/chart_schema.yaml
+   ./dev/ci/lintconf.yaml
+
    This product bundles a third-party component under the
    MIT License.
 

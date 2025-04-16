@@ -1,0 +1,84 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+mysql:
+  enabled: true
+
+visibleConfigs: "gravitino.datastrato.custom.authorization.ranger.admin.url,gravitino.datastrato.custom.authorization.ranger.username,gravitino.datastrato.custom.authorization.ranger.password,gravitino.datastrato.custom.authorization.ranger.auth.type"
+
+visibleConfigsItems:
+  gravitino.datastrato.custom.authorization.ranger.admin.url: "http://ranger:6080"
+  gravitino.datastrato.custom.authorization.ranger.username: admin
+  gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
+  gravitino.datastrato.custom.authorization.ranger.auth.type: simple
+
+additionalConfigItems:
+  gravitino.testAdditionalConfigItems.names: audit,sync
+  gravitino.testAdditionalConfigItems.names.test: test
+
+extraVolumeMounts:
+  - name: gravitino-log
+    mountPath: /root/gravitino/logs
+  - name: extra-volume
+    mountPath: /extra-volume-path
+  - name: another-extra-volume
+    mountPath: /another-extra-volume-path
+
+extraVolumes:
+  - name: gravitino-log
+    emptyDir: {}
+  - name: extra-volume
+    emptyDir: {}
+  - name: another-extra-volume
+    emptyDir: {}
+
+replicas: 2
+
+env:
+  - name: GRAVITINO_HOME
+    value: /root/gravitino
+  - name: HADOOP_USER_NAME
+    value: hdfs
+
+audit:
+  enabled: true
+
+log:
+  containerStdout: true
+
+log4j2Properties:
+  rootLoggerLevel: warn
+  rollingAppenderStrategyDeleteIfLastModifiedAge: 2d
+
+additionalLog4j2Properties:
+  appender.console.type: Console
+  appender.console.name: console
+  appender.console.layout.type: PatternLayout
+  appender.console.layout.pattern: "%d{HH:mm:ss.SSS} %level %msg%n"
+  rootLogger.appenderRef.console.ref: console
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+ingress:
+  enabled: true
