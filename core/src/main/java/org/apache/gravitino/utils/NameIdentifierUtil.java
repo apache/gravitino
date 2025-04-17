@@ -24,7 +24,6 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.gravitino.Entity;
@@ -45,18 +44,6 @@ import org.apache.gravitino.exceptions.IllegalNamespaceException;
 public class NameIdentifierUtil {
 
   private NameIdentifierUtil() {}
-
-  /**
-   * Create a NameIdentifier for any metadata type
-   *
-   * @param metadataType metadataType
-   * @param metadataNames metadata names, such as metalake-a,catalog-b,schema-c
-   * @return NameIdentifier
-   */
-  public static NameIdentifier of(
-      MetadataObject.Type metadataType, Map<String, String> metadataNames) {
-    return null;
-  }
 
   /**
    * Create the metalake {@link NameIdentifierUtil} with the given name.
