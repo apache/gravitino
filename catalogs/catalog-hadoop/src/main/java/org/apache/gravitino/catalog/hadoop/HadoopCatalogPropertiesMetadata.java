@@ -59,6 +59,15 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
   static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
 
+  /**
+   * The property to disable file system operations like list, exists, mkdir operations in the
+   * server side, so that the server side catalog can be used as a metadata only catalog, no need to
+   * configure the file system access related configurations. By default, it is false.
+   */
+  static final String DISABLE_FILESYSTEM_OPS = "disable-filesystem-ops";
+
+  static final boolean DEFAULT_DISABLE_FILESYSTEM_OPS = false;
+
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
@@ -108,6 +117,16 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* immutable */,
                   DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS,
                   false /* hidden */))
+          .put(
+              DISABLE_FILESYSTEM_OPS,
+              PropertyEntry.booleanPropertyEntry(
+                  DISABLE_FILESYSTEM_OPS,
+                  "Disable file system operations in the server side",
+                  false /* required */,
+                  true /* immutable */,
+                  DEFAULT_DISABLE_FILESYSTEM_OPS,
+                  false /* hidden */,
+                  false /* reserved */))
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
