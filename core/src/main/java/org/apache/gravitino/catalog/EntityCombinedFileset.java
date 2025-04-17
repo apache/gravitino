@@ -40,6 +40,14 @@ public final class EntityCombinedFileset implements Fileset {
     this.filesetEntity = filesetEntity;
   }
 
+  public FilesetEntity filesetEntity() {
+    return filesetEntity;
+  }
+
+  public Fileset fileset() {
+    return fileset;
+  }
+
   public static EntityCombinedFileset of(Fileset fileset, FilesetEntity filesetEntity) {
     return new EntityCombinedFileset(fileset, filesetEntity);
   }
