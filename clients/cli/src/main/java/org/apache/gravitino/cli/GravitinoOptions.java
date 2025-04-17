@@ -26,6 +26,7 @@ import org.apache.commons.cli.Options;
 public class GravitinoOptions {
   public static final String AUDIT = "audit";
   public static final String AUTO = "auto";
+  public static final String CLIENT = "client";
   public static final String COLUMNFILE = "columnfile";
   public static final String COMMENT = "comment";
   public static final String DATATYPE = "datatype";
@@ -76,7 +77,7 @@ public class GravitinoOptions {
 
     // Add options using helper method to avoid repetition
     options.addOption(createSimpleOption("h", HELP, "command help information"));
-    options.addOption(createSimpleOption("v", VERSION, "Gravitino client version"));
+    options.addOption(createSimpleOption(null, CLIENT, "Gravitino client version"));
     options.addOption(createSimpleOption("s", SERVER, "Gravitino server version"));
     options.addOption(createArgOption("u", URL, "Gravitino URL (default: http://localhost:8090)"));
     options.addOption(createArgOption("n", NAME, "full entity name (dot separated)"));
@@ -116,6 +117,7 @@ public class GravitinoOptions {
     // model options
     options.addOption(createArgOption(null, URI, "model version artifact"));
     options.addOption(createArgsOption(null, ALIAS, "model aliases"));
+    options.addOption(createArgOption(null, VERSION, "Gravitino client version"));
 
     // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));
