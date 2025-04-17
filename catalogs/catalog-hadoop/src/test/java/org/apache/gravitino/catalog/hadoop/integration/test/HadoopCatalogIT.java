@@ -43,6 +43,7 @@ import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
@@ -148,6 +149,76 @@ public class HadoopCatalogIT extends BaseIT {
   private void dropSchema() {
     catalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
+  }
+
+  @Test
+  public void testFilesetCache() {
+    Assumptions.assumeTrue(getClass() == HadoopCatalogIT.class);
+    String catalogName = GravitinoITUtils.genRandomName("test_fileset_cache");
+    String newCatalogName = catalogName + "_new";
+    String filesetName = GravitinoITUtils.genRandomName("test_fileset_cache_fileset");
+    String location = defaultBaseLocation() + "/" + filesetName;
+    Map<String, String> catalogProperties = ImmutableMap.of("location", location);
+
+    Catalog filesetCatalog =
+        metalake.createCatalog(
+            catalogName, Catalog.Type.FILESET, provider, null, catalogProperties);
+    filesetCatalog.asSchemas().createSchema(schemaName, null, null);
+    filesetCatalog
+        .asFilesetCatalog()
+        .createFileset(NameIdentifier.of(schemaName, filesetName), null, MANAGED, null, null);
+
+    // Load fileset
+    Fileset fileset =
+        filesetCatalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetName));
+    Assertions.assertEquals(filesetName, fileset.name());
+
+    // rename catalog and load fileset
+    Catalog alteredCatalog =
+        metalake.alterCatalog(catalogName, CatalogChange.rename(newCatalogName));
+    Assertions.assertTrue(
+        alteredCatalog
+            .asFilesetCatalog()
+            .filesetExists(NameIdentifier.of(schemaName, filesetName)));
+    Assertions.assertThrows(
+        NoSuchCatalogException.class,
+        () ->
+            filesetCatalog
+                .asFilesetCatalog()
+                .filesetExists(NameIdentifier.of(schemaName, filesetName)));
+
+    // rename fileset and load fileset
+    String newFilesetName = filesetName + "_new";
+    Fileset alteredFileset =
+        alteredCatalog
+            .asFilesetCatalog()
+            .alterFileset(
+                NameIdentifier.of(schemaName, filesetName), FilesetChange.rename(newFilesetName));
+    Assertions.assertEquals(newFilesetName, alteredFileset.name());
+    Assertions.assertTrue(
+        alteredCatalog
+            .asFilesetCatalog()
+            .filesetExists(NameIdentifier.of(schemaName, newFilesetName)));
+
+    // drop schema and load fileset
+    alteredCatalog.asSchemas().dropSchema(schemaName, true);
+    Assertions.assertFalse(
+        alteredCatalog
+            .asFilesetCatalog()
+            .filesetExists(NameIdentifier.of(schemaName, newFilesetName)));
+    Assertions.assertFalse(
+        alteredCatalog
+            .asFilesetCatalog()
+            .filesetExists(NameIdentifier.of(schemaName, filesetName)));
+
+    // drop catalog and load fileset
+    metalake.dropCatalog(newCatalogName, true);
+    Assertions.assertThrows(
+        NoSuchCatalogException.class,
+        () ->
+            alteredCatalog
+                .asFilesetCatalog()
+                .filesetExists(NameIdentifier.of(schemaName, newFilesetName)));
   }
 
   @Test
