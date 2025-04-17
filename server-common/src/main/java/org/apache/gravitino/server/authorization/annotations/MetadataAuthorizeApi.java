@@ -18,6 +18,7 @@
 package org.apache.gravitino.server.authorization.annotations;
 
 /**
- * Used to mark the REST APIs that require authorization and specify the exact authorization rules.
+ * Defines the annotation for authorizing access to an API. Use the resourceType and privileges
+ * fields to define the required privileges and resource type for the API.
  */
-public @interface AuthorizeApi {}
+public @interface MetadataAuthorizeApi {}

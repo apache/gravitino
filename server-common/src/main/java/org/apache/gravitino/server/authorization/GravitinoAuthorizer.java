@@ -17,11 +17,12 @@
 
 package org.apache.gravitino.server.authorization;
 
+import java.io.Closeable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 
 /** Used for metadata authorization. */
-public interface GravitinoAuthorizer {
+public interface GravitinoAuthorizer extends Closeable {
 
   /**
    * After instantiating the GravitinoAuthorizer, execute the initialize method to perform a series
@@ -40,7 +41,4 @@ public interface GravitinoAuthorizer {
    */
   boolean authorize(
       long userId, MetadataObject.Type metadataType, long metadataId, Privilege.Name privilege);
-
-  /** When the Gravitino Server exits, close the GravitinoAuthorizer */
-  void close();
 }
