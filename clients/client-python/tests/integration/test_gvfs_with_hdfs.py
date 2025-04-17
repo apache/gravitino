@@ -262,7 +262,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             metalake_name=self.metalake_name,
             options=options,
         )
-        token = fs._client._rest_client.auth_data_provider.get_token_data()
+        token = fs._operations._client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
             token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")
