@@ -16,14 +16,12 @@
 # under the License.
 import base64
 import os
-
-# pylint: disable=protected-access,too-many-lines,too-many-locals
-
 import random
 import string
 import time
 import unittest
 from datetime import datetime
+from unittest import mock
 from unittest.mock import patch
 
 import pandas
@@ -32,7 +30,7 @@ import pyarrow.dataset as dt
 import pyarrow.parquet as pq
 from fsspec.implementations.local import LocalFileSystem
 
-from gravitino import gvfs, NameIdentifier
+from gravitino import gvfs, NameIdentifier, Fileset
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
@@ -40,7 +38,8 @@ from gravitino.exceptions.base import (
     BadRequestException,
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
-from gravitino.filesystem.gvfs_utils import extract_identifier
+from gravitino.filesystem.gvfs_storage_handler import LOCA_HANDLER
+from gravitino.filesystem.gvfs_utils import extract_identifier, to_gvfs_path_prefix
 from tests.unittests import mock_base
 from tests.unittests.auth.mock_base import (
     mock_jwt,
@@ -50,6 +49,9 @@ from tests.unittests.auth.mock_base import (
 )
 
 
+# pylint: disable=protected-access,too-many-lines,too-many-locals
+
+
 # pylint: disable=C0302
 def generate_unique_random_string(length):
     characters = string.ascii_letters + string.digits
@@ -57,6 +59,10 @@ def generate_unique_random_string(length):
     return random_string
 
 
+@patch(
+    "gravitino.client.generic_fileset.GenericFileset.get_credentials",
+    return_value=[],
+)
 @mock_base.mock_data
 class TestLocalFilesystem(unittest.TestCase):
     _metalake_name: str = "metalake_demo"
@@ -80,9 +86,14 @@ class TestLocalFilesystem(unittest.TestCase):
         fileset_storage_location = f"{self._fileset_dir}/test_cache"
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_cache"
         actual_path = fileset_storage_location
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "test_cache", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             local_fs = LocalFileSystem()
             local_fs.mkdir(fileset_storage_location)
@@ -97,7 +108,14 @@ class TestLocalFilesystem(unittest.TestCase):
             self.assertTrue(fs.exists(fileset_virtual_location))
             # wait 2 seconds
             time.sleep(2)
-            self.assertIsNone(fs._cache.get("file:/"))
+            name_identifier = NameIdentifier.of(
+                self._metalake_name, "fileset_catalog", "tmp", "test_cache"
+            )
+            self.assertIsNone(
+                fs._operations._filesystem_cache.get(
+                    (name_identifier, Fileset.LOCATION_NAME_UNKNOWN)
+                )
+            )
 
     def test_simple_auth(self, *mock_methods):
         options = {"auth_type": "simple"}
@@ -112,7 +130,7 @@ class TestLocalFilesystem(unittest.TestCase):
             options=options,
             skip_instance_cache=True,
         )
-        token = fs._client._rest_client.auth_data_provider.get_token_data()
+        token = fs._operations._client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
             token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")
@@ -142,9 +160,14 @@ class TestLocalFilesystem(unittest.TestCase):
             fileset_storage_location = f"{self._fileset_dir}/test_oauth2_auth"
             fileset_virtual_location = "fileset/fileset_catalog/tmp/test_oauth2_auth"
             actual_path = fileset_storage_location
-            with patch(
-                "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-                return_value=actual_path,
+            with patch.multiple(
+                "gravitino.client.fileset_catalog.FilesetCatalog",
+                load_fileset=mock.MagicMock(
+                    return_value=mock_base.mock_load_fileset(
+                        "fileset", fileset_storage_location
+                    )
+                ),
+                get_file_location=mock.MagicMock(return_value=actual_path),
             ):
                 local_fs = LocalFileSystem()
                 local_fs.mkdir(fileset_storage_location)
@@ -193,9 +216,14 @@ class TestLocalFilesystem(unittest.TestCase):
         fileset_storage_location = f"{self._fileset_dir}/test_ls"
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_ls"
         actual_path = fileset_storage_location
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             local_fs = LocalFileSystem()
             local_fs.mkdir(fileset_storage_location)
@@ -255,9 +283,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -297,25 +330,40 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
         dir_virtual_path = fileset_virtual_location + "/test_1"
         actual_path = fileset_storage_location + "/test_1"
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(dir_virtual_path))
 
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         actual_path = fileset_storage_location + "/test_file_1.par"
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(file_virtual_path))
 
@@ -337,9 +385,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -354,6 +407,11 @@ class TestLocalFilesystem(unittest.TestCase):
                 dst_actual_path,
                 dst_actual_path,
             ],
+        ), patch(
+            "gravitino.client.fileset_catalog.FilesetCatalog.load_fileset",
+            return_value=mock_base.mock_load_fileset(
+                "fileset", fileset_storage_location
+            ),
         ):
             self.assertTrue(fs.exists(file_virtual_path))
             cp_file_virtual_path = fileset_virtual_location + "/test_cp_file_1.par"
@@ -389,17 +447,27 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
         file_virtual_path = fileset_virtual_location + "/test_file_1.par"
         src_actual_path = fileset_storage_location + "/test_file_1.par"
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=src_actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=src_actual_path),
         ):
             self.assertTrue(fs.exists(file_virtual_path))
 
@@ -408,6 +476,11 @@ class TestLocalFilesystem(unittest.TestCase):
         with patch(
             "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[src_actual_path, dst_actual_path, dst_actual_path],
+        ), patch(
+            "gravitino.client.fileset_catalog.FilesetCatalog.load_fileset",
+            return_value=mock_base.mock_load_fileset(
+                "fileset", fileset_storage_location
+            ),
         ):
             fs.mv(file_virtual_path, mv_file_virtual_path)
             self.assertTrue(fs.exists(mv_file_virtual_path))
@@ -419,6 +492,11 @@ class TestLocalFilesystem(unittest.TestCase):
         with patch(
             "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[dst_actual_path, dst_actual_path1, dst_actual_path1],
+        ), patch(
+            "gravitino.client.fileset_catalog.FilesetCatalog.load_fileset",
+            return_value=mock_base.mock_load_fileset(
+                "fileset", fileset_storage_location
+            ),
         ):
             fs.mv(mv_file_virtual_path, mv_another_dir_virtual_path)
             self.assertTrue(fs.exists(mv_another_dir_virtual_path))
@@ -429,6 +507,11 @@ class TestLocalFilesystem(unittest.TestCase):
         with patch(
             "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[dst_actual_path1, dst_actual_path2],
+        ), patch(
+            "gravitino.client.fileset_catalog.FilesetCatalog.load_fileset",
+            return_value=mock_base.mock_load_fileset(
+                "fileset", fileset_storage_location
+            ),
         ):
             with self.assertRaises(FileNotFoundError):
                 fs.mv(path1=mv_another_dir_virtual_path, path2=not_exist_dst_dir_path)
@@ -459,9 +542,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -511,9 +599,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -558,9 +651,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -605,9 +703,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -653,9 +756,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -702,9 +810,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -740,9 +853,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -771,9 +889,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -806,9 +929,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -858,9 +986,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
@@ -901,23 +1034,20 @@ class TestLocalFilesystem(unittest.TestCase):
             fs.get_file(file_virtual_path, remote_path)
 
     def test_convert_actual_path(self, *mock_methods):
-        fs = gvfs.GravitinoVirtualFileSystem(
-            server_uri=self._server_uri,
-            metalake_name=self._metalake_name,
-            skip_instance_cache=True,
-        )
-        storage_location = "hdfs://localhost:8090/fileset/test_f1"
-        virtual_location = fs._get_virtual_location(
+        storage_location = "file:/fileset/test_f1"
+        virtual_location = to_gvfs_path_prefix(
             NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_f1")
         )
         # test actual path not start with storage location
         actual_path = "/not_start_with_storage/ttt"
         with self.assertRaises(GravitinoRuntimeException):
-            fs._convert_actual_path(actual_path, storage_location, virtual_location)
+            LOCA_HANDLER.actual_path_to_gvfs_path(
+                actual_path, storage_location, virtual_location
+            )
 
         # test actual path start with storage location
         actual_path = "/fileset/test_f1/actual_path"
-        virtual_path = fs._convert_actual_path(
+        virtual_path = LOCA_HANDLER.actual_path_to_gvfs_path(
             actual_path, storage_location, virtual_location
         )
         self.assertEqual(
@@ -925,23 +1055,20 @@ class TestLocalFilesystem(unittest.TestCase):
         )
 
         # test convert actual local path
-        fs = gvfs.GravitinoVirtualFileSystem(
-            server_uri=self._server_uri,
-            metalake_name=self._metalake_name,
-            skip_instance_cache=True,
-        )
         storage_location = "file:/tmp/fileset/test_f1"
-        virtual_location = fs._get_virtual_location(
+        virtual_location = to_gvfs_path_prefix(
             NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_f1")
         )
         # test actual path not start with storage location
         actual_path = "/not_start_with_storage/ttt"
         with self.assertRaises(GravitinoRuntimeException):
-            fs._convert_actual_path(actual_path, storage_location, virtual_location)
+            LOCA_HANDLER.actual_path_to_gvfs_path(
+                actual_path, storage_location, virtual_location
+            )
 
         # test actual path start with storage location
         actual_path = "/tmp/fileset/test_f1/actual_path"
-        virtual_path = fs._convert_actual_path(
+        virtual_path = LOCA_HANDLER.actual_path_to_gvfs_path(
             actual_path, storage_location, virtual_location
         )
         self.assertEqual(
@@ -951,13 +1078,13 @@ class TestLocalFilesystem(unittest.TestCase):
         # test storage location without "/"
         actual_path = "/tmp/test_convert_actual_path/sub_dir/1.parquet"
         storage_location = "file:/tmp/test_convert_actual_path"
-        virtual_location = fs._get_virtual_location(
+        virtual_location = to_gvfs_path_prefix(
             NameIdentifier.of(
                 "test_metalake", "catalog", "schema", "test_convert_actual_path"
             )
         )
 
-        virtual_path = fs._convert_actual_path(
+        virtual_path = LOCA_HANDLER.actual_path_to_gvfs_path(
             actual_path, storage_location, virtual_location
         )
         self.assertEqual(
@@ -968,13 +1095,13 @@ class TestLocalFilesystem(unittest.TestCase):
         # test storage location with "/"
         actual_path = "/tmp/test_convert_actual_path/sub_dir/1.parquet"
         storage_location = "file:/tmp/test_convert_actual_path/"
-        virtual_location = fs._get_virtual_location(
+        virtual_location = to_gvfs_path_prefix(
             NameIdentifier.of(
                 "test_metalake", "catalog", "schema", "test_convert_actual_path"
             )
         )
 
-        virtual_path = fs._convert_actual_path(
+        virtual_path = LOCA_HANDLER.actual_path_to_gvfs_path(
             actual_path, storage_location, virtual_location
         )
         self.assertEqual(
@@ -983,11 +1110,6 @@ class TestLocalFilesystem(unittest.TestCase):
         )
 
     def test_convert_info(self, *mock_methods):
-        fs = gvfs.GravitinoVirtualFileSystem(
-            server_uri=self._server_uri,
-            metalake_name=self._metalake_name,
-            skip_instance_cache=True,
-        )
         # test actual path not start with storage location
         entry = {
             "name": "/not_start_with_storage/ttt",
@@ -995,12 +1117,14 @@ class TestLocalFilesystem(unittest.TestCase):
             "type": "file",
             "mtime": datetime.now(),
         }
-        storage_location = "hdfs://localhost:8090/fileset/test_f1"
-        virtual_location = fs._get_virtual_location(
+        storage_location = "file:/fileset/test_f1"
+        gvfs_path_prefix = to_gvfs_path_prefix(
             NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_f1")
         )
         with self.assertRaises(GravitinoRuntimeException):
-            fs._convert_actual_info(entry, storage_location, virtual_location)
+            LOCA_HANDLER.actual_info_to_gvfs_info(
+                entry, storage_location, gvfs_path_prefix
+            )
 
         # test actual path start with storage location
         entry = {
@@ -1009,17 +1133,14 @@ class TestLocalFilesystem(unittest.TestCase):
             "type": "file",
             "mtime": datetime.now(),
         }
-        info = fs._convert_actual_info(entry, storage_location, virtual_location)
+        info = LOCA_HANDLER.actual_info_to_gvfs_info(
+            entry, storage_location, gvfs_path_prefix
+        )
         self.assertEqual(
             "fileset/test_catalog/test_schema/test_f1/actual_path", info["name"]
         )
 
         # test convert actual local path
-        fs = gvfs.GravitinoVirtualFileSystem(
-            server_uri=self._server_uri,
-            metalake_name=self._metalake_name,
-            skip_instance_cache=True,
-        )
         # test actual path not start with storage location
         entry = {
             "name": "/not_start_with_storage/ttt",
@@ -1028,11 +1149,13 @@ class TestLocalFilesystem(unittest.TestCase):
             "mtime": datetime.now(),
         }
         storage_location = "file:/tmp/fileset/test_f1"
-        virtual_location = fs._get_virtual_location(
+        gvfs_path_prefix = to_gvfs_path_prefix(
             NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_f1")
         )
         with self.assertRaises(GravitinoRuntimeException):
-            fs._convert_actual_info(entry, storage_location, virtual_location)
+            LOCA_HANDLER.actual_info_to_gvfs_info(
+                entry, storage_location, gvfs_path_prefix
+            )
 
         # test actual path start with storage location
         entry = {
@@ -1041,7 +1164,9 @@ class TestLocalFilesystem(unittest.TestCase):
             "type": "file",
             "mtime": datetime.now(),
         }
-        info = fs._convert_actual_info(entry, storage_location, virtual_location)
+        info = LOCA_HANDLER.actual_info_to_gvfs_info(
+            entry, storage_location, gvfs_path_prefix
+        )
         self.assertEqual(
             "fileset/test_catalog/test_schema/test_f1/actual_path", info["name"]
         )
@@ -1076,9 +1201,14 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         actual_path = fileset_storage_location + "/test.parquet"
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             # to parquet
             data.to_parquet(fileset_virtual_location + "/test.parquet", filesystem=fs)
@@ -1100,6 +1230,11 @@ class TestLocalFilesystem(unittest.TestCase):
         with patch(
             "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
             side_effect=[actual_path1, actual_path2, actual_path2],
+        ), patch(
+            "gravitino.client.fileset_catalog.FilesetCatalog.load_fileset",
+            return_value=mock_base.mock_load_fileset(
+                "fileset", fileset_storage_location
+            ),
         ):
             # to csv
             data.to_csv(
@@ -1127,9 +1262,14 @@ class TestLocalFilesystem(unittest.TestCase):
             skip_instance_cache=True,
         )
         actual_path = fileset_storage_location + "/test.parquet"
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             # to parquet
             data.to_parquet(fileset_virtual_location + "/test.parquet", filesystem=fs)
@@ -1172,9 +1312,14 @@ class TestLocalFilesystem(unittest.TestCase):
             metalake_name=self._metalake_name,
             skip_instance_cache=True,
         )
-        with patch(
-            "gravitino.client.fileset_catalog.FilesetCatalog.get_file_location",
-            return_value=actual_path,
+        with patch.multiple(
+            "gravitino.client.fileset_catalog.FilesetCatalog",
+            load_fileset=mock.MagicMock(
+                return_value=mock_base.mock_load_fileset(
+                    "fileset", fileset_storage_location
+                )
+            ),
+            get_file_location=mock.MagicMock(return_value=actual_path),
         ):
             self.assertTrue(fs.exists(fileset_virtual_location))
 
