@@ -80,7 +80,6 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
   private static String URIS;
   private static String TYPE;
-  private static String WAREHOUSE;
 
   private static final String HIVE_COL_NAME1 = "col1";
   private static final String HIVE_COL_NAME2 = "col2";
@@ -96,10 +95,6 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
             "thrift://%s:%d",
             kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
     TYPE = "hms";
-    WAREHOUSE =
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse",
-            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT);
 
     try {
       java.io.File baseDir = new java.io.File(System.getProperty("java.io.tmpdir"));
@@ -193,7 +188,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
   }
 
   private void addKerberosConfig() {
-    customConfigs.put(org.apache.gravitino.Configs.AUTHENTICATORS.getKey(), "kerberos");
+    customConfigs.put("gravitino." + AuthenticationConfig.AUTH_TYPE_KEY, "kerberos");
     customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
     customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
     customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
@@ -201,7 +196,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
   }
 
   @Test
-  void testHudiWithKerberosAndUserImpersonation() throws java.io.IOException {
+  void testHudiWithKerberosAndUserImpersonation() {
     KerberosTokenProvider provider =
         KerberosTokenProvider.builder()
             .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
@@ -228,8 +223,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, TYPE);
     properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
-    properties.put("warehouse", WAREHOUSE);
-    properties.put("location", WAREHOUSE);
+    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
     Catalog catalog =
         gravitinoMetalake.createCatalog(
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-hudi", "comment", properties);
@@ -246,9 +240,10 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
         exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
 
     // Now try to permit the user to create the schema again
-    kerberosHiveContainer.executeInContainer("hadoop", "fs", "-mkdir", "/user/hive/warehouse");
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse");
+        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-hudi");
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-hudi");
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -315,7 +310,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, TYPE);
     properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
-    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse");
+    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
