@@ -622,8 +622,7 @@ public class CatalogMysqlIT extends BaseIT {
               Literals.timestampLiteral("1983-09-05T00:00:00"), column.defaultValue());
           break;
         case "timestamp_col_3":
-          Assertions.assertEquals(
-              UnparsedExpression.of("CURRENT_TIMESTAMP(6)"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "decimal_6_2_col_1":
           Assertions.assertEquals(
@@ -865,7 +864,7 @@ public class CatalogMysqlIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[1].name()}, FunctionExpression.of("current_timestamp")),
+                new String[] {columns[1].name()}, DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
             TableChange.updateColumnDefaultValue(

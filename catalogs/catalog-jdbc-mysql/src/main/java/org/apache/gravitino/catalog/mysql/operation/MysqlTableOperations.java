@@ -672,4 +672,17 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
   }
+
+  @Override
+  public int calculateDatetimePrecision(String typeName, int columnSize) {
+    String upperTypeName = typeName.toUpperCase();
+    switch (upperTypeName) {
+      case "TIME":
+        return columnSize > 8 ? columnSize - 9 : 0;
+      case "TIMESTAMP":
+      case "DATETIME":
+        return columnSize > 19 ? columnSize - 20 : 0;
+    }
+    return 0;
+  }
 }
