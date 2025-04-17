@@ -1045,6 +1045,7 @@ public class TestCatalogOperations
     for (ModelVersionChange change : changes) {
       if (change instanceof ModelVersionChange.UpdateComment) {
         newComment = ((ModelVersionChange.UpdateComment) change).newComment();
+
       } else {
         throw new IllegalArgumentException("Unsupported model change: " + change);
       }
