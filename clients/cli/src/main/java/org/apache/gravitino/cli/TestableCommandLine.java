@@ -135,6 +135,7 @@ import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
 import org.apache.gravitino.cli.commands.UpdateModelName;
+import org.apache.gravitino.cli.commands.UpdateModelVersionComment;
 import org.apache.gravitino.cli.commands.UpdateTableComment;
 import org.apache.gravitino.cli.commands.UpdateTableName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
@@ -883,6 +884,19 @@ public class TestableCommandLine {
       String model,
       String rename) {
     return new UpdateModelName(context, metalake, catalog, schema, model, rename);
+  }
+
+  protected UpdateModelVersionComment newUpdateModelVersionComment(
+      CommandContext context,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      Integer version,
+      String alias,
+      String comment) {
+    return new UpdateModelVersionComment(
+        context, metalake, catalog, schema, model, version, alias, comment);
   }
 
   protected SetModelProperty newSetModelProperty(

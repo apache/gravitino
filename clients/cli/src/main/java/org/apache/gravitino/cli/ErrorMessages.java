@@ -66,6 +66,8 @@ public class ErrorMessages {
   public static final String MISSING_USER = "Missing --user option.";
   public static final String MISSING_VALUE = "Missing --value option.";
 
+  public static final String MULTIPLE_ALIASES_COMMAND_ERROR =
+      "This command only supports one --alias option.";
   public static final String MULTIPLE_ROLE_COMMAND_ERROR =
       "This command only supports one --role option.";
   public static final String MULTIPLE_TAG_COMMAND_ERROR =
