@@ -27,7 +27,6 @@ from fsspec import AbstractFileSystem
 from readerwriterlock import rwlock
 
 from gravitino.api.catalog import Catalog
-from gravitino.api.credential.credential import Credential
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
@@ -76,7 +75,6 @@ class BaseGVFSOperations(ABC):
     SLASH = "/"
 
     ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
-    ENABLE_CREDENTIAL_VENDING_DEFAULT = False
 
     def __init__(
         self,
@@ -88,22 +86,7 @@ class BaseGVFSOperations(ABC):
         self._metalake = metalake_name
         self._options = options
 
-        request_headers = (
-            None
-            if options is None
-            else {
-                key[
-                    len(GVFSConfig.GVFS_FILESYSTEM_CLIENT_REQUEST_HEADER_PREFIX) :
-                ]: value
-                for key, value in options.items()
-                if key.startswith(
-                    GVFSConfig.GVFS_FILESYSTEM_CLIENT_REQUEST_HEADER_PREFIX
-                )
-            }
-        )
-        self._client = create_client(
-            options, server_uri, metalake_name, request_headers
-        )
+        self._client = create_client(options, server_uri, metalake_name)
 
         cache_size = (
             GVFSConfig.DEFAULT_CACHE_SIZE
@@ -123,14 +106,6 @@ class BaseGVFSOperations(ABC):
         self._catalog_cache = LRUCache(maxsize=100)
         self._catalog_cache_lock = rwlock.RWLockFair()
 
-        self._enable_credential_vending = (
-            False
-            if options is None
-            else options.get(
-                GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING,
-                self.ENABLE_CREDENTIAL_VENDING_DEFAULT,
-            )
-        )
         self._current_location_name = self._init_current_location_name()
 
     @property
@@ -377,10 +352,8 @@ class BaseGVFSOperations(ABC):
         fileset = catalog.as_fileset_catalog().load_fileset(
             NameIdentifier.of(fileset_ident.namespace().level(2), fileset_ident.name())
         )
-        target_location_name = (
-            location_name
-            or fileset.properties().get(fileset.PROPERTY_DEFAULT_LOCATION_NAME)
-            or fileset.LOCATION_NAME_UNKNOWN
+        target_location_name = location_name or fileset.properties().get(
+            fileset.PROPERTY_DEFAULT_LOCATION_NAME
         )
         actual_location = fileset.storage_locations().get(target_location_name)
         if actual_location is None:
@@ -390,29 +363,7 @@ class BaseGVFSOperations(ABC):
         actual_fs = self._get_filesystem(
             actual_location, catalog, fileset_ident, target_location_name
         )
-        self._create_fileset_location_if_needed(
-            catalog.properties(), actual_fs, actual_location
-        )
         return actual_fs
-
-    def _create_fileset_location_if_needed(
-        self,
-        catalog_props: Dict[str, str],
-        actual_fs: AbstractFileSystem,
-        fileset_path: str,
-    ):
-        # If the server-side filesystem ops are disabled, the fileset directory may not exist. In
-        # such case the operations like create, open, list files under this directory will fail.
-        # So we need to check the existence of the fileset directory beforehand.
-        fs_ops_disabled = catalog_props.get("disable-filesystem-ops", "false")
-        if fs_ops_disabled.lower() == "true":
-            if not actual_fs.exists(fileset_path):
-                actual_fs.makedir(fileset_path, create_parents=True)
-                logger.info(
-                    "Automatically created a directory for fileset path: %s when "
-                    "disable-filesystem-ops sets to true in the server side",
-                    fileset_path,
-                )
 
     def _get_actual_file_path(
         self, gvfs_path: str, location_name: str, operation: FilesetDataOperation
@@ -430,7 +381,7 @@ class BaseGVFSOperations(ABC):
         catalog_ident: NameIdentifier = NameIdentifier.of(
             self._metalake, identifier.namespace().level(1)
         )
-        fileset_catalog = self._get_fileset_catalog(catalog_ident).as_fileset_catalog()
+        fileset_catalog = self._get_fileset_catalog(catalog_ident)
 
         sub_path: str = get_sub_path_from_virtual_path(
             identifier, processed_virtual_path
@@ -442,7 +393,7 @@ class BaseGVFSOperations(ABC):
         caller_context: CallerContext = CallerContext(context)
         CallerContextHolder.set(caller_context)
 
-        return fileset_catalog.get_file_location(
+        return fileset_catalog.as_fileset_catalog().get_file_location(
             NameIdentifier.of(identifier.namespace().level(2), identifier.name()),
             sub_path,
             location_name,
@@ -486,17 +437,7 @@ class BaseGVFSOperations(ABC):
                     name_identifier.namespace().level(2), name_identifier.name()
                 )
             )
-            if location_name:
-                context = {
-                    Credential.HTTP_HEADER_CURRENT_LOCATION_NAME: location_name,
-                }
-                caller_context: CallerContext = CallerContext(context)
-                CallerContextHolder.set(caller_context)
-            credentials = (
-                fileset.support_credentials().get_credentials()
-                if self._enable_credential_vending
-                else None
-            )
+            credentials = fileset.support_credentials().get_credentials()
             new_cache_value = get_storage_handler_by_path(
                 actual_file_location
             ).get_filesystem_with_expiration(
@@ -509,7 +450,6 @@ class BaseGVFSOperations(ABC):
             return new_cache_value[1]
         finally:
             write_lock.release()
-            CallerContextHolder.remove()
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
         read_lock = self._catalog_cache_lock.gen_rlock()
