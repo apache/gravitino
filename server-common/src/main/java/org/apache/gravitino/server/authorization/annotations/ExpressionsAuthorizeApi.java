@@ -31,7 +31,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ExpressionsAuthorizeApi {
   /**
-   * The expression to evaluate for authorization.
+   * The expression to evaluate for authorization, which represents multiple privileges.
    *
    * @return the expression to evaluate for authorization.
    */
