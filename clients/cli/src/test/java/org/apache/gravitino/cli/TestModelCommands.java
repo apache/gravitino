@@ -49,7 +49,9 @@ import org.apache.gravitino.cli.commands.RegisterModel;
 import org.apache.gravitino.cli.commands.RemoveModelProperty;
 import org.apache.gravitino.cli.commands.SetModelProperty;
 import org.apache.gravitino.cli.commands.UpdateModelName;
+import org.apache.gravitino.cli.commands.UpdateModelVersionComment;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.base.Joiner;
@@ -660,5 +662,94 @@ public class TestModelCommands {
     doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
+  }
+
+  @Test
+  void testUpdateModelVersionCommentCommand() {
+    UpdateModelVersionComment mockUpdate = mock(UpdateModelVersionComment.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.VERSION)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VERSION)).thenReturn("1");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
+
+    doReturn(mockUpdate)
+        .when(commandLine)
+        .newUpdateModelVersionComment(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            any(),
+            any(),
+            eq("comment"));
+    doReturn(mockUpdate).when(mockUpdate).validate();
+    commandLine.handleCommandLine();
+    verify(mockUpdate).handle();
+  }
+
+  @Test
+  void testUpdateModelVersionCommentCommandByAlias() {
+    Main.useExit = false;
+    UpdateModelVersionComment mockUpdate = mock(UpdateModelVersionComment.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS))
+        .thenReturn(new String[] {"aliasA"});
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
+
+    doReturn(mockUpdate)
+        .when(commandLine)
+        .newUpdateModelVersionComment(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            any(),
+            any(),
+            eq("comment"));
+    doReturn(mockUpdate).when(mockUpdate).validate();
+    commandLine.handleCommandLine();
+    verify(mockUpdate).handle();
+  }
+
+  @Test
+  void testUpdateModelVersionCommentCommandByAliasAndVersion() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.ALIAS)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.ALIAS))
+        .thenReturn(new String[] {"aliasA"});
+    when(mockCommandLine.hasOption(GravitinoOptions.VERSION)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.VERSION)).thenReturn("1");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
+
+    Assertions.assertThrows(RuntimeException.class, commandLine::handleCommandLine);
   }
 }

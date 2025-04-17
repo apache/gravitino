@@ -66,15 +66,6 @@ public class GravitinoOptions {
   public static final String DISABLE = "disable";
   public static final String ALIAS = "alias";
   public static final String URI = "uri";
-  // TODO: temporary option for model version update, it will be refactored in the future, just
-  // prove the E2E flow.
-  public static final String NEW_URI = "newuri";
-  // TODO: temporary option for model version update, it will be refactored in the future, just
-  // prove the E2E flow.
-  public static final String NEW_ALIAS = "newalias";
-  // TODO: temporary option for model version update, it will be refactored in the future, just
-  // prove the E2E flow.
-  public static final String REMOVE_ALIAS = "removealias";
 
   /**
    * Builds and returns the CLI options for Gravitino.
@@ -127,9 +118,6 @@ public class GravitinoOptions {
     options.addOption(createArgOption(null, URI, "model version artifact"));
     options.addOption(createArgsOption(null, ALIAS, "model aliases"));
     options.addOption(createArgOption(null, VERSION, "Gravitino client version"));
-    options.addOption(createArgOption(null, NEW_URI, "New uri of a model version"));
-    options.addOption(createArgsOption(null, NEW_ALIAS, "New alias of a model version"));
-    options.addOption(createArgsOption(null, REMOVE_ALIAS, "Remove alias of a model version"));
 
     // Options that support multiple values
     options.addOption(createArgsOption("p", PROPERTIES, "property name/value pairs"));

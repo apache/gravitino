@@ -391,7 +391,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  void testUpdateModelComment() {
+  void testUpdateModelVersionComment() {
     String schemaName = randomSchemaName();
     String schemaComment = "schema which tests update";
 
@@ -419,6 +419,9 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
         modelOperationDispatcher.alterModelVersion(modelIdent, "alias1", changeComment);
 
     Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
+    Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
+    Assertions.assertEquals(versionNewComment, alteredModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
   }
 
   private String randomSchemaName() {

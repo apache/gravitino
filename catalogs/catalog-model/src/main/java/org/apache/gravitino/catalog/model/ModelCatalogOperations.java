@@ -432,6 +432,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     for (ModelVersionChange change : changes) {
       if (change instanceof ModelVersionChange.UpdateComment) {
         entityComment = ((ModelVersionChange.UpdateComment) change).newComment();
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model version change: " + change.getClass().getSimpleName());
