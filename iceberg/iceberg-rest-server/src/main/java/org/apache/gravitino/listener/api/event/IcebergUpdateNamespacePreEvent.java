@@ -21,23 +21,29 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.ObjectWrapper;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 
 /** Represent a pre event before updating Iceberg namespace. */
 @DeveloperApi
 public class IcebergUpdateNamespacePreEvent extends IcebergNamespacePreEvent {
-  private final UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest;
+  private final ObjectWrapper<UpdateNamespacePropertiesRequest>
+      updateNamespacePropertiesRequestWrapper;
 
   public IcebergUpdateNamespacePreEvent(
       IcebergRequestContext icebergRequestContext,
       NameIdentifier nameIdentifier,
-      UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+      ObjectWrapper<UpdateNamespacePropertiesRequest> updateNamespacePropertiesRequestWrapper) {
     super(icebergRequestContext, nameIdentifier);
-    this.updateNamespacePropertiesRequest = updateNamespacePropertiesRequest;
+    this.updateNamespacePropertiesRequestWrapper = updateNamespacePropertiesRequestWrapper;
   }
 
   public UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest() {
-    return updateNamespacePropertiesRequest;
+    return updateNamespacePropertiesRequestWrapper.get();
+  }
+
+  public ObjectWrapper<UpdateNamespacePropertiesRequest> updateNamespacePropertiesRequestWrapper() {
+    return updateNamespacePropertiesRequestWrapper;
   }
 
   @Override
