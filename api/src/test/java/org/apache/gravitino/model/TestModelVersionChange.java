@@ -63,4 +63,96 @@ public class TestModelVersionChange {
     Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
     Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
   }
+
+  @Test
+  void testCreateSetPropertyChangeUseStaticMethod() {
+    String property = "property";
+    String value = "value";
+    ModelVersionChange modelVersionChange = ModelVersionChange.setProperty(property, value);
+
+    Assertions.assertEquals(ModelVersionChange.SetProperty.class, modelVersionChange.getClass());
+
+    ModelVersionChange.SetProperty setPropertyChange =
+        (ModelVersionChange.SetProperty) modelVersionChange;
+    Assertions.assertEquals(property, setPropertyChange.property());
+    Assertions.assertEquals(value, setPropertyChange.value());
+    Assertions.assertEquals("SETPROPERTY " + property + " " + value, setPropertyChange.toString());
+  }
+
+  @Test
+  void testCreateSetPropertyChangeUseConstructor() {
+    String property = "property";
+    String value = "value";
+    ModelVersionChange modelVersionChange = new ModelVersionChange.SetProperty(property, value);
+
+    Assertions.assertEquals(ModelVersionChange.SetProperty.class, modelVersionChange.getClass());
+
+    ModelVersionChange.SetProperty setPropertyChange =
+        (ModelVersionChange.SetProperty) modelVersionChange;
+    Assertions.assertEquals(property, setPropertyChange.property());
+    Assertions.assertEquals(value, setPropertyChange.value());
+    Assertions.assertEquals("SETPROPERTY " + property + " " + value, setPropertyChange.toString());
+  }
+
+  @Test
+  void testSetPropertyChangeEquals() {
+    String property1 = "property1";
+    String value1 = "value1";
+    String property2 = "property2";
+    ModelVersionChange modelVersionChange1 = ModelVersionChange.setProperty(property1, value1);
+    ModelVersionChange modelVersionChange2 = ModelVersionChange.setProperty(property1, value1);
+    ModelVersionChange modelVersionChange3 = ModelVersionChange.setProperty(property2, value1);
+
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
+    Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
+    Assertions.assertNotEquals(modelVersionChange2, modelVersionChange3);
+
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
+    Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+  }
+
+  @Test
+  void testCreateRemovePropertyChangeUseStaticMethod() {
+    String property = "property";
+    ModelVersionChange modelVersionChange = ModelVersionChange.removeProperty(property);
+
+    Assertions.assertEquals(ModelVersionChange.RemoveProperty.class, modelVersionChange.getClass());
+
+    ModelVersionChange.RemoveProperty removePropertyChange =
+        (ModelVersionChange.RemoveProperty) modelVersionChange;
+    Assertions.assertEquals(property, removePropertyChange.property());
+    Assertions.assertEquals("REMOVEPROPERTY " + property, removePropertyChange.toString());
+  }
+
+  @Test
+  void testCreateRemovePropertyChangeUseConstructor() {
+    String property = "property";
+    ModelVersionChange modelVersionChange = new ModelVersionChange.RemoveProperty(property);
+
+    Assertions.assertEquals(ModelVersionChange.RemoveProperty.class, modelVersionChange.getClass());
+
+    ModelVersionChange.RemoveProperty removePropertyChange =
+        (ModelVersionChange.RemoveProperty) modelVersionChange;
+    Assertions.assertEquals(property, removePropertyChange.property());
+    Assertions.assertEquals("REMOVEPROPERTY " + property, removePropertyChange.toString());
+  }
+
+  @Test
+  void testRemovePropertyChangeEquals() {
+    String property1 = "property1";
+    String property2 = "property2";
+
+    ModelVersionChange modelVersionChange1 = ModelVersionChange.removeProperty(property1);
+    ModelVersionChange modelVersionChange2 = ModelVersionChange.removeProperty(property1);
+    ModelVersionChange modelVersionChange3 = ModelVersionChange.removeProperty(property2);
+
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
+    Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
+    Assertions.assertNotEquals(modelVersionChange2, modelVersionChange3);
+
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
+    Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+  }
 }
