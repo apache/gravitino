@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.CACHE_VALUE_NOT_SET;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
@@ -27,10 +28,14 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PR
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
@@ -41,10 +46,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -119,6 +126,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
   private boolean disableFSOps;
 
+  private Cache<NameIdentifier, HadoopFileset> filesetCache;
+
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
   }
@@ -181,6 +190,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     }
 
     this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    this.filesetCache = initializeFilesetCache(config);
   }
 
   @Override
@@ -203,24 +213,28 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
-    try {
-      FilesetEntity filesetEntity =
-          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+    return filesetCache.get(
+        ident,
+        k -> {
+          try {
+            FilesetEntity filesetEntity =
+                store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
 
-      return HadoopFileset.builder()
-          .withName(ident.name())
-          .withType(filesetEntity.filesetType())
-          .withComment(filesetEntity.comment())
-          .withStorageLocations(filesetEntity.storageLocations())
-          .withProperties(filesetEntity.properties())
-          .withAuditInfo(filesetEntity.auditInfo())
-          .build();
+            return HadoopFileset.builder()
+                .withName(ident.name())
+                .withType(filesetEntity.filesetType())
+                .withComment(filesetEntity.comment())
+                .withStorageLocations(filesetEntity.storageLocations())
+                .withProperties(filesetEntity.properties())
+                .withAuditInfo(filesetEntity.auditInfo())
+                .build();
 
-    } catch (NoSuchEntityException exception) {
-      throw new NoSuchFilesetException(exception, FILESET_DOES_NOT_EXIST_MSG, ident);
-    } catch (IOException ioe) {
-      throw new RuntimeException("Failed to load fileset %s" + ident, ioe);
-    }
+          } catch (NoSuchEntityException exception) {
+            throw new NoSuchFilesetException(exception, FILESET_DOES_NOT_EXIST_MSG, ident);
+          } catch (IOException ioe) {
+            throw new RuntimeException("Failed to load fileset %s" + ident, ioe);
+          }
+        });
   }
 
   @Override
@@ -237,6 +251,12 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             throw new IllegalArgumentException("Location name must not be blank");
           }
         });
+
+    // Check if the fileset already existed in cache first. If it does, it means the fileset is
+    // already created, so we should throw an exception.
+    if (filesetCache.getIfPresent(ident) != null) {
+      throw new FilesetAlreadyExistsException("Fileset %s already exists", ident);
+    }
 
     try {
       if (store.exists(ident, Entity.EntityType.FILESET)) {
@@ -380,14 +400,17 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to create fileset " + ident, ioe);
     }
 
-    return HadoopFileset.builder()
-        .withName(ident.name())
-        .withComment(comment)
-        .withType(type)
-        .withStorageLocations(formattedStorageLocations)
-        .withProperties(filesetEntity.properties())
-        .withAuditInfo(filesetEntity.auditInfo())
-        .build();
+    HadoopFileset fileset =
+        HadoopFileset.builder()
+            .withName(ident.name())
+            .withComment(comment)
+            .withType(type)
+            .withStorageLocations(formattedStorageLocations)
+            .withProperties(filesetEntity.properties())
+            .withAuditInfo(filesetEntity.auditInfo())
+            .build();
+    filesetCache.put(ident, fileset);
+    return fileset;
   }
 
   private Map<String, String> setDefaultLocationIfAbsent(
@@ -441,6 +464,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
     }
 
+    filesetCache.invalidate(ident);
     try {
       FilesetEntity updatedFilesetEntity =
           store.update(
@@ -449,14 +473,17 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               Entity.EntityType.FILESET,
               e -> updateFilesetEntity(ident, e, changes));
 
-      return HadoopFileset.builder()
-          .withName(updatedFilesetEntity.name())
-          .withComment(updatedFilesetEntity.comment())
-          .withType(updatedFilesetEntity.filesetType())
-          .withStorageLocations(updatedFilesetEntity.storageLocations())
-          .withProperties(updatedFilesetEntity.properties())
-          .withAuditInfo(updatedFilesetEntity.auditInfo())
-          .build();
+      HadoopFileset fileset =
+          HadoopFileset.builder()
+              .withName(updatedFilesetEntity.name())
+              .withComment(updatedFilesetEntity.comment())
+              .withType(updatedFilesetEntity.filesetType())
+              .withStorageLocations(updatedFilesetEntity.storageLocations())
+              .withProperties(updatedFilesetEntity.properties())
+              .withAuditInfo(updatedFilesetEntity.auditInfo())
+              .build();
+      filesetCache.put(updatedFilesetEntity.nameIdentifier(), fileset);
+      return fileset;
 
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to update fileset " + ident, ioe);
@@ -514,6 +541,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
         }
       }
 
+      filesetCache.invalidate(ident);
       return store.delete(ident, Entity.EntityType.FILESET);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
@@ -677,6 +705,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to check if schema " + ident + " exists", ioe);
     }
 
+    // note: we need to invalidate the related fileset cache when the schema rename change is
+    // supported.
     return super.alterSchema(ident, changes);
   }
 
@@ -702,6 +732,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
 
       boolean dropped = super.dropSchema(ident, cascade);
+      filesetCache.invalidateAll(
+          filesets.stream().map(FilesetEntity::nameIdentifier).collect(Collectors.toList()));
       if (disableFSOps) {
         return dropped;
       }
@@ -831,7 +863,45 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    filesetCache.invalidateAll();
+  }
+
+  private Cache<NameIdentifier, HadoopFileset> initializeFilesetCache(Map<String, String> config) {
+    Caffeine<Object, Object> cacheBuilder =
+        Caffeine.newBuilder()
+            .removalListener(
+                (k, v, c) -> LOG.info("Evicting fileset {} from cache due to {}", k, c))
+            .scheduler(
+                Scheduler.forScheduledExecutorService(
+                    new ScheduledThreadPoolExecutor(
+                        1,
+                        new ThreadFactoryBuilder()
+                            .setDaemon(true)
+                            .setNameFormat("fileset-cleaner-%d")
+                            .build())));
+
+    Long cacheEvictionIntervalInMs =
+        (Long)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(
+                    config, HadoopCatalogPropertiesMetadata.FILESET_CACHE_EVICTION_INTERVAL_MS);
+    if (cacheEvictionIntervalInMs != CACHE_VALUE_NOT_SET) {
+      cacheBuilder.expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS);
+    }
+
+    Long cacheMaxSize =
+        (Long)
+            propertiesMetadata
+                .catalogPropertiesMetadata()
+                .getOrDefault(config, HadoopCatalogPropertiesMetadata.FILESET_CACHE_MAX_SIZE);
+    if (cacheMaxSize != CACHE_VALUE_NOT_SET) {
+      cacheBuilder.maximumSize(cacheMaxSize);
+    }
+
+    return cacheBuilder.build();
+  }
 
   private SchemaEntity updateSchemaEntity(
       NameIdentifier ident, SchemaEntity schemaEntity, SchemaChange... changes) {
