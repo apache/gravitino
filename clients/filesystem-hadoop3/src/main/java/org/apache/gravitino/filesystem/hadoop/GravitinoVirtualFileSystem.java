@@ -18,10 +18,13 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -52,6 +55,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   private Path workingDirectory;
   private URI uri;
+  private GravitinoVirtualFileSystemHook hook;
   private BaseGVFSOperations operations;
 
   @Override
@@ -61,6 +65,19 @@ public class GravitinoVirtualFileSystem extends FileSystem {
           String.format(
               "Unsupported file system scheme: %s for %s.",
               name.getScheme(), GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME));
+    }
+
+    String hookClassName =
+        configuration.get(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_HOOK_CLASS,
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_HOOK_CLASS_DEFAULT);
+    try {
+      Class<? extends GravitinoVirtualFileSystemHook> clz =
+          (Class<? extends GravitinoVirtualFileSystemHook>) Class.forName(hookClassName);
+      this.hook = clz.getDeclaredConstructor().newInstance();
+      hook.initialize(getConfigMap(configuration));
+    } catch (Exception e) {
+      throw new GravitinoRuntimeException(e, "Cannot create hook instance: %s", hookClassName);
     }
 
     String operationsClassName =
@@ -89,6 +106,11 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   }
 
   @VisibleForTesting
+  GravitinoVirtualFileSystemHook getHook() {
+    return hook;
+  }
+
+  @VisibleForTesting
   BaseGVFSOperations getOperations() {
     return operations;
   }
@@ -105,23 +127,29 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public synchronized void setWorkingDirectory(Path newDir) {
+    Path newPath = hook.preSetWorkingDirectory(newDir);
     try {
       runWithExceptionTranslation(
           () -> {
-            operations.setWorkingDirectory(newDir);
+            operations.setWorkingDirectory(newPath);
             return null;
           },
           FilesetDataOperation.SET_WORKING_DIR);
     } catch (FilesetPathNotFoundException e) {
       throw new RuntimeException(e);
     }
-    this.workingDirectory = newDir;
+    this.workingDirectory = newPath;
+    hook.postSetWorkingDirectory(newPath);
   }
 
   @Override
   public FSDataInputStream open(Path path, int bufferSize) throws IOException {
-    return runWithExceptionTranslation(
-        () -> operations.open(path, bufferSize), FilesetDataOperation.OPEN);
+    Path newPath = hook.preOpen(path, bufferSize);
+    return hook.postOpen(
+        newPath,
+        bufferSize,
+        runWithExceptionTranslation(
+            () -> operations.open(newPath, bufferSize), FilesetDataOperation.OPEN));
   }
 
   @Override
@@ -134,9 +162,17 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       long blockSize,
       Progressable progress)
       throws IOException {
+    Path newPath = hook.preCreate(path, permission, overwrite, bufferSize, replication, blockSize);
     try {
-      return operations.create(
-          path, permission, overwrite, bufferSize, replication, blockSize, progress);
+      return hook.postCreate(
+          newPath,
+          permission,
+          overwrite,
+          bufferSize,
+          replication,
+          blockSize,
+          operations.create(
+              newPath, permission, overwrite, bufferSize, replication, blockSize, progress));
     } catch (NoSuchCatalogException
         | CatalogNotInUseException
         | NoSuchFilesetException
@@ -155,21 +191,33 @@ public class GravitinoVirtualFileSystem extends FileSystem {
   @Override
   public FSDataOutputStream append(Path path, int bufferSize, Progressable progress)
       throws IOException {
-    return runWithExceptionTranslation(
-        () -> operations.append(path, bufferSize, progress), FilesetDataOperation.APPEND);
+    Path newPath = hook.preAppend(path, bufferSize);
+    return hook.postAppend(
+        newPath,
+        bufferSize,
+        runWithExceptionTranslation(
+            () -> operations.append(newPath, bufferSize, progress), FilesetDataOperation.APPEND));
   }
 
   @Override
   public boolean rename(Path src, Path dst) throws IOException {
-    return runWithExceptionTranslation(
-        () -> operations.rename(src, dst), FilesetDataOperation.RENAME);
+    Pair<Path, Path> pair = hook.preRename(src, dst);
+    return hook.postRename(
+        pair.getLeft(),
+        pair.getRight(),
+        runWithExceptionTranslation(
+            () -> operations.rename(pair.getLeft(), pair.getRight()), FilesetDataOperation.RENAME));
   }
 
   @Override
   public boolean delete(Path path, boolean recursive) throws IOException {
+    Path newPath = hook.preDelete(path, recursive);
     try {
-      return runWithExceptionTranslation(
-          () -> operations.delete(path, recursive), FilesetDataOperation.DELETE);
+      return hook.postDelete(
+          newPath,
+          recursive,
+          runWithExceptionTranslation(
+              () -> operations.delete(newPath, recursive), FilesetDataOperation.DELETE));
     } catch (FilesetPathNotFoundException e) {
       return false;
     }
@@ -177,20 +225,25 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
-    return runWithExceptionTranslation(
-        () -> operations.getFileStatus(path), FilesetDataOperation.GET_FILE_STATUS);
+    Path newPath = hook.preGetFileStatus(path);
+    return hook.postGetFileStatus(
+        runWithExceptionTranslation(
+            () -> operations.getFileStatus(newPath), FilesetDataOperation.GET_FILE_STATUS));
   }
 
   @Override
   public FileStatus[] listStatus(Path path) throws IOException {
-    return runWithExceptionTranslation(
-        () -> operations.listStatus(path), FilesetDataOperation.LIST_STATUS);
+    Path newPath = hook.preListStatus(path);
+    return hook.postListStatus(
+        runWithExceptionTranslation(
+            () -> operations.listStatus(newPath), FilesetDataOperation.LIST_STATUS));
   }
 
   @Override
   public boolean mkdirs(Path path, FsPermission permission) throws IOException {
+    Path newPath = hook.preMkdirs(path, permission);
     try {
-      return operations.mkdirs(path, permission);
+      return hook.postMkdirs(newPath, permission, operations.mkdirs(newPath, permission));
     } catch (NoSuchCatalogException
         | CatalogNotInUseException
         | NoSuchFilesetException
@@ -198,7 +251,7 @@ public class GravitinoVirtualFileSystem extends FileSystem {
         | FilesetPathNotFoundException e) {
       String message =
           "Fileset is not found for path: "
-              + path
+              + newPath
               + " for operation MKDIRS. "
               + "This may be caused by fileset related metadata not found or not in use in "
               + "Gravitino, please check the fileset metadata in Gravitino.";
@@ -208,9 +261,13 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public short getDefaultReplication(Path f) {
+    Path newPath = hook.preGetDefaultReplication(f);
     try {
-      return runWithExceptionTranslation(
-          () -> operations.getDefaultReplication(f), FilesetDataOperation.GET_DEFAULT_REPLICATION);
+      return hook.postGetDefaultReplication(
+          newPath,
+          runWithExceptionTranslation(
+              () -> operations.getDefaultReplication(newPath),
+              FilesetDataOperation.GET_DEFAULT_REPLICATION));
     } catch (IOException e) {
       return 1;
     }
@@ -218,9 +275,13 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public long getDefaultBlockSize(Path f) {
+    Path newPath = hook.preGetDefaultBlockSize(f);
     try {
-      return runWithExceptionTranslation(
-          () -> operations.getDefaultBlockSize(f), FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE);
+      return hook.postGetDefaultBlockSize(
+          newPath,
+          runWithExceptionTranslation(
+              () -> operations.getDefaultBlockSize(newPath),
+              FilesetDataOperation.GET_DEFAULT_BLOCK_SIZE));
     } catch (IOException e) {
       return operations.defaultBlockSize();
     }
@@ -233,6 +294,12 @@ public class GravitinoVirtualFileSystem extends FileSystem {
 
   @Override
   public synchronized void close() throws IOException {
+    try {
+      hook.close();
+    } catch (IOException e) {
+      LOG.warn("Failed to close hook: {}", hook.getClass().getName(), e);
+    }
+
     try {
       operations.close();
     } catch (IOException e) {

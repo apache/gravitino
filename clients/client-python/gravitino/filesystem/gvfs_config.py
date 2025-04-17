@@ -64,3 +64,6 @@ class GVFSConfig:
     # The configuration key for the class name of the file system operations.
     # The default value is "org.apache.gravitino.filesystem.hadoop.DefaultGVFSOperations".
     GVFS_FILESYSTEM_OPERATIONS = "operations_class"
+
+    # The hook class that will be used to intercept file system operations.
+    GVFS_FILESYSTEM_HOOK = "hook_class"
