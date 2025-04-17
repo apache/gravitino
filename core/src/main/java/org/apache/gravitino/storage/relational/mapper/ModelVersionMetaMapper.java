@@ -90,4 +90,11 @@ public interface ModelVersionMetaMapper {
       method = "deleteModelVersionMetasByLegacyTimeline")
   Integer deleteModelVersionMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(
+      type = ModelVersionMetaSQLProviderFactory.class,
+      method = "updateModelVersionMeta")
+  Integer updateModelVersionMeta(
+      @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
+      @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO);
 }

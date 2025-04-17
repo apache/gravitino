@@ -105,7 +105,7 @@ public interface ModelChange {
      */
     @Override
     public int hashCode() {
-      return newName.hashCode();
+      return Objects.hash(newName);
     }
 
     /**
@@ -239,7 +239,7 @@ public interface ModelChange {
      */
     @Override
     public int hashCode() {
-      return property.hashCode();
+      return Objects.hash(property);
     }
 
     /**

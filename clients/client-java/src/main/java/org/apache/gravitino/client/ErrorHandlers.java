@@ -46,6 +46,7 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -602,10 +603,18 @@ public class ErrorHandlers {
           throw new IllegalArgumentException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
-          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchCatalogException.class.getSimpleName())) {
+            throw new NoSuchCatalogException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
             throw new NoSuchSchemaException(errorMessage);
           } else if (errorResponse.getType().equals(NoSuchFilesetException.class.getSimpleName())) {
             throw new NoSuchFilesetException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchLocationNameException.class.getSimpleName())) {
+            throw new NoSuchLocationNameException(errorMessage);
           } else {
             throw new NotFoundException(errorMessage);
           }

@@ -1376,6 +1376,14 @@ public class POConverters {
     }
   }
 
+  /**
+   * Updata ModelPO with new ModelEntity object, metalakeID, catalogID, schemaID will be the same as
+   * the old one. the id, name, comment, properties, latestVersion and auditInfo will be updated.
+   *
+   * @param oldModelPO the old ModelPO object
+   * @param newModel the new ModelEntity object
+   * @return the updated ModelPO object
+   */
   public static ModelPO updateModelPO(ModelPO oldModelPO, ModelEntity newModel) {
     try {
       return ModelPO.builder()
@@ -1388,6 +1396,36 @@ public class POConverters {
           .withModelLatestVersion(newModel.latestVersion())
           .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(newModel.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newModel.auditInfo()))
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  /**
+   * Update ModelVersionPO with new ModelVersionEntity object, metalakeID, catalogID, schemaID and
+   * modelID will be the same as the old one. uri, comment, properties, version and auditInfo will
+   * be updated.
+   *
+   * @param oldModelVersionPO the old ModelVersionPO object
+   * @param newModelVersion the new ModelVersionEntity object
+   * @return the updated ModelVersionPO object
+   */
+  public static ModelVersionPO updateModelVersionPO(
+      ModelVersionPO oldModelVersionPO, ModelVersionEntity newModelVersion) {
+    try {
+      return ModelVersionPO.builder()
+          .withModelId(oldModelVersionPO.getModelId())
+          .withMetalakeId(oldModelVersionPO.getMetalakeId())
+          .withCatalogId(oldModelVersionPO.getCatalogId())
+          .withSchemaId(oldModelVersionPO.getSchemaId())
+          .withModelVersionUri(newModelVersion.uri())
+          .withModelVersion(oldModelVersionPO.getModelVersion())
+          .withModelVersionComment(newModelVersion.comment())
+          .withModelVersionProperties(
+              JsonUtils.anyFieldMapper().writeValueAsString(newModelVersion.properties()))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newModelVersion.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {

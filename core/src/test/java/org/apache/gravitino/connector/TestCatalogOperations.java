@@ -81,6 +81,7 @@ import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -974,6 +975,93 @@ public class TestCatalogOperations
 
     models.put(ident, updatedModel);
     return updatedModel;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
+
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelVersionException("Model %s does not exist", ident);
+    }
+
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", versionPair);
+    }
+
+    return internalUpdateModelVersion(ident, version, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelVersionException("Model %s does not exist", ident);
+    }
+
+    Pair<NameIdentifier, String> aliasPair = Pair.of(ident, alias);
+    if (!modelAliasToVersion.containsKey(aliasPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", alias);
+    }
+
+    int version = modelAliasToVersion.get(aliasPair);
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", versionPair);
+    }
+
+    return internalUpdateModelVersion(ident, version, changes);
+  }
+
+  private ModelVersion internalUpdateModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
+
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestModelVersion testModelVersion = modelVersions.get(versionPair);
+    Map<String, String> newProps =
+        testModelVersion.properties() != null
+            ? Maps.newHashMap(testModelVersion.properties())
+            : Maps.newHashMap();
+    String newComment = testModelVersion.comment();
+    int newVersion = testModelVersion.version();
+    String[] newAliases = testModelVersion.aliases();
+    String newUri = testModelVersion.uri();
+
+    for (ModelVersionChange change : changes) {
+      if (change instanceof ModelVersionChange.UpdateComment) {
+        newComment = ((ModelVersionChange.UpdateComment) change).newComment();
+      } else {
+        throw new IllegalArgumentException("Unsupported model change: " + change);
+      }
+    }
+
+    TestModelVersion updatedModelVersion =
+        TestModelVersion.builder()
+            .withVersion(newVersion)
+            .withComment(newComment)
+            .withProperties(newProps)
+            .withAuditInfo(updatedAuditInfo)
+            .withUri(newUri)
+            .withAliases(newAliases)
+            .build();
+
+    modelVersions.put(versionPair, updatedModelVersion);
+    return updatedModelVersion;
   }
 
   private boolean hasCallerContext() {

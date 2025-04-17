@@ -37,6 +37,8 @@ github:
     issues: true
     # Enable projects for project management boards
     projects: true
+    # Enable GitHub Discussions for community discussions
+    discussions: true
   enabled_merge_buttons:
     squash: true
     merge: false
@@ -65,3 +67,4 @@ notifications:
   commits: commits@gravitino.apache.org
   issues: commits@gravitino.apache.org
   pullrequests: commits@gravitino.apache.org
+  discussions: dev@gravitino.apache.org
