@@ -86,7 +86,22 @@ class BaseGVFSOperations(ABC):
         self._metalake = metalake_name
         self._options = options
 
-        self._client = create_client(options, server_uri, metalake_name)
+        request_headers = (
+            None
+            if options is None
+            else {
+                key[
+                    len(GVFSConfig.GVFS_FILESYSTEM_CLIENT_REQUEST_HEADER_PREFIX) :
+                ]: value
+                for key, value in options.items()
+                if key.startswith(
+                    GVFSConfig.GVFS_FILESYSTEM_CLIENT_REQUEST_HEADER_PREFIX
+                )
+            }
+        )
+        self._client = create_client(
+            options, server_uri, metalake_name, request_headers
+        )
 
         cache_size = (
             GVFSConfig.DEFAULT_CACHE_SIZE

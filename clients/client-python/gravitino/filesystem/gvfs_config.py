@@ -67,3 +67,6 @@ class GVFSConfig:
 
     # The hook class that will be used to intercept file system operations.
     GVFS_FILESYSTEM_HOOK = "hook_class"
+
+    # The configuration key prefix for the client request headers.
+    GVFS_FILESYSTEM_CLIENT_REQUEST_HEADER_PREFIX = "client_request_header_"

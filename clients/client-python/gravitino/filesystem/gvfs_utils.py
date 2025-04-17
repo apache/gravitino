@@ -67,6 +67,7 @@ def create_client(
             uri=server_uri,
             metalake_name=metalake_name,
             auth_data_provider=SimpleAuthProvider(),
+            request_headers=request_headers,
         )
 
     if auth_type == GVFSConfig.OAUTH2_AUTH_TYPE:
@@ -90,6 +91,7 @@ def create_client(
             uri=server_uri,
             metalake_name=metalake_name,
             auth_data_provider=oauth2_token_provider,
+            request_headers=request_headers,
         )
 
     raise GravitinoRuntimeException(

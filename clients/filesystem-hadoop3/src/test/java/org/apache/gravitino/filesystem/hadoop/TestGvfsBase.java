@@ -21,6 +21,7 @@ package org.apache.gravitino.filesystem.hadoop;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE_DEFAULT;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
@@ -35,6 +36,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyShort;
+import static org.mockserver.model.HttpRequest.request;
+import static org.mockserver.model.HttpResponse.response;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
@@ -52,6 +55,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
@@ -59,6 +63,7 @@ import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -80,6 +85,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
+import org.mockserver.matchers.Times;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.verify.VerificationTimes;
 
 public class TestGvfsBase extends GravitinoMockServerBase {
   protected static final String GVFS_IMPL_CLASS = GravitinoVirtualFileSystem.class.getName();
@@ -235,6 +243,45 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           .when(mockOps)
           .addDelegationTokens(any(), any());
       assertThrows(NoSuchFilesetException.class, () -> fs.addDelegationTokens("renewer", null));
+    }
+  }
+
+  @Test
+  public void testRequestHeaders()
+      throws NoSuchFieldException, IllegalAccessException, IOException {
+    String envKey = "GRAVITINO_TEST_HEADER";
+    String envValue = "v1";
+    String headerKey1 = "k1";
+    // prepare the env variable
+    Map<String, String> env = System.getenv();
+    Field field = env.getClass().getDeclaredField("m");
+    field.setAccessible(true);
+    Map<String, String> writableEnv = (Map<String, String>) field.get(env);
+    writableEnv.put(envKey, envValue);
+
+    // test the request headers
+    String headerKey2 = "k2";
+    String headerValue2 = "v2";
+    Configuration configuration = new Configuration(conf);
+    configuration.set(
+        FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX + headerKey1, "${env." + envKey + "}");
+    configuration.set(FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX + headerKey2, headerValue2);
+
+    mockServer().clear(request().withPath("/api/version"));
+    HttpRequest req =
+        request()
+            .withHeader(headerKey1, envValue)
+            .withHeader(headerKey2, headerValue2)
+            .withPath("/api/version");
+    mockServer()
+        .when(req, Times.once())
+        .respond(
+            response()
+                .withStatusCode(SC_OK)
+                .withBody(getJsonString(new VersionResponse(Version.getCurrentVersionDTO()))));
+
+    try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {
+      mockServer().verify(req, VerificationTimes.once());
     }
   }
 

@@ -203,6 +203,14 @@ public abstract class GravitinoMockServerBase {
     }
   }
 
+  protected String getJsonString(Object obj) {
+    try {
+      return MAPPER.writeValueAsString(obj);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   public static ClientAndServer mockServer() {
     return mockServer;
   }
