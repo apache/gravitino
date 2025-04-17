@@ -35,6 +35,7 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalog.CATALOG_PROPERTIES_META;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalog.FILESET_PROPERTIES_META;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalog.SCHEMA_PROPERTIES_META;
+import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS;
 import static org.apache.gravitino.catalog.hadoop.HadoopCatalogPropertiesMetadata.LOCATION;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
@@ -219,8 +220,8 @@ public class TestHadoopCatalogOperations {
 
     // Mock
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
-    MetalakeMetaService spyMetaservice = Mockito.spy(metalakeMetaService);
-    doReturn(1L).when(spyMetaservice).getMetalakeIdByName(Mockito.anyString());
+    MetalakeMetaService spyMetaService = Mockito.spy(metalakeMetaService);
+    doReturn(1L).when(spyMetaService).getMetalakeIdByName(Mockito.anyString());
 
     CatalogMetaService catalogMetaService = CatalogMetaService.getInstance();
     CatalogMetaService spyCatalogMetaService = Mockito.spy(catalogMetaService);
@@ -305,7 +306,7 @@ public class TestHadoopCatalogOperations {
 
     metalakeMetaServiceMockedStatic
         .when(MetalakeMetaService::getInstance)
-        .thenReturn(spyMetaservice);
+        .thenReturn(spyMetaService);
     catalogMetaServiceMockedStatic
         .when(CatalogMetaService::getInstance)
         .thenReturn(spyCatalogMetaService);
@@ -415,6 +416,16 @@ public class TestHadoopCatalogOperations {
     schemaPath = new Path(catalogPath, name);
     fs = schemaPath.getFileSystem(new Configuration());
     Assertions.assertFalse(fs.exists(schemaPath));
+
+    // Test disable server-side FS operations.
+    name = "schema12_2";
+    catalogPath = TEST_ROOT_PATH + "/" + "catalog12_2";
+    schema = createSchema(name, comment, catalogPath, null, true);
+    Assertions.assertEquals(name, schema.name());
+
+    // Schema path should not be existed if the server-side FS operations are disabled.
+    schemaPath = new Path(catalogPath, name);
+    Assertions.assertFalse(fs.exists(schemaPath));
   }
 
   @Test
@@ -452,6 +463,15 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(
         exception.getMessage().contains("Placeholder in location should not be empty"),
         exception.getMessage());
+
+    // Test disable server-side FS operations.
+    name = "schema13_3";
+    schemaPath = catalogPath + "/" + name;
+    schema = createSchema(name, comment, null, schemaPath, true);
+    Assertions.assertEquals(name, schema.name());
+
+    // Schema path should not be existed if the server-side FS operations are disabled.
+    Assertions.assertFalse(fs.exists(new Path(schemaPath)));
   }
 
   @Test
@@ -484,6 +504,17 @@ public class TestHadoopCatalogOperations {
     Assertions.assertFalse(fs.exists(schemaPath1));
     Assertions.assertFalse(fs.exists(new Path(catalogPath)));
     Assertions.assertFalse(fs.exists(new Path(catalogPath, name)));
+
+    // Test disable server-side FS operations.
+    name = "schema14_2";
+    catalogPath = TEST_ROOT_PATH + "/" + "catalog14_2";
+    schemaPath = TEST_ROOT_PATH + "/" + "schema14_2";
+    schema = createSchema(name, comment, catalogPath, schemaPath, true);
+    Assertions.assertEquals(name, schema.name());
+
+    // Schema path should not be existed if the server-side FS operations are disabled.
+    Assertions.assertFalse(fs.exists(new Path(catalogPath)));
+    Assertions.assertFalse(fs.exists(new Path(schemaPath)));
   }
 
   @Test
@@ -640,6 +671,38 @@ public class TestHadoopCatalogOperations {
     }
   }
 
+  @Test
+  public void testDropSchemaWithFSOpsDisabled() throws IOException {
+    String name = "schema21";
+    String comment = "comment21";
+    String catalogPath = TEST_ROOT_PATH + "/" + "catalog20";
+    Schema schema = createSchema(name, comment, catalogPath, null);
+    Assertions.assertEquals(name, schema.name());
+    NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", name);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath, DISABLE_FILESYSTEM_OPS, "true"),
+          randomCatalogInfo("m1", "c1"),
+          HADOOP_PROPERTIES_METADATA);
+
+      ops.dropSchema(id, false);
+
+      Path schemaPath = new Path(new Path(catalogPath), name);
+      FileSystem fs = schemaPath.getFileSystem(new Configuration());
+      Assertions.assertTrue(fs.exists(schemaPath));
+
+      createSchema(name, comment, catalogPath, null);
+      Fileset fs1 = createFileset("fs1", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
+      Path fs1Path = new Path(fs1.storageLocation());
+
+      // Test drop non-empty schema with cascade = true
+      ops.dropSchema(id, true);
+      Assertions.assertTrue(fs.exists(schemaPath));
+      Assertions.assertTrue(fs.exists(fs1Path));
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("locationArguments")
   public void testCreateLoadAndDeleteFilesetWithLocations(
@@ -688,6 +751,79 @@ public class TestHadoopCatalogOperations {
       } else {
         Assertions.assertTrue(fs.exists(expectedPath));
       }
+      // clean expected path if exist
+      fs.delete(expectedPath, true);
+
+      // Test drop non-existent fileset
+      Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("locationArguments")
+  public void testCreateLoadAndDeleteFilesetWithLocationsWhenFSOpsDisabled(
+      String name,
+      Fileset.Type type,
+      String catalogPath,
+      String schemaPath,
+      String storageLocation,
+      String expect)
+      throws IOException {
+    String schemaName = "s1_" + name;
+    String comment = "comment_s1";
+    Map<String, String> catalogProps = Maps.newHashMap();
+    catalogProps.put(DISABLE_FILESYSTEM_OPS, "true");
+    if (catalogPath != null) {
+      catalogProps.put(LOCATION, catalogPath);
+    }
+
+    NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+      if (!ops.schemaExists(schemaIdent)) {
+        createSchema(schemaName, comment, catalogPath, schemaPath, true);
+      }
+
+      Fileset fileset;
+      try {
+        fileset =
+            createFileset(name, schemaName, "comment", type, catalogPath, storageLocation, true);
+      } catch (Exception e) {
+        String locationPath =
+            storageLocation != null
+                ? storageLocation
+                : schemaPath != null ? schemaPath : catalogPath;
+        if (new Path(locationPath).toUri().getScheme() == null) {
+          Assertions.assertInstanceOf(IllegalArgumentException.class, e);
+          return;
+        } else {
+          throw e;
+        }
+      }
+
+      Assertions.assertEquals(name, fileset.name());
+      Assertions.assertEquals(type, fileset.type());
+      Assertions.assertEquals("comment", fileset.comment());
+      Assertions.assertEquals(expect, fileset.storageLocation());
+
+      // Fileset storage location should not be existed.
+      Path storagePath = new Path(fileset.storageLocation());
+      FileSystem fs = storagePath.getFileSystem(new Configuration());
+      Assertions.assertFalse(fs.exists(storagePath));
+
+      // Test load
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      Fileset loadedFileset = ops.loadFileset(filesetIdent);
+      Assertions.assertEquals(name, loadedFileset.name());
+      Assertions.assertEquals(type, loadedFileset.type());
+      Assertions.assertEquals("comment", loadedFileset.comment());
+      Assertions.assertEquals(expect, loadedFileset.storageLocation());
+
+      // Test drop
+      ops.dropFileset(filesetIdent);
+      Path expectedPath = new Path(expect);
+      Assertions.assertFalse(fs.exists(expectedPath));
+
       // clean expected path if exist
       fs.delete(expectedPath, true);
 
@@ -2378,7 +2514,14 @@ public class TestHadoopCatalogOperations {
 
   private Schema createSchema(String name, String comment, String catalogPath, String schemaPath)
       throws IOException {
+    return createSchema(name, comment, catalogPath, schemaPath, false);
+  }
+
+  private Schema createSchema(
+      String name, String comment, String catalogPath, String schemaPath, boolean disableFsOps)
+      throws IOException {
     Map<String, String> props = Maps.newHashMap();
+    props.put(DISABLE_FILESYSTEM_OPS, String.valueOf(disableFsOps));
     if (catalogPath != null) {
       props.put(LOCATION, catalogPath);
     }
@@ -2448,7 +2591,20 @@ public class TestHadoopCatalogOperations {
       String catalogPath,
       String storageLocation)
       throws IOException {
+    return createFileset(name, schemaName, comment, type, catalogPath, storageLocation, false);
+  }
+
+  private Fileset createFileset(
+      String name,
+      String schemaName,
+      String comment,
+      Fileset.Type type,
+      String catalogPath,
+      String storageLocation,
+      boolean disableFsOps)
+      throws IOException {
     Map<String, String> props = Maps.newHashMap();
+    props.put(DISABLE_FILESYSTEM_OPS, String.valueOf(disableFsOps));
     if (catalogPath != null) {
       props.put(LOCATION, catalogPath);
     }
