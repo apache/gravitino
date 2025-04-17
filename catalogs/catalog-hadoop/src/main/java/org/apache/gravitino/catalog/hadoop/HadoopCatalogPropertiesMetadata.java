@@ -56,6 +56,16 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    */
   public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
 
+  /** The interval in milliseconds to evict the fileset cache. */
+  public static final String FILESET_CACHE_EVICTION_INTERVAL_MS =
+      "fileset-cache-eviction-interval-ms";
+
+  /** The maximum number of the filesets the cache may contain. */
+  public static final String FILESET_CACHE_MAX_SIZE = "fileset-cache-max-size";
+
+  /** The value to indicate the cache value is not set. */
+  public static final long CACHE_VALUE_NOT_SET = -1;
+
   static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
 
@@ -116,6 +126,22 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "Timeout to wait for to create the Hadoop file system client instance.",
                   false /* immutable */,
                   DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS,
+                  false /* hidden */))
+          .put(
+              FILESET_CACHE_EVICTION_INTERVAL_MS,
+              PropertyEntry.longOptionalPropertyEntry(
+                  FILESET_CACHE_EVICTION_INTERVAL_MS,
+                  "The interval in milliseconds to evict the fileset cache, -1 means never evict.",
+                  false /* immutable */,
+                  60 * 60 * 1000L /* 1 hour */,
+                  false /* hidden */))
+          .put(
+              FILESET_CACHE_MAX_SIZE,
+              PropertyEntry.longOptionalPropertyEntry(
+                  FILESET_CACHE_MAX_SIZE,
+                  "The maximum number of the filesets the cache may contain, -1 means no limit.",
+                  false /* immutable */,
+                  200_000L,
                   false /* hidden */))
           .put(
               DISABLE_FILESYSTEM_OPS,
