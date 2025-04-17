@@ -445,7 +445,7 @@ public class ModelOperations {
                 modelDispatcher.alterModelVersion(modelId, version, changes);
             Response response =
                 Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(modelVersion)));
-            LOG.info("Model version got: {}.{}", modelId, version);
+            LOG.info("Model version altered: {}.{}", modelId, version);
             return response;
           });
     } catch (Exception e) {
@@ -489,7 +489,7 @@ public class ModelOperations {
             ModelVersion modelVersion = modelDispatcher.alterModelVersion(modelId, alias, changes);
             Response response =
                 Utils.ok(new ModelVersionResponse(DTOConverters.toDTO(modelVersion)));
-            LOG.info("Model version got: {}.{}", modelId, alias);
+            LOG.info("Model version altered: {}.{}", modelId, alias);
             return response;
           });
 
