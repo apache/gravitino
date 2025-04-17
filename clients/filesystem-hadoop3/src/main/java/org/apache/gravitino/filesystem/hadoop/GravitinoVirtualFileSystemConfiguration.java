@@ -135,5 +135,9 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The default value for the Gravitino hook class. */
   public static final String FS_GRAVITINO_HOOK_CLASS_DEFAULT = NoOpHook.class.getCanonicalName();
 
+  /** The configuration key prefix for the Gravitino client request header. */
+  public static final String FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX =
+      "fs.gravitino.client.request.header.";
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }
