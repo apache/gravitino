@@ -103,6 +103,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         String.format(
             "fs.%s.impl.disable.cache", GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME),
         "true");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_HOOK_CLASS,
+        MockGVFSHook.class.getCanonicalName());
   }
 
   @AfterAll
@@ -127,6 +130,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   public void testOpsException() throws IOException, NoSuchFieldException, IllegalAccessException {
     Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
     Configuration newConf = new Configuration(conf);
+    newConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_HOOK_CLASS,
+        NoOpHook.class.getCanonicalName());
     try (GravitinoVirtualFileSystem fs =
         (GravitinoVirtualFileSystem) new Path("gvfs://fileset/").getFileSystem(newConf)) {
       BaseGVFSOperations mockOps = Mockito.mock(BaseGVFSOperations.class);
@@ -382,6 +388,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileSystemTestUtils.create(filePath, gravitinoFileSystem);
       assertTrue(localFileSystem.exists(localFilePath));
       localFileSystem.delete(localFilePath, true);
+      // test gvfs preCreate and postCreate are called
+      assertTrue(getHook(gravitinoFileSystem).preCreateCalled);
+      assertTrue(getHook(gravitinoFileSystem).postCreateCalled);
 
       // mock the invalid fileset not in the server
       String invalidFilesetName = "invalid_fileset";
@@ -434,6 +443,11 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       FileSystemTestUtils.create(localAppendFile, localFileSystem);
       assertTrue(localFileSystem.exists(localAppendFile));
       FileSystemTestUtils.append(appendFile, gravitinoFileSystem);
+
+      // test gvfs preAppend and postAppend are called
+      assertTrue(getHook(gravitinoFileSystem).preAppendCalled);
+      assertTrue(getHook(gravitinoFileSystem).postAppendCalled);
+
       assertEquals(
           "Hello, World!",
           new String(
@@ -512,6 +526,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertTrue(localFileSystem.exists(dstLocalRenamePath2));
       localFileSystem.delete(dstLocalRenamePath2, true);
 
+      // test gvfs preRename and postRename are called
+      assertTrue(getHook(gravitinoFileSystem).preRenameCalled);
+      assertTrue(getHook(gravitinoFileSystem).postRenameCalled);
+
       // test invalid src path
       Path invalidSrcPath =
           FileSystemTestUtils.createFilesetPath(
@@ -566,6 +584,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       gravitinoFileSystem.delete(dirPath, true);
       assertFalse(localFileSystem.exists(localDirPath));
 
+      // test gvfs preDelete and postDelete called
+      assertTrue(getHook(gravitinoFileSystem).preDeleteCalled);
+      assertTrue(getHook(gravitinoFileSystem).postDeleteCalled);
+
       // mock the invalid fileset not in server
       String invalidFilesetName = "invalid_fileset";
       Path invalidFilesetPath =
@@ -612,6 +634,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               .replaceFirst(
                   GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                   FileSystemTestUtils.localRootPrefix()));
+
+      // test gvfs preGetStatus and postGetStatus called
+      assertTrue(getHook(gravitinoFileSystem).preGetFileStatusCalled);
+      assertTrue(getHook(gravitinoFileSystem).postGetFileStatusCalled);
     }
   }
 
@@ -647,6 +673,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           new ArrayList<>(Arrays.asList(gravitinoFileSystem.listStatus(managedFilesetPath)));
       gravitinoStatuses.sort(Comparator.comparing(FileStatus::getPath));
       assertEquals(5, gravitinoStatuses.size());
+
+      // test gvfs preListStatus and postListStatus are called
+      assertTrue(getHook(gravitinoFileSystem).preListStatusCalled);
+      assertTrue(getHook(gravitinoFileSystem).postListStatusCalled);
 
       List<FileStatus> localStatuses =
           new ArrayList<>(Arrays.asList(localFileSystem.listStatus(localPath)));
@@ -708,6 +738,10 @@ public class TestGvfsBase extends GravitinoMockServerBase {
               .replaceFirst(
                   GravitinoVirtualFileSystemConfiguration.GVFS_FILESET_PREFIX,
                   FileSystemTestUtils.localRootPrefix()));
+
+      // test gvfs preMkdirs and postMkdirs called
+      assertTrue(getHook(gravitinoFileSystem).preMkdirsCalled);
+      assertTrue(getHook(gravitinoFileSystem).postMkdirsCalled);
     }
   }
 
@@ -813,6 +847,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       buildMockResourceForCredential(filesetName, localPath.toString());
 
       assertEquals(1, fs.getDefaultReplication(managedFilesetPath));
+      assertTrue(getHook(fs).preGetDefaultReplicationCalled);
+      assertTrue(getHook(fs).postGetDefaultReplicationCalled);
     }
   }
 
@@ -836,6 +872,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       buildMockResourceForCredential(filesetName, localPath.toString());
 
       assertEquals(32 * 1024 * 1024, fs.getDefaultBlockSize(managedFilesetPath));
+      assertTrue(getHook(fs).preGetDefaultBlockSizeCalled);
+      assertTrue(getHook(fs).postGetDefaultBlockSizeCalled);
     }
   }
 
@@ -925,5 +963,9 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     buildMockResource(Method.GET, filesetPath, ImmutableMap.of(), null, filesetResponse, SC_OK);
     buildMockResource(
         Method.GET, credentialsPath, ImmutableMap.of(), null, credentialResponse, SC_OK);
+  }
+
+  private MockGVFSHook getHook(FileSystem gvfs) {
+    return (MockGVFSHook) ((GravitinoVirtualFileSystem) gvfs).getHook();
   }
 }
