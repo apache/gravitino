@@ -41,8 +41,6 @@ public interface GravitinoAuthorizer {
   boolean authorize(
       long userId, MetadataObject.Type metadataType, long metadataId, Privilege.Name privilege);
 
-    /**
-     * When the Gravitino Server exits, close the GravitinoAuthorizer
-     */
-    void close();
+  /** When the Gravitino Server exits, close the GravitinoAuthorizer */
+  void close();
 }
