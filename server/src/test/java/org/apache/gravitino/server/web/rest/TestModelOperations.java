@@ -36,10 +36,13 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.requests.ModelRegisterRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
+import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelVersionUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
@@ -55,6 +58,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -965,6 +969,84 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(modelName, modelResp.getModel().name());
     Assertions.assertEquals(0, modelResp.getModel().properties().size());
     Assertions.assertFalse(modelResp.getModel().properties().containsKey("key1"));
+  }
+
+  @Test
+  void testUpdateModelVersionComment() {
+    String modelName = "model1";
+    String newComment = "new comment";
+    String uri = "uri1";
+    int version = 0;
+    String[] alias = new String[] {"alias1"};
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    ModelVersion mockModelVersion = mockModelVersion(version, uri, alias, newComment);
+
+    when(modelDispatcher.alterModelVersion(
+            modelId, version, ModelVersionChange.updateComment(newComment)))
+        .thenReturn(mockModelVersion);
+
+    ModelVersionUpdatesRequest req =
+        new ModelVersionUpdatesRequest(
+            Collections.singletonList(
+                new ModelVersionUpdateRequest.UpdateModelVersionComment(newComment)));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelVersionResponse modelVersionResponse = resp.readEntity(ModelVersionResponse.class);
+    ModelVersionDTO modelVersion = modelVersionResponse.getModelVersion();
+
+    Assertions.assertEquals(newComment, modelVersion.comment());
+    Assertions.assertArrayEquals(alias, modelVersion.aliases());
+    Assertions.assertEquals(version, modelVersion.version());
+    Assertions.assertEquals(uri, modelVersion.uri());
+  }
+
+  @Test
+  void testUpdateModelVersionCommentByAlias() {
+    String modelName = "model1";
+    String newComment = "new comment";
+    String uri = "uri1";
+    int version = 0;
+    String[] alias = new String[] {"alias1"};
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    ModelVersion mockModelVersion = mockModelVersion(version, uri, alias, newComment);
+
+    when(modelDispatcher.alterModelVersion(
+            modelId, alias[0], ModelVersionChange.updateComment(newComment)))
+        .thenReturn(mockModelVersion);
+
+    ModelVersionUpdatesRequest req =
+        new ModelVersionUpdatesRequest(
+            Collections.singletonList(
+                new ModelVersionUpdateRequest.UpdateModelVersionComment(newComment)));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("aliases")
+            .path(alias[0])
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelVersionResponse modelVersionResponse = resp.readEntity(ModelVersionResponse.class);
+    ModelVersionDTO modelVersion = modelVersionResponse.getModelVersion();
+
+    Assertions.assertEquals(newComment, modelVersion.comment());
+    Assertions.assertArrayEquals(alias, modelVersion.aliases());
+    Assertions.assertEquals(version, modelVersion.version());
+    Assertions.assertEquals(uri, modelVersion.uri());
   }
 
   private String modelPath() {
