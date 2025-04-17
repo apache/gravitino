@@ -34,13 +34,13 @@ public interface ModelVersionChange {
    * Create a ModelVersionChange for updating the comment of a model version.
    *
    * @param newComment new comment to be set for the model version
-   * @return a new ModelVersionChange instance for updating the comment of a model version
+   * @return A new ModelVersionChange instance for updating the comment of a model version
    */
   static ModelVersionChange updateComment(String newComment) {
     return new ModelVersionChange.UpdateComment(newComment);
   }
 
-  /** A ModelVersionChange to update the modelve version comment. */
+  /** A ModelVersionChange to update the model version comment. */
   final class UpdateComment implements ModelVersionChange {
 
     private final String newComment;
