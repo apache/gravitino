@@ -369,9 +369,9 @@ class TestModelCatalog(IntegrationTestEnv):
             )
         )
 
-        self.assertEqual(update_property_model.name(), model_name)
+        self.assertEqual(update_property_model.version(), 0)
+        self.assertEqual(update_property_model.uri(), "uri")
         self.assertEqual(update_property_model.comment(), comment)
-        self.assertEqual(update_property_model.latest_version(), 0)
         self.assertEqual(update_property_model.aliases(), aliases)
         self.assertEqual(update_property_model.properties(), {"k1": "v11", "k3": "v3"})
 
