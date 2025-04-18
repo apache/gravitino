@@ -80,7 +80,30 @@ Configuration example For Spark shell:
 
 Please refer to [OpenLineage Spark guides](https://openlineage.io/docs/guides/spark/) and [Gravitino Spark connector](/spark-connector/spark-connector.md) for more details. Additionally, Gravitino provides following configurations for lineage. 
 
-| Configuration item                           | Description                                                                                                                                                                                                                                           | Default value | Required | Since Version |
-|----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `spark.sql.gravitino.useGravitinoIdentifier` | Whether to use Gravitino identifier for the dataset not managed by Gravitino. If setting to false, will use origin OpenLineage dataset identifier, like `hdfs://localhost:9000` as namespace and `/path/xx` as name for hive table.                   | True          | No       | 0.9.0         |
-| `spark.sql.gravitino.catalogMappings`        | Catalog name mapping roles for the dataset not managed by Gravitino. For example `spark_catalog:catalog1,iceberg_catalog:catalog2` will map `spark_catalog` to `catalog1` and `iceberg_catalog` to `catalog2`, the other catalogs will not be mapped. | None          | No       | 0.9.0         |
+<table>
+  <thead>
+    <tr>
+      <th>Configuration item</th>
+      <th>Description</th>
+      <th>Default value</th>
+      <th>Required</th>
+      <th>Since Version</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>spark.sql.gravitino.useGravitinoIdentifier</code></td>
+      <td>Whether to use Gravitino identifier for the dataset not managed by Gravitino. If setting to false, will use origin OpenLineage dataset identifier, like <code>hdfs://localhost:9000</code> as namespace and <code>/path/xx</code> as name for hive table.</td>
+      <td>True</td>
+      <td>No</td>
+      <td>0.9.0</td>
+    </tr>
+    <tr>
+      <td><code>spark.sql.gravitino.catalogMappings</code></td>
+      <td>Catalog name mapping roles for the dataset not managed by Gravitino. For example <code>spark_catalog:catalog1,iceberg_catalog:catalog2</code> will map <code>spark_catalog</code> to <code>catalog1</code> and <code>iceberg_catalog</code> to <code>catalog2</code>, the other catalogs will not be mapped.</td>
+      <td>None</td>
+      <td>No</td>
+      <td>0.9.0</td>
+    </tr>
+  </tbody>
+</table>

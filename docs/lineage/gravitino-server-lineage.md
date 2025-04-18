@@ -25,25 +25,30 @@ Gravitino server provides a pluginable lineage framework to receive, process, an
 Http source provides an endpoint which follows [OpenLineage API spec](https://openlineage.io/apidocs/openapi/) to receive OpenLineage run event. The following use example:
 
 ```shell
-curl -X POST http://localhost:8090/api/lineage \
+cat <<EOF >source.json
+{
+  "eventType": "START",
+  "eventTime": "2023-10-28T19:52:00.001+10:00",
+  "run": {
+    "runId": "0176a8c2-fe01-7439-87e6-56a1a1b4029f"
+  },
+  "job": {
+    "namespace": "gravitino-namespace",
+    "name": "gravitino-job1"
+  },
+  "inputs": [{
+    "namespace": "gravitino-namespace",
+    "name": "gravitino-table-identifier"
+  }],
+  "producer": "https://github.com/OpenLineage/OpenLineage/blob/v1-0-0/client",
+  "schemaURL": "https://openlineage.io/spec/1-0-5/OpenLineage.json#/definitions/RunEvent"
+}
+EOF
+
+curl -X POST \
   -i -H 'Content-Type: application/json' \
-  -d '{
-        "eventType": "START",
-        "eventTime": "2023-10-28T19:52:00.001+10:00",
-        "run": {
-          "runId": "0176a8c2-fe01-7439-87e6-56a1a1b4029f"
-        },
-        "job": {
-          "namespace": "gravitino-namespace",
-          "name": "gravitino-job1"
-        },
-        "inputs": [{
-          "namespace": "gravitino-namespace",
-          "name": "gravitino-table-identifier"
-        }],
-        "producer": "https://github.com/OpenLineage/OpenLineage/blob/v1-0-0/client",
-        "schemaURL": "https://openlineage.io/spec/1-0-5/OpenLineage.json#/definitions/RunEvent"
-      }'
+  -d '@source.json' \
+  http://localhost:8090/api/lineage
 ```
 
 ## Lineage log sink
