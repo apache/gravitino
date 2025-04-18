@@ -474,9 +474,9 @@ public abstract class RangerAuthorizationPlugin
             .build();
     if (preOwner != null) {
       if (preOwner.type() == Owner.Type.USER) {
-        preOwnerUserName = newOwner.name();
+        preOwnerUserName = preOwner.name();
       } else {
-        preOwnerGroupName = newOwner.name();
+        preOwnerGroupName = preOwner.name();
       }
     }
     if (newOwner.type() == Owner.Type.USER) {

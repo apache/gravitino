@@ -185,7 +185,7 @@ public class RangerIcebergE2EIT extends RangerBaseE2EIT {
     LOG.info("Catalog created: {}", catalog);
   }
 
-  public void useCatalog() {
+  public void reset() {
     String userName1 = System.getenv(HADOOP_USER_NAME);
     String roleName = currentFunName();
     SecurableObject securableObject =
