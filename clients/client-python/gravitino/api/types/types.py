@@ -740,7 +740,7 @@ class Types:
                 return f"{self._name}: {self._type.simple_string()} {nullable_str}{comment_str}"
 
     class ListType(ComplexType):
-		"""The list type in Gravitino."""
+        """The list type in Gravitino."""
         _element_type: Type
         _element_nullable: bool
 
