@@ -65,7 +65,7 @@ Configuration example For Spark shell:
 
 ```shell
 ./bin/spark-sql -v \
---jars /$path/openlineage-spark_2.12-$version.jar,/$path/gravitino-spark-connector-runtime-3.5_2.12-$version.jar \
+--jars /${path}/openlineage-spark_2.12-${version}.jar,/${path}/gravitino-spark-connector-runtime-3.5_2.12-${version}.jar \
 --conf spark.plugins="org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin" \
 --conf spark.sql.gravitino.uri=http://localhost:8090 \
 --conf spark.sql.gravitino.metalake=${metalakeName} \
