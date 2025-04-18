@@ -28,35 +28,40 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.model.ModelChange;
+import org.apache.gravitino.model.ModelVersionChange;
 
-/** Set a property of a model. */
-public class SetModelProperty extends Command {
-
+/** Set or update a property of a model version. */
+public class SetModelVersionProperty extends Command {
   private final String metalake;
   private final String catalog;
   private final String schema;
   private final String model;
+  private final Integer version;
+  private final String alias;
   private final String property;
   private final String value;
 
   /**
-   * Construct a new {@link SetModelProperty} instance.
+   * Constructs a new {@link SetModelVersionProperty} instance.
    *
    * @param context The command context.
-   * @param metalake The name of the metalake.
-   * @param catalog The name of the catalog.
-   * @param schema The name of the schema.
-   * @param model The name of the model.
-   * @param property The name of the property to set.
-   * @param value The value to set the property to.
+   * @param metalake The metalake name.
+   * @param catalog The catalog name.
+   * @param schema The schema name.
+   * @param model The model name.
+   * @param version The model version, if specified, otherwise null.
+   * @param alias The model alias, if specified, otherwise null.
+   * @param property The property name.
+   * @param value The property value.
    */
-  public SetModelProperty(
+  public SetModelVersionProperty(
       CommandContext context,
       String metalake,
       String catalog,
       String schema,
       String model,
+      Integer version,
+      String alias,
       String property,
       String value) {
     super(context);
@@ -64,18 +69,24 @@ public class SetModelProperty extends Command {
     this.catalog = catalog;
     this.schema = schema;
     this.model = model;
+    this.version = version;
+    this.alias = alias;
     this.property = property;
     this.value = value;
   }
 
-  /** Set a property of a model. */
+  /** Set or update a property of a model version. */
   @Override
   public void handle() {
     try {
       NameIdentifier name = NameIdentifier.of(schema, model);
       GravitinoClient client = buildClient(metalake);
-      ModelChange change = ModelChange.setProperty(property, value);
-      client.loadCatalog(catalog).asModelCatalog().alterModel(name, change);
+      ModelVersionChange change = ModelVersionChange.setProperty(property, value);
+      if (version != null) {
+        client.loadCatalog(catalog).asModelCatalog().alterModelVersion(name, version, change);
+      } else {
+        client.loadCatalog(catalog).asModelCatalog().alterModelVersion(name, alias, change);
+      }
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -90,7 +101,11 @@ public class SetModelProperty extends Command {
       exitWithError(exp.getMessage());
     }
 
-    printInformation(model + " property set.");
+    if (alias != null) {
+      printInformation(model + " version " + alias + " property set.");
+    } else {
+      printInformation(model + " version " + version + " property set.");
+    }
   }
 
   /** {@inheritDoc} */

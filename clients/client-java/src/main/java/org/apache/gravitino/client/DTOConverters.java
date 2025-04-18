@@ -391,6 +391,15 @@ class DTOConverters {
       return new ModelVersionUpdateRequest.UpdateModelVersionComment(
           ((ModelVersionChange.UpdateComment) change).newComment());
 
+    } else if (change instanceof ModelVersionChange.SetProperty) {
+      return new ModelVersionUpdateRequest.SetModelVersionPropertyRequest(
+          ((ModelVersionChange.SetProperty) change).property(),
+          ((ModelVersionChange.SetProperty) change).value());
+
+    } else if (change instanceof ModelVersionChange.RemoveProperty) {
+      return new ModelVersionUpdateRequest.RemoveModelVersionPropertyRequest(
+          ((ModelVersionChange.RemoveProperty) change).property());
+
     } else {
       throw new IllegalArgumentException(
           "Unknown model version change type: " + change.getClass().getSimpleName());
