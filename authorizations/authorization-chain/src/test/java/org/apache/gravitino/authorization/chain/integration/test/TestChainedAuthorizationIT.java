@@ -247,7 +247,7 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
   private void doTestCreateSchema(String roleName, SecurableObject securableObject)
       throws IOException {
     // Choose a catalog
-    useCatalog();
+    reset();
 
     // First, fail to create the schema
     Exception accessControlException =
@@ -426,7 +426,7 @@ public class TestChainedAuthorizationIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void useCatalog() {
+  protected void reset() {
     // TODO
   }
 

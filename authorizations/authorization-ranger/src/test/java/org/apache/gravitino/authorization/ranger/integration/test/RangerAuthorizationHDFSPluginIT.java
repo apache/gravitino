@@ -194,7 +194,7 @@ public class RangerAuthorizationHDFSPluginIT {
                           authorizationSecurableObject -> {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
-                            return pathBasedMetadataObject.path().equals("/test/*/*/")
+                            return pathBasedMetadataObject.path().equals("/test/*/*")
                                 && pathBasedMetadataObject.recursive();
                           })
                       .count());
@@ -234,7 +234,7 @@ public class RangerAuthorizationHDFSPluginIT {
                           authorizationSecurableObject -> {
                             PathBasedMetadataObject pathBasedMetadataObject =
                                 ((PathBasedMetadataObject) authorizationSecurableObject);
-                            return pathBasedMetadataObject.path().equals("/test/*/")
+                            return pathBasedMetadataObject.path().equals("/test/*")
                                 && pathBasedMetadataObject.recursive();
                           })
                       .count());

@@ -139,10 +139,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     if (client != null) {
       Arrays.stream(catalog.asSchemas().listSchemas())
           .filter(schema -> !schema.equals("default"))
-          .forEach(
-              (schema -> {
-                catalog.asSchemas().dropSchema(schema, false);
-              }));
+          .forEach((schema -> catalog.asSchemas().dropSchema(schema, false)));
 
       // The `dropCatalog` call will invoke the catalog metadata object to remove privileges
       Arrays.stream(metalake.listCatalogs())
@@ -203,11 +200,15 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   protected abstract void checkDeleteSQLWithModifyPrivileges();
 
-  protected abstract void useCatalog();
+  protected abstract void reset();
 
   protected abstract void checkWithoutPrivileges();
 
   protected abstract void testAlterTable();
+
+  protected void testDropTable() {
+    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+  }
 
   // ISSUE-5947: can't rename a catalog or a metalake
   @Test
@@ -224,25 +225,14 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  protected void testCreateSchema() throws InterruptedException, IOException {
+  protected void testCreateSchema() throws InterruptedException {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestCreateSchemaChecker createSchemaChecker = getTestCreateSchemaChecker();
 
     // First, fail to create the schema
-    Assertions.assertThrows(Exception.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
-    Exception accessControlException =
-        Assertions.assertThrows(Exception.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
-    Assertions.assertTrue(
-        accessControlException
-                .getMessage()
-                .contains(
-                    String.format(
-                        "Permission denied: user [%s] does not have [create] privilege",
-                        testUserName()))
-            || accessControlException
-                .getMessage()
-                .contains(
-                    String.format("Permission denied: user=%s, access=WRITE", testUserName())));
+    createSchemaChecker.checkCreateSchemaWithoutPriv();
 
     // Second, grant the `CREATE_SCHEMA` role
     String roleName = currentFunName();
@@ -256,18 +246,35 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // Third, succeed to create the schema
     sparkSession.sql(SQL_CREATE_SCHEMA);
 
-    // Fourth, fail to create the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+    // Fourth, test to create the table
+    createSchemaChecker.checkCreateTable();
 
     // Clean up
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.deleteRole(roleName);
   }
 
+  protected TestCreateSchemaChecker getTestCreateSchemaChecker() {
+    return new TestCreateSchemaChecker();
+  }
+
+  protected static class TestCreateSchemaChecker {
+    void checkCreateSchemaWithoutPriv() {
+      Assertions.assertThrows(Exception.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    }
+
+    void checkCreateTable() {
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+    }
+  }
+
   @Test
-  void testCreateTable() throws InterruptedException {
+  void testCreateTable() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestCreateTableChecker checker = getTestCreateTableChecker();
 
     // First, create a role for creating a database and grant role to the user
     String createSchemaRole = currentFunName();
@@ -285,7 +292,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
     // Third, fail to create a table
     sparkSession.sql(SQL_USE_SCHEMA);
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+    checker.checkCreateTable();
 
     // Fourth, create a role for creating a table and grant to the user
     String createTableRole = currentFunName() + "2";
@@ -301,9 +308,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_CREATE_TABLE);
 
     // Sixth, fail to read and write a table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    checker.checkTableReadWrite();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
@@ -312,10 +317,30 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake.deleteRole(createSchemaRole);
   }
 
+  protected TestCreateTableChecker getTestCreateTableChecker() {
+    return new TestCreateTableChecker();
+  }
+
+  protected static class TestCreateTableChecker {
+    void checkTableReadWrite() {
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_SELECT_TABLE).collectAsList());
+    }
+
+    void checkCreateTable() {
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+    }
+  }
+
   @Test
-  void testSelectModifyTableWithMetalakeLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithMetalakeLevelRole() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestSelectModifyTableChecker checker = getTestSelectModifyTableChecker();
 
     // First, create a role for creating a database and grant role to the user
     String readWriteRole = currentFunName();
@@ -346,31 +371,61 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
-    checkUpdateSQLWithSelectModifyPrivileges();
+    checker.checkUpdateSQL();
 
     // case 4:  Delete data from the table.
-    checkDeleteSQLWithSelectModifyPrivileges();
+    checker.checkDeleteSQL();
 
     // case 5: Succeed to alter the table
     testAlterTable();
 
     // case 6: Fail to drop the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    testDropTable();
 
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(readWriteRole);
     waitForUpdatingPolicies();
-    checkWithoutPrivileges();
+    checker.checkNoPrivSQL();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
+    waitForUpdatingPolicies();
+  }
+
+  TestSelectModifyTableChecker getTestSelectModifyTableChecker() {
+    return new TestSelectModifyTableChecker() {
+      @Override
+      void checkUpdateSQL() {
+        checkUpdateSQLWithSelectModifyPrivileges();
+      }
+
+      @Override
+      void checkDeleteSQL() {
+        checkDeleteSQLWithSelectModifyPrivileges();
+      }
+
+      @Override
+      void checkNoPrivSQL() {
+        checkWithoutPrivileges();
+      }
+    };
+  }
+
+  protected abstract static class TestSelectModifyTableChecker {
+    abstract void checkUpdateSQL();
+
+    abstract void checkDeleteSQL();
+
+    abstract void checkNoPrivSQL();
   }
 
   @Test
-  void testSelectModifyTableWithTableLevelRole() throws InterruptedException {
+  void testSelectModifyTableWithTableLevelRole() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestSelectModifyTableChecker checker = getTestSelectModifyTableChecker();
 
     // First, create a role for creating a database and grant role to the user
     String roleName = currentFunName();
@@ -410,21 +465,21 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table.
-    checkUpdateSQLWithSelectModifyPrivileges();
+    checker.checkUpdateSQL();
 
     // case 4: Delete data from the table.
-    checkDeleteSQLWithSelectModifyPrivileges();
+    checker.checkDeleteSQL();
 
     // case 5: Succeed to alter the table
     testAlterTable();
 
     // case 6: Fail to drop the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    testDropTable();
 
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(roleName);
     waitForUpdatingPolicies();
-    checkWithoutPrivileges();
+    checker.checkNoPrivSQL();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
@@ -432,9 +487,11 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testSelectOnlyTable() throws InterruptedException {
+  void testSelectOnlyTable() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestSelectOnlyTableChecker checker = getTestSelectOnlyTableChecker();
 
     // First, create a role for creating a database and grant role to the user
     String readOnlyRole = currentFunName();
@@ -458,37 +515,90 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_CREATE_TABLE);
 
     // case 1: Fail to insert data into table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
+    checker.checkInsertSQL();
 
     // case 2: Succeed to select data from the table
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
-    checkUpdateSQLWithSelectPrivileges();
+    checker.checkUpdateSQL();
 
     // case 4: Delete data from the table
-    checkDeleteSQLWithSelectPrivileges();
+    checker.checkDeleteSQL();
 
-    // case 5: Fail to alter the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_ALTER_TABLE));
+    // case 5: Test to alter the table
+    checker.checkAlterSQL();
 
-    // case 6: Fail to drop the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    // case 6: Test to drop the table
+    checker.checkDropSQL();
 
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(readOnlyRole);
     waitForUpdatingPolicies();
-    checkWithoutPrivileges();
+    checker.checkNoPrivSQL();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
+  TestSelectOnlyTableChecker getTestSelectOnlyTableChecker() {
+    return new TestSelectOnlyTableChecker() {
+      @Override
+      void checkUpdateSQL() {
+        checkUpdateSQLWithSelectPrivileges();
+      }
+
+      @Override
+      void checkDeleteSQL() {
+        checkDeleteSQLWithSelectPrivileges();
+      }
+
+      @Override
+      void checkNoPrivSQL() {
+        checkWithoutPrivileges();
+      }
+
+      @Override
+      void checkInsertSQL() {
+        Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_INSERT_TABLE));
+      }
+
+      @Override
+      void checkAlterSQL() {
+        Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_ALTER_TABLE));
+      }
+
+      @Override
+      void checkDropSQL() {
+        Assertions.assertThrows(
+            AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+      }
+    };
+  }
+
+  protected abstract static class TestSelectOnlyTableChecker {
+    abstract void checkUpdateSQL();
+
+    abstract void checkDeleteSQL();
+
+    abstract void checkNoPrivSQL();
+
+    abstract void checkInsertSQL();
+
+    abstract void checkDropSQL();
+
+    abstract void checkAlterSQL();
+  }
+
   @Test
-  void testModifyOnlyTable() throws InterruptedException {
+  void testModifyOnlyTable() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestModifyOnlyTableChecker checker = getTestModifyOnlyTableChecker();
 
     // First, create a role for creating a database and grant role to the user
     String writeOnlyRole = currentFunName();
@@ -518,31 +628,58 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     sparkSession.sql(SQL_SELECT_TABLE).collectAsList();
 
     // case 3: Update data in the table
-    checkUpdateSQLWithModifyPrivileges();
+    checker.checkUpdateSQL();
 
     // case 4: Delete data from the table
-    checkDeleteSQLWithModifyPrivileges();
+    checker.checkDeleteSQL();
 
     // case 5: Succeed to alter the table
     testAlterTable();
 
     // case 6: Fail to drop the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_TABLE));
+    testDropTable();
 
     // case 7: If we don't have the role, we can't insert and select from data.
     metalake.deleteRole(writeOnlyRole);
     waitForUpdatingPolicies();
-    checkWithoutPrivileges();
+    checker.checkNoPrivSQL();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
+  TestModifyOnlyTableChecker getTestModifyOnlyTableChecker() {
+    return new TestModifyOnlyTableChecker() {
+      @Override
+      void checkUpdateSQL() {
+        checkUpdateSQLWithModifyPrivileges();
+      }
+
+      @Override
+      void checkDeleteSQL() {
+        checkDeleteSQLWithModifyPrivileges();
+      }
+
+      @Override
+      void checkNoPrivSQL() {
+        checkWithoutPrivileges();
+      }
+    };
+  }
+
+  protected abstract static class TestModifyOnlyTableChecker {
+    abstract void checkUpdateSQL();
+
+    abstract void checkDeleteSQL();
+
+    abstract void checkNoPrivSQL();
+  }
+
   @Test
-  void testCreateAllPrivilegesRole() throws InterruptedException {
+  void testCreateAllPrivilegesRole() {
     // Choose a catalog
-    useCatalog();
+    reset();
 
     // Create a role
     String roleName = currentFunName();
@@ -589,12 +726,13 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testDeleteAndRecreateRole() throws InterruptedException {
+  void testDeleteAndRecreateRole() {
     // Choose a catalog
-    useCatalog();
+    reset();
 
+    TestDeleteAndRecreateRoleChecker checker = getTestDeleteAndRecreateRoleChecker();
     // Fail to create schema
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    checker.checkDropSchema();
 
     // Create a role with CREATE_SCHEMA privilege
     String roleName = currentFunName();
@@ -613,14 +751,14 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // Succeed to create the schema
     sparkSession.sql(SQL_CREATE_SCHEMA);
     catalog.asSchemas().dropSchema(schemaName, false);
+    reset();
 
     // Delete the role
     metalake.deleteRole(roleName);
     waitForUpdatingPolicies();
 
     // Fail to create the schema
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    checker.checkCreateSchema();
 
     // Create the role again
     metalake.createRole(roleName, Collections.emptyMap(), Lists.newArrayList(securableObject));
@@ -637,10 +775,28 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake.deleteRole(roleName);
   }
 
+  protected TestDeleteAndRecreateRoleChecker getTestDeleteAndRecreateRoleChecker() {
+    return new TestDeleteAndRecreateRoleChecker();
+  }
+
+  protected static class TestDeleteAndRecreateRoleChecker {
+    void checkDropSchema() {
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    }
+
+    void checkCreateSchema() {
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    }
+  }
+
   @Test
-  void testDeleteAndRecreateMetadataObject() throws InterruptedException {
+  void testDeleteAndRecreateMetadataObject() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestDeleteAndRecreateMetadataObject checker = getTestDeleteAndRecreateMetadataObject();
 
     // Create a role with CREATE_SCHEMA privilege
     String roleName = currentFunName();
@@ -659,7 +815,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // Create a schema
     sparkSession.sql(SQL_CREATE_SCHEMA);
 
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    checker.checkDropSchema();
 
     // Set owner
     MetadataObject schemaObject =
@@ -675,8 +831,6 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // Recreate a schema
     sparkSession.sql(SQL_CREATE_SCHEMA);
 
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
-
     // Set owner
     schemaObject = MetadataObjects.of(catalogName, schemaName, MetadataObject.Type.SCHEMA);
     metalake.setOwner(schemaObject, userName1, Owner.Type.USER);
@@ -687,16 +841,31 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake.deleteRole(roleName);
     waitForUpdatingPolicies();
 
-    sparkSession.sql(SQL_CREATE_SCHEMA);
+    checker.checkRecreateSchema();
 
     // Clean up
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
+  TestDeleteAndRecreateMetadataObject getTestDeleteAndRecreateMetadataObject() {
+    return new TestDeleteAndRecreateMetadataObject();
+  }
+
+  protected static class TestDeleteAndRecreateMetadataObject {
+    void checkDropSchema() {
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_DROP_SCHEMA));
+    }
+
+    void checkRecreateSchema() {
+      sparkSession.sql(SQL_CREATE_SCHEMA);
+    }
+  }
+
   @Test
-  void testRenameMetadataObject() throws InterruptedException {
+  void testRenameMetadataObject() {
     // Choose a catalog
-    useCatalog();
+    reset();
 
     // Create a role with CREATE_SCHEMA and CREATE_TABLE privilege
     String roleName = currentFunName();
@@ -732,9 +901,9 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testRenameMetadataObjectPrivilege() throws InterruptedException {
+  void testRenameMetadataObjectPrivilege() {
     // Choose a catalog
-    useCatalog();
+    reset();
 
     // Create a role with CREATE_SCHEMA and CREATE_TABLE privilege
     String roleName = currentFunName();
@@ -781,9 +950,11 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @Test
-  void testChangeOwner() throws InterruptedException {
+  void testChangeOwner() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestChangeOwnerChecker checker = getTestChangeOwnerChecker();
 
     // Create a schema and a table
     String helperRole = currentFunName();
@@ -826,8 +997,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
     waitForUpdatingPolicies();
 
-    // Fail to create the table
-    Assertions.assertThrows(AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+    checker.checkCreateTable();
 
     // case 3. user is the schema owner
     MetadataObject schemaObject =
@@ -846,9 +1016,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     catalog.asSchemas().dropSchema(schemaName, false);
     waitForUpdatingPolicies();
 
-    // Fail to create schema
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    checker.checkCreateSchema();
 
     // case 4. user is the catalog owner
     MetadataObject catalogObject =
@@ -894,10 +1062,30 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     catalog.asSchemas().dropSchema(schemaName, false);
   }
 
+  TestChangeOwnerChecker getTestChangeOwnerChecker() {
+    return new TestChangeOwnerChecker();
+  }
+
+  protected static class TestChangeOwnerChecker {
+    void checkCreateTable() {
+      // Fail to create the table
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_TABLE));
+    }
+
+    void checkCreateSchema() {
+      // Fail to create schema
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    }
+  }
+
   @Test
   protected void testAllowUseSchemaPrivilege() throws InterruptedException {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestAllowUseSchemaPrivilegeChecker checker = getTestAllowUseSchemaPrivilegeChecker();
 
     // Create a role with CREATE_SCHEMA privilege
     String roleName = currentFunName();
@@ -923,13 +1111,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         roleName, catalogObject, Sets.newHashSet(Privileges.CreateSchema.allow()));
     waitForUpdatingPolicies();
 
-    // Use Spark to show this databases(schema)
-    Dataset dataset1 = sparkSession.sql(SQL_SHOW_DATABASES);
-    dataset1.show();
-    List<Row> rows1 = dataset1.collectAsList();
-    // The schema should not be shown, because the user does not have the permission
-    Assertions.assertEquals(
-        0, rows1.stream().filter(row -> row.getString(0).equals(schemaName)).count());
+    checker.checkShowSchemas();
 
     // Grant the privilege of using schema
     MetadataObject schemaObject =
@@ -938,17 +1120,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         roleName, schemaObject, Sets.newHashSet(Privileges.UseSchema.allow()));
     waitForUpdatingPolicies();
 
-    // Use Spark to show this databases(schema) again
-    Dataset dataset2 = sparkSession.sql(SQL_SHOW_DATABASES);
-    dataset2.show(100, 100);
-    List<Row> rows2 = dataset2.collectAsList();
-    rows2.stream()
-        .filter(row -> row.getString(0).equals(schemaName))
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("Database not found: " + schemaName));
-    // The schema should be shown, because the user has the permission
-    Assertions.assertEquals(
-        1, rows2.stream().filter(row -> row.getString(0).equals(schemaName)).count());
+    checker.checkShowSchemasAgain();
 
     // Clean up
     catalog.asTableCatalog().purgeTable(NameIdentifier.of(schemaName, tableName));
@@ -957,10 +1129,40 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     metalake.deleteRole(roleName);
   }
 
-  @Test
-  void testDenyPrivileges() throws InterruptedException {
+  protected TestAllowUseSchemaPrivilegeChecker getTestAllowUseSchemaPrivilegeChecker() {
+    return new TestAllowUseSchemaPrivilegeChecker();
+  }
+
+  protected static class TestAllowUseSchemaPrivilegeChecker {
+
+    void checkShowSchemas() {
+      // Use Spark to show this databases(schema)
+      Dataset dataset1 = sparkSession.sql(SQL_SHOW_DATABASES);
+      dataset1.show();
+      List<Row> rows1 = dataset1.collectAsList();
+      // The schema should not be shown, because the user does not have the permission
+      Assertions.assertEquals(
+          0, rows1.stream().filter(row -> row.getString(0).equals(schemaName)).count());
+    }
+
+    void checkShowSchemasAgain() {
+      // Use Spark to show this databases(schema) again
+      Dataset dataset2 = sparkSession.sql(SQL_SHOW_DATABASES);
+      dataset2.show(100, 100);
+      List<Row> rows2 = dataset2.collectAsList();
+      rows2.stream()
+          .filter(row -> row.getString(0).equals(schemaName))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("Database not found: " + schemaName));
+      // The schema should be shown, because the user has the permission
+      Assertions.assertEquals(
+          1, rows2.stream().filter(row -> row.getString(0).equals(schemaName)).count());
+    }
+  }
+
+  void testDenyPrivileges() {
     // Choose a catalog
-    useCatalog();
+    reset();
 
     // Create a schema
     catalog.asSchemas().createSchema(schemaName, "test", Collections.emptyMap());
@@ -1023,9 +1225,11 @@ public abstract class RangerBaseE2EIT extends BaseIT {
 
   // ISSUE-5892 Fix to grant privilege for the metalake
   @Test
-  void testGrantPrivilegesForMetalake() throws InterruptedException {
+  void testGrantPrivilegesForMetalake() {
     // Choose a catalog
-    useCatalog();
+    reset();
+
+    TestGrantPrivilegesForMetalakeChecker checker = getTestGrantPrivilegesForMetalakeChecker();
 
     // Create a schema
     String roleName = currentFunName();
@@ -1036,10 +1240,7 @@ public abstract class RangerBaseE2EIT extends BaseIT {
         roleName,
         MetadataObjects.of(null, metalakeName, MetadataObject.Type.METALAKE),
         Sets.newHashSet(Privileges.CreateSchema.allow()));
-
-    // Fail to create a schema
-    Assertions.assertThrows(
-        AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    checker.checkCreateSchema();
 
     // Granted this role to the spark execution user `HADOOP_USER_NAME`
     String userName1 = testUserName();
@@ -1052,5 +1253,17 @@ public abstract class RangerBaseE2EIT extends BaseIT {
     // Clean up
     catalog.asSchemas().dropSchema(schemaName, false);
     metalake.deleteRole(roleName);
+  }
+
+  TestGrantPrivilegesForMetalakeChecker getTestGrantPrivilegesForMetalakeChecker() {
+    return new TestGrantPrivilegesForMetalakeChecker();
+  }
+
+  protected static class TestGrantPrivilegesForMetalakeChecker {
+    void checkCreateSchema() {
+      // Fail to create a schema
+      Assertions.assertThrows(
+          AccessControlException.class, () -> sparkSession.sql(SQL_CREATE_SCHEMA));
+    }
   }
 }
