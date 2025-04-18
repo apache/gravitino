@@ -481,7 +481,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### How to access GCS fileset with credential vending
 
-If the catalog has been configured with credential, you can access GCS fileset without providing authentication information via GVFS Java/Python client and Spark. Let's see how to access GCS fileset with credential:
+When the catalog is configured with credentials and client-side credential vending is enabled,
+you can access GCS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.
 
 GVFS Java client:
 

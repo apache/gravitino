@@ -265,17 +265,7 @@ public class SecureHadoopCatalogOperations
   @Override
   public List<PathContext> getPathContext(NameIdentifier filesetIdentifier) {
     Fileset fileset = loadFileset(filesetIdentifier);
-    CallerContext callerContext = CallerContext.CallerContextHolder.get();
-    String targetLocationName =
-        callerContext != null
-            ? callerContext.context().get(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
-            : fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
-    String path = fileset.storageLocations().get(targetLocationName);
-    Preconditions.checkState(
-        StringUtils.isNotBlank(path),
-        "The location with the location name %s of the fileset %s should not be empty.",
-        targetLocationName,
-        filesetIdentifier);
+    String path = getTargetLocation(fileset);
 
     Set<String> providers =
         CredentialUtils.getCredentialProvidersByOrder(
@@ -291,6 +281,24 @@ public class SecureHadoopCatalogOperations
     return providers.stream()
         .map(provider -> new PathContext(path, provider))
         .collect(Collectors.toList());
+  }
+
+  private String getTargetLocation(Fileset fileset) {
+    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+    String targetLocationName =
+        callerContext != null
+                && callerContext
+                    .context()
+                    .containsKey(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
+            ? callerContext.context().get(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
+            : fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+    String path = fileset.storageLocations().get(targetLocationName);
+    Preconditions.checkState(
+        StringUtils.isNotBlank(path),
+        "The location with the location name %s of the fileset %s should not be empty.",
+        targetLocationName,
+        fileset.name());
+    return path;
   }
 
   /**
