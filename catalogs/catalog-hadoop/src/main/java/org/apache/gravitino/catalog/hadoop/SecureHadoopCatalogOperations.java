@@ -48,7 +48,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
-import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -268,7 +268,7 @@ public class SecureHadoopCatalogOperations
     CallerContext callerContext = CallerContext.CallerContextHolder.get();
     String targetLocationName =
         callerContext != null
-            ? callerContext.context().get(Credential.HTTP_HEADER_CURRENT_LOCATION_NAME)
+            ? callerContext.context().get(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
             : fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
     String path = fileset.storageLocations().get(targetLocationName);
     Preconditions.checkState(

@@ -32,7 +32,7 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -228,9 +228,10 @@ public class Utils {
     Map<String, String> filteredHeaders = Maps.newHashMap();
 
     String currentLocationName =
-        httpRequest.getHeader(Credential.HTTP_HEADER_CURRENT_LOCATION_NAME);
+        httpRequest.getHeader(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME);
     if (StringUtils.isNotBlank(currentLocationName)) {
-      filteredHeaders.put(Credential.HTTP_HEADER_CURRENT_LOCATION_NAME, currentLocationName);
+      filteredHeaders.put(
+          CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, currentLocationName);
     }
     return filteredHeaders;
   }
