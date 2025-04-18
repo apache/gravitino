@@ -83,6 +83,7 @@ public class ErrorMessages {
   public static final String UNKNOWN_GROUP = "Unknown group.";
   public static final String UNKNOWN_METALAKE = "Unknown metalake name.";
   public static final String UNKNOWN_MODEL = "Unknown model name.";
+  public static final String UNKNOWN_MODEL_VERSION = "Unknown model version.";
   public static final String UNKNOWN_PRIVILEGE = "Unknown privilege";
   public static final String UNKNOWN_ROLE = "Unknown role.";
   public static final String UNKNOWN_SCHEMA = "Unknown schema name.";
