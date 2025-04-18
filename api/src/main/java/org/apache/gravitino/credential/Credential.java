@@ -29,9 +29,6 @@ public interface Credential {
   /** Credential expire time in ms since the epoch. */
   String EXPIRE_TIME_IN_MS = "expire-time-in-ms";
 
-  /** The HTTP header used to get the credential from fileset location */
-  String HTTP_HEADER_CURRENT_LOCATION_NAME = "CurrentLocationName";
-
   /**
    * Returns the type of the credential. It should be the same as the credential type of the
    * credential provider.

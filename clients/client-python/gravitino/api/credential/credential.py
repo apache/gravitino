@@ -23,7 +23,7 @@ class Credential(ABC):
     """Represents the credential in Gravitino."""
 
     # The HTTP header used to get the credential from fileset location
-    HTTP_HEADER_CURRENT_LOCATION_NAME = "CurrentLocationName"
+    HTTP_HEADER_CURRENT_LOCATION_NAME = "Current-Location-Name"
 
     @abstractmethod
     def credential_type(self) -> str:
