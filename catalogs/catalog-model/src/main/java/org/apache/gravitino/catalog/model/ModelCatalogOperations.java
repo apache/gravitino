@@ -416,6 +416,15 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       if (change instanceof ModelVersionChange.UpdateComment) {
         entityComment = ((ModelVersionChange.UpdateComment) change).newComment();
 
+      } else if (change instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setPropertyChange = (ModelVersionChange.SetProperty) change;
+        doSetProperty(entityProperties, setPropertyChange);
+
+      } else if (change instanceof ModelVersionChange.RemoveProperty) {
+        ModelVersionChange.RemoveProperty removePropertyChange =
+            (ModelVersionChange.RemoveProperty) change;
+        doRemoveProperty(entityProperties, removePropertyChange);
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model version change: " + change.getClass().getSimpleName());
@@ -488,5 +497,15 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
 
   private void doSetProperty(Map<String, String> entityProperties, ModelChange.SetProperty change) {
     entityProperties.put(change.property(), change.value());
+  }
+
+  private void doSetProperty(
+      Map<String, String> entityProperties, ModelVersionChange.SetProperty change) {
+    entityProperties.put(change.property(), change.value());
+  }
+
+  private void doRemoveProperty(
+      Map<String, String> entityProperties, ModelVersionChange.RemoveProperty change) {
+    entityProperties.remove(change.property());
   }
 }
