@@ -34,6 +34,27 @@ class ModelVersionChange(ABC):
         """
         return ModelVersionChange.UpdateComment(comment)
 
+    @staticmethod
+    def set_property(key, value):
+        """Creates a new model version change to set a property and value pair for the model version.
+        Args:
+            key: The key of the property.
+            value: The value of the property.
+        Returns:
+            The model version change.
+        """
+        return ModelVersionChange.SetProperty(key, value)
+
+    @staticmethod
+    def remove_property(key: str):
+        """Creates a new model version change to remove a property from the model version.
+        Args:
+            key: The key of the property.
+        Returns:
+            The model version change.
+        """
+        return ModelVersionChange.RemoveProperty(key)
+
     class UpdateComment:
         """A model version change to update the comment of the model version."""
 
@@ -76,3 +97,94 @@ class ModelVersionChange(ABC):
                 A string summary of this comment update operation.
             """
             return f"UpdateComment {self._new_comment}"
+
+    class SetProperty:
+        """A model version change to set a property and value pair for the model version."""
+
+        def __init__(self, key: str, value: str):
+            self._key = key
+            self._value = value
+
+        def property(self) -> str:
+            """Retrieves the name of the property.
+            Returns:
+                The name of the property.
+            """
+            return self._key
+
+        def value(self) -> str:
+            """Retrieves the value of the property.
+            Returns:
+                The value of the property.
+            """
+            return self._value
+
+        def __eq__(self, other):
+            """Compares this SetProperty instance with another object for equality. Two instances are
+            considered equal if they designate the same key and value pair for the model version.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model version property set operation;  false otherwise.
+            """
+            if not isinstance(other, ModelVersionChange.SetProperty):
+                return False
+            return self.key() == other.key() and self.value() == other.value()
+
+        def __hash__(self):
+            """Generates a hash code for this SetProperty instance. The hash code is primarily based on
+            the key and value pair for the model version.
+            Returns:
+                A hash code value for this property set operation.
+            """
+            return hash((self.key(), self.value()))
+
+        def __str__(self):
+            """Provides a string representation of the SetProperty instance. This string includes the
+            class name followed by the key and value pair for the model version.
+            Returns:
+                A string summary of this property set operation.
+            """
+            return f"SetProperty {self.key()}={self.value()}"
+
+    class RemoveProperty:
+        """A model version change to remove a property from the model version."""
+
+        def __init__(self, key: str):
+            self._key = key
+
+        def property(self) -> str:
+            """Retrieves the name of the property.
+            Returns:
+                The name of the property.
+            """
+            return self._key
+
+        def __eq__(self, other):
+            """Compares this RemoveProperty instance with another object for equality. Two instances are
+            considered equal if they designate the same key for the model version.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model version property remove operation;
+                false otherwise.
+            """
+            if not isinstance(other, ModelVersionChange.RemoveProperty):
+                return False
+            return self.key() == other.key()
+
+        def __hash__(self):
+            """Generates a hash code for this RemoveProperty instance. The hash code is primarily based on
+            the key for the model version.
+            Returns:
+                A hash code value for this property remove operation.
+            """
+            return hash(self.key())
+
+        def __str__(self):
+            """Provides a string representation of the RemoveProperty instance. This string includes the
+            class name followed by the key for the model version.
+            Returns:
+                A string summary of this property remove operation.
+            """
+            return f"RemoveProperty {self.key()}"
