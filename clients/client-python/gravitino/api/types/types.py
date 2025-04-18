@@ -741,7 +741,6 @@ class Types:
 
     class ListType(ComplexType):
         """The list type in Gravitino."""
-
         _element_type: Type
         _element_nullable: bool
 
