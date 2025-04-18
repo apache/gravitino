@@ -24,6 +24,7 @@ from gcsfs import GCSFileSystem
 
 from gravitino import Catalog, Fileset, GravitinoClient
 from gravitino.filesystem import gvfs
+from gravitino.filesystem.gvfs_config import GVFSConfig
 from tests.integration.test_gvfs_with_gcs import TestGvfsWithGCS
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,12 @@ class TestGvfsWithGCSCredential(TestGvfsWithGCS):
     key_file = os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH_FOR_CREDENTIAL")
     bucket_name = os.environ.get("GCS_BUCKET_NAME_FOR_CREDENTIAL")
     metalake_name: str = "TestGvfsWithGCSCredential_metalake" + str(randint(1, 10000))
+
+    def setUp(self):
+        self.options = {
+            f"{GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE}": self.key_file,
+            GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING: True,
+        }
 
     @classmethod
     def _init_test_entities(cls):

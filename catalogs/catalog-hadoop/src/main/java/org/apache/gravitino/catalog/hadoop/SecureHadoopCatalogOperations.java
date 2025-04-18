@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.security.auth.Subject;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -39,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.catalog.hadoop.authentication.UserContext;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -46,6 +48,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -262,17 +265,11 @@ public class SecureHadoopCatalogOperations
   @Override
   public List<PathContext> getPathContext(NameIdentifier filesetIdentifier) {
     Fileset fileset = loadFileset(filesetIdentifier);
-    Map<String, String> locations = fileset.storageLocations();
-    Preconditions.checkArgument(
-        locations != null && !locations.isEmpty(),
-        "No storage locations found for fileset: " + filesetIdentifier);
-
-    // todo: support multiple storage locations
-    String path = locations.get(fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
+    String path = getTargetLocation(fileset);
 
     Set<String> providers =
         CredentialUtils.getCredentialProvidersByOrder(
-            () -> fileset.properties(),
+            fileset::properties,
             () -> {
               Namespace namespace = filesetIdentifier.namespace();
               NameIdentifier schemaIdentifier =
@@ -284,6 +281,24 @@ public class SecureHadoopCatalogOperations
     return providers.stream()
         .map(provider -> new PathContext(path, provider))
         .collect(Collectors.toList());
+  }
+
+  private String getTargetLocation(Fileset fileset) {
+    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+    String targetLocationName =
+        callerContext != null
+                && callerContext
+                    .context()
+                    .containsKey(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
+            ? callerContext.context().get(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
+            : fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+    String path = fileset.storageLocations().get(targetLocationName);
+    Preconditions.checkState(
+        StringUtils.isNotBlank(path),
+        "The location with the location name %s of the fileset %s should not be empty.",
+        targetLocationName,
+        fileset.name());
+    return path;
   }
 
   /**

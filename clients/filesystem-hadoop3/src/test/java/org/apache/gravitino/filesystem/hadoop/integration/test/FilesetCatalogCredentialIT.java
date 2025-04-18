@@ -152,6 +152,6 @@ public class FilesetCatalogCredentialIT extends BaseIT {
     Fileset fileset = catalog.asFilesetCatalog().loadFileset(filesetIdent);
     Credential[] credentials = fileset.supportsCredentials().getCredentials();
     Assertions.assertEquals(1, credentials.length);
-    Assertions.assertTrue(credentials[0] instanceof S3TokenCredential);
+    Assertions.assertInstanceOf(S3TokenCredential.class, credentials[0]);
   }
 }

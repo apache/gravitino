@@ -523,12 +523,14 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### How to access S3 fileset with credential vending
 
-If the catalog has been configured with credential, you can access S3 fileset without providing authentication information via GVFS Java/Python client and Spark. Let's see how to access S3 fileset with credential:
+When the catalog is configured with credentials and client-side credential vending is enabled,
+you can access S3 filesets directly using the GVFS Java/Python client or Spark without providing authentication details.
 
 GVFS Java client:
 
 ```java
 Configuration conf = new Configuration();
+conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
@@ -545,6 +547,7 @@ Spark:
 ```python
 spark = SparkSession.builder
     .appName("s3_fileset_test")
+    .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")

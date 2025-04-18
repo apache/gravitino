@@ -67,6 +67,7 @@ class TestGvfsWithCredentialABS(TestGvfsWithABS):
         self.options = {
             GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME: self.azure_abs_account_name,
             GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY: self.azure_abs_account_key,
+            GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING: True,
         }
 
     @classmethod
