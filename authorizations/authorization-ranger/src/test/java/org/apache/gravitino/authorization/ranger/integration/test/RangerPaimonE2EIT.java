@@ -115,7 +115,7 @@ public class RangerPaimonE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void useCatalog() {
+  protected void reset() {
     String userName1 = System.getenv(HADOOP_USER_NAME);
     String roleName = currentFunName();
     SecurableObject securableObject =
