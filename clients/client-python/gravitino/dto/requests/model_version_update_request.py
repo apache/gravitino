@@ -61,3 +61,49 @@ class ModelVersionUpdateRequest:
 
         def model_version_change(self):
             return ModelVersionChange.update_comment(self._new_comment)
+
+    @dataclass
+    class SetModelVersionPropertyRequest(ModelVersionUpdateRequestBase):
+        """Request to update model version properties"""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+        _value: Optional[str] = field(metadata=config(field_name="value"))
+
+        def __init__(self, pro: str, value: str):
+            super().__init__("setProperty")
+            self._property = pro
+            self._value = value
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required')
+            if not self._value:
+                raise ValueError('"value" field is required')
+
+        def model_version_change(self) -> ModelVersionChange:
+            return ModelVersionChange.set_property(self._property, self._value)
+
+    @dataclass
+    class RemoveModelVersionPropertyRequest(ModelVersionUpdateRequestBase):
+        """Request to remove model version properties"""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+
+        def __init__(self, pro: str):
+            super().__init__("removeProperty")
+            self._property = pro
+
+        def key(self):
+            """
+            Returns the key of the property to remove.
+            Returns:
+                str: The key of the property to remove.
+            """
+            return self._property
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required')
+
+        def model_version_change(self):
+            return ModelVersionChange.remove_property(self._property)

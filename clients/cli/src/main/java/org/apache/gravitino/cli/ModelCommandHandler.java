@@ -185,14 +185,8 @@ public class ModelCommandHandler extends CommandHandler {
         && line.hasOption(GravitinoOptions.COMMENT)
         && (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {
       String comment = line.getOptionValue(GravitinoOptions.COMMENT);
-      Integer version =
-          line.hasOption(GravitinoOptions.VERSION)
-              ? Integer.parseInt(line.getOptionValue(GravitinoOptions.VERSION))
-              : null;
-      String alias =
-          line.hasOption(GravitinoOptions.ALIAS)
-              ? getOneAlias(line.getOptionValues(GravitinoOptions.ALIAS))
-              : null;
+      Integer version = getVersionFromLine(line);
+      String alias = getAliasFromLine(line);
 
       gravitinoCommandLine
           .newUpdateModelVersionComment(
@@ -211,18 +205,42 @@ public class ModelCommandHandler extends CommandHandler {
   private void handleSetCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
     String value = line.getOptionValue(GravitinoOptions.VALUE);
-    gravitinoCommandLine
-        .newSetModelProperty(context, metalake, catalog, schema, model, property, value)
-        .validate()
-        .handle();
+
+    if (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION)) {
+      Integer version = getVersionFromLine(line);
+      String alias = getAliasFromLine(line);
+      gravitinoCommandLine
+          .newSetModelVersionProperty(
+              context, metalake, catalog, schema, model, version, alias, property, value)
+          .validate()
+          .handle();
+    } else {
+      gravitinoCommandLine
+          .newSetModelProperty(context, metalake, catalog, schema, model, property, value)
+          .validate()
+          .handle();
+    }
   }
 
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
-    gravitinoCommandLine
-        .newRemoveModelProperty(context, metalake, catalog, schema, model, property)
-        .validate()
-        .handle();
+
+    if (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION)) {
+      Integer version = getVersionFromLine(line);
+      String alias = getAliasFromLine(line);
+
+      gravitinoCommandLine
+          .newRemoveModelVersionProperty(
+              context, metalake, catalog, schema, model, version, alias, property)
+          .validate()
+          .handle();
+    } else {
+
+      gravitinoCommandLine
+          .newRemoveModelProperty(context, metalake, catalog, schema, model, property)
+          .validate()
+          .handle();
+    }
   }
 
   private String getOneAlias(String[] aliases) {
@@ -231,5 +249,17 @@ public class ModelCommandHandler extends CommandHandler {
       Main.exit(-1);
     }
     return aliases[0];
+  }
+
+  private Integer getVersionFromLine(CommandLine line) {
+    return line.hasOption(GravitinoOptions.VERSION)
+        ? Integer.parseInt(line.getOptionValue(GravitinoOptions.VERSION))
+        : null;
+  }
+
+  private String getAliasFromLine(CommandLine line) {
+    return line.hasOption(GravitinoOptions.ALIAS)
+        ? getOneAlias(line.getOptionValues(GravitinoOptions.ALIAS))
+        : null;
   }
 }

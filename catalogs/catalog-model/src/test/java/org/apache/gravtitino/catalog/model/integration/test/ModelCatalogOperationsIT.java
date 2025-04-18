@@ -331,7 +331,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
-  void testLinkAndUpdateModelVersionCommentViaVersion() {
+  void testLinkAndUpdateModelVersionComment() {
     String modelName = RandomNameUtils.genRandomName("model1");
     Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
@@ -480,6 +480,148 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+  }
+
+  @Test
+  void testLinkAndSetModelVersionProperties() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> newProperties =
+        ImmutableMap.of("key1", "new value", "key2", "val2", "key3", "val3");
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", aliases, "comment", properties);
+
+    ModelVersion modelVersion = gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals("uri", modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals("comment", modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange[] changes = {
+      ModelVersionChange.setProperty("key1", "new value"),
+      ModelVersionChange.setProperty("key3", "val3")
+    };
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, 0, changes);
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+  }
+
+  @Test
+  void testLinkAndSetModelVersionPropertiesByAlias() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> newProperties =
+        ImmutableMap.of("key1", "new value", "key2", "val2", "key3", "val3");
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", aliases, "comment", properties);
+
+    ModelVersion modelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, aliases[0]);
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals("uri", modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals("comment", modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange[] changes = {
+      ModelVersionChange.setProperty("key1", "new value"),
+      ModelVersionChange.setProperty("key3", "val3")
+    };
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, aliases[0], changes);
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+  }
+
+  @Test
+  void testLinkAndRemoveModelVersionProperties() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> newProperties = ImmutableMap.of("key2", "val2");
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", aliases, "comment", properties);
+
+    ModelVersion modelVersion = gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals("uri", modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals("comment", modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange change = ModelVersionChange.removeProperty("key1");
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, 0, change);
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+  }
+
+  @Test
+  void testLinkAndRemoveModelVersionPropertiesByAlias() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> newProperties = ImmutableMap.of("key2", "val2");
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", aliases, "comment", properties);
+
+    ModelVersion modelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, aliases[0]);
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals("uri", modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals("comment", modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange change = ModelVersionChange.removeProperty("key1");
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, aliases[0], change);
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
   }
 
   private void createMetalake() {
