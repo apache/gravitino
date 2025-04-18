@@ -378,7 +378,29 @@ class BaseGVFSOperations(ABC):
         actual_fs = self._get_filesystem(
             actual_location, catalog, fileset_ident, target_location_name
         )
+        self._create_fileset_location_if_needed(
+            catalog.properties(), actual_fs, actual_location
+        )
         return actual_fs
+
+    def _create_fileset_location_if_needed(
+        self,
+        catalog_props: Dict[str, str],
+        actual_fs: AbstractFileSystem,
+        fileset_path: str,
+    ):
+        # If the server-side filesystem ops are disabled, the fileset directory may not exist. In
+        # such case the operations like create, open, list files under this directory will fail.
+        # So we need to check the existence of the fileset directory beforehand.
+        fs_ops_disabled = catalog_props.get("disable-filesystem-ops", "false")
+        if fs_ops_disabled.lower() == "true":
+            if not actual_fs.exists(fileset_path):
+                actual_fs.makedir(fileset_path, create_parents=True)
+                logger.info(
+                    "Automatically created a directory for fileset path: %s when "
+                    "disable-filesystem-ops sets to true in the server side",
+                    fileset_path,
+                )
 
     def _get_actual_file_path(
         self, gvfs_path: str, location_name: str, operation: FilesetDataOperation
