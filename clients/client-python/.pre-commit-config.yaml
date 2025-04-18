@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#  http://www.apache.org/licenses/LICENSE-2.0
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -15,18 +15,26 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# Configuration file for the Sphinx documentation builder.
+#
+# For the full list of built-in configuration values, see the documentation:
+# https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# the tools to publish the python client to Pypi
-requests==2.32.3
-dataclasses-json==0.6.7
-readerwriterlock==1.0.9
-fsspec==2024.3.1
-pyarrow==15.0.2
-cachetools==5.5.2
-gcsfs==2024.3.1
-s3fs==2024.3.1
-ossfs==2023.12.0
-adlfs==2023.12.0
-black==24.4.2
-flake8==7.0.0
-pre-commit==3.5.0
+# -- Project information -----------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
+
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black
+        language_version: python3
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [--max-line-length=100]
+        additional_dependencies: []
+
+default_stages: [pre-commit]
