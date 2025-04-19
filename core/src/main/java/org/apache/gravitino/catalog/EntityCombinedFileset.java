@@ -77,8 +77,8 @@ public final class EntityCombinedFileset implements Fileset {
   }
 
   @Override
-  public String storageLocation() {
-    return fileset.storageLocation();
+  public Map<String, String> storageLocations() {
+    return fileset.storageLocations();
   }
 
   @Override

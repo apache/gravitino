@@ -282,6 +282,18 @@ public abstract class GravitinoClientBase implements Closeable {
     }
 
     /**
+     * Sets CustomTokenProvider for the Gravitino.
+     *
+     * @param dataProvider The CustomTokenProvider used as the provider of authentication data for
+     *     Gravitino Client.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withCustomTokenAuth(CustomTokenProvider dataProvider) {
+      this.authDataProvider = dataProvider;
+      return this;
+    }
+
+    /**
      * Set base header for Gravitino Client.
      *
      * @param headers the base header.
