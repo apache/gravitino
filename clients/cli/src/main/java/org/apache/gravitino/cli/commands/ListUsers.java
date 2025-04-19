@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.cli.commands;
 
+import java.util.Arrays;
+import java.util.List;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
@@ -56,7 +60,27 @@ public class ListUsers extends Command {
     if (users.length == 0) {
       printInformation("No users exist.");
     } else {
-      printResults(String.join(",", users));
+      User[] userObjects = Arrays.stream(users).map(this::getUser).toArray(User[]::new);
+      printResults(userObjects);
     }
+  }
+
+  private User getUser(String user) {
+    return new User() {
+      @Override
+      public String name() {
+        return user;
+      }
+
+      @Override
+      public List<String> roles() {
+        return null;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return null;
+      }
+    };
   }
 }

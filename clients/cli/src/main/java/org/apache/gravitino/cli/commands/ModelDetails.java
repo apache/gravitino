@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -61,13 +60,11 @@ public class ModelDetails extends Command {
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, model);
     Model gModel = null;
-    int[] versions = new int[0];
 
     try {
       GravitinoClient client = buildClient(metalake);
       ModelCatalog modelCatalog = client.loadCatalog(catalog).asModelCatalog();
       gModel = modelCatalog.getModel(name);
-      versions = modelCatalog.listModelVersions(name);
     } catch (NoSuchMetalakeException noSuchMetalakeException) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException noSuchCatalogException) {
@@ -79,9 +76,7 @@ public class ModelDetails extends Command {
     } catch (Exception err) {
       exitWithError(err.getMessage());
     }
-    String basicInfo =
-        String.format("Model name %s, latest version: %s%n", gModel.name(), gModel.latestVersion());
-    String versionInfo = Arrays.toString(versions);
-    printResults(basicInfo + "versions: " + versionInfo);
+
+    printResults(gModel);
   }
 }
