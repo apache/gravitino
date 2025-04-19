@@ -69,7 +69,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    HudiCatalogBackend hudiCatalogBackend = CatalogUtils.loadHudiCatalogBackend(config);
+    HudiCatalogBackend hudiCatalogBackend = CatalogUtils.loadHudiCatalogBackend(config, info);
     hudiCatalogBackendOps = hudiCatalogBackend.backendOps();
   }
 
