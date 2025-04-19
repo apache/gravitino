@@ -34,8 +34,8 @@ public class GravitinoAuthorizerProvider {
   private GravitinoAuthorizer gravitinoAuthorizer;
 
   /**
-   * Use Java SPI to obtain the {@link GravitinoAuthorizerFactory}, instantiate the {@link
-   * GravitinoAuthorizer}, and then execute the initialize method in the GravitinoAuthorizer.
+   * Instantiate the {@link GravitinoAuthorizer}, and then execute the initialize method in the
+   * GravitinoAuthorizer.
    *
    * @param serverConfig Gravitino server config
    */
