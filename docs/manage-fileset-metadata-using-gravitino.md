@@ -327,7 +327,7 @@ when creating a fileset, or follow the rules of the catalog/schema location if n
 
 The value of `storageLocation` depends on the configuration settings of the catalog:
 - For a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
-- If this is a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
+- For a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
 
 For a `MANAGED` fileset, the storage location is:
 
