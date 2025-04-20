@@ -21,6 +21,7 @@ package org.apache.gravitino.rel.types;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.StringJoiner;
 
 /** The helper class for {@link Type}. */
@@ -330,7 +331,7 @@ public class Types {
 
   /** The time type in Gravitino. */
   public static class TimeType extends Type.DateTimeType {
-    private static final TimeType INSTANCE = new TimeType(0);
+    private static final TimeType INSTANCE = new TimeType(Optional.empty());
 
     /** @return The singleton instance of {@link TimeType}. */
     public static TimeType get() {
@@ -341,19 +342,24 @@ public class Types {
      * @param precision The precision of the time type.
      * @return A {@link TimeType} with the given precision.
      */
-    public static TimeType of(int precision) {
-      return new TimeType(precision);
+    public static TimeType of(Integer precision) {
+      return new TimeType(Optional.of(precision));
     }
 
-    private final int precision;
+    private final Optional<Integer> precision;
 
-    private TimeType(int precision) {
+    private TimeType(Optional<Integer> precision) {
       this.precision = precision;
     }
 
+    /** @return True if the time type has precision specified, false otherwise. */
+    public boolean hasPrecision() {
+      return precision.isPresent();
+    }
+
     /** @return The precision of the time type. */
-    public int precision() {
-      return precision;
+    public Integer precision() {
+      return precision.orElse(null);
     }
 
     @Override
@@ -363,7 +369,10 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return precision == 0 ? "time" : String.format("time(%d)", precision);
+      if (!precision.isPresent()) {
+        return "time";
+      }
+      return String.format("time(%d)", precision.get());
     }
 
     @Override
@@ -371,7 +380,7 @@ public class Types {
       if (this == o) return true;
       if (!(o instanceof TimeType)) return false;
       TimeType that = (TimeType) o;
-      return precision == that.precision;
+      return Objects.equals(precision, that.precision);
     }
 
     @Override
@@ -382,39 +391,41 @@ public class Types {
 
   /** The timestamp type in Gravitino. */
   public static class TimestampType extends Type.DateTimeType {
-    private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false, 0);
-    private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true, 0);
-
-    /** @return A {@link TimestampType} with time zone. */
-    public static TimestampType withTimeZone() {
-      return INSTANCE_WITH_TIME_ZONE;
-    }
+    private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE =
+        new TimestampType(false, Optional.empty());
+    private static final TimestampType INSTANCE_WITH_TIME_ZONE =
+        new TimestampType(true, Optional.empty());
 
     /** @return A {@link TimestampType} without time zone. */
     public static TimestampType withoutTimeZone() {
       return INSTANCE_WITHOUT_TIME_ZONE;
     }
 
-    /**
-     * @param precision The precision of the timestamp type.
-     * @return A {@link TimestampType} with the given precision and time zone.
-     */
-    public static TimestampType withTimeZone(int precision) {
-      return new TimestampType(true, precision);
+    /** @return A {@link TimestampType} with time zone. */
+    public static TimestampType withTimeZone() {
+      return INSTANCE_WITH_TIME_ZONE;
     }
 
     /**
      * @param precision The precision of the timestamp type.
      * @return A {@link TimestampType} with the given precision and without time zone.
      */
-    public static TimestampType withoutTimeZone(int precision) {
-      return new TimestampType(false, precision);
+    public static TimestampType withoutTimeZone(Integer precision) {
+      return new TimestampType(false, Optional.ofNullable(precision));
+    }
+
+    /**
+     * @param precision The precision of the timestamp type.
+     * @return A {@link TimestampType} with the given precision and time zone.
+     */
+    public static TimestampType withTimeZone(Integer precision) {
+      return new TimestampType(true, Optional.ofNullable(precision));
     }
 
     private final boolean withTimeZone;
-    private final int precision;
+    private final Optional<Integer> precision;
 
-    private TimestampType(boolean withTimeZone, int precision) {
+    private TimestampType(boolean withTimeZone, Optional<Integer> precision) {
       this.withTimeZone = withTimeZone;
       this.precision = precision;
     }
@@ -424,9 +435,14 @@ public class Types {
       return withTimeZone;
     }
 
+    /** @return True if the timestamp type has precision specified, false otherwise. */
+    public boolean hasPrecision() {
+      return precision.isPresent();
+    }
+
     /** @return The precision of the timestamp type. */
-    public int precision() {
-      return precision;
+    public Integer precision() {
+      return precision.orElse(null);
     }
 
     @Override
@@ -437,12 +453,12 @@ public class Types {
     /** @return The simple string representation of the timestamp type. */
     @Override
     public String simpleString() {
-      if (precision == 0) {
+      if (!hasPrecision()) {
         return withTimeZone ? "timestamp_tz" : "timestamp";
       }
       return withTimeZone
-          ? String.format("timestamp_tz(%d)", precision)
-          : String.format("timestamp(%d)", precision);
+          ? String.format("timestamp_tz(%d)", precision())
+          : String.format("timestamp(%d)", precision());
     }
 
     @Override
@@ -450,7 +466,7 @@ public class Types {
       if (this == o) return true;
       if (!(o instanceof TimestampType)) return false;
       TimestampType that = (TimestampType) o;
-      return withTimeZone == that.withTimeZone && precision == that.precision;
+      return withTimeZone == that.withTimeZone && Objects.equals(precision, that.precision);
     }
 
     @Override
