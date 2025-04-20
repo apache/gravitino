@@ -1045,6 +1045,16 @@ public class TestCatalogOperations
     for (ModelVersionChange change : changes) {
       if (change instanceof ModelVersionChange.UpdateComment) {
         newComment = ((ModelVersionChange.UpdateComment) change).newComment();
+
+      } else if (change instanceof ModelVersionChange.RemoveProperty) {
+        ModelVersionChange.RemoveProperty removeProperty =
+            (ModelVersionChange.RemoveProperty) change;
+        newProps.remove(removeProperty.property());
+
+      } else if (change instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
+        newProps.put(setProperty.property(), setProperty.value());
+
       } else {
         throw new IllegalArgumentException("Unsupported model change: " + change);
       }

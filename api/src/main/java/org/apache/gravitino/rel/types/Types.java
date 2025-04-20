@@ -654,10 +654,7 @@ public class Types {
     }
   }
 
-  /**
-   * The struct type in Gravitino. Note, this type is not supported in the current version of
-   * Gravitino.
-   */
+  /** The struct type in Gravitino. */
   public static class StructType extends Type.ComplexType {
 
     /**
@@ -827,7 +824,7 @@ public class Types {
     }
   }
 
-  /** A list type. Note, this type is not supported in the current version of Gravitino. */
+  /** The list type in Gravitino. */
   public static class ListType extends Type.ComplexType {
 
     /**
@@ -912,10 +909,7 @@ public class Types {
     }
   }
 
-  /**
-   * The map type in Gravitino. Note, this type is not supported in the current version of
-   * Gravitino.
-   */
+  /** The map type in Gravitino. */
   public static class MapType extends Type.ComplexType {
 
     /**
@@ -1009,10 +1003,7 @@ public class Types {
     }
   }
 
-  /**
-   * The union type in Gravitino. Note, this type is not supported in the current version of
-   * Gravitino.
-   */
+  /** The union type in Gravitino. */
   public static class UnionType extends Type.ComplexType {
 
     /**

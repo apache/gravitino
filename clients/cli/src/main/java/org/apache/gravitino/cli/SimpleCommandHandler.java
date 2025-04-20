@@ -44,7 +44,7 @@ public class SimpleCommandHandler extends CommandHandler {
   /** Handles the command execution logic based on the provided command. */
   @Override
   protected void handle() {
-    if (line.hasOption(GravitinoOptions.VERSION)) {
+    if (line.hasOption(GravitinoOptions.CLIENT)) {
       gravitinoCommandLine.newClientVersion(context).validate().handle();
     } else if (line.hasOption(GravitinoOptions.SERVER)) {
       gravitinoCommandLine.newServerVersion(context).validate().handle();
