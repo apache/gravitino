@@ -20,11 +20,11 @@ package org.apache.gravitino.spark.connector.jdbc.postgresql;
 
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalog;
-import org.apache.gravitino.spark.connector.jdbc.postgersql.PostgreSqlPropertiesConverter;
+import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConverter;
 
 public class GravitinoPostgreSqlCatalogSpark34 extends GravitinoJdbcCatalog {
   @Override
   protected PropertiesConverter getPropertiesConverter() {
-    return PostgreSqlPropertiesConverter.getInstance();
+    return JdbcPropertiesConverter.getPGInstance();
   }
 }

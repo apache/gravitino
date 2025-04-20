@@ -27,14 +27,27 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 
 public class JdbcPropertiesConverter implements PropertiesConverter {
 
+  private final boolean supportsTableProperties;
+
   public static class JdbcPropertiesConverterHolder {
     private static final JdbcPropertiesConverter INSTANCE = new JdbcPropertiesConverter();
+    private static final JdbcPropertiesConverter PG_INSTANCE = new JdbcPropertiesConverter(false);
   }
 
-  private JdbcPropertiesConverter() {}
+  private JdbcPropertiesConverter() {
+    this(true);
+  }
+
+  private JdbcPropertiesConverter(boolean supportsTableProperties) {
+    this.supportsTableProperties = supportsTableProperties;
+  }
 
   public static JdbcPropertiesConverter getInstance() {
     return JdbcPropertiesConverterHolder.INSTANCE;
+  }
+
+  public static JdbcPropertiesConverter getPGInstance() {
+    return JdbcPropertiesConverterHolder.PG_INSTANCE;
   }
 
   private static final Map<String, String> GRAVITINO_CONFIG_TO_JDBC =
@@ -63,6 +76,13 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
+    if (!this.supportsTableProperties) {
+      for (String key : properties.keySet()) {
+        if (key.equals("owner")) {
+          throw new UnsupportedOperationException("Unsupported Gravitino table property 'owner'");
+        }
+      }
+    }
     return new HashMap<>(properties);
   }
 

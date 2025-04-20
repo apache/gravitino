@@ -103,6 +103,10 @@ public enum TestDatabaseName {
     }
   },
 
+  /**
+   * Represents the PostgreSQL database for
+   * org.apache.gravitino.spark.connector.integration.test.jdbc.SparkJdbcPostgreSqlCatalogIT.
+   */
   PG_CATALOG_PG_IT {
     /** PostgreSQL only accept lowercase database name */
     @Override

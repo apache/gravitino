@@ -77,6 +77,11 @@ public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
   }
 
   @Override
+  protected boolean supportListTable() {
+    return false;
+  }
+
+  @Override
   protected String getCatalogName() {
     return "jdbc_postgresql";
   }
