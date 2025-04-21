@@ -19,10 +19,14 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
+import org.apache.gravitino.cli.utils.CliUtils;
 
 /** Handles the command execution for Tables based on command type and the command line options. */
 public class TableCommandHandler extends CommandHandler {
@@ -35,6 +39,64 @@ public class TableCommandHandler extends CommandHandler {
   private final String catalog;
   private final String schema;
   private String table;
+
+  public static final Map<String, CliUtils.CliOptions> cliOptions =
+      ImmutableMap.of(
+          CommandActions.LIST,
+              new CliUtils.CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.NAME),
+                  ImmutableList.of(GravitinoOptions.CommandOptions.OUTPUT)),
+          CommandActions.DETAILS,
+              new CliUtils.CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.NAME),
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.AUDIT,
+                      GravitinoOptions.CommandOptions.INDEX,
+                      GravitinoOptions.CommandOptions.DISTRIBUTION,
+                      GravitinoOptions.CommandOptions.PARTITION,
+                      GravitinoOptions.CommandOptions.SORTORDER,
+                      GravitinoOptions.CommandOptions.OUTPUT)),
+          CommandActions.DELETE,
+              new CliUtils.CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.NAME),
+                  ImmutableList.of(GravitinoOptions.CommandOptions.FORCE)),
+          CommandActions.SET,
+              new CliUtils.CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.NAME,
+                      GravitinoOptions.CommandOptions.PROPERTY,
+                      GravitinoOptions.CommandOptions.VALUE),
+                  ImmutableList.of()),
+          CommandActions.REMOVE,
+              new CliUtils.CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.NAME,
+                      GravitinoOptions.CommandOptions.PROPERTY),
+                  ImmutableList.of()),
+          CommandActions.PROPERTIES,
+              new CliUtils.CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.NAME),
+                  ImmutableList.of(GravitinoOptions.CommandOptions.OUTPUT)),
+          CommandActions.UPDATE,
+              new CliUtils.CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.NAME),
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.COMMENT,
+                      GravitinoOptions.CommandOptions.RENAME,
+                      GravitinoOptions.CommandOptions.ENABLE,
+                      GravitinoOptions.CommandOptions.DISABLE)));
 
   /**
    * Constructs a {@link TableCommandHandler} instance.

@@ -61,6 +61,7 @@ public class GravitinoOptions {
   public static final String USER = "user";
   public static final String VALUE = "value";
   public static final String VERSION = "version";
+  public static final String VERBOSE = "verbose";
   public static final String ALL = "all";
   public static final String ENABLE = "enable";
   public static final String DISABLE = "disable";
@@ -129,8 +130,56 @@ public class GravitinoOptions {
     options.addOption(createSimpleOption("f", FORCE, "force operation"));
 
     options.addOption(createArgOption(OUTPUT, "output format (plain/table)"));
+    options.addOption(createSimpleOption(null, VERBOSE, "verbose mode"));
 
     return options;
+  }
+
+  // TODO use this enum replace the GravitinoOptions class.
+  public enum CommandOptions {
+    URL(null, "url", "Gravitino URL (default: http://localhost:8090)"),
+    LOGIN(null, "login", "user name"),
+    IGNORE(null, "ignore", "ignore client/sever version check"),
+    QUIET(null, "quiet", "quiet mode"),
+    OUTPUT(null, "output", "output format (plain/table)"),
+    FORCE(null, "force", "force operation"),
+    AUDIT(null, "audit", "display audit information"),
+    COMMENT(null, "comment", "entity comment"),
+    PROPERTY(null, "property", "property name/value pairs"),
+    VALUE(null, "value", "property value"),
+    DISABLE(null, "disable", "disable entities"),
+    ENABLE(null, "enable", "enable entities"),
+    METALAKE(null, "metalake", "metalake name"),
+    RENAME(null, "rename", "new entity name"),
+    NAME(null, "name", "full entity name (dot separated)"),
+    INDEX(null, "index", "display index information"),
+    DISTRIBUTION(null, "distribution", "display distribution information"),
+    PARTITION(null, "partition", "display partition information"),
+    OWNER(null, "owner", "display entity owner"),
+    SORTORDER(null, "sortorder", "display sortorder information"),
+    VERBOSE(null, "verbose", "verbose mode");
+
+    private final String shortName;
+    private final String value;
+    private final String description;
+
+    public String getShortName() {
+      return shortName;
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    public String getDescription() {
+      return description;
+    }
+
+    CommandOptions(String shortName, String value, String description) {
+      this.shortName = shortName;
+      this.value = value;
+      this.description = description;
+    }
   }
 
   /**
