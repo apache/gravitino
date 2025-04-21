@@ -542,6 +542,11 @@ class GenericModelCatalog(BaseSchemaCatalog):
                 change.property()
             )
 
+        if isinstance(change, ModelVersionChange.UpdateUri):
+            return ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
+                change.new_uri()
+            )
+
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def _check_model_namespace(self, namespace: Namespace):

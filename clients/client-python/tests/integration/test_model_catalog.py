@@ -375,6 +375,45 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(update_property_model.aliases(), aliases)
         self.assertEqual(update_property_model.properties(), {"k1": "v11", "k3": "v3"})
 
+    def test_link_update_model_version_uri(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        aliases = ["alias1", "alias2"]
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri",
+            aliases=aliases,
+            comment="comment",
+            properties={"k1": "v1", "k2": "v2"},
+        )
+
+        original_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+
+        self.assertEqual(0, original_model_version.version())
+        self.assertEqual("uri", original_model_version.uri())
+        self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
+        self.assertEqual("comment", original_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+
+        changes = [ModelVersionChange.update_uri("new_uri")]
+        self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
+
+        updated_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+        self.assertEqual(0, updated_model_version.version())
+        self.assertEqual("new_uri", updated_model_version.uri())
+        self.assertEqual(["alias1", "alias2"], updated_model_version.aliases())
+        self.assertEqual("comment", updated_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+
     def test_link_get_model_version(self):
         model_name = "model_it_model" + str(randint(0, 1000))
         model_ident = NameIdentifier.of(self._schema_name, model_name)
