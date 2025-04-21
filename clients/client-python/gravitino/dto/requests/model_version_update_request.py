@@ -107,3 +107,34 @@ class ModelVersionUpdateRequest:
 
         def model_version_change(self):
             return ModelVersionChange.remove_property(self._property)
+
+    @dataclass
+    class UpdateModelVersionUriRequest(ModelVersionUpdateRequestBase):
+        """Request to update model version uri"""
+
+        _new_uri: Optional[str] = field(metadata=config(field_name="newUri"))
+        """Represents a request to update the uri on a Metalake."""
+
+        def __init__(self, new_uri: str):
+            super().__init__("updateUri")
+            self._new_uri = new_uri
+
+        def new_uri(self):
+            """Retrieves the new uri of the model version.
+            Returns:
+                The new uri of the model version.
+            """
+            return self._new_uri
+
+        def validate(self):
+            """Validates the fields of the request. Always pass."""
+            if not self._new_uri:
+                raise ValueError('"newUri" field is required')
+
+        def model_version_change(self):
+            """
+            Returns a ModelVersionChange object representing the update uri operation.
+            Returns:
+                ModelVersionChange: The ModelVersionChange object representing the update uri operation.
+            """
+            return ModelVersionChange.update_uri(self._new_uri)
