@@ -563,13 +563,20 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     }
 
     Fileset fileset = loadFileset(ident);
-    locationName =
-        locationName == null
-            ? fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME)
-            : locationName;
-    if (!fileset.storageLocations().containsKey(locationName)) {
+    String targetLocationName;
+    if (locationName == null) {
+      targetLocationName =
+          fileset.storageLocations().size() == 1
+              // to be compatible with the old version, the fileset in old version only has one
+              // location and does not have the default-location-name property
+              ? fileset.storageLocations().keySet().iterator().next()
+              : fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+    } else {
+      targetLocationName = locationName;
+    }
+    if (!fileset.storageLocations().containsKey(targetLocationName)) {
       throw new NoSuchLocationNameException(
-          "Location name %s does not exist in fileset %s", locationName, ident);
+          "Location name %s does not exist in fileset %s", targetLocationName, ident);
     }
 
     boolean isSingleFile = false;
@@ -581,7 +588,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               + "file location may be a wrong path. Please avoid using Fileset to manage a single"
               + " file path.");
     } else {
-      isSingleFile = checkSingleFile(fileset, locationName);
+      isSingleFile = checkSingleFile(fileset, targetLocationName);
     }
 
     // if the storage location is a single file, it cannot have sub path to access.

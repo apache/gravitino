@@ -285,20 +285,48 @@ public class SecureHadoopCatalogOperations
 
   private String getTargetLocation(Fileset fileset) {
     CallerContext callerContext = CallerContext.CallerContextHolder.get();
-    String targetLocationName =
-        callerContext != null
-                && callerContext
-                    .context()
-                    .containsKey(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
-            ? callerContext.context().get(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)
-            : fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
-    String path = fileset.storageLocations().get(targetLocationName);
-    Preconditions.checkState(
-        StringUtils.isNotBlank(path),
+    String targetLocationName;
+    String targetLocation;
+    if (callerContext != null
+        && callerContext
+            .context()
+            .containsKey(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)) {
+      // case 1: target location name is passed in the header
+      targetLocationName =
+          callerContext.context().get(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME);
+      Preconditions.checkArgument(
+          fileset.storageLocations().containsKey(targetLocationName),
+          "The location name %s is not in the fileset %s, expected location names are %s",
+          targetLocationName,
+          fileset.name(),
+          fileset.storageLocations().keySet());
+      targetLocation = fileset.storageLocations().get(targetLocationName);
+
+    } else if (fileset.storageLocations().size() == 1) {
+      // case 2: target location name is not passed in the header, but there is only one location.
+      // note: mainly used for backward compatibility since the old code does not pass the header
+      // and only supports one location
+      targetLocation = fileset.storageLocations().values().iterator().next();
+      targetLocationName = fileset.storageLocations().keySet().iterator().next();
+
+    } else {
+      // case 3: target location name is not passed in the header, and there are multiple locations.
+      // use the default location name
+      targetLocationName = fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+      // this should never happen, but just in case
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(targetLocationName),
+          "The default location name of the fileset %s should not be empty.",
+          fileset.name());
+      targetLocation = fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+    }
+
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(targetLocation),
         "The location with the location name %s of the fileset %s should not be empty.",
         targetLocationName,
         fileset.name());
-    return path;
+    return targetLocation;
   }
 
   /**

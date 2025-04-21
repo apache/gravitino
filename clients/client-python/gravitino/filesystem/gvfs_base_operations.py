@@ -379,7 +379,7 @@ class BaseGVFSOperations(ABC):
         )
         target_location_name = location_name or fileset.properties().get(
             fileset.PROPERTY_DEFAULT_LOCATION_NAME
-        )
+        ) or fileset.LOCATION_NAME_UNKNOWN
         actual_location = fileset.storage_locations().get(target_location_name)
         if actual_location is None:
             raise NoSuchLocationNameException(
