@@ -55,6 +55,16 @@ class ModelVersionChange(ABC):
         """
         return ModelVersionChange.RemoveProperty(key)
 
+    @staticmethod
+    def update_uri(uri: str):
+        """Creates a new model version change to update the uri of the model version.
+        Args:
+            uri: The new uri of the model version.
+        Returns:
+            The model version change.
+        """
+        return ModelVersionChange.UpdateUri(uri)
+
     class UpdateComment:
         """A model version change to update the comment of the model version."""
 
@@ -188,3 +198,45 @@ class ModelVersionChange(ABC):
                 A string summary of this property remove operation.
             """
             return f"RemoveProperty {self.key()}"
+
+    class UpdateUri:
+        """A model version change to update the URI of the model version."""
+
+        def __init__(self, new_uri: str):
+            self._new_uri = new_uri
+
+        def new_uri(self) -> str:
+            """Retrieves the new URI of the model version.
+            Returns:
+                The new URI of the model version.
+            """
+            return self._new_uri
+
+        def __eq__(self, other):
+            """Compares this UpdateUri instance with another object for equality. Two instances are
+            considered equal if they designate the same new URI for the model version.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model version URI update operation;
+                false otherwise.
+            """
+            if not isinstance(other, ModelVersionChange.UpdateUri):
+                return False
+            return self.new_uri() == other.new_uri()
+
+        def __hash__(self):
+            """Generates a hash code for this UpdateUri instance. The hash code is primarily based on
+            the new URI for the model version.
+            Returns:
+                A hash code value for this URI update operation.
+            """
+            return hash(self.new_uri())
+
+        def __str__(self):
+            """Provides a string representation of the UpdateUri instance. This string includes the
+            class name followed by the new URI of the model version.
+            Returns:
+                A string summary of this URI update operation.
+            """
+            return f"UpdateUri {self._new_uri}"
