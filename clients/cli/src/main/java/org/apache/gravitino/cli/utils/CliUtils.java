@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli.utils;
 
 import static org.apache.gravitino.cli.TableCommandHandler.cliOptions;
-import static sun.awt.FontConfiguration.verbose;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -35,6 +34,7 @@ import org.apache.gravitino.cli.GravitinoOptions;
 import org.apache.gravitino.cli.Main;
 import org.apache.gravitino.cli.MetalakeCommandHandler;
 
+/** This class contains utility methods for the CLI. */
 public class CliUtils {
   public static class CliOptions {
     List<GravitinoOptions.CommandOptions> necessaryParams;
