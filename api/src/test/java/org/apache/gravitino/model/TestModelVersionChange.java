@@ -155,4 +155,48 @@ public class TestModelVersionChange {
     Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
     Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
   }
+
+  @Test
+  void testUpdateUriChangeUseStaticMethod() {
+    String newUri = "S3://bucket/key";
+    ModelVersionChange modelVersionChange = ModelVersionChange.updateUri(newUri);
+
+    Assertions.assertEquals(ModelVersionChange.UpdateUri.class, modelVersionChange.getClass());
+
+    ModelVersionChange.UpdateUri updateUriChange =
+        (ModelVersionChange.UpdateUri) modelVersionChange;
+    Assertions.assertEquals(newUri, updateUriChange.newUri());
+    Assertions.assertEquals("UpdateUri " + newUri, updateUriChange.toString());
+  }
+
+  @Test
+  void testUpdateUriChangeUseConstructor() {
+    String newUri = "S3://bucket/key";
+    ModelVersionChange modelVersionChange = new ModelVersionChange.UpdateUri(newUri);
+
+    Assertions.assertEquals(ModelVersionChange.UpdateUri.class, modelVersionChange.getClass());
+
+    ModelVersionChange.UpdateUri updateUriChange =
+        (ModelVersionChange.UpdateUri) modelVersionChange;
+    Assertions.assertEquals(newUri, updateUriChange.newUri());
+    Assertions.assertEquals("UpdateUri " + newUri, updateUriChange.toString());
+  }
+
+  @Test
+  void testUpdateUriChangeEquals() {
+    String uri1 = "S3://bucket/key1";
+    String uri2 = "S3://bucket/key2";
+
+    ModelVersionChange modelVersionChange1 = ModelVersionChange.updateUri(uri1);
+    ModelVersionChange modelVersionChange2 = ModelVersionChange.updateUri(uri1);
+    ModelVersionChange modelVersionChange3 = ModelVersionChange.updateUri(uri2);
+
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
+    Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
+    Assertions.assertNotEquals(modelVersionChange2, modelVersionChange3);
+
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
+    Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+  }
 }

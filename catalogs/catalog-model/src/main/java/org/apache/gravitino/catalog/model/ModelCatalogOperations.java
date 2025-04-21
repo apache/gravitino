@@ -425,6 +425,10 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             (ModelVersionChange.RemoveProperty) change;
         doRemoveProperty(entityProperties, removePropertyChange);
 
+      } else if (change instanceof ModelVersionChange.UpdateUri) {
+        ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
+        entityUri = updateUriChange.newUri();
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model version change: " + change.getClass().getSimpleName());
