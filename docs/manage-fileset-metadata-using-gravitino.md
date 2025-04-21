@@ -316,8 +316,10 @@ Currently, Gravitino supports two **types** of filesets:
    the fileset is dropped.
 
 :::note
-If the locations of the manged fileset do not exist, Gravitino will create/delete the locations when the fileset is created/deleted.
-Unless the catalog property `disable-filesystem-ops` is set to true or the location contains a [placeholder](./manage-fileset-metadata-using-gravitino.md#placeholder).
+During fileset creation or deletion, Gravitino automatically creates or removes the corresponding filesystem directories for the fileset locations.
+This behavior is skipped in either of these cases:
+1. When the catalog property `disable-filesystem-ops` is set to `true`
+2. When the location contains [placeholders](./manage-fileset-metadata-using-gravitino.md#placeholder)
 :::
 
 #### storageLocation
@@ -325,34 +327,25 @@ Unless the catalog property `disable-filesystem-ops` is set to true or the locat
 The `storageLocation` is the physical location of the fileset. Users can specify this location
 when creating a fileset, or follow the rules of the catalog/schema location if not specified.
 
-The value of `storageLocation` depends on the configuration settings of the catalog:
-- For a local fileset catalog, the `storageLocation` should be in the format of `file:///path/to/fileset`.
-- For a HDFS fileset catalog, the `storageLocation` should be in the format of `hdfs://namenode:port/path/to/fileset`.
+For a `MANAGED` fileset, the storage location is determined in the following priority order:
 
-For a `MANAGED` fileset, the storage location is:
+1. If the user specifies `storageLocation` during fileset creation:
+   - This location is used, with any [placeholders](#placeholder) replaced by the corresponding fileset property values.
 
-1. The one specified by the user during the fileset creation, and the [placeholder](#placeholder) will be replaced by the
-   corresponding fileset property value.
-2. When the catalog property `location` is specified but the schema property `location` isn't specified, the storage location is:
-   1. `catalog location/schema name/fileset name` if `catalog location` does not contain any placeholder. 
-   2. `catalog location` - placeholders in the catalog location will be replaced by the corresponding fileset property value.
+2. If the user doesn't specify `storageLocation`:
+   - If schema property `location` is specified:
+      - Use `<schema location>/<fileset name>` if schema location has no placeholders
+      - Use `<schema location>` with placeholders replaced by fileset property values
 
-3. When the catalog property `location` isn't specified but the schema property `location` is specified,
-   the storage location is:
-   1. `schema location/fileset name` if `schema location` does not contain any placeholder.
-   2. `schema location` - placeholders in the schema location will be replaced by the corresponding fileset property value.
-   
-4. When both the catalog property `location` and the schema property `location` are specified, the storage
-   location is:
-   1. `schema location/fileset name` if `schema location` does not contain any placeholder.
-   2. `schema location` - placeholders in the schema location will be replaced by the corresponding fileset property value.
+   - Otherwise, if catalog property `location` is specified:
+      - Use `<catalog location>/<schema name>/<fileset name>` if catalog location has no placeholders
+      - Use `<catalog location>` with placeholders replaced by fileset property values
 
-5. When both the catalog property `location` and schema property `location` isn't specified, the user
-   should specify the `storageLocation` in the fileset creation.
+   - If neither schema nor catalog location is specified:
+      - The user must provide `storageLocation` during fileset creation
 
-For `EXTERNAL` fileset, users should specify `storageLocation` during the fileset creation,
-otherwise, Gravitino will throw an exception. If the `storageLocation` contains placeholders, the
-placeholder will be replaced by the corresponding fileset property value.
+For an `EXTERNAL` fileset, the user must always specify `storageLocation` during fileset creation. 
+If the provided location contains placeholders, they will be replaced by the corresponding fileset property values.
 
 #### placeholder
 

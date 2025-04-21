@@ -120,8 +120,10 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
 Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
 
 :::note
-If the locations of the schema do not exist, Gravitino will create/delete the locations when the schema is created/deleted.
-Unless the catalog property `disable-filesystem-ops` is set to true or the location contains a [placeholder](./manage-fileset-metadata-using-gravitino.md#placeholder).
+During schema creation or deletion, Gravitino automatically creates or removes the corresponding filesystem directories for the schema locations. 
+This behavior is skipped in either of these cases:
+1. When the catalog property `disable-filesystem-ops` is set to `true`
+2. When the location contains [placeholders](./manage-fileset-metadata-using-gravitino.md#placeholder)
 :::
 
 ## Fileset
