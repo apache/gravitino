@@ -636,11 +636,12 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     // 1. if the storage location is a single file, we pass the storage location directly
     // 2. if the processed sub path is blank, we pass the storage location directly
     if (isSingleFile || StringUtils.isBlank(processedSubPath)) {
-      fileLocation = fileset.storageLocations().get(locationName);
+      fileLocation = fileset.storageLocations().get(targetLocationName);
     } else {
       // the processed sub path always starts with "/" if it is not blank,
       // so we can safely remove the tailing slash if storage location ends with "/".
-      String storageLocation = removeTrailingSlash(fileset.storageLocations().get(locationName));
+      String storageLocation =
+          removeTrailingSlash(fileset.storageLocations().get(targetLocationName));
       fileLocation = String.format("%s%s", storageLocation, processedSubPath);
     }
     return fileLocation;
