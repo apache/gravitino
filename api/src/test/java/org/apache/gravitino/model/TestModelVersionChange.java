@@ -157,16 +157,7 @@ public class TestModelVersionChange {
   }
 
   @Test
-  void testUpdateUriChangeUseStaticMethod() {}
-
-  @Test
-  void testUpdateUriChangeUseConstructor() {}
-
-  @Test
-  void testUpdateUriChangeEquals() {}
-
-  @Test
-  void testCreateAddReferenceChangeUseStaticMethod() {
+  void testUpdateUriChangeUseStaticMethod() {
     String newUri = "S3://bucket/key";
     ModelVersionChange modelVersionChange = ModelVersionChange.updateUri(newUri);
 
@@ -179,7 +170,7 @@ public class TestModelVersionChange {
   }
 
   @Test
-  void testCreateAddReferenceChangeUseConstructor() {
+  void testUpdateUriChangeUseConstructor() {
     String newUri = "S3://bucket/key";
     ModelVersionChange modelVersionChange = new ModelVersionChange.UpdateUri(newUri);
 
@@ -192,7 +183,7 @@ public class TestModelVersionChange {
   }
 
   @Test
-  void testAddReferenceChangeEquals() {
+  void testUpdateUriChangeEquals() {
     String uri1 = "S3://bucket/key1";
     String uri2 = "S3://bucket/key2";
 
