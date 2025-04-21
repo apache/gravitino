@@ -79,9 +79,10 @@ git config user.email "$GIT_EMAIL"
 PYGRAVITINO_RELEASE_VERSION="${RELEASE_VERSION/-incubating}"
 PYGRAVITINO_NEXT_VERSION=$(echo $NEXT_VERSION | sed 's/-incubating-SNAPSHOT/.dev0/')
 
-# Create release version for Java and Python
+# Create release version for Java, Python and Rust
 sed -i".tmp1" 's/version = .*$/version = '"$RELEASE_VERSION"'/g' gradle.properties
 sed -i".tmp2" 's/    version=.*$/    version="'"$PYGRAVITINO_RELEASE_VERSION"'",/g' clients/client-python/setup.py
+sed -i".tmp3" 's/^version = .*$/version = \"'"$RELEASE_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
 
 # update docs version
 "$SELF/update-java-doc-version.sh" "$RELEASE_VERSION" "$SELF/gravitino"
@@ -91,8 +92,9 @@ echo "Creating tag $RELEASE_TAG at the head of $GIT_BRANCH"
 git tag $RELEASE_TAG
 
 # Create next version
-sed -i".tmp3" 's/version = .*$/version = '"$NEXT_VERSION"'/g' gradle.properties
-sed -i".tmp4" 's/    version=.*$/    version="'"$PYGRAVITINO_NEXT_VERSION"'",/g' clients/client-python/setup.py
+sed -i".tmp4" 's/version = .*$/version = '"$NEXT_VERSION"'/g' gradle.properties
+sed -i".tmp5" 's/    version=.*$/    version="'"$PYGRAVITINO_NEXT_VERSION"'",/g' clients/client-python/setup.py
+sed -i".tmp6" 's/^version = .*$/version = \"'"$NEXT_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
 git commit -a -m "Preparing development version $NEXT_VERSION"
 
 if ! is_dry_run; then
