@@ -100,7 +100,7 @@ Please refer to [OpenLineage Spark guides](https://openlineage.io/docs/guides/sp
     </tr>
     <tr>
       <td><code>spark.sql.gravitino.catalogMappings</code></td>
-      <td>Catalog name mapping roles for the dataset not managed by Gravitino. For example <code>spark_catalog:catalog1,iceberg_catalog:catalog2</code> will map <code>spark_catalog</code> to <code>catalog1</code> and <code>iceberg_catalog</code> to <code>catalog2</code>, the other catalogs will not be mapped.</td>
+      <td>Catalog name mapping roles for the dataset not managed by Gravitino. For example <code>spark_catalog:catalog1,iceberg_catalog:catalog2</code> maps <code>spark_catalog</code> to <code>catalog1</code> and <code>iceberg_catalog</code> to <code>catalog2</code>, the other catalogs will not be mapped.</td>
       <td>None</td>
       <td>No</td>
       <td>0.9.0-incubating</td>
