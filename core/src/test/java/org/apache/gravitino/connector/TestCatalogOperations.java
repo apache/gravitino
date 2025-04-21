@@ -1055,6 +1055,10 @@ public class TestCatalogOperations
         ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
         newProps.put(setProperty.property(), setProperty.value());
 
+      } else if (change instanceof ModelVersionChange.UpdateUri) {
+        ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
+        newUri = updateUriChange.newUri();
+
       } else {
         throw new IllegalArgumentException("Unsupported model change: " + change);
       }
