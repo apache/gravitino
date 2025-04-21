@@ -400,6 +400,10 @@ class DTOConverters {
       return new ModelVersionUpdateRequest.RemoveModelVersionPropertyRequest(
           ((ModelVersionChange.RemoveProperty) change).property());
 
+    } else if (change instanceof ModelVersionChange.UpdateUri) {
+      return new ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
+          ((ModelVersionChange.UpdateUri) change).newUri());
+
     } else {
       throw new IllegalArgumentException(
           "Unknown model version change type: " + change.getClass().getSimpleName());

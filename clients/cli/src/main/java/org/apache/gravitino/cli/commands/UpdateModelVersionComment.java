@@ -95,7 +95,7 @@ public class UpdateModelVersionComment extends Command {
     }
 
     if (alias != null) {
-      printInformation(model + " version " + alias + " comment changed.");
+      printInformation(model + " alias " + alias + " comment changed.");
     } else {
       printInformation(model + " version " + version + " comment changed.");
     }
