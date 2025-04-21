@@ -194,6 +194,18 @@ public class ModelCommandHandler extends CommandHandler {
           .validate()
           .handle();
     }
+
+    if (line.hasOption(GravitinoOptions.NEW_URI)
+        && (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {
+      String newUri = line.getOptionValue(GravitinoOptions.NEW_URI);
+      Integer version = getVersionFromLine(line);
+      String alias = getAliasFromLine(line);
+      gravitinoCommandLine
+          .newUpdateModelVersionUri(
+              context, metalake, catalog, schema, model, version, alias, newUri)
+          .validate()
+          .handle();
+    }
   }
 
   /** Handles the "LIST" command. */
