@@ -72,21 +72,15 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case TIME:
-        return typeBean.getDatetimePrecision() == null
-            ? Types.TimeType.get()
-            : Types.TimeType.of(typeBean.getDatetimePrecision());
+        return Types.TimeType.of(typeBean.getDatetimePrecision());
         // MySQL converts TIMESTAMP values from the current time zone to UTC for storage, and back
         // from UTC to the current time zone for retrieval. (This does not occur for other types
         // such as DATETIME.) see more details:
         // https://dev.mysql.com/doc/refman/8.0/en/datetime.html
       case TIMESTAMP:
-        return typeBean.getDatetimePrecision() == null
-            ? Types.TimestampType.withTimeZone()
-            : Types.TimestampType.withTimeZone(typeBean.getDatetimePrecision());
+        return Types.TimestampType.withTimeZone(typeBean.getDatetimePrecision());
       case DATETIME:
-        return typeBean.getDatetimePrecision() == null
-            ? Types.TimestampType.withoutTimeZone()
-            : Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
+        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
       case DECIMAL:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
@@ -144,8 +138,8 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       // such as DATETIME.) see more details: https://dev.mysql.com/doc/refman/8.0/en/datetime.html
       Types.TimestampType timestampType = (Types.TimestampType) type;
       String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
-      return timestampType.hasPrecision()
-          ? String.format("%s(%d)", baseType, timestampType.precision())
+      return timestampType.precision().isPresent()
+          ? String.format("%s(%d)", baseType, timestampType.precision().get())
           : baseType;
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();

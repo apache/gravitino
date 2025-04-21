@@ -343,7 +343,7 @@ public class Types {
      * @return A {@link TimeType} with the given precision.
      */
     public static TimeType of(Integer precision) {
-      return new TimeType(Optional.of(precision));
+      return new TimeType(Optional.ofNullable(precision));
     }
 
     private final Optional<Integer> precision;
@@ -352,14 +352,9 @@ public class Types {
       this.precision = precision;
     }
 
-    /** @return True if the time type has precision specified, false otherwise. */
-    public boolean hasPrecision() {
-      return precision.isPresent();
-    }
-
     /** @return The precision of the time type. */
-    public Integer precision() {
-      return precision.orElse(null);
+    public Optional<Integer> precision() {
+      return precision;
     }
 
     @Override
@@ -369,10 +364,7 @@ public class Types {
 
     @Override
     public String simpleString() {
-      if (!precision.isPresent()) {
-        return "time";
-      }
-      return String.format("time(%d)", precision.get());
+      return precision.map(integer -> String.format("time(%d)", integer)).orElse("time");
     }
 
     @Override
@@ -435,14 +427,9 @@ public class Types {
       return withTimeZone;
     }
 
-    /** @return True if the timestamp type has precision specified, false otherwise. */
-    public boolean hasPrecision() {
-      return precision.isPresent();
-    }
-
     /** @return The precision of the timestamp type. */
-    public Integer precision() {
-      return precision.orElse(null);
+    public Optional<Integer> precision() {
+      return precision;
     }
 
     @Override
@@ -453,12 +440,13 @@ public class Types {
     /** @return The simple string representation of the timestamp type. */
     @Override
     public String simpleString() {
-      if (!hasPrecision()) {
-        return withTimeZone ? "timestamp_tz" : "timestamp";
-      }
-      return withTimeZone
-          ? String.format("timestamp_tz(%d)", precision())
-          : String.format("timestamp(%d)", precision());
+      return precision
+          .map(
+              integer ->
+                  withTimeZone
+                      ? String.format("timestamp_tz(%d)", integer)
+                      : String.format("timestamp(%d)", integer))
+          .orElse(withTimeZone ? "timestamp_tz" : "timestamp");
     }
 
     @Override

@@ -59,10 +59,8 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
 
   private static TimestampWithTimeZoneType getTimestampWithTimeZoneType(
       Types.TimestampType timestampType) {
-    if (!timestampType.hasPrecision()) {
-      return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
-    }
-    switch (timestampType.precision()) {
+    int precision = timestampType.precision().orElse(0);
+    switch (precision) {
       case TIMESTAMP_PRECISION_SECONDS:
         return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
       case TIMESTAMP_PRECISION_MILLIS:
@@ -72,17 +70,13 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       default:
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Invalid MySQL timestamp precision: "
-                + timestampType.precision()
-                + ". Valid values are 0, 3, 6");
+            "Invalid MySQL timestamp precision: " + precision + ". Valid values are 0, 3, 6");
     }
   }
 
   private static TimestampType getTimestampType(Types.TimestampType timestampType) {
-    if (!timestampType.hasPrecision()) {
-      return TimestampType.TIMESTAMP_SECONDS;
-    }
-    switch (timestampType.precision()) {
+    int precision = timestampType.precision().orElse(0);
+    switch (precision) {
       case TIMESTAMP_PRECISION_SECONDS:
         return TimestampType.TIMESTAMP_SECONDS;
       case TIMESTAMP_PRECISION_MILLIS:
@@ -92,17 +86,13 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       default:
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Invalid MySQL datetime precision: "
-                + timestampType.precision()
-                + ". Valid values are 0, 3, 6");
+            "Invalid MySQL datetime precision: " + precision + ". Valid values are 0, 3, 6");
     }
   }
 
   private static TimeType getTimeType(Types.TimeType timeType) {
-    if (!timeType.hasPrecision()) {
-      return TimeType.TIME_SECONDS;
-    }
-    switch (timeType.precision()) {
+    int precision = timeType.precision().orElse(0);
+    switch (precision) {
       case TIMESTAMP_PRECISION_SECONDS:
         return TimeType.TIME_SECONDS;
       case TIMESTAMP_PRECISION_MILLIS:
@@ -112,7 +102,7 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       default:
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Invalid MySQL time precision: " + timeType.precision() + ". Valid values are 0, 3, 6");
+            "Invalid MySQL time precision: " + precision + ". Valid values are 0, 3, 6");
     }
   }
 
