@@ -26,9 +26,9 @@ info:
     name: Apache 2.0
     url: http://www.apache.org/licenses/LICENSE-2.0.html
 paths:
-  /api/lineage:
+  /lineage:
     post:
-      summary: Send an event related to the state of a run
+      summary: Post runEvent
       description: Updates a run state for a job.
       operationId: postRunEvent
       tags:
@@ -42,8 +42,13 @@ paths:
                 - $ref: '#/components/schemas/DatasetEvent'
                 - $ref: '#/components/schemas/JobEvent'
       responses:
-        200:
+        "200":
           description: OK
+        "429":
+          description: Too Many Requests
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
   schemas:
     BaseEvent:
@@ -68,7 +73,7 @@ components:
         - producer
         - schemaURL
     BaseFacet:
-      description: all fields of the base facet are prefixed with _ to avoid name conflicts in facets
+      description: all fields of the base facet are prefixed with `_` to avoid name conflicts in facets.
       type: object
       properties:
         _producer:
