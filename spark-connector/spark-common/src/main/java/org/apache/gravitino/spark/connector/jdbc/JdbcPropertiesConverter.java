@@ -21,7 +21,6 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -83,7 +82,7 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
           throw new UnsupportedOperationException("Doesn't support table property " + key);
         }
       }
-      return Collections.emptyMap();
+      return new HashMap<>();
     } else {
       return new HashMap<>(properties);
     }
