@@ -26,6 +26,7 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common")) {
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
