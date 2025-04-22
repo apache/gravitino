@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Gravitino server provides a pluginable lineage framework to receive, process, and sink OpenLineage events. By leveraging this, you could do custom process for the lineage event and sink to your dedicated systems.
+Gravitino server provides a pluggable lineage framework to receive, process, and sink OpenLineage events. By leveraging this, you could do custom process for the lineage event and sink to your dedicated systems.
 
 ## Lineage Configuration
 

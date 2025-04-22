@@ -45,7 +45,7 @@ When accessing datasets by location (e.g., `SELECT * FROM parquet.${dataset_path
 | GVFS location  | `${catalogName}.${schemaName}.${filesetName}` | `fileset_catalog.schema.fileset_a`    | 0.9.0-incubating |
 | Other location | location path                                 | `hdfs://127.0.0.1:9000/tmp/a/student` | 0.9.0-incubating |
 
-For GVFS location, the plugin add `fileset-location` facets which contains the location path.
+For GVFS location, this plugin adds `fileset-location` facets which contains the location path.
 
 ```json
 "fileset-location" :
@@ -65,7 +65,7 @@ Configuration example For Spark shell:
 
 ```shell
 ./bin/spark-sql -v \
---jars /${path}/openlineage-spark_2.12-${version}.jar,/${path}/gravitino-spark-connector-runtime-3.5_2.12-${version}.jar \
+--jars /${path}/openlineage-spark_2.12-${gravitino-specific-version}.jar,/${path}/gravitino-spark-connector-runtime-3.5_2.12-${version}.jar \
 --conf spark.plugins="org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin" \
 --conf spark.sql.gravitino.uri=http://localhost:8090 \
 --conf spark.sql.gravitino.metalake=${metalakeName} \
