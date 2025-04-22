@@ -626,8 +626,10 @@ model_version: ModelVersion = catalog.as_model_catalog().get_model_version_by_al
 
 ### Alter a ModelVersion
 
-You can modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties)
-by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model version:
+You can modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties) 
+by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}
+/schemas/{schema_name} /models/{model_name}/versions/{version_number}` endpoint or using the Gravitino 
+Java/Python client. The following is an example of modifying a model version:
 
 <Tabs groupId="language" queryString>
  <TabItem value="shell" label="Shell">
