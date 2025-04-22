@@ -724,12 +724,12 @@ updated_model = model_catalog.alter_model_version(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                               | Java Method                                            | Python Method                                      |
-|---------------------|------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`              | `ModelVersionChange.update_uri("new_uri")`         |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | <br/>`ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`       | `ModelVersionChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`             | `ModelVersionChange.remove_property("key")`        |
+| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
+|---------------------|------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | `ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
 
 :::note
 - Multiple modifications can be applied in a single request.
@@ -837,12 +837,12 @@ updated_model = model_catalog.alter_model_version_by_alias(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                               | Java Method                                            | Python Method                                      |
-|---------------------|------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`              | `ModelVersionChange.update_uri("new_uri")`         |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | <br/>`ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`       | `ModelVersionChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`             | `ModelVersionChange.remove_property("key")`        |
+| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
+|---------------------|------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | `ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
 
 
 :::note
