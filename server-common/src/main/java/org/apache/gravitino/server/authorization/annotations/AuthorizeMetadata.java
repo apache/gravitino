@@ -29,7 +29,7 @@ import org.apache.gravitino.MetadataObject;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface AuthorizeMetadata {
   /**
-   * The name of the parameter to be used for authorization.
+   * The type of the parameter to be used for authorization.
    *
    * @return the name of the parameter to be used for authorization.
    */
