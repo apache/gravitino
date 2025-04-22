@@ -180,7 +180,7 @@ paths:
     put:
       tags:
         - model
-      summary: Update model versions
+      summary: Update model version
       operationId: updateModelVersions
       requestBody:
         content:
