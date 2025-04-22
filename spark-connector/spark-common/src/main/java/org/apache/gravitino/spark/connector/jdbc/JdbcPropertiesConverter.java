@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -76,14 +77,16 @@ public class JdbcPropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
-    if (!this.supportsTableProperties) {
+    if (!supportsTableProperties) {
       for (String key : properties.keySet()) {
-        if (key.equals("owner")) {
-          throw new UnsupportedOperationException("Unsupported Gravitino table property 'owner'");
+        if (!"owner".equalsIgnoreCase(key)) {
+          throw new UnsupportedOperationException("Doesn't support table property " + key);
         }
       }
+      return Collections.emptyMap();
+    } else {
+      return new HashMap<>(properties);
     }
-    return new HashMap<>(properties);
   }
 
   @Override
