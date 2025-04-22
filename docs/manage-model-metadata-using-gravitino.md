@@ -304,7 +304,7 @@ model: Model = catalog.as_model_catalog().get_model(ident=NameIdentifier.of("mod
 
 ### Alter a model
 
-You can modify a model's metadata (e.g. rename, update comment, or modify properties) by 
+You can modify a model's metadata (e.g., rename or modify properties) by 
 sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
 {schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
 
@@ -315,10 +315,6 @@ sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog
 cat <<EOF >model.json
 {
   "updates": [
-    {
-      "@type": "updateComment",
-      "newComment": "Updated model comment"
-    },
     {
       "@type": "rename",
       "newName": "new_name"
@@ -360,7 +356,6 @@ curl -X PUT \
  // Define modifications
  ModelChange[] changes = {
      ModelChange.rename("example_model_renamed"),
-     ModelChange.updatComment("new comment"),
      ModelChange.setProperty("k2", "v2"),
      ModelChange.removeProperty("k1")
  };
@@ -384,7 +379,6 @@ catalog = client.load_catalog(name="mycatalog").as_model_catalog()
 # Define modifications
 changes = (
     ModelChange.rename("renamed"),
-    ModelChange.update_comment("new comment"),
     ModelChange.set_property("k2", "v2"),
     ModelChange.remove_property("k1"),
 )
@@ -402,12 +396,11 @@ updated_model = model_catalog.alter_model(
 The following operations are supported for altering a model:
 
 
-| Operation           | JSON Example                                               | Java Method                                | Python Method                               |
- |---------------------|------------------------------------------------------------|--------------------------------------------|---------------------------------------------|
-| **Rename model**    | `{"@type":"rename","newName":"new_name"}`                  | `ModelChange.rename("new_name")`           | `ModelChange.rename("new_name")`            |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new comment"}`     | `ModelChange.updateComment("new comment")` | `ModelChange.update_comment("new comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelChange.setProperty("key", "value")`  | `ModelChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelChange.removeProperty("key")`        | `ModelChange.remove_property("key")`        |
+| Operation           | JSON Example                                               | Java Method                               | Python Method                              |
+ |---------------------|------------------------------------------------------------|-------------------------------------------|--------------------------------------------|
+| **Rename model**    | `{"@type":"rename","newName":"new_name"}`                  | `ModelChange.rename("new_name")`          | `ModelChange.rename("new_name")`           |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelChange.setProperty("key", "value")` | `ModelChange.set_property("key", "value")` |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelChange.removeProperty("key")`       | `ModelChange.remove_property("key")`       |
 
 :::note
 - Multiple modifications can be applied in a single request.
@@ -661,16 +654,6 @@ cat <<EOF >model.json
     {
       "@type": "removeProperty",
       "property": "key"
-    },
-    {
-      "@type": "updateAliases",
-      "aliasesToAdd": [
-          "alias1",
-          "alias2"
-      ],
-      "aliasesToRemove": [
-          "alias3"
-      ]
     }
   ]
 }
@@ -700,8 +683,7 @@ ModelVersionChange[] changes = {
      ModelVersionChange.updateComment("Updated comment of model version"),
      ModelVersionChange.updateUri("new_uri"),
      ModelVersionChange.setProperty("key", "value"),
-     ModelVersionChange.removeProperty("key"),
-     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
+     ModelVersionChange.removeProperty("key")
  };
 
 // Apply changes
@@ -729,7 +711,6 @@ changes = (
     ModelVersionChange.update_uri("new_uri"),
     ModelVersionChange.set_property("k2", "v2"),
     ModelVersionChange.remove_property("k1"),
-    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
 )
 
 # Apply changes
@@ -743,13 +724,12 @@ updated_model = model_catalog.alter_model_version(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
-|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
-| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
+|---------------------|------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | `ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
 
 :::note
 - Multiple modifications can be applied in a single request.
@@ -787,16 +767,6 @@ cat <<EOF >model.json
     {
       "@type": "removeProperty",
       "property": "key"
-    },
-    {
-      "@type": "updateAliases",
-      "aliasesToAdd": [
-          "alias1",
-          "alias2"
-      ],
-      "aliasesToRemove": [
-          "alias3"
-      ]
     }
   ]
 }
@@ -826,8 +796,7 @@ ModelVersionChange[] changes = {
      ModelVersionChange.updateComment("Updated comment of model version"),
      ModelVersionChange.updateUri("new_uri"),
      ModelVersionChange.setProperty("key", "value"),
-     ModelVersionChange.removeProperty("key"),
-     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
+     ModelVersionChange.removeProperty("key")
  };
 
 // Apply changes
@@ -855,7 +824,6 @@ changes = (
     ModelVersionChange.update_uri("new_uri"),
     ModelVersionChange.set_property("k2", "v2"),
     ModelVersionChange.remove_property("k1"),
-    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
 )
 
 # Apply changes
@@ -869,13 +837,12 @@ updated_model = model_catalog.alter_model_version_by_alias(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
-|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
-| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
+|---------------------|------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | `ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
 
 
 :::note
