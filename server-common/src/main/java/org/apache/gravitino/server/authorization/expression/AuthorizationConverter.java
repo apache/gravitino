@@ -17,9 +17,7 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
-import java.util.Set;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
+import com.google.errorprone.annotations.DoNotCall;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 
 public class AuthorizationConverter {
@@ -36,60 +34,8 @@ public class AuthorizationConverter {
    * @param authorizationExpression authorization expression from {@link MetadataFilterHelper}
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
+  @DoNotCall
   public static String convertToOgnlExpression(String authorizationExpression) {
     throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Implicit privilege conversion. For example, checking the `select_table` privilege also requires
-   * simultaneously checking the `use_catalog` privilege.
-   *
-   * @param authorizationPrivilege
-   * @return AuthorizationPrivilege set
-   */
-  public static Set<AuthorizationPrivilege> convertToAuthorizationPrivileges(
-      AuthorizationPrivilege authorizationPrivilege) {
-    throw new UnsupportedOperationException();
-  }
-
-  public static class AuthorizationPrivilege {
-    private Privilege.Name privilege;
-    private MetadataObject.Type type;
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-
-      AuthorizationPrivilege that = (AuthorizationPrivilege) o;
-      return privilege == that.privilege && type == that.type;
-    }
-
-    @Override
-    public int hashCode() {
-      int result = privilege.hashCode();
-      result = 31 * result + type.hashCode();
-      return result;
-    }
-
-    public Privilege.Name getPrivilege() {
-      return privilege;
-    }
-
-    public void setPrivilege(Privilege.Name privilege) {
-      this.privilege = privilege;
-    }
-
-    public MetadataObject.Type getType() {
-      return type;
-    }
-
-    public void setType(MetadataObject.Type type) {
-      this.type = type;
-    }
   }
 }

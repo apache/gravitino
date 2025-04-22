@@ -21,7 +21,7 @@ import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 
-/** Authorization through expressions. */
+/** Evaluate the runtime result of the AuthorizationExpression.. */
 public class AuthorizationExpressionEvaluator {
 
   /**
@@ -39,7 +39,7 @@ public class AuthorizationExpressionEvaluator {
    * @param metadataIds key-metadata type, value-metadata id
    * @return authorization result
    */
-  public boolean authorize(Map<MetadataObject.Type, Long> metadataIds) {
-    return false;
+  public boolean evaluate(Map<MetadataObject.Type, Long> metadataIds) {
+    throw new UnsupportedOperationException();
   }
 }

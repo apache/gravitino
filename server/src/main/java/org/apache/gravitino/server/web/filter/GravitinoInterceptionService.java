@@ -66,7 +66,7 @@ public class GravitinoInterceptionService implements InterceptionService {
      */
     @Override
     public Object invoke(MethodInvocation methodInvocation) throws Throwable {
-      return null;
+      throw new UnsupportedOperationException();
     }
   }
 }

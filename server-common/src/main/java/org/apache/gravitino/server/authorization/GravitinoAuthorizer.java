@@ -18,6 +18,7 @@
 package org.apache.gravitino.server.authorization;
 
 import java.io.Closeable;
+import java.security.Principal;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 
@@ -33,12 +34,15 @@ public interface GravitinoAuthorizer extends Closeable {
   /**
    * Perform authorization and return the authorization result.
    *
-   * @param userId the user id in use_meta table
-   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
-   * @param metadataId the metadata id.
+   * @param principal the user principal
+   * @param metalake the metalake
+   * @param metadataObject the metadataObject.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @return authorization result.
    */
   boolean authorize(
-      long userId, MetadataObject.Type metadataType, long metadataId, Privilege.Name privilege);
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      Privilege.Name privilege);
 }
