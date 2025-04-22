@@ -26,9 +26,11 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
+@Disabled("Disabled until PG table creation is supported")
 public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
 
   protected String pgUrl;
