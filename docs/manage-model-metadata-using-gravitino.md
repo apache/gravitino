@@ -305,7 +305,8 @@ model: Model = catalog.as_model_catalog().get_model(ident=NameIdentifier.of("mod
 ### Alter a model
 
 You can modify a model's metadata (e.g., rename or modify properties) by 
-sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}`endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
+sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
+{schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
 
 <Tabs groupId="language" queryString>
  <TabItem value="shell" label="Shell">
@@ -626,8 +627,7 @@ model_version: ModelVersion = catalog.as_model_catalog().get_model_version_by_al
 ### Alter a ModelVersion
 
 You can modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties)
-by 
-sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
+by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
 {schema_name}/models/{model_name}/versions/{version_number}` endpoint or using the Gravitino 
 Java/Python client. The following is an example of modifying a model version:
 
@@ -740,12 +740,9 @@ updated_model = model_catalog.alter_model_version(
 ### Alter a ModelVersion by alias
 
 You can also modify a modelVersion's metadata (e.g. update uri, update comment, or modify 
-properties)
-by
-sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
-{schema_name}/models/{model_name}/aliases/{alias}` endpoint or using the Gravitino
-Java/Python client. The
-following is an example of modifying a model version:
+properties) by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/
+{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or using the Gravitino
+Java/Python client. The following is an example of modifying a model version:
 
 <Tabs groupId="language" queryString>
  <TabItem value="shell" label="Shell">
