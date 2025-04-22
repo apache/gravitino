@@ -70,3 +70,6 @@ class GVFSConfig:
 
     # The configuration key prefix for the client request headers.
     GVFS_FILESYSTEM_CLIENT_REQUEST_HEADER_PREFIX = "client_request_header_"
+
+    # The configuration key for whether to enable credential vending. The default is false.
+    GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING = "enable_credential_vending"
