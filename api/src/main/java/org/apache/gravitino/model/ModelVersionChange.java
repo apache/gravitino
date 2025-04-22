@@ -19,6 +19,12 @@
 
 package org.apache.gravitino.model;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -29,6 +35,7 @@ import org.apache.gravitino.annotation.Evolving;
  */
 @Evolving
 public interface ModelVersionChange {
+  Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
 
   /**
    * Create a ModelVersionChange for updating the comment of a model version.
@@ -69,6 +76,26 @@ public interface ModelVersionChange {
    */
   static ModelVersionChange updateUri(String newUri) {
     return new ModelVersionChange.UpdateUri(newUri);
+  }
+
+  /**
+   * Create a ModelVersionChange for updating the aliases of a model version.
+   *
+   * @param newAlias The new aliases to be set for the model version.
+   * @return A new ModelVersionChange instance for updating the alias of a model version.
+   */
+  static ModelVersionChange updateAlias(String... newAlias) {
+    return new ModelVersionChange.UpdateAlias(Arrays.asList(newAlias));
+  }
+
+  /**
+   * Create a ModelVersionChange for updating the alias of a model version.
+   *
+   * @param newAlias The new aliases to be set for the model version.
+   * @return A new ModelVersionChange instance for updating the alias of a model version.
+   */
+  static ModelVersionChange updateAlias(List<String> newAlias) {
+    return new ModelVersionChange.UpdateAlias(newAlias);
   }
 
   /** A ModelVersionChange to update the model version comment. */
@@ -325,6 +352,69 @@ public interface ModelVersionChange {
     @Override
     public String toString() {
       return "UpdateUri " + newUri;
+    }
+  }
+
+  /** A ModelVersionChange to update the alias of a model version. */
+  final class UpdateAlias implements ModelVersionChange {
+    private final List<String> newAlias;
+
+    /**
+     * Creates a new {@link UpdateAlias} instance with the specified alias.
+     *
+     * @param newAlias The new alias to be set for the model version.
+     */
+    public UpdateAlias(List<String> newAlias) {
+      List<String> sorted = new ArrayList<>(newAlias);
+      Collections.sort(sorted);
+      this.newAlias = ImmutableList.copyOf(sorted);
+    }
+
+    /**
+     * Returns the new alias to be set for the model version.
+     *
+     * @return The new alias to be set for the model version.
+     */
+    public List<String> newAlias() {
+      return newAlias;
+    }
+
+    /**
+     * Compares this UpdateAlias instance with another object for equality. The comparison is based
+     * on the new alias of the model version.
+     *
+     * @param o The object to compare with this instance.
+     * @return {@code true} if the given object represents the same model update operation; {@code
+     *     false} otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof UpdateAlias)) return false;
+      UpdateAlias that = (UpdateAlias) o;
+      return newAlias.equals(that.newAlias);
+    }
+
+    /**
+     * Generates a hash code for this UpdateAlias instance. The hash code is based on the new alias
+     * of the model.
+     *
+     * @return A hash code value for this model renaming operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(newAlias);
+    }
+
+    /**
+     * Provides a string representation of the UpdateAlias instance. This string format includes the
+     * class name followed by the new alias to be set.
+     *
+     * @return A string summary of the UpdateAlias instance.
+     */
+    @Override
+    public String toString() {
+      return "UpdateAlias " + COMMA_JOINER.join(newAlias);
     }
   }
 }

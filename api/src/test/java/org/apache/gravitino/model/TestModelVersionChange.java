@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.model;
 
+import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -198,5 +199,76 @@ public class TestModelVersionChange {
     Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
     Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
     Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+  }
+
+  @Test
+  void testCreateUpdateVersionAliasUseStaticMethod1() {
+    String alias1 = "test";
+    String alias2 = "test2";
+    ModelVersionChange modelVersionChange = ModelVersionChange.updateAlias(alias1, alias2);
+
+    Assertions.assertEquals(ModelVersionChange.UpdateAlias.class, modelVersionChange.getClass());
+
+    ModelVersionChange.UpdateAlias updateAliasChange =
+        (ModelVersionChange.UpdateAlias) modelVersionChange;
+    Assertions.assertEquals(Lists.newArrayList(alias1, alias2), updateAliasChange.newAlias());
+    Assertions.assertEquals("UpdateAlias " + alias1 + "," + alias2, updateAliasChange.toString());
+  }
+
+  @Test
+  void testCreateUpdateVersionAliasUseStaticMethod2() {
+    String alias1 = "test";
+    String alias2 = "test2";
+
+    ModelVersionChange modelVersionChange =
+        ModelVersionChange.updateAlias(Lists.newArrayList(alias1, alias2));
+
+    Assertions.assertEquals(ModelVersionChange.UpdateAlias.class, modelVersionChange.getClass());
+
+    ModelVersionChange.UpdateAlias updateAliasChange =
+        (ModelVersionChange.UpdateAlias) modelVersionChange;
+    Assertions.assertEquals(Lists.newArrayList(alias1, alias2), updateAliasChange.newAlias());
+    Assertions.assertEquals("UpdateAlias " + alias1 + "," + alias2, updateAliasChange.toString());
+  }
+
+  @Test
+  void testCreateUpdateVersionAliasUseConstructor() {
+    String alias1 = "test";
+    String alias2 = "test2";
+    ModelVersionChange modelVersionChange =
+        new ModelVersionChange.UpdateAlias(Lists.newArrayList(alias1, alias2));
+
+    Assertions.assertEquals(ModelVersionChange.UpdateAlias.class, modelVersionChange.getClass());
+
+    ModelVersionChange.UpdateAlias updateAliasChange =
+        (ModelVersionChange.UpdateAlias) modelVersionChange;
+    Assertions.assertEquals(Lists.newArrayList(alias1, alias2), updateAliasChange.newAlias());
+    Assertions.assertEquals("UpdateAlias " + alias1 + "," + alias2, updateAliasChange.toString());
+  }
+
+  @Test
+  void testUpdateVersionAliasChangeEquals() {
+    String alias1 = "test1";
+    String alias2 = "test2";
+    String alias3 = "test3";
+
+    ModelVersionChange modelVersionChange1 = ModelVersionChange.updateAlias(alias1, alias2);
+    ModelVersionChange modelVersionChange2 = ModelVersionChange.updateAlias(alias1, alias2);
+    ModelVersionChange modelVersionChange3 = ModelVersionChange.updateAlias(alias2, alias3);
+    ModelVersionChange modelVersionChange4 = ModelVersionChange.updateAlias(alias2, alias1);
+
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
+    Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange4);
+    Assertions.assertNotEquals(modelVersionChange2, modelVersionChange3);
+    Assertions.assertEquals(modelVersionChange2, modelVersionChange4);
+    Assertions.assertNotEquals(modelVersionChange3, modelVersionChange4);
+
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
+    Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange4.hashCode());
+    Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertEquals(modelVersionChange2.hashCode(), modelVersionChange4.hashCode());
+    Assertions.assertNotEquals(modelVersionChange3.hashCode(), modelVersionChange4.hashCode());
   }
 }

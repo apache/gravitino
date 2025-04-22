@@ -627,6 +627,98 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
   }
 
+  @Test
+  void testUpdateModelVersionAliases() {
+    String schemaName = randomSchemaName();
+    String schemaComment = "schema which tests update";
+
+    String modelName = randomModelName();
+    String modelComment = "model which tests update";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    String versionUri = "s3://test-bucket/test-path/model.json";
+    String[] versionAliases = {"alias1", "alias2"};
+    String versionComment = "version which tests update";
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    modelOperationDispatcher.linkModelVersion(
+        modelIdent, versionUri, versionAliases, versionComment, props);
+
+    ModelVersionChange change = ModelVersionChange.updateAlias("new_alias1", "new_alias2");
+    ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
+    ModelVersion alteredModelVersion =
+        modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
+
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
+    Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
+    Assertions.assertArrayEquals(
+        new String[] {"new_alias1", "new_alias2"}, alteredModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
+
+    // Reload model version
+    ModelVersion reloadedModelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertArrayEquals(
+        new String[] {"new_alias1", "new_alias2"}, reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
+  }
+
+  @Test
+  void testUpdateModelVersionAliasesByAlias() {
+    String schemaName = randomSchemaName();
+    String schemaComment = "schema which tests update";
+
+    String modelName = randomModelName();
+    String modelComment = "model which tests update";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    String versionUri = "s3://test-bucket/test-path/model.json";
+    String[] versionAliases = {"alias1", "alias2"};
+    String versionComment = "version which tests update";
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    modelOperationDispatcher.linkModelVersion(
+        modelIdent, versionUri, versionAliases, versionComment, props);
+
+    ModelVersionChange change = ModelVersionChange.updateAlias("new_alias1", "new_alias2");
+    ModelVersion modelVersion =
+        modelOperationDispatcher.getModelVersion(modelIdent, versionAliases[0]);
+    ModelVersion alteredModelVersion =
+        modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], change);
+
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
+    Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
+    Assertions.assertArrayEquals(
+        new String[] {"new_alias1", "new_alias2"}, alteredModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
+
+    // Reload model version
+    ModelVersion reloadedModelVersion =
+        modelOperationDispatcher.getModelVersion(modelIdent, "new_alias1");
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertArrayEquals(
+        new String[] {"new_alias1", "new_alias2"}, reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
+  }
+
   private String randomSchemaName() {
     return "schema_" + UUID.randomUUID().toString().replace("-", "");
   }

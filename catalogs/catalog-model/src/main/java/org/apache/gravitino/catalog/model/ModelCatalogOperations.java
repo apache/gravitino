@@ -429,6 +429,10 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
         entityUri = updateUriChange.newUri();
 
+      } else if (change instanceof ModelVersionChange.UpdateAlias) {
+        ModelVersionChange.UpdateAlias updateAliasChange = (ModelVersionChange.UpdateAlias) change;
+        entityAliases = updateAliasChange.newAlias();
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model version change: " + change.getClass().getSimpleName());

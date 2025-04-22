@@ -1055,6 +1055,10 @@ public class TestCatalogOperations
         ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
         newProps.put(setProperty.property(), setProperty.value());
 
+      } else if (change instanceof ModelVersionChange.UpdateAlias) {
+        ModelVersionChange.UpdateAlias updateAliasChange = (ModelVersionChange.UpdateAlias) change;
+        newAliases = updateAliasChange.newAlias().toArray(new String[0]);
+
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
         newUri = updateUriChange.newUri();
@@ -1075,6 +1079,10 @@ public class TestCatalogOperations
             .build();
 
     modelVersions.put(versionPair, updatedModelVersion);
+
+    Arrays.stream(newAliases)
+        .map(alias -> Pair.of(ident, alias))
+        .forEach(pair -> modelAliasToVersion.put(pair, newVersion));
     return updatedModelVersion;
   }
 
