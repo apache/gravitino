@@ -129,5 +129,22 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The default block size of the GVFS file. */
   public static final long FS_GRAVITINO_BLOCK_SIZE_DEFAULT = 32 * 1024 * 1024;
 
+  /** The configuration key for the Gravitino hook class. */
+  public static final String FS_GRAVITINO_HOOK_CLASS = "fs.gravitino.hook.class";
+
+  /** The default value for the Gravitino hook class. */
+  public static final String FS_GRAVITINO_HOOK_CLASS_DEFAULT = NoOpHook.class.getCanonicalName();
+
+  /** The configuration key prefix for the Gravitino client request header. */
+  public static final String FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX =
+      "fs.gravitino.client.request.header.";
+
+  /** The configuration key for whether to enable credential vending. The default is false. */
+  public static final String FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING =
+      "fs.gravitino.enableCredentialVending";
+
+  /** The default value for whether to enable credential vending. */
+  public static final boolean FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT = false;
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }

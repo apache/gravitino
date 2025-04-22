@@ -60,7 +60,7 @@ public class TestSimpleCommands {
   @Test
   void testClientVersion() {
     ClientVersion mockClientVersion = mock(ClientVersion.class);
-    when(mockCommandLine.hasOption(GravitinoOptions.VERSION)).thenReturn(true);
+    when(mockCommandLine.hasOption(GravitinoOptions.CLIENT)).thenReturn(true);
     GravitinoCommandLine commandLine =
         spy(new GravitinoCommandLine(mockCommandLine, mockOptions, null, null));
 

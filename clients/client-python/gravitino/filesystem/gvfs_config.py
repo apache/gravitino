@@ -60,3 +60,16 @@ class GVFSConfig:
     # The configuration key for the env variable name that indicates the current location name. If
     # not set, the file system will read the location name from CURRENT_LOCATION_NAME env variable.
     GVFS_FILESYSTEM_CURRENT_LOCATION_NAME_ENV_VAR = "current_location_name_env_var"
+
+    # The configuration key for the class name of the file system operations.
+    # The default value is "org.apache.gravitino.filesystem.hadoop.DefaultGVFSOperations".
+    GVFS_FILESYSTEM_OPERATIONS = "operations_class"
+
+    # The hook class that will be used to intercept file system operations.
+    GVFS_FILESYSTEM_HOOK = "hook_class"
+
+    # The configuration key prefix for the client request headers.
+    GVFS_FILESYSTEM_CLIENT_REQUEST_HEADER_PREFIX = "client_request_header_"
+
+    # The configuration key for whether to enable credential vending. The default is false.
+    GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING = "enable_credential_vending"
