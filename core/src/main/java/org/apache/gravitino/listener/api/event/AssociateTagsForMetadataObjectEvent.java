@@ -28,6 +28,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  */
 @DeveloperApi
 public final class AssociateTagsForMetadataObjectEvent extends TagEvent {
+  private final MetadataObject.Type objectType;
   private final String[] tagsToAdd;
   private final String[] tagsToRemove;
   private final String[] associatedTags;
@@ -50,9 +51,19 @@ public final class AssociateTagsForMetadataObjectEvent extends TagEvent {
       String[] tagsToRemove,
       String[] associatedTags) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+    this.objectType = metadataObject.type();
     this.tagsToAdd = tagsToAdd != null ? tagsToAdd.clone() : new String[0];
     this.tagsToRemove = tagsToRemove != null ? tagsToRemove.clone() : new String[0];
     this.associatedTags = associatedTags != null ? associatedTags.clone() : new String[0];
+  }
+
+  /**
+   * Provides the type of metadata object associated with this event.
+   *
+   * @return The type of metadata object.
+   */
+  public MetadataObject.Type objectType() {
+    return objectType;
   }
 
   /**
