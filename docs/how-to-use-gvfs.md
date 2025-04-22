@@ -397,7 +397,7 @@ For fileset with multiple locations, you can specify which location to access us
 1. Set the `current_location_name` configuration property
 2. Export the environment variable `CURRENT_LOCATION_NAME`
 3. If neither is specified, the system will use the value of `default-location-name` from the fileset properties
-   :::
+:::
 
 1. Make sure to obtain the Gravitino library.
    You can get it by [pip](https://pip.pypa.io/en/stable/installation/):
