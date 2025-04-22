@@ -58,7 +58,7 @@ For GVFS location, the plugin add `fileset-location` facets which contains the l
 
 ## How to use 
 
-1. Download Gravitino OpenLineage plugin jar and place it to the classpath of Spark.
+1. Download [Gravitino OpenLineage plugin jar](https://github.com/datastrato/gravitino-openlineage-plugins/tree/main/spark-plugin/) and place it to the classpath of Spark.
 2. Add configuration to the Spark to enable lineage collection.
 
 Configuration example For Spark shell:
