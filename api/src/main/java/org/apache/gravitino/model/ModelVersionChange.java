@@ -35,6 +35,7 @@ import org.apache.gravitino.annotation.Evolving;
  */
 @Evolving
 public interface ModelVersionChange {
+  /** A Joiner for comma-separated values. */
   Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
 
   /**
