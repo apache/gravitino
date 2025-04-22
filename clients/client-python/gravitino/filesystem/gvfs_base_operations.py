@@ -27,6 +27,7 @@ from fsspec import AbstractFileSystem
 from readerwriterlock import rwlock
 
 from gravitino.api.catalog import Catalog
+from gravitino.api.credential.credential import Credential
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.audit.fileset_audit_constants import FilesetAuditConstants
 from gravitino.audit.fileset_data_operation import FilesetDataOperation
@@ -75,6 +76,7 @@ class BaseGVFSOperations(ABC):
     SLASH = "/"
 
     ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
+    ENABLE_CREDENTIAL_VENDING_DEFAULT = False
 
     def __init__(
         self,
@@ -121,6 +123,14 @@ class BaseGVFSOperations(ABC):
         self._catalog_cache = LRUCache(maxsize=100)
         self._catalog_cache_lock = rwlock.RWLockFair()
 
+        self._enable_credential_vending = (
+            False
+            if options is None
+            else options.get(
+                GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING,
+                self.ENABLE_CREDENTIAL_VENDING_DEFAULT,
+            )
+        )
         self._current_location_name = self._init_current_location_name()
 
     @property
@@ -369,7 +379,7 @@ class BaseGVFSOperations(ABC):
         )
         target_location_name = location_name or fileset.properties().get(
             fileset.PROPERTY_DEFAULT_LOCATION_NAME
-        )
+        ) or fileset.LOCATION_NAME_UNKNOWN
         actual_location = fileset.storage_locations().get(target_location_name)
         if actual_location is None:
             raise NoSuchLocationNameException(
@@ -418,7 +428,7 @@ class BaseGVFSOperations(ABC):
         catalog_ident: NameIdentifier = NameIdentifier.of(
             self._metalake, identifier.namespace().level(1)
         )
-        fileset_catalog = self._get_fileset_catalog(catalog_ident)
+        fileset_catalog = self._get_fileset_catalog(catalog_ident).as_fileset_catalog()
 
         sub_path: str = get_sub_path_from_virtual_path(
             identifier, processed_virtual_path
@@ -430,7 +440,7 @@ class BaseGVFSOperations(ABC):
         caller_context: CallerContext = CallerContext(context)
         CallerContextHolder.set(caller_context)
 
-        return fileset_catalog.as_fileset_catalog().get_file_location(
+        return fileset_catalog.get_file_location(
             NameIdentifier.of(identifier.namespace().level(2), identifier.name()),
             sub_path,
             location_name,
@@ -474,7 +484,17 @@ class BaseGVFSOperations(ABC):
                     name_identifier.namespace().level(2), name_identifier.name()
                 )
             )
-            credentials = fileset.support_credentials().get_credentials()
+            if location_name:
+                context = {
+                    Credential.HTTP_HEADER_CURRENT_LOCATION_NAME: location_name,
+                }
+                caller_context: CallerContext = CallerContext(context)
+                CallerContextHolder.set(caller_context)
+            credentials = (
+                fileset.support_credentials().get_credentials()
+                if self._enable_credential_vending
+                else None
+            )
             new_cache_value = get_storage_handler_by_path(
                 actual_file_location
             ).get_filesystem_with_expiration(
@@ -487,6 +507,7 @@ class BaseGVFSOperations(ABC):
             return new_cache_value[1]
         finally:
             write_lock.release()
+            CallerContextHolder.remove()
 
     def _get_fileset_catalog(self, catalog_ident: NameIdentifier):
         read_lock = self._catalog_cache_lock.gen_rlock()
