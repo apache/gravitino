@@ -47,7 +47,7 @@ public interface MetaCache {
   Entity getOrLoadMetadataByName(NameIdentifier ident, Entity.EntityType type) throws IOException;
 
   /**
-   * Removes an entity (and any dependent entries) from the cache by its id and type.
+   * Removes an entity (and any sub-entities) from the cache by its id and type.
    *
    * @param id the unique id of the entity to remove
    * @param type the type of the entity
@@ -55,7 +55,7 @@ public interface MetaCache {
   void removeById(Long id, Entity.EntityType type);
 
   /**
-   * Removes an entity (and any dependent entries) from the cache by its name identifier.
+   * Removes an entity (and any sub-entities) from the cache by its name identifier.
    *
    * @param ident the name identifier of the entity to remove
    */

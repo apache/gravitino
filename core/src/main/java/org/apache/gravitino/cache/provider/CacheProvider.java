@@ -52,4 +52,12 @@ public interface CacheProvider {
    * @return A cache instance initialized according to the configuration and entity store.
    */
   MetaCache getCache(CacheConfig config, EntityStore entityStore);
+
+  /**
+   * Gets a {@link MetaCache} instance without any configuration. this method is used for get
+   * singletons instance after initialization.
+   *
+   * @return An initialized cache instance.
+   */
+  MetaCache getCache();
 }

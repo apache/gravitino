@@ -36,7 +36,7 @@ public class CacheConfig extends Config {
   public static final ConfigEntry<Integer> CACHE_MAX_SIZE =
       new ConfigBuilder("gravitino.server.cache.max.size")
           .doc("The max size of the cache in number of entries.")
-          .version(ConfigConstants.VERSION_0_9_0)
+          .version(ConfigConstants.VERSION_0_10_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10_000);
@@ -45,24 +45,25 @@ public class CacheConfig extends Config {
   public static final ConfigEntry<Boolean> CACHE_EXPIRATION_ENABLED =
       new ConfigBuilder("gravitino.server.cache.expiration.enabled")
           .doc("Whether to enable cache expiration.")
-          .version(ConfigConstants.VERSION_0_9_0)
+          .version(ConfigConstants.VERSION_0_10_0)
           .booleanConf()
           .createWithDefault(true);
 
   // Cache entry expiration time
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.server.cache.expiration.time")
-          .doc("The time after which cache entries expire.")
-          .version(ConfigConstants.VERSION_0_9_0)
+          .doc("The time after which cache entries expire. default is 60 minutes.")
+          .version(ConfigConstants.VERSION_0_10_0)
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60L);
 
   // Whether to enable cache status
   public static final ConfigEntry<Boolean> CACHE_STATUS_ENABLED =
-      new ConfigBuilder("gravitino.server.cache.enabled")
-          .doc("Whether to enable cache status.")
-          .version(ConfigConstants.VERSION_0_9_0)
+      new ConfigBuilder("gravitino.server.cache.status.log.enabled")
+          .doc(
+              "Whether to collect and log cache status. if enabled, cache status will be collected and logged.")
+          .version(ConfigConstants.VERSION_0_10_0)
           .booleanConf()
           .createWithDefault(false);
 

@@ -47,4 +47,10 @@ public class CaffeineCacheProvider implements CacheProvider {
   public MetaCache getCache(CacheConfig config, EntityStore entityStore) {
     return CaffeineMetaCache.getInstance(config, entityStore);
   }
+
+  /** {@inheritDoc} */
+  @Override
+  public MetaCache getCache() {
+    return CaffeineMetaCache.getInstance();
+  }
 }

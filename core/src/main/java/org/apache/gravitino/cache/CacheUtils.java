@@ -20,6 +20,9 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -46,6 +49,21 @@ import org.apache.gravitino.utils.NamespaceUtil;
 
 public class CacheUtils {
 
+  private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAP;
+
+  static {
+    Map<Entity.EntityType, Class<?>> map = new EnumMap<>(Entity.EntityType.class);
+    map.put(Entity.EntityType.METALAKE, BaseMetalake.class);
+    map.put(Entity.EntityType.CATALOG, CatalogEntity.class);
+    map.put(Entity.EntityType.SCHEMA, SchemaEntity.class);
+    map.put(Entity.EntityType.TABLE, TableEntity.class);
+    map.put(Entity.EntityType.FILESET, FilesetEntity.class);
+    map.put(Entity.EntityType.MODEL, ModelEntity.class);
+    map.put(Entity.EntityType.TOPIC, TopicEntity.class);
+    map.put(Entity.EntityType.TAG, TagEntity.class);
+    ENTITY_CLASS_MAP = Collections.unmodifiableMap(map);
+  }
+
   /**
    * Returns the class of the entity based on its type.
    *
@@ -53,37 +71,16 @@ public class CacheUtils {
    * @return The class of the entity
    * @throws IllegalArgumentException if the entity type is not supported
    */
+  @SuppressWarnings("unchecked")
   public static <E extends Entity & HasIdentifier> Class<E> getEntityClass(Entity.EntityType type) {
     Preconditions.checkNotNull(type, "EntityType must not be null");
 
-    switch (type) {
-      case METALAKE:
-        return (Class<E>) BaseMetalake.class;
-
-      case CATALOG:
-        return (Class<E>) CatalogEntity.class;
-
-      case SCHEMA:
-        return (Class<E>) SchemaEntity.class;
-
-      case TABLE:
-        return (Class<E>) TableEntity.class;
-
-      case FILESET:
-        return (Class<E>) FilesetEntity.class;
-
-      case MODEL:
-        return (Class<E>) ModelEntity.class;
-
-      case TOPIC:
-        return (Class<E>) TopicEntity.class;
-
-      case TAG:
-        return (Class<E>) TagEntity.class;
-
-      default:
-        throw new IllegalArgumentException("Unsupported EntityType: " + type.getShortName());
+    Class<?> aClass = ENTITY_CLASS_MAP.get(type);
+    if (aClass == null) {
+      throw new IllegalArgumentException("Unsupported EntityType: " + type.getShortName());
     }
+
+    return (Class<E>) aClass;
   }
 
   /**

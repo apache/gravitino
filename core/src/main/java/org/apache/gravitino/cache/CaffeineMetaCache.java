@@ -45,7 +45,6 @@ import org.slf4j.LoggerFactory;
 
 /** This class implements a meta cache using Caffeine cache. */
 public class CaffeineMetaCache extends BaseMetaCache {
-  /** Logger */
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineMetaCache.class.getName());
 
   /** Singleton instance */
@@ -79,6 +78,19 @@ public class CaffeineMetaCache extends BaseMetaCache {
         }
       }
     }
+    return INSTANCE;
+  }
+
+  /**
+   * Returns the instance of MetaCacheCaffeine, if it is initialized, otherwise throws an exception.
+   *
+   * @return If INSTANCE initialized, returns the instance, otherwise throws an exception.
+   */
+  public static CaffeineMetaCache getInstance() {
+    if (INSTANCE == null) {
+      throw new RuntimeException("Illegal state: instance not initialized");
+    }
+
     return INSTANCE;
   }
 

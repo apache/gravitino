@@ -69,6 +69,20 @@ public class SnapshotMetaCache extends BaseMetaCache {
   }
 
   /**
+   * Returns the instance of SnapshotMetaCache.
+   *
+   * @return The instance of {@link SnapshotMetaCache}, or throws an exception if it has not been
+   *     initialized.
+   */
+  public static SnapshotMetaCache getInstance() {
+    if (INSTANCE == null) {
+      throw new IllegalStateException("SnapshotMetaCache not initialized");
+    }
+
+    return INSTANCE;
+  }
+
+  /**
    * Returns the instance of SnapshotMetaCache based on the cache configuration.
    *
    * @param cacheConfig The cache configuration

@@ -44,4 +44,10 @@ public class SnapshotCacheProvider implements CacheProvider {
   public MetaCache getCache(CacheConfig config, EntityStore entityStore) {
     return SnapshotMetaCache.getInstance(config, entityStore);
   }
+
+  /** {@inheritDoc} */
+  @Override
+  public MetaCache getCache() {
+    return SnapshotMetaCache.getInstance();
+  }
 }
