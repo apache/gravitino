@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +32,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -202,37 +205,76 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       MetadataObject.Type operationType,
       AuthorizationMetadataObject oldAuthzMetaObject,
       AuthorizationMetadataObject newAuthzMetaObject) {
-    PathBasedMetadataObject newPathBasedMetadataObject =
-        (PathBasedMetadataObject) newAuthzMetaObject;
-    RangerPolicy oldPolicy = findManagedPolicy(oldAuthzMetaObject);
-    RangerPolicy existNewPolicy = findManagedPolicy(newAuthzMetaObject);
-    if (oldPolicy == null) {
+    List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaObject);
+    List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaObject);
+    if (oldPolicies.isEmpty()) {
       LOG.warn("Cannot find the Ranger policy for the metadata object({})!", oldAuthzMetaObject);
       return;
     }
-
-    if (existNewPolicy != null) {
+    if (!existNewPolicies.isEmpty()) {
       LOG.warn("The Ranger policy for the metadata object({}) already exists!", newAuthzMetaObject);
-      return;
     }
+    oldPolicies.forEach(
+        policy -> {
+          try {
+            // Update the policy name is following Gravitino's spec
+            // Only Hive managed table rename will use this case
+            List<String> oldNames =
+                Arrays.stream(policy.getName().split("/"))
+                    .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
+                    .collect(Collectors.toList());
+            List<String> newNames =
+                Arrays.stream(
+                        getAuthorizationPath((PathBasedMetadataObject) newAuthzMetaObject)
+                            .split("/"))
+                    .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
+                    .collect(Collectors.toList());
 
-    try {
-      // Update the policy name is following Gravitino's spec
-      oldPolicy.setName(getAuthorizationPath(newPathBasedMetadataObject));
-      // Update the policy resource name to new name
-      oldPolicy
-          .getResources()
-          .put(
-              rangerHelper.policyResourceDefines.get(0),
-              new RangerPolicy.RangerPolicyResource(
-                  getAuthorizationPath(newPathBasedMetadataObject)));
+            int minLen = Math.min(oldNames.size(), newNames.size());
+            for (int i = 0; i < minLen; i++) {
+              String oldName = oldNames.get(i);
+              String newName = newNames.get(i);
+              if (!oldName.equals(newName)) {
+                if (oldName.equals(oldAuthzMetaObject.name())
+                    && newName.equals(newAuthzMetaObject.name())) {
+                  oldNames.set(i, newAuthzMetaObject.name());
+                  break;
+                } else {
+                  // If resource doesn't match, ignore this resource
+                  return;
+                }
+              }
+            }
+            String newPolicyName = "/" + String.join("/", oldNames);
 
-      // Update the policy
-      rangerClient.updatePolicy(oldPolicy.getId(), oldPolicy);
-    } catch (RangerServiceException e) {
-      LOG.error("Failed to rename the policy {}!", oldPolicy);
-      throw new RuntimeException(e);
-    }
+            policy.setName(newPolicyName);
+            // Update the policy resource name to new name
+            policy
+                .getResources()
+                .put(
+                    rangerHelper.policyResourceDefines.get(0),
+                    new RangerPolicy.RangerPolicyResource(newPolicyName));
+
+            boolean alreadyExist =
+                existNewPolicies.stream()
+                    .anyMatch(
+                        existNewPolicy ->
+                            existNewPolicy.getName().equals(policy.getName())
+                                || existNewPolicy.getResources().equals(policy.getResources()));
+            if (alreadyExist) {
+              LOG.warn(
+                  "The Ranger policy for the metadata object({}) already exists!",
+                  newAuthzMetaObject);
+              return;
+            }
+
+            // Update the policy
+            rangerClient.updatePolicy(policy.getId(), policy);
+          } catch (RangerServiceException e) {
+            LOG.error("Failed to rename the policy {}!", policy);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   /**
