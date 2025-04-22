@@ -304,7 +304,9 @@ model: Model = catalog.as_model_catalog().get_model(ident=NameIdentifier.of("mod
 
 ### Alter a model
 
-You can modify a model's metadata (e.g., rename, update comment, or modify properties) by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
+You can modify a model's metadata (e.g., rename, update comment, or modify properties) by 
+sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
+{schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
 
 <Tabs groupId="language" queryString>
  <TabItem value="shell" label="Shell">
@@ -635,8 +637,7 @@ You can modify a modelVersion's metadata (e.g. update uri, update comment, or mo
 by 
 sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
 {schema_name}/models/{model_name}/versions/{version_number}` endpoint or using the Gravitino 
-Java/Python client. The 
-following is an example of modifying a model version:
+Java/Python client. The following is an example of modifying a model version:
 
 <Tabs groupId="language" queryString>
  <TabItem value="shell" label="Shell">
@@ -731,12 +732,12 @@ updated_model = model_catalog.alter_model_version(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
-| ------------------- | ---------------------------------------------------------- | ------------------------------------------------- |----------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
+| Operation           | JSON Example                                               | Java Method                                            | Python Method                                      |
+|---------------------|------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`              | `ModelVersionChange.update_uri("new_uri")`         |
 | **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | <br/>`ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`       | `ModelVersionChange.set_property("key", "value")`  |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`             | `ModelVersionChange.remove_property("key")`        |
 
 :::note
 - Multiple modifications can be applied in a single request.
@@ -847,12 +848,13 @@ updated_model = model_catalog.alter_model_version_by_alias(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
-| ------------------- | ---------------------------------------------------------- | ------------------------------------------------- |----------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
+| Operation           | JSON Example                                               | Java Method                                            | Python Method                                      |
+|---------------------|------------------------------------------------------------|--------------------------------------------------------|----------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`              | `ModelVersionChange.update_uri("new_uri")`         |
 | **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | <br/>`ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`       | `ModelVersionChange.set_property("key", "value")`  |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`             | `ModelVersionChange.remove_property("key")`        |
+
 
 :::note
 - Multiple modifications can be applied in a single request.
