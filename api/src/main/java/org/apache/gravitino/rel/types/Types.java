@@ -364,7 +364,7 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return precision.map(integer -> String.format("time(%d)", integer)).orElse("time");
+      return precision.filter(p -> p > 0).map(p -> String.format("time(%d)", p)).orElse("time");
     }
 
     @Override
@@ -441,11 +441,12 @@ public class Types {
     @Override
     public String simpleString() {
       return precision
+          .filter(p -> p > 0)
           .map(
-              integer ->
+              p ->
                   withTimeZone
-                      ? String.format("timestamp_tz(%d)", integer)
-                      : String.format("timestamp(%d)", integer))
+                      ? String.format("timestamp_tz(%d)", p)
+                      : String.format("timestamp(%d)", p))
           .orElse(withTimeZone ? "timestamp_tz" : "timestamp");
     }
 

@@ -138,9 +138,11 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       // such as DATETIME.) see more details: https://dev.mysql.com/doc/refman/8.0/en/datetime.html
       Types.TimestampType timestampType = (Types.TimestampType) type;
       String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
-      return timestampType.precision().isPresent()
-          ? String.format("%s(%d)", baseType, timestampType.precision().get())
-          : baseType;
+      return timestampType
+          .precision()
+          .filter(p -> p > 0)
+          .map(p -> String.format("%s(%d)", baseType, p))
+          .orElse(baseType);
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {

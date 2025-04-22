@@ -679,9 +679,9 @@ public class MysqlTableOperations extends JdbcTableOperations {
    * TIME: Format is 'HH:MM:SS' (8 chars) + precision - TIMESTAMP/DATETIME: Format is 'YYYY-MM-DD
    * HH:MM:SS' (19 chars) + precision
    *
-   * <p>The precision is calculated by subtracting the base format length from the total column
-   * size. For example: - TIME(6) has columnSize = 14 (8 + 6) - TIMESTAMP(6) has columnSize = 25 (19
-   * + 6)
+   * <p>The precision is calculated by subtracting the base format length plus one (for decimal
+   * point) from the total column size. For example: - TIME(6) has columnSize = 15 (8 + 1 + 6) -
+   * TIMESTAMP(6) has columnSize = 26 (19 + 1 + 6)
    *
    * @param typeName The data type name (TIME, TIMESTAMP, or DATETIME)
    * @param columnSize The total column size from MySQL JDBC driver
@@ -692,12 +692,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String upperTypeName = typeName.toUpperCase();
     switch (upperTypeName) {
       case "TIME":
-        // TIME format: 'HH:MM:SS' (8 chars) + precision
-        return columnSize > 8 ? columnSize - 9 : 0;
+        // TIME format: 'HH:MM:SS' (8 chars) + decimal point + precision
+        return columnSize >= 9 ? columnSize - 9 : 0;
       case "TIMESTAMP":
       case "DATETIME":
-        // TIMESTAMP/DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + precision
-        return columnSize > 19 ? columnSize - 20 : 0;
+        // TIMESTAMP/DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+        return columnSize >= 20 ? columnSize - 20 : 0;
     }
     return 0;
   }
