@@ -558,6 +558,81 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
+  void testLinkAndUpdateModelVersionUri() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+
+    String uri = "s3://bucket/path/to/model.zip";
+    String newUri = "s3://bucket/path/to/new_model.zip";
+    String versionComment = "comment";
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, uri, aliases, versionComment, properties);
+
+    ModelVersion modelVersion = gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals(uri, modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals(versionComment, modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange updateUriChange = ModelVersionChange.updateUri(newUri);
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, 0, updateUriChange);
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(newUri, updatedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
+  }
+
+  @Test
+  void testLinkAndUpdateModelVersionUriByAlias() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+
+    String uri = "s3://bucket/path/to/model.zip";
+    String newUri = "s3://bucket/path/to/new_model.zip";
+    String versionComment = "comment";
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, uri, aliases, versionComment, properties);
+
+    ModelVersion modelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, aliases[0]);
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals(uri, modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals(versionComment, modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange updateUriChange = ModelVersionChange.updateUri(newUri);
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog
+            .asModelCatalog()
+            .alterModelVersion(modelIdent, aliases[0], updateUriChange);
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(newUri, updatedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
+  }
+
+  @Test
   void testLinkAndRemoveModelVersionProperties() {
     String modelName = RandomNameUtils.genRandomName("model1");
     String[] aliases = {"alias1"};

@@ -28,5 +28,8 @@ public class CredentialConstants {
   public static final String OSS_TOKEN_EXPIRE_IN_SECS = "oss-token-expire-in-secs";
   public static final String ADLS_TOKEN_EXPIRE_IN_SECS = "adls-token-expire-in-secs";
 
+  /** The HTTP header used to get the credential from fileset location */
+  public static final String HTTP_HEADER_CURRENT_LOCATION_NAME = "Current-Location-Name";
+
   private CredentialConstants() {}
 }
