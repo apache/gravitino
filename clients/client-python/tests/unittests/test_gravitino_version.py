@@ -56,6 +56,14 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.minor, 6)
         self.assertEqual(version.patch, 0)
 
+        version = GravitinoVersion(
+            VersionDTO("0.9.0-incubating-SNAPSHOT-0.8.0-SNAPSHOT", "2023-01-01", "1234567")
+        )
+
+        self.assertEqual(version.major, 0)
+        self.assertEqual(version.minor, 9)
+        self.assertEqual(version.patch, 0)
+
         # Test a valid the version string with alpha
         version = GravitinoVersion(VersionDTO("0.6.0-alpha", "2023-01-01", "1234567"))
 
