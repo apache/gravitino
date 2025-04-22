@@ -20,7 +20,7 @@ package org.apache.gravitino.server.authorization;
 import java.util.Map;
 import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionExecutor;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
 /**
  * MetadataFilterHelper performs permission checks on the list data returned by the REST API based
@@ -50,7 +50,7 @@ public class MetadataFilterHelper {
   }
 
   /**
-   * Call {@link AuthorizationExpressionExecutor} to filter the metadata list
+   * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
    *
    * @param expression authorization expression
    * @param metadataList metaData list.

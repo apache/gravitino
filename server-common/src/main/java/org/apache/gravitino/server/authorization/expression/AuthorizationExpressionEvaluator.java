@@ -22,7 +22,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 
 /** Authorization through expressions. */
-public class AuthorizationExpressionExecutor {
+public class AuthorizationExpressionEvaluator {
 
   /**
    * Use {@link AuthorizationConverter} to convert the authorization expression into an OGNL
@@ -30,7 +30,7 @@ public class AuthorizationExpressionExecutor {
    *
    * @param expression authorization expression
    */
-  public AuthorizationExpressionExecutor(String expression) {}
+  public AuthorizationExpressionEvaluator(String expression) {}
 
   /**
    * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of metadata
