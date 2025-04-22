@@ -17,7 +17,6 @@
 
 package org.apache.gravitino.server.authorization;
 
-import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
@@ -42,10 +41,10 @@ public class MetadataFilterHelper {
    * @return metadata List that the user has permission to access.
    * @param <E> metadata object.
    */
-  public static <E> List<E> filter(
+  public static <E> E[] filter(
       MetadataObject.Type metadataType,
       String privilege,
-      List<E> metadataList,
+      E[] metadataList,
       Function<E, Long> metadataIdExtractor) {
     return null;
   }
@@ -60,9 +59,9 @@ public class MetadataFilterHelper {
    * @return metadata List that the user has permission to access.
    * @param <E> metadata object.
    */
-  public static <E> List<E> filterByExpression(
+  public static <E> E[] filterByExpression(
       String expression,
-      List<E> metadataList,
+      E[] metadataList,
       Function<E, Map<MetadataObject.Type, Long>> metadataContextExtractor) {
     return null;
   }

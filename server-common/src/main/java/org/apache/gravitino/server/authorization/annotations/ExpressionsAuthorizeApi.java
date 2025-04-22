@@ -17,8 +17,15 @@
 
 package org.apache.gravitino.server.authorization.annotations;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
 /**
  * This annotation is used to implement unified authentication in AOP. Use Expressions to define the
  * required privileges for an API.
  */
+@Target({ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
 public @interface ExpressionsAuthorizeApi {}

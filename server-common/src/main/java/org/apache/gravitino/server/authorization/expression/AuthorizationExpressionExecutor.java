@@ -25,8 +25,8 @@ import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 public class AuthorizationExpressionExecutor {
 
   /**
-   * Use {@link AuthorizationExpressionConverter} to convert the authorization expression into an
-   * OGNL expression, and then call {@link GravitinoAuthorizer} to perform permission verification.
+   * Use {@link AuthorizationConverter} to convert the authorization expression into an OGNL
+   * expression, and then call {@link GravitinoAuthorizer} to perform permission verification.
    *
    * @param expression authorization expression
    */
