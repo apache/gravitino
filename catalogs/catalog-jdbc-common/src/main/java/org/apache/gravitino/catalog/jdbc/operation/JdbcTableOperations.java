@@ -593,7 +593,7 @@ public abstract class JdbcTableOperations implements TableOperation {
     JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
     typeBean.setColumnSize(columnSize);
     typeBean.setScale(column.getInt("DECIMAL_DIGITS"));
-    int datetimePrecision = calculateDatetimePrecision(typeName, columnSize);
+    Integer datetimePrecision = calculateDatetimePrecision(typeName, columnSize);
     typeBean.setDatetimePrecision(datetimePrecision);
 
     String comment = column.getString("REMARKS");
@@ -619,7 +619,7 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @param columnSize the column size from database
    * @return the precision of the time/datetime/timestamp type
    */
-  public int calculateDatetimePrecision(String typeName, int columnSize) {
-    return 0;
+  public Integer calculateDatetimePrecision(String typeName, int columnSize) {
+    return null;
   }
 }

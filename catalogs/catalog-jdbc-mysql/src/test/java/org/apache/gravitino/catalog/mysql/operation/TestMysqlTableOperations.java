@@ -478,7 +478,7 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             // MySQL 5.7 doesn't support nullable timestamp
             .withNullable(false)
             .withComment("timestamp")
@@ -563,7 +563,7 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             // MySQL 5.7 doesn't support nullable timestamp
             .withNullable(false)
             .withComment("timestamp")
@@ -645,13 +645,13 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_8")
-            .withType(Types.TimeType.get())
+            .withType(Types.TimeType.of(0))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .build());
     columns.add(
