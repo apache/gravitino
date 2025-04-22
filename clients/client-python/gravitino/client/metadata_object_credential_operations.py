@@ -20,6 +20,7 @@ from typing import List
 from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.credential.credential import Credential
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.audit.caller_context import CallerContext, CallerContextHolder
 from gravitino.dto.credential_dto import CredentialDTO
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.exceptions.handlers.credential_error_handler import (
@@ -53,10 +54,17 @@ class MetadataObjectCredentialOperations(SupportsCredentials):
         )
 
     def get_credentials(self) -> List[Credential]:
-        resp = self._rest_client.get(
-            self._request_path,
-            error_handler=CREDENTIAL_ERROR_HANDLER,
-        )
+        try:
+            caller_context: CallerContext = CallerContextHolder.get()
+            resp = self._rest_client.get(
+                self._request_path,
+                headers=(
+                    caller_context.context() if caller_context is not None else None
+                ),
+                error_handler=CREDENTIAL_ERROR_HANDLER,
+            )
+        finally:
+            CallerContextHolder.remove()
 
         credential_resp = CredentialResponse.from_json(resp.body, infer_missing=True)
         credential_resp.validate()
