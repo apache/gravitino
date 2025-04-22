@@ -17,14 +17,6 @@
 
 ---
 
-openapi: 3.0.2
-info:
-  title: OpenLineage
-  version: 2-0-2
-  description: OpenLineage is an open source **lineage and metadata collection API** for the data ecosystem.
-  license:
-    name: Apache 2.0
-    url: http://www.apache.org/licenses/LICENSE-2.0.html
 paths:
   /lineage:
     post:
