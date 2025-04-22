@@ -170,6 +170,15 @@ const DetailsDrawer = props => {
           </Grid>
         )}
 
+        {drawerData.storageLocations && (
+          <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+            <Typography variant='body2' sx={{ mb: 2 }}>
+              Storage Location
+            </Typography>
+            {Object.keys(drawerData.storageLocations).map((key) =>renderFieldText({ value: `${key}: ${drawerData.storageLocations[key]}` }))}
+          </Grid>
+        )}
+
         <Grid item xs={12} sx={{ mb: [0, 5] }}>
           <Typography variant='body2' sx={{ mb: 2 }}>
             Comment
