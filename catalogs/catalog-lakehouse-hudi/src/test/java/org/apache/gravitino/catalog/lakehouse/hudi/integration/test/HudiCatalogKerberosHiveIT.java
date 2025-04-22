@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig;
@@ -43,6 +44,7 @@ import org.apache.gravitino.rel.types.Types.IntegerType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -85,7 +87,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
   private static final String HIVE_COL_NAME2 = "col2";
   private static final String HIVE_COL_NAME3 = "col3";
 
-  @org.junit.jupiter.api.BeforeAll
+  @BeforeAll
   public void startIntegrationTest() {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
@@ -118,6 +120,8 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
   @AfterAll
   public void stop() {
+    // Restore the file permission
+    restoreFilePermission();
     // Reset the UGI
     UserGroupInformation.reset();
 
@@ -188,7 +192,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
   }
 
   private void addKerberosConfig() {
-    customConfigs.put("gravitino." + AuthenticationConfig.AUTH_TYPE_KEY, "kerberos");
+    customConfigs.put(Configs.AUTHENTICATORS.getKey(), "kerberos");
     customConfigs.put("gravitino.authenticator.kerberos.principal", GRAVITINO_SERVER_PRINCIPAL);
     customConfigs.put("gravitino.authenticator.kerberos.keytab", TMP_DIR + GRAVITINO_SERVER_KEYTAB);
     customConfigs.put(SDK_KERBEROS_KEYTAB_KEY, TMP_DIR + GRAVITINO_CLIENT_KEYTAB);
@@ -223,7 +227,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, TYPE);
     properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
-    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
+    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi01");
     Catalog catalog =
         gravitinoMetalake.createCatalog(
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-hudi", "comment", properties);
@@ -241,9 +245,9 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     // Now try to permit the user to create the schema again
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-hudi");
+        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-hudi01");
     kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-hudi");
+        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-hudi01");
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
@@ -310,7 +314,7 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, TYPE);
     properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
-    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
+    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi01");
 
     Catalog catalog =
         gravitinoMetalake.createCatalog(
@@ -332,5 +336,10 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     Column col2 = Column.of(HIVE_COL_NAME2, DateType.get(), "col_2_comment");
     Column col3 = Column.of(HIVE_COL_NAME3, Types.StringType.get(), "col_3_comment");
     return new Column[] {col1, col2, col3};
+  }
+
+  static void restoreFilePermission() {
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chmod", "-R", "755", "/user/hive/warehouse-catalog-hudi01");
   }
 }
