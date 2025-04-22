@@ -32,13 +32,13 @@ public class TestAnnotations {
   static class TestResourceAnnotationClass {
 
     public void methodWithAnnotatedParam(
-        @AuthorizeMetadata(MetadataObject.Type.TABLE) String table) {
+        @AuthorizeMetadata(type = MetadataObject.Type.TABLE) String table) {
       // dummy method
     }
 
     public void listSchemas(
-        @AuthorizeMetadata(MetadataObject.Type.METALAKE) String metalake,
-        @AuthorizeMetadata(MetadataObject.Type.CATALOG) String catalog) {
+        @AuthorizeMetadata(type = MetadataObject.Type.METALAKE) String metalake,
+        @AuthorizeMetadata(type = MetadataObject.Type.CATALOG) String catalog) {
       // dummy method
     }
   }
@@ -95,7 +95,7 @@ public class TestAnnotations {
             .getParameters()[0];
     AuthorizeMetadata annotation = argument.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(annotation);
-    Assertions.assertEquals(MetadataObject.Type.TABLE, annotation.value());
+    Assertions.assertEquals(MetadataObject.Type.TABLE, annotation.type());
   }
 
   @Test
@@ -108,11 +108,11 @@ public class TestAnnotations {
     Parameter argumentMetalake = arguments[0];
     AuthorizeMetadata metalakeAnnotation = argumentMetalake.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(metalakeAnnotation);
-    Assertions.assertEquals(MetadataObject.Type.METALAKE, metalakeAnnotation.value());
+    Assertions.assertEquals(MetadataObject.Type.METALAKE, metalakeAnnotation.type());
 
     Parameter argumentCatalog = arguments[1];
     AuthorizeMetadata catalogAnnotation = argumentCatalog.getAnnotation(AuthorizeMetadata.class);
     Assertions.assertNotNull(catalogAnnotation);
-    Assertions.assertEquals(MetadataObject.Type.CATALOG, catalogAnnotation.value());
+    Assertions.assertEquals(MetadataObject.Type.CATALOG, catalogAnnotation.type());
   }
 }

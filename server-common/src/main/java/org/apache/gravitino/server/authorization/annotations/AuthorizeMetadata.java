@@ -33,5 +33,5 @@ public @interface AuthorizeMetadata {
    *
    * @return the name of the parameter to be used for authorization.
    */
-  MetadataObject.Type value();
+  MetadataObject.Type type();
 }
