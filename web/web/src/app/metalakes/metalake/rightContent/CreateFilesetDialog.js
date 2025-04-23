@@ -76,7 +76,7 @@ const schema = yup.object().shape({
           otherwise: schema => schema
         }),
         location: yup.string().when('name', {
-          is: (name) => !!name,
+          is: name => !!name,
           then: schema => schema.required(),
           otherwise: schema => schema
         })
@@ -235,6 +235,7 @@ const CreateFilesetDialog = props => {
             if (item.defaultLocation) {
               properties['default-location-name'] = item.name
             }
+
             return acc
           }, {}),
           comment: data.comment,
@@ -409,7 +410,9 @@ const CreateFilesetDialog = props => {
                                 disabled={type === 'update'}
                                 label={`Name ${index + 1}`}
                                 error={!!errors.storageLocations?.[index]?.name || !!errors.storageLocations?.message}
-                                helperText={errors.storageLocations?.[index]?.name?.message || errors.storageLocations?.message}
+                                helperText={
+                                  errors.storageLocations?.[index]?.name?.message || errors.storageLocations?.message
+                                }
                                 fullWidth
                               />
                             )}
@@ -426,8 +429,13 @@ const CreateFilesetDialog = props => {
                                 onChange={onChange}
                                 disabled={type === 'update'}
                                 label={`Location ${index + 1}`}
-                                error={!!errors.storageLocations?.[index]?.location || !!errors.storageLocations?.message}
-                                helperText={errors.storageLocations?.[index]?.location?.message || errors.storageLocations?.message}
+                                error={
+                                  !!errors.storageLocations?.[index]?.location || !!errors.storageLocations?.message
+                                }
+                                helperText={
+                                  errors.storageLocations?.[index]?.location?.message ||
+                                  errors.storageLocations?.message
+                                }
                                 fullWidth
                               />
                             )}
@@ -441,7 +449,7 @@ const CreateFilesetDialog = props => {
                               <Tooltip title='Default Location' placement='top'>
                                 <Switch
                                   checked={value}
-                                  onChange={(event) => onChangeDefaultLocation({ index, event })}
+                                  onChange={event => onChangeDefaultLocation({ index, event })}
                                   disabled={type === 'update'}
                                   size='small'
                                 />
@@ -452,26 +460,31 @@ const CreateFilesetDialog = props => {
                         <Box>
                           {index === 0 ? (
                             <Box sx={{ minWidth: 40 }}>
-                              <IconButton sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }} onClick={() => {
-                                if (type === 'update') return
-                                append({ name: '', location: '', defaultLocation: false })
-                              }}>
+                              <IconButton
+                                sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
+                                onClick={() => {
+                                  if (type === 'update') return
+                                  append({ name: '', location: '', defaultLocation: false })
+                                }}
+                              >
                                 <Icon icon='mdi:plus-circle-outline' />
                               </IconButton>
                             </Box>
                           ) : (
                             <Box sx={{ minWidth: 40 }}>
-                              <IconButton sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }} onClick={() => {
-                                if (type === 'update') return
-                                remove(index)
-                              }}>
+                              <IconButton
+                                sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
+                                onClick={() => {
+                                  if (type === 'update') return
+                                  remove(index)
+                                }}
+                              >
                                 <Icon icon='mdi:minus-circle-outline' />
                               </IconButton>
                             </Box>
                           )}
                         </Box>
                       </Box>
-                      
                     </FormControl>
                   </Grid>
                 )
@@ -534,7 +547,10 @@ const CreateFilesetDialog = props => {
                                 name='key'
                                 label='Key'
                                 value={item.key}
-                                disabled={item.disabled || (['location', 'default-location-name'].includes(item.key) && type === 'update')}
+                                disabled={
+                                  item.disabled ||
+                                  (['location', 'default-location-name'].includes(item.key) && type === 'update')
+                                }
                                 onChange={event => handleFormChange({ index, event })}
                                 error={item.hasDuplicateKey || item.invalid || !item.key.trim()}
                                 data-refer={`props-key-${index}`}
@@ -547,14 +563,20 @@ const CreateFilesetDialog = props => {
                                 label='Value'
                                 error={item.required && item.value === ''}
                                 value={item.value}
-                                disabled={item.disabled || (['location', 'default-location-name'].includes(item.key) && type === 'update')}
+                                disabled={
+                                  item.disabled ||
+                                  (['location', 'default-location-name'].includes(item.key) && type === 'update')
+                                }
                                 onChange={event => handleFormChange({ index, event })}
                                 data-refer={`props-value-${index}`}
                                 data-prev-refer={`props-${item.key}`}
                               />
                             </Box>
 
-                            {!(item.disabled || (['location', 'default-location-name'].includes(item.key) && type === 'update')) ? (
+                            {!(
+                              item.disabled ||
+                              (['location', 'default-location-name'].includes(item.key) && type === 'update')
+                            ) ? (
                               <Box sx={{ minWidth: 40 }}>
                                 <IconButton onClick={() => removeFields(index)}>
                                   <Icon icon='mdi:minus-circle-outline' />
