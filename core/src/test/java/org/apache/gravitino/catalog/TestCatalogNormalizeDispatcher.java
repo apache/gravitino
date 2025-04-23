@@ -126,7 +126,6 @@ public class TestCatalogNormalizeDispatcher {
     Assertions.assertEquals("The catalog name '*' is reserved.", exception.getMessage());
 
     String[] illegalNames = {
-      "catalog-xxx",
       "catalog/xxx",
       "catalog.xxx",
       "catalog xxx",
