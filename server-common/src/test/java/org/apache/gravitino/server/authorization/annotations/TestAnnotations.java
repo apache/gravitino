@@ -32,13 +32,13 @@ public class TestAnnotations {
   static class TestResourceAnnotationClass {
 
     public void methodWithAnnotatedParam(
-        @AuthorizeMetadata(type = MetadataObject.Type.TABLE) String table) {
+        @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table) {
       // dummy method
     }
 
     public void listSchemas(
-        @AuthorizeMetadata(type = MetadataObject.Type.METALAKE) String metalake,
-        @AuthorizeMetadata(type = MetadataObject.Type.CATALOG) String catalog) {
+        @AuthorizationMetadata(type = MetadataObject.Type.METALAKE) String metalake,
+        @AuthorizationMetadata(type = MetadataObject.Type.CATALOG) String catalog) {
       // dummy method
     }
   }
@@ -47,12 +47,12 @@ public class TestAnnotations {
   // 1. ResourceAuthorizeApi
   // 2. ExpressionsAuthorizeApi
   static class TestAuthorizeAnnotationClass {
-    @MetadataAuthorizeApi(
+    @AuthorizationMetadataApi(
         privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
         metadataType = MetadataObject.Type.CATALOG)
     public void testAuthedMethodUseResourceType() {}
 
-    @ExpressionsAuthorizeApi(expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE")
+    @AuthorizationExpressionApi(expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE")
     public void testAuthedMethodUseExpression() {}
   }
 
@@ -61,10 +61,10 @@ public class TestAnnotations {
     Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
     Method method = testClass.getMethod("testAuthedMethodUseResourceType");
 
-    boolean hasAnnotation = method.isAnnotationPresent(MetadataAuthorizeApi.class);
+    boolean hasAnnotation = method.isAnnotationPresent(AuthorizationMetadataApi.class);
     Assertions.assertTrue(hasAnnotation);
 
-    MetadataAuthorizeApi annotation = method.getAnnotation(MetadataAuthorizeApi.class);
+    AuthorizationMetadataApi annotation = method.getAnnotation(AuthorizationMetadataApi.class);
     Assertions.assertNotNull(annotation);
 
     Assertions.assertArrayEquals(
@@ -78,10 +78,10 @@ public class TestAnnotations {
     Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
     Method method = testClass.getMethod("testAuthedMethodUseExpression");
 
-    boolean hasAnnotation = method.isAnnotationPresent(ExpressionsAuthorizeApi.class);
+    boolean hasAnnotation = method.isAnnotationPresent(AuthorizationExpressionApi.class);
     Assertions.assertTrue(hasAnnotation);
 
-    ExpressionsAuthorizeApi annotation = method.getAnnotation(ExpressionsAuthorizeApi.class);
+    AuthorizationExpressionApi annotation = method.getAnnotation(AuthorizationExpressionApi.class);
     Assertions.assertNotNull(annotation);
 
     Assertions.assertEquals(
@@ -93,7 +93,7 @@ public class TestAnnotations {
     Parameter argument =
         TestResourceAnnotationClass.class.getMethod("methodWithAnnotatedParam", String.class)
             .getParameters()[0];
-    AuthorizeMetadata annotation = argument.getAnnotation(AuthorizeMetadata.class);
+    AuthorizationMetadata annotation = argument.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(annotation);
     Assertions.assertEquals(MetadataObject.Type.TABLE, annotation.type());
   }
@@ -106,12 +106,14 @@ public class TestAnnotations {
             .getParameters();
 
     Parameter argumentMetalake = arguments[0];
-    AuthorizeMetadata metalakeAnnotation = argumentMetalake.getAnnotation(AuthorizeMetadata.class);
+    AuthorizationMetadata metalakeAnnotation =
+        argumentMetalake.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(metalakeAnnotation);
     Assertions.assertEquals(MetadataObject.Type.METALAKE, metalakeAnnotation.type());
 
     Parameter argumentCatalog = arguments[1];
-    AuthorizeMetadata catalogAnnotation = argumentCatalog.getAnnotation(AuthorizeMetadata.class);
+    AuthorizationMetadata catalogAnnotation =
+        argumentCatalog.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(catalogAnnotation);
     Assertions.assertEquals(MetadataObject.Type.CATALOG, catalogAnnotation.type());
   }
