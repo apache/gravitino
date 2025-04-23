@@ -17,32 +17,21 @@
  *  under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
 
-/** Represent a pre event before creating Iceberg table. */
-@DeveloperApi
-public class IcebergCreateTablePreEvent extends IcebergTablePreEvent
-    implements SupportsChangingPreEvent {
-  private final CreateTableRequest createTableRequest;
+public class CountingPreEvent extends PreEvent implements SupportsChangingPreEvent {
+  private final int count;
 
-  public IcebergCreateTablePreEvent(
-      IcebergRequestContext icebergRequestContext,
-      NameIdentifier resourceIdentifier,
-      CreateTableRequest createTableRequest) {
-    super(icebergRequestContext, resourceIdentifier);
-    this.createTableRequest = createTableRequest;
+  protected CountingPreEvent(String user, NameIdentifier identifier, int count) {
+    super(user, identifier);
+    this.count = count;
   }
 
-  @Override
-  public OperationType operationType() {
-    return OperationType.CREATE_TABLE;
-  }
-
-  public CreateTableRequest createTableRequest() {
-    return createTableRequest;
+  public int count() {
+    return count;
   }
 }
