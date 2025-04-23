@@ -484,6 +484,9 @@ public class HadoopCatalogIT extends BaseIT {
 
   @Test
   void testNameSpec() {
+    Assertions.assertDoesNotThrow(
+        () -> metalake.createCatalog("my-catalog", Catalog.Type.FILESET, provider, null, null));
+
     String illegalName = "ok/test";
 
     // test illegal catalog name
