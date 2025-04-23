@@ -102,14 +102,16 @@ class ModelUpdateRequest:
     class UpdateModelCommentRequest(ModelUpdateRequestBase):
         """Request to update model comment"""
 
-        _comment: Optional[str] = field(metadata=config(field_name="comment"))
+        _new_comment: Optional[str] = field(metadata=config(field_name="newComment"))
+        """Represents a request to update the comment on a Metalake."""
 
-        def __init__(self, comment: str):
+        def __init__(self, new_comment: str):
             super().__init__("updateComment")
-            self._comment = comment
+            self._new_comment = new_comment
 
         def validate(self):
+            """Validates the fields of the request. Always pass."""
             pass
 
-        def model_change(self) -> ModelChange:
-            return ModelChange.update_comment(self._comment)
+        def model_version_change(self):
+            return ModelChange.update_comment(self._new_comment)

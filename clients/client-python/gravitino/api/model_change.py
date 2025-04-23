@@ -209,8 +209,8 @@ class ModelChange(ABC):
         A model change to update the comment of the model.
         """
 
-        def __init__(self, comment):
-            self._comment = comment
+        def __init__(self, new_comment):
+            self._new_comment = new_comment
 
         def new_comment(self):
             """Retrieves the comment of the model.
@@ -237,7 +237,7 @@ class ModelChange(ABC):
             Returns:
                 A hash code value for this comment update operation.
             """
-            return hash(self.comment())
+            return hash(self.new_comment())
 
         def __str__(self):
             """Provides a string representation of the UpdateComment instance. This string includes the
@@ -245,4 +245,4 @@ class ModelChange(ABC):
             Returns:
                 A string summary of this comment update operation.
             """
-            return f"UpdateComment {self.comment()}"
+            return f"UpdateComment {self.new_comment()}"
