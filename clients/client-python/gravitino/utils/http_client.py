@@ -79,7 +79,6 @@ class Response:
 
 
 class HTTPClient:
-
     FORMDATA_HEADER = {
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "application/vnd.gravitino.v1+json",

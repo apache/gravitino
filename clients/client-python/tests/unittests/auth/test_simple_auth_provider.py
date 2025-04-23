@@ -25,7 +25,6 @@ from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 
 
 class TestSimpleAuthProvider(unittest.TestCase):
-
     def test_auth_provider(self):
         os.environ["user.name"] = "test_auth1"
         provider: AuthDataProvider = SimpleAuthProvider()

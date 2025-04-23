@@ -24,17 +24,10 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 repos:
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
     hooks:
-      - id: black
-        language_version: python3
-
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        args: [--max-line-length=100]
-        additional_dependencies: []
+      - id: ruff        # runs the linter
+      - id: ruff-format # runs the formatter
 
 default_stages: [pre-commit]

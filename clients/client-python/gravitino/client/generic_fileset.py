@@ -31,7 +31,6 @@ from gravitino.utils import HTTPClient
 
 
 class GenericFileset(Fileset, SupportsCredentials):
-
     _fileset: FilesetDTO
     """The fileset data transfer object"""
 
