@@ -24,7 +24,7 @@ paths:
       description: Updates a run state for a job.
       operationId: postRunEvent
       tags:
-        - lineage
+        - OpenLineage
       requestBody:
         content:
           application/json:
