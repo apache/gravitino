@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.jdbc;
 
-import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
+import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CATALOG_PG_IT;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
@@ -26,15 +26,17 @@ import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 
 @Tag("gravitino-docker-test")
-public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
+@Disabled("Disabled until PG table creation is supported")
+public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
 
-  protected String mysqlUrl;
-  protected String mysqlUsername;
-  protected String mysqlPassword;
-  protected String mysqlDriver;
+  protected String pgUrl;
+  protected String pgUsername;
+  protected String pgPassword;
+  protected String pgDriver;
 
   @Override
   protected boolean supportsSparkSQLClusteredBy() {
@@ -73,22 +75,22 @@ public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
 
   @Override
   protected boolean supportsUpdateColumnPosition() {
-    return true;
+    return false;
   }
 
   @Override
   protected boolean supportListTable() {
-    return true;
+    return false;
   }
 
   @Override
   protected String getCatalogName() {
-    return "jdbc_mysql";
+    return "jdbc_postgresql";
   }
 
   @Override
   protected String getProvider() {
-    return "jdbc-mysql";
+    return "jdbc-postgresql";
   }
 
   @Override
@@ -99,20 +101,22 @@ public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
   @Override
   protected void initCatalogEnv() throws Exception {
     ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(MYSQL_CATALOG_MYSQL_IT);
-    mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
-    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
-    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
-    mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
+    containerSuite.startPostgreSQLContainer(PG_CATALOG_PG_IT);
+    this.pgUrl = containerSuite.getPostgreSQLContainer().getJdbcUrl();
+    this.pgUsername = containerSuite.getPostgreSQLContainer().getUsername();
+    this.pgPassword = containerSuite.getPostgreSQLContainer().getPassword();
+    this.pgDriver = containerSuite.getPostgreSQLContainer().getDriverClassName(PG_CATALOG_PG_IT);
   }
 
   @Override
   protected Map<String, String> getCatalogConfigs() {
     Map<String, String> catalogProperties = Maps.newHashMap();
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, mysqlUrl);
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, mysqlUsername);
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, mysqlPassword);
-    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, mysqlDriver);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, this.pgUrl);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, this.pgUsername);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, this.pgPassword);
+    catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, this.pgDriver);
+    catalogProperties.put(
+        JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, PG_CATALOG_PG_IT.toString());
     return catalogProperties;
   }
 }
