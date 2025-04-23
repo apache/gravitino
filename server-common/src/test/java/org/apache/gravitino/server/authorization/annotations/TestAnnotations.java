@@ -64,7 +64,8 @@ public class TestAnnotations {
     boolean hasAnnotation = method.isAnnotationPresent(AuthorizationMetadataPrivileges.class);
     Assertions.assertTrue(hasAnnotation);
 
-    AuthorizationMetadataPrivileges annotation = method.getAnnotation(AuthorizationMetadataPrivileges.class);
+    AuthorizationMetadataPrivileges annotation =
+        method.getAnnotation(AuthorizationMetadataPrivileges.class);
     Assertions.assertNotNull(annotation);
 
     Assertions.assertArrayEquals(
