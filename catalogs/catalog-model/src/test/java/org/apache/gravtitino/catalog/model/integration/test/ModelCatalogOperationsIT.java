@@ -395,7 +395,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
-  public void testRegisterAndUpdateModel() {
+  public void testRegisterAndRenameModel() {
     String comment = "comment";
     String modelName = RandomNameUtils.genRandomName("alter_name_model");
     String newName = RandomNameUtils.genRandomName("new_name");
@@ -480,6 +480,24 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+  }
+
+  @Test
+  void testRegisterAndUpdateModelComment() {
+    String comment = "comment";
+    String newComment = "new comment";
+    String modelName = RandomNameUtils.genRandomName("alter_name_model");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    Map<String, String> properties = ImmutableMap.of("owner", "data-team", "key1", "val1");
+
+    Model createdModel =
+        gravitinoCatalog.asModelCatalog().registerModel(modelIdent, comment, properties);
+    ModelChange change = ModelChange.updateComment(newComment);
+    Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, change);
+
+    Assertions.assertEquals(createdModel.name(), alteredModel.name());
+    Assertions.assertEquals(createdModel.properties(), alteredModel.properties());
+    Assertions.assertEquals(newComment, alteredModel.comment());
   }
 
   @Test

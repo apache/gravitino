@@ -968,12 +968,21 @@ public class TestCatalogOperations
         if (models.containsKey(newIdent)) {
           throw new ModelAlreadyExistsException("Model %s already exists", ident);
         }
+
       } else if (change instanceof ModelChange.RemoveProperty) {
         ModelChange.RemoveProperty removeProperty = (ModelChange.RemoveProperty) change;
         newProps.remove(removeProperty.property());
+
       } else if (change instanceof ModelChange.SetProperty) {
         ModelChange.SetProperty setProperty = (ModelChange.SetProperty) change;
         newProps.put(setProperty.property(), setProperty.value());
+
+      } else if (change instanceof ModelChange.UpdateComment) {
+        ModelChange.UpdateComment updateComment = (ModelChange.UpdateComment) change;
+        newComment = updateComment.newComment();
+
+      } else {
+        throw new IllegalArgumentException("Unsupported model change: " + change);
       }
     }
     TestModel updatedModel =
@@ -1068,7 +1077,7 @@ public class TestCatalogOperations
         newProps.put(setProperty.property(), setProperty.value());
 
       } else {
-        throw new IllegalArgumentException("Unsupported model change: " + change);
+        throw new IllegalArgumentException("Unsupported model version change: " + change);
       }
     }
 

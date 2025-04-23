@@ -55,6 +55,16 @@ class ModelChange(ABC):
         """
         return ModelChange.RemoveProperty(pro)
 
+    @staticmethod
+    def update_comment(comment):
+        """Creates a new model change to update the comment of the model.
+        Args:
+            comment: The new comment of the model.
+        Returns:
+            The model change.
+        """
+        return ModelChange.UpdateComment(comment)
+
     class RenameModel:
         """A model change to rename the model."""
 
@@ -193,3 +203,46 @@ class ModelChange(ABC):
                 A string summary of this property removal operation.
             """
             return f"REMOVEPROPERTY {self.property()}"
+
+    class UpdateComment:
+        """
+        A model change to update the comment of the model.
+        """
+
+        def __init__(self, new_comment):
+            self._new_comment = new_comment
+
+        def new_comment(self):
+            """Retrieves the comment of the model.
+            Returns:
+                The comment of the model.
+            """
+            return self._new_comment
+
+        def __eq__(self, other) -> bool:
+            """Compares this UpdateComment instance with another object for equality. Two instances are
+            considered equal if they designate the same comment for the model.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model comment update operation; false otherwise.
+            """
+            if not isinstance(other, ModelChange.UpdateComment):
+                return False
+            return self.new_comment() == other.new_comment()
+
+        def __hash__(self):
+            """Generates a hash code for this UpdateComment instance. The hash code is primarily based on
+            the comment for the model.
+            Returns:
+                A hash code value for this comment update operation.
+            """
+            return hash(self.new_comment())
+
+        def __str__(self):
+            """Provides a string representation of the UpdateComment instance. This string includes the
+            class name followed by the comment of the model.
+            Returns:
+                A string summary of this comment update operation.
+            """
+            return f"UpdateComment {self.new_comment()}"

@@ -374,6 +374,10 @@ class DTOConverters {
           ((ModelChange.SetProperty) change).property(),
           ((ModelChange.SetProperty) change).value());
 
+    } else if (change instanceof ModelChange.UpdateComment) {
+      return new ModelUpdateRequest.UpdateModelCommentRequest(
+          ((ModelChange.UpdateComment) change).newComment());
+
     } else {
       throw new IllegalArgumentException(
           "Unknown model change type: " + change.getClass().getSimpleName());

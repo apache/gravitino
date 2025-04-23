@@ -181,6 +181,15 @@ public class ModelCommandHandler extends CommandHandler {
           .handle();
     }
 
+    if (line.hasOption(GravitinoOptions.COMMENT)
+        && !(line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {
+      String newComment = line.getOptionValue(GravitinoOptions.COMMENT);
+      gravitinoCommandLine
+          .newUpdateModelComment(context, metalake, catalog, schema, model, newComment)
+          .validate()
+          .handle();
+    }
+
     if (!line.hasOption(GravitinoOptions.URI)
         && line.hasOption(GravitinoOptions.COMMENT)
         && (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {

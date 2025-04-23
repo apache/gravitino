@@ -50,6 +50,7 @@ import org.apache.gravitino.cli.commands.RemoveModelProperty;
 import org.apache.gravitino.cli.commands.RemoveModelVersionProperty;
 import org.apache.gravitino.cli.commands.SetModelProperty;
 import org.apache.gravitino.cli.commands.SetModelVersionProperty;
+import org.apache.gravitino.cli.commands.UpdateModelComment;
 import org.apache.gravitino.cli.commands.UpdateModelName;
 import org.apache.gravitino.cli.commands.UpdateModelVersionComment;
 import org.apache.gravitino.cli.commands.UpdateModelVersionUri;
@@ -665,6 +666,35 @@ public class TestModelCommands {
     doReturn(mockRemoveProperty).when(mockRemoveProperty).validate();
     commandLine.handleCommandLine();
     verify(mockRemoveProperty).handle();
+  }
+
+  @Test
+  void testUpdateModelComment() {
+    UpdateModelComment mockUpdate = mock(UpdateModelComment.class);
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME)).thenReturn("catalog.schema.model");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("new comment");
+
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.MODEL, CommandActions.UPDATE));
+
+    doReturn(mockUpdate)
+        .when(commandLine)
+        .newUpdateModelComment(
+            any(CommandContext.class),
+            eq("metalake_demo"),
+            eq("catalog"),
+            eq("schema"),
+            eq("model"),
+            eq("new comment"));
+    doReturn(mockUpdate).when(mockUpdate).validate();
+    commandLine.handleCommandLine();
+    verify(mockUpdate).handle();
   }
 
   @Test
