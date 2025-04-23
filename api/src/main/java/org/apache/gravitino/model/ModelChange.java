@@ -59,6 +59,16 @@ public interface ModelChange {
     return new ModelChange.RemoveProperty(property);
   }
 
+  /**
+   * Create a ModelChange for updating the comment of a model.
+   *
+   * @param newComment The new comment of the model.
+   * @return A ModelChange for the comment update.
+   */
+  static ModelChange updateComment(String newComment) {
+    return new ModelChange.UpdateComment(newComment);
+  }
+
   /** A ModelChange to rename a model. */
   final class RenameModel implements ModelChange {
     private final String newName;
@@ -251,6 +261,67 @@ public interface ModelChange {
     @Override
     public String toString() {
       return "RemoveProperty " + property;
+    }
+  }
+
+  /** A ModelChange to update the comment of a model. */
+  final class UpdateComment implements ModelChange {
+    private final String newComment;
+
+    /**
+     * Constructs a new {@link UpdateComment} instance with the specified new comment.
+     *
+     * @param newComment The new comment of the model.
+     */
+    public UpdateComment(String newComment) {
+      this.newComment = newComment;
+    }
+
+    /**
+     * Retrieves the new comment for the model.
+     *
+     * @return The new comment of the model.
+     */
+    public String newComment() {
+      return newComment;
+    }
+
+    /**
+     * Compares this UpdateComment instance with another object for equality. The comparison is
+     * based on the new comment of the model.
+     *
+     * @param obj The object to compare with this instance.
+     * @return {@code true} if the given object represents the same model comment update; {@code
+     *     false} otherwise.
+     */
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == this) return true;
+      if (!(obj instanceof UpdateComment)) return false;
+      UpdateComment other = (UpdateComment) obj;
+      return Objects.equals(newComment, other.newComment);
+    }
+
+    /**
+     * Generates a hash code for this UpdateComment instance. The hash code is based on the new
+     * comment of the model.
+     *
+     * @return A hash code value for this model comment update operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(newComment);
+    }
+
+    /**
+     * Provides a string representation of the UpdateComment instance. This string format includes
+     * the class name followed by the new comment of the model.
+     *
+     * @return A string summary of the model comment update operation.
+     */
+    @Override
+    public String toString() {
+      return "UpdateComment " + newComment;
     }
   }
 }

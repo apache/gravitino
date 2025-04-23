@@ -523,6 +523,9 @@ class GenericModelCatalog(BaseSchemaCatalog):
         if isinstance(change, ModelChange.RemoveProperty):
             return ModelUpdateRequest.ModelRemovePropertyRequest(change.property())
 
+        if isinstance(change, ModelChange.UpdateComment):
+            return ModelUpdateRequest.UpdateModelCommentRequest(change.new_comment())
+
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     @staticmethod

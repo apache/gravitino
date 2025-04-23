@@ -41,7 +41,12 @@ import org.apache.gravitino.rest.RESTRequest;
   @JsonSubTypes.Type(
       value = ModelUpdateRequest.RemoveModelPropertyRequest.class,
       name = "removeProperty"),
-  @JsonSubTypes.Type(value = ModelUpdateRequest.SetModelPropertyRequest.class, name = "setProperty")
+  @JsonSubTypes.Type(
+      value = ModelUpdateRequest.SetModelPropertyRequest.class,
+      name = "setProperty"),
+  @JsonSubTypes.Type(
+      value = ModelUpdateRequest.UpdateModelCommentRequest.class,
+      name = "updateComment")
 })
 public interface ModelUpdateRequest extends RESTRequest {
 
@@ -156,5 +161,26 @@ public interface ModelUpdateRequest extends RESTRequest {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
     }
+  }
+
+  /** The model update request for update comment of model. */
+  @EqualsAndHashCode
+  @AllArgsConstructor
+  @NoArgsConstructor(force = true)
+  @ToString
+  @Getter
+  class UpdateModelCommentRequest implements ModelUpdateRequest {
+    @JsonProperty("newComment")
+    private final String newComment;
+
+    /** {@inheritDoc} */
+    @Override
+    public ModelChange modelChange() {
+      return ModelChange.updateComment(newComment);
+    }
+
+    /** Validates the fields of the request. Always pass. */
+    @Override
+    public void validate() throws IllegalArgumentException {}
   }
 }
