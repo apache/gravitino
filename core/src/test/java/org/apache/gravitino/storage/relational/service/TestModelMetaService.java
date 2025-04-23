@@ -202,7 +202,7 @@ public class TestModelMetaService extends TestJDBCBackend {
   }
 
   @Test
-  void testAlterModel() throws IOException {
+  void testInsertAndRenameModel() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");
     String newName = "new_model_name";
@@ -228,6 +228,93 @@ public class TestModelMetaService extends TestJDBCBackend {
             .withLatestVersion(modelEntity.latestVersion())
             .withAuditInfo(modelEntity.auditInfo())
             .withComment(modelEntity.comment())
+            .withProperties(modelEntity.properties())
+            .build();
+
+    Function<ModelEntity, ModelEntity> renameUpdater = oldModel -> updatedModel;
+    ModelEntity alteredModel =
+        ModelMetaService.getInstance().updateModel(modelEntity.nameIdentifier(), renameUpdater);
+
+    Assertions.assertEquals(alteredModel, updatedModel);
+    // Test update an in-existent model
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelMetaService.getInstance()
+                .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
+  }
+
+  @Test
+  void testInsertAndUpdateModelComment() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    Map<String, String> properties = ImmutableMap.of("k1", "v1");
+    String newComment = "new_model_comment";
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model1",
+            "model1 comment",
+            0,
+            properties,
+            auditInfo);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    ModelEntity updatedModel =
+        ModelEntity.builder()
+            .withId(modelEntity.id())
+            .withName(newComment)
+            .withNamespace(modelEntity.namespace())
+            .withLatestVersion(modelEntity.latestVersion())
+            .withAuditInfo(modelEntity.auditInfo())
+            .withComment(modelEntity.comment())
+            .withProperties(modelEntity.properties())
+            .build();
+
+    Function<ModelEntity, ModelEntity> renameUpdater = oldModel -> updatedModel;
+    ModelEntity alteredModel =
+        ModelMetaService.getInstance().updateModel(modelEntity.nameIdentifier(), renameUpdater);
+
+    Assertions.assertEquals(alteredModel, updatedModel);
+    // Test update an in-existent model
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelMetaService.getInstance()
+                .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
+  }
+
+  @Test
+  void testInsertAndUpdateModelProperties() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Map<String, String> newProps = ImmutableMap.of("k1", "v1", "k3", "v3");
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model1",
+            "model1 comment",
+            0,
+            properties,
+            auditInfo);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    ModelEntity updatedModel =
+        ModelEntity.builder()
+            .withId(modelEntity.id())
+            .withName(modelEntity.comment())
+            .withNamespace(modelEntity.namespace())
+            .withLatestVersion(modelEntity.latestVersion())
+            .withAuditInfo(modelEntity.auditInfo())
+            .withComment(modelEntity.comment())
+            .withProperties(newProps)
             .build();
 
     Function<ModelEntity, ModelEntity> renameUpdater = oldModel -> updatedModel;
