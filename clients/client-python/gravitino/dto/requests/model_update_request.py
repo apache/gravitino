@@ -97,3 +97,21 @@ class ModelUpdateRequest:
 
         def model_change(self) -> ModelChange:
             return ModelChange.remove_property(self._property)
+
+    @dataclass
+    class UpdateModelCommentRequest(ModelUpdateRequestBase):
+        """Request to update model comment"""
+
+        _new_comment: Optional[str] = field(metadata=config(field_name="newComment"))
+        """Represents a request to update the comment on a Metalake."""
+
+        def __init__(self, new_comment: str):
+            super().__init__("updateComment")
+            self._new_comment = new_comment
+
+        def validate(self):
+            """Validates the fields of the request. Always pass."""
+            pass
+
+        def model_change(self):
+            return ModelChange.update_comment(self._new_comment)
