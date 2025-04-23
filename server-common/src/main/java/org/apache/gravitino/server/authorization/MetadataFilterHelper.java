@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization;
 
+import com.google.errorprone.annotations.DoNotCall;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -38,9 +39,10 @@ public class MetadataFilterHelper {
    * @param metadataList metadata list.
    * @return metadata List that the user has permission to access.
    */
+  @DoNotCall
   public static NameIdentifier[] filter(
       MetadataObject.Type metadataType, String privilege, NameIdentifier[] metadataList) {
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   /**
@@ -51,8 +53,9 @@ public class MetadataFilterHelper {
    * @param nameIdentifiers metaData list.
    * @return metadata List that the user has permission to access.
    */
+  @DoNotCall
   public static NameIdentifier[] filterByExpression(
       String expression, MetadataObject.Type metadataType, NameIdentifier[] nameIdentifiers) {
-    return null;
+    throw new UnsupportedOperationException();
   }
 }

@@ -37,7 +37,7 @@ public class GravitinoInterceptionService implements InterceptionService {
 
   @Override
   public Filter getDescriptorFilter() {
-    return null;
+    throw new UnsupportedOperationException();
   }
 
   @Override
