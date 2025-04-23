@@ -170,6 +170,9 @@ paths:
   /metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectFullName}/revoke:
     $ref: "./permissions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1permissions~1roles~1%7Brole%7D~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1revoke"
 
+  /lineage:
+    $ref: "./lineage.yaml#/paths/~1lineage"
+
 components:
 
   schemas:
