@@ -121,6 +121,10 @@ public interface EventListenerPlugin {
    */
   default void onPreEvent(PreEvent preEvent) throws ForbiddenException {}
 
+  default PreEvent transformPreEvent(PreEvent preEvent) {
+    return preEvent;
+  };
+
   /**
    * Specifies the default operational mode for event processing by the plugin. The default
    * implementation is synchronous, but implementers can override this to utilize asynchronous
