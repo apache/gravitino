@@ -47,6 +47,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -294,5 +295,11 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+
+    // Test if the schema is not empty in entity store but does exist in catalog
+    doThrow(new NonEmptyEntityException("mock error"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+    Assertions.assertFalse(dispatcher.dropSchema(schemaIdent, false));
   }
 }

@@ -339,6 +339,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
           } catch (NonEmptyEntityException e) {
             LOG.warn("The schema to be dropped does not empty in the store: {}", ident, e);
+            // then cascade delete the schema, otherwise, the schema will never be deleted.
+            try {
+              store.delete(ident, SCHEMA, true);
+            } catch (Exception e1) {
+              LOG.warn("Failed to delete the schema from the store: {}", ident, e1);
+            }
+
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
