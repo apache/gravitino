@@ -339,7 +339,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   @Test
   void testRemoveModelProperty() {
     String schemaName = "test_remove_model_property_schema";
-    String modelName = "test_update_model_property";
+    String modelName = "test_remove_model_property";
     String modelComment = "model which tests update property";
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
     schemaOperationDispatcher.createSchema(
@@ -366,8 +366,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
   @Test
   void testUpdateModelComment() {
-    String schemaName = "test_remove_model_property_schema";
-    String modelName = "test_update_model_property";
+    String schemaName = "test_update_model_comment_schema";
+    String modelName = "test_update_model_comment";
     String modelComment = "model which tests update property";
     String newModelComment = "new model comment";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
