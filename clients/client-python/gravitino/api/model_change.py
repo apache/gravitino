@@ -217,7 +217,7 @@ class ModelChange(ABC):
             Returns:
                 The comment of the model.
             """
-            return self._comment
+            return self._new_comment
 
         def __eq__(self, other) -> bool:
             """Compares this UpdateComment instance with another object for equality. Two instances are
