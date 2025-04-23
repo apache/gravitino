@@ -299,8 +299,8 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(origin_model.properties(), properties)
 
         # Alter model and validate the updated model
-        change = ModelChange.update_comment(new_comment)
-        self._catalog.as_model_catalog().alter_model(model_ident, change)
+        changes = [ModelChange.update_comment(new_comment)]
+        self._catalog.as_model_catalog().alter_model(model_ident, changes)
         update_comment_model = self._catalog.as_model_catalog().get_model(model_ident)
         self.assertEqual(update_comment_model.name(), model_name)
         self.assertEqual(update_comment_model.comment(), new_comment)
