@@ -17,9 +17,8 @@
 
 package org.apache.gravitino.server.authorization;
 
-import java.util.Map;
-import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 
 /**
@@ -37,15 +36,10 @@ public class MetadataFilterHelper {
    * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @param metadataList metadata list.
-   * @param metadataIdExtractor extract the metadata id from list items.
    * @return metadata List that the user has permission to access.
-   * @param <E> metadata object.
    */
-  public static <E> E[] filter(
-      MetadataObject.Type metadataType,
-      String privilege,
-      E[] metadataList,
-      Function<E, Long> metadataIdExtractor) {
+  public static NameIdentifier[] filter(
+      MetadataObject.Type metadataType, String privilege, NameIdentifier[] metadataList) {
     return null;
   }
 
@@ -53,16 +47,12 @@ public class MetadataFilterHelper {
    * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
    *
    * @param expression authorization expression
-   * @param metadataList metaData list.
-   * @param metadataContextExtractor extract the metadata context(key-metadata type, value-metadata
-   *     id) from list items.
+   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param nameIdentifiers metaData list.
    * @return metadata List that the user has permission to access.
-   * @param <E> metadata object.
    */
-  public static <E> E[] filterByExpression(
-      String expression,
-      E[] metadataList,
-      Function<E, Map<MetadataObject.Type, Long>> metadataContextExtractor) {
+  public static NameIdentifier[] filterByExpression(
+      String expression, MetadataObject.Type metadataType, NameIdentifier[] nameIdentifiers) {
     return null;
   }
 }
