@@ -79,20 +79,24 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
-    eventBus.dispatchEvent(
-        new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequest));
+    IcebergCreateTablePreEvent transformedEvent =
+        (IcebergCreateTablePreEvent)
+            eventBus.dispatchAndTransformPreEvent(
+                new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequest));
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
-          icebergTableOperationDispatcher.createTable(context, namespace, createTableRequest);
+          icebergTableOperationDispatcher.createTable(
+              context, namespace, transformedEvent.createTableRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergCreateTableFailureEvent(context, nameIdentifier, createTableRequest, e));
+          new IcebergCreateTableFailureEvent(
+              context, nameIdentifier, transformedEvent.createTableRequest(), e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergCreateTableEvent(
-            context, nameIdentifier, createTableRequest, loadTableResponse));
+            context, nameIdentifier, transformedEvent.createTableRequest(), loadTableResponse));
     return loadTableResponse;
   }
 

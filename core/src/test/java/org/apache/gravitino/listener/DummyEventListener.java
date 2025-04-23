@@ -53,6 +53,15 @@ public class DummyEventListener implements EventListenerPlugin {
   }
 
   @Override
+  public PreEvent transformPreEvent(PreEvent preEvent) {
+    if (preEvent instanceof CountingPreEvent) {
+      return new CountingPreEvent(
+          preEvent.user(), preEvent.identifier(), ((CountingPreEvent) preEvent).count() + 1);
+    }
+    return preEvent;
+  }
+
+  @Override
   public void onPreEvent(PreEvent preEvent) {
     if (preEvent.equals(TestEventListenerManager.DUMMY_FORBIDDEN_PRE_EVENT_INSTANCE)) {
       throw new ForbiddenException("");
