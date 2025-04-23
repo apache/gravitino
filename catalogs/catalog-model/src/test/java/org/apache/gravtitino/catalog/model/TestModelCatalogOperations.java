@@ -801,6 +801,42 @@ public class TestModelCatalogOperations {
   }
 
   @Test
+  void testUpdateModelComment() {
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model";
+    String comment = "comment";
+    String newComment = "new comment";
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties =
+        StringIdentifier.newPropertiesWithId(stringId, ImmutableMap.of("key1", "value1"));
+
+    // validate registered model
+    Model registeredModel = ops.registerModel(modelIdent, comment, properties);
+    Assertions.assertEquals(modelName, registeredModel.name());
+    Assertions.assertEquals(comment, registeredModel.comment());
+    Assertions.assertEquals(properties, registeredModel.properties());
+
+    // validate loaded model
+    Model loadedModel = ops.getModel(modelIdent);
+    Assertions.assertEquals(modelName, loadedModel.name());
+    Assertions.assertEquals(comment, loadedModel.comment());
+    Assertions.assertEquals(properties, loadedModel.properties());
+
+    ModelChange change = ModelChange.updateComment(newComment);
+    Model alteredModel = ops.alterModel(modelIdent, change);
+
+    // validate altered model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(newComment, alteredModel.comment());
+    Assertions.assertEquals(properties, alteredModel.properties());
+  }
+
+  @Test
   void testUpdateVersionCommentViaVersion() {
     String schemaName = randomSchemaName();
     createSchema(schemaName);

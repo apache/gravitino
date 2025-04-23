@@ -97,3 +97,19 @@ class ModelUpdateRequest:
 
         def model_change(self) -> ModelChange:
             return ModelChange.remove_property(self._property)
+
+    @dataclass
+    class UpdateModelCommentRequest(ModelUpdateRequestBase):
+        """Request to update model comment"""
+
+        _comment: Optional[str] = field(metadata=config(field_name="comment"))
+
+        def __init__(self, comment: str):
+            super().__init__("updateComment")
+            self._comment = comment
+
+        def validate(self):
+            pass
+
+        def model_change(self) -> ModelChange:
+            return ModelChange.update_comment(self._comment)

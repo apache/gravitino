@@ -365,6 +365,37 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  void testUpdateModelComment() {
+    String schemaName = "test_remove_model_property_schema";
+    String modelName = "test_update_model_property";
+    String modelComment = "model which tests update property";
+    String newModelComment = "new model comment";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(
+        schemaIdent, "schema comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+
+    Model model = modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    // validate registered model
+    Assertions.assertEquals(modelName, model.name());
+    Assertions.assertEquals(modelComment, model.comment());
+    Assertions.assertEquals(props, model.properties());
+
+    ModelChange change = ModelChange.updateComment(newModelComment);
+    Model alteredModel = modelOperationDispatcher.alterModel(modelIdent, change);
+
+    // validate updated model
+    Assertions.assertEquals(modelName, alteredModel.name());
+    Assertions.assertEquals(newModelComment, alteredModel.comment());
+    Assertions.assertEquals(props, alteredModel.properties());
+  }
+
+  @Test
   void testUpdateModelVersionComment() {
     String schemaName = randomSchemaName();
     String schemaComment = "schema which tests update";
