@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +32,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -202,8 +205,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       MetadataObject.Type operationType,
       AuthorizationMetadataObject oldAuthzMetaObject,
       AuthorizationMetadataObject newAuthzMetaObject) {
-    PathBasedMetadataObject newPathBasedMetadataObject =
-        (PathBasedMetadataObject) newAuthzMetaObject;
     List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaObject);
     List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaObject);
     if (oldPolicies.isEmpty()) {
@@ -217,14 +218,48 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         policy -> {
           try {
             // Update the policy name is following Gravitino's spec
-            policy.setName(getAuthorizationPath(newPathBasedMetadataObject));
+            // Only Hive managed table rename will use this case
+            String oldResource =
+                policy
+                    .getResources()
+                    .get(rangerHelper.policyResourceDefines.get(0))
+                    .getValues()
+                    .get(0);
+            List<String> oldResourceNames =
+                Arrays.stream(oldResource.split("/"))
+                    .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
+                    .collect(Collectors.toList());
+            List<String> newResourceNames =
+                Arrays.stream(
+                        getAuthorizationPath((PathBasedMetadataObject) newAuthzMetaObject)
+                            .split("/"))
+                    .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
+                    .collect(Collectors.toList());
+
+            int minLen = Math.min(oldResourceNames.size(), newResourceNames.size());
+            for (int i = 0; i < minLen; i++) {
+              String oldName = oldResourceNames.get(i);
+              String newName = newResourceNames.get(i);
+              if (!oldName.equals(newName)) {
+                if (oldName.equals(oldAuthzMetaObject.name())
+                    && newName.equals(newAuthzMetaObject.name())) {
+                  oldResourceNames.set(i, newAuthzMetaObject.name());
+                  break;
+                } else {
+                  // If resource doesn't match, ignore this resource
+                  return;
+                }
+              }
+            }
+            String newResourcePath = "/" + String.join("/", oldResourceNames);
+
+            policy.setName(newResourcePath);
             // Update the policy resource name to new name
             policy
                 .getResources()
                 .put(
                     rangerHelper.policyResourceDefines.get(0),
-                    new RangerPolicy.RangerPolicyResource(
-                        getAuthorizationPath(newPathBasedMetadataObject)));
+                    new RangerPolicy.RangerPolicyResource(newResourcePath));
 
             boolean alreadyExist =
                 existNewPolicies.stream()
@@ -527,13 +562,21 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
     locations.forEach(
         locationPath -> {
+          Entity.EntityType pathEntityType;
+          MetadataObject.Type pathObjectType;
+          if (type == Entity.EntityType.METALAKE) {
+            pathEntityType = Entity.EntityType.CATALOG;
+            pathObjectType = MetadataObject.Type.CATALOG;
+          } else {
+            pathEntityType = type;
+            pathObjectType = securableObject.type();
+          }
           PathBasedMetadataObject pathBaseMetadataObject =
               new PathBasedMetadataObject(
                   securableObject.parent(),
                   securableObject.name(),
-                  pathExtractor.getPath(
-                      MetadataObjectUtil.toEntityType(securableObject), locationPath),
-                  PathBasedMetadataObject.PathType.get(securableObject.type()),
+                  pathExtractor.getPath(pathEntityType, locationPath),
+                  PathBasedMetadataObject.PathType.get(pathObjectType),
                   recursive);
           pathBaseMetadataObject.validateAuthorizationMetadataObject();
           rangerSecurableObjects.add(
@@ -811,9 +854,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     @Override
     public String getPath(Entity.EntityType type, String location) {
       if (type == Entity.EntityType.CATALOG) {
-        return String.format("%s/*/*/", location);
+        return String.format("%s/*/*", location);
       } else if (type == Entity.EntityType.SCHEMA) {
-        return String.format("%s/*/", location);
+        return String.format("%s/*", location);
       }
       if (type == Entity.EntityType.TABLE || type == Entity.EntityType.FILESET) {
         return location;
