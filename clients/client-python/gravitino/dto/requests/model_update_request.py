@@ -113,5 +113,5 @@ class ModelUpdateRequest:
             """Validates the fields of the request. Always pass."""
             pass
 
-        def model_version_change(self):
+        def model_change(self):
             return ModelChange.update_comment(self._new_comment)
