@@ -51,6 +51,7 @@ import org.apache.gravitino.authorization.ranger.RangerHelper;
 import org.apache.gravitino.authorization.ranger.RangerPrivileges;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.container.RangerContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -485,9 +486,41 @@ public class RangerFilesetIT extends BaseIT {
                   return null;
                 });
 
+    catalog
+        .asFilesetCatalog()
+        .alterFileset(
+            NameIdentifier.of(schemaName, filenameRole), FilesetChange.rename("new_name"));
+    UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
+        .doAs(
+            (PrivilegedExceptionAction<Void>)
+                () -> {
+                  FileSystem userFileSystem =
+                      FileSystem.get(
+                          new Configuration() {
+                            {
+                              set("fs.defaultFS", defaultBaseLocation());
+                            }
+                          });
+                  Assertions.assertDoesNotThrow(
+                      () ->
+                          userFileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
+                  Assertions.assertDoesNotThrow(
+                      () ->
+                          userFileSystem.mkdirs(
+                              new Path(
+                                  String.format("%s/%s", storageLocation(filenameRole), "test3"))));
+                  userFileSystem.close();
+                  return null;
+                });
+    MetadataObject renamedFilesetObject =
+        MetadataObjects.of(
+            String.format("%s.%s", catalogName, schemaName),
+            "new_name",
+            MetadataObject.Type.FILESET);
+
     metalake.revokePrivilegesFromRole(
         filesetRole,
-        filesetObject,
+        renamedFilesetObject,
         Sets.newHashSet(Privileges.ReadFileset.allow(), Privileges.WriteFileset.allow()));
     RangerBaseE2EIT.waitForUpdatingPolicies();
     UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
@@ -515,7 +548,7 @@ public class RangerFilesetIT extends BaseIT {
                   return null;
                 });
 
-    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, fileset.name()));
+    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, "new_name"));
   }
 
   private void createCatalogAndSchema() {
