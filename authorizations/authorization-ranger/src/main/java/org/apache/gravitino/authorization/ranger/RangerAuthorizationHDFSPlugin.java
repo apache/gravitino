@@ -219,25 +219,31 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           try {
             // Update the policy name is following Gravitino's spec
             // Only Hive managed table rename will use this case
-            List<String> oldNames =
-                Arrays.stream(policy.getName().split("/"))
+            String oldResource =
+                policy
+                    .getResources()
+                    .get(rangerHelper.policyResourceDefines.get(0))
+                    .getValues()
+                    .get(0);
+            List<String> oldResourceNames =
+                Arrays.stream(oldResource.split("/"))
                     .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
                     .collect(Collectors.toList());
-            List<String> newNames =
+            List<String> newResourceNames =
                 Arrays.stream(
                         getAuthorizationPath((PathBasedMetadataObject) newAuthzMetaObject)
                             .split("/"))
                     .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
                     .collect(Collectors.toList());
 
-            int minLen = Math.min(oldNames.size(), newNames.size());
+            int minLen = Math.min(oldResourceNames.size(), newResourceNames.size());
             for (int i = 0; i < minLen; i++) {
-              String oldName = oldNames.get(i);
-              String newName = newNames.get(i);
+              String oldName = oldResourceNames.get(i);
+              String newName = newResourceNames.get(i);
               if (!oldName.equals(newName)) {
                 if (oldName.equals(oldAuthzMetaObject.name())
                     && newName.equals(newAuthzMetaObject.name())) {
-                  oldNames.set(i, newAuthzMetaObject.name());
+                  oldResourceNames.set(i, newAuthzMetaObject.name());
                   break;
                 } else {
                   // If resource doesn't match, ignore this resource
@@ -245,15 +251,15 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 }
               }
             }
-            String newPolicyName = "/" + String.join("/", oldNames);
+            String newResourcePath = "/" + String.join("/", oldResourceNames);
 
-            policy.setName(newPolicyName);
+            policy.setName(newResourcePath);
             // Update the policy resource name to new name
             policy
                 .getResources()
                 .put(
                     rangerHelper.policyResourceDefines.get(0),
-                    new RangerPolicy.RangerPolicyResource(newPolicyName));
+                    new RangerPolicy.RangerPolicyResource(newResourcePath));
 
             boolean alreadyExist =
                 existNewPolicies.stream()
