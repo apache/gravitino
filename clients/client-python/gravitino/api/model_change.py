@@ -212,7 +212,7 @@ class ModelChange(ABC):
         def __init__(self, comment):
             self._comment = comment
 
-        def comment(self):
+        def new_comment(self):
             """Retrieves the comment of the model.
             Returns:
                 The comment of the model.
@@ -229,7 +229,7 @@ class ModelChange(ABC):
             """
             if not isinstance(other, ModelChange.UpdateComment):
                 return False
-            return self.comment() == other.comment()
+            return self.new_comment() == other.new_comment()
 
         def __hash__(self):
             """Generates a hash code for this UpdateComment instance. The hash code is primarily based on
