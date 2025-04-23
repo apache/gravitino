@@ -47,12 +47,12 @@ public class TestAnnotations {
   // 1. ResourceAuthorizeApi
   // 2. ExpressionsAuthorizeApi
   static class TestAuthorizeAnnotationClass {
-    @AuthorizationMetadataApi(
+    @AuthorizationMetadataPrivileges(
         privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
         metadataType = MetadataObject.Type.CATALOG)
     public void testAuthedMethodUseResourceType() {}
 
-    @AuthorizationExpressionApi(expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE")
+    @AuthorizationExpression(expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE")
     public void testAuthedMethodUseExpression() {}
   }
 
@@ -61,10 +61,10 @@ public class TestAnnotations {
     Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
     Method method = testClass.getMethod("testAuthedMethodUseResourceType");
 
-    boolean hasAnnotation = method.isAnnotationPresent(AuthorizationMetadataApi.class);
+    boolean hasAnnotation = method.isAnnotationPresent(AuthorizationMetadataPrivileges.class);
     Assertions.assertTrue(hasAnnotation);
 
-    AuthorizationMetadataApi annotation = method.getAnnotation(AuthorizationMetadataApi.class);
+    AuthorizationMetadataPrivileges annotation = method.getAnnotation(AuthorizationMetadataPrivileges.class);
     Assertions.assertNotNull(annotation);
 
     Assertions.assertArrayEquals(
@@ -78,10 +78,10 @@ public class TestAnnotations {
     Class<TestAuthorizeAnnotationClass> testClass = TestAuthorizeAnnotationClass.class;
     Method method = testClass.getMethod("testAuthedMethodUseExpression");
 
-    boolean hasAnnotation = method.isAnnotationPresent(AuthorizationExpressionApi.class);
+    boolean hasAnnotation = method.isAnnotationPresent(AuthorizationExpression.class);
     Assertions.assertTrue(hasAnnotation);
 
-    AuthorizationExpressionApi annotation = method.getAnnotation(AuthorizationExpressionApi.class);
+    AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
     Assertions.assertNotNull(annotation);
 
     Assertions.assertEquals(

@@ -16,34 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.server.authorization.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
 
 /**
- * Defines the annotation for authorizing access to an API. Use the resourceType and privileges
- * fields to define the required privileges and resource type for the API.
+ * This annotation is used to implement unified authentication in AOP. Use Expressions to define the
+ * required privileges for an API.
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface AuthorizationMetadataApi {
+public @interface AuthorizationExpression {
   /**
-   * The list of privileges required to access the API.
+   * The expression to evaluate for authorization, which represents multiple privileges.
    *
-   * @return the list of privileges required to access the API.
+   * @return the expression to evaluate for authorization.
    */
-  Privilege.Name[] privileges();
-
-  /**
-   * The resource type of the API.
-   *
-   * @return the resource type of the API.
-   */
-  MetadataObject.Type metadataType();
+  String expression() default "";
 }
