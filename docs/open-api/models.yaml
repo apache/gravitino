@@ -439,12 +439,14 @@ components:
         - $ref: "#/components/schemas/RenameModelRequest"
         - $ref: "#/components/schemas/SetModelPropertyRequest"
         - $ref: "#/components/schemas/RemoveModelPropertyRequest"
+        - $ref: "#/components/schemas/UpdateModelCommentRequest"
       discriminator:
         propertyName: "@type"
         mapping:
           rename: "#/components/schemas/RenameModelRequest"
           setProperty: "#/components/schemas/SetModelPropertyRequest"
           removeProperty: "#/components/schemas/RemoveModelPropertyRequest"
+          updateComment: "#/components/schemas/UpdateModelCommentRequest"
 
     RenameModelRequest:
       type: object
@@ -505,6 +507,24 @@ components:
       example: {
         "@type": "removeProperty",
         "property": "key1"
+      }
+
+    UpdateModelCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateComment"
+        newComment:
+          type: string
+          description: The new comment of the model
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is a new comment"
       }
 
     ModelVersionLinkRequest:
