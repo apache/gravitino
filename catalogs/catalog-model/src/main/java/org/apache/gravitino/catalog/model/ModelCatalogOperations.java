@@ -334,12 +334,18 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     for (ModelChange change : changes) {
       if (change instanceof ModelChange.RenameModel) {
         entityName = ((ModelChange.RenameModel) change).newName();
+
       } else if (change instanceof ModelChange.SetProperty) {
         ModelChange.SetProperty setPropertyChange = (ModelChange.SetProperty) change;
         doSetProperty(entityProperties, setPropertyChange);
+
       } else if (change instanceof ModelChange.RemoveProperty) {
         ModelChange.RemoveProperty removePropertyChange = (ModelChange.RemoveProperty) change;
         doRemoveProperty(entityProperties, removePropertyChange);
+
+      } else if (change instanceof ModelChange.UpdateComment) {
+        entityComment = ((ModelChange.UpdateComment) change).newComment();
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model change: " + change.getClass().getSimpleName());
