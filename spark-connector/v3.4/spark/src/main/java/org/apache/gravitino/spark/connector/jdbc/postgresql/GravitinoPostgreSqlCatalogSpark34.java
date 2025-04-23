@@ -16,19 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.spark.connector.jdbc.postgresql;
 
-package org.apache.gravitino.spark.connector.jdbc;
+import org.apache.gravitino.spark.connector.PropertiesConverter;
+import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalog;
+import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConverter;
 
-public class JdbcPropertiesConstants {
-
-  public static final String GRAVITINO_JDBC_USER = "jdbc-user";
-  public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
-  public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
-  public static final String GRAVITINO_JDBC_URL = "jdbc-url";
-  public static final String GRAVITINO_JDBC_DATABASE = "jdbc-database";
-
-  public static final String SPARK_JDBC_URL = "url";
-  public static final String SPARK_JDBC_USER = "user";
-  public static final String SPARK_JDBC_PASSWORD = "password";
-  public static final String SPARK_JDBC_DRIVER = "driver";
+public class GravitinoPostgreSqlCatalogSpark34 extends GravitinoJdbcCatalog {
+  @Override
+  protected PropertiesConverter getPropertiesConverter() {
+    return JdbcPropertiesConverter.getPGInstance();
+  }
 }
