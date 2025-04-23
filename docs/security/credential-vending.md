@@ -141,7 +141,7 @@ For Hadoop catalog, please use Gravitino cloud bundle jar with Hadoop and cloud 
 - [Gravitino GCP bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)
 - [Gravitino Azure bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
 
-For Iceberg REST catalog server, please use Gravitino cloud bundle jar without Hadoop and cloud packages:
+For Iceberg REST catalog server, please use the Gravitino cloud bundle jar without Hadoop and cloud packages. Additionally, download the corresponding Iceberg cloud packages.
 
 - [Gravitino AWS bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws)
 - [Gravitino Aliyun bundle jar without Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun)
