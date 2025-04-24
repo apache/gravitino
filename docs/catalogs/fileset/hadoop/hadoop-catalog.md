@@ -421,13 +421,13 @@ Some properties are reserved and cannot be set by users:
   <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>pacehoder-schema</tt></td>
+  <td><tt>placehoder-schema</tt></td>
   <td>The placeholder for the schema name.</td>
   <td>Schema name for the fileset</td>
   <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>pacehoder-fileset</tt></td>
+  <td><tt>placehoder-fileset</tt></td>
   <td>The placeholder for the fileset name.</td>
   <td>Fileset name</td>
   <td>`0.9.0-incubating`</td>
