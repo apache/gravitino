@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -269,8 +270,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
         File keytabFile = kerberosClient.saveKeyTabFileFromUri(keytabPath);
         kerberosClient.login(keytabFile.getAbsolutePath());
         LOG.info("Login with kerberos success");
-        return;
-      } catch (java.io.IOException e) {
+      } catch (IOException e) {
         throw new RuntimeException("Failed to login with kerberos", e);
       }
     }
