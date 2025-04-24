@@ -409,6 +409,7 @@ const CreateFilesetDialog = props => {
                                 onChange={onChange}
                                 disabled={type === 'update'}
                                 label={`Name ${index + 1}`}
+                                data-refer={`storageLocations-name-${index}`}
                                 error={!!errors.storageLocations?.[index]?.name || !!errors.storageLocations?.message}
                                 helperText={
                                   errors.storageLocations?.[index]?.name?.message || errors.storageLocations?.message
@@ -429,6 +430,7 @@ const CreateFilesetDialog = props => {
                                 onChange={onChange}
                                 disabled={type === 'update'}
                                 label={`Location ${index + 1}`}
+                                data-refer={`storageLocations-location-${index}`}
                                 error={
                                   !!errors.storageLocations?.[index]?.location || !!errors.storageLocations?.message
                                 }
