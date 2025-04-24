@@ -668,7 +668,7 @@ tasks {
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
         from(projectDir.dir("bin")) {
-          include("common.sh", "${rootProject.name}-iceberg-rest-server.sh")
+          include("common.sh.template", "${rootProject.name}-iceberg-rest-server.sh.template")
           into("${rootProject.name}-iceberg-rest-server/bin")
         }
         into(outputDir)
