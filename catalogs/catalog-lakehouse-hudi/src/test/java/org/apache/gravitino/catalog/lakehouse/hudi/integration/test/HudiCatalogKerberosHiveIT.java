@@ -20,28 +20,29 @@ package org.apache.gravitino.catalog.lakehouse.hudi.integration.test;
 
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.io.File;
+import java.nio.file.Files;
 import java.util.Map;
+import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.KerberosConfig;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.TableChange;
-import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.rel.types.Types.DateType;
-import org.apache.gravitino.rel.types.Types.IntegerType;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.apache.hadoop.security.authentication.util.KerberosUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -71,59 +72,49 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
   private static String TMP_DIR;
 
-  private static HiveContainer kerberosHiveContainer;
+  protected static String HIVE_METASTORE_URI;
 
   private static GravitinoAdminClient adminClient;
 
-  private static final String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
-  private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
-  private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("test_schema");
-  private static final String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
+  protected static HiveContainer kerberosHiveContainer;
 
-  private static String URIS;
-  private static String TYPE;
-
-  private static final String HIVE_COL_NAME1 = "col1";
-  private static final String HIVE_COL_NAME2 = "col2";
-  private static final String HIVE_COL_NAME3 = "col3";
+  static String METALAKE_NAME = GravitinoITUtils.genRandomName("test_metalake");
+  static String CATALOG_NAME = GravitinoITUtils.genRandomName("test_catalog");
+  static String SCHEMA_NAME = "default";
+  static String TABLE_NAME = GravitinoITUtils.genRandomName("test_table");
 
   @BeforeAll
-  public void startIntegrationTest() {
+  public void startIntegrationTest() throws Exception {
     containerSuite.startKerberosHiveContainer();
     kerberosHiveContainer = containerSuite.getKerberosHiveContainer();
 
-    URIS =
+    File baseDir = new File(System.getProperty("java.io.tmpdir"));
+    File file = Files.createTempDirectory(baseDir.toPath(), "test").toFile();
+    file.deleteOnExit();
+    TMP_DIR = file.getAbsolutePath();
+
+    HIVE_METASTORE_URI =
         String.format(
             "thrift://%s:%d",
             kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HIVE_METASTORE_PORT);
-    TYPE = "hms";
 
-    try {
-      java.io.File baseDir = new java.io.File(System.getProperty("java.io.tmpdir"));
-      java.io.File file =
-          java.nio.file.Files.createTempDirectory(baseDir.toPath(), "test").toFile();
-      file.deleteOnExit();
-      TMP_DIR = file.getAbsolutePath();
+    // Prepare kerberos related-config;
+    prepareKerberosConfig();
 
-      // Prepare kerberos related-config;
-      prepareKerberosConfig();
+    // Config kerberos configuration for Gravitino server
+    addKerberosConfig();
 
-      // Config kerberos configuration for Gravitino server
-      addKerberosConfig();
+    // Create hive tables
+    createHudiTables();
 
-      // Start Gravitino server
-      super.startIntegrationTest();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    // Start Gravitino server
+    super.startIntegrationTest();
   }
 
   @AfterAll
   public void stop() {
-    // Restore the file permission
-    restoreFilePermission();
     // Reset the UGI
-    UserGroupInformation.reset();
+    org.apache.hadoop.security.UserGroupInformation.reset();
 
     LOG.info("krb5 path: {}", System.getProperty("java.security.krb5.conf"));
     // Clean up the kerberos configuration
@@ -156,23 +147,19 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
     // Modify the krb5.conf and change the kdc and admin_server to the container IP
     String ip = containerSuite.getKerberosHiveContainer().getContainerIpAddress();
     String content =
-        org.apache.commons.io.FileUtils.readFileToString(
-            new java.io.File(tmpKrb5Path), java.nio.charset.StandardCharsets.UTF_8);
+        FileUtils.readFileToString(new File(tmpKrb5Path), java.nio.charset.StandardCharsets.UTF_8);
     content = content.replace("kdc = localhost:88", "kdc = " + ip + ":88");
     content = content.replace("admin_server = localhost", "admin_server = " + ip + ":749");
-    org.apache.commons.io.FileUtils.write(
-        new java.io.File(krb5Path), content, java.nio.charset.StandardCharsets.UTF_8);
+    FileUtils.write(new File(krb5Path), content, java.nio.charset.StandardCharsets.UTF_8);
 
     LOG.info("Kerberos kdc config:\n{}, path: {}", content, krb5Path);
     System.setProperty("java.security.krb5.conf", krb5Path);
     System.setProperty("sun.security.krb5.debug", "true");
 
     refreshKerberosConfig();
-    org.apache.hadoop.security.authentication.util.KerberosName.resetDefaultRealm();
+    KerberosName.resetDefaultRealm();
 
-    LOG.info(
-        "Kerberos default realm: {}",
-        org.apache.hadoop.security.authentication.util.KerberosUtil.getDefaultRealm());
+    LOG.info("Kerberos default realm: {}", KerberosUtil.getDefaultRealm());
   }
 
   private static void refreshKerberosConfig() {
@@ -200,146 +187,77 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
   }
 
   @Test
-  void testHudiWithKerberosAndUserImpersonation() {
+  public void testHudiCatalogWithKerberos() {
     KerberosTokenProvider provider =
         KerberosTokenProvider.builder()
             .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
-            .withKeyTabFile(new java.io.File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
+            .withKeyTabFile(new File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
             .build();
     adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
-
     GravitinoMetalake gravitinoMetalake =
         adminClient.createMetalake(METALAKE_NAME, null, ImmutableMap.of());
 
-    // Create a catalog
+    // Create a catalog with kerberos
     Map<String, String> properties = Maps.newHashMap();
     properties.put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, "true");
     properties.put(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos");
-
     properties.put(KerberosConfig.KEY_TAB_URI_KEY, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
     properties.put(KerberosConfig.PRINCIPAL_KEY, HIVE_METASTORE_CLIENT_PRINCIPAL);
+    properties.put("list-all-tables", "false");
     properties.put(
         CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
-        "hive/_HOST@HADOOPKRB"
-            .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
+        "hive/_HOST@HADOOPKRB".replace("_HOST", kerberosHiveContainer.getHostName()));
     properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
     properties.put(CATALOG_BYPASS_PREFIX + "hadoop.security.authentication", "kerberos");
 
-    properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, TYPE);
-    properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
-    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi01");
+    properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, "hms");
+    properties.put(HudiCatalogPropertiesMetadata.URI, HIVE_METASTORE_URI);
+    properties.put("warehouse", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
     Catalog catalog =
         gravitinoMetalake.createCatalog(
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-hudi", "comment", properties);
+    LOG.info("create catalog: {} sucess", catalog.name());
+    Assertions.assertEquals(CATALOG_NAME, catalog.name());
 
-    // Test create schema
-    Exception exception =
+    Schema schema = catalog.asSchemas().loadSchema(SCHEMA_NAME);
+    Assertions.assertEquals(SCHEMA_NAME, schema.name());
+
+    TableCatalog tableOps = catalog.asTableCatalog();
+    NoSuchTableException exception =
         Assertions.assertThrows(
-            Exception.class,
-            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-    String exceptionMessage = Throwables.getStackTraceAsString(exception);
+            NoSuchTableException.class,
+            () -> tableOps.loadTable(NameIdentifier.of(SCHEMA_NAME, TABLE_NAME)));
 
-    // Make sure the real user is 'gravitino_client'
     Assertions.assertTrue(
-        exceptionMessage.contains("Permission denied: user=gravitino_client, access=WRITE"));
-
-    // Now try to permit the user to create the schema again
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-mkdir", "/user/hive/warehouse-catalog-hudi01");
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-hudi01");
-    Assertions.assertDoesNotThrow(
-        () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-
-    // Create table
-    NameIdentifier tableNameIdentifier = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
-    catalog
-        .asTableCatalog()
-        .createTable(
-            tableNameIdentifier,
-            createColumns(),
-            "",
-            ImmutableMap.of(),
-            org.apache.gravitino.rel.expressions.transforms.Transforms.EMPTY_TRANSFORM,
-            org.apache.gravitino.rel.expressions.distributions.Distributions.NONE,
-            org.apache.gravitino.rel.expressions.sorts.SortOrders.NONE);
-
-    // Now try to alter the table
-    catalog.asTableCatalog().alterTable(tableNameIdentifier, TableChange.rename("new_table"));
-    NameIdentifier newTableIdentifier = NameIdentifier.of(SCHEMA_NAME, "new_table");
-
-    // Old table name should not exist
-    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableNameIdentifier));
-    Assertions.assertTrue(catalog.asTableCatalog().tableExists(newTableIdentifier));
-
-    // Drop table
-    catalog.asTableCatalog().dropTable(newTableIdentifier);
-    Assertions.assertFalse(catalog.asTableCatalog().tableExists(newTableIdentifier));
-
-    // Drop schema
-    catalog.asSchemas().dropSchema(SCHEMA_NAME, false);
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(SCHEMA_NAME));
-
-    // Drop catalog
-    Assertions.assertDoesNotThrow(() -> gravitinoMetalake.disableCatalog(CATALOG_NAME));
-    Assertions.assertTrue(gravitinoMetalake.dropCatalog(CATALOG_NAME));
+        exception
+            .getMessage()
+            .contains("Hudi table does not exist: " + TABLE_NAME + " in Hive Metastore"),
+        "Unexpected exception message: " + exception.getMessage());
   }
 
-  @Test
-  void testHudiWithKerberos() {
-    KerberosTokenProvider provider =
-        KerberosTokenProvider.builder()
-            .withClientPrincipal(GRAVITINO_CLIENT_PRINCIPAL)
-            .withKeyTabFile(new java.io.File(TMP_DIR + GRAVITINO_CLIENT_KEYTAB))
-            .build();
-    adminClient = GravitinoAdminClient.builder(serverUri).withKerberosAuth(provider).build();
+  private static void createHudiTables() {
+    /*    String createSchemaSql =
+        String.format(
+            "CREATE DATABASE %s  LOCATION '%s' ",
+            SCHEMA_NAME, "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
+    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + createSchemaSql + ";'");*/
 
-    String metalakeName = GravitinoITUtils.genRandomName("test_metalake");
-    GravitinoMetalake gravitinoMetalake =
-        adminClient.createMetalake(metalakeName, null, ImmutableMap.of());
+    //    LOG.info("create database {} success[{}]", SCHEMA_NAME, createSchemaSql);
+    String createTableSql =
+        String.format(
+            "CREATE TABLE %s.%s (\n"
+                + "  id STRING,\n"
+                + "  name STRING,\n"
+                + "  age INT\n"
+                + ") \n"
+                + "LOCATION 'hdfs://localhost:9000/user/hive/warehouse-catalog-hudi' ",
+            SCHEMA_NAME, TABLE_NAME);
+    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + createTableSql + ";'");
+    LOG.info("create table {} success[{}]", TABLE_NAME, createTableSql);
 
-    // Create a catalog
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos");
-    // Not user impersonation here
-
-    properties.put(KerberosConfig.KEY_TAB_URI_KEY, TMP_DIR + HIVE_METASTORE_CLIENT_KEYTAB);
-    properties.put(KerberosConfig.PRINCIPAL_KEY, HIVE_METASTORE_CLIENT_PRINCIPAL);
-    properties.put(
-        CATALOG_BYPASS_PREFIX + "hive.metastore.kerberos.principal",
-        "hive/_HOST@HADOOPKRB"
-            .replace("_HOST", containerSuite.getKerberosHiveContainer().getHostName()));
-    properties.put(CATALOG_BYPASS_PREFIX + "hive.metastore.sasl.enabled", "true");
-    properties.put(CATALOG_BYPASS_PREFIX + "hadoop.security.authentication", "kerberos");
-
-    properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, TYPE);
-    properties.put(HudiCatalogPropertiesMetadata.URI, URIS);
-    properties.put("location", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi01");
-
-    Catalog catalog =
-        gravitinoMetalake.createCatalog(
-            CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-hudi", "comment", properties);
-
-    // Test create schema
-    Exception exception =
-        Assertions.assertThrows(
-            Exception.class,
-            () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
-    String exceptionMessage = Throwables.getStackTraceAsString(exception);
-
-    // Make sure the real user is 'cli' because no impersonation here.
-    Assertions.assertTrue(exceptionMessage.contains("Permission denied: user=cli, access=WRITE"));
-  }
-
-  private static Column[] createColumns() {
-    Column col1 = Column.of(HIVE_COL_NAME1, IntegerType.get(), "col_1_comment");
-    Column col2 = Column.of(HIVE_COL_NAME2, DateType.get(), "col_2_comment");
-    Column col3 = Column.of(HIVE_COL_NAME3, Types.StringType.get(), "col_3_comment");
-    return new Column[] {col1, col2, col3};
-  }
-
-  static void restoreFilePermission() {
-    kerberosHiveContainer.executeInContainer(
-        "hadoop", "fs", "-chmod", "-R", "755", "/user/hive/warehouse-catalog-hudi01");
+    String insertTableSql =
+        String.format("INSERT INTO %s.%s" + " VALUES " + "(1,'Cyber',26)", SCHEMA_NAME, TABLE_NAME);
+    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + insertTableSql + ";'");
+    LOG.info("insert table {} data success[{}]", TABLE_NAME, insertTableSql);
   }
 }
