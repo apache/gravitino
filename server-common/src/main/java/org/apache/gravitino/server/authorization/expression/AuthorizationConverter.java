@@ -17,29 +17,25 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
-import java.util.Map;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
+import com.google.errorprone.annotations.DoNotCall;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 
-/** Evaluate the runtime result of the AuthorizationExpression.. */
-public class AuthorizationExpressionEvaluator {
+public class AuthorizationConverter {
 
-  /**
-   * Use {@link AuthorizationConverter} to convert the authorization expression into an OGNL
-   * expression, and then call {@link GravitinoAuthorizer} to perform permission verification.
-   *
-   * @param expression authorization expression
-   */
-  public AuthorizationExpressionEvaluator(String expression) {}
+  private AuthorizationConverter() {}
 
   /**
-   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of metadata
-   * IDs.
+   * Convert the authorization expression to OGNL expression. <a
+   * href="https://github.com/orphan-oss/ognl">OGNL</a> stands for Object-Graph Navigation Language;
+   * It is an expression language for getting and setting properties of Java objects, plus other
+   * extras such as list projection and selection and lambda expressions. You use the same
+   * expression for both getting and setting the value of a property.
    *
-   * @param metadataIds key-metadata type, value-metadata id
-   * @return authorization result
+   * @param authorizationExpression authorization expression from {@link MetadataFilterHelper}
+   * @return an OGNL expression used to call GravitinoAuthorizer
    */
-  public boolean evaluate(Map<MetadataObject.Type, Long> metadataIds) {
+  @DoNotCall
+  public static String convertToOgnlExpression(String authorizationExpression) {
     throw new UnsupportedOperationException();
   }
 }
