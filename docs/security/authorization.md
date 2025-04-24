@@ -420,6 +420,35 @@ and the `USE_SCHEMA` privilege on its parent schema.
 </tbody>
 </table>
 
+### Model privileges
+
+<table>
+<thead>
+<tr>
+  <th>Name</th>
+  <th>Securable Object supported</th>
+  <th>Operations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td>CREATE_MODEL</td>
+  <td>Metalake, Catalog, Schema</td>
+  <td>Create a model</td>
+</tr>
+<tr>
+  <td>CREATE_MODEL_VERSION</td>
+  <td>Metalake, Catalog, Schema, Model</td>
+  <td>Write a model version </td>
+</tr>
+<tr>
+  <td>USE_MODEL</td>
+  <td>Metalake, Catalog, Schema, Model</td>
+  <td>View the metadata of the model and download all the model versions.</td>
+</tr>
+</tbody>
+</table>
+
 ## Inheritance Model
 
 Securable objects in Gravitino are hierarchical and privileges are inherited downward.
