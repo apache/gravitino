@@ -159,6 +159,19 @@ It also triggers a failure event if the operation failed.
   </td>
   <td>0.9.0-incubating</td>
 </tr>
+<tr>
+  <td>Gravitino server role operation</td>
+  <td>
+    `CreateRolePreEvent`<br/>
+    `DeleteRolePreEvent`<br/>
+    `GetRolePreEvent`<br/>
+    `GrantPrivilegesPreEvent`<br/>
+    `ListRoleNamesPreEvent`<br/>
+    `RevokePrivilegesPreEvent`
+  </td>
+  <td>0.9.0-incubating</td>
+</tr>
+
 </tbody>
 </table>
 
