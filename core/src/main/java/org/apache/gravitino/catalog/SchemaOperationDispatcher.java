@@ -36,7 +36,6 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
@@ -334,18 +333,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
-            store.delete(ident, SCHEMA, cascade);
+            store.delete(ident, SCHEMA, true);
           } catch (NoSuchEntityException e) {
             LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
-          } catch (NonEmptyEntityException e) {
-            LOG.warn("The schema to be dropped is not empty in the store: {}", ident, e);
-            // then cascade delete the schema, otherwise, the schema will never be deleted.
-            try {
-              store.delete(ident, SCHEMA, true);
-            } catch (Exception e1) {
-              LOG.warn("Failed to delete the schema from the store: {}", ident, e1);
-            }
-
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
