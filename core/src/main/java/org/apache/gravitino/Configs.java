@@ -212,6 +212,13 @@ public class Configs {
               ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(Lists.newArrayList("simple"));
 
+  public static final ConfigEntry<String> AUTHORIZATION_MODE =
+      new ConfigBuilder("gravitino.authorization.mode")
+          .doc("The authorization mode")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .stringConf()
+          .createWithDefault("allow");
+
   public static final ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
           .doc("The maximum skew time of transactions in milliseconds")
