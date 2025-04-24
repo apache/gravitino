@@ -129,6 +129,37 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     checkPartitionDirExists(tableInfo);
   }
 
+  @Test
+  void testPartitionTableManage() {
+    System.out.println("" + System.getProperty("SKIP_DOCKER_TESTS"));
+    String tableName = "hive_partition_ops_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
+    sql(createTableSQL);
+
+    List<Object[]> tableInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(0, tableInfo.size());
+
+    sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=20, age_p2='twenty')");
+    sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
+    tableInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, tableInfo.size());
+
+    sql("ALTER TABLE  " + tableName + " DROP PARTITION (age_p1=20, age_p2='twenty')");
+    tableInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(1, tableInfo.size());
+
+    sql(
+        "ALTER TABLE  "
+            + tableName
+            + " ADD PARTITION (age_p1=22, age_p2='twenty two') "
+            + "LOCATION '/user/hive/warehouse/hive_partition_ops_table/age_p1=22/age_p2=twentytwo' ");
+    tableInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, tableInfo.size());
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testWriteHiveDynamicPartition(boolean isInsertOverWrite) {

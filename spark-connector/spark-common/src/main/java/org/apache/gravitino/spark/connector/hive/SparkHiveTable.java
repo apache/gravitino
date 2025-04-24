@@ -28,12 +28,16 @@ import org.apache.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.analysis.NoSuchPartitionException;
+import org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.SupportsPartitionManagement;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructType;
 
 /** Keep consistent behavior with the SparkIcebergTable */
-public class SparkHiveTable extends HiveTable {
+public class SparkHiveTable extends HiveTable implements SupportsPartitionManagement {
 
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
 
@@ -75,5 +79,51 @@ public class SparkHiveTable extends HiveTable {
   @Override
   public Transform[] partitioning() {
     return gravitinoTableInfoHelper.partitioning();
+  }
+
+  @Override
+  public void createPartition(InternalRow ident, Map<String, String> properties)
+      throws PartitionAlreadyExistsException, UnsupportedOperationException {
+    gravitinoTableInfoHelper.createPartition(ident, properties, partitionSchema());
+  }
+
+  @Override
+  public boolean dropPartition(InternalRow ident) {
+    return gravitinoTableInfoHelper.dropPartition(ident, partitionSchema());
+  }
+
+  @Override
+  public void replacePartitionMetadata(InternalRow ident, Map<String, String> properties)
+      throws NoSuchPartitionException, UnsupportedOperationException {
+    throw new UnsupportedOperationException("Partition replace is not supported");
+  }
+
+  @Override
+  public Map<String, String> loadPartitionMetadata(InternalRow ident)
+      throws UnsupportedOperationException {
+    return gravitinoTableInfoHelper.loadPartitionMetadata(ident, partitionSchema());
+  }
+
+  @Override
+  public InternalRow[] listPartitionIdentifiers(String[] names, InternalRow ident) {
+    return gravitinoTableInfoHelper.listPartitionIdentifiers(names, ident, partitionSchema());
+  }
+
+  @Override
+  public Object productElement(int n) {
+    if (n == 0) {
+      return gravitinoTableInfoHelper;
+    }
+    throw new IndexOutOfBoundsException("Invalid index: " + n);
+  }
+
+  @Override
+  public int productArity() {
+    return 1;
+  }
+
+  @Override
+  public boolean canEqual(Object that) {
+    return that instanceof SparkHiveTable;
   }
 }

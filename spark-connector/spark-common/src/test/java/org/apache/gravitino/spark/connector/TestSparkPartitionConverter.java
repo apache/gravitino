@@ -1,0 +1,169 @@
+package org.apache.gravitino.spark.connector;
+
+import java.time.LocalDate;
+import java.util.HashMap;
+import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types.BooleanType;
+import org.apache.gravitino.rel.types.Types.ByteType;
+import org.apache.gravitino.rel.types.Types.DateType;
+import org.apache.gravitino.rel.types.Types.DecimalType;
+import org.apache.gravitino.rel.types.Types.DoubleType;
+import org.apache.gravitino.rel.types.Types.FixedCharType;
+import org.apache.gravitino.rel.types.Types.FloatType;
+import org.apache.gravitino.rel.types.Types.IntegerType;
+import org.apache.gravitino.rel.types.Types.LongType;
+import org.apache.gravitino.rel.types.Types.ShortType;
+import org.apache.gravitino.rel.types.Types.StringType;
+import org.apache.gravitino.rel.types.Types.VarCharType;
+import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
+import org.apache.spark.sql.types.CharType;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.Metadata;
+import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.VarcharType;
+import org.apache.spark.unsafe.types.UTF8String;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
+
+@TestInstance(Lifecycle.PER_CLASS)
+public class TestSparkPartitionConverter {
+
+  private HashMap<Type, DataType> gravitinoToSparkTypeMapper = new HashMap<>();
+
+  boolean boolValue = true;
+  byte byteValue = 100;
+  short shortValue = 1000;
+  int intValue = 100000;
+  long longValue = 10000000000L;
+  float floatValue = 3.14f;
+  double doubleValue = 3.1415926535;
+  UTF8String stringValue = UTF8String.fromString("Hello World");
+  int date = 0;
+  private InternalRow internalRow =
+      new GenericInternalRow(
+          new Object[] {
+            boolValue,
+            byteValue,
+            shortValue,
+            intValue,
+            longValue,
+            floatValue,
+            doubleValue,
+            stringValue,
+            date
+          });
+  private Literal[] literals =
+      new Literals.LiteralImpl[] {
+        Literals.booleanLiteral(boolValue),
+        Literals.byteLiteral(byteValue),
+        Literals.shortLiteral(shortValue),
+        Literals.integerLiteral(intValue),
+        Literals.longLiteral(longValue),
+        Literals.floatLiteral(floatValue),
+        Literals.doubleLiteral(doubleValue),
+        Literals.stringLiteral(stringValue.toString()),
+        Literals.dateLiteral(LocalDate.of(1970, 1, 1)),
+      };
+  private String[] hivePartitionValues = {
+    "true",
+    "100",
+    "1000",
+    "100000",
+    "10000000000",
+    "3.14",
+    "3.1415926535",
+    "Hello World",
+    "1970-01-01"
+  };
+  StructType schema =
+      new StructType(
+          new StructField[] {
+            new StructField("boolean", DataTypes.BooleanType, false, Metadata.empty()),
+            new StructField("byte", DataTypes.ByteType, false, Metadata.empty()),
+            new StructField("short", DataTypes.ShortType, false, Metadata.empty()),
+            new StructField("int", DataTypes.IntegerType, false, Metadata.empty()),
+            new StructField("long", DataTypes.LongType, false, Metadata.empty()),
+            new StructField("float", DataTypes.FloatType, false, Metadata.empty()),
+            new StructField("double", DataTypes.DoubleType, false, Metadata.empty()),
+            new StructField("string", DataTypes.StringType, false, Metadata.empty()),
+            new StructField("date", DataTypes.DateType, false, Metadata.empty())
+          });
+
+  @BeforeAll
+  void init() {
+    gravitinoToSparkTypeMapper.put(ByteType.get(), DataTypes.ByteType);
+    gravitinoToSparkTypeMapper.put(ShortType.get(), DataTypes.ShortType);
+    gravitinoToSparkTypeMapper.put(IntegerType.get(), DataTypes.IntegerType);
+    gravitinoToSparkTypeMapper.put(LongType.get(), DataTypes.LongType);
+    gravitinoToSparkTypeMapper.put(FloatType.get(), DataTypes.FloatType);
+    gravitinoToSparkTypeMapper.put(DoubleType.get(), DataTypes.DoubleType);
+    gravitinoToSparkTypeMapper.put(DecimalType.of(10, 2), DataTypes.createDecimalType(10, 2));
+    gravitinoToSparkTypeMapper.put(StringType.get(), DataTypes.StringType);
+    gravitinoToSparkTypeMapper.put(VarCharType.of(2), VarcharType.apply(2));
+    gravitinoToSparkTypeMapper.put(FixedCharType.of(2), CharType.apply(2));
+    gravitinoToSparkTypeMapper.put(BooleanType.get(), DataTypes.BooleanType);
+    gravitinoToSparkTypeMapper.put(DateType.get(), DataTypes.DateType);
+  }
+
+  @Test
+  void testToGravitinoLiteral() {
+    int numFields = internalRow.numFields();
+    for (int i = 0; i < numFields; i++) {
+      DataType dataType = schema.apply(i).dataType();
+      Assertions.assertEquals(
+          literals[i], SparkPartitionConverter.toGravitinoLiteral(internalRow, i, dataType));
+    }
+
+    Assertions.assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () ->
+            SparkPartitionConverter.toGravitinoLiteral(
+                new GenericInternalRow(new Object[] {"1970-01-01 00:00:00"}),
+                0,
+                DataTypes.TimestampType));
+  }
+
+  @Test
+  void testGetPartitionValueAsString() {
+    int numFields = internalRow.numFields();
+    for (int i = 0; i < numFields; i++) {
+      DataType dataType = schema.apply(i).dataType();
+      Assertions.assertEquals(
+          hivePartitionValues[i],
+          SparkPartitionConverter.getPartitionValueAsString(internalRow, i, dataType));
+    }
+
+    Assertions.assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () ->
+            SparkPartitionConverter.getPartitionValueAsString(
+                new GenericInternalRow(new Object[] {"1970-01-01 00:00:00"}),
+                0,
+                DataTypes.TimestampType));
+  }
+
+  @Test
+  void testGetSparkPartitionValue() {
+    int numFields = internalRow.numFields();
+    for (int i = 0; i < numFields; i++) {
+      DataType dataType = schema.apply(i).dataType();
+      Assertions.assertEquals(
+          internalRow.get(i, dataType),
+          SparkPartitionConverter.getSparkPartitionValue(hivePartitionValues[i], dataType));
+    }
+
+    Assertions.assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () ->
+            SparkPartitionConverter.getSparkPartitionValue(
+                "1970-01-01 00:00:00", DataTypes.TimestampType));
+  }
+}
