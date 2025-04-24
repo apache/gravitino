@@ -39,6 +39,7 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ConfigServlet;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
@@ -97,6 +98,8 @@ public class GravitinoServer extends ResourceConfig {
 
     lineageService.initialize(
         new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
+
+    GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
 
     // initialize Jersey REST API resources.
     initializeRestApi();
