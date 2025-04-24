@@ -26,6 +26,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.ModelChange;
 
@@ -82,7 +83,9 @@ public class SetModelProperty extends Command {
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (NoSuchModelException err) {
-      exitWithError(ErrorMessages.UNKNOWN_TABLE);
+      exitWithError(ErrorMessages.UNKNOWN_MODEL);
+    } catch (NoSuchModelVersionException err) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL_VERSION);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }

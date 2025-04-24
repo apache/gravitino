@@ -30,7 +30,9 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.guava)
-  implementation(libs.httpclient5)
+  implementation(libs.httpclient5) {
+    exclude(group = "org.slf4j")
+  }
   implementation(libs.commons.lang3)
 
   compileOnly(libs.lombok)

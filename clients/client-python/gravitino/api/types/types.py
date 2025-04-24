@@ -598,8 +598,7 @@ class Types:
             return "binary"
 
     class StructType(ComplexType):
-        """The struct type in Gravitino.
-        Note, this type is not supported in the current version of Gravitino."""
+        """The struct type in Gravitino."""
 
         _fields: List[Field]
 
@@ -741,7 +740,7 @@ class Types:
                 return f"{self._name}: {self._type.simple_string()} {nullable_str}{comment_str}"
 
     class ListType(ComplexType):
-        """A list type. Note, this type is not supported in the current version of Gravitino."""
+        """The list type in Gravitino."""
 
         _element_type: Type
         _element_nullable: bool
@@ -827,7 +826,7 @@ class Types:
             return hash((self._element_type, self._element_nullable))
 
     class MapType(ComplexType):
-        """The map type in Gravitino. Note, this type is not supported in the current version of Gravitino."""
+        """The map type in Gravitino."""
 
         _key_type: Type
         _value_type: Type
@@ -928,7 +927,7 @@ class Types:
             return hash((self._key_type, self._value_type, self._value_nullable))
 
     class UnionType(ComplexType):
-        """The union type in Gravitino. Note, this type is not supported in the current version of Gravitino."""
+        """The union type in Gravitino."""
 
         _types: list[Type]
 

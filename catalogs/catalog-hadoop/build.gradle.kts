@@ -40,6 +40,7 @@ dependencies {
   implementation(project(":core")) {
     exclude(group = "*")
   }
+  implementation(libs.caffeine)
   implementation(libs.commons.lang3)
   implementation(libs.commons.io)
   implementation(libs.hadoop3.client.api)

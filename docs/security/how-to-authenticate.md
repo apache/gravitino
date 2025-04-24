@@ -86,6 +86,19 @@ Now Iceberg REST service doesn't support Kerberos authentication.
 The URI must use the hostname of server instead of IP.
 :::
 
+### Custom mode
+
+Gravitino also supports to implement custom authentication mode.
+For server side, you can implement the interface `Authenticator` and specify `grantviino.authenciators`.
+For client side, you extend the abstract class `CustomTokenProvider` and specify the token provider.
+
+```java
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
+    .withCustomProvider(provider)
+    .build();
+```
+
 ### Server configuration
 
 | Configuration item                                | Description                                                                                                                                                                                                                                                | Default value     | Required                                   | Since version    |

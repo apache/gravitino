@@ -26,7 +26,9 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":clients:filesystem-hadoop3"))
+  implementation(project(":clients:filesystem-hadoop3")) {
+    exclude(group = "org.slf4j")
+  }
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
   implementation(libs.commons.lang3)
 }

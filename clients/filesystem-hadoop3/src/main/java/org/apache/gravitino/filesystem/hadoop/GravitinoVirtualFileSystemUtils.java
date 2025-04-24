@@ -19,12 +19,15 @@
 
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
@@ -83,6 +86,14 @@ public class GravitinoVirtualFileSystemUtils {
         "'%s' is not set in the configuration",
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY);
 
+    Map<String, String> requestHeaders =
+        configuration.entrySet().stream()
+            .filter(e -> e.getKey().startsWith(FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX))
+            .collect(
+                Collectors.toMap(
+                    e -> e.getKey().substring(FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX.length()),
+                    Map.Entry::getValue));
+
     String authType =
         configuration.getOrDefault(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
@@ -91,6 +102,7 @@ public class GravitinoVirtualFileSystemUtils {
       return GravitinoClient.builder(serverUri)
           .withMetalake(metalakeValue)
           .withSimpleAuth()
+          .withHeaders(requestHeaders)
           .build();
     } else if (authType.equalsIgnoreCase(
         GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE)) {
@@ -137,6 +149,7 @@ public class GravitinoVirtualFileSystemUtils {
       return GravitinoClient.builder(serverUri)
           .withMetalake(metalakeValue)
           .withOAuth(authDataProvider)
+          .withHeaders(requestHeaders)
           .build();
     } else if (authType.equalsIgnoreCase(
         GravitinoVirtualFileSystemConfiguration.KERBEROS_AUTH_TYPE)) {
@@ -167,6 +180,7 @@ public class GravitinoVirtualFileSystemUtils {
       return GravitinoClient.builder(serverUri)
           .withMetalake(metalakeValue)
           .withKerberosAuth(authDataProvider)
+          .withHeaders(requestHeaders)
           .build();
     } else {
       throw new IllegalArgumentException(

@@ -17,21 +17,38 @@
 import unittest
 from unittest.mock import patch
 
-from gravitino.filesystem.gvfs import (
-    GravitinoVirtualFileSystem,
-    FilesetPathNotFoundError,
-)
+from gravitino.exceptions.base import NoSuchFilesetException
+from gravitino.filesystem.gvfs import GravitinoVirtualFileSystem
+from gravitino.filesystem.gvfs_base_operations import FilesetPathNotFoundError
 
 
 class TestGVFSWithoutFileset(unittest.TestCase):
 
-    @patch("gravitino.filesystem.gvfs.create_client")
-    @patch.object(GravitinoVirtualFileSystem, "_get_fileset_context")
-    def test_when_fileset_not_created(
-        self, mock_get_fileset_context, mock_create_client
-    ):
-        mock_create_client.return_value = None
-        mock_get_fileset_context.return_value = None
+    @patch.object(GravitinoVirtualFileSystem, "_get_gvfs_operations_class")
+    def test_when_fileset_not_created(self, mock_get_gvfs_operations):
+        mock_operations = unittest.mock.MagicMock()
+        methods = [
+            "ls",
+            "info",
+            "exists",
+            "cp_file",
+            "mv",
+            "rm",
+            "rm_file",
+            "rmdir",
+            "open",
+            "mkdir",
+            "makedirs",
+            "created",
+            "modified",
+            "cat_file",
+            "get_file",
+        ]
+        for method in methods:
+            getattr(mock_operations, method).side_effect = NoSuchFilesetException(
+                f"{method} failed"
+            )
+        mock_get_gvfs_operations.return_value = mock_operations
 
         fs = GravitinoVirtualFileSystem(
             server_uri="http://localhost:9090",
