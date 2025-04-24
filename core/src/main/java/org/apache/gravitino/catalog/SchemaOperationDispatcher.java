@@ -333,7 +333,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
-            store.delete(ident, SCHEMA, cascade);
+            store.delete(ident, SCHEMA, true);
           } catch (NoSuchEntityException e) {
             LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
           } catch (Exception e) {

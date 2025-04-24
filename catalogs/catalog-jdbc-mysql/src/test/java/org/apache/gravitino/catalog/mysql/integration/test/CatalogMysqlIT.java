@@ -923,6 +923,23 @@ public class CatalogMysqlIT extends BaseIT {
         () -> {
           schemas.loadSchema(schemaName);
         });
+
+    // test drop inconsistent database
+    catalog
+        .asSchemas()
+        .createSchema(schemaName, null, ImmutableMap.<String, String>builder().build());
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, tableName),
+            createColumns(),
+            "Created by Gravitino client",
+            ImmutableMap.<String, String>builder().build());
+    // drop the table externally
+    mysqlService.executeQuery("DROP TABLE " + schemaName + "." + tableName);
+
+    // drop the schema without cascade
+    Assertions.assertTrue(catalog.asSchemas().dropSchema(schemaName, false));
   }
 
   @Test
