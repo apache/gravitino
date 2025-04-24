@@ -18,29 +18,13 @@
 package org.apache.gravitino.server.web.filter;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
-import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.server.web.rest.CatalogOperations;
-import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
 import org.glassfish.hk2.api.InterceptionService;
 
@@ -53,7 +37,7 @@ public class GravitinoInterceptionService implements InterceptionService {
 
   @Override
   public Filter getDescriptorFilter() {
-    return new ClassListFilter(ImmutableSet.of(CatalogOperations.class.getName()));
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -82,89 +66,7 @@ public class GravitinoInterceptionService implements InterceptionService {
      */
     @Override
     public Object invoke(MethodInvocation methodInvocation) throws Throwable {
-      Method method = methodInvocation.getMethod();
-      Parameter[] parameters = method.getParameters();
-      AuthorizationExpression expressionAnnotation =
-          method.getAnnotation(AuthorizationExpression.class);
-      if (expressionAnnotation != null) {
-        String expression = expressionAnnotation.expression();
-        Object[] args = methodInvocation.getArguments();
-        Map<Entity.EntityType, NameIdentifier> metadataContext =
-            extractNameIdentifierFromParameters(parameters, args);
-        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-            new AuthorizationExpressionEvaluator(expression);
-        boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
-        if (!authorizeResult) {
-          return Utils.internalError("Can not access metadata.");
-        }
-      }
-      return methodInvocation.proceed();
-    }
-
-    private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
-        Parameter[] parameters, Object[] args) {
-      Map<Entity.EntityType, String> metadatas = new HashMap<>();
-      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
-      for (int i = 0; i < parameters.length; i++) {
-        Parameter parameter = parameters[i];
-        AuthorizationMetadata authorizeResource =
-            parameter.getAnnotation(AuthorizationMetadata.class);
-        if (authorizeResource == null) {
-          continue;
-        }
-        MetadataObject.Type type = authorizeResource.type();
-        metadatas.put(Entity.EntityType.valueOf(type.name()), String.valueOf(args[i]));
-      }
-      String metalake = metadatas.get(Entity.EntityType.METALAKE);
-      String catalog = metadatas.get(Entity.EntityType.CATALOG);
-      String schema = metadatas.get(Entity.EntityType.SCHEMA);
-      String table = metadatas.get(Entity.EntityType.TABLE);
-      String topic = metadatas.get(Entity.EntityType.TOPIC);
-      metadatas.forEach(
-          (type, metadata) -> {
-            switch (type) {
-              case CATALOG:
-                nameIdentifierMap.put(
-                    Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalake, catalog));
-                break;
-              case SCHEMA:
-                nameIdentifierMap.put(
-                    Entity.EntityType.SCHEMA,
-                    NameIdentifierUtil.ofSchema(metalake, catalog, schema));
-                break;
-              case TABLE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.SCHEMA,
-                    NameIdentifierUtil.ofTable(metalake, catalog, schema, table));
-                break;
-              case TOPIC:
-                nameIdentifierMap.put(
-                    Entity.EntityType.SCHEMA,
-                    NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
-                break;
-              case METALAKE:
-                nameIdentifierMap.put(
-                    Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-                break;
-              default:
-                break;
-            }
-          });
-      return nameIdentifierMap;
-    }
-  }
-
-  private static class ClassListFilter implements Filter {
-    private final Set<String> targetClasses;
-
-    public ClassListFilter(Set<String> targetClasses) {
-      this.targetClasses = new HashSet<>(targetClasses);
-    }
-
-    @Override
-    public boolean matches(Descriptor descriptor) {
-      String implementation = descriptor.getImplementation();
-      return targetClasses.contains(implementation);
+      throw new UnsupportedOperationException();
     }
   }
 }

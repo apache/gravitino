@@ -17,16 +17,10 @@
 
 package org.apache.gravitino.server.authorization;
 
-import java.security.Principal;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.gravitino.Entity;
+import com.google.errorprone.annotations.DoNotCall;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
-import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * MetadataFilterHelper performs permission checks on the list data returned by the REST API based
@@ -40,89 +34,28 @@ public class MetadataFilterHelper {
   /**
    * Call {@link GravitinoAuthorizer} to filter the metadata list
    *
-   * @param entityType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @param metadataList metadata list.
    * @return metadata List that the user has permission to access.
    */
-  public static NameIdentifier[] filterByPrivilege(
-      String metalake,
-      Entity.EntityType entityType,
-      String privilege,
-      NameIdentifier[] metadataList) {
-    GravitinoAuthorizer gravitinoAuthorizer =
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    return Arrays.stream(metadataList)
-        .filter(
-            metaDataName ->
-                gravitinoAuthorizer.authorize(
-                    currentPrincipal,
-                    metalake,
-                    NameIdentifierUtil.toMetadataObject(metaDataName, entityType),
-                    Privilege.Name.valueOf(privilege)))
-        .toArray(NameIdentifier[]::new);
+  @DoNotCall
+  public static NameIdentifier[] filter(
+      MetadataObject.Type metadataType, String privilege, NameIdentifier[] metadataList) {
+    throw new UnsupportedOperationException();
   }
 
   /**
    * Call {@link AuthorizationExpressionEvaluator} to filter the metadata list
    *
-   * @param metalake metalake
    * @param expression authorization expression
-   * @param entityType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
    * @param nameIdentifiers metaData list.
    * @return metadata List that the user has permission to access.
    */
+  @DoNotCall
   public static NameIdentifier[] filterByExpression(
-      String metalake,
-      String expression,
-      Entity.EntityType entityType,
-      NameIdentifier[] nameIdentifiers) {
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
-    return Arrays.stream(nameIdentifiers)
-        .filter(
-            metaDataName -> {
-              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                  spiltMetadataNames(metalake, entityType, metaDataName);
-              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
-            })
-        .toArray(NameIdentifier[]::new);
-  }
-
-  /**
-   * Extract the parent metadata from NameIdentifier. For example, when given a Table
-   * NameIdentifier, it returns a map containing the Table itself along with its parent Schema and
-   * Catalog.
-   *
-   * @param metalake metalake
-   * @param entityType metadata type
-   * @param nameIdentifier metadata name
-   * @return A map containing the metadata object and all its parent objects, keyed by their types
-   */
-  private static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
-      String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
-    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
-    nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-    switch (entityType) {
-      case CATALOG:
-        nameIdentifierMap.put(Entity.EntityType.CATALOG, nameIdentifier);
-        break;
-      case SCHEMA:
-        nameIdentifierMap.put(Entity.EntityType.SCHEMA, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      case TABLE:
-        nameIdentifierMap.put(Entity.EntityType.TABLE, nameIdentifier);
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
-        nameIdentifierMap.put(
-            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
-        break;
-      default:
-        break;
-    }
-    return nameIdentifierMap;
+      String expression, MetadataObject.Type metadataType, NameIdentifier[] nameIdentifiers) {
+    throw new UnsupportedOperationException();
   }
 }
