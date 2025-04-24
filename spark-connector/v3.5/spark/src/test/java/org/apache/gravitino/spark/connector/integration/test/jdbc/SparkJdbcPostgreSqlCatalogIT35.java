@@ -16,19 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.spark.connector.integration.test.jdbc;
 
-package org.apache.gravitino.spark.connector.jdbc;
+import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark35;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
-public class JdbcPropertiesConstants {
+@Disabled("Disabled until PG table creation is supported")
+public class SparkJdbcPostgreSqlCatalogIT35 extends SparkJdbcPostgreSqlCatalogIT {
 
-  public static final String GRAVITINO_JDBC_USER = "jdbc-user";
-  public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
-  public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
-  public static final String GRAVITINO_JDBC_URL = "jdbc-url";
-  public static final String GRAVITINO_JDBC_DATABASE = "jdbc-database";
-
-  public static final String SPARK_JDBC_URL = "url";
-  public static final String SPARK_JDBC_USER = "user";
-  public static final String SPARK_JDBC_PASSWORD = "password";
-  public static final String SPARK_JDBC_DRIVER = "driver";
+  @Test
+  void testCatalogClassName() {
+    String catalogClass =
+        getSparkSession()
+            .sessionState()
+            .conf()
+            .getConfString("spark.sql.catalog." + getCatalogName());
+    Assertions.assertEquals(GravitinoPostgreSqlCatalogSpark35.class.getName(), catalogClass);
+  }
 }
