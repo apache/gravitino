@@ -27,7 +27,7 @@ public class AuthorizationConverter {
 
   private static final Pattern PATTERN = Pattern.compile("([A-Z_]+)::([A-Z_]+)");
 
-  private static final Map<String, String> cache = new ConcurrentHashMap<>();
+  private static final Map<String, String> EXPRESSION_CACHE = new ConcurrentHashMap<>();
 
   private AuthorizationConverter() {}
 
@@ -42,7 +42,7 @@ public class AuthorizationConverter {
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {
-    return cache.computeIfAbsent(
+    return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
           Matcher matcher = PATTERN.matcher(expression);
