@@ -25,19 +25,20 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackend;
-import org.apache.gravitino.connector.CatalogInfo;
 
 public class CatalogUtils {
+
+  public static final String CATALOG_ID_KEY = "catalogId";
+
   private CatalogUtils() {}
 
-  public static HudiCatalogBackend loadHudiCatalogBackend(
-      Map<String, String> properties, CatalogInfo info) {
+  public static HudiCatalogBackend loadHudiCatalogBackend(Map<String, String> properties) {
     BackendType backendType =
         BackendType.valueOf(properties.get(CATALOG_BACKEND).toUpperCase(Locale.ROOT));
     switch (backendType) {
       case HMS:
         HudiCatalogBackend hudiHMSBackend = new HudiHMSBackend();
-        hudiHMSBackend.initialize(properties, info);
+        hudiHMSBackend.initialize(properties);
         return hudiHMSBackend;
       default:
         throw new UnsupportedOperationException("Unsupported backend type: " + backendType);

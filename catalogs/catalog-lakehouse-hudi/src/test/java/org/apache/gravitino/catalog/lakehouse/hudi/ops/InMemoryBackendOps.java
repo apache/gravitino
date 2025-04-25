@@ -28,7 +28,6 @@ import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
 import org.apache.gravitino.catalog.lakehouse.hudi.TestHudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.TestHudiTable;
-import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -53,7 +52,7 @@ public class InMemoryBackendOps implements HudiCatalogBackendOps {
   }
 
   @Override
-  public void initialize(Map<String, String> properties, CatalogInfo info) {
+  public void initialize(Map<String, String> properties) {
     // Do nothing
   }
 

@@ -28,7 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -37,7 +36,7 @@ import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
-import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.catalog.lakehouse.hudi.utils.CatalogUtils;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -71,13 +70,10 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
   @VisibleForTesting CachedClientPool clientPool;
 
-  private CatalogInfo info;
-
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-lakehouse-hudi-%s-keytab";
 
   @Override
-  public void initialize(Map<String, String> properties, CatalogInfo info) {
-    this.info = info;
+  public void initialize(Map<String, String> properties) {
     HiveConf hiveConf = buildHiveConfAndInitKerberosAuth(properties);
     this.clientPool = new CachedClientPool(hiveConf, properties);
   }
@@ -266,7 +262,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
       try (KerberosClient kerberosClient = new KerberosClient(properties, hadoopConf, true)) {
         String keytabPath =
             String.format(
-                GRAVITINO_KEYTAB_FORMAT, Objects.isNull(this.info) ? "0" : this.info.id());
+                GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(CatalogUtils.CATALOG_ID_KEY, "0"));
         File keytabFile = kerberosClient.saveKeyTabFileFromUri(keytabPath);
         kerberosClient.login(keytabFile.getAbsolutePath());
         LOG.info("Login with kerberos success");

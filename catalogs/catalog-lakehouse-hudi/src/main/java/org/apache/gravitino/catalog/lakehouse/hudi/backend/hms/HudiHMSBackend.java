@@ -24,7 +24,6 @@ import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.BackendType;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
-import org.apache.gravitino.connector.CatalogInfo;
 
 public class HudiHMSBackend extends HudiCatalogBackend {
 
@@ -37,7 +36,7 @@ public class HudiHMSBackend extends HudiCatalogBackend {
   }
 
   @Override
-  public void initialize(Map<String, String> properties, CatalogInfo info) {
-    backendOps().initialize(properties, info);
+  public void initialize(Map<String, String> properties) {
+    backendOps().initialize(properties);
   }
 }

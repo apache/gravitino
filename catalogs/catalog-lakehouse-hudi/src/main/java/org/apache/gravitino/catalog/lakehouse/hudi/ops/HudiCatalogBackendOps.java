@@ -23,7 +23,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
-import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -41,7 +40,7 @@ import org.apache.gravitino.rel.indexes.Index;
 /** Operations for Interacting with Hudi Catalog. */
 public interface HudiCatalogBackendOps extends AutoCloseable {
 
-  void initialize(Map<String, String> properties, CatalogInfo info);
+  void initialize(Map<String, String> properties);
 
   HudiSchema loadSchema(NameIdentifier schemaIdent) throws NoSuchSchemaException;
 

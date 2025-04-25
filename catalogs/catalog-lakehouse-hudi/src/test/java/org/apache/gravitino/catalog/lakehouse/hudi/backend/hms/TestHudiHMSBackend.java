@@ -29,7 +29,7 @@ public class TestHudiHMSBackend {
   @Test
   public void testInitialize() {
     HudiCatalogBackend backend = new HudiHMSBackend();
-    backend.initialize(ImmutableMap.of(), null);
+    backend.initialize(ImmutableMap.of());
 
     Assertions.assertEquals(HMS, backend.type());
     Assertions.assertInstanceOf(HudiHMSBackendOps.class, backend.backendOps());
