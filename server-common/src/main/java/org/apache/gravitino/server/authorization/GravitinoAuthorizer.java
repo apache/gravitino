@@ -45,4 +45,19 @@ public interface GravitinoAuthorizer extends Closeable {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege);
+
+  /**
+   * Perform authorization and return the authorization result.
+   *
+   * @param principal the user principal
+   * @param metalake the metalake
+   * @param metadataObject the metadataObject.
+   * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
+   * @return authorization result.
+   */
+  default boolean authorize(
+      Principal principal, String metalake, MetadataObject metadataObject, String privilege) {
+    return authorize(
+        principal, metalake, metadataObject, Enum.valueOf(Privilege.Name.class, privilege));
+  }
 }

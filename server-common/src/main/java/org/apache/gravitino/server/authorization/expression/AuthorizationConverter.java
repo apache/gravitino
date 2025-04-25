@@ -17,10 +17,17 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
-import com.google.errorprone.annotations.DoNotCall;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 
 public class AuthorizationConverter {
+
+  private static final Pattern PATTERN = Pattern.compile("([A-Z_]+)::([A-Z_]+)");
+
+  private static final Map<String, String> cache = new ConcurrentHashMap<>();
 
   private AuthorizationConverter() {}
 
@@ -34,8 +41,23 @@ public class AuthorizationConverter {
    * @param authorizationExpression authorization expression from {@link MetadataFilterHelper}
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
-  @DoNotCall
   public static String convertToOgnlExpression(String authorizationExpression) {
-    throw new UnsupportedOperationException();
+    return cache.computeIfAbsent(
+        authorizationExpression,
+        (expression) -> {
+          Matcher matcher = PATTERN.matcher(expression);
+          StringBuffer result = new StringBuffer();
+
+          while (matcher.find()) {
+            String metadataType = matcher.group(1);
+            String privilege = matcher.group(2);
+            String replacement =
+                "authorizer.authorize(principal,METALAKE," + metadataType + ",'" + privilege + "')";
+            matcher.appendReplacement(result, replacement);
+          }
+          matcher.appendTail(result);
+
+          return result.toString();
+        });
   }
 }
