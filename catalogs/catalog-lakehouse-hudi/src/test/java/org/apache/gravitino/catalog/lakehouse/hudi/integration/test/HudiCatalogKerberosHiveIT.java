@@ -240,13 +240,6 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
   }
 
   private static void createHudiTables() {
-    /*    String createSchemaSql =
-        String.format(
-            "CREATE DATABASE %s  LOCATION '%s' ",
-            SCHEMA_NAME, "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
-    kerberosHiveContainer.executeInContainer("hive", "-e", "'" + createSchemaSql + ";'");*/
-
-    //    LOG.info("create database {} success[{}]", SCHEMA_NAME, createSchemaSql);
     String createTableSql =
         String.format(
             "CREATE TABLE %s.%s (\n"
