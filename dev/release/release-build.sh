@@ -177,6 +177,10 @@ fi
 if [[ "$PYGRAVITINO_VERSION" == *"dev"* ]]; then
   RC_PYGRAVITINO_VERSION="${PYGRAVITINO_VERSION}"
 else
+  if [ -z "$RC_COUNT" ]; then
+    echo "ERROR: RC_COUNT must be set to run this script"
+    exit_with_usage
+  fi
   RC_PYGRAVITINO_VERSION="${PYGRAVITINO_VERSION}rc${RC_COUNT}"
 fi
 
