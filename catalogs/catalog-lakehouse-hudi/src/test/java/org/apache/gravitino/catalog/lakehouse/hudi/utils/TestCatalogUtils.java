@@ -31,7 +31,7 @@ public class TestCatalogUtils {
   @Test
   public void testLoadHudiCatalogBackend() {
     HudiCatalogBackend catalogBackend =
-        CatalogUtils.loadHudiCatalogBackend(ImmutableMap.of(CATALOG_BACKEND, "hms"), null);
+        CatalogUtils.loadHudiCatalogBackend(ImmutableMap.of(CATALOG_BACKEND, "hms"));
     Assertions.assertInstanceOf(HudiHMSBackend.class, catalogBackend);
     Assertions.assertInstanceOf(HudiHMSBackendOps.class, catalogBackend.backendOps());
   }
