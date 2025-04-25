@@ -45,10 +45,10 @@ public class GravitinoAuthorizerProvider {
       synchronized (this) {
         if (gravitinoAuthorizer == null) {
           boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
-          if (!enableAuthorization) {
-            gravitinoAuthorizer = new IgnoreAuthorizer();
-          } else {
+          if (enableAuthorization) {
             // TODO
+          } else {
+            gravitinoAuthorizer = new IgnoreAuthorizer();
           }
         }
       }
