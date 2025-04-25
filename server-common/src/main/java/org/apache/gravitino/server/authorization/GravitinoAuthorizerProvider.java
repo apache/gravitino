@@ -17,7 +17,6 @@
 
 package org.apache.gravitino.server.authorization;
 
-import java.security.InvalidParameterException;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.ServerConfig;
 
@@ -45,17 +44,17 @@ public class GravitinoAuthorizerProvider {
     if (gravitinoAuthorizer == null) {
       synchronized (this) {
         if (gravitinoAuthorizer == null) {
-          String authorizationMode = serverConfig.get(Configs.AUTHORIZATION_MODE);
-          switch (authorizationMode) {
-            case "allow":
-              gravitinoAuthorizer = new AllowAuthorizer();
-              break;
-            default:
-              throw new InvalidParameterException("Invalid authorization mode");
+          boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
+          if (!enableAuthorization) {
+            gravitinoAuthorizer = new IgnoreAuthorizer();
+          } else {
+            // TODO
           }
         }
-        gravitinoAuthorizer.initialize();
       }
+    }
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.initialize();
     }
   }
 

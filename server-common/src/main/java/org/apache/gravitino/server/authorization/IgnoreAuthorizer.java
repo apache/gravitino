@@ -26,7 +26,7 @@ import org.apache.gravitino.authorization.Privilege;
  * The default implementation of GravitinoAuthorizer, indicating that metadata permission control is
  * not enabled.
  */
-public class AllowAuthorizer implements GravitinoAuthorizer {
+public class IgnoreAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public void initialize() {}

@@ -21,13 +21,13 @@ import java.io.IOException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Test of {@link AllowAuthorizer} */
-public class TestAllowAuthorizer {
+/** Test of {@link IgnoreAuthorizer} */
+public class TestIgnoreAuthorizer {
 
   @Test
   public void testAuthorize() throws IOException {
-    try (AllowAuthorizer allowAuthorizer = new AllowAuthorizer()) {
-      boolean result = allowAuthorizer.authorize(null, null, null, null);
+    try (IgnoreAuthorizer ignoreAuthorizer = new IgnoreAuthorizer()) {
+      boolean result = ignoreAuthorizer.authorize(null, null, null, null);
       Assertions.assertTrue(result, "Logic error in AllowAuthorizer");
     }
   }
