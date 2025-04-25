@@ -37,6 +37,7 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -55,8 +56,7 @@ import org.slf4j.LoggerFactory;
 public class HudiCatalogKerberosHiveIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(HudiCatalogKerberosHiveIT.class);
 
-  private static final org.apache.gravitino.integration.test.container.ContainerSuite
-      containerSuite = org.apache.gravitino.integration.test.container.ContainerSuite.getInstance();
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static final String SDK_KERBEROS_PRINCIPAL_KEY = "client.kerberos.principal";
   private static final String SDK_KERBEROS_KEYTAB_KEY = "client.kerberos.keytab";
@@ -212,7 +212,11 @@ public class HudiCatalogKerberosHiveIT extends BaseIT {
 
     properties.put(HudiCatalogPropertiesMetadata.CATALOG_BACKEND, "hms");
     properties.put(HudiCatalogPropertiesMetadata.URI, HIVE_METASTORE_URI);
-    properties.put("warehouse", "hdfs://localhost:9000/user/hive/warehouse-catalog-hudi");
+    properties.put(
+        "warehouse",
+        String.format(
+            "hdfs://%s:%d/user/hive/warehouse-catalog-hudi",
+            kerberosHiveContainer.getContainerIpAddress(), HiveContainer.HDFS_DEFAULTFS_PORT));
     Catalog catalog =
         gravitinoMetalake.createCatalog(
             CATALOG_NAME, Catalog.Type.RELATIONAL, "lakehouse-hudi", "comment", properties);
