@@ -48,6 +48,11 @@ on:
         type: boolean
         default: false
 
+# Set permission for building ranger jars.
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   publish-docker-image:
     runs-on: ubuntu-latest
