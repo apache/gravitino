@@ -28,6 +28,7 @@ on:
         description: 'Docker version to apply to this image'
         required: true
         type: string
+
       username:
         description: 'Docker username'
         required: true
@@ -36,6 +37,11 @@ on:
         description: 'Publish Docker token'
         required: true
         type: string
+      pat:
+        description: 'GitHub private access token'
+        required: true
+        type: string
+
       publish-latest-tag:
         description: 'Whether to update the latest tag. This operation is only applicable to official releases and should not be used for Release Candidate (RC).'
         required: false
