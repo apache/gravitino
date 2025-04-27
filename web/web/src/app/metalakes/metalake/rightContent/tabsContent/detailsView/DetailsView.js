@@ -19,7 +19,18 @@
 
 'use client'
 
-import { Box, Grid, Typography, Table, TableHead, TableBody, TableRow, TableCell, TableContainer, Tooltip } from '@mui/material'
+import {
+  Box,
+  Grid,
+  Typography,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableContainer,
+  Tooltip
+} from '@mui/material'
 
 import EmptyText from '@/components/EmptyText'
 
@@ -96,18 +107,20 @@ const DetailsView = () => {
               </Typography>
               {renderFieldText({ value: activatedItem?.type })}
             </Grid>
-            {activatedItem?.storageLocation && <Grid item xs={12} sx={{ mb: [0, 5] }}>
-              <Typography variant='body2' sx={{ mb: 2 }}>
-                Storage location
-              </Typography>
-              {renderFieldText({ value: activatedItem?.storageLocation })}
-            </Grid>}
+            {activatedItem?.storageLocation && (
+              <Grid item xs={12} sx={{ mb: [0, 5] }}>
+                <Typography variant='body2' sx={{ mb: 2 }}>
+                  Storage location
+                </Typography>
+                {renderFieldText({ value: activatedItem?.storageLocation })}
+              </Grid>
+            )}
             {activatedItem?.storageLocations && (
               <Grid item xs={12} sx={{ mb: [0, 5] }}>
                 <Typography variant='body2' sx={{ mb: 2 }}>
                   Storage Location(s)
                 </Typography>
-    
+
                 <TableContainer>
                   <Table>
                     <TableHead
@@ -141,7 +154,11 @@ const DetailsView = () => {
                               data-prev-refer={`storageLocations-name-${name}`}
                             >
                               <Tooltip
-                                title={<span data-prev-refer={`storageLocations-name-${name}`}>{activatedItem?.storageLocations[name]}</span>}
+                                title={
+                                  <span data-prev-refer={`storageLocations-name-${name}`}>
+                                    {activatedItem?.storageLocations[name]}
+                                  </span>
+                                }
                                 placement='bottom'
                               >
                                 {activatedItem?.storageLocations[name]}

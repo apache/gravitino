@@ -209,7 +209,11 @@ const DetailsDrawer = props => {
                           data-prev-refer={`storageLocations-name-${name}`}
                         >
                           <Tooltip
-                            title={<span data-prev-refer={`storageLocations-name-${name}`}>{drawerData.storageLocations[name]}</span>}
+                            title={
+                              <span data-prev-refer={`storageLocations-name-${name}`}>
+                                {drawerData.storageLocations[name]}
+                              </span>
+                            }
                             placement='bottom'
                           >
                             {drawerData.storageLocations[name]}
