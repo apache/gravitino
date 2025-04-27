@@ -308,8 +308,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     @Override
     public String getOutput(Model model) {
       return String.format(
-          "Model name %s, comment: %s, latest version: %s%n",
-          model.name(), model.comment(), model.latestVersion());
+          "Model name %s, latest version: %s%n", model.name(), model.latestVersion());
     }
   }
 
@@ -328,8 +327,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Model[] models) {
-      return NEWLINE_JOINER.join(
-          Arrays.stream(models).map(Model::name).collect(Collectors.toList()));
+      return COMMA_JOINER.join(Arrays.stream(models).map(Model::name).collect(Collectors.toList()));
     }
   }
 
@@ -348,7 +346,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(User user) {
-      return String.format("username: %s, role: %s", user.name(), COMMA_JOINER.join(user.roles()));
+      return COMMA_JOINER.join(user.roles());
     }
   }
 
@@ -367,7 +365,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(User[] users) {
-      return NEWLINE_JOINER.join(Arrays.stream(users).map(User::name).collect(Collectors.toList()));
+      return COMMA_JOINER.join(Arrays.stream(users).map(User::name).collect(Collectors.toList()));
     }
   }
 
@@ -385,8 +383,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Group group) {
-      return String.format(
-          "group name: %s, role: %s", group.name(), COMMA_JOINER.join(group.roles()));
+      return COMMA_JOINER.join(group.roles());
     }
   }
 
@@ -404,8 +401,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     /** {@inheritDoc} */
     @Override
     public String getOutput(Group[] groups) {
-      return NEWLINE_JOINER.join(
-          Arrays.stream(groups).map(Group::name).collect(Collectors.toList()));
+      return COMMA_JOINER.join(Arrays.stream(groups).map(Group::name).collect(Collectors.toList()));
     }
   }
 }

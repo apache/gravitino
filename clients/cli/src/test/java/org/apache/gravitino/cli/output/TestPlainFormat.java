@@ -351,8 +351,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(mockModel, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "Model name demo_model, comment: This is a demo model, latest version: 1", output);
+    Assertions.assertEquals("Model name demo_model, latest version: 1", output);
   }
 
   @Test
@@ -364,7 +363,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(new Model[] {model1, model2, model3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("model1\n" + "model2\n" + "model3", output);
+    Assertions.assertEquals("model1,model2,model3", output);
   }
 
   @Test
@@ -373,7 +372,7 @@ public class TestPlainFormat {
     User mockUser = getMockUser("demo_user", ImmutableList.of("admin", "user"));
     PlainFormat.output(mockUser, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("username: demo_user, role: admin,user", output);
+    Assertions.assertEquals("admin,user", output);
   }
 
   @Test
@@ -385,16 +384,16 @@ public class TestPlainFormat {
 
     PlainFormat.output(new User[] {user1, user2, user3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("user1\n" + "user2\n" + "user3", output);
+    Assertions.assertEquals("user1,user2,user3", output);
   }
 
   @Test
   void testGroupDetailsWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    Group mockGroup = getMockGroup("demo_group", ImmutableList.of("admin", "user"));
+    Group mockGroup = getMockGroup("demo_group", ImmutableList.of("admin", "scientist"));
     PlainFormat.output(mockGroup, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("group name: demo_group, role: admin,user", output);
+    Assertions.assertEquals("admin,scientist", output);
   }
 
   @Test
@@ -406,7 +405,7 @@ public class TestPlainFormat {
 
     PlainFormat.output(new Group[] {group1, group2, group3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals("group1\n" + "group2\n" + "group3", output);
+    Assertions.assertEquals("group1,group2,group3", output);
   }
 
   private org.apache.gravitino.rel.Column getMockColumn(
