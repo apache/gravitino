@@ -23,13 +23,21 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 
-public class AuthorizationConverter {
+/**
+ * Convert the authorization expression into an executable expression, such as OGNL expression, etc.
+ */
+public class AuthorizationExpressionConverter {
 
+  /** Match authorization expressions */
   private static final Pattern PATTERN = Pattern.compile("([A-Z_]+)::([A-Z_]+)");
 
+  /**
+   * The EXPRESSION_CACHE caches the result of converting authorization expressions into an OGNL
+   * expression.
+   */
   private static final Map<String, String> EXPRESSION_CACHE = new ConcurrentHashMap<>();
 
-  private AuthorizationConverter() {}
+  private AuthorizationExpressionConverter() {}
 
   /**
    * Convert the authorization expression to OGNL expression. <a
@@ -52,7 +60,9 @@ public class AuthorizationConverter {
             String metadataType = matcher.group(1);
             String privilege = matcher.group(2);
             String replacement =
-                "authorizer.authorize(principal,METALAKE," + metadataType + ",'" + privilege + "')";
+                String.format(
+                    "authorizer.authorize(principal,METALAKE,%s,@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                    metadataType, privilege);
             matcher.appendReplacement(result, replacement);
           }
           matcher.appendTail(result);

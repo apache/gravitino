@@ -20,21 +20,23 @@ package org.apache.gravitino.server.authorization.expression;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Test for {@link AuthorizationConverter} */
-public class TestAuthorizationConverter {
+/** Test for {@link AuthorizationExpressionConverter} */
+public class TestAuthorizationExpressionConverter {
 
   @Test
   public void testConvertToOgnlExpression() {
     String createTableAuthorizationExpression = "CATALOG::CREATE_TABLE || SCHEMA::CREATE_SCHEMA";
     String createTableOgnlExpression =
-        AuthorizationConverter.convertToOgnlExpression(createTableAuthorizationExpression);
+        AuthorizationExpressionConverter.convertToOgnlExpression(
+            createTableAuthorizationExpression);
     Assertions.assertEquals(
         "authorizer.authorize(principal,METALAKE,CATALOG,'CREATE_TABLE') || authorizer.authorize(principal,METALAKE,SCHEMA,'CREATE_SCHEMA')",
         createTableOgnlExpression);
     String selectTableAuthorizationExpression =
         "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA && (TABLE::SELECT_TABLE || TABLE::MODIFY_TABLE)";
     String selectTableOgnlExpression =
-        AuthorizationConverter.convertToOgnlExpression(selectTableAuthorizationExpression);
+        AuthorizationExpressionConverter.convertToOgnlExpression(
+            selectTableAuthorizationExpression);
     Assertions.assertEquals(
         "authorizer.authorize(principal,METALAKE,CATALOG,'USE_CATALOG') && authorizer.authorize(principal,METALAKE,SCHEMA,'USE_SCHEMA') && (authorizer.authorize(principal,METALAKE,TABLE,'SELECT_TABLE') || authorizer.authorize(principal,METALAKE,TABLE,'MODIFY_TABLE'))",
         selectTableOgnlExpression);

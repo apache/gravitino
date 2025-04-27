@@ -35,13 +35,14 @@ public class AuthorizationExpressionEvaluator {
   private final String ognlAuthorizationExpression;
 
   /**
-   * Use {@link AuthorizationConverter} to convert the authorization expression into an OGNL
-   * expression, and then call {@link GravitinoAuthorizer} to perform permission verification.
+   * Use {@link AuthorizationExpressionConverter} to convert the authorization expression into an
+   * OGNL expression, and then call {@link GravitinoAuthorizer} to perform permission verification.
    *
    * @param expression authorization expression
    */
   public AuthorizationExpressionEvaluator(String expression) {
-    this.ognlAuthorizationExpression = AuthorizationConverter.convertToOgnlExpression(expression);
+    this.ognlAuthorizationExpression =
+        AuthorizationExpressionConverter.convertToOgnlExpression(expression);
   }
 
   /**
