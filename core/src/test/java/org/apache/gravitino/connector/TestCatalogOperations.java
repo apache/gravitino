@@ -26,6 +26,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -1057,7 +1058,8 @@ public class TestCatalogOperations
 
       } else if (change instanceof ModelVersionChange.UpdateAlias) {
         ModelVersionChange.UpdateAlias updateAliasChange = (ModelVersionChange.UpdateAlias) change;
-        newAliases = updateAliasChange.newAlias().toArray(new String[0]);
+        newAliases = doDeleteAlias(newAliases, updateAliasChange);
+        newAliases = doSetAlias(newAliases, updateAliasChange);
 
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
@@ -1282,5 +1284,19 @@ public class TestCatalogOperations
         .map(TestColumn.class::cast)
         .sorted(Comparator.comparingInt(TestColumn::position))
         .toArray(TestColumn[]::new);
+  }
+
+  private String[] doDeleteAlias(String[] entityAliases, ModelVersionChange.UpdateAlias change) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    aliasList.removeAll(change.aliasesToDelete());
+
+    return aliasList.toArray(new String[0]);
+  }
+
+  private String[] doSetAlias(String[] entityAliases, ModelVersionChange.UpdateAlias change) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    aliasList.addAll(change.aliasesToAdd());
+
+    return aliasList.toArray(new String[0]);
   }
 }

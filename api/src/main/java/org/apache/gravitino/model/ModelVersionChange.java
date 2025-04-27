@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -80,23 +81,16 @@ public interface ModelVersionChange {
   }
 
   /**
-   * Create a ModelVersionChange for updating the aliases of a model version.
-   *
-   * @param newAlias The new aliases to be set for the model version.
-   * @return A new ModelVersionChange instance for updating the alias of a model version.
-   */
-  static ModelVersionChange updateAlias(String... newAlias) {
-    return new ModelVersionChange.UpdateAlias(Arrays.asList(newAlias));
-  }
-
-  /**
    * Create a ModelVersionChange for updating the alias of a model version.
    *
-   * @param newAlias The new aliases to be set for the model version.
+   * @param aliasesToAdd The new aliases to be added for the model version.
+   * @param aliasesToDelete The aliases to be removed from the model version.
    * @return A new ModelVersionChange instance for updating the alias of a model version.
    */
-  static ModelVersionChange updateAlias(List<String> newAlias) {
-    return new ModelVersionChange.UpdateAlias(newAlias);
+  static ModelVersionChange updateAlias(String[] aliasesToAdd, String[] aliasesToDelete) {
+    return new ModelVersionChange.UpdateAlias(
+        Arrays.stream(aliasesToAdd).collect(Collectors.toList()),
+        Arrays.stream(aliasesToDelete).collect(Collectors.toList()));
   }
 
   /** A ModelVersionChange to update the model version comment. */
@@ -358,31 +352,49 @@ public interface ModelVersionChange {
 
   /** A ModelVersionChange to update the alias of a model version. */
   final class UpdateAlias implements ModelVersionChange {
-    private final List<String> newAlias;
+    private final List<String> aliasesToAdd;
+    private final List<String> aliasesToDelete;
 
     /**
-     * Creates a new {@link UpdateAlias} instance with the specified alias.
+     * Creates a new {@link UpdateAlias} instance with specified aliases to add and delete. This
+     * constructor sorts both lists and converts them to immutable collections.
      *
-     * @param newAlias The new alias to be set for the model version.
+     * @param aliasesToAdd List of aliases to add to the model version, can be null
+     * @param aliasesToDelete List of aliases to remove from the model version, can be null
      */
-    public UpdateAlias(List<String> newAlias) {
-      List<String> sorted = new ArrayList<>(newAlias);
-      Collections.sort(sorted);
-      this.newAlias = ImmutableList.copyOf(sorted);
+    public UpdateAlias(List<String> aliasesToAdd, List<String> aliasesToDelete) {
+      List<String> tmpAliasesToAdd = aliasesToAdd == null ? new ArrayList<>() : aliasesToAdd;
+      List<String> tmpAliasesToDelete =
+          aliasesToDelete == null ? new ArrayList<>() : aliasesToDelete;
+
+      Collections.sort(tmpAliasesToAdd);
+      Collections.sort(tmpAliasesToDelete);
+
+      this.aliasesToAdd = ImmutableList.copyOf(tmpAliasesToAdd);
+      this.aliasesToDelete = ImmutableList.copyOf(tmpAliasesToDelete);
     }
 
     /**
-     * Returns the new alias to be set for the model version.
+     * Returns the new aliases to be added for the model version.
      *
-     * @return The new alias to be set for the model version.
+     * @return The new aliases to be added for the model version.
      */
-    public List<String> newAlias() {
-      return newAlias;
+    public List<String> aliasesToAdd() {
+      return aliasesToAdd;
+    }
+
+    /**
+     * Returns the aliases to be removed from the model version.
+     *
+     * @return The aliases to be removed from the model version.
+     */
+    public List<String> aliasesToDelete() {
+      return aliasesToDelete;
     }
 
     /**
      * Compares this UpdateAlias instance with another object for equality. The comparison is based
-     * on the new alias of the model version.
+     * on the both new and removed aliases of the model version.
      *
      * @param o The object to compare with this instance.
      * @return {@code true} if the given object represents the same model update operation; {@code
@@ -393,29 +405,36 @@ public interface ModelVersionChange {
       if (this == o) return true;
       if (!(o instanceof UpdateAlias)) return false;
       UpdateAlias that = (UpdateAlias) o;
-      return newAlias.equals(that.newAlias);
+      return aliasesToAdd.equals(that.aliasesToAdd) && aliasesToDelete.equals(that.aliasesToDelete);
     }
 
     /**
-     * Generates a hash code for this UpdateAlias instance. The hash code is based on the new alias
-     * of the model.
+     * Generates a hash code for this UpdateAlias instance. The hash code is based on the both new
+     * and removed aliases of the model.
      *
      * @return A hash code value for this model renaming operation.
      */
     @Override
     public int hashCode() {
-      return Objects.hash(newAlias);
+      return Objects.hash(aliasesToAdd, aliasesToDelete);
     }
 
     /**
      * Provides a string representation of the UpdateAlias instance. This string format includes the
-     * class name followed by the new alias to be set.
+     * class name followed by the new and removed aliases to be set and removed.
      *
      * @return A string summary of the UpdateAlias instance.
      */
     @Override
     public String toString() {
-      return "UpdateAlias " + COMMA_JOINER.join(newAlias);
+      return "UpdateAlias "
+          + "AliasToAdd: ("
+          + COMMA_JOINER.join(aliasesToAdd)
+          + ")"
+          + " "
+          + "AliasToDelete: ("
+          + COMMA_JOINER.join(aliasesToDelete)
+          + ")";
     }
   }
 }
