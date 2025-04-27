@@ -26,7 +26,8 @@ RUN apt-get -q update && \
     apt-get install -y -q python python3 gcc mariadb-server vim curl wget openjdk-11-jdk git procps && \
     rm -rf /var/lib/apt/lists/*
 
-ARG RANGER_VERSION=2.4.0
+ARG RANGER_VERSION_NUMBER=distro-2.4.0
+ARG RANGER_VERSION="distro-${RANGER_VERSION_NUMBER}"
 ENV RANGER_PASSWORD=rangerR0cks!
 ARG MYSQL_CONNECTOR_PACKAGE_NAME
 ARG LOG4JDBC_PACKAGE_NAME
@@ -46,7 +47,7 @@ RUN ARCH=$(uname -m) && \
 # install ranger
 ENV RANGER_HOME=/opt/ranger-admin
 ADD packages/ranger-${RANGER_VERSION}-admin.tar.gz /opt/
-RUN ln -s /opt/ranger-${RANGER_VERSION}-admin ${RANGER_HOME}
+RUN ln -s /opt/ranger-${RANGER_VERSION_NUMBER}-admin ${RANGER_HOME}
 
 # Initialize Ranger envirioment
 # We download these packages because ranger-admin required thiese packages, but it seems not included in tar file.

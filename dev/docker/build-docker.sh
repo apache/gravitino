@@ -112,7 +112,7 @@ elif [ "${component_type}" == "doris" ]; then
   build_args="--build-arg DORIS_VERSION=${DORIS_VERSION}"
 elif [ "${component_type}" == "ranger" ]; then
   . ${script_dir}/ranger/ranger-dependency.sh
-  build_args="--build-arg RANGER_PACKAGE_NAME=${RANGER_PACKAGE_NAME} --build-arg MYSQL_CONNECTOR_PACKAGE_NAME=${MYSQL_CONNECTOR_PACKAGE_NAME} --build-arg LOG4JDBC_PACKAGE_NAME=${LOG4JDBC_PACKAGE_NAME} --build-arg RANGER_VERSION=${RANGER_VERSION}"
+  build_args="--build-arg RANGER_PACKAGE_NAME=${RANGER_PACKAGE_NAME} --build-arg MYSQL_CONNECTOR_PACKAGE_NAME=${MYSQL_CONNECTOR_PACKAGE_NAME} --build-arg LOG4JDBC_PACKAGE_NAME=${LOG4JDBC_PACKAGE_NAME} --build-arg RANGER_VERSION_NUMBER=${RANGER_VERSION_NUMBER} --build-arg RANGER_VERSION=${RANGER_VERSION}"
 elif [ "${component_type}" == "iceberg-rest-server" ]; then
   . ${script_dir}/iceberg-rest-server/iceberg-rest-server-dependency.sh
 else
