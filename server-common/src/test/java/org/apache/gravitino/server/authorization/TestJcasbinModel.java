@@ -17,9 +17,9 @@
 
 package org.apache.gravitino.server.authorization;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.IOUtils;
 import org.casbin.jcasbin.main.Enforcer;
@@ -34,17 +34,42 @@ public class TestJcasbinModel {
 
   private static Enforcer enforcer;
 
+  /** mock jcasbin policy */
+  private static final String JCASBIN_POLICY =
+      "p,role1,metalake1,METALAKE,metalake1,OWNER,allow\n"
+          + "\n"
+          + "p,role2,metalake1,CATALOG,catalog1,OWNER,allow\n"
+          + "\n"
+          + "p,role3,metalake1,SCHEMA,schema1,OWNER,allow\n"
+          + "\n"
+          + "p,role4,metalake1,TABLE,table1,OWNER,allow\n"
+          + "\n"
+          + "p,role5,metalake1,METALAKE,metalake1,SELECT_TABLE,allow\n"
+          + "p,role5,metalake1,METALAKE,metalake1,USE_CATALOG,allow\n"
+          + "p,role5,metalake1,TABLE,table1,SELECT_TABLE,allow\n"
+          + "\n"
+          + "g,user1,role5\n"
+          + "\n"
+          + "g,group1,role5\n"
+          + "\n"
+          + "g,user2,group1\n"
+          + "\n"
+          + "g,user3,role1\n"
+          + "g,user3,group1";
+
   @BeforeAll
   public static void init() throws IOException {
-    InputStream modelStream = TestJcasbinModel.class.getResourceAsStream("/jcasbin_model.conf");
-    Assertions.assertNotNull(modelStream);
-    String string = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
-    Model model = new Model();
-    model.loadModelFromText(string);
-    URL resource = TestJcasbinModel.class.getResource("/jcasbin_policy.txt");
-    Assertions.assertNotNull(resource);
-    FileAdapter fileAdapter = new FileAdapter(resource.getPath());
-    enforcer = new Enforcer(model, fileAdapter);
+    try (InputStream modelStream =
+            TestJcasbinModel.class.getResourceAsStream("/jcasbin_model.conf");
+        InputStream policyInputStream =
+            new ByteArrayInputStream(JCASBIN_POLICY.getBytes(StandardCharsets.UTF_8))) {
+      Assertions.assertNotNull(modelStream);
+      String string = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
+      Model model = new Model();
+      model.loadModelFromText(string);
+      FileAdapter fileAdapter = new FileAdapter(policyInputStream);
+      enforcer = new Enforcer(model, fileAdapter);
+    }
   }
 
   @Test
