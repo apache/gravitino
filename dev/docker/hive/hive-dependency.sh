@@ -30,7 +30,8 @@ HIVE2_VERSION="2.3.9"
 HIVE3_VERSION="3.1.3"
 MYSQL_JDBC_DRIVER_VERSION=${MYSQL_VERSION:-"8.0.15"}
 ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION:-"3.4.13"}
-RANGER_VERSION="2.4.0" # Notice: Currently only tested Ranger plugin 2.4.0 in the Hadoop 3.1.0 and Hive 3.1.3
+RANGER_VERSION_NUMBER="2.4.0"
+RANGER_VERSION="distro-${RANGER_VERSION_NUMBER}" # Notice: Currently only tested Ranger plugin 2.4.0 in the Hadoop 3.1.0 and Hive 3.1.3
 
 HADOOP2_PACKAGE_NAME="hadoop-${HADOOP2_VERSION}.tar.gz"
 HADOOP2_DOWNLOAD_URL="https://archive.apache.org/dist/hadoop/core/hadoop-${HADOOP2_VERSION}/${HADOOP2_PACKAGE_NAME}"
@@ -55,10 +56,10 @@ ZOOKEEPER_PACKAGE_NAME="zookeeper-${ZOOKEEPER_VERSION}.tar.gz"
 ZOOKEEPER_DOWNLOAD_URL="https://archive.apache.org/dist/zookeeper/zookeeper-${ZOOKEEPER_VERSION}/${ZOOKEEPER_PACKAGE_NAME}"
 
 RANGER_HIVE_PACKAGE_NAME="ranger-${RANGER_VERSION}-hive-plugin.tar.gz"
-RANGER_HIVE_DOWNLOAD_URL=https://github.com/datastrato/ranger/releases/download/v${RANGER_VERSION}/ranger-${RANGER_VERSION}-hive-plugin.tar.gz
+RANGER_HIVE_DOWNLOAD_URL="https://repo.maven.apache.org/maven2/org/apache/ranger/ranger-distro/${RANGER_VERSION_NUMBER}/${RANGER_HIVE_PACKAGE_NAME}"
 
 RANGER_HDFS_PACKAGE_NAME="ranger-${RANGER_VERSION}-hdfs-plugin.tar.gz"
-RANGER_HDFS_DOWNLOAD_URL=https://github.com/datastrato/ranger/releases/download/v${RANGER_VERSION}/ranger-${RANGER_VERSION}-hdfs-plugin.tar.gz
+RANGER_HDFS_DOWNLOAD_URL="https://repo.maven.apache.org/maven2/org/apache/ranger/ranger-distro/${RANGER_VERSION_NUMBER}/${RANGER_HDFS_PACKAGE_NAME}"
 
 # Prepare download packages
 if [[ ! -d "${hive_dir}/packages" ]]; then
@@ -91,8 +92,9 @@ fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" ]; then
   # ranger-hdfs plugin not exist, run ranger-dependency.sh to build from source
-  . ${ranger_dir}/ranger-dependency.sh
-  cp "${ranger_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" "${hive_dir}/packages"
+#  . ${ranger_dir}/ranger-dependency.sh
+#  cp "${ranger_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" "${hive_dir}/packages"
+  curl -L -s -o "${hive_dir}/packages/${RANGER_HDFS_PACKAGE_NAME}" ${RANGER_HDFS_DOWNLOAD_URL}
 fi
 
 if [[ $? -ne 0 ]]; then
@@ -102,8 +104,9 @@ fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ]; then
   # ranger-hive plugin not exist, run ranger-dependency.sh to build from source
-  . ${ranger_dir}/ranger-dependency.sh
-  cp "${ranger_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" "${hive_dir}/packages"
+#  . ${ranger_dir}/ranger-dependency.sh
+#  cp "${ranger_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" "${hive_dir}/packages"
+  curl -L -s -o "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ${RANGER_HIVE_DOWNLOAD_URL}
 fi
 
 if [[ $? -ne 0 ]]; then
