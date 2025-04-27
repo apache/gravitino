@@ -51,10 +51,10 @@ public class GravitinoAuthorizerProvider {
             gravitinoAuthorizer = new IgnoreAuthorizer();
           }
         }
+        if (gravitinoAuthorizer != null) {
+          gravitinoAuthorizer.initialize();
+        }
       }
-    }
-    if (gravitinoAuthorizer != null) {
-      gravitinoAuthorizer.initialize();
     }
   }
 
