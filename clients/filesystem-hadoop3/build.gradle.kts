@@ -36,8 +36,9 @@ dependencies {
   }
 
   implementation(libs.caffeine)
-  implementation(libs.guava)
   implementation(libs.commons.lang3)
+  implementation(libs.guava)
+  implementation(libs.slf4j.api)
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))

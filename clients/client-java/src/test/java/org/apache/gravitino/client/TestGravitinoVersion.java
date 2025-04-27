@@ -35,8 +35,22 @@ public class TestGravitinoVersion {
     assertEquals(5, versionNumber[1]);
     assertEquals(3, versionNumber[2]);
 
+    // Test a valid the version string with hyphen separator
+    version = new GravitinoVersion("2.5.3-1.0.1", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(2, versionNumber[0]);
+    assertEquals(5, versionNumber[1]);
+    assertEquals(3, versionNumber[2]);
+
     // Test a valid the version string with SNAPSHOT
     version = new GravitinoVersion("2.5.3-SNAPSHOT", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(2, versionNumber[0]);
+    assertEquals(5, versionNumber[1]);
+    assertEquals(3, versionNumber[2]);
+
+    // Test a valid the version string with SNAPSHOT and hyphen separator
+    version = new GravitinoVersion("2.5.3-SNAPSHOT-2.5.3-SNAPSHOT", "2023-01-01", "1234567");
     versionNumber = version.getVersionNumber();
     assertEquals(2, versionNumber[0]);
     assertEquals(5, versionNumber[1]);
@@ -49,8 +63,22 @@ public class TestGravitinoVersion {
     assertEquals(5, versionNumber[1]);
     assertEquals(3, versionNumber[2]);
 
+    // Test a valid the version string with alpha and hyphen separator
+    version = new GravitinoVersion("2.5.3-alpha-2.5.3-alpha", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(2, versionNumber[0]);
+    assertEquals(5, versionNumber[1]);
+    assertEquals(3, versionNumber[2]);
+
     // Test incubator version
     version = new GravitinoVersion("2.5.3-incubating", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(2, versionNumber[0]);
+    assertEquals(5, versionNumber[1]);
+    assertEquals(3, versionNumber[2]);
+
+    // Test incubator version with hyphen separator
+    version = new GravitinoVersion("2.5.3-incubating-2.5.3-incubating", "2023-01-01", "1234567");
     versionNumber = version.getVersionNumber();
     assertEquals(2, versionNumber[0]);
     assertEquals(5, versionNumber[1]);
@@ -63,16 +91,44 @@ public class TestGravitinoVersion {
     assertEquals(5, versionNumber[1]);
     assertEquals(3, versionNumber[2]);
 
+    // Test incubator snapshot version with hyphen separator
+    version =
+        new GravitinoVersion(
+            "2.5.3-incubating-SNAPSHOT-2.5.3-incubating-SNAPSHOT", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(2, versionNumber[0]);
+    assertEquals(5, versionNumber[1]);
+    assertEquals(3, versionNumber[2]);
+
+    version =
+        new GravitinoVersion("0.9.0-incubating-SNAPSHOT-0.8.0-SNAPSHOT", "2023-01-01", "1234567");
+    versionNumber = version.getVersionNumber();
+    assertEquals(0, versionNumber[0]);
+    assertEquals(9, versionNumber[1]);
+    assertEquals(0, versionNumber[2]);
+
     // Test an invalid the version string with 2 part
     version = new GravitinoVersion("2.5", "2023-01-01", "1234567");
+    assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
+
+    // Test an invalid the version string with 2 part and hyphen separator
+    version = new GravitinoVersion("2.5-2.5", "2023-01-01", "1234567");
     assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
 
     // Test an invalid the version string with 4 part
     version = new GravitinoVersion("2.5.7.6", "2023-01-01", "1234567");
     assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
 
+    // Test an invalid the version string with 4 part and hyphen separator
+    version = new GravitinoVersion("2.5.7.6-2.5.7.6", "2023-01-01", "1234567");
+    assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
+
     // Test an invalid the version string with not number
     version = new GravitinoVersion("a.b.c", "2023-01-01", "1234567");
+    assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
+
+    // Test an invalid the version string with not number and hyphen separator
+    version = new GravitinoVersion("a.b.c-a.b.c", "2023-01-01", "1234567");
     assertThrows(GravitinoRuntimeException.class, version::getVersionNumber);
   }
 

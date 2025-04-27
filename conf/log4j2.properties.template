@@ -65,8 +65,9 @@ appender.lineage_file.strategy.delete.type = Delete
 appender.lineage_file.strategy.delete.basePath = ${basePath}
 appender.lineage_file.strategy.delete.maxDepth = 10
 appender.lineage_file.strategy.delete.ifLastModified.type = IfLastModified
+appender.lineage_file.strategy.delete.ifLastModified.age = 30d
 
-logger.lineage.name = org.apache.gravitino.lineage.LineageLogSink$LineageLogger
+logger.lineage.name = org.apache.gravitino.lineage.sink.LineageLogSink$LineageLogger
 logger.lineage.level = info
 logger.lineage.appenderRef.lineage_file.ref = lineage_file
 logger.lineage.additivity = false

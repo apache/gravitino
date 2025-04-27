@@ -24,6 +24,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -37,6 +38,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.dto.credential.CredentialDTO;
@@ -95,6 +97,17 @@ public class MetadataObjectCredentialOperations {
             }
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+            Map<String, String> filteredFilesetHeaders =
+                Utils.filterFilesetCredentialHeaders(httpRequest);
+            // set the fileset info into the thread local context
+            if (!filteredFilesetHeaders.isEmpty()) {
+              CallerContext context =
+                  CallerContext.builder().withContext(filteredFilesetHeaders).build();
+              CallerContext.CallerContextHolder.set(context);
+              LOG.info(
+                  "Set the caller context for getting credential: {}",
+                  context.context().toString());
+            }
             List<Credential> credentials = credentialOperationDispatcher.getCredentials(identifier);
             if (credentials == null) {
               return Utils.ok(new CredentialResponse(new CredentialDTO[0]));
@@ -105,6 +118,9 @@ public class MetadataObjectCredentialOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleCredentialException(OperationType.GET, fullName, e);
+    } finally {
+      // Clear the caller context
+      CallerContext.CallerContextHolder.remove();
     }
   }
 

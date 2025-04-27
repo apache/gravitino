@@ -98,5 +98,53 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
       1000L * 60 * 60;
 
+  /**
+   * The configuration key for the fileset with multiple locations, on which the file system will
+   * operate. If not set, the file system will operate on the default location.
+   */
+  public static final String FS_GRAVITINO_CURRENT_LOCATION_NAME =
+      "fs.gravitino.current.location.name";
+
+  /**
+   * The configuration key for the env variable name that indicates the current location name. If
+   * not set, the file system will read the location name from CURRENT_LOCATION_NAME env variable.
+   */
+  public static final String FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR =
+      "fs.gravitino.current.location.name.env.var";
+
+  /** The default env variable to read from to get current location name. */
+  public static final String FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT =
+      "CURRENT_LOCATION_NAME";
+
+  /** The configuration key for the GVFS operations class. */
+  public static final String FS_GRAVITINO_OPERATIONS_CLASS = "fs.gravitino.operations.class";
+
+  /** The default value for the GVFS operations class. */
+  public static final String FS_GRAVITINO_OPERATIONS_CLASS_DEFAULT =
+      DefaultGVFSOperations.class.getCanonicalName();
+
+  /** The configuration key for the block size of the GVFS file. */
+  public static final String FS_GRAVITINO_BLOCK_SIZE = "fs.gravitino.block.size";
+
+  /** The default block size of the GVFS file. */
+  public static final long FS_GRAVITINO_BLOCK_SIZE_DEFAULT = 32 * 1024 * 1024;
+
+  /** The configuration key for the Gravitino hook class. */
+  public static final String FS_GRAVITINO_HOOK_CLASS = "fs.gravitino.hook.class";
+
+  /** The default value for the Gravitino hook class. */
+  public static final String FS_GRAVITINO_HOOK_CLASS_DEFAULT = NoOpHook.class.getCanonicalName();
+
+  /** The configuration key prefix for the Gravitino client request header. */
+  public static final String FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX =
+      "fs.gravitino.client.request.header.";
+
+  /** The configuration key for whether to enable credential vending. The default is false. */
+  public static final String FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING =
+      "fs.gravitino.enableCredentialVending";
+
+  /** The default value for whether to enable credential vending. */
+  public static final boolean FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT = false;
+
   private GravitinoVirtualFileSystemConfiguration() {}
 }
