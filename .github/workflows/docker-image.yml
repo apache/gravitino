@@ -19,11 +19,15 @@ on:
           - 'gravitino-playground:hive'
           - 'gravitino-playground:ranger'
           - 'gravitino-iceberg-rest-server'
+      docker_repo_name:
+        description: 'Docker repository name (default is apache)'
+        required: false
+        default: 'apache'
+        type: string
       version:
         description: 'Docker version to apply to this image'
         required: true
         type: string
-
       username:
         description: 'Docker username'
         required: true
@@ -50,43 +54,43 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.image }}" == "gravitino-ci:hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:kerberos-hive" ]; then
             echo "image_type=kerberos-hive" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=kerberos-hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=trino" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:doris" ]; then
             echo "image_type=doris" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=doris" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-ci:ranger" ]; then
             echo "image_type=ranger" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-ci" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-ci" >> $GITHUB_ENV
             echo "tag_name=ranger" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
             echo "image_type=gravitino" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino" >> $GITHUB_ENV
-            # `apache/gravitino` is the default image name, didn't need to tag alias name
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino" >> $GITHUB_ENV
+            # `${{ github.event.inputs.docker_repo_name }}/gravitino` is the default image name, didn't need to tag alias name
           elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-playground" >> $GITHUB_ENV
             echo "tag_name=trino" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:hive" ]; then
             echo "image_type=hive" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-playground" >> $GITHUB_ENV
             echo "tag_name=hive" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:ranger" ]; then
             echo "image_type=ranger" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-playground" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-playground" >> $GITHUB_ENV
             echo "tag_name=ranger" >> $GITHUB_ENV
           elif [ "${{ github.event.inputs.image }}" == "gravitino-iceberg-rest-server" ]; then
             echo "image_type=iceberg-rest-server" >> $GITHUB_ENV
-            echo "image_name=apache/gravitino-iceberg-rest" >> $GITHUB_ENV
+            echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-iceberg-rest" >> $GITHUB_ENV
           fi
           
           if [ "${{ github.event.inputs.publish-latest-tag }}" == "true" ]; then
