@@ -103,9 +103,6 @@ if [[ $? -ne 0 ]]; then
 fi
 
 if [ ! -f "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ]; then
-  # ranger-hive plugin not exist, run ranger-dependency.sh to build from source
-#  . ${ranger_dir}/ranger-dependency.sh
-#  cp "${ranger_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" "${hive_dir}/packages"
   curl -L -s -o "${hive_dir}/packages/${RANGER_HIVE_PACKAGE_NAME}" ${RANGER_HIVE_DOWNLOAD_URL}
 fi
 
