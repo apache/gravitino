@@ -28,7 +28,7 @@ public class TestIgnoreAuthorizer {
   public void testAuthorize() throws IOException {
     try (IgnoreAuthorizer ignoreAuthorizer = new IgnoreAuthorizer()) {
       boolean result = ignoreAuthorizer.authorize(null, null, null, null);
-      Assertions.assertTrue(result, "Logic error in AllowAuthorizer");
+      Assertions.assertTrue(result, "Logic error in IgnoreAuthorizer");
     }
   }
 }

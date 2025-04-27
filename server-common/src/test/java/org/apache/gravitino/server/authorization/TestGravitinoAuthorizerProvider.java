@@ -28,7 +28,7 @@ public class TestGravitinoAuthorizerProvider {
   @Test
   public void testInitializeAllowAuthorizer() {
     ServerConfig serverConfig = new ServerConfig();
-    serverConfig.set(Configs.AUTHORIZATION_MODE, "allow");
+    serverConfig.set(Configs.ENABLE_AUTHORIZATION, true);
     GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
