@@ -171,13 +171,56 @@ const DetailsDrawer = props => {
         )}
 
         {drawerData.storageLocations && (
-          <Grid item xs={12} md={6} sx={{ mb: [0, 5] }}>
+          <Grid item xs={12} sx={{ mb: [0, 5] }}>
             <Typography variant='body2' sx={{ mb: 2 }}>
-              Storage Location
+              Storage Location(s)
             </Typography>
-            {Object.keys(drawerData.storageLocations).map(key =>
-              renderFieldText({ value: `${key}: ${drawerData.storageLocations[key]}` })
-            )}
+
+            <TableContainer>
+              <Table>
+                <TableHead
+                  sx={{
+                    backgroundColor: theme => theme.palette.action.hover
+                  }}
+                >
+                  <TableRow>
+                    <TableCell sx={{ py: 2 }}>Name</TableCell>
+                    <TableCell sx={{ py: 2 }}>Location</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody data-refer='details-props-table'>
+                  {Object.keys(drawerData.storageLocations).map((name, index) => {
+                    return (
+                      <TableRow key={index} data-refer={`details-props-index-${index}`}>
+                        <TableCell
+                          className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                          data-refer={`storageLocations-name-${name}`}
+                        >
+                          <Tooltip
+                            title={<span data-refer={`tip-storageLocations-name-${name}`}>{name}</span>}
+                            placement='bottom'
+                          >
+                            {name}
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell
+                          className={'twc-py-[0.7rem] twc-truncate twc-max-w-[134px]'}
+                          data-refer={`storageLocations-location-${drawerData.storageLocations[name]}`}
+                          data-prev-refer={`storageLocations-name-${name}`}
+                        >
+                          <Tooltip
+                            title={<span data-prev-refer={`storageLocations-name-${name}`}>{drawerData.storageLocations[name]}</span>}
+                            placement='bottom'
+                          >
+                            {drawerData.storageLocations[name]}
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Grid>
         )}
 
