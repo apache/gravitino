@@ -318,14 +318,17 @@ public class CatalogsPage extends BaseWebIT {
     }
   }
 
-  public void setFilesetStorageLocationField(String storageLocation) {
+  public void setFilesetStorageLocationField(
+      int index, String locationName, String storageLocation) {
     try {
-      WebElement filesetStorageLocationFieldInput =
-          filesetStorageLocationField.findElement(By.tagName("input"));
-      filesetStorageLocationFieldInput.sendKeys(
-          Keys.chord(Keys.HOME, Keys.chord(Keys.SHIFT, Keys.END), Keys.DELETE));
-      filesetStorageLocationFieldInput.clear();
-      filesetStorageLocationFieldInput.sendKeys(storageLocation);
+      // Set the indexed storageLocations name
+      String namePath = "//div[@data-refer='storageLocations-name-" + index + "']//input";
+      WebElement nameInput = driver.findElement(By.xpath(namePath));
+      nameInput.sendKeys(locationName);
+      // Set the indexed storageLocations location
+      String locationPath = "//div[@data-refer='storageLocations-location-" + index + "']//input";
+      WebElement locationInput = driver.findElement(By.xpath(locationPath));
+      locationInput.sendKeys(storageLocation);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
