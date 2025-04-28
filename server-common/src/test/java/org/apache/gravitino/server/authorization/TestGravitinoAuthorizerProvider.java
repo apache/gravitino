@@ -33,7 +33,7 @@ public class TestGravitinoAuthorizerProvider {
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     Assertions.assertInstanceOf(
-        IgnoreAuthorizer.class,
+        PassThroughAuthorizer.class,
         gravitinoAuthorizer,
         "Error initializing GravitinoAuthorizerProvider");
   }

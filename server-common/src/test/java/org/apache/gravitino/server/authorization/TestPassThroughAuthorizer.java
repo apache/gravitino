@@ -18,28 +18,17 @@
 package org.apache.gravitino.server.authorization;
 
 import java.io.IOException;
-import java.security.Principal;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-/**
- * The default implementation of GravitinoAuthorizer, indicating that metadata permission control is
- * not enabled.
- */
-public class IgnoreAuthorizer implements GravitinoAuthorizer {
+/** Test of {@link PassThroughAuthorizer} */
+public class TestPassThroughAuthorizer {
 
-  @Override
-  public void initialize() {}
-
-  @Override
-  public boolean authorize(
-      Principal principal,
-      String metalake,
-      MetadataObject metadataObject,
-      Privilege.Name privilege) {
-    return true;
+  @Test
+  public void testAuthorize() throws IOException {
+    try (PassThroughAuthorizer passThroughAuthorizer = new PassThroughAuthorizer()) {
+      boolean result = passThroughAuthorizer.authorize(null, null, null, null);
+      Assertions.assertTrue(result, "Logic error in PassThroughAuthorizer");
+    }
   }
-
-  @Override
-  public void close() throws IOException {}
 }

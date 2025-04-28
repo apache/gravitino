@@ -48,7 +48,7 @@ public class GravitinoAuthorizerProvider {
           if (enableAuthorization) {
             // TODO
           } else {
-            gravitinoAuthorizer = new IgnoreAuthorizer();
+            gravitinoAuthorizer = new PassThroughAuthorizer();
           }
           if (gravitinoAuthorizer != null) {
             gravitinoAuthorizer.initialize();
