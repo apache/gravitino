@@ -15,6 +15,7 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import com.google.common.base.Preconditions;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -89,6 +90,7 @@ public final class Either<L, R> {
    * @param <R> Right type
    */
   public static <L, R> Either<L, R> left(L value) {
+    Preconditions.checkArgument(value != null, "Left value cannot be null");
     return new Either<>(Optional.of(value), Optional.empty());
   }
 
@@ -100,6 +102,7 @@ public final class Either<L, R> {
    * @param <R> Right type
    */
   public static <L, R> Either<L, R> right(R value) {
+    Preconditions.checkArgument(value != null, "Right value cannot be null");
     return new Either<>(Optional.empty(), Optional.of(value));
   }
 
