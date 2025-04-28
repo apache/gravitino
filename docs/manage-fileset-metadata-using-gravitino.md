@@ -351,7 +351,7 @@ If the provided location contains placeholders, they will be replaced by the cor
 
 The `storageLocation` in each level can contain **placeholders**, format as `{{name}}`, which will
 be replaced by the corresponding fileset property value when the fileset object is created. The
-placeholder property in the fileset object is formed as "placeholder-{{name}}". For example, if
+placeholder property in the fileset object is formed as `placeholder-{{name}}`. For example, if
 the `storageLocation` is `file:///tmp/{{schema}}-{{fileset}}-{{verion}}`, and the fileset object
 named "catalog1.schema1.fileset1" contains the properties `placeholder-version=v1`,
 the actual `storageLocation` will be `file:///tmp/schema1-fileset1-v1`.
