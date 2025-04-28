@@ -915,4 +915,6 @@ Third-Party Notices and Licenses:
   Source/Reference: https://github.com/apache/hadoop/blob/trunk/NOTICE.txt
 
 OpenLineage
-License: Apache License 2.0
+This project includes code from the Marquez Project, part of the LFAI & Data Foundation.
+This project includes code from https://github.com/oittaa/uuid6-python repo (MIT license).
+This project includes code from https://github.com/f4b6a3/uuid-creator repo (MIT license).
