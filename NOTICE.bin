@@ -913,3 +913,6 @@ Third-Party Notices and Licenses:
 - Hadoop: Apache Hadoop is used as a dependency
   License: Apache License 2.0
   Source/Reference: https://github.com/apache/hadoop/blob/trunk/NOTICE.txt
+
+OpenLineage
+License: Apache License 2.0
