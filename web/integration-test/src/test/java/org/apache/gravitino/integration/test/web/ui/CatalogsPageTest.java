@@ -89,6 +89,7 @@ public class CatalogsPageTest extends BaseWebIT {
   private static final String FILESET_CATALOG_NAME = "catalog_fileset";
   private static final String SCHEMA_NAME = "default";
   private static final String SCHEMA_NAME_FILESET = "schema_fileset";
+  private static final String FILESET_DEFAULT_LOCATION = "fileset_location";
   private static final String FILESET_NAME = "fileset1";
   private static final String TABLE_NAME = "table1";
   private static final String TABLE_NAME_2 = "table2";
@@ -638,7 +639,7 @@ public class CatalogsPageTest extends BaseWebIT {
     clickAndWait(catalogsPage.createFilesetBtn);
     catalogsPage.setFilesetNameField(FILESET_NAME);
     String storageLocation = storageLocation(SCHEMA_NAME_FILESET, FILESET_NAME);
-    catalogsPage.setFilesetStorageLocationField(storageLocation);
+    catalogsPage.setFilesetStorageLocationField(0, FILESET_DEFAULT_LOCATION, storageLocation);
     catalogsPage.setFilesetCommentField("fileset comment");
     catalogsPage.addFilesetPropsBtn.click();
     catalogsPage.setPropsAt(0, PROPERTIES_KEY1, PROPERTIES_VALUE1);
