@@ -34,10 +34,6 @@ public class AuthenticationConfig extends Config {
   enum AuthenticationType {
     SIMPLE,
     KERBEROS;
-
-    public static AuthenticationType fromString(String type) {
-      return AuthenticationType.valueOf(type.toUpperCase());
-    }
   }
 
   public static final boolean KERBEROS_DEFAULT_IMPERSONATION_ENABLE = false;
@@ -50,31 +46,20 @@ public class AuthenticationConfig extends Config {
   public static final ConfigEntry<String> AUTH_TYPE_ENTRY =
       new ConfigBuilder(AUTH_TYPE_KEY)
           .doc(
-              "The type of authentication for Hadoop catalog, currently we only support simple and Kerberos")
+              "The type of authentication for Hudi catalog, currently we only support simple and Kerberos")
           .version(ConfigConstants.VERSION_0_10_0)
           .stringConf()
           .createWithDefault("simple");
 
   public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
       new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
-          .doc("Whether to enable impersonation for the Hadoop catalog")
+          .doc("Whether to enable impersonation for the Hudi catalog")
           .version(ConfigConstants.VERSION_0_10_0)
           .booleanConf()
           .createWithDefault(KERBEROS_DEFAULT_IMPERSONATION_ENABLE);
 
   public String getAuthType() {
     return get(AUTH_TYPE_ENTRY);
-  }
-
-  public boolean isImpersonationEnabled() {
-    return get(ENABLE_IMPERSONATION_ENTRY);
-  }
-
-  public boolean isSimpleAuth() {
-    return org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig
-        .AuthenticationType.SIMPLE
-        .name()
-        .equalsIgnoreCase(getAuthType());
   }
 
   public boolean isKerberosAuth() {

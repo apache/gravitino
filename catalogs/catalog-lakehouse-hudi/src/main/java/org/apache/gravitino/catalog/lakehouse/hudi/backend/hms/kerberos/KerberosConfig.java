@@ -53,7 +53,7 @@ public class KerberosConfig extends AuthenticationConfig {
 
   public static final ConfigEntry<Integer> CHECK_INTERVAL_SEC_ENTRY =
       new ConfigBuilder(CHECK_INTERVAL_SEC_KEY)
-          .doc("The check interval of the Kerberos connection for Hadoop catalog")
+          .doc("The check interval of the Kerberos connection for Hudi catalog")
           .version(ConfigConstants.VERSION_0_10_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
