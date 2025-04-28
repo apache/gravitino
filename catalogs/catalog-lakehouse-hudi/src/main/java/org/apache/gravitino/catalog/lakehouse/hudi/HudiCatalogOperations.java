@@ -19,6 +19,8 @@
 package org.apache.gravitino.catalog.lakehouse.hudi;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.Catalog;
@@ -70,7 +72,13 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    config.put(
+    Map<String, String> newConfig;
+    if (config instanceof ImmutableMap) {
+      newConfig = new LinkedHashMap<>(config);
+    } else {
+      newConfig = config;
+    }
+    newConfig.put(
         CatalogUtils.CATALOG_ID_KEY, Objects.nonNull(info) ? String.valueOf(info.id()) : "0");
     HudiCatalogBackend hudiCatalogBackend = CatalogUtils.loadHudiCatalogBackend(config);
     hudiCatalogBackendOps = hudiCatalogBackend.backendOps();
