@@ -139,6 +139,9 @@ const CreateFilesetDialog = props => {
     resolver: yupResolver(schema)
   })
 
+  const defaultLocationProps = watch('propItems').filter(item => item.key === 'default-location-name')[0]
+  const storageLocationsItems = watch('storageLocations')
+
   const handleFormChange = ({ index, event }) => {
     let data = [...innerProps]
     data[index][event.target.name] = event.target.value
@@ -231,9 +234,11 @@ const CreateFilesetDialog = props => {
           name: data.name,
           type: data.type,
           storageLocations: data.storageLocations.reduce((acc, item) => {
-            acc[item.name] = item.location
-            if (item.defaultLocation) {
-              properties['default-location-name'] = item.name
+            if (item.name && item.location) {
+              acc[item.name] = item.location
+              if (item.defaultLocation && !properties['default-location-name']) {
+                properties['default-location-name'] = item.name
+              }
             }
 
             return acc
@@ -443,22 +448,27 @@ const CreateFilesetDialog = props => {
                             )}
                           />
                         </Box>
-                        <Box>
-                          <Controller
-                            name={`storageLocations.${index}.defaultLocation`}
-                            control={control}
-                            render={({ field: { value, onChange } }) => (
-                              <Tooltip title='Default Location' placement='top'>
-                                <Switch
-                                  checked={value}
-                                  onChange={event => onChangeDefaultLocation({ index, event })}
-                                  disabled={type === 'update'}
-                                  size='small'
-                                />
-                              </Tooltip>
-                            )}
-                          />
-                        </Box>
+                        {!defaultLocationProps &&
+                          storageLocationsItems.length > 1 &&
+                          storageLocationsItems[0].name &&
+                          storageLocationsItems[0].location && (
+                            <Box>
+                              <Controller
+                                name={`storageLocations.${index}.defaultLocation`}
+                                control={control}
+                                render={({ field: { value, onChange } }) => (
+                                  <Tooltip title='Default Location' placement='top'>
+                                    <Switch
+                                      checked={value}
+                                      onChange={event => onChangeDefaultLocation({ index, event })}
+                                      disabled={type === 'update'}
+                                      size='small'
+                                    />
+                                  </Tooltip>
+                                )}
+                              />
+                            </Box>
+                          )}
                         <Box>
                           {index === 0 ? (
                             <Box sx={{ minWidth: 40 }}>
