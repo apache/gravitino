@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import org.apache.commons.io.IOUtils;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 import org.casbin.jcasbin.main.Enforcer;
 import org.casbin.jcasbin.model.Model;
 import org.casbin.jcasbin.persist.file_adapter.FileAdapter;
@@ -78,17 +80,36 @@ public class TestJcasbinModel {
    */
   @Test
   public void testMetalakeOwner() {
-    Assertions.assertTrue(enforcer.enforce("role1", "metalake1", "METALAKE", "metalake1", "OWNER"));
     Assertions.assertTrue(
-        enforcer.enforce("role1", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "role1", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
+    Assertions.assertTrue(
+        enforcer.enforce(
+            "role1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1", "metalake2", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "role1", "metalake2", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
     Assertions.assertFalse(
-        enforcer.enforce("role1", "metalake2", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "role1",
+            "metalake2",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1", "metalake1", "METALAKE", "metalake2", "OWNER"));
+        enforcer.enforce(
+            "role1", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake2", "OWNER"));
     Assertions.assertFalse(
-        enforcer.enforce("role1", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "role1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
   }
 
   /**
@@ -97,17 +118,43 @@ public class TestJcasbinModel {
    */
   @Test
   public void testCatalogOwner() {
-    Assertions.assertTrue(enforcer.enforce("role2", "metalake1", "CATALOG", "catalog1", "OWNER"));
     Assertions.assertTrue(
-        enforcer.enforce("role2", "metalake1", "CATALOG", "catalog1", "USE_SCHEMA"));
+        enforcer.enforce(
+            "role2", "metalake1", MetadataObject.Type.CATALOG.name(), "catalog1", "OWNER"));
     Assertions.assertTrue(
-        enforcer.enforce("role2", "metalake1", "CATALOG", "catalog1", "USE_CATALOG"));
-    Assertions.assertFalse(enforcer.enforce("role2", "metalake2", "CATALOG", "catalog1", "OWNER"));
+        enforcer.enforce(
+            "role2",
+            "metalake1",
+            MetadataObject.Type.CATALOG.name(),
+            "catalog1",
+            Privilege.Name.USE_SCHEMA.name()));
+    Assertions.assertTrue(
+        enforcer.enforce(
+            "role2",
+            "metalake1",
+            MetadataObject.Type.CATALOG.name(),
+            "catalog1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role2", "metalake2", "CATALOG", "catalog1", "USE_CATALOG"));
-    Assertions.assertFalse(enforcer.enforce("role2", "metalake1", "CATALOG", "catalog2", "OWNER"));
+        enforcer.enforce(
+            "role2", "metalake2", MetadataObject.Type.CATALOG.name(), "catalog1", "OWNER"));
     Assertions.assertFalse(
-        enforcer.enforce("role2", "metalake1", "CATALOG", "catalog2", "USE_CATALOG"));
+        enforcer.enforce(
+            "role2",
+            "metalake2",
+            MetadataObject.Type.CATALOG.name(),
+            "catalog1",
+            Privilege.Name.USE_CATALOG.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "role2", "metalake1", MetadataObject.Type.CATALOG.name(), "catalog2", "OWNER"));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "role2",
+            "metalake1",
+            MetadataObject.Type.CATALOG.name(),
+            "catalog2",
+            Privilege.Name.USE_CATALOG.name()));
   }
 
   /**
@@ -115,31 +162,78 @@ public class TestJcasbinModel {
    */
   @Test
   public void testSchemaOwner() {
-    Assertions.assertTrue(enforcer.enforce("role3", "metalake1", "SCHEMA", "schema1", "OWNER"));
     Assertions.assertTrue(
-        enforcer.enforce("role3", "metalake1", "SCHEMA", "schema1", "SELECT_TABLE"));
-    Assertions.assertFalse(enforcer.enforce("role3", "metalake2", "SCHEMA", "schema1", "OWNER"));
+        enforcer.enforce(
+            "role3", "metalake1", MetadataObject.Type.SCHEMA.name(), "schema1", "OWNER"));
+    Assertions.assertTrue(
+        enforcer.enforce(
+            "role3",
+            "metalake1",
+            MetadataObject.Type.SCHEMA.name(),
+            "schema1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role3", "metalake2", "SCHEMA", "schema1", "SELECT_TABLE"));
-    Assertions.assertFalse(enforcer.enforce("role3", "metalake1", "SCHEMA", "schema2", "OWNER"));
+        enforcer.enforce(
+            "role3", "metalake2", MetadataObject.Type.SCHEMA.name(), "schema1", "OWNER"));
     Assertions.assertFalse(
-        enforcer.enforce("role3", "metalake1", "SCHEMA", "schema2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role3",
+            "metalake2",
+            MetadataObject.Type.SCHEMA.name(),
+            "schema1",
+            Privilege.Name.SELECT_TABLE.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "role3", "metalake1", MetadataObject.Type.SCHEMA.name(), "schema2", "OWNER"));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "role3",
+            "metalake1",
+            MetadataObject.Type.SCHEMA.name(),
+            "schema2",
+            Privilege.Name.SELECT_TABLE.name()));
   }
 
   /** "role4" is the owner of table1. Determine whether role4 has the permissions for table1. */
   @Test
   public void testTableOwner() {
-    Assertions.assertTrue(enforcer.enforce("role4", "metalake1", "TABLE", "table1", "OWNER"));
     Assertions.assertTrue(
-        enforcer.enforce("role4", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "role4", "metalake1", MetadataObject.Type.TABLE.name(), "table1", "OWNER"));
     Assertions.assertTrue(
-        enforcer.enforce("role4", "metalake1", "TABLE", "table1", "SELECT_TABLE"));
-    Assertions.assertFalse(enforcer.enforce("role3", "metalake2", "SCHEMA", "table1", "OWNER"));
+        enforcer.enforce(
+            "role4",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
+    Assertions.assertTrue(
+        enforcer.enforce(
+            "role4",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role4", "metalake2", "TABLE", "table1", "SELECT_TABLE"));
-    Assertions.assertFalse(enforcer.enforce("role3", "metalake1", "SCHEMA", "table2", "OWNER"));
+        enforcer.enforce(
+            "role3", "metalake2", MetadataObject.Type.SCHEMA.name(), "table1", "OWNER"));
     Assertions.assertFalse(
-        enforcer.enforce("role4", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role4",
+            "metalake2",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "role3", "metalake1", MetadataObject.Type.SCHEMA.name(), "table2", "OWNER"));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "role4",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
   }
 
   /** Check whether a role can have privileges. */
@@ -147,41 +241,113 @@ public class TestJcasbinModel {
   public void testRolePrivilege() {
     // "role5" has partial privilege.
     Assertions.assertFalse(
-        enforcer.enforce("role5", "metalake1", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "role5", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     Assertions.assertTrue(
-        enforcer.enforce("role5", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role5",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertTrue(
-        enforcer.enforce("role5", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "role5",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertTrue(
-        enforcer.enforce("role5", "metalake1", "TABLE", "table1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role5",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role5", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role5",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role5", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "role5",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role5", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role5",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role5", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "role5",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
 
     // role1000 has no privilege.
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "role1000", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "role1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "TABLE", "table1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "role1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "role1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("role1000", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "role1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
   }
 
   /**
@@ -192,41 +358,113 @@ public class TestJcasbinModel {
   public void testGroupPrivilege() {
     // "group1" possesses role5, and therefore, group5 has the permissions of role5.
     Assertions.assertFalse(
-        enforcer.enforce("group1", "metalake1", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "group1", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     Assertions.assertTrue(
-        enforcer.enforce("group1", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertTrue(
-        enforcer.enforce("group1", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "group1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertTrue(
-        enforcer.enforce("group1", "metalake1", "TABLE", "table1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "group1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "group1",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
 
     // group1000 has no roles and therefore has no permissions.
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "group1000", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "group1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "TABLE", "table1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "group1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "group1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("group1000", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "group1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
   }
 
   /**
@@ -237,77 +475,222 @@ public class TestJcasbinModel {
   public void testUserPrivilege() {
     // ”user1" has the privilege of role5.
     Assertions.assertFalse(
-        enforcer.enforce("user1", "metalake1", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "user1", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     Assertions.assertTrue(
-        enforcer.enforce("user1", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertTrue(
-        enforcer.enforce("user1", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "user1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertTrue(
-        enforcer.enforce("user1", "metalake1", "TABLE", "table1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user1",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "user1",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user1",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "user1",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
 
     // ”user2" has the privilege of group1.
     Assertions.assertFalse(
-        enforcer.enforce("user2", "metalake1", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "user2", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     Assertions.assertTrue(
-        enforcer.enforce("user2", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user2",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertTrue(
-        enforcer.enforce("user2", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "user2",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user2", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "user2",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user2", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user2",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user2", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "user2",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user2", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user2",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user2", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "user2",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
 
     // "user3" has the privilege of both role1 and group1.
-    Assertions.assertTrue(enforcer.enforce("user3", "metalake1", "METALAKE", "metalake1", "OWNER"));
+    Assertions.assertTrue(
+        enforcer.enforce(
+            "user3", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     Assertions.assertTrue(
-        enforcer.enforce("user3", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user3",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertTrue(
-        enforcer.enforce("user3", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "user3",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user3", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "user3",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user3", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user3",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user3", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "user3",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user3", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user3",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user3", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "user3",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
 
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "METALAKE", "metalake1", "OWNER"));
+        enforcer.enforce(
+            "user1000", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
 
     // "user1000" has no roles and therefore has no permissions.
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "METALAKE", "metalake1", "USE_CATALOG"));
+        enforcer.enforce(
+            "user1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "user1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "METALAKE", "metalake2", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
+        enforcer.enforce(
+            "user1000",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "TABLE", "table2", "MODIFY_TABLE"));
+        enforcer.enforce(
+            "user1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.MODIFY_TABLE.name()));
     Assertions.assertFalse(
-        enforcer.enforce("user1000", "metalake1", "TABLE", "table1", "SELECT_TABLE"));
+        enforcer.enforce(
+            "user1000",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
   }
 }
