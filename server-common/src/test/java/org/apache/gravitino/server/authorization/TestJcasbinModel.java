@@ -39,14 +39,17 @@ import org.junit.jupiter.api.Test;
 /** Test for jcasbin model. */
 public class TestJcasbinModel {
 
+  /** Jcasbin enforcer */
   private static Enforcer enforcer;
 
   @BeforeAll
   public static void init() throws IOException {
+    // Load jcasbin policy from jcasbin_policy.txt
     URL resource = TestJcasbinModel.class.getResource("/jcasbin_policy.txt");
     Assertions.assertNotNull(resource);
     List<String> policyWithLicense =
         FileUtils.readLines(new File(resource.getFile()), StandardCharsets.UTF_8);
+    // remove license
     String policy =
         policyWithLicense.stream()
             .filter(line -> !line.startsWith("#"))
@@ -56,9 +59,9 @@ public class TestJcasbinModel {
         InputStream policyInputStream =
             new ByteArrayInputStream(policy.getBytes(StandardCharsets.UTF_8))) {
       Assertions.assertNotNull(modelStream);
-      String string = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
+      String modelString = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       Model model = new Model();
-      model.loadModelFromText(string);
+      model.loadModelFromText(modelString);
       FileAdapter fileAdapter = new FileAdapter(policyInputStream);
       enforcer = new Enforcer(model, fileAdapter);
     }
