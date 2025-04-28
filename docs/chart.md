@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Helm Chart"
+title: "Helm Chart"
 slug: /chart
 keyword: chart
 license: "This software is licensed under the Apache License version 2."
@@ -9,22 +9,10 @@ license: "This software is licensed under the Apache License version 2."
 
 This Helm chart deploys Apache Gravitino on Kubernetes with customizable configurations.
 
-**Homepage:** <https://gravitino.apache.org/>
-
 ## Prerequisites
 
 - Kubernetes 1.29+
 - Helm 3+
-
-## Maintainers
-
-| Name             | Email                    | Url                          |
-|------------------|--------------------------|------------------------------|
-| Apache Gravitino | dev@gravitino.apache.org | https://gravitino.apache.org |
-
-## Source Code
-
-* <https://github.com/apache/gravitino>
 
 ## Update Chart Dependency
 
@@ -32,6 +20,12 @@ If the chart has not been released yet, navigate to the chart directory and upda
 
 ```console
 helm dependency update [CHART]
+```
+
+## Package Helm Chart
+
+```console
+helm package [CHART_PATH]
 ```
 
 ## View Chart values
@@ -126,10 +120,4 @@ Ensure the target MySQL database (gravitino) exists before deployment._
 
 ```console
 helm uninstall [RELEASE_NAME] -n [NAMESPACE]
-```
-
-## Package Helm Chart
-
-```console
-helm package [CHART_PATH]
 ```
