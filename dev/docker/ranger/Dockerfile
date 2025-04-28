@@ -26,7 +26,7 @@ RUN apt-get -q update && \
     apt-get install -y -q python python3 gcc mariadb-server vim curl wget openjdk-11-jdk git procps && \
     rm -rf /var/lib/apt/lists/*
 
-ARG RANGER_VERSION_NUMBER=distro-2.4.0
+ARG RANGER_VERSION_NUMBER=2.4.0
 ARG RANGER_VERSION="distro-${RANGER_VERSION_NUMBER}"
 ENV RANGER_PASSWORD=rangerR0cks!
 ARG MYSQL_CONNECTOR_PACKAGE_NAME

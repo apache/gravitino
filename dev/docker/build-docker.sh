@@ -93,6 +93,7 @@ if [[ "${component_type}" == "hive" ]]; then
   --build-arg HADOOP_VERSION=${HADOOP_VERSION} \
   --build-arg HIVE_VERSION=${HIVE_VERSION} \
   --build-arg MYSQL_JDBC_DRIVER_VERSION=${MYSQL_JDBC_DRIVER_VERSION} \
+  --build-arg RANGER_VERSION_NUMBER=${RANGER_VERSION_NUMBER} \
   --build-arg RANGER_VERSION=${RANGER_VERSION} \
   --build-arg ZOOKEEPER_VERSION=${ZOOKEEPER_VERSION} \
   --build-arg HIVE2_VERSION=${HIVE2_VERSION} \
@@ -136,14 +137,14 @@ fi
 cd ${script_dir}/${component_type}
 if [[ "${platform_type}" == "all" ]]; then
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 else
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 fi
