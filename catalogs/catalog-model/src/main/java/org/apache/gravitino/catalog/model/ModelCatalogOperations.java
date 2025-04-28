@@ -435,10 +435,11 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
         entityUri = updateUriChange.newUri();
 
-      } else if (change instanceof ModelVersionChange.UpdateAlias) {
-        ModelVersionChange.UpdateAlias updateAliasChange = (ModelVersionChange.UpdateAlias) change;
-        doDeleteAlias(entityAliases, updateAliasChange);
-        doSetAlias(entityAliases, updateAliasChange);
+      } else if (change instanceof ModelVersionChange.UpdateAliases) {
+        ModelVersionChange.UpdateAliases updateAliasesChange =
+            (ModelVersionChange.UpdateAliases) change;
+        doDeleteAlias(entityAliases, updateAliasesChange);
+        doSetAlias(entityAliases, updateAliasesChange);
 
       } else {
         throw new IllegalArgumentException(
@@ -524,11 +525,11 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     entityProperties.remove(change.property());
   }
 
-  private void doDeleteAlias(List<String> entityAliases, ModelVersionChange.UpdateAlias change) {
+  private void doDeleteAlias(List<String> entityAliases, ModelVersionChange.UpdateAliases change) {
     entityAliases.removeAll(change.aliasesToDelete());
   }
 
-  private void doSetAlias(List<String> entityAliases, ModelVersionChange.UpdateAlias change) {
+  private void doSetAlias(List<String> entityAliases, ModelVersionChange.UpdateAliases change) {
     entityAliases.addAll(change.aliasesToAdd());
   }
 }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.model;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.List;
 import org.junit.jupiter.api.Assertions;
@@ -208,25 +209,23 @@ public class TestModelVersionChange {
     String[] aliasesToDelete = {"alias delete 1", "alias delete 2"};
 
     ModelVersionChange modelVersionChange =
-        ModelVersionChange.updateAlias(aliasesToAdd, aliasesToDelete);
+        ModelVersionChange.updateAliases(aliasesToAdd, aliasesToDelete);
 
-    Assertions.assertEquals(ModelVersionChange.UpdateAlias.class, modelVersionChange.getClass());
+    Assertions.assertEquals(ModelVersionChange.UpdateAliases.class, modelVersionChange.getClass());
 
-    ModelVersionChange.UpdateAlias updateAliasChange =
-        (ModelVersionChange.UpdateAlias) modelVersionChange;
+    ModelVersionChange.UpdateAliases updateAliasesChange =
+        (ModelVersionChange.UpdateAliases) modelVersionChange;
     Assertions.assertEquals(
-        Lists.newArrayList(Lists.newArrayList("alias add 1", "alias add 2")),
-        updateAliasChange.aliasesToAdd());
+        ImmutableSet.of("alias add 1", "alias add 2"), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(
-        Lists.newArrayList(Lists.newArrayList("alias delete 1", "alias delete 2")),
-        updateAliasChange.aliasesToDelete());
+        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToDelete());
     Assertions.assertEquals(
         "UpdateAlias "
             + "AliasToAdd: (alias add 1,alias add 2)"
             + " "
             + "AliasToDelete: (alias "
             + "delete 1,alias delete 2)",
-        updateAliasChange.toString());
+        updateAliasesChange.toString());
   }
 
   @Test
@@ -235,40 +234,36 @@ public class TestModelVersionChange {
     List<String> aliasesToDelete = Lists.newArrayList("alias delete 1", "alias delete 2");
 
     ModelVersionChange modelVersionChange =
-        new ModelVersionChange.UpdateAlias(aliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToDelete);
 
-    Assertions.assertEquals(ModelVersionChange.UpdateAlias.class, modelVersionChange.getClass());
+    Assertions.assertEquals(ModelVersionChange.UpdateAliases.class, modelVersionChange.getClass());
 
-    ModelVersionChange.UpdateAlias updateAliasChange =
-        (ModelVersionChange.UpdateAlias) modelVersionChange;
+    ModelVersionChange.UpdateAliases updateAliasesChange =
+        (ModelVersionChange.UpdateAliases) modelVersionChange;
     Assertions.assertEquals(
-        Lists.newArrayList(Lists.newArrayList("alias add 1", "alias add 2")),
-        updateAliasChange.aliasesToAdd());
+        ImmutableSet.of("alias add 1", "alias add 2"), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(
-        Lists.newArrayList(Lists.newArrayList("alias delete 1", "alias delete 2")),
-        updateAliasChange.aliasesToDelete());
+        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToDelete());
     Assertions.assertEquals(
         "UpdateAlias "
             + "AliasToAdd: (alias add 1,alias add 2)"
             + " "
             + "AliasToDelete: (alias "
             + "delete 1,alias delete 2)",
-        updateAliasChange.toString());
+        updateAliasesChange.toString());
   }
 
   @Test
   void testCreateUpdateVersionAliasUseConstructorWithNull() {
-    ModelVersionChange modelVersionChange = new ModelVersionChange.UpdateAlias(null, null);
-    Assertions.assertEquals(ModelVersionChange.UpdateAlias.class, modelVersionChange.getClass());
+    ModelVersionChange modelVersionChange = new ModelVersionChange.UpdateAliases(null, null);
+    Assertions.assertEquals(ModelVersionChange.UpdateAliases.class, modelVersionChange.getClass());
 
-    ModelVersionChange.UpdateAlias updateAliasChange =
-        (ModelVersionChange.UpdateAlias) modelVersionChange;
+    ModelVersionChange.UpdateAliases updateAliasesChange =
+        (ModelVersionChange.UpdateAliases) modelVersionChange;
+    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToAdd());
+    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToDelete());
     Assertions.assertEquals(
-        Lists.newArrayList(Lists.newArrayList()), updateAliasChange.aliasesToAdd());
-    Assertions.assertEquals(
-        Lists.newArrayList(Lists.newArrayList()), updateAliasChange.aliasesToDelete());
-    Assertions.assertEquals(
-        "UpdateAlias AliasToAdd: () AliasToDelete: ()", updateAliasChange.toString());
+        "UpdateAlias AliasToAdd: () AliasToDelete: ()", updateAliasesChange.toString());
   }
 
   @Test
@@ -280,13 +275,13 @@ public class TestModelVersionChange {
     List<String> differentAliasesToDelete = Lists.newArrayList("alias delete 1", "alias delete 3");
 
     ModelVersionChange modelVersionChange1 =
-        new ModelVersionChange.UpdateAlias(aliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToDelete);
     ModelVersionChange modelVersionChange2 =
-        new ModelVersionChange.UpdateAlias(aliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToDelete);
     ModelVersionChange modelVersionChange3 =
-        new ModelVersionChange.UpdateAlias(differentAliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(differentAliasesToAdd, aliasesToDelete);
     ModelVersionChange modelVersionChange4 =
-        new ModelVersionChange.UpdateAlias(aliasesToAdd, differentAliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, differentAliasesToDelete);
 
     Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
     Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);

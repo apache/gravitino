@@ -1065,10 +1065,11 @@ public class TestCatalogOperations
         ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
         newProps.put(setProperty.property(), setProperty.value());
 
-      } else if (change instanceof ModelVersionChange.UpdateAlias) {
-        ModelVersionChange.UpdateAlias updateAliasChange = (ModelVersionChange.UpdateAlias) change;
-        newAliases = doDeleteAlias(newAliases, updateAliasChange);
-        newAliases = doSetAlias(newAliases, updateAliasChange);
+      } else if (change instanceof ModelVersionChange.UpdateAliases) {
+        ModelVersionChange.UpdateAliases updateAliasesChange =
+            (ModelVersionChange.UpdateAliases) change;
+        newAliases = doDeleteAlias(newAliases, updateAliasesChange);
+        newAliases = doSetAlias(newAliases, updateAliasesChange);
 
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
@@ -1295,14 +1296,14 @@ public class TestCatalogOperations
         .toArray(TestColumn[]::new);
   }
 
-  private String[] doDeleteAlias(String[] entityAliases, ModelVersionChange.UpdateAlias change) {
+  private String[] doDeleteAlias(String[] entityAliases, ModelVersionChange.UpdateAliases change) {
     List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
     aliasList.removeAll(change.aliasesToDelete());
 
     return aliasList.toArray(new String[0]);
   }
 
-  private String[] doSetAlias(String[] entityAliases, ModelVersionChange.UpdateAlias change) {
+  private String[] doSetAlias(String[] entityAliases, ModelVersionChange.UpdateAliases change) {
     List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
     aliasList.addAll(change.aliasesToAdd());
 

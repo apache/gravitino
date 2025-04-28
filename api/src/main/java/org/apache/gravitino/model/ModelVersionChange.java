@@ -20,12 +20,12 @@
 package org.apache.gravitino.model;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Lists;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -81,14 +81,14 @@ public interface ModelVersionChange {
   }
 
   /**
-   * Create a ModelVersionChange for updating the alias of a model version.
+   * Create a ModelVersionChange for updating the aliases of a model version.
    *
    * @param aliasesToAdd The new aliases to be added for the model version.
    * @param aliasesToDelete The aliases to be removed from the model version.
-   * @return A new ModelVersionChange instance for updating the alias of a model version.
+   * @return A new ModelVersionChange instance for updating the aliases of a model version.
    */
-  static ModelVersionChange updateAlias(String[] aliasesToAdd, String[] aliasesToDelete) {
-    return new ModelVersionChange.UpdateAlias(
+  static ModelVersionChange updateAliases(String[] aliasesToAdd, String[] aliasesToDelete) {
+    return new UpdateAliases(
         Arrays.stream(aliasesToAdd).collect(Collectors.toList()),
         Arrays.stream(aliasesToDelete).collect(Collectors.toList()));
   }
@@ -350,45 +350,45 @@ public interface ModelVersionChange {
     }
   }
 
-  /** A ModelVersionChange to update the alias of a model version. */
-  final class UpdateAlias implements ModelVersionChange {
-    private final List<String> aliasesToAdd;
-    private final List<String> aliasesToDelete;
+  /**
+   * Represents an update to a model version’s aliases, specifying which aliases to add and which to
+   * remove.
+   *
+   * <p>Both alias sets are stored as immutable.
+   */
+  final class UpdateAliases implements ModelVersionChange {
+    private final ImmutableSortedSet<String> aliasesToAdd;
+    private final ImmutableSortedSet<String> aliasesToDelete;
 
     /**
-     * Creates a new {@link UpdateAlias} instance with specified aliases to add and delete. This
-     * constructor sorts both lists and converts them to immutable collections.
+     * Constructs a new aliases-update operation.
      *
-     * @param aliasesToAdd List of aliases to add to the model version, can be null
-     * @param aliasesToDelete List of aliases to remove from the model version, can be null
+     * @param aliasesToAdd the aliases to add, or null for none
+     * @param aliasesToDelete the aliases to remove, or null for none
      */
-    public UpdateAlias(List<String> aliasesToAdd, List<String> aliasesToDelete) {
-      List<String> tmpAliasesToAdd = aliasesToAdd == null ? new ArrayList<>() : aliasesToAdd;
-      List<String> tmpAliasesToDelete =
-          aliasesToDelete == null ? new ArrayList<>() : aliasesToDelete;
-
-      Collections.sort(tmpAliasesToAdd);
-      Collections.sort(tmpAliasesToDelete);
-
-      this.aliasesToAdd = ImmutableList.copyOf(tmpAliasesToAdd);
-      this.aliasesToDelete = ImmutableList.copyOf(tmpAliasesToDelete);
+    public UpdateAliases(List<String> aliasesToAdd, List<String> aliasesToDelete) {
+      this.aliasesToAdd =
+          ImmutableSortedSet.copyOf(aliasesToAdd != null ? aliasesToAdd : Lists.newArrayList());
+      this.aliasesToDelete =
+          ImmutableSortedSet.copyOf(
+              aliasesToDelete != null ? aliasesToDelete : Lists.newArrayList());
     }
 
     /**
-     * Returns the new aliases to be added for the model version.
+     * Returns the set of aliases to add.
      *
-     * @return The new aliases to be added for the model version.
+     * @return an immutable, sorted set of aliases to add
      */
-    public List<String> aliasesToAdd() {
+    public Set<String> aliasesToAdd() {
       return aliasesToAdd;
     }
 
     /**
-     * Returns the aliases to be removed from the model version.
+     * Returns the set of aliases to remove.
      *
-     * @return The aliases to be removed from the model version.
+     * @return an immutable, sorted set of aliases to remove
      */
-    public List<String> aliasesToDelete() {
+    public Set<String> aliasesToDelete() {
       return aliasesToDelete;
     }
 
@@ -403,8 +403,8 @@ public interface ModelVersionChange {
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
-      if (!(o instanceof UpdateAlias)) return false;
-      UpdateAlias that = (UpdateAlias) o;
+      if (!(o instanceof UpdateAliases)) return false;
+      UpdateAliases that = (UpdateAliases) o;
       return aliasesToAdd.equals(that.aliasesToAdd) && aliasesToDelete.equals(that.aliasesToDelete);
     }
 
