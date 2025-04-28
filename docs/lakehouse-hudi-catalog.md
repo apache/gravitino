@@ -51,6 +51,7 @@ Users can use the following properties to configure the security of the catalog 
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                         | (none)        | required if the value of `authentication.type` is kerberos. | 0.10.0-incubating |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for hudi catalog.                                                                                                    | 60            | No                                                          | 0.10.0-incubating |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                     | 60            | No                                                          | 0.10.0-incubating |
+
 Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.kerberos.principal=XXXX`、`gravitino.bypass.hadoop.security.authentication=kerberos`、`gravitino.bypass.hive.metastore.sasl.enabled=ture` And so on.
 
 

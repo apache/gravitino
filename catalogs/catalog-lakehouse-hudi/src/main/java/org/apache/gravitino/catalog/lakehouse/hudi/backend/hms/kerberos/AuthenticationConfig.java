@@ -19,11 +19,12 @@
 
 package org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos;
 
+import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 
-public class AuthenticationConfig extends org.apache.gravitino.Config {
+public class AuthenticationConfig extends Config {
 
   // The key for the authentication type, currently we support Kerberos and simple
   public static final String AUTH_TYPE_KEY = "authentication.type";
