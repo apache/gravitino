@@ -72,6 +72,10 @@ public class TestJcasbinModel {
     }
   }
 
+  /**
+   * "role1" is the OWNER of metalake1. Determine whether role1 has the OWNER permission for
+   * metalake1.
+   */
   @Test
   public void testMetalakeOwner() {
     Assertions.assertTrue(enforcer.enforce("role1", "metalake1", "METALAKE", "metalake1", "OWNER"));
@@ -87,6 +91,10 @@ public class TestJcasbinModel {
         enforcer.enforce("role1", "metalake1", "METALAKE", "metalake2", "USE_CATALOG"));
   }
 
+  /**
+   * "role2" is the OWNER of catalog1. Determine whether role2 has the OWNER permission for
+   * catalog2.
+   */
   @Test
   public void testCatalogOwner() {
     Assertions.assertTrue(enforcer.enforce("role2", "metalake1", "CATALOG", "catalog1", "OWNER"));
@@ -102,6 +110,9 @@ public class TestJcasbinModel {
         enforcer.enforce("role2", "metalake1", "CATALOG", "catalog2", "USE_CATALOG"));
   }
 
+  /**
+   * role3 is the owner of schema1. Determine whether role3 has the owner permission for schema1.
+   */
   @Test
   public void testSchemaOwner() {
     Assertions.assertTrue(enforcer.enforce("role3", "metalake1", "SCHEMA", "schema1", "OWNER"));
@@ -115,6 +126,7 @@ public class TestJcasbinModel {
         enforcer.enforce("role3", "metalake1", "SCHEMA", "schema2", "SELECT_TABLE"));
   }
 
+  /** "role4" is the owner of table1. Determine whether role4 has the permissions for table1. */
   @Test
   public void testTableOwner() {
     Assertions.assertTrue(enforcer.enforce("role4", "metalake1", "TABLE", "table1", "OWNER"));
@@ -130,8 +142,10 @@ public class TestJcasbinModel {
         enforcer.enforce("role4", "metalake1", "TABLE", "table2", "SELECT_TABLE"));
   }
 
+  /** Check whether a role can have privileges. */
   @Test
   public void testRolePrivilege() {
+    // "role5" has partial privilege.
     Assertions.assertFalse(
         enforcer.enforce("role5", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
@@ -150,6 +164,7 @@ public class TestJcasbinModel {
     Assertions.assertFalse(
         enforcer.enforce("role5", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
 
+    // role1000 has no privilege.
     Assertions.assertFalse(
         enforcer.enforce("role1000", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
@@ -169,8 +184,13 @@ public class TestJcasbinModel {
         enforcer.enforce("role1000", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
   }
 
+  /**
+   * Determine whether a group, after being assigned a role, can inherit the permissions of that
+   * role.
+   */
   @Test
   public void testGroupPrivilege() {
+    // "group1" possesses role5, and therefore, group5 has the permissions of role5.
     Assertions.assertFalse(
         enforcer.enforce("group1", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
@@ -189,6 +209,7 @@ public class TestJcasbinModel {
     Assertions.assertFalse(
         enforcer.enforce("group1", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
 
+    // group1000 has no roles and therefore has no permissions.
     Assertions.assertFalse(
         enforcer.enforce("group1000", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
@@ -208,8 +229,13 @@ public class TestJcasbinModel {
         enforcer.enforce("group1000", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
   }
 
+  /**
+   * Determine whether a user can have the corresponding permissions after being granted a role or
+   * belonging to a user group.
+   */
   @Test
   public void testUserPrivilege() {
+    // ”user1" has the privilege of role5.
     Assertions.assertFalse(
         enforcer.enforce("user1", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
@@ -228,6 +254,7 @@ public class TestJcasbinModel {
     Assertions.assertFalse(
         enforcer.enforce("user1", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
 
+    // ”user2" has the privilege of group1.
     Assertions.assertFalse(
         enforcer.enforce("user2", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
@@ -246,6 +273,7 @@ public class TestJcasbinModel {
     Assertions.assertFalse(
         enforcer.enforce("user2", "metalake1", "TABLE", "table1", "MODIFY_TABLE"));
 
+    // "user3" has the privilege of both role1 and group1.
     Assertions.assertTrue(enforcer.enforce("user3", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
     Assertions.assertTrue(
@@ -266,6 +294,7 @@ public class TestJcasbinModel {
     Assertions.assertFalse(
         enforcer.enforce("user1000", "metalake1", "METALAKE", "metalake1", "OWNER"));
 
+    // "user1000" has no roles and therefore has no permissions.
     Assertions.assertFalse(
         enforcer.enforce("user1000", "metalake1", "METALAKE", "metalake1", "SELECT_TABLE"));
     Assertions.assertFalse(
