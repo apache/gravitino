@@ -1,0 +1,42 @@
+version: "3"
+services:
+  ranger-build:
+    build:
+      context: .
+      dockerfile: Dockerfile.ranger-build
+      args:
+        - RANGER_BUILD_JAVA_VERSION=${RANGER_BUILD_JAVA_VERSION}
+    image: ranger-build
+    container_name: ranger-build
+    hostname: ranger-build.example.com
+    privileged: true
+    networks:
+      - ranger
+    volumes:
+      # SELinux
+      # https://github.com/moby/moby/issues/41202#issuecomment-657422171
+      # - ${HOME:-~}/.m2:/home/ranger/.m2:Z
+      - m2:/home/ranger/.m2:Z
+      - ./scripts:/home/ranger/scripts
+      - ./patches:/home/ranger/patches
+      - dist:/home/ranger/dist:Z
+      # - ./dist:/home/ranger/dist:Z
+      - ${RANGER_HOME:-./../../}:/home/ranger/src:Z
+    depends_on:
+      - ranger-base
+    environment:
+      - BRANCH
+      - BUILD_HOST_SRC
+      - BUILD_OPTS
+      - PROFILE
+      - GIT_URL
+      - RANGER_VERSION
+      - SKIPTESTS
+
+networks:
+  ranger:
+    name: rangernw
+
+volumes:
+  m2:
+  dist:
