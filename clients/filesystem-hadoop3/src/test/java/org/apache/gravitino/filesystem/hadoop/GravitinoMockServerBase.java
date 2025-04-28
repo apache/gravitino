@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
-import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -180,28 +179,33 @@ public abstract class GravitinoMockServerBase {
       String schemaName,
       String filesetName,
       Fileset.Type type,
-      String location) {
+      Map<String, String> locations,
+      Map<String, String> properties) {
     NameIdentifier fileset = NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
-    String filesetPath =
+    String filesetEndpoint =
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s",
             metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
-    Map<String, String> locations =
-        location == null
-            ? Collections.emptyMap()
-            : ImmutableMap.of(LOCATION_NAME_UNKNOWN, location);
     FilesetDTO mockFileset =
         FilesetDTO.builder()
             .name(fileset.name())
             .type(type)
             .storageLocations(locations)
             .comment("comment")
-            .properties(ImmutableMap.of("k1", "v1"))
+            .properties(properties)
             .audit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
             .build();
     FilesetResponse filesetResponse = new FilesetResponse(mockFileset);
     try {
-      buildMockResource(Method.GET, filesetPath, null, filesetResponse, SC_OK);
+      buildMockResource(Method.GET, filesetEndpoint, null, filesetResponse, SC_OK);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected String getJsonString(Object obj) {
+    try {
+      return MAPPER.writeValueAsString(obj);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

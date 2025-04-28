@@ -39,6 +39,7 @@ import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
@@ -46,6 +47,7 @@ import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.model.ModelChange;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -372,9 +374,43 @@ class DTOConverters {
           ((ModelChange.SetProperty) change).property(),
           ((ModelChange.SetProperty) change).value());
 
+    } else if (change instanceof ModelChange.UpdateComment) {
+      return new ModelUpdateRequest.UpdateModelCommentRequest(
+          ((ModelChange.UpdateComment) change).newComment());
+
     } else {
       throw new IllegalArgumentException(
           "Unknown model change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  /**
+   * Converts a {@link ModelVersionChange} to a {@link ModelVersionUpdateRequest}.
+   *
+   * @param change The change to convert.
+   * @return The converted request.
+   */
+  static ModelVersionUpdateRequest toModelVersionUpdateRequest(ModelVersionChange change) {
+    if (change instanceof ModelVersionChange.UpdateComment) {
+      return new ModelVersionUpdateRequest.UpdateModelVersionComment(
+          ((ModelVersionChange.UpdateComment) change).newComment());
+
+    } else if (change instanceof ModelVersionChange.SetProperty) {
+      return new ModelVersionUpdateRequest.SetModelVersionPropertyRequest(
+          ((ModelVersionChange.SetProperty) change).property(),
+          ((ModelVersionChange.SetProperty) change).value());
+
+    } else if (change instanceof ModelVersionChange.RemoveProperty) {
+      return new ModelVersionUpdateRequest.RemoveModelVersionPropertyRequest(
+          ((ModelVersionChange.RemoveProperty) change).property());
+
+    } else if (change instanceof ModelVersionChange.UpdateUri) {
+      return new ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
+          ((ModelVersionChange.UpdateUri) change).newUri());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown model version change type: " + change.getClass().getSimpleName());
     }
   }
 }

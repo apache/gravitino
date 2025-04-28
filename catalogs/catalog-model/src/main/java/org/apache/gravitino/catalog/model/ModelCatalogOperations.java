@@ -334,12 +334,18 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     for (ModelChange change : changes) {
       if (change instanceof ModelChange.RenameModel) {
         entityName = ((ModelChange.RenameModel) change).newName();
+
       } else if (change instanceof ModelChange.SetProperty) {
         ModelChange.SetProperty setPropertyChange = (ModelChange.SetProperty) change;
         doSetProperty(entityProperties, setPropertyChange);
+
       } else if (change instanceof ModelChange.RemoveProperty) {
         ModelChange.RemoveProperty removePropertyChange = (ModelChange.RemoveProperty) change;
         doRemoveProperty(entityProperties, removePropertyChange);
+
+      } else if (change instanceof ModelChange.UpdateComment) {
+        entityComment = ((ModelChange.UpdateComment) change).newComment();
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model change: " + change.getClass().getSimpleName());
@@ -415,6 +421,20 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     for (ModelVersionChange change : changes) {
       if (change instanceof ModelVersionChange.UpdateComment) {
         entityComment = ((ModelVersionChange.UpdateComment) change).newComment();
+
+      } else if (change instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setPropertyChange = (ModelVersionChange.SetProperty) change;
+        doSetProperty(entityProperties, setPropertyChange);
+
+      } else if (change instanceof ModelVersionChange.RemoveProperty) {
+        ModelVersionChange.RemoveProperty removePropertyChange =
+            (ModelVersionChange.RemoveProperty) change;
+        doRemoveProperty(entityProperties, removePropertyChange);
+
+      } else if (change instanceof ModelVersionChange.UpdateUri) {
+        ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
+        entityUri = updateUriChange.newUri();
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model version change: " + change.getClass().getSimpleName());
@@ -487,5 +507,15 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
 
   private void doSetProperty(Map<String, String> entityProperties, ModelChange.SetProperty change) {
     entityProperties.put(change.property(), change.value());
+  }
+
+  private void doSetProperty(
+      Map<String, String> entityProperties, ModelVersionChange.SetProperty change) {
+    entityProperties.put(change.property(), change.value());
+  }
+
+  private void doRemoveProperty(
+      Map<String, String> entityProperties, ModelVersionChange.RemoveProperty change) {
+    entityProperties.remove(change.property());
   }
 }

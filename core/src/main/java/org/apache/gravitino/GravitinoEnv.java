@@ -355,6 +355,15 @@ public class GravitinoEnv {
     return futureGrantManager;
   }
 
+  /**
+   * Get the EventListenerManager associated with the Gravitino environment.
+   *
+   * @return The EventListenerManager instance.
+   */
+  public EventListenerManager eventListenerManager() {
+    return eventListenerManager;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();

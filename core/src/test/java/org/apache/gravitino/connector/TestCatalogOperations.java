@@ -956,12 +956,21 @@ public class TestCatalogOperations
         if (models.containsKey(newIdent)) {
           throw new ModelAlreadyExistsException("Model %s already exists", ident);
         }
+
       } else if (change instanceof ModelChange.RemoveProperty) {
         ModelChange.RemoveProperty removeProperty = (ModelChange.RemoveProperty) change;
         newProps.remove(removeProperty.property());
+
       } else if (change instanceof ModelChange.SetProperty) {
         ModelChange.SetProperty setProperty = (ModelChange.SetProperty) change;
         newProps.put(setProperty.property(), setProperty.value());
+
+      } else if (change instanceof ModelChange.UpdateComment) {
+        ModelChange.UpdateComment updateComment = (ModelChange.UpdateComment) change;
+        newComment = updateComment.newComment();
+
+      } else {
+        throw new IllegalArgumentException("Unsupported model change: " + change);
       }
     }
     TestModel updatedModel =
@@ -1045,8 +1054,22 @@ public class TestCatalogOperations
     for (ModelVersionChange change : changes) {
       if (change instanceof ModelVersionChange.UpdateComment) {
         newComment = ((ModelVersionChange.UpdateComment) change).newComment();
+
+      } else if (change instanceof ModelVersionChange.RemoveProperty) {
+        ModelVersionChange.RemoveProperty removeProperty =
+            (ModelVersionChange.RemoveProperty) change;
+        newProps.remove(removeProperty.property());
+
+      } else if (change instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
+        newProps.put(setProperty.property(), setProperty.value());
+
+      } else if (change instanceof ModelVersionChange.UpdateUri) {
+        ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
+        newUri = updateUriChange.newUri();
+
       } else {
-        throw new IllegalArgumentException("Unsupported model change: " + change);
+        throw new IllegalArgumentException("Unsupported model version change: " + change);
       }
     }
 

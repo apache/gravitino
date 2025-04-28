@@ -52,8 +52,6 @@ github:
         required_approving_review_count: 1
   dependabot_alerts: true
   dependabot_updates: false
-  protected_tags:
-    - "v*.*.*"
   collaborators:
     - noidname01
     - orenccl
@@ -67,3 +65,4 @@ notifications:
   commits: commits@gravitino.apache.org
   issues: commits@gravitino.apache.org
   pullrequests: commits@gravitino.apache.org
+  discussions: dev@gravitino.apache.org

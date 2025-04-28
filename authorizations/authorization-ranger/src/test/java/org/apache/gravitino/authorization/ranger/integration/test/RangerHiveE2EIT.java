@@ -112,7 +112,7 @@ public class RangerHiveE2EIT extends RangerBaseE2EIT {
   }
 
   @Override
-  protected void useCatalog() {
+  protected void reset() {
     // Do nothing, default catalog is ok for Hive.
   }
 

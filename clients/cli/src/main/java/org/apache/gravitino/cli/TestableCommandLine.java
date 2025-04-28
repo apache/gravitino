@@ -90,6 +90,7 @@ import org.apache.gravitino.cli.commands.RemoveCatalogProperty;
 import org.apache.gravitino.cli.commands.RemoveFilesetProperty;
 import org.apache.gravitino.cli.commands.RemoveMetalakeProperty;
 import org.apache.gravitino.cli.commands.RemoveModelProperty;
+import org.apache.gravitino.cli.commands.RemoveModelVersionProperty;
 import org.apache.gravitino.cli.commands.RemoveRoleFromGroup;
 import org.apache.gravitino.cli.commands.RemoveRoleFromUser;
 import org.apache.gravitino.cli.commands.RemoveSchemaProperty;
@@ -107,6 +108,7 @@ import org.apache.gravitino.cli.commands.SetCatalogProperty;
 import org.apache.gravitino.cli.commands.SetFilesetProperty;
 import org.apache.gravitino.cli.commands.SetMetalakeProperty;
 import org.apache.gravitino.cli.commands.SetModelProperty;
+import org.apache.gravitino.cli.commands.SetModelVersionProperty;
 import org.apache.gravitino.cli.commands.SetOwner;
 import org.apache.gravitino.cli.commands.SetSchemaProperty;
 import org.apache.gravitino.cli.commands.SetTableProperty;
@@ -134,7 +136,10 @@ import org.apache.gravitino.cli.commands.UpdateFilesetComment;
 import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.apache.gravitino.cli.commands.UpdateMetalakeComment;
 import org.apache.gravitino.cli.commands.UpdateMetalakeName;
+import org.apache.gravitino.cli.commands.UpdateModelComment;
 import org.apache.gravitino.cli.commands.UpdateModelName;
+import org.apache.gravitino.cli.commands.UpdateModelVersionComment;
+import org.apache.gravitino.cli.commands.UpdateModelVersionUri;
 import org.apache.gravitino.cli.commands.UpdateTableComment;
 import org.apache.gravitino.cli.commands.UpdateTableName;
 import org.apache.gravitino.cli.commands.UpdateTagComment;
@@ -885,6 +890,42 @@ public class TestableCommandLine {
     return new UpdateModelName(context, metalake, catalog, schema, model, rename);
   }
 
+  protected UpdateModelComment newUpdateModelComment(
+      CommandContext context,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      String comment) {
+    return new UpdateModelComment(context, metalake, catalog, schema, model, comment);
+  }
+
+  protected UpdateModelVersionComment newUpdateModelVersionComment(
+      CommandContext context,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      Integer version,
+      String alias,
+      String comment) {
+    return new UpdateModelVersionComment(
+        context, metalake, catalog, schema, model, version, alias, comment);
+  }
+
+  protected UpdateModelVersionUri newUpdateModelVersionUri(
+      CommandContext context,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      Integer version,
+      String alias,
+      String uri) {
+    return new UpdateModelVersionUri(
+        context, metalake, catalog, schema, model, version, alias, uri);
+  }
+
   protected SetModelProperty newSetModelProperty(
       CommandContext context,
       String metalake,
@@ -894,6 +935,33 @@ public class TestableCommandLine {
       String property,
       String value) {
     return new SetModelProperty(context, metalake, catalog, schema, model, property, value);
+  }
+
+  protected RemoveModelVersionProperty newRemoveModelVersionProperty(
+      CommandContext context,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      Integer version,
+      String alias,
+      String property) {
+    return new RemoveModelVersionProperty(
+        context, metalake, catalog, schema, model, version, alias, property);
+  }
+
+  protected SetModelVersionProperty newSetModelVersionProperty(
+      CommandContext context,
+      String metalake,
+      String catalog,
+      String schema,
+      String model,
+      Integer version,
+      String alias,
+      String property,
+      String value) {
+    return new SetModelVersionProperty(
+        context, metalake, catalog, schema, model, version, alias, property, value);
   }
 
   protected RemoveModelProperty newRemoveModelProperty(
