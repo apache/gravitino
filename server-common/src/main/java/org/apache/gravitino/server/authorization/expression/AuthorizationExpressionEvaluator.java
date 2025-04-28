@@ -67,7 +67,7 @@ public class AuthorizationExpressionEvaluator {
           ognlContext.put(metadataType.name(), metadataObject);
         });
     NameIdentifier nameIdentifier = metadataNames.get(MetadataObject.Type.METALAKE);
-    ognlContext.put("METALAKE", nameIdentifier.name());
+    ognlContext.put("METALAKE_NAME", nameIdentifier.name());
     try {
       Object value = Ognl.getValue(ognlAuthorizationExpression, ognlContext);
       return (boolean) value;

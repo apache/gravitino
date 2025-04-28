@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
@@ -73,6 +74,33 @@ public class TestAuthorizationExpressionEvaluator {
     }
   }
 
+  @Test
+  public void testEvaluatorWithOwner() {
+    String expression = "METALAKE::OWNER || CATELOG::CREATE_CATALOG";
+    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+        new AuthorizationExpressionEvaluator(expression);
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
+      Map<MetadataObject.Type, NameIdentifier> metadataNames = new HashMap<>();
+      metadataNames.put(
+          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOutOwner"));
+      metadataNames.put(
+          MetadataObject.Type.CATALOG,
+          NameIdentifierUtil.ofCatalog("metalakeWithOwner", "testCatalog"));
+      Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
+      metadataNames.put(
+          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOwner"));
+      Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
+    }
+  }
+
   private static class MockGravitinoAuthorizer implements GravitinoAuthorizer {
 
     @Override
@@ -102,6 +130,15 @@ public class TestAuthorizationExpressionEvaluator {
       return type == MetadataObject.Type.TABLE
           && "testTable".equals(name)
           && privilege == Privilege.Name.SELECT_TABLE;
+    }
+
+    @Override
+    public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+      if (!("tester".equals(principal.getName()) && "metalakeWithOwner".equals(metalake))) {
+        return false;
+      }
+      return Objects.equals(metadataObject.type(), MetadataObject.Type.METALAKE)
+          && Objects.equals("metalakeWithOwner", metadataObject.name());
     }
 
     @Override

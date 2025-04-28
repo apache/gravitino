@@ -58,12 +58,18 @@ public class AuthorizationExpressionConverter {
 
           while (matcher.find()) {
             String metadataType = matcher.group(1);
-            String privilege = matcher.group(2);
-            String replacement =
-                String.format(
-                    "authorizer.authorize(principal,METALAKE,%s,@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
-                    metadataType, privilege);
-            matcher.appendReplacement(result, replacement);
+            String privilegeOrOwner = matcher.group(2);
+            if ("OWNER".equals(privilegeOrOwner)) {
+              String replacement =
+                  String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", metadataType);
+              matcher.appendReplacement(result, replacement);
+            } else {
+              String replacement =
+                  String.format(
+                      "authorizer.authorize(principal,METALAKE_NAME,%s,@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                      metadataType, privilegeOrOwner);
+              matcher.appendReplacement(result, replacement);
+            }
           }
           matcher.appendTail(result);
 
