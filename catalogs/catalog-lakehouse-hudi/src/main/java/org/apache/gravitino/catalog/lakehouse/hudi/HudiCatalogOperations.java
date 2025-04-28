@@ -80,7 +80,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     newConfig.put(
         CatalogUtils.CATALOG_ID_KEY, Objects.nonNull(info) ? String.valueOf(info.id()) : "0");
-    HudiCatalogBackend hudiCatalogBackend = CatalogUtils.loadHudiCatalogBackend(config);
+    HudiCatalogBackend hudiCatalogBackend = CatalogUtils.loadHudiCatalogBackend(newConfig);
     hudiCatalogBackendOps = hudiCatalogBackend.backendOps();
   }
 
