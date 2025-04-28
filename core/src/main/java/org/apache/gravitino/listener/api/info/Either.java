@@ -16,91 +16,147 @@
 package org.apache.gravitino.listener.api.info;
 
 import java.util.Optional;
-import org.glassfish.jersey.internal.guava.Preconditions;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
- * Either represents a value of two possible types (a disjoint union).
+ * Represents a value that can be one of two types.
  *
  * @param <L> Left type
  * @param <R> Right type
  */
 public final class Either<L, R> {
+
   private final Optional<L> left;
   private final Optional<R> right;
 
-  /**
-   * Create a new {@code Either} instance with a left value.
-   *
-   * @param value Left value
-   * @return Either with left value
-   * @param <L> Left type
-   * @param <R> Right type
-   */
-  public static <L, R> Either<L, R> left(L value) {
-    Preconditions.checkArgument(value != null, "Left value cannot be null");
-    return new Either<>(Optional.of(value), Optional.empty());
-  }
-
-  /**
-   * Create a new {@code Either} instance with a right value.
-   *
-   * @param value Right value
-   * @return Either with right value
-   * @param <L> Left type
-   * @param <R> Right type
-   */
-  public static <L, R> Either<L, R> right(R value) {
-    Preconditions.checkArgument(value != null, "Right value cannot be null");
-    return new Either<>(Optional.empty(), Optional.of(value));
-  }
-
-  /** Private constructor. */
   private Either(Optional<L> l, Optional<R> r) {
     left = l;
     right = r;
   }
 
   /**
-   * Returns true if this is a left value.
+   * Maps the Either to a type and returns the resolved value (which may be from the left or the
+   * right value).
    *
-   * @return True if this is a left value
+   * @param lFunc Function that maps the left value if present.
+   * @param rFunc Function that maps the right value if present.
+   * @param <T> Type that both the left and right should be mapped to.
+   * @return Mapped value from either lFunc or rFunc depending on which value is present.
    */
-  public boolean isLeft() {
-    return left.isPresent();
+  public <T> T map(Function<? super L, ? extends T> lFunc, Function<? super R, ? extends T> rFunc) {
+    return left.<T>map(lFunc).orElseGet(() -> right.map(rFunc).get());
   }
 
   /**
-   * Returns true if this is a right value.
+   * Map the left most value and return a new Either reflecting the new types.
    *
-   * @return True if this is a right value
+   * @param lFunc Function that maps the left value if present.
+   * @param <T> New type of left value.
+   * @return New Either bound to the new left type and the same right type.
    */
-  public boolean isRight() {
-    return right.isPresent();
+  public <T> Either<T, R> mapLeft(Function<? super L, ? extends T> lFunc) {
+    return new Either<>(left.map(lFunc), right);
   }
 
   /**
-   * Returns the left value if this is a left value, otherwise throws an exception.
+   * Map the right most value and return a new Either reflecting the new types.
    *
-   * @return Left value
-   * @throws IllegalStateException if this is a right value
+   * @param rFunc Function that maps the right value if present.
+   * @param <T> New type of right value.
+   * @return New Either bound to the same left type and the new right type.
    */
-  public L getLeft() {
-    if (isRight()) {
-      throw new IllegalStateException("Not a left value");
+  public <T> Either<L, T> mapRight(Function<? super R, ? extends T> rFunc) {
+    return new Either<>(left, right.map(rFunc));
+  }
+
+  /**
+   * Apply the consumers to the left or the right value depending on which is present.
+   *
+   * @param lFunc Consumer of left value, invoked if left value is present.
+   * @param rFunc Consumer of right value, invoked if right value is present.
+   */
+  public void apply(Consumer<? super L> lFunc, Consumer<? super R> rFunc) {
+    left.ifPresent(lFunc);
+    right.ifPresent(rFunc);
+  }
+
+  /**
+   * Create a new Either with the left type.
+   *
+   * @param value Left value
+   * @param <L> Left type
+   * @param <R> Right type
+   */
+  public static <L, R> Either<L, R> left(L value) {
+    return new Either<>(Optional.of(value), Optional.empty());
+  }
+
+  /**
+   * Create a new Either with the right type.
+   *
+   * @param value Right value
+   * @param <L> Left type
+   * @param <R> Right type
+   */
+  public static <L, R> Either<L, R> right(R value) {
+    return new Either<>(Optional.empty(), Optional.of(value));
+  }
+
+  /** @return the left value */
+  public Optional<L> left() {
+    return left;
+  }
+
+  /** @return the right value */
+  public Optional<R> right() {
+    return right;
+  }
+
+  /**
+   * Create a new {@code Optional<Either>} from two possibly null values.
+   *
+   * <p>If both values are null, {@link Optional#empty()} is returned. Only one of the left or right
+   * values is allowed to be non-null, otherwise an {@link IllegalArgumentException} is thrown.
+   *
+   * @param left The left value (possibly null)
+   * @param right The right value (possibly null)
+   * @param <L> Left type
+   * @param <R> Right type
+   * @return an Optional Either representing one of the two values or empty if both are null
+   */
+  public static <L, R> Optional<Either<L, R>> fromNullable(L left, R right) {
+    if (left != null && right == null) {
+      return Optional.of(left(left));
     }
-    return left.get();
+    if (left == null && right != null) {
+      return Optional.of(right(right));
+    }
+    if (left == null && right == null) {
+      return Optional.empty();
+    }
+    throw new IllegalArgumentException(
+        String.format(
+            "Only one of either left or right should be non-null. " + "Got (left: %s, right: %s)",
+            left, right));
   }
 
-  /**
-   * Returns the right value if this is a right value, otherwise throws an exception.
-   *
-   * @return Right value
-   * @throws IllegalStateException if this is a left value
-   */
-  public R getRight() {
-    if (isLeft()) {
-      throw new IllegalStateException("Not a right value");
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
-    return right.get();
+    if (!(o instanceof Either)) {
+      return false;
+    }
+
+    Either<?, ?> either = (Either<?, ?>) o;
+
+    return left.equals(either.left) && right.equals(either.right);
+  }
+
+  @Override
+  public int hashCode() {
+    return 31 * left.hashCode() + right.hashCode();
   }
 }
