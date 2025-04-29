@@ -60,7 +60,7 @@ The `gravitino-fileset-example` contains the following code snippets:
    with `location` pointing to an existing HDFS path.
 1. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was not deleted in HDFS.
 
-## How to development Apache Gravitino Python Client
+## How to develop Apache Gravitino Python Client
 
 You can ues any IDE to develop Gravitino Python Client.
 Directly open the client-python module project in the IDE.
@@ -84,6 +84,21 @@ Directly open the client-python module project in the IDE.
    ```shell
    ./gradlew :clients:client-python:build
    ```
+
+   The default Python version is 3.8.
+   If you want to build the Python client for a specify Python version,
+   you can specify the `-PpythonVersion` parameter with the version number.
+   For example, the following command builds the client for Python 3.10.
+
+   ```shell
+   ./gradlew :clients:client-python:build -PpythonVersion=3.10
+   ```
+
+   :::note
+   You may encounter the error: `fatal error: 'cstdlib' file not found` while setting up Python.
+   This might because default Python version (3.8) is too old.
+   In this case, you may want to switch to a newer version like Python 3.9.
+   :::
 
 1. Run unit tests
 
@@ -115,6 +130,77 @@ Directly open the client-python module project in the IDE.
    ```shell
    ./gradlew :clients:client-python:deploy
    ```
+
+   
+## IDE specific settings
+
+### JetBrains IntelliJ IDEA
+
+We use Conda Environment to manage Python Environment.
+To configure the Python SDK, you need to:
+
+1. Make sure you have installed the [Python Plugin](https://plugins.jetbrains.com/plugin/631-python).
+1. Make sure you have built the Python module by following the steps in [Build and testing](#build-and-testing).
+1. Make sure you are at the root directory of Gravitino Git repository. 
+1. Find conda executable by executing this command
+
+   ```shell
+   find $(pwd)/.gradle/python/*/Miniforge3/bin/conda
+   ```
+   
+   The output is similar to this:
+
+   ```console
+   /Users/tiger/gravitino/.gradle/python/MacOSX/Miniforge3/bin/conda
+   ```
+
+1. Find the Python interpreter with this command:
+
+   ```shell
+   find $(pwd)/.gradle/python/*/Miniforge3/envs/*/bin/python
+   ```
+   
+   The output is similar to this:
+
+   ```console
+   /Users/tiger/gravitino/.gradle/python/MacOSX/Miniforge3/envs/python-3.8/bin/python
+   ```
+
+1. Configure the Python SDK, by following guide in [create a conda environment](https://www.jetbrains.com/help/idea/configuring-python-sdk.html#gdizlj_44).
+   When you are at step 5, choose [Existing conda environment](https://www.jetbrains.com/help/idea/configuring-python-sdk.html#existing-conda-environment).
+
+1. Fill in the output from step 4 into *Conda executable* field, step 5 into *Interpreter* field.
+
+   ![Configure conda_env](../assets/configure-conda-env.png)
+
+   You will see a new Python SDK has been added, and it has several packages installed.
+
+   ![Add Platform SDK](../assets/add-platform-sdk.png)
+
+1. Set `clients/client-python` module SDK to the one we set in the previous step.
+
+   ![Configure python module sdk](../assets/configure-python-module-sdk.png)
+
+1. Done! Now, open any Python files and start developing Gravitino Python Client.
+
+### Notes about running the integration tests in IntelliJ IDEA.
+
+Since the integration tests require Gravitino Java distribution,
+you cannot run tests with IntelliJ [Run tests button](https://www.jetbrains.com/help/idea/performing-tests.html).
+You may see errors like this:
+
+```console
+ERROR:tests.integration.integration_test_env:Gravitino Python client integration test must configure `GRAVITINO_HOME`
+
+Process finished with exit code 0
+```
+
+You need to execute this gradle task using the [Gradle Plugin](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
+or run the intergration tests from the command line.
+
+```shell
+./gradlew clients:client-python:integrationTest
+```
 
 ## Resources
 

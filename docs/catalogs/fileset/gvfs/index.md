@@ -249,7 +249,7 @@ GVFS internally manages the path mapping and convert automatically.
   <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>fs.gravitino.client.request.header.</tt><td>
+  <td><tt>fs.gravitino.client.request.header.</tt></td>
   <td>
     The configuration key prefix for the Gravitino client request header.
     You can set the request header for the Gravitino client.
@@ -742,7 +742,7 @@ Then you need to completely replace the files in `${HADOOP_HOME}/lib/native`.
   <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>client_request_header_</tt><td>
+  <td><tt>client_request_header_</tt></td>
   <td>
     The configuration key prefix for the Gravitino client request header.
     You can set the request header for the Gravitino client.
