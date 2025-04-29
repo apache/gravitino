@@ -226,6 +226,17 @@ GVFS internally manages the path mapping and convert automatically.
   <td>No</td>
   <td>0.9.0-incubating</td>
 </tr>
+<tr>
+  <td><tt>fs.gravitino.operations.class</tt></td>
+  <td>
+    The operations class that provides the FS operations for the Gravitino Virtual File System.
+    Users can extend the `BaseGVFSOperations` interface to implement their own operations,
+    and then set the class name using this configuration item to use their custom FS operations.
+  </td>
+  <td>`org.apache.gravitino.filesystem.hadoop.DefaultGVFSOperations`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
 </tbody>
 </table>
 
@@ -688,13 +699,13 @@ Then you need to completely replace the files in `${HADOOP_HOME}/lib/native`.
   <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>fs.gravitino.operations.class</tt></td>
+  <td><tt>operations_class</tt></td>
   <td>
     The operations class that provides the FS operations for the Gravitino Virtual File System.
     Users can extend the `BaseGVFSOperations` interface to implement their own operations,
     and then set the class name using this configuration item to use their custom FS operations.
   </td>
-  <td>`org.apache.gravitino.filesystem.hadoop.DefaultGVFSOperations`</td>
+  <td>`gravitino.filesystem.gvfs_default_operations.DefaultGVFSOperations`</td>
   <td>No</td>
   <td>`0.9.0-incubating`</td>
 </tr>
