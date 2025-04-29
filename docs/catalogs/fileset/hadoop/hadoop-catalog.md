@@ -102,6 +102,20 @@ the Hadoop catalog has the following properties:
   <td>No</td>
   <td>`0.9.0-incubating`</td>
 </tr>
+<tr>
+  <td><tt>fileset-cache-eviction-interval-ms</tt></td>
+  <td>The interval in milliseconds to evict the fileset cache, -1 means never evict.</td>
+  <td>`3600000`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>fileset-cache-max-size</tt></td>
+  <td>The maximum number of filesets the cache may contain, -1 means no limit.</td>
+  <td>`200000`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
 </tbody>
 </table>
 
