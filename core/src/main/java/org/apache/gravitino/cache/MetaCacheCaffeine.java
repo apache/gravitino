@@ -180,9 +180,9 @@ public class MetaCacheCaffeine extends BaseMetaCache {
     Set<CacheKey> removedKeys = Sets.newHashSet();
     Set<Entity> removedEntities = Sets.newHashSet();
 
-    // 遍历前缀树
+    //  Traverse the prefix tree
     for (NameIdentifier ident : prefixMap.values()) {
-      // 1. 添加所有要删除的缓存
+      // 1. Add all the caches you want to delete
       CacheKey childCacheKey = map2.get(ident);
       Entity childEntity = cache2.getIfPresent(childCacheKey);
 
@@ -190,7 +190,7 @@ public class MetaCacheCaffeine extends BaseMetaCache {
       removedEntities.add(childEntity);
     }
 
-    // 2. 删除缓存
+    // 2. Deleting the cache
     cache1.invalidateAll(removedEntities);
     cache2.invalidateAll(removedKeys);
   }
@@ -205,17 +205,17 @@ public class MetaCacheCaffeine extends BaseMetaCache {
     Set<NameIdentifier> removedNameKeys = Sets.newHashSet();
 
     for (NameIdentifier ident : prefixMap.values()) {
-      // 1. 添加前缀树索引
+      // 1. Add the prefix tree index
       removedIndexKeys.add(ident.toString());
-      // 2. 添加 ID 索引
+      // 2. Adding an ID index
       CacheKey childCacheKey = map2.get(ident);
       removedIdKeys.add(Pair.of(childCacheKey.id(), childCacheKey.entityType()));
 
-      // 3. 添加 NameIdentifier 索引
+      // 3. Add the NameIdentifier index
       removedNameKeys.add(ident);
     }
 
-    // 删除索引
+    // Deleting an index
     map1.keySet().removeAll(removedIdKeys);
     map2.keySet().removeAll(removedNameKeys);
     for (String removedIndexKey : removedIndexKeys) {
