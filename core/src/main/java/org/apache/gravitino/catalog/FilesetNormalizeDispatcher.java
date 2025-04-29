@@ -126,4 +126,9 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
     Capability capabilities = getCapability(filesetIdents[0], catalogManager);
     return applyCaseSensitive(filesetIdents, Capability.Scope.FILESET, capabilities);
   }
+
+  @Override
+  public String listFiles(NameIdentifier ident) {
+    return dispatcher.listFiles(normalizeCaseSensitive(ident));
+  }
 }

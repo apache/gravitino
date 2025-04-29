@@ -42,6 +42,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.ListFilesResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -378,6 +379,41 @@ class FilesetCatalog extends BaseSchemaCatalog
 
       return new FilesetCatalog(
           namespace, name, type, provider, comment, properties, audit, restClient);
+    }
+  }
+
+  @VisibleForTesting
+  static String formatListFileRequestPath(Namespace ns, String name) {
+    Namespace schemaNs = Namespace.of(ns.level(0), ns.level(1));
+    return new StringBuilder()
+        .append(formatSchemaRequestPath(schemaNs))
+        .append("/")
+        .append(RESTUtils.encodeString(ns.level(2)))
+        .append("/filesets/")
+        .append(RESTUtils.encodeString(name))
+        .append("/listFiles")
+        .toString();
+  }
+
+  @Override
+  public String listFiles(NameIdentifier ident) {
+    checkFilesetNameIdentifier(ident);
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
+
+    try {
+      CallerContext callerContext = CallerContext.CallerContextHolder.get();
+      ListFilesResponse resp =
+          restClient.get(
+              formatListFileRequestPath(fullNamespace, ident.name()),
+              Collections.emptyMap(),
+              ListFilesResponse.class,
+              callerContext != null ? callerContext.context() : Collections.emptyMap(),
+              ErrorHandlers.filesetErrorHandler());
+      resp.validate();
+      return resp.getFileList();
+    } finally {
+      // Clear the caller context
+      CallerContext.CallerContextHolder.remove();
     }
   }
 }

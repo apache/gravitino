@@ -68,6 +68,7 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.file.ListFileUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -1296,6 +1297,33 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               timeoutSeconds,
               HadoopCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
+    }
+  }
+
+  @Override
+  public String listFiles(NameIdentifier ident) {
+    try {
+
+      FilesetEntity filesetEntity =
+          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+      Path filesetPath = new Path(filesetEntity.storageLocation());
+
+      StringBuilder stb = new StringBuilder();
+      // For managed fileset, we should delete the related files.
+      FileSystem fs = getFileSystem(filesetPath, conf);
+      if (fs.exists(filesetPath)) {
+        LOG.info("********fileset.listFiles get path={},START:********", filesetPath);
+        String fileTreeStr = ListFileUtils.buildTreeFile(fs, filesetPath);
+        LOG.info("********fileset.listFiles get path={},END:********", filesetPath);
+        stb.append(fileTreeStr);
+      } else {
+        LOG.warn("Fileset {} location {} does not exist", ident, filesetPath);
+      }
+
+      return stb.toString();
+    } catch (Exception e) {
+      LOG.error("listFiles error", e);
+      return "";
     }
   }
 }

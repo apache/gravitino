@@ -125,4 +125,9 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
       throws NoSuchFilesetException, NoSuchLocationNameException {
     return dispatcher.getFileLocation(ident, subPath, locationName);
   }
+
+  @Override
+  public String listFiles(NameIdentifier ident) {
+    return dispatcher.listFiles(ident);
+  }
 }

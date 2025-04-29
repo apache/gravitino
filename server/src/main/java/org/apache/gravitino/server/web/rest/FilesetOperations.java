@@ -51,9 +51,12 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.ListFilesResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.Utils;
@@ -290,6 +293,32 @@ public class FilesetOperations {
     } finally {
       // Clear the caller context
       CallerContext.CallerContextHolder.remove();
+    }
+  }
+
+  @GET
+  @Path("{fileset}/listFiles")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "listFiles." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "listFiles", absolute = true)
+  public Response listFiles(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      @PathParam("fileset") String fileset) {
+    LOG.info("Received listFiles request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
+            String result =
+                TreeLockUtils.doWithTreeLock(
+                    ident, LockType.READ, () -> dispatcher.listFiles(ident));
+            return Utils.ok(new ListFilesResponse(result));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
     }
   }
 }

@@ -185,4 +185,6 @@ public interface FilesetCatalog {
       throws NoSuchFilesetException, NoSuchLocationNameException {
     throw new UnsupportedOperationException("Not implemented");
   }
+
+  String listFiles(NameIdentifier ident);
 }

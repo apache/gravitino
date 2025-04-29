@@ -43,6 +43,8 @@ import org.apache.gravitino.listener.api.event.DropFilesetPreEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationPreEvent;
+import org.apache.gravitino.listener.api.event.ListFilesEvent;
+import org.apache.gravitino.listener.api.event.ListFilesFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetPreEvent;
@@ -188,6 +190,21 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
       eventBus.dispatchEvent(
           new GetFileLocationFailureEvent(
               PrincipalUtils.getCurrentUserName(), ident, subPath, locationName, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public String listFiles(NameIdentifier ident) {
+
+    try {
+      String listFiles = dispatcher.listFiles(ident);
+      eventBus.dispatchEvent(
+          new ListFilesEvent(PrincipalUtils.getCurrentUserName(), ident, listFiles));
+      return listFiles;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListFilesFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
       throw e;
     }
   }

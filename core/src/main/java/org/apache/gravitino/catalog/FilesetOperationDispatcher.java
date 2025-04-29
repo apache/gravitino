@@ -251,4 +251,12 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 c -> c.doWithFilesetOps(f -> f.getFileLocation(ident, subPath, locationName)),
                 NonEmptyEntityException.class));
   }
+
+  @Override
+  public String listFiles(NameIdentifier ident) throws NoSuchFilesetException {
+    return doWithCatalog(
+        getCatalogIdentifier(ident),
+        c -> c.doWithFilesetOps(f -> f.listFiles(ident)),
+        NonEmptyEntityException.class);
+  }
 }

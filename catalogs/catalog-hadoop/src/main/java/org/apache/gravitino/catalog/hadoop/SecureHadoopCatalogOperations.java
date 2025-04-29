@@ -244,6 +244,11 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
+  public String listFiles(NameIdentifier ident) throws NoSuchFilesetException {
+    return hadoopCatalogOperations.listFiles(ident);
+  }
+
+  @Override
   public void close() throws IOException {
     hadoopCatalogOperations.close();
 

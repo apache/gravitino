@@ -1284,4 +1284,9 @@ public class TestCatalogOperations
         .sorted(Comparator.comparingInt(TestColumn::position))
         .toArray(TestColumn[]::new);
   }
+
+  @Override
+  public String listFiles(NameIdentifier ident) {
+    return "";
+  }
 }
