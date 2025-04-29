@@ -91,6 +91,17 @@ the Hadoop catalog has the following properties:
   <td>No</td>
   <td>`0.8.0-incubating`</td>
 </tr>
+<tr>
+  <td><tt>disable-filesystem-ops</tt></td>
+  <td>
+    The configuration to disable file system operations at the server side.
+    If set to true, the Hadoop catalog at the server side will not create, drop files or folder
+    when the schema, fileset is created, dropped.
+  </td>
+  <td>`false`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
 </tbody>
 </table>
 
