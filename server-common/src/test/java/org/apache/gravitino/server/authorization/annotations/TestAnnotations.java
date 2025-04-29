@@ -45,7 +45,7 @@ public class TestAnnotations {
 
   // This class is used to test the AuthorizeApi annotation.
   // 1. ResourceAuthorizeApi
-  // 2. ExpressionsAuthorizeApi
+  // 2. AuthorizationExpression
   static class TestAuthorizeAnnotationClass {
     @AuthorizationMetadataPrivileges(
         privileges = {Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG},
