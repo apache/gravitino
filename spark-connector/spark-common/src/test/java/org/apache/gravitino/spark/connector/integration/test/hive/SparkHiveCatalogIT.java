@@ -453,4 +453,21 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("gravitino_it_test", (String) row[1]);
     Assertions.assertEquals("2", row[2]);
   }
+
+  @Test
+  void testCreateTableWithTimestamp() {
+    String databaseName = "test_db_with_timestamp";
+    String tableName = "test_table_with_timestamp";
+    createDatabaseIfNotExists(databaseName, getProvider());
+    sql(String.format("USE %s", databaseName));
+    sql(String.format("CREATE TABLE %s (id int, ts timestamp)", tableName));
+    sql(String.format("describe extended %s", tableName));
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    List<SparkColumnInfo> expectedSparkInfo =
+        Arrays.asList(
+            SparkColumnInfo.of("id", DataTypes.IntegerType),
+            SparkColumnInfo.of("ts", DataTypes.TimestampType));
+    checkTableColumns(tableName, expectedSparkInfo, tableInfo);
+  }
 }
