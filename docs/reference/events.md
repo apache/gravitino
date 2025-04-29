@@ -396,6 +396,19 @@ It also triggers a failure event if the operation failed.
   </td>
   <td>0.9.0-incubating</td>
 </tr>
+<tr>
+  <td>role operation</td>
+  <td>
+    `CreateRoleEvent`<br/>
+    `DeleteRoleEvent`<br/>
+    `GetRoleEvent`<br/>
+    `GrantPrivilegesEvent`<br/>
+    `ListRoleNamesEvent`<br/>
+    `RevokePrivilegesEvent`<br/>
+  </td>
+  <td>0.9.0-incubating</td>
+</tr>
+
 </tbody>
 </table>
 
