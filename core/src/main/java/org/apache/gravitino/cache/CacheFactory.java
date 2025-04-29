@@ -30,8 +30,6 @@ public class CacheFactory {
 
   static {
     ServiceLoader<CacheProvider> loader = ServiceLoader.load(CacheProvider.class);
-    boolean b = loader.iterator().hasNext();
-    System.out.println(b);
     for (CacheProvider provider : loader) {
       PROVIDERS.put(provider.name(), provider);
     }
