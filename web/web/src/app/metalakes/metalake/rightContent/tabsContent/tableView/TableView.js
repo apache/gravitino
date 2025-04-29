@@ -44,6 +44,8 @@ import CreateSchemaDialog from '../../CreateSchemaDialog'
 import CreateFilesetDialog from '../../CreateFilesetDialog'
 import CreateTopicDialog from '../../CreateTopicDialog'
 import CreateTableDialog from '../../CreateTableDialog'
+import RegisterModelDialog from '../../RegisterModelDialog'
+import LinkVersionDialog from '../../LinkVersionDialog'
 
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import {
@@ -120,6 +122,8 @@ const TableView = () => {
   const [openFilesetDialog, setOpenFilesetDialog] = useState(false)
   const [openTopicDialog, setOpenTopicDialog] = useState(false)
   const [openTableDialog, setOpenTableDialog] = useState(false)
+  const [openModelDialog, setOpenModelDialog] = useState(false)
+  const [openModelVersionDialog, setOpenModelVersionDialog] = useState(false)
   const [dialogData, setDialogData] = useState({})
   const [dialogType, setDialogType] = useState('create')
   const [isHideEdit, setIsHideEdit] = useState(true)
@@ -132,7 +136,7 @@ const TableView = () => {
       const isHideAction =
         (['lakehouse-hudi', 'kafka'].includes(currentCatalog?.provider) && paramsSize == 3) ||
         (currentCatalog?.provider === 'lakehouse-hudi' && paramsSize == 4)
-      setIsHideEdit(isHideAction || type === 'model')
+      setIsHideEdit(isHideAction)
       setIsHideDrop(isHideAction)
     }
   }, [store.catalogs, store.catalogs.length, paramsSize, catalog, type])
@@ -637,6 +641,32 @@ const TableView = () => {
         }
         break
       }
+      case 'model': {
+        if (metalake && catalog && schema) {
+          const [err, res] = await to(getModelDetailsApi({ metalake, catalog, schema, model: data.row?.name }))
+          if (err || !res) {
+            throw new Error(err)
+          }
+
+          setDialogType('update')
+          setDialogData(res.model)
+          setOpenModelDialog(true)
+        }
+        break
+      }
+      case 'version': {
+        if (metalake && catalog && schema && model) {
+          const [err, res] = await to(getVersionDetailsApi({ metalake, catalog, schema, model, version: data.row?.name }))
+          if (err || !res) {
+            throw new Error(err)
+          }
+
+          setDialogType('update')
+          setDialogData(res.modelVersion)
+          setOpenModelVersionDialog(true)
+        }
+        break
+      }
       default:
         return
     }
@@ -779,6 +809,10 @@ const TableView = () => {
       <CreateTopicDialog open={openTopicDialog} setOpen={setOpenTopicDialog} data={dialogData} type={dialogType} />
 
       <CreateTableDialog open={openTableDialog} setOpen={setOpenTableDialog} data={dialogData} type={dialogType} />
+
+      <RegisterModelDialog open={openModelDialog} setOpen={setOpenModelDialog} data={dialogData} type={dialogType} />
+
+      <LinkVersionDialog open={openModelVersionDialog} setOpen={setOpenModelVersionDialog} data={dialogData} type={dialogType} />
     </Box>
   )
 }

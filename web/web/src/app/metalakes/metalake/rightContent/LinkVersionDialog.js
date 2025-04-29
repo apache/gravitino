@@ -40,12 +40,12 @@ import {
 import Icon from '@/components/Icon'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { linkVersion } from '@/lib/store/metalakes'
+import { linkVersion, updateVersion } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
-
+import { genUpdates } from '@/lib/utils'
 import { groupBy } from 'lodash-es'
 import { keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
@@ -224,6 +224,27 @@ const LinkVersionDialog = props => {
               handleClose()
             }
           })
+        } else {
+          const reqData = { updates: genUpdates(cacheData, schemaData) }
+          console.log('reqData', reqData)
+
+          if (reqData.updates.length !== 0) {
+            dispatch(
+              updateVersion({
+                metalake,
+                catalog,
+                type: catalogType,
+                schema: schemaName,
+                model,
+                version: cacheData.version,
+                data: reqData
+              })
+            ).then(res => {
+              if (!res.payload?.err) {
+                handleClose()
+              }
+            })
+          }
         }
       })
       .catch(err => {
@@ -242,6 +263,10 @@ const LinkVersionDialog = props => {
       setCacheData(data)
       setValue('uri', data.uri)
       setValue('comment', data.comment)
+
+      data.aliases.forEach((alias, index) => {
+        setValue(`aliases.${index}.name`, alias)
+      })
 
       const propsItems = Object.entries(properties).map(([key, value]) => {
         return {
@@ -292,7 +317,6 @@ const LinkVersionDialog = props => {
                       label='URI'
                       onChange={onChange}
                       placeholder=''
-                      disabled={type === 'update'}
                       error={Boolean(errors.uri)}
                       data-refer='link-uri-field'
                     />
@@ -323,6 +347,7 @@ const LinkVersionDialog = props => {
                                   field.onChange(event)
                                   trigger('aliases')
                                 }}
+                                disabled={type === 'update'}
                                 label={`Alias ${index + 1}`}
                                 error={!!errors.aliases?.[index]?.name || !!errors.aliases?.message}
                                 helperText={errors.aliases?.[index]?.name?.message || errors.aliases?.message}
@@ -334,13 +359,17 @@ const LinkVersionDialog = props => {
                         <Box>
                           {index === 0 ? (
                             <Box sx={{ minWidth: 40 }}>
-                              <IconButton onClick={() => append({ name: '' })}>
+                              <IconButton sx={{'cursor': type === 'update' ? 'not-allowed': 'pointer'}} onClick={() => {
+                                if (type === 'update') return
+                                append({ name: '' })}}>
                                 <Icon icon='mdi:plus-circle-outline' />
                               </IconButton>
                             </Box>
                           ) : (
                             <Box sx={{ minWidth: 40 }}>
-                              <IconButton onClick={() => remove(index)}>
+                              <IconButton sx={{'cursor': type === 'update' ? 'not-allowed': 'pointer'}} onClick={() => {
+                                if (type === 'update') return
+                                remove(index)}}>
                                 <Icon icon='mdi:minus-circle-outline' />
                               </IconButton>
                             </Box>
