@@ -656,7 +656,9 @@ const TableView = () => {
       }
       case 'version': {
         if (metalake && catalog && schema && model) {
-          const [err, res] = await to(getVersionDetailsApi({ metalake, catalog, schema, model, version: data.row?.name }))
+          const [err, res] = await to(
+            getVersionDetailsApi({ metalake, catalog, schema, model, version: data.row?.name })
+          )
           if (err || !res) {
             throw new Error(err)
           }
@@ -812,7 +814,12 @@ const TableView = () => {
 
       <RegisterModelDialog open={openModelDialog} setOpen={setOpenModelDialog} data={dialogData} type={dialogType} />
 
-      <LinkVersionDialog open={openModelVersionDialog} setOpen={setOpenModelVersionDialog} data={dialogData} type={dialogType} />
+      <LinkVersionDialog
+        open={openModelVersionDialog}
+        setOpen={setOpenModelVersionDialog}
+        data={dialogData}
+        type={dialogType}
+      />
     </Box>
   )
 }

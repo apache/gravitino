@@ -359,17 +359,25 @@ const LinkVersionDialog = props => {
                         <Box>
                           {index === 0 ? (
                             <Box sx={{ minWidth: 40 }}>
-                              <IconButton sx={{'cursor': type === 'update' ? 'not-allowed': 'pointer'}} onClick={() => {
-                                if (type === 'update') return
-                                append({ name: '' })}}>
+                              <IconButton
+                                sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
+                                onClick={() => {
+                                  if (type === 'update') return
+                                  append({ name: '' })
+                                }}
+                              >
                                 <Icon icon='mdi:plus-circle-outline' />
                               </IconButton>
                             </Box>
                           ) : (
                             <Box sx={{ minWidth: 40 }}>
-                              <IconButton sx={{'cursor': type === 'update' ? 'not-allowed': 'pointer'}} onClick={() => {
-                                if (type === 'update') return
-                                remove(index)}}>
+                              <IconButton
+                                sx={{ cursor: type === 'update' ? 'not-allowed' : 'pointer' }}
+                                onClick={() => {
+                                  if (type === 'update') return
+                                  remove(index)
+                                }}
+                              >
                                 <Icon icon='mdi:minus-circle-outline' />
                               </IconButton>
                             </Box>
