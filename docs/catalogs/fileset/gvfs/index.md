@@ -207,6 +207,25 @@ GVFS internally manages the path mapping and convert automatically.
   <td>No</td>
   <td>0.5.0</td>
 </tr>
+<tr>
+  <td><tt>fs.gravitino.current.location.name</tt></td>
+  <td>
+    The configuration used to select the location of the fileset.
+    If this configuration is not set, the value of environment variable configured by
+    `fs.gravitino.current.location.env.var` will be checked.
+    If neither is set, the value of fileset property `default-location-name` will be used as the location name.
+  </td>
+  <td>the value of fileset property `default-location-name`</td>
+  <td>No</td>
+  <td>0.9.0-incubating</td>
+</tr>
+<tr>
+  <td><tt>fs.gravitino.current.location.name.env.var</tt></td>
+  <td>The environment variable name to get the current location name.</td>
+  <td>`CURRENT_LOCATION_NAME`</td>
+  <td>No</td>
+  <td>0.9.0-incubating</td>
+</tr>
 </tbody>
 </table>
 
@@ -648,6 +667,25 @@ Then you need to completely replace the files in `${HADOOP_HOME}/lib/native`.
   <td>`0.5`</td>
   <td>No</td>
   <td>`0.8.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>current_location_name</tt></td>
+  <td>
+    The configuration used to select the location of the fileset.
+    If this configuration is not set, the value of environment variable configured by
+    `current_location_name_env_var` will be checked.
+    If neither is set, the value of fileset property `default-location-name` will be used as the location name.
+  </td>
+  <td>the value of fileset property `default-location-name`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>current_location_name_env_var</tt></td>
+  <td>The environment variable name to get the current location name.</td>
+  <td>`CURRENT_LOCATION_NAME`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
 </tr>
 </tbody>
 </table>
