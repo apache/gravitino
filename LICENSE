@@ -287,6 +287,9 @@
    ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/KafkaEmbedded.java
    ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/ZooKeeperEmbedded.java
 
+   OpenLineage
+   ./lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java
+
    Trino
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CloseableGroup.java
    ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java

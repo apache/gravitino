@@ -557,6 +557,7 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "docs/**/*.md",
+    "lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java",
     "spark-connector/spark-common/src/test/resources/**",
     "web/web/.**",
     "web/web/dist/**/*",
