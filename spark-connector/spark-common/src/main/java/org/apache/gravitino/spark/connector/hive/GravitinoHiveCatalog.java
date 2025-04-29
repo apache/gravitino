@@ -72,4 +72,9 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   protected SparkTransformConverter getSparkTransformConverter() {
     return new SparkTransformConverter(false);
   }
+
+  @Override
+  protected SparkTypeConverter getSparkTypeConverter() {
+    return new SparkHiveTypeConverter();
+  }
 }
