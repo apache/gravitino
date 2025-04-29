@@ -258,6 +258,13 @@ GVFS internally manages the path mapping and convert automatically.
   <td>No</td>
   <td>`0.9.0-incubating`</td>
 </tr>
+<tr>
+  <td><tt>fs.gravitino.enableCredentialVending</tt></td>
+  <td>Whether to enable credential vending for the Gravitino Virtual File System. </td>
+  <td>`false`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
 </tbody>
 </table>
 
@@ -751,6 +758,14 @@ Then you need to completely replace the files in `${HADOOP_HOME}/lib/native`.
   <td>No</td>
   <td>`0.9.0-incubating`</td>
 </tr>
+<tr>
+  <td><tt>enable_credential_vending</tt></td>
+  <td>Whether to enable credential vending for the Gravitino Virtual File System.</td>
+  <td>`false`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+
 </tbody>
 </table>
 
