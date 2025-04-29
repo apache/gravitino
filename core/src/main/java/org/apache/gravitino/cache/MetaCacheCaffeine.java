@@ -44,10 +44,6 @@ public class MetaCacheCaffeine extends BaseMetaCache {
   private final Map<NameIdentifier, CacheKey> map2;
   private final Trie<String, NameIdentifier> indexTree;
 
-  public MetaCacheCaffeine() {
-    this(new CacheConfig());
-  }
-
   public MetaCacheCaffeine(CacheConfig cacheConfig) {
     this(cacheConfig, null);
   }
