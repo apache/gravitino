@@ -99,7 +99,7 @@ public class TestTypeConverter {
             UnsupportedOperationException.class,
             () -> HiveDataTypeConverter.CONVERTER.fromGravitino(timestampWithTimeZone));
     Assertions.assertEquals(
-        "Unsupported conversion: Hive does not support TIMESTAMP WITH TIMEZONE type.",
+        "Unsupported conversion: Please use the TIMESTAMP WITHOUT TIMEZONE type. TIMESTAMP WITH TIMEZONE type is not supported by Hive.",
         exception.getMessage());
   }
 

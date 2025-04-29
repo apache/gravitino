@@ -89,9 +89,11 @@ public class HiveDataTypeConverter implements DataTypeConverter<TypeInfo, String
       case TIMESTAMP:
         if (type instanceof Types.TimestampType) {
           Types.TimestampType tsType = (Types.TimestampType) type;
+          // Timestamps are interpreted to be timezoneless in Hive:
+          // https://hive.apache.org/docs/latest/languagemanual-types_27838462/#timestamps
           if (tsType.hasTimeZone()) {
             throw new UnsupportedOperationException(
-                "Unsupported conversion: Hive does not support TIMESTAMP WITH TIMEZONE type.");
+                "Unsupported conversion: Please use the TIMESTAMP WITHOUT TIMEZONE type. TIMESTAMP WITH TIMEZONE type is not supported by Hive.");
           }
           return getPrimitiveTypeInfo(TIMESTAMP_TYPE_NAME);
         }
