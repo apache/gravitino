@@ -55,12 +55,13 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
   # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
   docker builder ls
   # docker builder prune -f
-  docker context use default
-  docker builder use default
+  # docker context use default
+  # docker builder use default
 
   export DOCKER_BUILDKIT=1
   export COMPOSE_DOCKER_CLI_BUILD=1
   export RANGER_DB_TYPE=mysql
+  export BUILDX_BUILDER=default
 
   # run docker compose command to build packages
   docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
@@ -76,8 +77,11 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
 
   cp ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker/dist/* ${ranger_dir}/packages
 
-  # change back to gravitino-builder
-  # docker builder use gravitino-builder
+  # remove export
+  export -n DOCKER_BUILDKIT
+  export -n COMPOSE_DOCKER_CLI_BUILD
+  export -n RANGER_DB_TYPE
+  export -n BUILDX_BUILDER
 fi
 
 if [ ! -f "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ]; then
