@@ -21,8 +21,9 @@ package org.apache.gravitino.model;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -88,9 +89,12 @@ public interface ModelVersionChange {
    * @return A new ModelVersionChange instance for updating the aliases of a model version.
    */
   static ModelVersionChange updateAliases(String[] aliasesToAdd, String[] aliasesToDelete) {
+    String[] toAdd = aliasesToAdd == null ? new String[0] : aliasesToAdd;
+    String[] toDelete = aliasesToDelete == null ? new String[0] : aliasesToDelete;
+
     return new UpdateAliases(
-        Arrays.stream(aliasesToAdd).collect(Collectors.toList()),
-        Arrays.stream(aliasesToDelete).collect(Collectors.toList()));
+        Arrays.stream(toAdd).collect(Collectors.toList()),
+        Arrays.stream(toDelete).collect(Collectors.toList()));
   }
 
   /** A ModelVersionChange to update the model version comment. */
@@ -367,11 +371,13 @@ public interface ModelVersionChange {
      * @param aliasesToDelete the aliases to remove, or null for none
      */
     public UpdateAliases(List<String> aliasesToAdd, List<String> aliasesToDelete) {
-      this.aliasesToAdd =
-          ImmutableSortedSet.copyOf(aliasesToAdd != null ? aliasesToAdd : Lists.newArrayList());
-      this.aliasesToDelete =
-          ImmutableSortedSet.copyOf(
-              aliasesToDelete != null ? aliasesToDelete : Lists.newArrayList());
+      Set<String> toAdd =
+          Sets.newHashSet(aliasesToAdd != null ? aliasesToAdd : Collections.emptyList());
+      Set<String> toDelete =
+          Sets.newHashSet(aliasesToDelete != null ? aliasesToDelete : Collections.emptyList());
+
+      this.aliasesToAdd = ImmutableSortedSet.copyOf(Sets.difference(toAdd, toDelete));
+      this.aliasesToDelete = ImmutableSortedSet.copyOf(Sets.difference(toDelete, toAdd));
     }
 
     /**

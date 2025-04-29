@@ -204,7 +204,7 @@ public class TestModelVersionChange {
   }
 
   @Test
-  void testCreateUpdateVersionAliasUseStaticMethod1() {
+  void testCreateUpdateVersionAliasUseStaticMethod() {
     String[] aliasesToAdd = {"alias add 1", "alias add 2"};
     String[] aliasesToDelete = {"alias delete 1", "alias delete 2"};
 
@@ -226,6 +226,19 @@ public class TestModelVersionChange {
             + "AliasToDelete: (alias "
             + "delete 1,alias delete 2)",
         updateAliasesChange.toString());
+  }
+
+  @Test
+  void testCreateUpdateVersionAliasUseStaticMethodWithNull() {
+    ModelVersionChange modelVersionChange = ModelVersionChange.updateAliases(null, null);
+    Assertions.assertEquals(ModelVersionChange.UpdateAliases.class, modelVersionChange.getClass());
+
+    ModelVersionChange.UpdateAliases updateAliasesChange =
+        (ModelVersionChange.UpdateAliases) modelVersionChange;
+    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToAdd());
+    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToDelete());
+    Assertions.assertEquals(
+        "UpdateAlias AliasToAdd: () AliasToDelete: ()", updateAliasesChange.toString());
   }
 
   @Test

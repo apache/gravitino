@@ -35,6 +35,7 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -1490,7 +1491,6 @@ public class TestModelCatalogOperations {
     String versionComment = "version1 comment";
     String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias2", "alias3"};
-    String[] newVersionAliases = new String[] {"alias1", "alias2"};
 
     NameIdentifier modelIdent =
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
@@ -1526,13 +1526,17 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, updatedModelVersion.version());
     Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
-    Assertions.assertArrayEquals(newVersionAliases, updatedModelVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(updatedModelVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
 
     // Reload the version
     ModelVersion reloadVersion = ops.getModelVersion(modelIdent, 0);
     Assertions.assertEquals(0, reloadVersion.version());
-    Assertions.assertArrayEquals(newVersionAliases, reloadVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(reloadVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());
@@ -1549,7 +1553,6 @@ public class TestModelCatalogOperations {
     String versionComment = "version1 comment";
     String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias2", "alias3"};
-    String[] newVersionAliases = new String[] {"alias1", "alias2"};
 
     NameIdentifier modelIdent =
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
@@ -1585,13 +1588,17 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, updatedModelVersion.version());
     Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
-    Assertions.assertArrayEquals(newVersionAliases, updatedModelVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(updatedModelVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
 
     // Reload the version
     ModelVersion reloadVersion = ops.getModelVersion(modelIdent, "alias2");
     Assertions.assertEquals(0, reloadVersion.version());
-    Assertions.assertArrayEquals(newVersionAliases, reloadVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(reloadVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());

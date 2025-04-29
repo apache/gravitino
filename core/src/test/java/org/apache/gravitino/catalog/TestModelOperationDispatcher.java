@@ -24,6 +24,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Arrays;
@@ -880,7 +881,9 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
     Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
-    Assertions.assertArrayEquals(new String[] {"alias1", "alias2"}, alteredModelVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(alteredModelVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
 
@@ -888,7 +891,9 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion reloadedModelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
     Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
-    Assertions.assertArrayEquals(new String[] {"alias1", "alias2"}, reloadedModelVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(reloadedModelVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
   }
@@ -925,7 +930,9 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
     Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
-    Assertions.assertArrayEquals(new String[] {"alias1", "alias2"}, alteredModelVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(alteredModelVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
 
@@ -934,7 +941,9 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
         modelOperationDispatcher.getModelVersion(modelIdent, "alias1");
     Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
-    Assertions.assertArrayEquals(new String[] {"alias1", "alias2"}, reloadedModelVersion.aliases());
+    Assertions.assertEquals(
+        ImmutableSet.of("alias1", "alias2"),
+        Arrays.stream(reloadedModelVersion.aliases()).collect(Collectors.toSet()));
     Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
   }
