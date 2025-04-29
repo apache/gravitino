@@ -19,20 +19,19 @@
 
 package org.apache.gravitino.cache;
 
+import com.google.common.base.Preconditions;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 
 public abstract class BaseMetaCache implements MetaCache {
   protected final EntityStore entityStore;
 
   public BaseMetaCache() {
-    // TODO - get entity store from GravitinoEnv
-    this(null);
+    this(GravitinoEnv.getInstance().entityStore());
   }
 
   public BaseMetaCache(EntityStore entityStore) {
-    if (entityStore == null) {
-      // TODO - create entity store from GravitinoEnv
-    }
+    Preconditions.checkNotNull(entityStore, "EntityStore cannot be null");
     this.entityStore = entityStore;
   }
 }
