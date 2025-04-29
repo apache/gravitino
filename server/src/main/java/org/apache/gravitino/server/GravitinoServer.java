@@ -20,6 +20,7 @@ package org.apache.gravitino.server;
 
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
 import javax.servlet.Servlet;
@@ -37,6 +38,7 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ConfigServlet;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -161,7 +163,12 @@ public class GravitinoServer extends ResourceConfig {
     server.join();
   }
 
-  public void stop() {
+  public void stop() throws IOException {
+    GravitinoAuthorizer gravitinoAuthorizer =
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.close();
+    }
     server.stop();
     gravitinoEnv.shutdown();
   }

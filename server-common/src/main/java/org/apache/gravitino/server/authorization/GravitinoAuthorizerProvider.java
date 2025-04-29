@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization;
 
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.ServerConfig;
 
 /**
@@ -31,7 +32,7 @@ public class GravitinoAuthorizerProvider {
 
   private GravitinoAuthorizerProvider() {}
 
-  private GravitinoAuthorizer gravitinoAuthorizer;
+  private volatile GravitinoAuthorizer gravitinoAuthorizer;
 
   /**
    * Instantiate the {@link GravitinoAuthorizer}, and then execute the initialize method in the
@@ -40,7 +41,21 @@ public class GravitinoAuthorizerProvider {
    * @param serverConfig Gravitino server config
    */
   public void initialize(ServerConfig serverConfig) {
-    // TODO
+    if (gravitinoAuthorizer == null) {
+      synchronized (this) {
+        if (gravitinoAuthorizer == null) {
+          boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
+          if (enableAuthorization) {
+            // TODO
+          } else {
+            gravitinoAuthorizer = new PassThroughAuthorizer();
+          }
+          if (gravitinoAuthorizer != null) {
+            gravitinoAuthorizer.initialize();
+          }
+        }
+      }
+    }
   }
 
   public static GravitinoAuthorizerProvider getInstance() {
