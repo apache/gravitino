@@ -400,11 +400,17 @@ It also triggers a failure event if the operation failed.
   <td>role operation</td>
   <td>
     `CreateRoleEvent`<br/>
+    `CreateRoleFailureEvent`<br/>
     `DeleteRoleEvent`<br/>
+    `DeleteRoleFailureEvent`<br/>
     `GetRoleEvent`<br/>
+    `GetRoleFailureEvent`<br/>
     `GrantPrivilegesEvent`<br/>
+    `GrantPrivilegesFailureEvent`<br/>
     `ListRoleNamesEvent`<br/>
+    `ListRoleNamesFailureEvent`<br/>
     `RevokePrivilegesEvent`<br/>
+    `RevokePrivilegesFailureEvent`<br/>
   </td>
   <td>0.9.0-incubating</td>
 </tr>
