@@ -81,7 +81,7 @@ public class TestGravitinoServer {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws IOException {
     if (gravitinoServer != null) {
       gravitinoServer.stop();
     }
