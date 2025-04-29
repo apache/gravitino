@@ -105,6 +105,8 @@ It also triggers a failure event if the operation failed.
 <tr>
   <td>Gravitino server model operation</td>
   <td>
+    `AlterModelPreEvent`<br/>
+    `AlterModelVersionPreEvent`<br/>
     `DeleteModelPreEvent`<br/>
     `DeleteModelVersionPreEvent`<br/>
     `GetModelPreEvent`<br/>
@@ -335,6 +337,8 @@ It also triggers a failure event if the operation failed.
 <tr>
   <td>model operation</td>
   <td>
+    `AlterModelVersionEvent`<br/>
+    `AlterModelVersionFailureEvent`<br/>
     `DeleteModelEvent`<br/>
     `DeleteModelFailureEvent`<br/>
     `DeleteModelVersionEvent`<br/>
