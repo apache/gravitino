@@ -248,6 +248,16 @@ GVFS internally manages the path mapping and convert automatically.
   <td>No</td>
   <td>`0.9.0-incubating`</td>
 </tr>
+<tr>
+  <td><tt>fs.gravitino.client.request.header.</tt><td>
+  <td>
+    The configuration key prefix for the Gravitino client request header.
+    You can set the request header for the Gravitino client.
+  </td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
 </tbody>
 </table>
 
@@ -728,6 +738,16 @@ Then you need to completely replace the files in `${HADOOP_HOME}/lib/native`.
     and then set this configuration to the class name to inject custom code.
   </td>
   <td>`gravitino.filesystem.gvfs_hook.NoOpHook`</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+<tr>
+  <td><tt>client_request_header_</tt><td>
+  <td>
+    The configuration key prefix for the Gravitino client request header.
+    You can set the request header for the Gravitino client.
+  </td>
+  <td>(none)</td>
   <td>No</td>
   <td>`0.9.0-incubating`</td>
 </tr>
