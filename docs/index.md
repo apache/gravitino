@@ -33,6 +33,9 @@ Gravitino provides Docker images on [Docker Hub](https://hub.docker.com/u/apache
 You can pull the image and run it.
 For details of these image, see [Docker image details](./develop/docker-image-details.md).
 
+You can also install the Gravitino server using [Helm chart](./install/helm-chart.md),
+if you are working in a Kubernetes cluster.
+
 Gravitino provides a playground environment for you to experiment with the whole Gravitino system.
 For the details, check [installing the Apache Gravitino layground](./playground/install.md).
 

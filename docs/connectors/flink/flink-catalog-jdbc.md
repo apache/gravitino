@@ -20,8 +20,8 @@ to access the JDBC catalog managed by the Gravitino server.
 
 Place the following JAR files in the lib directory for your Flink installation:
 
-- [flink-connector-jdbc-${flinkJdbcConnectorVersion}.jar](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/connectors/table/jdbc/)
-- [gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
+- [`flink-connector-jdbc-${flinkJdbcConnectorVersion}.jar`](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/connectors/table/jdbc/)
+- [`gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
 - JDBC driver
 
 ### SQL Example
