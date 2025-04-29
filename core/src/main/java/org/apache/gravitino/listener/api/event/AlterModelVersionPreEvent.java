@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.base.Supplier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.Either;
@@ -59,7 +60,11 @@ public class AlterModelVersionPreEvent extends ModelPreEvent {
    *     otherwise throw an IllegalStateException exception.
    */
   public String alias() {
-    return aliasOrVersion.getLeft();
+    return aliasOrVersion
+        .left()
+        .orElseThrow(
+            (Supplier<IllegalStateException>)
+                () -> new IllegalStateException("Alias can't be null value"));
   }
 
   /**
@@ -69,7 +74,12 @@ public class AlterModelVersionPreEvent extends ModelPreEvent {
    *     otherwise throw an IllegalStateException exception.
    */
   public Integer version() {
-    return aliasOrVersion.getRight();
+
+    return aliasOrVersion
+        .right()
+        .orElseThrow(
+            (Supplier<IllegalStateException>)
+                () -> new IllegalStateException("Version can't be null value"));
   }
 
   /**
