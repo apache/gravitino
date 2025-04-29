@@ -312,6 +312,9 @@
    ./dev/ci/chart_schema.yaml
    ./dev/ci/lintconf.yaml
 
+   AWS SDK
+   ./core/src/main/java/org/apache/gravitino/listener/api/info/Either.java
+
    This product bundles a third-party component under the
    MIT License.
 
