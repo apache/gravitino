@@ -15,10 +15,20 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization.annotations;
+package org.apache.gravitino.server.authorization;
 
-/**
- * Defines the annotation for authorizing access to an API. Use the resourceType and privileges
- * fields to define the required privileges and resource type for the API.
- */
-public @interface MetadataAuthorizeApi {}
+import java.io.IOException;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+
+/** Test of {@link PassThroughAuthorizer} */
+public class TestPassThroughAuthorizer {
+
+  @Test
+  public void testAuthorize() throws IOException {
+    try (PassThroughAuthorizer passThroughAuthorizer = new PassThroughAuthorizer()) {
+      boolean result = passThroughAuthorizer.authorize(null, null, null, null);
+      Assertions.assertTrue(result, "Logic error in PassThroughAuthorizer");
+    }
+  }
+}
