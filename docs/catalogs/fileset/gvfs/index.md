@@ -733,7 +733,7 @@ fs.ls(path=fileset + "/sub_dir")
 # get file info under the fileset
 fs.info(path=fileset + "/sub_dir/test.parquet")
 
-# check a file or a diretory whether exists
+# check a file or a directory whether exists
 fs.exists(path=fileset + "/sub_dir")
 
 # write something into a file

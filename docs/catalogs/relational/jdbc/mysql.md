@@ -33,7 +33,7 @@ like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`.
 - [Column default value](../../../metadata/relational.md#table-column-default-value)
   and [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment).
   are supported.
-- This catalog supports managing MySQL table features though table properties,
+- This catalog supports managing MySQL table features through table properties,
   like using `engine` to set MySQL storage engine.
 
 ### Catalog properties
@@ -157,7 +157,7 @@ Refer to [manage relational metadata](../../../metadata/relational.md#schema-ope
 - [Column default value](../../../metadata/relational.md#table-column-default-value)
   and [auto-increment columns](../../../metadata/relational.md#table-column-auto-increment).
   are supported.
-- This catalog supports managing MySQL table features though table properties,
+- This catalog supports managing MySQL table features through table properties,
   like using `engine` to set MySQL storage engine.
 
 ### Table column types

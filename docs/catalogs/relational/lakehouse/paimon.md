@@ -178,7 +178,7 @@ This catalog was built with Apache Paimon *0.8.0*.
   <td>`0.7.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>oss-accesss-key-secret</tt></td>
+  <td><tt>oss-access-key-secret</tt></td>
   <td>
     The secret key for the Aliyun OSS.
 

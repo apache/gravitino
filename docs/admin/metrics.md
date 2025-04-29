@@ -56,5 +56,5 @@ Metrics with the `iceberg-rest-server` prefix are for the Gravitino Iceberg REST
 JVM metrics source uses [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html)
 with `BufferPoolMetricSet`, `GarbageCollectorMetricSet`, and `MemoryUsageGaugeSet`.
 These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format,
-`jvm_head_used` in Prometheus format.
+`jvm_heap_used` in Prometheus format.
 
