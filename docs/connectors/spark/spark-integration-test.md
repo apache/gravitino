@@ -19,7 +19,7 @@ It's enabled in the GitHub CI.
 You can run tests with specific Spark version. For example:
 
 ```shell
-./gradlew :spark-connector:spark3.3:test \
+./gradlew :spark-connector:spark-3.3:test \
   --tests "org.apache.gravitino.spark.connector.integration.test.hive.SparkHiveCatalogIT33.testCreateHiveFormatPartitionTable"
 ```
 
