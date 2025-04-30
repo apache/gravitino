@@ -72,8 +72,8 @@ the REST API and the Java SDK. You can use either of them to manage metadata.
   model metadata.
 
 Also, you can find the complete REST API definition in [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Java doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/index.html),
-and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/python/index.html).
+Java SDK definition in [Gravitino Java doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/java/index.html),
+and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/python/index.html).
 
 Gravitino also provides a web UI to manage the metadata.
 Visit the web UI in the browser via `http://<ip-address>:8090`.
@@ -186,8 +186,8 @@ including HTTPS, authentication and access control configurations.
 ### Programming guides
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api).
-* [Gravitino Java doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/index.html).
-* [Gravitino Python doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/python/index.html).
+* [Gravitino Java doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/java/index.html).
+* [Gravitino Python doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/python/index.html).
 
 ### Development guides
 
