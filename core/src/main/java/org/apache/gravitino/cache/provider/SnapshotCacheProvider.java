@@ -17,10 +17,31 @@
  * under the License.
  */
 
-package org.apache.gravitino.cache;
+package org.apache.gravitino.cache.provider;
 
-public interface CacheProvider {
-  String name();
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.cache.CacheConfig;
+import org.apache.gravitino.cache.MetaCache;
+import org.apache.gravitino.cache.SnapshotMetaCache;
 
-  public MetaCache getCache(CacheConfig config);
+/** Provides a snapshot cache implementation. */
+public class SnapshotCacheProvider implements CacheProvider {
+
+  /** {@inheritDoc} */
+  @Override
+  public String name() {
+    return "Snapshot";
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public MetaCache getCache(CacheConfig config) {
+    return SnapshotMetaCache.getInstance(config);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public MetaCache getCache(CacheConfig config, EntityStore entityStore) {
+    return SnapshotMetaCache.getInstance(config, entityStore);
+  }
 }

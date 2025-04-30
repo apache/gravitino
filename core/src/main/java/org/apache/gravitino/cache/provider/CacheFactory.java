@@ -17,14 +17,17 @@
  * under the License.
  */
 
-package org.apache.gravitino.cache;
+package org.apache.gravitino.cache.provider;
 
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.cache.CacheConfig;
+import org.apache.gravitino.cache.MetaCache;
 
 /** Factory class for creating {@link MetaCache} instances. */
-public class CacheFactory {
+public final class CacheFactory {
   /** Map of cache provider names to their implementations. */
   private static final Map<String, CacheProvider> PROVIDERS = new ConcurrentHashMap<>();
 
@@ -46,10 +49,33 @@ public class CacheFactory {
    * @return A {@link MetaCache} instance for the specified cache provider and configuration.
    */
   public static MetaCache getMetaCache(String name, CacheConfig config) {
+    CacheProvider provider = getProvider(name);
+
+    return provider.getCache(config);
+  }
+
+  /**
+   * Returns a {@link MetaCache} instance for the specified cache provider, configuration, and
+   * entity store.
+   *
+   * @param name The name of the cache provider.
+   * @param config The cache configuration.
+   * @param entityStore The entity store to use for the cache.
+   * @return A {@link MetaCache} instance for the specified cache provider, configuration, and
+   *     entity store.
+   */
+  public static MetaCache getMetaCache(String name, CacheConfig config, EntityStore entityStore) {
+    CacheProvider provider = getProvider(name);
+
+    return provider.getCache(config, entityStore);
+  }
+
+  private static CacheProvider getProvider(String name) {
     CacheProvider provider = PROVIDERS.get(name);
     if (provider == null) {
       throw new IllegalArgumentException("No such cache provider: " + name);
     }
-    return provider.getCache(config);
+
+    return provider;
   }
 }

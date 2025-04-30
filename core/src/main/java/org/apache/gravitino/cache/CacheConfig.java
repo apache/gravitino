@@ -25,8 +25,14 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 
+/**
+ * Cache configuration class, inheriting from Config. This class defines configuration entries
+ * related to caching, including whether to use a weighted cache, cache size limits, and cache
+ * expiration settings.
+ */
 public class CacheConfig extends Config {
 
+  // Whether to use a weighted cache
   public static final ConfigEntry<Boolean> USE_WEIGHTED_CACHE =
       new ConfigBuilder("gravitino.server.cache.weighted.enabled")
           .doc("Whether to use a weighted cache.")
@@ -34,6 +40,7 @@ public class CacheConfig extends Config {
           .booleanConf()
           .createWithDefault(false);
 
+  // Target weight of the cache
   public static final ConfigEntry<Long> ENTITY_CACHE_WEIGHER_TARGET =
       new ConfigBuilder("gravitino.server.cache.weighted.target")
           .doc("The target weight of the cache.")
@@ -41,6 +48,8 @@ public class CacheConfig extends Config {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(100 * MetadataEntityWeigher.WEIGHT_PER_MB);
+
+  // Maximum number of entries in the cache
   public static final ConfigEntry<Integer> CACHE_MAX_SIZE =
       new ConfigBuilder("gravitino.server.cache.max.size")
           .doc("The max size of the cache in number of entries.")
@@ -49,6 +58,7 @@ public class CacheConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10_000);
 
+  // Whether to enable cache expiration
   public static final ConfigEntry<Boolean> CACHE_EXPIRATION_ENABLED =
       new ConfigBuilder("gravitino.server.cache.expiration.enabled")
           .doc("Whether to enable cache expiration.")
@@ -56,6 +66,7 @@ public class CacheConfig extends Config {
           .booleanConf()
           .createWithDefault(true);
 
+  // Cache entry expiration time
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.server.cache.expiration.time")
           .doc("The time after which cache entries expire.")
@@ -64,37 +75,91 @@ public class CacheConfig extends Config {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60L);
 
+  // Whether to enable cache status
+  public static final ConfigEntry<Boolean> CACHE_STATUS_ENABLED =
+      new ConfigBuilder("gravitino.server.cache.status.enabled")
+          .doc("Whether to enable cache status.")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  // Time unit for cache expiration
   private static final TimeUnit expirationTimeUnit = TimeUnit.MINUTES;
 
+  /**
+   * Constructs a new CacheConfig instance.
+   *
+   * @param loadDefaults whether to load the default configuration
+   */
   public CacheConfig(boolean loadDefaults) {
     super(loadDefaults);
   }
 
+  /** Default constructor, loads the default configuration. */
   public CacheConfig() {
     this(true);
   }
 
+  /**
+   * Gets the maximum cache size
+   *
+   * @return the maximum cache size
+   */
   public int getMaxSize() {
     return get(CACHE_MAX_SIZE);
   }
 
+  /**
+   * Checks if cache expiration is enabled
+   *
+   * @return {@code true} if cache expiration is enabled, {@code false} otherwise
+   */
   public boolean isExpirationEnabled() {
     return get(CACHE_EXPIRATION_ENABLED);
   }
 
+  /**
+   * Gets the cache expiration time
+   *
+   * @return the cache expiration time
+   */
   public long getExpirationTime() {
     return get(CACHE_EXPIRATION_TIME);
   }
 
+  /**
+   * Gets the time unit for cache expiration
+   *
+   * @return A {@link TimeUnit} representing the time unit for cache expiration.
+   */
   public TimeUnit getExpirationTimeUnit() {
     return expirationTimeUnit;
   }
 
+  /**
+   * Checks if weighted cache is enabled
+   *
+   * @return {@code true} if weighted cache is enabled, {@code false} otherwise
+   */
   public boolean isWeightedCacheEnabled() {
     return get(USE_WEIGHTED_CACHE);
   }
 
+  /**
+   * Gets the target weight of the cache
+   *
+   * @return the target weight of the cache
+   */
   public long getEntityCacheWeigherTarget() {
     return get(ENTITY_CACHE_WEIGHER_TARGET);
+  }
+
+  /**
+   * Checks if cache status is enabled
+   *
+   * @return {@code true} if cache status is enabled, {@code false} otherwise
+   */
+  public boolean isCacheStatusEnabled() {
+    return get(CACHE_STATUS_ENABLED);
   }
 }

@@ -28,6 +28,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.CacheUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -119,6 +120,13 @@ public class SchemaMetaService {
     SchemaPO schemaPO = getSchemaPOByCatalogIdAndName(catalogId, schemaName);
 
     return POConverters.fromSchemaPO(schemaPO, identifier.namespace());
+  }
+
+  public SchemaEntity getSchemaByID(long id) {
+    SchemaPO schemaPO = getSchemaPOById(id);
+    Namespace namespace = CacheUtils.getNamespaceFromSchema(schemaPO);
+
+    return POConverters.fromSchemaPO(schemaPO, namespace);
   }
 
   public List<SchemaEntity> listSchemasByNamespace(Namespace namespace) {

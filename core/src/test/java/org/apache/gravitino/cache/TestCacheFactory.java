@@ -19,19 +19,41 @@
 
 package org.apache.gravitino.cache;
 
+import static org.mockito.Mockito.mock;
+
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.cache.provider.CacheFactory;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestCacheFactory {
+  private EntityStore mockStore;
+
+  @BeforeAll
+  void setUp() {
+    mockStore = mock(EntityStore.class);
+  }
+
   @Test
-  void testGetCaffeineCache() {
-    String providerName = "Caffeine";
-    MetaCache metaCache = CacheFactory.getMetaCache(providerName, new CacheConfig());
+  void testCreateCache() {
+    String cacheName = "Caffeine";
+    MetaCache metaCache = CacheFactory.getMetaCache(cacheName, new CacheConfig(), mockStore);
 
-    Assertions.assertEquals(MetaCacheCaffeine.class, metaCache.getClass());
-    MetaCacheCaffeine cacheCaffeine = (MetaCacheCaffeine) metaCache;
+    Assertions.assertEquals(CaffeineMetaCache.class, metaCache.getClass());
 
-    Assertions.assertEquals(0, cacheCaffeine.sizeOfCacheData());
-    Assertions.assertEquals(0, cacheCaffeine.sizeOfCacheIndex());
+    cacheName = "Snapshot";
+    metaCache = CacheFactory.getMetaCache(cacheName, new CacheConfig(), mockStore);
+    Assertions.assertEquals(SnapshotMetaCache.class, metaCache.getClass());
+  }
+
+  @Test
+  void testCreateCacheWithInvalidName() {
+    String cacheName = "InvalidCacheName";
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CacheFactory.getMetaCache(cacheName, new CacheConfig(), mockStore));
   }
 }

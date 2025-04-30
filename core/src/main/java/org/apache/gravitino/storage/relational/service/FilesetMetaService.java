@@ -28,6 +28,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.CacheUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -109,6 +110,13 @@ public class FilesetMetaService {
     FilesetPO filesetPO = getFilesetPOBySchemaIdAndName(schemaId, filesetName);
 
     return POConverters.fromFilesetPO(filesetPO, identifier.namespace());
+  }
+
+  public FilesetEntity getFilesetByID(Long id) {
+    FilesetPO filesetPO = getFilesetPOById(id);
+    Namespace namespace = CacheUtils.getNamespaceFromFileset(filesetPO);
+
+    return POConverters.fromFilesetPO(filesetPO, namespace);
   }
 
   public List<FilesetEntity> listFilesetsByNamespace(Namespace namespace) {
