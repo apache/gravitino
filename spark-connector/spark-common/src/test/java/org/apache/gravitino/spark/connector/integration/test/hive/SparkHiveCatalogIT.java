@@ -130,8 +130,7 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
   }
 
   @Test
-  void testPartitionTableManage() {
-    System.out.println("" + System.getProperty("SKIP_DOCKER_TESTS"));
+  void testManagePartitionTable() {
     String tableName = "hive_partition_ops_table";
 
     dropTableIfExists(tableName);
@@ -139,25 +138,30 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
     sql(createTableSQL);
 
-    List<Object[]> tableInfo = getTablePartitions(tableName);
-    Assertions.assertEquals(0, tableInfo.size());
+    List<Object[]> partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(0, partitionInfo.size());
 
     sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=20, age_p2='twenty')");
     sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
-    tableInfo = getTablePartitions(tableName);
-    Assertions.assertEquals(2, tableInfo.size());
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, partitionInfo.size());
+    Assertions.assertEquals("age_p1=20/age_p2=twenty", partitionInfo.get(0)[0]);
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(1)[0]);
 
     sql("ALTER TABLE  " + tableName + " DROP PARTITION (age_p1=20, age_p2='twenty')");
-    tableInfo = getTablePartitions(tableName);
-    Assertions.assertEquals(1, tableInfo.size());
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
 
     sql(
         "ALTER TABLE  "
             + tableName
             + " ADD PARTITION (age_p1=22, age_p2='twenty two') "
             + "LOCATION '/user/hive/warehouse/hive_partition_ops_table/age_p1=22/age_p2=twentytwo' ");
-    tableInfo = getTablePartitions(tableName);
-    Assertions.assertEquals(2, tableInfo.size());
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+    Assertions.assertEquals("age_p1=22/age_p2=twenty two", partitionInfo.get(1)[0]);
   }
 
   @ParameterizedTest

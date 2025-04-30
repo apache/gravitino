@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.spark.connector;
+package org.apache.gravitino.spark.connector.utils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -41,9 +41,9 @@ import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.VarcharType;
 import org.apache.spark.unsafe.types.UTF8String;
 
-public class SparkPartitionConverter {
+public class SparkPartitionUtils {
 
-  private SparkPartitionConverter() {}
+  private SparkPartitionUtils() {}
 
   public static Literal<?> toGravitinoLiteral(InternalRow ident, int ordinal, DataType sparkType) {
     if (sparkType instanceof ByteType) {
