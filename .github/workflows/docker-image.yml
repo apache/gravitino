@@ -5,39 +5,39 @@ on:
     inputs:
       image:
         type: choice
-        description: "Choose the image to build"
+        description: 'Choose the image to build'
         required: true
-        default: "gravitino"
+        default: 'gravitino'
         options:
-          - "gravitino"
-          - "gravitino-ci:hive"
-          - "gravitino-ci:kerberos-hive"
-          - "gravitino-ci:trino"
-          - "gravitino-ci:doris"
-          - "gravitino-ci:ranger"
-          - "gravitino-playground:trino"
-          - "gravitino-playground:hive"
-          - "gravitino-playground:ranger"
-          - "gravitino-iceberg-rest-server"
+          - 'gravitino'
+          - 'gravitino-ci:hive'
+          - 'gravitino-ci:kerberos-hive'
+          - 'gravitino-ci:trino'
+          - 'gravitino-ci:doris'
+          - 'gravitino-ci:ranger'
+          - 'gravitino-playground:trino'
+          - 'gravitino-playground:hive'
+          - 'gravitino-playground:ranger'
+          - 'gravitino-iceberg-rest-server'
       docker_repo_name:
-        description: "Docker repository name (default is apache)"
+        description: 'Docker repository name (default is apache)'
         required: false
-        default: "apache"
+        default: 'apache'
         type: string
       version:
-        description: "Docker version to apply to this image"
+        description: 'Docker version to apply to this image'
         required: true
         type: string
       username:
-        description: "Docker username"
+        description: 'Docker username'
         required: true
         type: string
       token:
-        description: "Publish Docker token"
+        description: 'Publish Docker token'
         required: true
         type: string
       publish-latest-tag:
-        description: "Whether to update the latest tag. This operation is only applicable to official releases and should not be used for Release Candidate (RC)."
+        description: 'Whether to update the latest tag. This operation is only applicable to official releases and should not be used for Release Candidate (RC).'
         required: false
         type: boolean
         default: false
@@ -75,7 +75,7 @@ jobs:
           elif [ "${{ github.event.inputs.image }}" == "gravitino" ]; then
             echo "image_type=gravitino" >> $GITHUB_ENV
             echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino" >> $GITHUB_ENV
-            # `${{ github.event.inputs.docker_repo_name }}/gravitino` is the default image name, didn't need to tag alias name
+            # `${{ github.event.inputs.docker_repo_name }}/gravitino` is the default image name, didn"t need to tag alias name
           elif [ "${{ github.event.inputs.image }}" == "gravitino-playground:trino" ]; then
             echo "image_type=trino" >> $GITHUB_ENV
             echo "image_name=${{ github.event.inputs.docker_repo_name }}/gravitino-playground" >> $GITHUB_ENV
@@ -122,8 +122,8 @@ jobs:
 
       - uses: actions/setup-java@v4
         with:
-          java-version: "8"
-          distribution: "temurin"
+          java-version: '8'
+          distribution: 'temurin'
 
       - name: Check groups of runner
         run: |
