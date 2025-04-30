@@ -337,6 +337,8 @@ It also triggers a failure event if the operation failed.
 <tr>
   <td>model operation</td>
   <td>
+    `AlterModelEvent`<br/>
+    `AlterModelFailureEvent`<br/>
     `AlterModelVersionEvent`<br/>
     `AlterModelVersionFailureEvent`<br/>
     `DeleteModelEvent`<br/>
