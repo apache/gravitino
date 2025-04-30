@@ -538,13 +538,17 @@ the [GCP](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-
 and the [Azure](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
 cloud platforms.
 
-For Iceberg REST catalog server, please use *Gravitino cloud bundle JAR without Hadoop and cloud packages*.
-The corresponding JAR balls can be downloaded for
-the [AWS](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws),
-the [Aliyun](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun),
-the [GCP](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp), and
-the [Azure](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure)
-platforms.
+For Iceberg REST catalog server, please use _the Gravitino cloud bundle JAR without Hadoop and cloud packages_.
+In addition to this, you need to download the corresponding Iceberg cloud packages, i.e.
+
+- The [AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws)
+  without Hadoop and cloud packages.
+- The [Aliyun bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun)
+  without Hadoop and cloud packages.
+- The [GCP bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp)
+  without Hadoop and cloud packages.
+- The [Azure bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure)
+  without Hadoop and cloud packages.
 
 :::note
 For OSS, Iceberg doesn't provide Iceberg Aliyun bundle JAR which contains OSS packages.
