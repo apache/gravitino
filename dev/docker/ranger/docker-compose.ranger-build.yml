@@ -32,12 +32,10 @@ services:
     volumes:
       # SELinux
       # https://github.com/moby/moby/issues/41202#issuecomment-657422171
-      # - ${HOME:-~}/.m2:/home/ranger/.m2:Z
       - m2:/home/ranger/.m2:Z
       - ./scripts:/home/ranger/scripts
       - ./patches:/home/ranger/patches
       - dist:/home/ranger/dist:Z
-      # - ./dist:/home/ranger/dist:Z
       - ${RANGER_HOME:-./../../}:/home/ranger/src:Z
     depends_on:
       - ranger-base
