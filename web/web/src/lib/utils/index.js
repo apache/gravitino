@@ -59,6 +59,10 @@ export const genUpdates = (originalData, newData) => {
     updates.push({ '@type': 'rename', newName: newData.name })
   }
 
+  if (originalData.uri !== newData.uri) {
+    updates.push({ '@type': 'updateUri', newUri: newData.uri })
+  }
+
   if (originalData.comment !== newData.comment) {
     updates.push({ '@type': 'updateComment', newComment: newData.comment })
   }
