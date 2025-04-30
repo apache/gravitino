@@ -24,9 +24,15 @@ import org.apache.gravitino.Entity;
 import org.checkerframework.checker.index.qual.NonNegative;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
+/**
+ * A {@link Weigher} implementation that weighs {@link Entity} objects by the approximate size of
+ * the entity object.
+ */
 public class MetadataEntityWeigher implements Weigher<Long, Entity> {
 
+  /** The amount of weight that is expected to roughly equate to 1MB of memory usage */
   public static final long WEIGHT_PER_MB = 1024 * 1024;
+  /** Represents the approximate size of an entity beyond the properties */
   private static final int APPROXIMATE_ENTITY_OVERHEAD = 500;
 
   private static final MetadataEntityWeigher INSTANCE = new MetadataEntityWeigher();
@@ -37,12 +43,20 @@ public class MetadataEntityWeigher implements Weigher<Long, Entity> {
     return INSTANCE;
   }
 
+  /**
+   * Computes the weight of a given entity. The unit here is not exactly bytes, but it's close.
+   *
+   * @param id The entity's id; not used
+   * @param entity The entity to be cached
+   * @return The weight of the entity
+   */
   @Override
   public @NonNegative int weigh(@NonNull Long id, @NonNull Entity entity) {
     return APPROXIMATE_ENTITY_OVERHEAD + calculateWeight(entity.type());
   }
 
   private int calculateWeight(Entity.EntityType tp) {
+    // TODO: find a more accurate weight of each entity type
     int weight;
     switch (tp) {
       case METALAKE:

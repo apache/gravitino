@@ -47,6 +47,9 @@ public interface TagMetaMapper {
   TagPO selectTagMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagMetaByTagId")
+  TagPO selectTagMetaByTagId(@Param("tagId") Long tagId);
+
   @InsertProvider(type = TagMetaSQLProviderFactory.class, method = "insertTagMeta")
   void insertTagMeta(@Param("tagMeta") TagPO tagPO);
 

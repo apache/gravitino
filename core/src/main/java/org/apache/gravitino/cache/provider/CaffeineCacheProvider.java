@@ -17,20 +17,34 @@
  * under the License.
  */
 
-package org.apache.gravitino.cache;
+package org.apache.gravitino.cache.provider;
+
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.cache.CacheConfig;
+import org.apache.gravitino.cache.CaffeineMetaCache;
+import org.apache.gravitino.cache.MetaCache;
 
 /**
  * CaffeineCacheProvider is a CacheProvider implementation that uses the Caffeine library for
  * caching. It creates caches with configurations for maximum size and other parameters.
  */
 public class CaffeineCacheProvider implements CacheProvider {
+
+  /** {@inheritDoc} */
   @Override
   public String name() {
     return "Caffeine";
   }
 
+  /** {@inheritDoc} */
   @Override
   public MetaCache getCache(CacheConfig config) {
-    return new MetaCacheCaffeine(config);
+    return CaffeineMetaCache.getInstance(config);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public MetaCache getCache(CacheConfig config, EntityStore entityStore) {
+    return CaffeineMetaCache.getInstance(config, entityStore);
   }
 }

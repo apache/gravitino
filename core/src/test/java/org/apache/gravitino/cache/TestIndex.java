@@ -19,16 +19,21 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.SortedMap;
-import org.apache.commons.collections4.Trie;
-import org.apache.commons.collections4.trie.PatriciaTrie;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
+import com.googlecode.concurrenttrees.radix.RadixTree;
+import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharSequenceNodeFactory;
+import java.util.List;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class TestIndex {
-  private Trie<String, NameIdentifier> indexTree;
+  private RadixTree<NameIdentifier> indexTree;
   private NameIdentifier ident1;
   private NameIdentifier ident2;
   private NameIdentifier ident3;
@@ -38,20 +43,20 @@ public class TestIndex {
 
   @BeforeEach
   void setUp() {
-    indexTree = new PatriciaTrie();
+    indexTree = new ConcurrentRadixTree<>(new DefaultCharSequenceNodeFactory());
     ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
     ident2 = NameIdentifier.of("metalake2", "catalog2", "schema2");
-    ident3 = NameIdentifier.of("metalake1", "catalog1", "schema1", "table");
-    ident4 = NameIdentifier.of("metalake1", "catalog1", "schema1", "topic");
-    ident5 = NameIdentifier.of("metalake1", "catalog2", "schema1", "table");
+    ident3 = NameIdentifier.of("metalake1", "catalog1", "schema1", "user");
+    ident4 = NameIdentifier.of("metalake1", "catalog1", "schema1", "order");
+    ident5 = NameIdentifier.of("metalake1", "catalog2", "schema1", "topic");
     ident6 = NameIdentifier.of("metalake1", "catalog1", "schema2", "table");
 
-    addIndex(indexTree, ident6);
-    addIndex(indexTree, ident5);
-    addIndex(indexTree, ident4);
-    addIndex(indexTree, ident3);
-    addIndex(indexTree, ident2);
-    addIndex(indexTree, ident1);
+    addIndex(ident6);
+    addIndex(ident5);
+    addIndex(ident4);
+    addIndex(ident3);
+    addIndex(ident2);
+    addIndex(ident1);
   }
 
   @Test
@@ -60,51 +65,123 @@ public class TestIndex {
   }
 
   @Test
-  void testGetFromMetalakeByPrefix() {
-    SortedMap<String, NameIdentifier> prefixMap = indexTree.prefixMap("metalake1");
+  void testCaffeineCache() {
+    Cache<NameIdentifier, Entity> byName =
+        Caffeine.newBuilder()
+            .executor(Runnable::run)
+            .removalListener(
+                (NameIdentifier identifier, Entity entity, RemovalCause cause) -> {
+                  if (cause == RemovalCause.EXPIRED) {
+                    System.out.println("Cache entry expired: " + identifier);
+                  }
+                })
+            .build();
 
-    Assertions.assertEquals(5, prefixMap.size());
-    Assertions.assertEquals(ident1, prefixMap.get(ident1.toString()));
-    Assertions.assertEquals(ident3, prefixMap.get(ident3.toString()));
-    Assertions.assertEquals(ident4, prefixMap.get(ident4.toString()));
-    Assertions.assertEquals(ident5, prefixMap.get(ident5.toString()));
-    Assertions.assertEquals(ident6, prefixMap.get(ident6.toString()));
+    byName.put(ident1, TestUtil.getTestSchemaEntity());
+    byName.put(ident2, TestUtil.getTestSchemaEntity());
+  }
+
+  @Test
+  void testGetFromMetalakeByPrefix() {
+    Iterable<NameIdentifier> values = indexTree.getValuesForKeysStartingWith("metalake1");
+    List<NameIdentifier> identList = TestUtil.toList(values);
+
+    Assertions.assertEquals(5, identList.size());
+    Assertions.assertTrue(identList.contains(ident1));
+    Assertions.assertTrue(identList.contains(ident3));
+    Assertions.assertTrue(identList.contains(ident4));
+    Assertions.assertTrue(identList.contains(ident5));
+    Assertions.assertTrue(identList.contains(ident6));
   }
 
   @Test
   void testGetFromCatalogByPrefix() {
-    SortedMap<String, NameIdentifier> prefixMap = indexTree.prefixMap("metalake1.catalog1");
+    Iterable<NameIdentifier> values = indexTree.getValuesForKeysStartingWith("metalake1");
+    List<NameIdentifier> identList = TestUtil.toList(values);
 
-    Assertions.assertEquals(4, prefixMap.size());
-    Assertions.assertEquals(ident1, prefixMap.get(ident1.toString()));
-    Assertions.assertEquals(ident3, prefixMap.get(ident3.toString()));
-    Assertions.assertEquals(ident4, prefixMap.get(ident4.toString()));
-    Assertions.assertEquals(ident6, prefixMap.get(ident6.toString()));
+    Assertions.assertEquals(5, identList.size());
+    Assertions.assertTrue(identList.contains(ident1));
+    Assertions.assertTrue(identList.contains(ident3));
+    Assertions.assertTrue(identList.contains(ident4));
+    Assertions.assertTrue(identList.contains(ident5));
+    Assertions.assertTrue(identList.contains(ident6));
 
-    prefixMap = indexTree.prefixMap("metalake1.catalog2");
-    Assertions.assertEquals(1, prefixMap.size());
-    Assertions.assertEquals(ident5, prefixMap.get(ident5.toString()));
+    values = indexTree.getValuesForKeysStartingWith("metalake1.catalog2");
+    identList = TestUtil.toList(values);
+
+    Assertions.assertEquals(1, identList.size());
+    Assertions.assertTrue(identList.contains(ident5));
   }
 
   @Test
   void testGetFromSchemaByPrefix() {
-    SortedMap<String, NameIdentifier> prefixMap = indexTree.prefixMap("metalake1.catalog1.schema1");
+    String prefix = "metalake1.catalog1.schema1";
+    Iterable<NameIdentifier> values = indexTree.getValuesForKeysStartingWith(prefix);
+    List<NameIdentifier> identList = TestUtil.toList(values);
 
-    Assertions.assertEquals(3, prefixMap.size());
-    Assertions.assertEquals(ident1, prefixMap.get(ident1.toString()));
-    Assertions.assertEquals(ident3, prefixMap.get(ident3.toString()));
-    Assertions.assertEquals(ident4, prefixMap.get(ident4.toString()));
+    Assertions.assertEquals(3, identList.size());
+    Assertions.assertTrue(identList.contains(ident1));
+    Assertions.assertTrue(identList.contains(ident3));
+    Assertions.assertTrue(identList.contains(ident4));
 
-    prefixMap = indexTree.prefixMap("metalake2.catalog2.schema2");
-    Assertions.assertEquals(1, prefixMap.size());
-    Assertions.assertEquals(ident2, prefixMap.get(ident2.toString()));
+    prefix = "metalake1.catalog1.schema2";
+    values = indexTree.getValuesForKeysStartingWith(prefix);
+    identList = TestUtil.toList(values);
 
-    prefixMap = indexTree.prefixMap("metalake1.catalog2.schema1");
-    Assertions.assertEquals(1, prefixMap.size());
-    Assertions.assertEquals(ident5, prefixMap.get(ident5.toString()));
+    Assertions.assertEquals(1, identList.size());
+    Assertions.assertTrue(identList.contains(ident6));
+
+    prefix = "metalake1.catalog2.schema1";
+    values = indexTree.getValuesForKeysStartingWith(prefix);
+    identList = TestUtil.toList(values);
+
+    Assertions.assertEquals(1, identList.size());
+    Assertions.assertTrue(identList.contains(ident5));
   }
 
-  private void addIndex(Trie<String, NameIdentifier> indexTree, NameIdentifier ident) {
+  @Test
+  void testDeleteIndexUseMetalake() {
+    String prefix = "metalake1";
+    indexTree.getKeysStartingWith(prefix).forEach(node -> indexTree.remove(node));
+
+    Assertions.assertEquals(1, indexTree.size());
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident2.toString()));
+  }
+
+  @Test
+  void testDeleteIndexUseCatalog() {
+    String prefix = "metalake1.catalog1";
+    indexTree.getKeysStartingWith(prefix).forEach(node -> indexTree.remove(node));
+
+    Assertions.assertEquals(2, indexTree.size());
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident2.toString()));
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident5.toString()));
+  }
+
+  @Test
+  void testDeleteIndexUseSchema() {
+    String prefix = "metalake1.catalog1.schema1.user";
+    indexTree.getKeysStartingWith(prefix).forEach(node -> indexTree.remove(node));
+
+    Assertions.assertEquals(5, indexTree.size());
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident1.toString()));
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident2.toString()));
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident4.toString()));
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident5.toString()));
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident6.toString()));
+  }
+
+  @Test
+  void testDeleteIndexUseTable() {
+    String prefix = "metalake1.catalog1.schema2.table";
+    indexTree.getKeysStartingWith(prefix).forEach(node -> indexTree.remove(node));
+
+    Assertions.assertEquals(5, indexTree.size());
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident1.toString()));
+    Assertions.assertNotNull(indexTree.getValueForExactKey(ident2.toString()));
+  }
+
+  private void addIndex(NameIdentifier ident) {
     indexTree.put(ident.toString(), ident);
   }
 }

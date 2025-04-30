@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_TABLE_NAME;
 
 import java.util.List;
@@ -194,5 +195,22 @@ public class TagMetaBaseSQLProvider {
     return "DELETE FROM "
         + TAG_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String selectTagMetaByTagId(@Param("tagId") Long tagId) {
+    return "SELECT "
+        + "tag_id         AS tagId, "
+        + "tag_name       AS tagName, "
+        + "metalake_id    AS metalakeId, "
+        + "tag_comment    AS tagComment, "
+        + "properties     AS properties, "
+        + "audit_info     AS auditInfo, "
+        + "current_version AS currentVersion, "
+        + "last_version   AS lastVersion, "
+        + "deleted_at     AS deletedAt "
+        + "FROM "
+        + TABLE_NAME
+        + "WHERE tag_id = #{tagId} "
+        + "  AND deleted_at = 0";
   }
 }

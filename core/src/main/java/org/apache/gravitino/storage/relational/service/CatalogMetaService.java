@@ -29,6 +29,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.CacheUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -122,6 +123,13 @@ public class CatalogMetaService {
     CatalogPO catalogPO = getCatalogPOByMetalakeIdAndName(metalakeId, catalogName);
 
     return POConverters.fromCatalogPO(catalogPO, identifier.namespace());
+  }
+
+  public CatalogEntity getCatalogByID(long id) {
+    CatalogPO catalogPO = getCatalogPOById(id);
+    Namespace namespace = CacheUtils.getNamespaceFromCatalog(catalogPO);
+
+    return POConverters.fromCatalogPO(catalogPO, namespace);
   }
 
   public List<CatalogEntity> listCatalogsByNamespace(Namespace namespace) {

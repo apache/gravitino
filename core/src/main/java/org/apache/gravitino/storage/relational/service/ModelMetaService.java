@@ -31,6 +31,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.CacheUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -72,6 +73,13 @@ public class ModelMetaService {
   public ModelEntity getModelByIdentifier(NameIdentifier ident) {
     ModelPO modelPO = getModelPOByIdentifier(ident);
     return POConverters.fromModelPO(modelPO, ident.namespace());
+  }
+
+  public ModelEntity getModelByID(long id) {
+    ModelPO modelPO = getModelPOById(id);
+    Namespace namespace = CacheUtils.getNamespaceFromModel(modelPO);
+
+    return POConverters.fromModelPO(modelPO, namespace);
   }
 
   public void insertModel(ModelEntity modelEntity, boolean overwrite) throws IOException {
