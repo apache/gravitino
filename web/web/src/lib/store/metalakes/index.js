@@ -64,6 +64,7 @@ import {
   getModelVersionsApi,
   getVersionDetailsApi,
   linkVersionApi,
+  updateVersionApi,
   deleteVersionApi
 } from '@/lib/api/models'
 
@@ -1304,7 +1305,7 @@ export const registerModel = createAsyncThunk(
 export const updateModel = createAsyncThunk(
   'appMetalakes/updateModel',
   async ({ metalake, catalog, type, schema, model, data }, { dispatch }) => {
-    const [err, res] = await to(updateTopicApi({ metalake, catalog, schema, model, data }))
+    const [err, res] = await to(updateModelApi({ metalake, catalog, schema, model, data }))
     if (err || !res) {
       return { err: true }
     }
@@ -1419,6 +1420,19 @@ export const linkVersion = createAsyncThunk(
     dispatch(fetchModelVersions({ metalake, catalog, schema, type, model, init: true }))
 
     return versionData
+  }
+)
+
+export const updateVersion = createAsyncThunk(
+  'appMetalakes/updateVersion',
+  async ({ metalake, catalog, type, schema, model, version, data }, { dispatch }) => {
+    const [err, res] = await to(updateVersionApi({ metalake, catalog, schema, model, version, data }))
+    if (err || !res) {
+      return { err: true }
+    }
+    dispatch(fetchModelVersions({ metalake, catalog, type, schema, model, init: true }))
+
+    return res.modelVersion
   }
 )
 
@@ -1824,6 +1838,16 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(linkVersion.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(updateVersion.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteVersion.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }
