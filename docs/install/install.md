@@ -249,5 +249,12 @@ If you want to enjoy the whole Gravitino system with other components, you can u
 
 For more details, check [installing Apache Gravitino playground](../playground/install.md).
 
+
+## Deploy Apache Gravitino on Kubernetes Using Helm Chart
+
+The Apache Gravitino Helm chart provides a way to deploy Gravitino on Kubernetes with fully customizable configurations. 
+For detailed installation instructions and configuration options,
+refer to the [Apache Gravitino Helm Chart](./helm-chart.md).
+
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToInstall" alt="" />
 
