@@ -1,0 +1,36 @@
+---
+title: "Apache Gravitino Trino connector"
+slug: /trino-connector/trino-connector
+keyword: gravitino connector trino
+license: "This software is licensed under the Apache License version 2."
+---
+
+Users can manage and access data using the Gravitino Trino connector.
+After configuring the Gravitino Trino connector in Trino,
+Trino can automatically load catalog metadata from Gravitino,
+allowing users to directly access these metadata.
+Once integrated with Gravitino, Trino can operate on all Gravitino data
+without requiring additional configuration. 
+The Gravitino Trino connector uses the [Trino dynamic catalog](https://trino.io/docs/current/admin/properties-catalog.html)
+to load catalogs.
+When the Gravitino Trino connector retrieves catalogs
+from the Gravitino server, it generates a `CREATE CATAGLOG` statement
+and executes the statement on the Trino server to register the catalog.
+
+:::note
+When metadata such as catalogs are changed in Gravitino,
+Trino can receive these changes from Gravitino.
+This process usually takes about 3~10 seconds. 
+:::
+
+By default, the loading of Gravitino's catalogs into Trino follows the naming convention:
+
+```text
+{catalog}
+```
+
+Usage in queries is as follows:
+
+```text
+SELECT * from catalog.dbname.tablename
+```
