@@ -44,10 +44,23 @@ the Hadoop catalog has the following properties:
 <tbody>
 <tr>
   <td><tt>location</tt></td>
-  <td>The storage location managed by Hadoop catalog.</td>
+  <td>
+    The storage location managed by Hadoop catalog.
+    The location name is `unknown`.
+  </td>
   <td>(none)</td>
   <td>No</td>
   <td>`0.5.0`</td>
+</tr>
+<tr>
+  <td><tt>location-</tt></td>
+  <td>
+    This is a property prefix.
+    Users can use `location-{name}={path}` to specify multiple locations with different names for the catalog.
+  </td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
   <td><tt>default-filesystem-provider</tt></td>
@@ -303,6 +316,16 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
   <td>`0.5.0`</td>
 </tr>
 <tr>
+  <td><tt>location-</tt></td>
+  <td>
+    This is a property prefix.
+    Users can use `location-{name}={path}` to specify multiple locations with different names for the catalog.
+  </td>
+  <td>(none)</td>
+  <td>No</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+<tr>
   <td><tt>authentication.impersonation-enable</tt></td>
   <td>
     Whether to enable impersonation for this schema of the Hadoop catalog.
@@ -349,6 +372,14 @@ The Hadoop catalog supports creating, updating, deleting, and listing schema.
 
 Refer to [Schema operation](../../../metadata/fileset.md#schema-operations)
 for more details.
+
+:::note
+During schema creation or deletion, Gravitino automatically creates or removes the filesystem directories 
+corresponding to the schema locations.
+This behavior is skipped in either of the following cases:
+1. When the catalog property `disable-filesystem-ops` is set to `true`.
+1. When the location contains [placeholders](../../../metadata/fileset.md#placeholder)
+:::
 
 ## Fileset
 
@@ -414,9 +445,9 @@ for more details.
   <td>`0.8.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>placehoder-&#42;</tt></td>
+  <td><tt>placeholder-&#42;</tt></td>
   <td>
-    Properties that start with `placeholder-` are used to replace placehoders
+    Properties that start with `placeholder-` are used to replace placeholders
     in the <tt>location</tt>.
   </td>
   <td>(none)</td>
@@ -424,6 +455,21 @@ for more details.
   <td>Yes</td>
   <td>`0.9.0-incubating`</td>
 </tr>
+<tr>
+  <td><tt>default-location-name</tt></td>
+  <td>
+    The name of the default location of the fileset.
+    This is  mainly used for GVFS operations without specifying a location name.
+    When the fileset has only one location, its location name is treated as the default value.
+
+    This is required when the fileset has multiple locations.
+  </td>
+  <td>(none)</td>
+  <td>Yes|No</td>
+  <td>Yes</td>
+  <td>`0.9.0-incubating`</td>
+</tr>
+
 </tbody>
 </table>
 
@@ -446,13 +492,13 @@ Some properties are reserved and cannot be set by users:
   <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>placehoder-schema</tt></td>
+  <td><tt>placeholder-schema</tt></td>
   <td>The placeholder for the schema name.</td>
   <td>Schema name for the fileset</td>
   <td>`0.9.0-incubating`</td>
 </tr>
 <tr>
-  <td><tt>placehoder-fileset</tt></td>
+  <td><tt>placeholder-fileset</tt></td>
   <td>The placeholder for the fileset name.</td>
   <td>Fileset name</td>
   <td>`0.9.0-incubating`</td>

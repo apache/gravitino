@@ -346,7 +346,7 @@ You can configure these properties in two ways:
 
 ### Usage examples
 
-The firs step is to get the Gravitino Virtual File System runtime JAR file.
+The first step is to get the Gravitino Virtual File System runtime JAR file.
 You can get the file by:
 
 1. Download from the maven central repository. You can download the runtime JAR
@@ -362,6 +362,14 @@ You can get the file by:
    ./gradlew :clients:filesystem-hadoop3-runtime:build -x test
    ```
 
+:::note
+For filesets with multiple locations, you can specify the location to use
+using one of the following methods (in priority order):
+1. The `fs.gravitino.current.location.name` configuration property specified;
+1. The environment variable `CURRENT_LOCATION_NAME`, if set;
+1. The value of `default-location-name` from the fileset properties.
+:::
+
 #### Access using Hadoop shell command
 
 You can use the Hadoop shell command to perform operations on the fileset storage.
@@ -370,7 +378,10 @@ For example:
 1. Configure the hadoop `core-site.xml` configuration
    You should put the required properties into this file.
 
+   Set the location name if you want to access a specific location
+
    ```shell
+   export CURRENT_LOCATION_NAME=${fileset-location-name}
    vi ${HADOOP_HOME}/etc/hadoop/core-site.xml
    ```
 
@@ -407,6 +418,8 @@ conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.had
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "mymetalake");
+// set the location name if you want to access a specific location
+conf.set("fs.gravitino.current.location.name", "mylocation");
 Path filesetPath = new Path("gvfs://fileset/mycatalog/myschema/my_fileset_1");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.getFileStatus(filesetPath);
@@ -435,6 +448,8 @@ fs.getFileStatus(filesetPath);
    --conf spark.hadoop.fs.gvfs.impl=org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem
    --conf spark.hadoop.fs.gravitino.server.uri=${your_gravitino_server_uri}
    --conf spark.hadoop.fs.gravitino.client.metalake=${your_gravitino_metalake}
+   # set the location name if you want to accesss a specific location
+   # --conf spark.hadoop.fs.gravitino.current.location.name=${the_fileset_location_name}
    ```
 
 1. Access the fileset storage in your Spark program:
@@ -469,6 +484,8 @@ For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https:
    ```shell
    export HADOOP_HOME=${your_hadoop_home}
    export HADOOP_CONF_DIR=${your_hadoop_conf_home}
+   # set the location name if you want to access a specific location
+   # export CURRENT_LOCATION_NAME=${the_fileset_location_name}
    export PATH=$PATH:$HADOOP_HOME/libexec/hadoop-config.sh
    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$JAVA_HOME/jre/lib/amd64/server
    export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
@@ -785,6 +802,14 @@ due to the limit of `fsspec` library.
 
 ### Usage examples
 
+:::note
+For fileset with multiple locations, you can specify which location to access
+using one of these methods (in priority order):
+1. the `current_location_name` configuration property;
+1. the environment variable `CURRENT_LOCATION_NAME`, if set;
+1. the value of `default-location-name` from the fileset properties.
+:::
+
 1. Install the Gravitino library using [pip](https://pip.pypa.io/en/stable/installation/):
 
    ```shell
@@ -818,6 +843,12 @@ due to the limit of `fsspec` library.
      <name>hadoop.client.keytab.file</name>
      <value>/tmp/xxx.keytab</value>
    </property>
+
+   <!-- optional, use this when you want to access a specific location. -->
+   <property>
+     <name>fs.gravitino.current.location.name</name>
+     <value>location-name</value>
+   </property>
    ```
    
    You can also Configure Hadoop environment variables in Linux:
@@ -840,7 +871,10 @@ from gravitino import gvfs
 # init the gvfs
 fs = gvfs.GravitinoVirtualFileSystem(
         server_uri="http://localhost:8090",
-         metalake_name="mymetalake")
+        metalake_name="mymetalake",
+        # set the location name if you want to access a specific location
+        options={"current_location_name": "the_location_name"}
+     )
 
 fileset = "gvfs://fileset/mycatalog/myschema/my_fileset"
 
@@ -940,7 +974,10 @@ For example:
    import pyarrow.parquet as pq
 
    fs = gvfs.GravitinoVirtualFileSystem(
-       server_uri="http://localhost:8090", metalake_name="test_metalake"
+       server_uri="http://localhost:8090",
+       metalake_name="test_metalake"
+       # set the location name if you want to access a specific location
+       options={"current_location_name": "the_location_name"}
    )
    fileset = "gvfs://fileset/mycatalog/myschema/myfileset"
 
@@ -958,7 +995,10 @@ For example:
    import ray
 
    fs = gvfs.GravitinoVirtualFileSystem(
-       server_uri="http://localhost:8090", metalake_name="test_metalake"
+       server_uri="http://localhost:8090",
+       metalake_name="test_metalake"
+       # set the location name if you want to access a specific location
+       options={"current_location_name": "the_location_name"}
    )
    fileset = "gvfs://fileset/mycatalog/myschema/myfileset"
 
@@ -972,7 +1012,12 @@ For example:
    from gravitino import gvfs
    from llama_index.core import SimpleDirectoryReader
 
-   fs = gvfs.GravitinoVirtualFileSystem(server_uri=server_uri, metalake_name=metalake_name)
+   fs = gvfs.GravitinoVirtualFileSystem(
+       server_uri=server_uri,
+       metalake_name=metalake_name
+        # set the location name if you want to access a specific location
+       options={"current_location_name": "the_location_name"}
+   )
    fileset = "gvfs://fileset/mycatalog/myschema/myfileset"
 
    # read all document files like csv files under the fileset sub dir
