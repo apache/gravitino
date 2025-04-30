@@ -51,37 +51,22 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
   cp ${ranger_dir}/docker-compose.ranger-build.yml ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
   cd ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
 
-  # Prevent builder to pull remote image
-  # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
-  docker builder ls
-  # docker builder prune -f
-  # docker context use default
-  # docker builder use default
-
-  export DOCKER_BUILDKIT=1
-  export COMPOSE_DOCKER_CLI_BUILD=1
-  export RANGER_DB_TYPE=mysql
-  export BUILDX_BUILDER=default
-
-  # run docker compose command to build packages
-  docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
-  #
-  # docker compose -f docker-compose.ranger-base.yml build
-  # docker image ls
-  # docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml build
-
   mkdir -p ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker/dist
 
-  # copy packages from volume to host
-  docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
+  # run command in subshell to avoid environment variable pollution
+  (
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    export RANGER_DB_TYPE=mysql
+    # Prevent builder to pull remote image
+    # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
+    export BUILDX_BUILDER=default
+
+    docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
+    docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
+  )
 
   cp ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker/dist/* ${ranger_dir}/packages
-
-  # remove export
-  export -n DOCKER_BUILDKIT
-  export -n COMPOSE_DOCKER_CLI_BUILD
-  export -n RANGER_DB_TYPE
-  export -n BUILDX_BUILDER
 fi
 
 if [ ! -f "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ]; then
