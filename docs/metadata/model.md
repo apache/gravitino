@@ -325,7 +325,7 @@ model = catalog.as_model_catalog().get_model(
 
 ### Alter a model
 
-You can modify a model's metadata (e.g., rename or modify properties) by sending a `PUT` request
+You can modify a model's metadata (e.g. rename, update comment or modify properties) by sending a `PUT` request
 to the `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}` endpoint
 or using the Gravitino Java/Python client.
 
@@ -336,6 +336,10 @@ or using the Gravitino Java/Python client.
   cat <<EOF >model.json
   {
     "updates": [
+      {
+        "@type": "updateComment",
+        "newComment": "Updated model comment"
+      },
       {
         "@type": "rename",
         "newName": "new_name"
@@ -376,6 +380,7 @@ or using the Gravitino Java/Python client.
   // Define modifications
   ModelChange[] changes = {
       ModelChange.rename("example_model_renamed"),
+      ModelChange.updateComment("new comment"),
       ModelChange.setProperty("k2", "v2"),
       ModelChange.removeProperty("k1")
   };
@@ -399,6 +404,7 @@ or using the Gravitino Java/Python client.
   # Define modifications
   changes = (
       ModelChange.rename("renamed"),
+      ModelChange.updateComment("new comment"),
       ModelChange.set_property("k2", "v2"),
       ModelChange.remove_property("k1"),
   )
@@ -440,6 +446,24 @@ The following operations are supported for altering a model:
   <td>
     ```python
     ModelChange.rename("new_name")
+    ```
+  </td>
+</tr>
+<tr>
+  <td>Update comment</td>
+  <td>
+    ```json
+    {"@type": "updateComment", "newComment": "new comment"}
+    ```
+  </td>
+  <td>
+    ```java
+    ModelChange.updateComment("new comment");
+    ```
+  </td>
+  <td>
+    ```python
+    ModelChange.updateComment("new comment")
     ```
   </td>
 </tr>
