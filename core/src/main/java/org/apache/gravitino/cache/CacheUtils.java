@@ -48,6 +48,7 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.utils.NamespaceUtil;
 
 public class CacheUtils {
 
@@ -247,6 +248,6 @@ public class CacheUtils {
     String metalakeName =
         MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
 
-    return Namespace.of(metalakeName);
+    return NamespaceUtil.ofTag(metalakeName);
   }
 }
