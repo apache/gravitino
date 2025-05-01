@@ -30,6 +30,9 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -552,6 +555,43 @@ public class TestCaffeineMetaCache {
     Assertions.assertFalse(cache.containsByName(ident4));
     Assertions.assertFalse(cache.containsByName(ident5));
     Assertions.assertFalse(cache.containsByName(ident6));
+  }
+
+  @Test
+  void testConcurrentGetAndRemove() throws InterruptedException {
+    cache.getOrLoadMetadataByName(ident1, Entity.EntityType.SCHEMA);
+
+    int threadNum = 100;
+    ExecutorService exec = Executors.newFixedThreadPool(threadNum);
+    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch done = new CountDownLatch(threadNum);
+
+    for (int i = 0; i < threadNum; i++) {
+      final boolean remover = (i % 2 == 0);
+      exec.execute(
+          () -> {
+            try {
+              start.await();
+              if (remover) {
+                cache.removeByName(ident1);
+              } else {
+                cache.getOrLoadMetadataByName(ident1, Entity.EntityType.SCHEMA);
+              }
+            } catch (Exception e) {
+              Assertions.fail("throw exception in thread", e);
+            } finally {
+              done.countDown();
+            }
+          });
+    }
+
+    start.countDown();
+    done.await();
+    exec.shutdownNow();
+
+    Assertions.assertTrue(
+        (cache.sizeOfCacheData() == 1 && cache.sizeOfCacheIndex() == 1)
+            || (cache.sizeOfCacheData() == 0 && cache.sizeOfCacheIndex() == 0));
   }
 
   private void initTestNameIdentifier() {
