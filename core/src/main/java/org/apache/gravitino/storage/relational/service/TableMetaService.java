@@ -30,7 +30,6 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.cache.CacheUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -90,17 +89,6 @@ public class TableMetaService {
             .getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
 
     return POConverters.fromTableAndColumnPOs(tablePO, columnPOs, identifier.namespace());
-  }
-
-  public TableEntity getTableByID(Long tableId) {
-    TablePO tablePO = getTablePOById(tableId);
-    List<ColumnPO> columnPOs =
-        TableColumnMetaService.getInstance()
-            .getColumnsByTableIdAndVersion(tablePO.getTableId(), tablePO.getCurrentVersion());
-
-    Namespace namespace = CacheUtils.getNamespaceFromTable(tablePO);
-
-    return POConverters.fromTableAndColumnPOs(tablePO, columnPOs, namespace);
   }
 
   public List<TableEntity> listTablesByNamespace(Namespace namespace) {

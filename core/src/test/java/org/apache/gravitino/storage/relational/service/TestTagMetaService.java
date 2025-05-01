@@ -125,55 +125,6 @@ public class TestTagMetaService extends TestJDBCBackend {
   }
 
   @Test
-  public void testInsertAndGetTagById() throws IOException {
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
-
-    // Test no tag entity.
-    TagMetaService tagMetaService = TagMetaService.getInstance();
-    Exception excep =
-        Assertions.assertThrows(
-            NoSuchEntityException.class,
-            () ->
-                tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1")));
-    Assertions.assertEquals("No such tag entity: tag1", excep.getMessage());
-    long tagId = RandomIdGenerator.INSTANCE.nextId();
-
-    // Test get tag entity
-    TagEntity tagEntity =
-        TagEntity.builder()
-            .withId(tagId)
-            .withName("tag1")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
-            .withComment("comment")
-            .withProperties(props)
-            .withAuditInfo(auditInfo)
-            .build();
-    tagMetaService.insertTag(tagEntity, false);
-
-    TagEntity resultTagEntity = tagMetaService.getTagByID(tagId);
-    Assertions.assertEquals(tagEntity, resultTagEntity);
-
-    // Test insert with overwrite.
-    TagEntity tagEntity2 =
-        TagEntity.builder()
-            .withId(tagEntity.id())
-            .withName("tag3")
-            .withNamespace(NamespaceUtil.ofTag(metalakeName))
-            .withComment("comment")
-            .withProperties(props)
-            .withAuditInfo(auditInfo)
-            .build();
-
-    Assertions.assertThrows(Exception.class, () -> tagMetaService.insertTag(tagEntity2, false));
-
-    tagMetaService.insertTag(tagEntity2, true);
-    TagEntity resultTagEntity2 = tagMetaService.getTagByID(tagEntity.id());
-    Assertions.assertEquals(tagEntity2, resultTagEntity2);
-  }
-
-  @Test
   public void testCreateAndListTags() throws IOException {
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);

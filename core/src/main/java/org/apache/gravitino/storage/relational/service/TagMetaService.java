@@ -35,7 +35,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.cache.CacheUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.TagEntity;
@@ -73,13 +72,6 @@ public class TagMetaService {
     String metalakeName = ident.namespace().level(0);
     TagPO tagPO = getTagPOByMetalakeAndName(metalakeName, ident.name());
     return POConverters.fromTagPO(tagPO, ident.namespace());
-  }
-
-  public TagEntity getTagByID(long id) {
-    TagPO tagPO = getTagPOByID(id);
-    Namespace namespace = CacheUtils.getNamespaceFromTag(tagPO);
-
-    return POConverters.fromTagPO(tagPO, namespace);
   }
 
   public void insertTag(TagEntity tagEntity, boolean overwritten) throws IOException {
@@ -394,7 +386,7 @@ public class TagMetaService {
     return tagPO;
   }
 
-  private TagPO getTagPOByID(long id) {
+  public TagPO getTagPOByID(long id) {
     TagPO tagPO =
         SessionUtils.getWithoutCommit(
             TagMetaMapper.class, mapper -> mapper.selectTagMetaByTagId(id));

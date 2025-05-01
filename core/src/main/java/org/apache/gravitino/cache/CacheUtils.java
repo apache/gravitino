@@ -29,7 +29,6 @@ import static org.apache.gravitino.Entity.EntityType.TOPIC;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -48,6 +47,7 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 public class CacheUtils {
@@ -124,130 +124,157 @@ public class CacheUtils {
   }
 
   /**
-   * Returns the namespace from ModelPO.
+   * Returns the entity from the PO based on its type.
    *
-   * @param modelPO The {@link ModelPO} instance.
-   * @return The namespace of the model
+   * @param cache The cache to retrieve the entity from.
+   * @param catalogPO The catalog PO to convert to an entity.
+   * @return The {@link CatalogEntity} instance.
    */
-  public static Namespace getNamespaceFromModel(ModelPO modelPO) {
-    Long metalakeId = modelPO.getMetalakeId();
-    Long catalogId = modelPO.getCatalogId();
-    Long schemaId = modelPO.getSchemaId();
+  public static CatalogEntity getCatalogEntityFromPO(MetaCache cache, CatalogPO catalogPO) {
+    String metalakeName = getMetalakeName(cache, catalogPO.getMetalakeId());
 
-    String metalakeName =
-        MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
-    String catalogName =
-        CatalogMetaService.getInstance().getCatalogPOById(catalogId).getCatalogName();
-    String schemaName = SchemaMetaService.getInstance().getSchemaPOById(schemaId).getSchemaName();
-
-    return Namespace.of(metalakeName, catalogName, schemaName);
+    return POConverters.fromCatalogPO(catalogPO, NamespaceUtil.ofCatalog(metalakeName));
   }
 
   /**
-   * Returns the namespace from TablePO.
+   * Returns the schema entity from the schema PO.
    *
-   * @param tablePO The {@link TablePO} instance.
-   * @return The namespace of the table
+   * @param cache The cache to retrieve the schema entity from.
+   * @param schemaPO The schema PO to convert to an entity.
+   * @return The {@link SchemaEntity} instance.
    */
-  public static Namespace getNamespaceFromTable(TablePO tablePO) {
-    Long metalakeId = tablePO.getMetalakeId();
-    Long catalogId = tablePO.getCatalogId();
-    Long schemaId = tablePO.getSchemaId();
+  public static SchemaEntity getSchemaEntityFromPO(MetaCache cache, SchemaPO schemaPO) {
+    String metalakeName = getMetalakeName(cache, schemaPO.getMetalakeId());
+    String catalogName = getCatalogName(cache, schemaPO.getCatalogId());
 
-    String metalakeName =
-        MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
-    String catalogName =
-        CatalogMetaService.getInstance().getCatalogPOById(catalogId).getCatalogName();
-    String schemaName = SchemaMetaService.getInstance().getSchemaPOById(schemaId).getSchemaName();
-
-    return Namespace.of(metalakeName, catalogName, schemaName);
+    return POConverters.fromSchemaPO(schemaPO, NamespaceUtil.ofSchema(metalakeName, catalogName));
   }
 
   /**
-   * Returns the namespace from FilesetPO.
+   * Returns the table entity from the table PO.
    *
-   * @param filesetPO The {@link FilesetPO} instance.
-   * @return The namespace of the fileset
+   * @param cache The cache to retrieve the table entity from.
+   * @param tablePO The table PO to convert to an entity.
+   * @return The {@link TableEntity} instance.
    */
-  public static Namespace getNamespaceFromFileset(FilesetPO filesetPO) {
-    Long metalakeId = filesetPO.getMetalakeId();
-    Long catalogId = filesetPO.getCatalogId();
-    Long schemaId = filesetPO.getSchemaId();
+  public static TableEntity getTableEntityFromPO(MetaCache cache, TablePO tablePO) {
+    String metalakeName = getMetalakeName(cache, tablePO.getMetalakeId());
+    String catalogName = getCatalogName(cache, tablePO.getCatalogId());
+    String schemaName = getSchemaName(cache, tablePO.getSchemaId());
 
-    String metalakeName =
-        MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
-    String catalogName =
-        CatalogMetaService.getInstance().getCatalogPOById(catalogId).getCatalogName();
-    String schemaName = SchemaMetaService.getInstance().getSchemaPOById(schemaId).getSchemaName();
-
-    return Namespace.of(metalakeName, catalogName, schemaName);
+    return POConverters.fromTablePO(
+        tablePO, NamespaceUtil.ofTable(metalakeName, catalogName, schemaName));
   }
 
   /**
-   * Returns the namespace from TopicPO.
+   * Returns the model entity from the model PO.
    *
-   * @param topicPO The {@link TopicPO} instance.
-   * @return The namespace of the topic
+   * @param cache The cache to retrieve the model entity from.
+   * @param modelPO The model PO to convert to an entity.
+   * @return The {@link ModelEntity} instance.
    */
-  public static Namespace getNameSpaceFromTopic(TopicPO topicPO) {
-    Long metalakeId = topicPO.getMetalakeId();
-    Long catalogId = topicPO.getCatalogId();
-    Long schemaId = topicPO.getSchemaId();
+  public static ModelEntity getModelEntityFromPO(MetaCache cache, ModelPO modelPO) {
+    String metalakeName = getMetalakeName(cache, modelPO.getMetalakeId());
+    String catalogName = getCatalogName(cache, modelPO.getCatalogId());
+    String schemaName = getSchemaName(cache, modelPO.getSchemaId());
 
-    String metalakeName =
-        MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
-    String catalogName =
-        CatalogMetaService.getInstance().getCatalogPOById(catalogId).getCatalogName();
-    String schemaName = SchemaMetaService.getInstance().getSchemaPOById(schemaId).getSchemaName();
-
-    return Namespace.of(metalakeName, catalogName, schemaName);
+    return POConverters.fromModelPO(
+        modelPO, NamespaceUtil.ofModel(metalakeName, catalogName, schemaName));
   }
 
   /**
-   * Returns the namespace from SchemaPO.
+   * Returns the topic entity from the topic PO.
    *
-   * @param schemaPO The {@link SchemaPO} instance.
-   * @return The namespace of the schema
+   * @param cache The cache to retrieve the topic entity from.
+   * @param topicPO The topic PO to convert to an entity.
+   * @return The {@link TopicEntity} instance.
    */
-  public static Namespace getNamespaceFromSchema(SchemaPO schemaPO) {
-    Long metalakeId = schemaPO.getMetalakeId();
-    Long catalogId = schemaPO.getCatalogId();
+  public static TopicEntity getTopicEntityFromPO(MetaCache cache, TopicPO topicPO) {
+    String metalakeName = getMetalakeName(cache, topicPO.getMetalakeId());
+    String catalogName = getCatalogName(cache, topicPO.getCatalogId());
+    String schemaName = getSchemaName(cache, topicPO.getSchemaId());
 
-    String metalakeName =
-        MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
-    String catalogName =
-        CatalogMetaService.getInstance().getCatalogPOById(catalogId).getCatalogName();
-
-    return Namespace.of(metalakeName, catalogName);
+    return POConverters.fromTopicPO(
+        topicPO, NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName));
   }
 
   /**
-   * Returns the namespace from CatalogPO.
+   * Returns the fileset entity from the fileset PO.
    *
-   * @param catalogPO The {@link CatalogPO} instance.
-   * @return The namespace of the catalog
+   * @param cache The cache to retrieve the fileset entity from.
+   * @param filesetPO The fileset PO to convert to an entity.
+   * @return The {@link FilesetEntity} instance.
    */
-  public static Namespace getNamespaceFromCatalog(CatalogPO catalogPO) {
-    Long metalakeId = catalogPO.getMetalakeId();
+  public static FilesetEntity getFilesetEntityFromPO(MetaCache cache, FilesetPO filesetPO) {
+    String metalakeName = getMetalakeName(cache, filesetPO.getMetalakeId());
+    String catalogName = getCatalogName(cache, filesetPO.getCatalogId());
+    String schemaName = getSchemaName(cache, filesetPO.getSchemaId());
 
-    String metalakeName =
-        MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
-
-    return Namespace.of(metalakeName);
+    return POConverters.fromFilesetPO(
+        filesetPO, NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName));
   }
 
   /**
-   * Returns the namespace from TagPO.
+   * Returns the tag entity from the tag PO.
    *
-   * @param tagPO The {@link TagPO} instance.
-   * @return The namespace of the tag
+   * @param cache The cache to retrieve the tag entity from.
+   * @param tagPO The tag PO to convert to an entity.
+   * @return The {@link TagEntity} instance.
    */
-  public static Namespace getNamespaceFromTag(TagPO tagPO) {
-    Long metalakeId = tagPO.getMetalakeId();
+  public static TagEntity getTagEntityFromPO(MetaCache cache, TagPO tagPO) {
+    String metalakeName = getMetalakeName(cache, tagPO.getMetalakeId());
 
-    String metalakeName =
-        MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
+    return POConverters.fromTagPO(tagPO, NamespaceUtil.ofTag(metalakeName));
+  }
 
-    return NamespaceUtil.ofTag(metalakeName);
+  /**
+   * Returns the name of the metalake based on its id.
+   *
+   * @param cache The cache to retrieve the metalake name from.
+   * @param metalakeId The id of the metalake.
+   * @return if the metalake is in the cache, returns the name of the metalake. Otherwise, returns
+   *     the name of the metalake from the database.
+   */
+  public static String getMetalakeName(MetaCache cache, Long metalakeId) {
+    if (cache.containsById(metalakeId, Entity.EntityType.METALAKE)) {
+      return getIdentFromEntity(cache.getOrLoadMetadataById(metalakeId, Entity.EntityType.METALAKE))
+          .name();
+    } else {
+      return MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
+    }
+  }
+
+  /**
+   * Returns the name of the catalog based on its id.
+   *
+   * @param cache The cache to retrieve the catalog name from.
+   * @param catalogId The id of the catalog.
+   * @return if the catalog is in the cache, returns the name of the catalog. Otherwise, returns the
+   *     name of the catalog from the database.
+   */
+  public static String getCatalogName(MetaCache cache, Long catalogId) {
+    if (cache.containsById(catalogId, Entity.EntityType.CATALOG)) {
+      return getIdentFromEntity(cache.getOrLoadMetadataById(catalogId, Entity.EntityType.CATALOG))
+          .name();
+    } else {
+      return CatalogMetaService.getInstance().getCatalogPOById(catalogId).getCatalogName();
+    }
+  }
+
+  /**
+   * Returns the name of the schema based on its id.
+   *
+   * @param cache The cache to retrieve the schema name from.
+   * @param schemaId The id of the schema.
+   * @return if the schema is in the cache, returns the name of the schema. Otherwise, returns the
+   *     name of the schema from the database.
+   */
+  public static String getSchemaName(MetaCache cache, Long schemaId) {
+    if (cache.containsById(schemaId, Entity.EntityType.SCHEMA)) {
+      return getIdentFromEntity(cache.getOrLoadMetadataById(schemaId, Entity.EntityType.SCHEMA))
+          .name();
+    } else {
+      return SchemaMetaService.getInstance().getSchemaPOById(schemaId).getSchemaName();
+    }
   }
 }
