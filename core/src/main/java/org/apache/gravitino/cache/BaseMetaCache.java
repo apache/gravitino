@@ -24,6 +24,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -75,25 +82,32 @@ public abstract class BaseMetaCache implements MetaCache {
         return MetalakeMetaService.getInstance().getMetalakeById(id);
 
       case CATALOG:
-        return CatalogMetaService.getInstance().getCatalogByID(id);
+        CatalogPO catalogPO = CatalogMetaService.getInstance().getCatalogPOById(id);
+        return CacheUtils.getCatalogEntityFromPO(this, catalogPO);
 
       case SCHEMA:
-        return SchemaMetaService.getInstance().getSchemaByID(id);
+        SchemaPO schemaPO = SchemaMetaService.getInstance().getSchemaPOById(id);
+        return CacheUtils.getSchemaEntityFromPO(this, schemaPO);
 
       case TOPIC:
-        return TopicMetaService.getInstance().getTopicByID(id);
+        TopicPO topicPO = TopicMetaService.getInstance().getTopicPOById(id);
+        return CacheUtils.getTopicEntityFromPO(this, topicPO);
 
       case FILESET:
-        return FilesetMetaService.getInstance().getFilesetByID(id);
+        FilesetPO filesetPO = FilesetMetaService.getInstance().getFilesetPOById(id);
+        return CacheUtils.getFilesetEntityFromPO(this, filesetPO);
 
       case MODEL:
-        return ModelMetaService.getInstance().getModelByID(id);
+        ModelPO modelPO = ModelMetaService.getInstance().getModelPOById(id);
+        return CacheUtils.getModelEntityFromPO(this, modelPO);
 
       case TABLE:
-        return TableMetaService.getInstance().getTableByID(id);
+        TablePO tablePO = TableMetaService.getInstance().getTablePOById(id);
+        return CacheUtils.getTableEntityFromPO(this, tablePO);
 
       case TAG:
-        return TagMetaService.getInstance().getTagByID(id);
+        TagPO tagPO = TagMetaService.getInstance().getTagPOByID(id);
+        return CacheUtils.getTagEntityFromPO(this, tagPO);
 
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + type);
