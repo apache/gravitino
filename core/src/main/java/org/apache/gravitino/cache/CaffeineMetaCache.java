@@ -341,7 +341,6 @@ public class CaffeineMetaCache extends BaseMetaCache {
           List<NameIdentifier> toRemovedIdent = Lists.newArrayList();
           for (NameIdentifier ident : indexTree.getValuesForKeysStartingWith(prefix.toString())) {
             toRemovedIdent.add(ident);
-            indexTree.remove(ident.toString());
           }
 
           if (!toRemovedIdent.isEmpty()) {
@@ -356,6 +355,8 @@ public class CaffeineMetaCache extends BaseMetaCache {
             // 3, clean up id cache and name cache
             byName.invalidateAll(toRemovedIdent);
             byId.invalidateAll(removedKeys);
+            // 4. remove from index tree
+            toRemovedIdent.forEach(ident -> indexTree.remove(ident.toString()));
           }
         });
   }
