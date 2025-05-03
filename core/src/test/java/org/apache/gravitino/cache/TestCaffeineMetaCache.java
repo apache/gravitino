@@ -594,6 +594,103 @@ public class TestCaffeineMetaCache {
             || (cache.sizeOfCacheData() == 0 && cache.sizeOfCacheIndex() == 0));
   }
 
+  @Test
+  void testRemoveNonExistentEntity() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> cache.removeById(9999L, Entity.EntityType.TABLE));
+
+    NameIdentifier unknownIdent = NameIdentifier.of("metalakeZ", "catalogZ", "schemaZ", "tableZ");
+    Assertions.assertThrows(IllegalArgumentException.class, () -> cache.removeByName(unknownIdent));
+  }
+
+  @Test
+  void testLoadEntityThrowException() throws IOException {
+    NameIdentifier badIdent = NameIdentifier.of("metalakeX", "catalogX", "schemaX");
+
+    when(mockStore.get(badIdent, Entity.EntityType.SCHEMA, SchemaEntity.class))
+        .thenThrow(new IOException("Simulated IO failure"));
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> cache.getOrLoadMetadataByName(badIdent, Entity.EntityType.SCHEMA));
+  }
+
+  @Test
+  void testLoadByNameWithNull() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.getOrLoadMetadataByName(null, Entity.EntityType.SCHEMA));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> cache.getOrLoadMetadataByName(ident1, null));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> cache.getOrLoadMetadataById(99999999L, null));
+  }
+
+  @Test
+  void testRemoveByIdThenReload() {
+    long id = idMap.get(ident3);
+    Entity.EntityType type = Entity.EntityType.TABLE;
+
+    Entity firstLoad = cache.getOrLoadMetadataById(id, type);
+    Assertions.assertEquals(table1, firstLoad);
+    Assertions.assertTrue(cache.containsById(id, type));
+    Assertions.assertTrue(cache.containsByName(ident3));
+
+    cache.removeById(id, type);
+    Assertions.assertFalse(cache.containsById(id, type));
+    Assertions.assertFalse(cache.containsByName(ident3));
+
+    Entity secondLoad = cache.getOrLoadMetadataById(id, type);
+    Assertions.assertEquals(table1, secondLoad);
+    Assertions.assertTrue(cache.containsById(id, type));
+    Assertions.assertTrue(cache.containsByName(ident3));
+  }
+
+  @Test
+  void testCreateEntityKey() {
+    CaffeineMetaCache.EntityKey entityKey1 =
+        CaffeineMetaCache.EntityKey.of(1L, Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(1L, entityKey1.id());
+    Assertions.assertEquals(Entity.EntityType.SCHEMA, entityKey1.type());
+
+    CaffeineMetaCache.EntityKey entityKey2 =
+        CaffeineMetaCache.EntityKey.of(2L, Entity.EntityType.TABLE);
+    Assertions.assertEquals(2L, entityKey2.id());
+    Assertions.assertEquals(Entity.EntityType.TABLE, entityKey2.type());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> CaffeineMetaCache.EntityKey.of(1L, null));
+  }
+
+  @Test
+  void testEntityKeyEqualsAndHashCode() {
+    CaffeineMetaCache.EntityKey entityKey1 =
+        CaffeineMetaCache.EntityKey.of(1L, Entity.EntityType.SCHEMA);
+    CaffeineMetaCache.EntityKey entityKey2 =
+        CaffeineMetaCache.EntityKey.of(1L, Entity.EntityType.SCHEMA);
+    CaffeineMetaCache.EntityKey entityKey3 =
+        CaffeineMetaCache.EntityKey.of(2L, Entity.EntityType.SCHEMA);
+    CaffeineMetaCache.EntityKey entityKey4 =
+        CaffeineMetaCache.EntityKey.of(2L, Entity.EntityType.TABLE);
+
+    Assertions.assertEquals(entityKey1, entityKey2);
+    Assertions.assertNotEquals(entityKey1, entityKey3);
+    Assertions.assertNotEquals(entityKey1, entityKey4);
+    Assertions.assertNotEquals(entityKey2, entityKey3);
+    Assertions.assertNotEquals(entityKey2, entityKey4);
+    Assertions.assertNotEquals(entityKey3, entityKey4);
+
+    Assertions.assertEquals(entityKey1.hashCode(), entityKey2.hashCode());
+    Assertions.assertNotEquals(entityKey1.hashCode(), entityKey3.hashCode());
+    Assertions.assertNotEquals(entityKey1.hashCode(), entityKey4.hashCode());
+    Assertions.assertNotEquals(entityKey2.hashCode(), entityKey3.hashCode());
+    Assertions.assertNotEquals(entityKey2.hashCode(), entityKey4.hashCode());
+    Assertions.assertNotEquals(entityKey3.hashCode(), entityKey4.hashCode());
+  }
+
   private void initTestNameIdentifier() {
     ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
     ident2 = NameIdentifier.of("metalake2", "catalog2", "schema2");
