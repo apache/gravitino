@@ -18,10 +18,10 @@
 import unittest
 from itertools import combinations, product
 
+from gravitino.api.types.json_serdes import TypeSerializer
+from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.types.type import PrimitiveType
 from gravitino.api.types.types import Types
-from gravitino.utils.json_serdes import TypeSerializer
-from gravitino.utils.json_serdes._helper.serdes_utils import SerdesUtils
 
 
 class MockType(PrimitiveType):
