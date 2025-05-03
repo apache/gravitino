@@ -18,7 +18,7 @@
 import unittest
 from itertools import combinations, product
 
-from gravitino.api.types.json_serdes import TypeSerializer
+from gravitino.api.types.json_serdes import TypeSerdes
 from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.types.type import PrimitiveType
 from gravitino.api.types.types import Types
@@ -35,7 +35,7 @@ class MockType(PrimitiveType):
         return "mock_type"
 
 
-class TestTypeSerializer(unittest.TestCase):
+class TestTypeSerdes(unittest.TestCase):
     def setUp(self):
         self._primitive_and_none_types = {
             **SerdesUtils.TYPES,
@@ -49,7 +49,7 @@ class TestTypeSerializer(unittest.TestCase):
 
     def test_serialize_primitive_and_none_type(self):
         for simple_string, type_ in self._primitive_and_none_types.items():
-            self.assertEqual(TypeSerializer.serialize(data=type_), simple_string)
+            self.assertEqual(TypeSerdes.serialize(data_type=type_), simple_string)
 
     def test_serialize_struct_type_of_primitive_and_none_types(self):
         types = self._primitive_and_none_types.values()
@@ -63,7 +63,7 @@ class TestTypeSerializer(unittest.TestCase):
         ]
 
         struct_type = Types.StructType.of(*fields)
-        serialized_result = TypeSerializer.serialize(struct_type)
+        serialized_result = TypeSerdes.serialize(struct_type)
         serialized_fields = serialized_result.get(SerdesUtils.FIELDS)
 
         self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.STRUCT)
@@ -86,7 +86,7 @@ class TestTypeSerializer(unittest.TestCase):
     def test_serialize_list_type_of_primitive_and_none_types(self):
         for simple_string, type_ in self._primitive_and_none_types.items():
             list_type = Types.ListType.of(element_type=type_, element_nullable=False)
-            serialized_result = TypeSerializer.serialize(list_type)
+            serialized_result = TypeSerdes.serialize(list_type)
             self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.LIST)
             self.assertEqual(
                 serialized_result.get(SerdesUtils.LIST_ELEMENT_TYPE), simple_string
@@ -101,7 +101,7 @@ class TestTypeSerializer(unittest.TestCase):
             map_type = Types.MapType.of(
                 key_type=key_type, value_type=value_type, value_nullable=False
             )
-            serialized_result = TypeSerializer.serialize(map_type)
+            serialized_result = TypeSerdes.serialize(map_type)
             self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.MAP)
             self.assertEqual(
                 serialized_result.get(SerdesUtils.MAP_KEY_TYPE),
@@ -119,7 +119,7 @@ class TestTypeSerializer(unittest.TestCase):
         types = self._primitive_and_none_types.values()
         for types in combinations(types, 2):
             union_type = Types.UnionType.of(*types)
-            serialized_result = TypeSerializer.serialize(union_type)
+            serialized_result = TypeSerdes.serialize(union_type)
             self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.UNION)
             self.assertListEqual(
                 serialized_result.get(SerdesUtils.UNION_TYPES),
@@ -128,7 +128,7 @@ class TestTypeSerializer(unittest.TestCase):
 
     def test_serialize_external_type(self):
         external_type = Types.ExternalType.of(catalog_string="catalog_string")
-        serialized_result = TypeSerializer.serialize(external_type)
+        serialized_result = TypeSerdes.serialize(external_type)
         self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.EXTERNAL)
         self.assertEqual(
             serialized_result.get(SerdesUtils.CATALOG_STRING), "catalog_string"
@@ -136,14 +136,14 @@ class TestTypeSerializer(unittest.TestCase):
 
     def test_write_unparsed_type(self):
         unparsed_type = Types.UnparsedType.of(unparsed_type="unparsed_type")
-        serialized_result = TypeSerializer.serialize(unparsed_type)
+        serialized_result = TypeSerdes.serialize(unparsed_type)
         self.assertEqual(serialized_result.get(SerdesUtils.TYPE), SerdesUtils.UNPARSED)
         self.assertEqual(
             serialized_result.get(SerdesUtils.UNPARSED_TYPE), "unparsed_type"
         )
 
         mock_type = MockType(name="mock")
-        result = TypeSerializer.serialize(mock_type)
+        result = TypeSerdes.serialize(mock_type)
         self.assertEqual(result.get(SerdesUtils.TYPE), SerdesUtils.UNPARSED)
         self.assertEqual(
             result.get(SerdesUtils.UNPARSED_TYPE), mock_type.simple_string()
