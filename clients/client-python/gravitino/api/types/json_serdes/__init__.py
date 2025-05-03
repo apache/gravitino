@@ -15,10 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.utils.json_serdes.base import (
+from gravitino.api.types.json_serdes.base import (
     GenericJsonDeserializer,
     GenericJsonSerializer,
 )
-from gravitino.utils.json_serdes.type_serializer import TypeSerializer
+from gravitino.api.types.json_serdes.type_serializer import TypeSerializer
 
 __all__ = ["GenericJsonDeserializer", "GenericJsonSerializer", "TypeSerializer"]

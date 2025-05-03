@@ -17,9 +17,9 @@
 
 from typing import Any, Dict, Union
 
+from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.api.types.json_serdes.base import GenericJsonSerializer
 from gravitino.api.types.type import Type
-from gravitino.utils.json_serdes._helper.serdes_utils import SerdesUtils
-from gravitino.utils.json_serdes.base import GenericJsonSerializer
 
 
 class TypeSerializer(GenericJsonSerializer[Type, Union[str, Dict[str, Any]]]):
