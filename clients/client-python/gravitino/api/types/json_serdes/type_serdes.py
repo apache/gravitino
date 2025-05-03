@@ -18,15 +18,15 @@
 from typing import Any, Dict, Union
 
 from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
-from gravitino.api.types.json_serdes.base import GenericJsonSerializer
+from gravitino.api.types.json_serdes.base import JsonSerializable
 from gravitino.api.types.type import Type
 
 
-class TypeSerializer(GenericJsonSerializer[Type, Union[str, Dict[str, Any]]]):
+class TypeSerdes(JsonSerializable[Type, Union[str, Dict[str, Any]]]):
     """Custom JSON serializer for Gravitino Type objects."""
 
     @classmethod
-    def serialize(cls, data: Type) -> Union[str, Dict[str, Any]]:
+    def serialize(cls, data_type: Type) -> Union[str, Dict[str, Any]]:
         """Serialize the given Gravitino Type.
 
         Args:
@@ -36,4 +36,19 @@ class TypeSerializer(GenericJsonSerializer[Type, Union[str, Dict[str, Any]]]):
             Union[str, Dict[str, Any]]: The serialized data corresponding to the given Gravitino Type.
         """
 
-        return SerdesUtils.write_data_type(data)
+        return SerdesUtils.write_data_type(data_type)
+
+    @classmethod
+    def deserialize(cls, data: Union[str, Dict[str, Any]]) -> Type:
+        """Deserialize the given data to a Gravitino Type.
+
+        Args:
+            data (Union[str, Dict[str, Any]]): The data to be deserialized.
+
+        Returns:
+            Type: The deserialized Gravitino Type.
+        """
+
+        # TODO: We shall implement the deserialization logic here.
+        # For now, it's just a placeholder.
+        pass
