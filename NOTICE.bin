@@ -913,3 +913,8 @@ Third-Party Notices and Licenses:
 - Hadoop: Apache Hadoop is used as a dependency
   License: Apache License 2.0
   Source/Reference: https://github.com/apache/hadoop/blob/trunk/NOTICE.txt
+
+OpenLineage
+This project includes code from the Marquez Project, part of the LFAI & Data Foundation.
+This project includes code from https://github.com/oittaa/uuid6-python repo (MIT license).
+This project includes code from https://github.com/f4b6a3/uuid-creator repo (MIT license).
