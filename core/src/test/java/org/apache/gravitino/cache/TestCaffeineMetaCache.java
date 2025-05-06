@@ -650,45 +650,38 @@ public class TestCaffeineMetaCache {
 
   @Test
   void testCreateEntityKey() {
-    CaffeineMetaCache.EntityKey entityKey1 =
-        CaffeineMetaCache.EntityKey.of(1L, Entity.EntityType.SCHEMA);
+    MetaCacheKey metaCacheKey1 = MetaCacheKey.of(1L, Entity.EntityType.SCHEMA);
 
-    Assertions.assertEquals(1L, entityKey1.id());
-    Assertions.assertEquals(Entity.EntityType.SCHEMA, entityKey1.type());
+    Assertions.assertEquals(1L, metaCacheKey1.id());
+    Assertions.assertEquals(Entity.EntityType.SCHEMA, metaCacheKey1.type());
 
-    CaffeineMetaCache.EntityKey entityKey2 =
-        CaffeineMetaCache.EntityKey.of(2L, Entity.EntityType.TABLE);
-    Assertions.assertEquals(2L, entityKey2.id());
-    Assertions.assertEquals(Entity.EntityType.TABLE, entityKey2.type());
+    MetaCacheKey metaCacheKey2 = MetaCacheKey.of(2L, Entity.EntityType.TABLE);
+    Assertions.assertEquals(2L, metaCacheKey2.id());
+    Assertions.assertEquals(Entity.EntityType.TABLE, metaCacheKey2.type());
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> CaffeineMetaCache.EntityKey.of(1L, null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> MetaCacheKey.of(1L, null));
   }
 
   @Test
   void testEntityKeyEqualsAndHashCode() {
-    CaffeineMetaCache.EntityKey entityKey1 =
-        CaffeineMetaCache.EntityKey.of(1L, Entity.EntityType.SCHEMA);
-    CaffeineMetaCache.EntityKey entityKey2 =
-        CaffeineMetaCache.EntityKey.of(1L, Entity.EntityType.SCHEMA);
-    CaffeineMetaCache.EntityKey entityKey3 =
-        CaffeineMetaCache.EntityKey.of(2L, Entity.EntityType.SCHEMA);
-    CaffeineMetaCache.EntityKey entityKey4 =
-        CaffeineMetaCache.EntityKey.of(2L, Entity.EntityType.TABLE);
+    MetaCacheKey metaCacheKey1 = MetaCacheKey.of(1L, Entity.EntityType.SCHEMA);
+    MetaCacheKey metaCacheKey2 = MetaCacheKey.of(1L, Entity.EntityType.SCHEMA);
+    MetaCacheKey metaCacheKey3 = MetaCacheKey.of(2L, Entity.EntityType.SCHEMA);
+    MetaCacheKey metaCacheKey4 = MetaCacheKey.of(2L, Entity.EntityType.TABLE);
 
-    Assertions.assertEquals(entityKey1, entityKey2);
-    Assertions.assertNotEquals(entityKey1, entityKey3);
-    Assertions.assertNotEquals(entityKey1, entityKey4);
-    Assertions.assertNotEquals(entityKey2, entityKey3);
-    Assertions.assertNotEquals(entityKey2, entityKey4);
-    Assertions.assertNotEquals(entityKey3, entityKey4);
+    Assertions.assertEquals(metaCacheKey1, metaCacheKey2);
+    Assertions.assertNotEquals(metaCacheKey1, metaCacheKey3);
+    Assertions.assertNotEquals(metaCacheKey1, metaCacheKey4);
+    Assertions.assertNotEquals(metaCacheKey2, metaCacheKey3);
+    Assertions.assertNotEquals(metaCacheKey2, metaCacheKey4);
+    Assertions.assertNotEquals(metaCacheKey3, metaCacheKey4);
 
-    Assertions.assertEquals(entityKey1.hashCode(), entityKey2.hashCode());
-    Assertions.assertNotEquals(entityKey1.hashCode(), entityKey3.hashCode());
-    Assertions.assertNotEquals(entityKey1.hashCode(), entityKey4.hashCode());
-    Assertions.assertNotEquals(entityKey2.hashCode(), entityKey3.hashCode());
-    Assertions.assertNotEquals(entityKey2.hashCode(), entityKey4.hashCode());
-    Assertions.assertNotEquals(entityKey3.hashCode(), entityKey4.hashCode());
+    Assertions.assertEquals(metaCacheKey1.hashCode(), metaCacheKey2.hashCode());
+    Assertions.assertNotEquals(metaCacheKey1.hashCode(), metaCacheKey3.hashCode());
+    Assertions.assertNotEquals(metaCacheKey1.hashCode(), metaCacheKey4.hashCode());
+    Assertions.assertNotEquals(metaCacheKey2.hashCode(), metaCacheKey3.hashCode());
+    Assertions.assertNotEquals(metaCacheKey2.hashCode(), metaCacheKey4.hashCode());
+    Assertions.assertNotEquals(metaCacheKey3.hashCode(), metaCacheKey4.hashCode());
   }
 
   private void initTestNameIdentifier() {

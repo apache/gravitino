@@ -55,6 +55,12 @@ public class MetadataEntityWeigher implements Weigher<Long, Entity> {
     return APPROXIMATE_ENTITY_OVERHEAD + calculateWeight(entity.type());
   }
 
+  /**
+   * Calculates the weight of an entity based on its type.
+   *
+   * @param tp The entity type
+   * @return The weight of the entity type
+   */
   private int calculateWeight(Entity.EntityType tp) {
     // TODO: find a more accurate weight of each entity type
     int weight;

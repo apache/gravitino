@@ -17,4 +17,3 @@
 # under the License.
 #
 org.apache.gravitino.cache.provider.CaffeineCacheProvider
-org.apache.gravitino.cache.provider.SnapshotCacheProvider

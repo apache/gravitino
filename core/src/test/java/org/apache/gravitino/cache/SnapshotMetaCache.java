@@ -193,6 +193,11 @@ public class SnapshotMetaCache extends BaseMetaCache {
     }
   }
 
+  /**
+   * Removes the given entity from the cache.
+   *
+   * @param entity The entity to remove.
+   */
   private void remove(Entity entity) {
     String prefix = CacheUtils.getIdentFromEntity(entity).toString();
 

@@ -31,7 +31,6 @@ import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.io.IOException;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -53,9 +52,9 @@ public class CaffeineMetaCache extends BaseMetaCache {
   private static volatile CaffeineMetaCache INSTANCE;
 
   /** Cache part */
-  private final Cache<EntityKey, Entity> cacheData;
+  private final Cache<MetaCacheKey, Entity> cacheData;
   /** Index part */
-  private RadixTree<EntityKey> cacheIndex;
+  private RadixTree<MetaCacheKey> cacheIndex;
 
   private final ReentrantLock opLock = new ReentrantLock();
   private final ScheduledExecutorService statsScheduler;
@@ -120,7 +119,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
             },
             new ThreadPoolExecutor.CallerRunsPolicy());
 
-    Caffeine<EntityKey, Entity> cacheDataBuilder = newBaseBuilder(cacheConfig);
+    Caffeine<MetaCacheKey, Entity> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
     cacheDataBuilder
         .executor(cleanupExec)
@@ -155,11 +154,11 @@ public class CaffeineMetaCache extends BaseMetaCache {
     Preconditions.checkArgument(id != null, "Id cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
-    EntityKey entityKey = EntityKey.of(id, type);
+    MetaCacheKey metaCacheKey = MetaCacheKey.of(id, type);
     LOG.debug("getById: checking cache for key={} type={}", id, type);
 
     return cacheData.get(
-        entityKey,
+        metaCacheKey,
         key -> {
           LOG.debug("Cache miss [byId] for id={}, type={}, loading from DB", id, type);
           // ???: Should we check if the entity is null?
@@ -180,7 +179,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
       LOG.debug("getByName: checking cache for key={} type={}", ident, type);
     }
 
-    EntityKey idKey = cacheIndex.getValueForExactKey(ident.toString());
+    MetaCacheKey idKey = cacheIndex.getValueForExactKey(ident.toString());
     if (idKey != null) {
       return cacheData.getIfPresent(idKey);
     }
@@ -202,7 +201,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
   /** {@inheritDoc} */
   @Override
   public void removeById(Long id, Entity.EntityType type) {
-    Entity entity = cacheData.getIfPresent(EntityKey.of(id, type));
+    Entity entity = cacheData.getIfPresent(MetaCacheKey.of(id, type));
     if (entity == null) {
       throw new IllegalArgumentException(
           "Entity with id " + id + " and type " + type + " not found in cache");
@@ -214,7 +213,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
   /** {@inheritDoc} */
   @Override
   public void removeByName(NameIdentifier ident) {
-    EntityKey idKey = cacheIndex.getValueForExactKey(ident.toString());
+    MetaCacheKey idKey = cacheIndex.getValueForExactKey(ident.toString());
     if (idKey == null) {
       throw new IllegalArgumentException("Entity with name " + ident + " not found in cache");
     }
@@ -226,7 +225,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
   /** {@inheritDoc} */
   @Override
   public boolean containsById(Long id, Entity.EntityType type) {
-    return cacheData.asMap().containsKey(EntityKey.of(id, type));
+    return cacheData.asMap().containsKey(MetaCacheKey.of(id, type));
   }
 
   /** {@inheritDoc} */
@@ -258,6 +257,11 @@ public class CaffeineMetaCache extends BaseMetaCache {
         });
   }
 
+  /**
+   * Synchronizes the entity to the index.
+   *
+   * @param entity The entity to synchronize
+   */
   private void syncEntityToIndex(Entity entity) {
     NameIdentifier nameIdent = CacheUtils.getIdentFromEntity(entity);
     long id = CacheUtils.getIdFromEntity(entity);
@@ -268,10 +272,15 @@ public class CaffeineMetaCache extends BaseMetaCache {
             LOG.trace("SyncFromIdCache: putting name={} for entity id={}", nameIdent, id);
           }
 
-          cacheIndex.put(nameIdent.toString(), EntityKey.of(id, entity.type()));
+          cacheIndex.put(nameIdent.toString(), MetaCacheKey.of(id, entity.type()));
         });
   }
 
+  /**
+   * Synchronizes the entity to the cache.
+   *
+   * @param entity The entity to synchronize
+   */
   private void syncEntityToCache(Entity entity) {
     NameIdentifier nameIdent = CacheUtils.getIdentFromEntity(entity);
     long id = CacheUtils.getIdFromEntity(entity);
@@ -282,11 +291,17 @@ public class CaffeineMetaCache extends BaseMetaCache {
             LOG.trace("SyncFromIndexCache: putting id={} for entity name={}", id, nameIdent);
           }
 
-          cacheData.put(EntityKey.of(id, entity.type()), entity);
-          cacheIndex.put(nameIdent.toString(), EntityKey.of(id, entity.type()));
+          cacheData.put(MetaCacheKey.of(id, entity.type()), entity);
+          cacheIndex.put(nameIdent.toString(), MetaCacheKey.of(id, entity.type()));
         });
   }
 
+  /**
+   * Removes the expired entity from the cache. This method is a hook method for the Cache, when an
+   * entry expires, it will call this method.
+   *
+   * @param entity The entity to remove,
+   */
   private void removeExpiredEntityFromDataCache(Entity entity) {
     NameIdentifier identifier = CacheUtils.getIdentFromEntity(entity);
 
@@ -303,6 +318,11 @@ public class CaffeineMetaCache extends BaseMetaCache {
         });
   }
 
+  /**
+   * Removes the entity from the cache. This method will remove all entries with the same prefix.
+   *
+   * @param rootEntity The root entity to remove.
+   */
   private void removeFromEntity(Entity rootEntity) {
     NameIdentifier prefix = CacheUtils.getIdentFromEntity(rootEntity);
 
@@ -310,10 +330,10 @@ public class CaffeineMetaCache extends BaseMetaCache {
         () -> {
           LOG.debug("Manual remove: prefix={}, removing matching entries", prefix);
           // 1. find all keys starting with prefix
-          List<EntityKey> toRemovedId = Lists.newArrayList();
+          List<MetaCacheKey> toRemovedId = Lists.newArrayList();
           List<String> toRemovedIdent = Lists.newArrayList();
 
-          for (EntityKey idKey : cacheIndex.getValuesForKeysStartingWith(prefix.toString())) {
+          for (MetaCacheKey idKey : cacheIndex.getValuesForKeysStartingWith(prefix.toString())) {
             Entity entityToRemove = cacheData.getIfPresent(idKey);
             toRemovedId.add(idKey);
 
@@ -333,6 +353,14 @@ public class CaffeineMetaCache extends BaseMetaCache {
         });
   }
 
+  /**
+   * Returns a new instance of Caffeine cache builder.
+   *
+   * @param cacheConfig The cache configuration
+   * @param <KEY> The key type
+   * @param <VALUE> The value type
+   * @return The new instance of Caffeine cache builder
+   */
   private <KEY, VALUE> Caffeine<KEY, VALUE> newBaseBuilder(CacheConfig cacheConfig) {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
 
@@ -356,6 +384,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
     return (Caffeine<KEY, VALUE>) builder;
   }
 
+  /** Initializes the stats scheduler. */
   private void initStatsScheduler() {
     if (!cacheConfig.isCacheStatusEnabled()) {
       return;
@@ -379,90 +408,17 @@ public class CaffeineMetaCache extends BaseMetaCache {
         TimeUnit.MINUTES);
   }
 
+  /**
+   * Runs the given action with the lock.
+   *
+   * @param action The action to run with the lock
+   */
   private void withLock(Runnable action) {
     opLock.lock();
     try {
       action.run();
     } finally {
       opLock.unlock();
-    }
-  }
-
-  /**
-   * Represents a key for the cache.
-   *
-   * <p>The key consists of the entity id and type.
-   */
-  static final class EntityKey {
-    private final Long id;
-    private final Entity.EntityType type;
-
-    /**
-     * Creates a new instance of {@link EntityKey}.
-     *
-     * @param id The entity id
-     * @param type The entity type
-     * @return The new instance
-     */
-    public static EntityKey of(long id, Entity.EntityType type) {
-      return new EntityKey(id, type);
-    }
-
-    /**
-     * Creates a new instance of {@link EntityKey}.
-     *
-     * @param id The entity id
-     * @param type The entity type
-     */
-    public EntityKey(Long id, Entity.EntityType type) {
-      Preconditions.checkArgument(id != null, "Id cannot be null");
-      Preconditions.checkArgument(type != null, "EntityType cannot be null");
-
-      this.id = id;
-      this.type = type;
-    }
-
-    /**
-     * Returns the entity id.
-     *
-     * @return The entity id
-     */
-    public Long id() {
-      return id;
-    }
-
-    /**
-     * Returns the entity type.
-     *
-     * @return The entity type
-     */
-    public Entity.EntityType type() {
-      return type;
-    }
-
-    /**
-     * Compares two instances of {@link EntityKey}. The comparison is based on the entity id and
-     * type.
-     *
-     * @param obj The object to compare to
-     * @return {@code true} if the two instances are equal, {@code false} otherwise
-     */
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj) return true;
-      if (!(obj instanceof EntityKey)) return false;
-      EntityKey other = (EntityKey) obj;
-      return id.equals(other.id) && type.equals(other.type);
-    }
-
-    /**
-     * Returns the hash code of this instance. The hash code is based on the entity id and type.
-     *
-     * @return The hash code of this instance
-     */
-    @Override
-    public int hashCode() {
-      return 31 * Objects.hashCode(id) + Objects.hashCode(type);
     }
   }
 }
