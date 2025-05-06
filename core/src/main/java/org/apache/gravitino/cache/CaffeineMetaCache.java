@@ -302,7 +302,8 @@ public class CaffeineMetaCache extends BaseMetaCache {
    *
    * @param entity The entity to remove,
    */
-  private void removeExpiredEntityFromDataCache(Entity entity) {
+  @Override
+  protected void removeExpiredEntityFromDataCache(Entity entity) {
     NameIdentifier identifier = CacheUtils.getIdentFromEntity(entity);
 
     withLock(
