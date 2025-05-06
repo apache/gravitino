@@ -85,6 +85,10 @@ public class SnapshotMetaCache extends BaseMetaCache {
 
   /** {@inheritDoc} */
   @Override
+  protected void removeExpiredEntityFromDataCache(Entity entity) {}
+
+  /** {@inheritDoc} */
+  @Override
   public Entity getOrLoadMetadataById(Long id, Entity.EntityType type) {
     Pair<Long, Entity.EntityType> key = Pair.of(id, type);
     Snapshot snap = snapshotRef.get();

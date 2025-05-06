@@ -126,4 +126,11 @@ public abstract class BaseMetaCache implements MetaCache {
       throws IOException {
     return entityStore.get(ident, type, CacheUtils.getEntityClass(type));
   }
+
+  /**
+   * Removes an expired entity from the data cache.
+   *
+   * @param entity The expired entity to remove.
+   */
+  protected abstract void removeExpiredEntityFromDataCache(Entity entity);
 }
