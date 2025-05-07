@@ -172,9 +172,9 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./binbin/gcli.sh <entity> <operation> [options]\n"
-            + "Entities: list, details, delete, set, remove, properties, update\n"
-            + "Common Options:\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] <entity> <command> [command-options]\n"
+            + "Entities: schema, role, metalake, catalog, column, topic, model, tag, fileset, user, table, group\n"
+            + "Gravitino Options:\n"
             + "  --url Gravitino URL (default: http://localhost:8090)\n"
             + "  --login user name\n"
             + "  --ignore ignore client/sever version check\n"
@@ -190,9 +190,9 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./binbin/gcli.sh <entity> <operation> [options]\n"
-            + "Entities: list, details, delete, set, remove, properties, update\n"
-            + "Common Options:\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] <entity> <command> [command-options]\n"
+            + "Entities: schema, role, metalake, catalog, column, topic, model, tag, fileset, user, table, group\n"
+            + "Gravitino Options:\n"
             + "  --url Gravitino URL (default: http://localhost:8090)\n"
             + "  --login user name\n"
             + "  --ignore ignore client/sever version check\n"
@@ -208,7 +208,7 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./bin/gcli.sh metalake <command> [options]\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] metalake <command> [command-options]\n"
             + "Commands:\n"
             + "  -- list\n"
             + "  -- details\n"
@@ -229,7 +229,7 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./bin/gcli.sh table <command> [options]\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] table <command> [command-options]\n"
             + "Commands:\n"
             + "  -- list\n"
             + "  -- details\n"
@@ -249,16 +249,16 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./bin/gcli.sh metalake list <required args> [optional args] [options]\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] metalake list <required args> [optional args]\n"
             + "Required Args:\n"
             + "  N/A\n"
             + "Optional Args:\n"
-            + "  --output output format (plain/table)\n"
-            + "Options:\n"
-            + "  --url Gravitino URL (default: http://localhost:8090)\n"
-            + "  --login user name\n"
-            + "  --ignore ignore client/sever version check\n"
-            + "  --quiet quiet mode",
+            + "  --output: output format (plain/table)\n"
+            + "Gravitino Options:\n"
+            + "  --url: Gravitino URL (default: http://localhost:8090)\n"
+            + "  --login: user name\n"
+            + "  --ignore: ignore client/sever version check\n"
+            + "  --quiet: quiet mode",
         output);
   }
 
@@ -269,17 +269,17 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./bin/gcli.sh metalake details <required args> [optional args] [options]\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] metalake details <required args> [optional args]\n"
             + "Required Args:\n"
             + "  N/A\n"
             + "Optional Args:\n"
-            + "  --audit display audit information\n"
-            + "  --output output format (plain/table)\n"
-            + "Options:\n"
-            + "  --url Gravitino URL (default: http://localhost:8090)\n"
-            + "  --login user name\n"
-            + "  --ignore ignore client/sever version check\n"
-            + "  --quiet quiet mode",
+            + "  --audit: display audit information\n"
+            + "  --output: output format (plain/table)\n"
+            + "Gravitino Options:\n"
+            + "  --url: Gravitino URL (default: http://localhost:8090)\n"
+            + "  --login: user name\n"
+            + "  --ignore: ignore client/sever version check\n"
+            + "  --quiet: quiet mode",
         output);
   }
 
@@ -290,17 +290,17 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./bin/gcli.sh table list <required args> [optional args] [options]\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] table list <required args> [optional args]\n"
             + "Required Args:\n"
-            + "  --metalake metalake name\n"
-            + "  --name full entity name (dot separated)\n"
+            + "  --metalake: metalake name\n"
+            + "  --name: full entity name (dot separated)\n"
             + "Optional Args:\n"
-            + "  --output output format (plain/table)\n"
-            + "Options:\n"
-            + "  --url Gravitino URL (default: http://localhost:8090)\n"
-            + "  --login user name\n"
-            + "  --ignore ignore client/sever version check\n"
-            + "  --quiet quiet mode",
+            + "  --output: output format (plain/table)\n"
+            + "Gravitino Options:\n"
+            + "  --url: Gravitino URL (default: http://localhost:8090)\n"
+            + "  --login: user name\n"
+            + "  --ignore: ignore client/sever version check\n"
+            + "  --quiet: quiet mode",
         output);
   }
 
@@ -311,22 +311,22 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./bin/gcli.sh table details <required args> [optional args] [options]\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] table details <required args> [optional args]\n"
             + "Required Args:\n"
-            + "  --metalake metalake name\n"
-            + "  --name full entity name (dot separated)\n"
+            + "  --metalake: metalake name\n"
+            + "  --name: full entity name (dot separated)\n"
             + "Optional Args:\n"
-            + "  --audit display audit information\n"
-            + "  --index display index information\n"
-            + "  --distribution display distribution information\n"
-            + "  --partition display partition information\n"
-            + "  --sortorder display sortorder information\n"
-            + "  --output output format (plain/table)\n"
-            + "Options:\n"
-            + "  --url Gravitino URL (default: http://localhost:8090)\n"
-            + "  --login user name\n"
-            + "  --ignore ignore client/sever version check\n"
-            + "  --quiet quiet mode",
+            + "  --audit: display audit information\n"
+            + "  --index: display index information\n"
+            + "  --distribution: display distribution information\n"
+            + "  --partition: display partition information\n"
+            + "  --sortorder: display sortorder information\n"
+            + "  --output: output format (plain/table)\n"
+            + "Gravitino Options:\n"
+            + "  --url: Gravitino URL (default: http://localhost:8090)\n"
+            + "  --login: user name\n"
+            + "  --ignore: ignore client/sever version check\n"
+            + "  --quiet: quiet mode",
         output);
   }
 
@@ -337,7 +337,7 @@ public class TestMain {
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals(
-        "Usage: ./bin/gcli.sh table <command> [options]\n"
+        "Usage: ./bin/gcli.sh [gravitino-options] table <command> [command-options]\n"
             + "Commands:\n"
             + "  -- list\n"
             + "  -- details\n"

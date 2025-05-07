@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
-import org.apache.gravitino.cli.utils.CliUtils;
 
 /**
  * Handles the command execution for Metalakes based on command type and the command line options.
@@ -37,44 +36,44 @@ public class MetalakeCommandHandler extends CommandHandler {
   private final String command;
   private String metalake;
 
-  public static Map<String, CliUtils.CliOptions> cliOptions =
+  public static Map<String, CliOptions> cliOptions =
       ImmutableMap.of(
           CommandActions.LIST,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(), ImmutableList.of(GravitinoOptions.CommandOptions.OUTPUT)),
           CommandActions.DETAILS,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(),
                   ImmutableList.of(
                       GravitinoOptions.CommandOptions.AUDIT,
                       GravitinoOptions.CommandOptions.OUTPUT)),
           CommandActions.CREATE,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
                   ImmutableList.of(GravitinoOptions.CommandOptions.COMMENT)),
           CommandActions.DELETE,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
                   ImmutableList.of(GravitinoOptions.CommandOptions.FORCE)),
           CommandActions.SET,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(
                       GravitinoOptions.CommandOptions.METALAKE,
                       GravitinoOptions.CommandOptions.PROPERTY,
                       GravitinoOptions.CommandOptions.VALUE),
                   ImmutableList.of()),
           CommandActions.REMOVE,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(
                       GravitinoOptions.CommandOptions.METALAKE,
                       GravitinoOptions.CommandOptions.PROPERTY),
                   ImmutableList.of()),
           CommandActions.PROPERTIES,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
                   ImmutableList.of(GravitinoOptions.CommandOptions.OUTPUT)),
           CommandActions.UPDATE,
-              new CliUtils.CliOptions(
+              new CliOptions(
                   ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
                   ImmutableList.of(
                       GravitinoOptions.CommandOptions.ENABLE,

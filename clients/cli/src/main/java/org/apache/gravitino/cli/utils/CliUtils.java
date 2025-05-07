@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.apache.gravitino.cli.CliOptions;
 import org.apache.gravitino.cli.CommandEntities;
 import org.apache.gravitino.cli.CommandHandler;
 import org.apache.gravitino.cli.GravitinoCommandLine;
@@ -36,41 +37,6 @@ import org.apache.gravitino.cli.MetalakeCommandHandler;
 
 /** This class contains utility methods for the CLI. */
 public class CliUtils {
-  public static class CliOptions {
-    List<GravitinoOptions.CommandOptions> necessaryParams;
-    List<GravitinoOptions.CommandOptions> optionalParams;
-
-    /**
-     * Constructs a new instance of {@link CliOptions}.
-     *
-     * @param necessaryParams The list of necessary options for the command.
-     * @param optionalParams The list of optional options for the command.
-     */
-    public CliOptions(
-        List<GravitinoOptions.CommandOptions> necessaryParams,
-        List<GravitinoOptions.CommandOptions> optionalParams) {
-      this.necessaryParams = necessaryParams;
-      this.optionalParams = optionalParams;
-    }
-
-    /**
-     * Retrieves the list of necessary options for the command.
-     *
-     * @return The list of necessary options for the command.
-     */
-    public List<GravitinoOptions.CommandOptions> getNecessaryParams() {
-      return necessaryParams;
-    }
-
-    /**
-     * Retrieves the list of optional options for the command.
-     *
-     * @return The list of optional options for the command.
-     */
-    public List<GravitinoOptions.CommandOptions> getOptionalParams() {
-      return optionalParams;
-    }
-  }
 
   /**
    * Prints the help message for the CLI.
@@ -82,9 +48,10 @@ public class CliUtils {
    */
   public static void printHelp() {
     System.out.println();
-    System.out.println("Usage: ./binbin/gcli.sh <entity> <operation> [options]");
-    System.out.printf("Entities: %s\n", String.join(", ", cliOptions.keySet()));
-    System.out.println("Common Options:");
+    System.out.println(
+        "Usage: ./bin/gcli.sh [gravitino-options] <entity> <command> [command-options]");
+    System.out.printf("Entities: %s\n", String.join(", ", CommandEntities.VALID_ENTITIES));
+    System.out.println("Gravitino Options:");
     for (GravitinoOptions.CommandOptions commonOption : CommandHandler.COMMON_OPTIONS) {
       System.out.printf("  --%s %s\n", commonOption.getValue(), commonOption.getDescription());
     }
@@ -101,7 +68,8 @@ public class CliUtils {
    */
   public static void printEntityHelp(String entity, boolean verbose) {
     // TODO: Implement help for each entity
-    System.out.println("Usage: ./bin/gcli.sh " + entity + " <command> [options]");
+    System.out.println(
+        "Usage: ./bin/gcli.sh " + "[gravitino-options] " + entity + " <command> [command-options]");
     System.out.println("Commands:");
     switch (entity) {
       case CommandEntities.METALAKE:
@@ -151,17 +119,17 @@ public class CliUtils {
     }
   }
 
-  private static void printSubCommandHelp(
-      String entity, String command, CliUtils.CliOptions options) {
+  private static void printSubCommandHelp(String entity, String command, CliOptions options) {
     System.out.printf(
-        "Usage: ./bin/gcli.sh %s %s <required args> [optional args] [options]\n", entity, command);
+        "Usage: ./bin/gcli.sh [gravitino-options] %s %s <required args> [optional args]\n",
+        entity, command);
     System.out.println("Required Args:");
     printSection(options.getNecessaryParams());
 
     System.out.println("Optional Args:");
     printSection(options.getOptionalParams());
 
-    System.out.println("Options:");
+    System.out.println("Gravitino Options:");
     printSection(CommandHandler.COMMON_OPTIONS);
   }
 
@@ -170,7 +138,7 @@ public class CliUtils {
       System.out.print("  N/A\n");
     } else {
       options.forEach(
-          option -> System.out.printf("  --%s %s\n", option.getValue(), option.getDescription()));
+          option -> System.out.printf("  --%s: %s\n", option.getValue(), option.getDescription()));
     }
   }
 
