@@ -170,6 +170,13 @@ icebergRest:
   ## The warehouse directory of Iceberg catalog for Iceberg REST service
   ##
   warehouse: /tmp/
+  #uri: thrift://localhost:9083
+  #catalogBackendName: memory
+  #jdbc:
+  #  user: ""
+  #  password: ""
+  #  initialize: True
+  #  driver: "com.mysql.cj.jdbc.Driver"
 
 ## Authentication mechanisms configuration. Support simple, OAuth and Kerberos.
 ##
