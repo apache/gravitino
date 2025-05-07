@@ -62,7 +62,7 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put("authorizer", gravitinoAuthorizer);
     metadataNames.forEach(
         (metadataType, metadataName) -> {
-          MetadataObject metadataObject = getMetadataObject(metadataType, metadataName);
+          MetadataObject metadataObject = buildMetadataObject(metadataType, metadataName);
           ognlContext.put(metadataType.name(), metadataObject);
         });
     NameIdentifier nameIdentifier = metadataNames.get(MetadataObject.Type.METALAKE);
@@ -75,7 +75,14 @@ public class AuthorizationExpressionEvaluator {
     }
   }
 
-  private MetadataObject getMetadataObject(
+  /**
+   * Build the MetadataObject through metadataType and metadataName.
+   *
+   * @param metadataType metadata type
+   * @param metadataName metadata NameIdentifier
+   * @return MetadataObject
+   */
+  private MetadataObject buildMetadataObject(
       MetadataObject.Type metadataType, NameIdentifier metadataName) {
     String namespaceWithMetalake = metadataName.namespace().toString();
     String metadataParent = StringUtils.substringAfter(namespaceWithMetalake, ".");
