@@ -49,7 +49,11 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.cli.commands.Command;
+import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 
 /**
@@ -86,6 +90,18 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new TableDetailsTableFormat(context).output((Table) entity);
     } else if (entity instanceof Table[]) {
       new TableListTableFormat(context).output((Table[]) entity);
+    } else if (entity instanceof Model) {
+      new ModelDetailsTableFormat(context).output((Model) entity);
+    } else if (entity instanceof Model[]) {
+      new ModelListTableFormat(context).output((Model[]) entity);
+    } else if (entity instanceof User) {
+      new UserDetailsTableFormat(context).output((User) entity);
+    } else if (entity instanceof User[]) {
+      new UserListTableFormat(context).output((User[]) entity);
+    } else if (entity instanceof Group) {
+      new GroupDetailsTableFormat(context).output((Group) entity);
+    } else if (entity instanceof Group[]) {
+      new GroupListTableFormat(context).output((Group[]) entity);
     } else if (entity instanceof Audit) {
       new AuditTableFormat(context).output((Audit) entity);
     } else if (entity instanceof org.apache.gravitino.rel.Column[]) {
@@ -725,6 +741,165 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
           columnAutoIncrement,
           columnNullable,
           columnComment);
+    }
+  }
+
+  /**
+   * Formats a single {@link Model} instance into a three-column table display. Displays model
+   * details, including name, comment, and latest version.
+   */
+  static final class ModelDetailsTableFormat extends TableFormat<Model> {
+    /**
+     * Constructs a new {@link ModelDetailsTableFormat} with the specified CommandContext.
+     *
+     * @param context the {@link CommandContext} instance.
+     */
+    public ModelDetailsTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Model model) {
+      Column modelName = new Column(context, "name");
+      Column modelComment = new Column(context, "comment");
+      Column modelLatestVersion = new Column(context, "latest version");
+
+      modelName.addCell(model.name());
+      modelComment.addCell(model.comment());
+      modelLatestVersion.addCell(model.latestVersion());
+
+      return getTableFormat(modelName, modelComment, modelLatestVersion);
+    }
+  }
+
+  /**
+   * Formats an array of {@link Model} into a single-column table display. Lists all model names in
+   * a vertical format.
+   */
+  static final class ModelListTableFormat extends TableFormat<Model[]> {
+    /**
+     * Constructs a new {@link ModelListTableFormat} with the specified CommandContext.
+     *
+     * @param context the {@link CommandContext} instance.
+     */
+    public ModelListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Model[] models) {
+      Column modelName = new Column(context, "name");
+      Arrays.stream(models).forEach(model -> modelName.addCell(model.name()));
+
+      return getTableFormat(modelName);
+    }
+  }
+
+  /**
+   * Formats a single {@link User} instance into a two-column table display. Displays user details,
+   * including name and roles.
+   */
+  static final class UserDetailsTableFormat extends TableFormat<User> {
+
+    /**
+     * Constructs a new {@link UserDetailsTableFormat} with the specified CommandContext.
+     *
+     * @param context the {@link CommandContext} instance.
+     */
+    public UserDetailsTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(User user) {
+      Column columnName = new Column(context, "name");
+      Column columnRoles = new Column(context, "roles");
+
+      columnName.addCell(user.name());
+      columnRoles.addCell(Command.COMMA_JOINER.join(user.roles()));
+
+      return getTableFormat(columnName, columnRoles);
+    }
+  }
+
+  /**
+   * Formats an array of {@link User} into a single-column table display. Lists all usernames in a
+   * vertical format.
+   */
+  static final class UserListTableFormat extends TableFormat<User[]> {
+
+    /**
+     * Constructs a new {@link UserListTableFormat} with the specified CommandContext.
+     *
+     * @param context the {@link CommandContext} instance.
+     */
+    public UserListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(User[] users) {
+      Column name = new Column(context, "name");
+      Arrays.stream(users).forEach(user -> name.addCell(user.name()));
+
+      return getTableFormat(name);
+    }
+  }
+
+  /**
+   * Formats a single {@link Group} instance into a two-column table display. Displays group
+   * details, including name and roles.
+   */
+  static final class GroupDetailsTableFormat extends TableFormat<Group> {
+
+    /**
+     * Constructs a new {@link GroupDetailsTableFormat} with the specified CommandContext.
+     *
+     * @param context the {@link CommandContext} instance.
+     */
+    public GroupDetailsTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Group group) {
+      Column columnName = new Column(context, "name");
+      Column columnRoles = new Column(context, "roles");
+
+      columnName.addCell(group.name());
+      columnRoles.addCell(Command.COMMA_JOINER.join(group.roles()));
+
+      return getTableFormat(columnName, columnRoles);
+    }
+  }
+
+  /**
+   * Formats an array of {@link Group} into a single-column table display. Lists all group names in
+   * a vertical format.
+   */
+  static final class GroupListTableFormat extends TableFormat<Group[]> {
+
+    /**
+     * Constructs a new {@link GroupListTableFormat} with the specified CommandContext.
+     *
+     * @param context the {@link CommandContext} instance.
+     */
+    public GroupListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Group[] groups) {
+      Column name = new Column(context, "name");
+      Arrays.stream(groups).forEach(group -> name.addCell(group.name()));
+
+      return getTableFormat(name);
     }
   }
 }
