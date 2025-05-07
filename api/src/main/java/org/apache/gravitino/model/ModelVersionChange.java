@@ -21,9 +21,8 @@ package org.apache.gravitino.model;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Sets;
+import com.google.common.collect.Lists;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -371,13 +370,11 @@ public interface ModelVersionChange {
      * @param aliasesToDelete the aliases to remove, or null for none
      */
     public UpdateAliases(List<String> aliasesToAdd, List<String> aliasesToDelete) {
-      Set<String> toAdd =
-          Sets.newHashSet(aliasesToAdd != null ? aliasesToAdd : Collections.emptyList());
-      Set<String> toDelete =
-          Sets.newHashSet(aliasesToDelete != null ? aliasesToDelete : Collections.emptyList());
-
-      this.aliasesToAdd = ImmutableSortedSet.copyOf(Sets.difference(toAdd, toDelete));
-      this.aliasesToDelete = ImmutableSortedSet.copyOf(Sets.difference(toDelete, toAdd));
+      this.aliasesToAdd =
+          ImmutableSortedSet.copyOf(aliasesToAdd != null ? aliasesToAdd : Lists.newArrayList());
+      this.aliasesToDelete =
+          ImmutableSortedSet.copyOf(
+              aliasesToDelete != null ? aliasesToDelete : Lists.newArrayList());
     }
 
     /**
