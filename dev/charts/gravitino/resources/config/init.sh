@@ -31,6 +31,13 @@ cp ${GRAVITINO_HOME}/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.27.jar ${
 cp ${GRAVITINO_HOME}/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.27.jar ${GRAVITINO_HOME}/libs
 echo "Finish downloading"
 
+
+## Should be refactor
+iceberg_version="1.6.1"
+iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
+wget https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/${iceberg_version}/${iceberg_gcp_bundle} -O ${GRAVITINO_HOME}/iceberg-rest-server/libs
+wget https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-gcp/0.8.0-incubating/gravitino-gcp-0.8.0-incubating.jar -O ${GRAVITINO_HOME}/iceberg-rest-server/libs
+
 cp /tmp/conf/* ${GRAVITINO_HOME}/conf
 cp /tmp/conf/log4j2.properties ${GRAVITINO_HOME}/conf
 
