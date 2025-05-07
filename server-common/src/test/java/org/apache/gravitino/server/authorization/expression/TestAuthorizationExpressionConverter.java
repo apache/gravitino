@@ -31,15 +31,25 @@ public class TestAuthorizationExpressionConverter {
             createTableAuthorizationExpression);
     Assertions.assertEquals(
         "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
-            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_TABLE) || authorizer.authorize(principal,METALAKE_NAME,SCHEMA,@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA)",
+            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_TABLE) "
+            + "|| authorizer.authorize(principal,METALAKE_NAME,SCHEMA,"
+            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA)",
         createTableOgnlExpression);
     String selectTableAuthorizationExpression =
-        "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA && (TABLE::SELECT_TABLE || TABLE::MODIFY_TABLE)";
+        "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA &&"
+            + " (TABLE::SELECT_TABLE || TABLE::MODIFY_TABLE)";
     String selectTableOgnlExpression =
         AuthorizationExpressionConverter.convertToOgnlExpression(
             selectTableAuthorizationExpression);
     Assertions.assertEquals(
-        "authorizer.authorize(principal,METALAKE_NAME,CATALOG,@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG) && authorizer.authorize(principal,METALAKE_NAME,SCHEMA,@org.apache.gravitino.authorization.Privilege$Name@USE_SCHEMA) && (authorizer.authorize(principal,METALAKE_NAME,TABLE,@org.apache.gravitino.authorization.Privilege$Name@SELECT_TABLE) || authorizer.authorize(principal,METALAKE_NAME,TABLE,@org.apache.gravitino.authorization.Privilege$Name@MODIFY_TABLE))",
+        "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
+            + "@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG) "
+            + "&& authorizer.authorize(principal,METALAKE_NAME,SCHEMA,"
+            + "@org.apache.gravitino.authorization.Privilege$Name@USE_SCHEMA) "
+            + "&& (authorizer.authorize(principal,METALAKE_NAME,TABLE,"
+            + "@org.apache.gravitino.authorization.Privilege$Name@SELECT_TABLE) "
+            + "|| authorizer.authorize(principal,METALAKE_NAME,TABLE,"
+            + "@org.apache.gravitino.authorization.Privilege$Name@MODIFY_TABLE))",
         selectTableOgnlExpression);
   }
 
@@ -49,7 +59,9 @@ public class TestAuthorizationExpressionConverter {
     String createTableOgnlExpression =
         AuthorizationExpressionConverter.convertToOgnlExpression(expressionWithOwner);
     Assertions.assertEquals(
-        "authorizer.authorize(principal,METALAKE_NAME,CATALOG,@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA) || authorizer.isOwner(principal,METALAKE_NAME,SCHEMA)",
+        "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
+            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA) "
+            + "|| authorizer.isOwner(principal,METALAKE_NAME,SCHEMA)",
         createTableOgnlExpression);
   }
 }
