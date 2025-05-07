@@ -114,6 +114,7 @@ find ${gravitino_home}/bundles/aliyun-bundle/build/libs/ -name 'gravitino-aliyun
 
 download_gcs_connector
 
+
 # Keeping the container running at all times
 cat <<EOF >> "${gravitino_dir}/packages/gravitino/bin/gravitino.sh"
 

@@ -31,3 +31,5 @@ data:
     {{- tpl (.Files.Get "resources/config/gravitino.conf") . | nindent 4 }}
   log4j2.properties: |-
     {{- tpl (.Files.Get "resources/config/log4j2.properties") . | nindent 4 }}
+  gcs-credentials.json: |-
+    {{- tpl (.Files.Get "resources/config/gcs-credentials.json") . | nindent 4 }}
