@@ -177,7 +177,7 @@ public class KerberosAuthenticator implements Authenticator {
         throw new UnauthorizedException("Principal has wrong format", AuthConstants.NEGOTIATE);
       }
 
-      String user = principalComponents.get(0);
+      String user = Splitter.on('/').splitToList(principalComponents.get(0)).get(0);
       // TODO: We will have KerberosUserPrincipal in the future.
       //  We can put more information of Kerberos to the KerberosUserPrincipal
       // For example, we can put the token into the KerberosUserPrincipal,
