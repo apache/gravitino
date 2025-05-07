@@ -415,7 +415,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
   }
 
   /**
-   * Formats tag details ({@link org.apache.gravitino.tag.Tag}) information. Output format: name,
+   * Formats detail information of {@link org.apache.gravitino.tag.Tag}. Output format: name,
    * comment
    */
   static final class TagDetailsPlainFormat extends PlainFormat<Tag> {
@@ -437,7 +437,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     }
   }
 
-  /** Formats tags ({@link org.apache.gravitino.tag.Tag}) information. Output format: name */
+  /** Formats array of {@link org.apache.gravitino.tag.Tag} information. Output format: name */
   static final class TagListPlainFormat extends PlainFormat<Tag[]> {
 
     /**
@@ -457,7 +457,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     }
   }
 
-  /** Formats properties ({@link java.util.Map}) information. Output format: key, value */
+  /** Formats information about properties of {@link org.apache.gravitino.tag.Tag}. Output format: key, value */
   static final class PropertiesListPlainFormat extends PlainFormat<Map<?, ?>> {
 
     /**
