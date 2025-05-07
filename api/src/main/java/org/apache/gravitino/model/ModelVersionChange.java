@@ -364,7 +364,7 @@ public interface ModelVersionChange {
     private final ImmutableSortedSet<String> aliasesToDelete;
 
     /**
-     * Constructs a new aliases-update operation.
+     * Constructs a new aliases-update operation, specifying the aliases to add and remove.
      *
      * @param aliasesToAdd the aliases to add, or null for none
      * @param aliasesToDelete the aliases to remove, or null for none
