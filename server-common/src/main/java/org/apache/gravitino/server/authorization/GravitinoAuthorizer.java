@@ -47,7 +47,7 @@ public interface GravitinoAuthorizer extends Closeable {
       Privilege.Name privilege);
 
   /**
-   * Determine whether the user is the Owner of a certain metadataType.
+   * Determine whether the user is the Owner of a certain metadata object.
    *
    * @param principal the user principal
    * @param metalake the metalake

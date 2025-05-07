@@ -30,7 +30,8 @@ public class TestAuthorizationExpressionConverter {
         AuthorizationExpressionConverter.convertToOgnlExpression(
             createTableAuthorizationExpression);
     Assertions.assertEquals(
-        "authorizer.authorize(principal,METALAKE_NAME,CATALOG,@org.apache.gravitino.authorization.Privilege$Name@CREATE_TABLE) || authorizer.authorize(principal,METALAKE_NAME,SCHEMA,@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA)",
+        "authorizer.authorize(principal,METALAKE_NAME,CATALOG,"
+            + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_TABLE) || authorizer.authorize(principal,METALAKE_NAME,SCHEMA,@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA)",
         createTableOgnlExpression);
     String selectTableAuthorizationExpression =
         "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA && (TABLE::SELECT_TABLE || TABLE::MODIFY_TABLE)";

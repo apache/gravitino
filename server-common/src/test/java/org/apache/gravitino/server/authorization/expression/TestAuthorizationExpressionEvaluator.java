@@ -69,14 +69,16 @@ public class TestAuthorizationExpressionEvaluator {
           NameIdentifierUtil.ofTable(
               "testMetalake", "testCatalog", "testSchema", "testTableHasNotPermission"));
       Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
-      metadataNames.put(MetadataObject.Type.TABLE, NameIdentifierUtil.ofMetalake("testTable"));
+      metadataNames.put(
+          MetadataObject.Type.TABLE,
+          NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "testSchema", "testTable"));
       Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
     }
   }
 
   @Test
   public void testEvaluatorWithOwner() {
-    String expression = "METALAKE::OWNER || CATELOG::CREATE_CATALOG";
+    String expression = "METALAKE::OWNER || CATALOG::CREATE_CATALOG";
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);

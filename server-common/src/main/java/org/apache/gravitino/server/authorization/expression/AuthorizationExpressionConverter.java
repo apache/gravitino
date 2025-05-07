@@ -66,7 +66,8 @@ public class AuthorizationExpressionConverter {
             } else {
               String replacement =
                   String.format(
-                      "authorizer.authorize(principal,METALAKE_NAME,%s,@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                      "authorizer.authorize(principal,METALAKE_NAME,%s,"
+                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
                       metadataType, privilegeOrOwner);
               matcher.appendReplacement(result, replacement);
             }

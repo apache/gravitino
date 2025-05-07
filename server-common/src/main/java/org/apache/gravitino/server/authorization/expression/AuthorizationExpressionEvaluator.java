@@ -22,6 +22,7 @@ import java.util.Map;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -61,9 +62,7 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put("authorizer", gravitinoAuthorizer);
     metadataNames.forEach(
         (metadataType, metadataName) -> {
-          MetadataObjects.MetadataObjectImpl metadataObject =
-              new MetadataObjects.MetadataObjectImpl(
-                  metadataName.namespace().toString(), metadataName.name(), metadataType);
+          MetadataObject metadataObject = getMetadataObject(metadataType, metadataName);
           ognlContext.put(metadataType.name(), metadataObject);
         });
     NameIdentifier nameIdentifier = metadataNames.get(MetadataObject.Type.METALAKE);
@@ -74,5 +73,15 @@ public class AuthorizationExpressionEvaluator {
     } catch (OgnlException e) {
       throw new RuntimeException("ognl evaluate error", e);
     }
+  }
+
+  private MetadataObject getMetadataObject(
+      MetadataObject.Type metadataType, NameIdentifier metadataName) {
+    String namespaceWithMetalake = metadataName.namespace().toString();
+    String metadataParent = StringUtils.substringAfter(namespaceWithMetalake, ".");
+    if ("".equals(metadataParent)) {
+      return MetadataObjects.of(null, metadataName.name(), metadataType);
+    }
+    return MetadataObjects.of(metadataParent, metadataName.name(), metadataType);
   }
 }
