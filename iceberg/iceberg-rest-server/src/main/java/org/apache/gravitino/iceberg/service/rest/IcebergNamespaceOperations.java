@@ -28,6 +28,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.POST;
@@ -80,7 +81,8 @@ public class IcebergNamespaceOperations {
   @Timed(name = "list-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespace", absolute = true)
   public Response listNamespaces(
-      @DefaultValue("") @QueryParam("parent") String parent, @PathParam("prefix") String prefix) {
+      @DefaultValue("") @Encoded() @QueryParam("parent") String parent,
+      @PathParam("prefix") String prefix) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace parentNamespace =
         parent.isEmpty() ? Namespace.empty() : RESTUtil.decodeNamespace(parent);
@@ -98,7 +100,7 @@ public class IcebergNamespaceOperations {
   @Timed(name = "load-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-namespace", absolute = true)
   public Response loadNamespace(
-      @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+      @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("Load Iceberg namespace, catalog: {}, namespace: {}", catalogName, icebergNS);
@@ -115,7 +117,7 @@ public class IcebergNamespaceOperations {
   @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "namespace-exists", absolute = true)
   public Response namespaceExists(
-      @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+      @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("Check Iceberg namespace exists, catalog: {}, namespace: {}", catalogName, icebergNS);
@@ -135,7 +137,7 @@ public class IcebergNamespaceOperations {
   @Timed(name = "drop-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-namespace", absolute = true)
   public Response dropNamespace(
-      @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+      @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     // todo check if table exists in namespace after table ops is added
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
@@ -169,7 +171,7 @@ public class IcebergNamespaceOperations {
   @ResponseMetered(name = "update-namespace", absolute = true)
   public Response updateNamespace(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
@@ -192,7 +194,7 @@ public class IcebergNamespaceOperations {
   @ResponseMetered(name = "register-table", absolute = true)
   public Response registerTable(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       RegisterTableRequest registerTableRequest) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
