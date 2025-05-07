@@ -434,7 +434,7 @@ Please refer to [Trino Iceberg document](https://trino.io/docs/current/connector
 ### Exploring Apache Iceberg with Trino SQL
 
 ```sql
-Use rest.dml;
+USE rest.dml;
 DELETE FROM rest.dml.test WHERE id = 2;
 SELECT * FROM test;
 ```
