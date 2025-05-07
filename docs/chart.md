@@ -16,16 +16,11 @@ This Helm chart deploys Apache Gravitino on Kubernetes with customizable configu
 
 ## Update Chart Dependency
 
-If the chart has not been released yet, navigate to the chart directory and update its dependencies:
+The Gravitino Helm chart has not yet been officially released.   
+To proceed, please clone the repository, navigate to the chart directory, and execute the Helm dependency update command.
 
 ```console
 helm dependency update [CHART]
-```
-
-## Package Helm Chart
-
-```console
-helm package [CHART_PATH]
 ```
 
 ## View Chart values
@@ -46,10 +41,10 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino using the default settings:
+Run the following command to deploy Gravitino using the default settings, specify container image versions using --set image.tag=0.x.0-incubating (replace x with target version):
 
 ```console
-helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set image.tag=<0.*.0-incubating>
 ```
 
 ### Deploy with Custom Configuration
