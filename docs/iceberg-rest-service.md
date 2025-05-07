@@ -415,6 +415,30 @@ INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test;
 ```
 
+## Exploring the Apache Gravitino Iceberg REST catalog service with Trino
+
+### Deploying Trino with Apache Iceberg support
+
+To configure the Iceberg connector, create a catalog properties file like `etc/catalog/rest.properties` that references the Iceberg connector.
+
+```
+connector.name=iceberg
+iceberg.catalog.type=rest
+iceberg.rest-catalog.uri=http://localhost:9001/iceberg/
+fs.hadoop.enabled=true
+iceberg.rest-catalog.view-endpoints-enabled=false
+```
+
+Please refer to [Trino Iceberg document](https://trino.io/docs/current/connector/iceberg.html) for more details.
+
+### Exploring Apache Iceberg with Trino SQL
+
+```sql
+Use rest.dml;
+DELETE FROM rest.dml.test WHERE id = 2;
+SELECT * FROM test;
+```
+
 ## Docker instructions
 
 You could run Gravitino Iceberg REST server though docker container:
