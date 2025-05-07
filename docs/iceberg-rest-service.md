@@ -415,30 +415,6 @@ INSERT INTO dml.test VALUES (1), (2);
 SELECT * FROM dml.test;
 ```
 
-## Exploring the Apache Gravitino Iceberg REST catalog service with Trino
-
-### Deploying Trino with Apache Iceberg support
-
-To configure the Iceberg connector, create a catalog properties file like `etc/catalog/rest.properties` that references the Iceberg connector.
-
-```
-connector.name=iceberg
-iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=http://localhost:9001/iceberg/
-fs.hadoop.enabled=true
-iceberg.rest-catalog.view-endpoints-enabled=false
-```
-
-Please refer to [Trino Iceberg document](https://trino.io/docs/current/connector/iceberg.html) for more details.
-
-### Exploring Apache Iceberg with Trino SQL
-
-```sql
-USE rest.dml;
-DELETE FROM rest.dml.test WHERE id = 2;
-SELECT * FROM test;
-```
-
 ## Docker instructions
 
 You could run Gravitino Iceberg REST server though docker container:
@@ -453,7 +429,7 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 |----------------------------------------|-----------------------------------------------------|-------------------|
 | `GRAVITINO_IO_IMPL`                    | `gravitino.iceberg-rest.io-impl`                    | 0.7.0-incubating  |
 | `GRAVITINO_URI`                        | `gravitino.iceberg-rest.uri`                        | 0.7.0-incubating  |
-| `GRAVITINO_CATALOG_BACKEND`            | `gravitino.iceberg-rest.catalog-backend`            | 0.10.0            |
+| `GRAVITINO_CATALOG_BACKEND`            | `gravitino.iceberg-rest.catalog-backend`            | 0.10.0-incubating |
 | `GRAVITINO_JDBC_DRIVER`                | `gravitino.iceberg-rest.jdbc-driver`                | 0.9.0-incubating  |
 | `GRAVITINO_JDBC_USER`                  | `gravitino.iceberg-rest.jdbc-user`                  | 0.9.0-incubating  |
 | `GRAVITINO_JDBC_PASSWORD`              | `gravitino.iceberg-rest.jdbc-password`              | 0.9.0-incubating  |
