@@ -457,7 +457,10 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     }
   }
 
-  /** Formats information about properties of {@link org.apache.gravitino.tag.Tag}. Output format: key, value */
+  /**
+   * Formats information about properties of {@link org.apache.gravitino.tag.Tag}. Output format:
+   * key, value
+   */
   static final class PropertiesListPlainFormat extends PlainFormat<Map<?, ?>> {
 
     /**
