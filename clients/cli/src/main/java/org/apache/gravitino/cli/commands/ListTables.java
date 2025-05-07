@@ -37,7 +37,7 @@ public class ListTables extends TableCommand {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    */
   public ListTables(CommandContext context, String metalake, String catalog, String schema) {
     super(context, metalake, catalog);
@@ -47,43 +47,50 @@ public class ListTables extends TableCommand {
   /** List the names of all tables in a schema. */
   @Override
   public void handle() {
-    NameIdentifier[] tables = null;
-    Namespace name = Namespace.of(schema);
 
-    try {
-      tables = tableCatalog().listTables(name);
+      Namespace name = Namespace.of(schema);
+      NameIdentifier[] tables = tableCatalog().listTables(name);
+
+      if (tables == null || tables.length == 0) {
+        printInformation("No tables exist.");
+        return;
+      }
+      
+      try {
+      Table[] gTables = new Table[tables.length];
+      for (int i = 0; i < tables.length; i++) {
+        String tableName = tables[i].name();
+        gTables[i] = createTableStub(tableName);
+      }
+
+      printResults(gTables);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
+  }
 
-    if (tables.length == 0) {
-      printInformation("No tables exist.");
-      return;
-    }
+  /**
+   * Creates a stub Table instance with only the table name.
+   *
+   * @param tableName The name of the table.
+   * @return A minimal Table instance.
+   */
+  private Table createTableStub(String tableName) {
+    return new Table() {
+      @Override
+      public String name() {
+        return tableName;
+      }
 
-    Table[] gTables = new Table[tables.length];
-    for (int i = 0; i < tables.length; i++) {
-      String tableName = tables[i].name();
-      gTables[i] =
-          new Table() {
+      @Override
+      public Column[] columns() {
+        return new Column[0]; // Empty columns since only table names are needed
+      }
 
-            @Override
-            public String name() {
-              return tableName;
-            }
-
-            @Override
-            public Column[] columns() {
-              return new Column[0];
-            }
-
-            @Override
-            public Audit auditInfo() {
-              return null;
-            }
-          };
-    }
-
-    printResults(gTables);
+      @Override
+      public Audit auditInfo() {
+        return null; // No audit info needed for listing tables
+      }
+    };
   }
 }

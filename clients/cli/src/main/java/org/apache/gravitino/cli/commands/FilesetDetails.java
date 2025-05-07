@@ -43,7 +43,7 @@ public class FilesetDetails extends Command {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param fileset The name of the fileset.
    */
   public FilesetDetails(

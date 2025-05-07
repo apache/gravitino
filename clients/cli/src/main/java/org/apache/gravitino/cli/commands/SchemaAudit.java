@@ -40,7 +40,7 @@ public class SchemaAudit extends AuditCommand {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    */
   public SchemaAudit(CommandContext context, String metalake, String catalog, String schema) {
     super(context);
@@ -52,9 +52,11 @@ public class SchemaAudit extends AuditCommand {
   /** Displays the audit information of schema. */
   @Override
   public void handle() {
+    GravitinoClient client = null;
     Schema result = null;
 
-    try (GravitinoClient client = buildClient(metalake)) {
+    try {
+      client = buildClient(metalake);
       result = client.loadCatalog(catalog).asSchemas().loadSchema(this.schema);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -64,6 +66,10 @@ public class SchemaAudit extends AuditCommand {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+    }
+
+    if (result == null) {
+      exitWithError("Failed to retrieve schema details.");
     }
 
     displayAuditInfo(result.auditInfo());

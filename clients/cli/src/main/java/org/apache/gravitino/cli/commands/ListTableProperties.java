@@ -59,10 +59,12 @@ public class ListTableProperties extends ListProperties {
   /** List the properties of a table. */
   @Override
   public void handle() {
+    GravitinoClient client = null;
     Table gTable = null;
+
     try {
+      client = buildClient(metalake);
       NameIdentifier name = NameIdentifier.of(schema, table);
-      GravitinoClient client = buildClient(metalake);
       gTable = client.loadCatalog(catalog).asTableCatalog().loadTable(name);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -74,6 +76,10 @@ public class ListTableProperties extends ListProperties {
       exitWithError(ErrorMessages.UNKNOWN_TABLE);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+    }
+
+    if (gTable == null) {
+      exitWithError("Table not found: " + table);
     }
 
     Map<String, String> properties = gTable.properties();

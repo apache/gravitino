@@ -55,8 +55,10 @@ public class ListSchemaProperties extends ListProperties {
   @Override
   public void handle() {
     Schema gSchema = null;
+    GravitinoClient client = null;
+
     try {
-      GravitinoClient client = buildClient(metalake);
+      client = buildClient(metalake);
       gSchema = client.loadCatalog(catalog).asSchemas().loadSchema(schema);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
@@ -66,6 +68,10 @@ public class ListSchemaProperties extends ListProperties {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+    }
+
+    if (gSchema == null) {
+      exitWithError("Schema not found: " + schema);
     }
 
     Map<String, String> properties = gSchema.properties();

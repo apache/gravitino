@@ -86,9 +86,19 @@ public class CreateTable extends Command {
       exitWithError("Error initializing client or table name: " + exp.getMessage());
     }
 
+    if (client == null) {
+      exitWithError("Client initialization failed.");
+    }
+    if (tableName == null) {
+      exitWithError("Table name could not be determined.");
+    }
+
     try {
       tableData = readTableCSV.parse(columnFile);
       columns = readTableCSV.columns(tableData);
+      if (columns == null || columns.length == 0) {
+        exitWithError("No valid columns found in the provided file.");
+      }
     } catch (Exception exp) {
       exitWithError("Error reading or parsing column file: " + exp.getMessage());
     }

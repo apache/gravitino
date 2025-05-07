@@ -35,7 +35,7 @@ public class TableSortOrder extends TableCommand {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param table The name of the table.
    */
   public TableSortOrder(

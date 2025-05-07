@@ -21,6 +21,10 @@ package org.apache.gravitino.cli.commands;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.cli.ErrorMessages;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.rel.Table;
 
 /** Displays the audit information of a table. */
@@ -35,7 +39,7 @@ public class TableAudit extends TableCommand {
    * @param context The command context.
    * @param metalake The name of the metalake.
    * @param catalog The name of the catalog.
-   * @param schema The name of the schenma.
+   * @param schema The name of the schema.
    * @param table The name of the table.
    */
   public TableAudit(
@@ -53,8 +57,19 @@ public class TableAudit extends TableCommand {
     try {
       NameIdentifier name = NameIdentifier.of(schema, table);
       gTable = tableCatalog().loadTable(name);
+
+    } catch (NoSuchMetalakeException err) {
+      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+    } catch (NoSuchCatalogException err) {
+      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+    } catch (NoSuchSchemaException err) {
+      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
+    }
+
+    if (gTable == null) {
+      exitWithError("Failed to retrieve table details.");
     }
 
     displayAuditInfo(gTable.auditInfo());
