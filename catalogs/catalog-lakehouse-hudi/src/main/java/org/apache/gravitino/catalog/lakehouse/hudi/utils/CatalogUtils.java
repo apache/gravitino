@@ -27,6 +27,9 @@ import org.apache.gravitino.catalog.lakehouse.hudi.backend.HudiCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.HudiHMSBackend;
 
 public class CatalogUtils {
+
+  public static final String CATALOG_ID_KEY = "catalogId";
+
   private CatalogUtils() {}
 
   public static HudiCatalogBackend loadHudiCatalogBackend(Map<String, String> properties) {
