@@ -20,24 +20,17 @@ package org.apache.gravitino.cli.outputs;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
-import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Role;
-import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.tag.Tag;
 
 /** Plain format to print a pretty string to standard out. */
 public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
@@ -51,7 +44,6 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
    * @throws IllegalArgumentException if the object type is not supported
    */
   public static void output(Object entity, CommandContext context) {
-
     if (entity instanceof Metalake) {
       new MetalakePlainFormat(context).output((Metalake) entity);
     } else if (entity instanceof Metalake[]) {
@@ -84,36 +76,17 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
       new AuditPlainFormat(context).output((Audit) entity);
     } else if (entity instanceof Column[]) {
       new ColumnListPlainFormat(context).output((Column[]) entity);
-    } else if (entity instanceof Role) {
-      new RoleDetailsPlainFormat(context).output((Role) entity);
-    } else if (entity instanceof Role[]) {
-      new RoleListPlainFormat(context).output((Role[]) entity);
-    } else if (entity instanceof Fileset) {
-      new FilesetDetailsPlainFormat(context).output((Fileset) entity);
-    } else if (entity instanceof Fileset[]) {
-      new FilesetListPlainFormat(context).output((Fileset[]) entity);
-    } else if (entity instanceof Topic) {
-      new TopicDetailsPlainFormat(context).output((Topic) entity);
-    } else if (entity instanceof Topic[]) {
-      new TopicListPlainFormat(context).output((Topic[]) entity);
-    } else if (entity instanceof Tag) {
-      new TagDetailsPlainFormat(context).output((Tag) entity);
-    } else if (entity instanceof Tag[]) {
-      new TagListPlainFormat(context).output((Tag[]) entity);
-    } else if (entity instanceof Map) {
-      new PropertiesListPlainFormat(context).output((Map<?, ?>) entity);
     } else {
-      throw new IllegalArgumentException(
-          "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
+      throw new IllegalArgumentException("Unsupported object type");
     }
   }
 
   /**
-   * Creates a new {@link PlainFormat} with the specified command context.
+   * Creates a new {@link PlainFormat} with the specified output properties.
    *
    * @param context The command context.
    */
-  protected PlainFormat(CommandContext context) {
+  public PlainFormat(CommandContext context) {
     super(context);
   }
 
@@ -285,7 +258,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
   static final class ColumnListPlainFormat extends PlainFormat<Column[]> {
 
     /**
-     * Creates a new {@link ColumnListPlainFormat} with the specified command context.
+     * Creates a new {@link ColumnListPlainFormat} with the specified output properties.
      *
      * @param context The command context.
      */
@@ -429,218 +402,6 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     @Override
     public String getOutput(Group[] groups) {
       return COMMA_JOINER.join(Arrays.stream(groups).map(Group::name).collect(Collectors.toList()));
-    }
-  }
-
-  /**
-   * Formats detail information of {@link org.apache.gravitino.tag.Tag}. Output format: name,
-   * comment
-   */
-  static final class TagDetailsPlainFormat extends PlainFormat<Tag> {
-
-    /**
-     * Creates a new {@link TagDetailsPlainFormat}.
-     *
-     * @param context The command context.
-     */
-    public TagDetailsPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Tag tag) {
-      String comment = tag.comment() == null ? "N/A" : tag.comment();
-      return COMMA_JOINER.join(tag.name(), comment);
-    }
-  }
-
-  /** Formats array of {@link org.apache.gravitino.tag.Tag} information. Output format: name */
-  static final class TagListPlainFormat extends PlainFormat<Tag[]> {
-
-    /**
-     * Creates a new {@link TagListPlainFormat}.
-     *
-     * @param context The command context.
-     */
-    public TagListPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Tag[] tags) {
-      List<String> tagNames = Arrays.stream(tags).map(Tag::name).collect(Collectors.toList());
-      return NEWLINE_JOINER.join(tagNames);
-    }
-  }
-
-  /**
-   * Formats information about properties of {@link org.apache.gravitino.tag.Tag}. Output format:
-   * key, value
-   */
-  static final class PropertiesListPlainFormat extends PlainFormat<Map<?, ?>> {
-
-    /**
-     * Creates a new {@link PropertiesListPlainFormat}.
-     *
-     * @param context The command context.
-     */
-    public PropertiesListPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Map<?, ?> properties) {
-      StringBuilder data = new StringBuilder();
-      properties.forEach(
-          (key, value) -> {
-            data.append(COMMA_JOINER.join(key.toString(), value.toString()));
-            data.append(System.lineSeparator());
-          });
-
-      return data.toString();
-    }
-  }
-
-  /**
-   * Format a {@link Role} instance with their details. Output format: securable object details
-   * which belongs to the role,
-   */
-  static final class RoleDetailsPlainFormat extends PlainFormat<Role> {
-
-    /**
-     * Creates a new {@link PlainFormat} with the specified CommandContext.
-     *
-     * @param context The command context.
-     */
-    public RoleDetailsPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Role entity) {
-      List<SecurableObject> objects = entity.securableObjects();
-      StringBuilder sb = new StringBuilder();
-      for (SecurableObject object : objects) {
-        sb.append(object.name()).append(",").append(object.type()).append(",").append("\n");
-        sb.append(
-            String.join(
-                "\n",
-                object.privileges().stream().map(Privilege::simpleString).toArray(String[]::new)));
-        sb.append("\n");
-      }
-
-      return sb.toString();
-    }
-  }
-
-  /** Format an array of {@link Role} instances with their names. Output format: role name */
-  static final class RoleListPlainFormat extends PlainFormat<Role[]> {
-    /**
-     * Creates a new {@link PlainFormat} with the specified CommandContext.
-     *
-     * @param context The command context.
-     */
-    public RoleListPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Role[] entity) {
-      List<String> roleList = Arrays.stream(entity).map(Role::name).collect(Collectors.toList());
-      return String.join(",", roleList);
-    }
-  }
-
-  /**
-   * Format a {@link Fileset} instance with their details. Output format: fileset name, type,
-   * comment and storage location
-   */
-  static final class FilesetDetailsPlainFormat extends PlainFormat<Fileset> {
-
-    /**
-     * Creates a new {@link PlainFormat} with the specified CommandContext.
-     *
-     * @param context The command context.
-     */
-    public FilesetDetailsPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    @Override
-    public String getOutput(Fileset entity) {
-      String filesetType = (entity.type() == Fileset.Type.MANAGED) ? "managed" : "external";
-      return entity.name()
-          + ","
-          + filesetType
-          + ","
-          + entity.comment()
-          + ","
-          + entity.storageLocation();
-    }
-  }
-
-  /** Format an array of {@link Fileset} instances with their names. Output format: fileset name */
-  static final class FilesetListPlainFormat extends PlainFormat<Fileset[]> {
-
-    /**
-     * Creates a new {@link PlainFormat} with the specified CommandContext.
-     *
-     * @param context The command context.
-     */
-    public FilesetListPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Fileset[] entity) {
-      List<String> filesetList =
-          Arrays.stream(entity).map(Fileset::name).collect(Collectors.toList());
-      return String.join(",", filesetList);
-    }
-  }
-
-  /** Format a {@link Topic} instance with their details. Output format: topic name, comment */
-  static final class TopicDetailsPlainFormat extends PlainFormat<Topic> {
-
-    /**
-     * Creates a new {@link PlainFormat} with the specified CommandContext.
-     *
-     * @param context The command context.
-     */
-    public TopicDetailsPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Topic entity) {
-      return entity.name() + "," + entity.comment();
-    }
-  }
-
-  /** Format an array of {@link Topic} instances with their names. Output format: topic name */
-  static final class TopicListPlainFormat extends PlainFormat<Topic[]> {
-
-    /**
-     * Creates a new {@link PlainFormat} with the specified CommandContext.
-     *
-     * @param context The command context.
-     */
-    public TopicListPlainFormat(CommandContext context) {
-      super(context);
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public String getOutput(Topic[] entity) {
-      List<String> topicList = Arrays.stream(entity).map(Topic::name).collect(Collectors.toList());
-      return String.join(",", topicList);
     }
   }
 }

@@ -30,20 +30,16 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.List;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
-import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
-import org.apache.gravitino.cli.TestCliUtil;
 import org.apache.gravitino.cli.outputs.Column;
 import org.apache.gravitino.cli.outputs.TableFormat;
-import org.apache.gravitino.file.Fileset;
-import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -51,7 +47,6 @@ import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.tag.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +72,7 @@ public class TestTableFormat {
 
   @Test
   void testCreateDefaultTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
 
     Column columnA = new Column(mockContext, "metalake");
     Column columnB = new Column(mockContext, "comment");
@@ -107,7 +102,7 @@ public class TestTableFormat {
 
   @Test
   void testTitleWithLeftAlign() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
 
     Column columnA =
         new Column(
@@ -142,7 +137,7 @@ public class TestTableFormat {
 
   @Test
   void testTitleWithRightAlign() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
 
     Column columnA =
         new Column(
@@ -177,7 +172,7 @@ public class TestTableFormat {
 
   @Test
   void testDataWithCenterAlign() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
 
     Column columnA =
         new Column(
@@ -212,7 +207,7 @@ public class TestTableFormat {
 
   @Test
   void testDataWithRightAlign() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
 
     Column columnA =
         new Column(
@@ -247,9 +242,9 @@ public class TestTableFormat {
 
   @Test
   void testMetalakeDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
 
-    Metalake mockMetalake = TestCliUtil.getMockMetalake("demo_metalake", "This is a demo metalake");
+    Metalake mockMetalake = getMockMetalake();
     TableFormat.output(mockMetalake, mockContext);
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -264,9 +259,9 @@ public class TestTableFormat {
 
   @Test
   void testListMetalakeWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Metalake mockMetalake1 = TestCliUtil.getMockMetalake("metalake1", "This is a metalake");
-    Metalake mockMetalake2 = TestCliUtil.getMockMetalake("metalake2", "This is another metalake");
+    CommandContext mockContext = getMockContext();
+    Metalake mockMetalake1 = getMockMetalake("metalake1", "This is a metalake");
+    Metalake mockMetalake2 = getMockMetalake("metalake2", "This is another metalake");
 
     TableFormat.output(new Metalake[] {mockMetalake1, mockMetalake2}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -282,10 +277,8 @@ public class TestTableFormat {
 
   @Test
   void testCatalogDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Catalog mockCatalog =
-        TestCliUtil.getMockCatalog(
-            "demo_catalog", Catalog.Type.RELATIONAL, "demo_provider", "This is a demo catalog");
+    CommandContext mockContext = getMockContext();
+    Catalog mockCatalog = getMockCatalog();
 
     TableFormat.output(mockCatalog, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -300,12 +293,12 @@ public class TestTableFormat {
 
   @Test
   void testListCatalogWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
     Catalog mockCatalog1 =
-        TestCliUtil.getMockCatalog(
+        getMockCatalog(
             "catalog1", Catalog.Type.RELATIONAL, "demo_provider", "This is a demo catalog");
     Catalog mockCatalog2 =
-        TestCliUtil.getMockCatalog(
+        getMockCatalog(
             "catalog2", Catalog.Type.RELATIONAL, "demo_provider", "This is another demo catalog");
 
     TableFormat.output(new Catalog[] {mockCatalog1, mockCatalog2}, mockContext);
@@ -323,8 +316,8 @@ public class TestTableFormat {
 
   @Test
   void testSchemaDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Schema mockSchema = TestCliUtil.getMockSchema("demo_schema", "This is a demo schema");
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema = getMockSchema();
 
     TableFormat.output(mockSchema, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -339,9 +332,9 @@ public class TestTableFormat {
 
   @Test
   void testListSchemaWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Schema mockSchema1 = TestCliUtil.getMockSchema("demo_schema1", "This is a demo schema");
-    Schema mockSchema2 = TestCliUtil.getMockSchema("demo_schema2", "This is another demo schema");
+    CommandContext mockContext = getMockContext();
+    Schema mockSchema1 = getMockSchema("demo_schema1", "This is a demo schema");
+    Schema mockSchema2 = getMockSchema("demo_schema2", "This is another demo schema");
 
     TableFormat.output(new Schema[] {mockSchema1, mockSchema2}, mockContext);
 
@@ -358,8 +351,8 @@ public class TestTableFormat {
 
   @Test
   void testTableDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Table mockTable = TestCliUtil.getMockTable("demo_table", "This is a demo table");
+    CommandContext mockContext = getMockContext();
+    Table mockTable = getMockTable();
 
     TableFormat.output(mockTable, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -375,10 +368,10 @@ public class TestTableFormat {
 
   @Test
   void testListTableWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
 
-    Table mockTable1 = TestCliUtil.getMockTable("table1", "This is a demo table");
-    Table mockTable2 = TestCliUtil.getMockTable("table2", "This is another demo table");
+    Table mockTable1 = getMockTable("table1", "This is a demo table");
+    Table mockTable2 = getMockTable("table2", "This is another demo table");
     TableFormat.output(new Table[] {mockTable1, mockTable2}, mockContext);
 
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -394,7 +387,7 @@ public class TestTableFormat {
 
   @Test
   void testAuditWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("demo_user");
     when(mockAudit.createTime()).thenReturn(Instant.ofEpochMilli(1611111111111L));
@@ -415,7 +408,7 @@ public class TestTableFormat {
 
   @Test
   void testAuditWithTableFormatWithNullValues() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("demo_user");
     when(mockAudit.createTime()).thenReturn(null);
@@ -436,9 +429,9 @@ public class TestTableFormat {
 
   @Test
   void testListColumnWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
     org.apache.gravitino.rel.Column mockColumn1 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column1",
             Types.IntegerType.get(),
             "This is a int column",
@@ -456,7 +449,7 @@ public class TestTableFormat {
               }
             });
     org.apache.gravitino.rel.Column mockColumn2 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column2",
             Types.StringType.get(),
             "This is a string column",
@@ -474,7 +467,7 @@ public class TestTableFormat {
               }
             });
     org.apache.gravitino.rel.Column mockColumn3 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column2",
             Types.StringType.get(),
             "This is a string column",
@@ -493,7 +486,7 @@ public class TestTableFormat {
             });
 
     org.apache.gravitino.rel.Column mockColumn4 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column2",
             Types.StringType.get(),
             "This is a string column",
@@ -502,7 +495,7 @@ public class TestTableFormat {
             FunctionExpression.of("current_timestamp"));
 
     org.apache.gravitino.rel.Column mockColumn5 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column2",
             Types.StringType.get(),
             "This is a string column",
@@ -531,9 +524,9 @@ public class TestTableFormat {
 
   @Test
   void testListColumnWithTableFormatAndEmptyDefaultValues() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
     org.apache.gravitino.rel.Column mockColumn1 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column1",
             Types.IntegerType.get(),
             "This is a int column",
@@ -541,7 +534,7 @@ public class TestTableFormat {
             true,
             DEFAULT_VALUE_NOT_SET);
     org.apache.gravitino.rel.Column mockColumn2 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column2",
             Types.StringType.get(),
             "This is a string column",
@@ -549,7 +542,7 @@ public class TestTableFormat {
             false,
             DEFAULT_VALUE_NOT_SET);
     org.apache.gravitino.rel.Column mockColumn3 =
-        TestCliUtil.getMockColumn(
+        getMockColumn(
             "column3",
             Types.BooleanType.get(),
             "this is a boolean column",
@@ -573,10 +566,10 @@ public class TestTableFormat {
 
   @Test
   void testListModelWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Model model1 = TestCliUtil.getMockModel("model1", "This is a demo model", 1);
-    Model model2 = TestCliUtil.getMockModel("model2", "This is another demo model", 2);
-    Model model3 = TestCliUtil.getMockModel("model3", "This is a third demo model", 3);
+    CommandContext mockContext = getMockContext();
+    Model model1 = getMockModel("model1", "This is a demo model", 1);
+    Model model2 = getMockModel("model2", "This is another demo model", 2);
+    Model model3 = getMockModel("model3", "This is a third demo model", 3);
 
     TableFormat.output(new Model[] {model1, model2, model3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -593,8 +586,8 @@ public class TestTableFormat {
 
   @Test
   void testModelDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Model mockModel = TestCliUtil.getMockModel("demo_model", "This is a demo model", 1);
+    CommandContext mockContext = getMockContext();
+    Model mockModel = getMockModel("demo_model", "This is a demo model", 1);
 
     TableFormat.output(mockModel, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -609,10 +602,10 @@ public class TestTableFormat {
 
   @Test
   void testListUserWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    User user1 = TestCliUtil.getMockUser("user1", Arrays.asList("role1", "role2"));
-    User user2 = TestCliUtil.getMockUser("user2", Arrays.asList("role3", "role4"));
-    User user3 = TestCliUtil.getMockUser("user3", Arrays.asList("role5"));
+    CommandContext mockContext = getMockContext();
+    User user1 = getMockUser("user1", Arrays.asList("role1", "role2"));
+    User user2 = getMockUser("user2", Arrays.asList("role3", "role4"));
+    User user3 = getMockUser("user3", Arrays.asList("role5"));
 
     TableFormat.output(new User[] {user1, user2, user3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -629,8 +622,8 @@ public class TestTableFormat {
 
   @Test
   void testUserDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    User mockUser = TestCliUtil.getMockUser("demo_user", Arrays.asList("role1", "role2"));
+    CommandContext mockContext = getMockContext();
+    User mockUser = getMockUser("demo_user", Arrays.asList("role1", "role2"));
 
     TableFormat.output(mockUser, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -645,10 +638,10 @@ public class TestTableFormat {
 
   @Test
   void testListGroupWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Group group1 = TestCliUtil.getMockGroup("group1", Arrays.asList("role1", "role2"));
-    Group group2 = TestCliUtil.getMockGroup("group2", Arrays.asList("role3", "role4"));
-    Group group3 = TestCliUtil.getMockGroup("group3", Arrays.asList("role5"));
+    CommandContext mockContext = getMockContext();
+    Group group1 = getMockGroup("group1", Arrays.asList("role1", "role2"));
+    Group group2 = getMockGroup("group2", Arrays.asList("role3", "role4"));
+    Group group3 = getMockGroup("group3", Arrays.asList("role5"));
 
     TableFormat.output(new Group[] {group1, group2, group3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -665,8 +658,8 @@ public class TestTableFormat {
 
   @Test
   void testGroupDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Group mockGroup = TestCliUtil.getMockGroup("demo_group", Arrays.asList("role1", "role2"));
+    CommandContext mockContext = getMockContext();
+    Group mockGroup = getMockGroup("demo_group", Arrays.asList("role1", "role2"));
 
     TableFormat.output(mockGroup, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -680,98 +673,8 @@ public class TestTableFormat {
   }
 
   @Test
-  void testTagDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Tag mockTag = TestCliUtil.getMockTag("tag1", "comment for tag1");
-
-    TableFormat.output(mockTag, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+------+------------------+\n"
-            + "| Name |     Comment      |\n"
-            + "+------+------------------+\n"
-            + "| tag1 | comment for tag1 |\n"
-            + "+------+------------------+",
-        output);
-  }
-
-  @Test
-  void testTagDetailsWithTableFormatWithNullValues() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Tag mockTag = mock(Tag.class);
-    when(mockTag.name()).thenReturn("tag1");
-    when(mockTag.comment()).thenReturn(null);
-
-    TableFormat.output(mockTag, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+------+---------+\n"
-            + "| Name | Comment |\n"
-            + "+------+---------+\n"
-            + "| tag1 | N/A     |\n"
-            + "+------+---------+",
-        output);
-  }
-
-  @Test
-  void testListAllTagsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-
-    Tag mockTag1 = TestCliUtil.getMockTag("tag1", "comment for tag1");
-    Tag mockTag2 = TestCliUtil.getMockTag("tag2", "comment for tag2");
-    Tag mockTag3 = TestCliUtil.getMockTag("tag3", "comment for tag3");
-
-    TableFormat.output(new Tag[] {mockTag1, mockTag2, mockTag3}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+------+\n"
-            + "| Name |\n"
-            + "+------+\n"
-            + "| tag1 |\n"
-            + "| tag2 |\n"
-            + "| tag3 |\n"
-            + "+------+",
-        output);
-  }
-
-  @Test
-  void testListTagPropertiesWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-
-    Tag mockTag1 = TestCliUtil.getMockTag("tag1", "comment for tag1");
-
-    TableFormat.output(mockTag1.properties(), mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+-----+-------+\n"
-            + "| Key | Value |\n"
-            + "+-----+-------+\n"
-            + "| k1  | v2    |\n"
-            + "| k2  | v2    |\n"
-            + "+-----+-------+",
-        output);
-  }
-
-  @Test
-  void testListTagPropertiesWithTableFormatWithEmptyMap() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-
-    Tag mockTag1 = TestCliUtil.getMockTag("tag1", "comment for tag1", Collections.emptyMap());
-
-    TableFormat.output(mockTag1.properties(), mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+-----+-------+\n"
-            + "| Key | Value |\n"
-            + "+-----+-------+\n"
-            + "| N/A | N/A   |\n"
-            + "+-----+-------+",
-        output);
-  }
-
-  @Test
   void testOutputWithUnsupportType() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
+    CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
 
     assertThrows(
@@ -781,133 +684,123 @@ public class TestTableFormat {
         });
   }
 
-  @Test
-  void testRoleDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Role admin = TestCliUtil.getMockRole("admin");
+  private CommandContext getMockContext() {
+    CommandContext mockContext = mock(CommandContext.class);
 
-    TableFormat.output(admin, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+--------------+---------+----------------------+\n"
-            + "|     Name     |  Type   |      Privileges      |\n"
-            + "+--------------+---------+----------------------+\n"
-            + "| demo_table   | TABLE   | ALLOW create table   |\n"
-            + "|              |         | ALLOW select table   |\n"
-            + "| demo_fileset | FILESET | ALLOW create fileset |\n"
-            + "|              |         | ALLOW read fileset   |\n"
-            + "+--------------+---------+----------------------+",
-        output);
+    return mockContext;
   }
 
-  @Test
-  void testRoleListWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Role admin = TestCliUtil.getMockRole("admin");
-    Role user = TestCliUtil.getMockRole("user");
-    Role guest = TestCliUtil.getMockRole("guest");
-
-    TableFormat.output(new Role[] {admin, user, guest}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+-------+\n"
-            + "| Name  |\n"
-            + "+-------+\n"
-            + "| admin |\n"
-            + "| user  |\n"
-            + "| guest |\n"
-            + "+-------+",
-        output);
+  private Metalake getMockMetalake() {
+    return getMockMetalake("demo_metalake", "This is a demo metalake");
   }
 
-  @Test
-  void testFilesetDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Fileset mockFileset =
-        TestCliUtil.getMockFileset(
-            "demo_fileset",
-            Fileset.Type.MANAGED,
-            "This is a demo fileset",
-            "hdfs" + "://demo_location");
+  private Metalake getMockMetalake(String name, String comment) {
+    Metalake mockMetalake = mock(Metalake.class);
+    when(mockMetalake.name()).thenReturn(name);
+    when(mockMetalake.comment()).thenReturn(comment);
 
-    TableFormat.output(mockFileset, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+--------------+---------+------------------------+----------------------+\n"
-            + "|     Name     |  Type   |        Comment         |       Location       |\n"
-            + "+--------------+---------+------------------------+----------------------+\n"
-            + "| demo_fileset | managed | This is a demo fileset | hdfs://demo_location |\n"
-            + "+--------------+---------+------------------------+----------------------+",
-        output);
+    return mockMetalake;
   }
 
-  @Test
-  void testListFilesetWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Fileset fileset1 =
-        TestCliUtil.getMockFileset(
-            "fileset1",
-            Fileset.Type.MANAGED,
-            "This is a demo fileset",
-            "hdfs" + "://demo_location");
-    Fileset fileset2 =
-        TestCliUtil.getMockFileset(
-            "fileset2",
-            Fileset.Type.EXTERNAL,
-            "This is another demo fileset",
-            "s3" + "://demo_location");
-    Fileset fileset3 =
-        TestCliUtil.getMockFileset(
-            "fileset3",
-            Fileset.Type.MANAGED,
-            "This is a third demo fileset",
-            "hdfs" + "://demo_location");
-    TableFormat.output(new Fileset[] {fileset1, fileset2, fileset3}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+----------+\n"
-            + "|   Name   |\n"
-            + "+----------+\n"
-            + "| fileset1 |\n"
-            + "| fileset2 |\n"
-            + "| fileset3 |\n"
-            + "+----------+",
-        output);
+  private Catalog getMockCatalog() {
+    return getMockCatalog(
+        "demo_catalog", Catalog.Type.RELATIONAL, "demo_provider", "This is a demo catalog");
   }
 
-  @Test
-  void testTopicDetailsWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Topic mockTopic = TestCliUtil.getMockTopic("demo_topic", "This is a demo topic");
+  private Catalog getMockCatalog(String name, Catalog.Type type, String provider, String comment) {
+    Catalog mockCatalog = mock(Catalog.class);
+    when(mockCatalog.name()).thenReturn(name);
+    when(mockCatalog.type()).thenReturn(type);
+    when(mockCatalog.provider()).thenReturn(provider);
+    when(mockCatalog.comment()).thenReturn(comment);
 
-    TableFormat.output(mockTopic, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+------------+----------------------+\n"
-            + "|    Name    |       Comment        |\n"
-            + "+------------+----------------------+\n"
-            + "| demo_topic | This is a demo topic |\n"
-            + "+------------+----------------------+",
-        output);
+    return mockCatalog;
   }
 
-  @Test
-  void testListTopicWithTableFormat() {
-    CommandContext mockContext = TestCliUtil.getMockContext();
-    Topic topic1 = TestCliUtil.getMockTopic("topic1", "This is a demo topic");
-    Topic topic2 = TestCliUtil.getMockTopic("topic2", "This is another demo topic");
-    Topic topic3 = TestCliUtil.getMockTopic("topic3", "This is a third demo topic");
+  private Schema getMockSchema() {
+    return getMockSchema("demo_schema", "This is a demo schema");
+  }
 
-    TableFormat.output(new Topic[] {topic1, topic2, topic3}, mockContext);
-    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
-    Assertions.assertEquals(
-        "+--------+\n"
-            + "|  Name  |\n"
-            + "+--------+\n"
-            + "| topic1 |\n"
-            + "| topic2 |\n"
-            + "| topic3 |\n"
-            + "+--------+",
-        output);
+  private Schema getMockSchema(String name, String comment) {
+    Schema mockSchema = mock(Schema.class);
+    when(mockSchema.name()).thenReturn(name);
+    when(mockSchema.comment()).thenReturn(comment);
+
+    return mockSchema;
+  }
+
+  private Table getMockTable() {
+    return getMockTable("demo_table", "This is a demo table");
+  }
+
+  private Table getMockTable(String name, String comment) {
+    Table mockTable = mock(Table.class);
+    org.apache.gravitino.rel.Column mockColumnInt =
+        getMockColumn(
+            "id",
+            Types.IntegerType.get(),
+            "This is a int column",
+            false,
+            true,
+            DEFAULT_VALUE_NOT_SET);
+    org.apache.gravitino.rel.Column mockColumnString =
+        getMockColumn(
+            "name",
+            Types.StringType.get(),
+            "This is a string column",
+            true,
+            false,
+            DEFAULT_VALUE_NOT_SET);
+
+    when(mockTable.name()).thenReturn(name);
+    when(mockTable.comment()).thenReturn(comment);
+    when(mockTable.columns())
+        .thenReturn(new org.apache.gravitino.rel.Column[] {mockColumnInt, mockColumnString});
+
+    return mockTable;
+  }
+
+  private org.apache.gravitino.rel.Column getMockColumn(
+      String name,
+      Type dataType,
+      String comment,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue) {
+
+    org.apache.gravitino.rel.Column mockColumn = mock(org.apache.gravitino.rel.Column.class);
+    when(mockColumn.name()).thenReturn(name);
+    when(mockColumn.dataType()).thenReturn(dataType);
+    when(mockColumn.comment()).thenReturn(comment);
+    when(mockColumn.nullable()).thenReturn(nullable);
+    when(mockColumn.defaultValue()).thenReturn(defaultValue);
+    when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
+
+    return mockColumn;
+  }
+
+  private Model getMockModel(String name, String comment, int lastVersion) {
+    Model mockModel = mock(Model.class);
+    when(mockModel.name()).thenReturn(name);
+    when(mockModel.comment()).thenReturn(comment);
+    when(mockModel.latestVersion()).thenReturn(lastVersion);
+
+    return mockModel;
+  }
+
+  private User getMockUser(String name, List<String> roles) {
+    User mockUser = mock(User.class);
+    when(mockUser.name()).thenReturn(name);
+    when(mockUser.roles()).thenReturn(roles);
+
+    return mockUser;
+  }
+
+  private Group getMockGroup(String name, List<String> roles) {
+    Group mockGroup = mock(Group.class);
+    when(mockGroup.name()).thenReturn(name);
+    when(mockGroup.roles()).thenReturn(roles);
+
+    return mockGroup;
   }
 }
