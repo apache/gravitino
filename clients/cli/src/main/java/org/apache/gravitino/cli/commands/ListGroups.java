@@ -58,7 +58,7 @@ public class ListGroups extends Command {
     }
 
     if (groups.length == 0) {
-      printInformation("No groups found in metalake: " + metalake);
+      printInformation("No groups found in metalake " + metalake);
     } else {
       Group[] groupObjects = Arrays.stream(groups).map(this::getGroup).toArray(Group[]::new);
       printResults(groupObjects);
