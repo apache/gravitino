@@ -21,6 +21,7 @@ import os
 env_map = {
   "GRAVITINO_IO_IMPL" : "io-impl",
   "GRAVITINO_URI" : "uri",
+  "GRAVITINO_CATALOG_BACKEND" : "catalog-backend",
   "GRAVITINO_JDBC_DRIVER": "jdbc-driver",
   "GRAVITINO_JDBC_USER": "jdbc-user",
   "GRAVITINO_JDBC_PASSWORD": "jdbc-password",
