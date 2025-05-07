@@ -166,10 +166,42 @@ icebergRest:
   httpPort: 9001
   ## The backend Iceberg catalog for Iceberg REST service, it's recommended to change to hive or jdbc
   ##
-  catalogBackend: memory
+  catalogBackend: hive
   ## The warehouse directory of Iceberg catalog for Iceberg REST service
   ##
-  warehouse: /tmp/
+  warehouse: "s3a://lakehouse/hive-ha/"
+  uri: thrift://localhost:9083
+  # catalogBackendName: memory
+  # jdbc:
+  #   user: ""
+  #   password: ""
+  #   initialize: True
+  #   driver: "com.mysql.cj.jdbc.Driver"
+  # ## Storage
+  ioImpl: "org.apache.iceberg.aws.s3.S3FileIO"
+  credentialProviders: "s3-secret-key"
+  # s3:
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
+  #   roleArn: ""
+  #   endpoint: ""
+  #   pathStyleAccess: ""
+  #   region: ""
+  #   externalId: ""
+  #   tokenServiceEndpoint: ""
+  # oss:
+  #   endpoint: ""
+  #   region: ""
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
+  #   roleArn: ""
+  #   externalId: ""
+  # azure:
+  #   storageAccountName: ""
+  #   storageAccountKey: ""
+  #   tenantId: ""
+  #   clientId: ""
+  #   clientSecret: ""
 
 ## Authentication mechanisms configuration. Support simple, OAuth and Kerberos.
 ##
