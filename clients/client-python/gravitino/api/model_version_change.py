@@ -66,7 +66,7 @@ class ModelVersionChange(ABC):
         return ModelVersionChange.UpdateUri(uri)
 
     @staticmethod
-    def update_aliases(add_aliases: set[str], delete_aliases: set[str]):
+    def update_aliases(add_aliases, delete_aliases):
         """Creates a new model version change to update the aliases of the model version.
         Args:
             add_aliases: The new aliases to add to the model version.
@@ -259,14 +259,14 @@ class ModelVersionChange(ABC):
             self.aliases_to_add = set(aliases_to_add)
             self.aliases_to_delete = set(aliases_to_delete)
 
-        def add_aliases(self) -> set[str]:
+        def add_aliases(self):
             """Retrieves the aliases to add.
             Returns:
                 The aliases to add.
             """
             return self.aliases_to_add
 
-        def delete_aliases(self) -> set[str]:
+        def delete_aliases(self):
             """Retrieves the aliases to delete.
             Returns:
                 The aliases to delete.

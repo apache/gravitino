@@ -17,6 +17,7 @@
 
 
 from abc import abstractmethod
+from collections.abc import Set
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -143,14 +144,14 @@ class ModelVersionUpdateRequest:
     class ModelVersionAliasesRequest(ModelVersionUpdateRequestBase):
         """Request to update model version aliases"""
 
-        _add_aliases: Optional[set[str]] = field(
+        _add_aliases: Optional[Set[str]] = field(
             metadata=config(field_name="addAliases")
         )
-        _delete_aliases: Optional[set[str]] = field(
+        _delete_aliases: Optional[Set[str]] = field(
             metadata=config(field_name="deleteAliases")
         )
 
-        def __init__(self, add_aliases: set[str], delete_aliases: set[str]):
+        def __init__(self, add_aliases: Set[str], delete_aliases: Set[str]):
             super().__init__("updateAliases")
             self._add_aliases = add_aliases
             self._delete_aliases = delete_aliases
