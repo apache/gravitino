@@ -550,6 +550,11 @@ class GenericModelCatalog(BaseSchemaCatalog):
                 change.new_uri()
             )
 
+        if isinstance(change, ModelVersionChange.UpdateAliases):
+            return ModelVersionUpdateRequest.ModelVersionAliasesRequest(
+                change.add_aliases(), change.delete_aliases()
+            )
+
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def _check_model_namespace(self, namespace: Namespace):

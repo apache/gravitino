@@ -65,6 +65,17 @@ class ModelVersionChange(ABC):
         """
         return ModelVersionChange.UpdateUri(uri)
 
+    @staticmethod
+    def update_aliases(add_aliases: set[str], delete_aliases: set[str]):
+        """Creates a new model version change to update the aliases of the model version.
+        Args:
+            add_aliases: The new aliases to add to the model version.
+            delete_aliases: The new aliases to delete from the model version.
+        Returns:
+            The model version change.
+        """
+        return ModelVersionChange.UpdateAliases(add_aliases, delete_aliases)
+
     class UpdateComment:
         """A model version change to update the comment of the model version."""
 
@@ -240,3 +251,58 @@ class ModelVersionChange(ABC):
                 A string summary of this URI update operation.
             """
             return f"UpdateUri {self._new_uri}"
+
+    class UpdateAliases:
+        """A model version change to update the aliases of the model version."""
+
+        def __init__(self, aliases_to_add, aliases_to_delete):
+            self.aliases_to_add = set(aliases_to_add)
+            self.aliases_to_delete = set(aliases_to_delete)
+
+        def add_aliases(self) -> set[str]:
+            """Retrieves the aliases to add.
+            Returns:
+                The aliases to add.
+            """
+            return self.aliases_to_add
+
+        def delete_aliases(self) -> set[str]:
+            """Retrieves the aliases to delete.
+            Returns:
+                The aliases to delete.
+            """
+            return self.aliases_to_delete
+
+        def __eq__(self, other) -> bool:
+            """Compares this UpdateAliases instance with another object for equality. Two instances are
+            considered equal if they designate the same aliases to add and delete for the model version.
+            Args:
+                other: The object to compare with this instance.
+            Returns:
+                true if the given object represents an identical model version alias update operation;
+                false otherwise.
+            """
+            if not isinstance(other, ModelVersionChange.UpdateAliases):
+                return False
+            return (
+                self.aliases_to_add == other.aliases_to_add
+                and self.aliases_to_delete == other.aliases_to_delete
+            )
+
+        def __hash__(self) -> int:
+            """Generates a hash code for this UpdateAliases instance. The hash code is primarily based on
+            the aliases to add and delete for the model version.
+            Returns:
+                A hash code value for this alias update operation.
+            """
+            return hash((self.aliases_to_add, self.aliases_to_delete))
+
+        def __str__(self) -> str:
+            """Returns a string representation of the UpdateAliases instance. This string includes the
+            class name followed by the aliases to add and delete for the model version.
+            Returns:
+                A string summary of this alias update operation.
+            """
+            add_str = ", ".join(sorted(self.aliases_to_add))
+            delete_str = ", ".join(sorted(self.aliases_to_delete))
+            return f"UpdateAlias AliasToAdd: ({add_str}) AliasToDelete: ({delete_str})"

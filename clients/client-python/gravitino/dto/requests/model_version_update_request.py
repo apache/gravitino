@@ -138,3 +138,48 @@ class ModelVersionUpdateRequest:
                 ModelVersionChange: The ModelVersionChange object representing the update uri operation.
             """
             return ModelVersionChange.update_uri(self._new_uri)
+
+    @dataclass
+    class ModelVersionAliasesRequest(ModelVersionUpdateRequestBase):
+        """Request to update model version aliases"""
+
+        _add_aliases: Optional[set[str]] = field(
+            metadata=config(field_name="addAliases")
+        )
+        _delete_aliases: Optional[set[str]] = field(
+            metadata=config(field_name="deleteAliases")
+        )
+
+        def __init__(self, add_aliases: set[str], delete_aliases: set[str]):
+            super().__init__("updateAliases")
+            self._add_aliases = add_aliases
+            self._delete_aliases = delete_aliases
+
+        def add_aliases(self):
+            """Retrieves the new aliases of the model version.
+            Returns:
+                The new aliases of the model version.
+            """
+            return self._add_aliases
+
+        def delete_aliases(self):
+            """Retrieves the new aliases of the model version.
+            Returns:
+                The new aliases of the model version.
+            """
+            return self._delete_aliases
+
+        def validate(self):
+            """Validates the fields of the request. Always pass."""
+            pass
+
+        def model_version_change(self):
+            """
+            Returns a ModelVersionChange object representing the update aliases operation.
+            Returns:
+                ModelVersionChange: The ModelVersionChange object representing the update aliases operation.
+            """
+            return ModelVersionChange.UpdateAliases(
+                self._add_aliases,
+                self._delete_aliases,
+            )

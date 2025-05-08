@@ -215,6 +215,19 @@ public class ModelCommandHandler extends CommandHandler {
           .validate()
           .handle();
     }
+
+    if (line.hasOption(GravitinoOptions.NEW_ALIAS)
+        && (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {
+      String[] newAliases = line.getOptionValues(GravitinoOptions.NEW_ALIAS);
+      Integer version = getVersionFromLine(line);
+      String alias = getAliasFromLine(line);
+
+      gravitinoCommandLine
+          .newUpdateModelVersionAliases(
+              context, metalake, catalog, schema, model, version, alias, newAliases, new String[0])
+          .validate()
+          .handle();
+    }
   }
 
   /** Handles the "LIST" command. */
@@ -243,10 +256,31 @@ public class ModelCommandHandler extends CommandHandler {
     }
   }
 
+  /** Handles the "REMOVE" command. */
   private void handleRemoveCommand() {
     String property = line.getOptionValue(GravitinoOptions.PROPERTY);
 
-    if (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION)) {
+    if (line.hasOption(GravitinoOptions.REMOVE_ALIAS)
+        && (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION))) {
+      String[] removeAliases = line.getOptionValues(GravitinoOptions.REMOVE_ALIAS);
+      Integer version = getVersionFromLine(line);
+      String alias = getAliasFromLine(line);
+
+      gravitinoCommandLine
+          .newUpdateModelVersionAliases(
+              context,
+              metalake,
+              catalog,
+              schema,
+              model,
+              version,
+              alias,
+              new String[0],
+              removeAliases)
+          .validate()
+          .handle();
+
+    } else if (line.hasOption(GravitinoOptions.ALIAS) || line.hasOption(GravitinoOptions.VERSION)) {
       Integer version = getVersionFromLine(line);
       String alias = getAliasFromLine(line);
 
@@ -255,8 +289,8 @@ public class ModelCommandHandler extends CommandHandler {
               context, metalake, catalog, schema, model, version, alias, property)
           .validate()
           .handle();
-    } else {
 
+    } else {
       gravitinoCommandLine
           .newRemoveModelProperty(context, metalake, catalog, schema, model, property)
           .validate()

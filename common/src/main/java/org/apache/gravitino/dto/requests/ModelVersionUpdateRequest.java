@@ -48,7 +48,10 @@ import org.apache.gravitino.rest.RESTRequest;
       name = "removeProperty"),
   @JsonSubTypes.Type(
       value = ModelVersionUpdateRequest.UpdateModelVersionUriRequest.class,
-      name = "updateUri")
+      name = "updateUri"),
+  @JsonSubTypes.Type(
+      value = ModelVersionUpdateRequest.UpdateModelVersionAliasesRequest.class,
+      name = "updateAliases")
 })
 public interface ModelVersionUpdateRequest extends RESTRequest {
 
@@ -165,6 +168,35 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
     public void validate() throws IllegalArgumentException {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(newUri), "\"newUri\" field is required and cannot be empty");
+    }
+  }
+
+  @EqualsAndHashCode
+  @AllArgsConstructor
+  @NoArgsConstructor(force = true)
+  @ToString
+  @Getter
+  class UpdateModelVersionAliasesRequest implements ModelVersionUpdateRequest {
+    @JsonProperty("addAliases")
+    private final String[] addAliases;
+
+    @JsonProperty("deleteAliases")
+    private final String[] deleteAliases;
+
+    /** {@inheritDoc} */
+    @Override
+    public ModelVersionChange modelVersionChange() {
+      return ModelVersionChange.updateAliases(addAliases, deleteAliases);
+    }
+
+    /**
+     * Validates the request, i.e., always pass.
+     *
+     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+     */
+    @Override
+    public void validate() throws IllegalArgumentException {
+      // always pass
     }
   }
 }

@@ -408,6 +408,12 @@ class DTOConverters {
       return new ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
           ((ModelVersionChange.UpdateUri) change).newUri());
 
+    } else if (change instanceof ModelVersionChange.UpdateAliases) {
+      ModelVersionChange.UpdateAliases updateAliases = (ModelVersionChange.UpdateAliases) change;
+      return new ModelVersionUpdateRequest.UpdateModelVersionAliasesRequest(
+          (updateAliases.aliasesToAdd().toArray(new String[0])),
+          updateAliases.aliasesToDelete().toArray(new String[0]));
+
     } else {
       throw new IllegalArgumentException(
           "Unknown model version change type: " + change.getClass().getSimpleName());
