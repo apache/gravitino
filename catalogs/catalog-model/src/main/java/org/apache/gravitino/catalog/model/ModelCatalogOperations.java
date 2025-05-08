@@ -21,10 +21,13 @@ package org.apache.gravitino.catalog.model;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -435,6 +438,17 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
         entityUri = updateUriChange.newUri();
 
+      } else if (change instanceof ModelVersionChange.UpdateAliases) {
+        ModelVersionChange.UpdateAliases updateAliasesChange =
+            (ModelVersionChange.UpdateAliases) change;
+        Set<String> addTmpSet = updateAliasesChange.aliasesToAdd();
+        Set<String> deleteTmpSet = updateAliasesChange.aliasesToDelete();
+        Set<String> aliasToAdd = Sets.difference(addTmpSet, deleteTmpSet).immutableCopy();
+        Set<String> aliasToDelete = Sets.difference(deleteTmpSet, addTmpSet).immutableCopy();
+
+        doDeleteAlias(entityAliases, aliasToDelete);
+        doSetAlias(entityAliases, aliasToAdd);
+
       } else {
         throw new IllegalArgumentException(
             "Unsupported model version change: " + change.getClass().getSimpleName());
@@ -517,5 +531,19 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   private void doRemoveProperty(
       Map<String, String> entityProperties, ModelVersionChange.RemoveProperty change) {
     entityProperties.remove(change.property());
+  }
+
+  private void doDeleteAlias(List<String> entityAliases, Set<String> deleteSet) {
+    entityAliases.removeAll(deleteSet);
+  }
+
+  private void doSetAlias(List<String> entityAliases, Set<String> addSet) {
+    // for fast lookup
+    Set<String> aliasSet = new HashSet<>(entityAliases);
+    for (String alias : addSet) {
+      if (aliasSet.add(alias)) {
+        entityAliases.add(alias);
+      }
+    }
   }
 }
