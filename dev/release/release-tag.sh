@@ -84,13 +84,14 @@ sed -i".tmp1" 's/version = .*$/version = '"$RELEASE_VERSION"'/g' gradle.properti
 sed -i".tmp2" 's/    version=.*$/    version="'"$PYGRAVITINO_RELEASE_VERSION"'",/g' clients/client-python/setup.py
 sed -i".tmp3" 's/^version = .*$/version = \"'"$RELEASE_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
 sed -i".tmp4" 's/^appVersion: .*$/appVersion: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp5" '22s/  tag: .*$/  tag: '"$RELEASE_VERSION"'/g' dev/charts/gravitino/values.yaml
 
 CHART_VERSION=$(grep -e '^version: .*' dev/charts/gravitino/Chart.yaml | cut -d':' -f2 | sed 's/^ *//;s/ *$//')
 CHART_SHORT_VERSION=$(echo "$CHART_VERSION" | cut -d . -f 1-2)
 CHART_REV=$(echo "$CHART_VERSION" | cut -d . -f 3 | cut -d '-' -f 1)
 CHART_REV=$((CHART_REV + 1))
 NEXT_CHART_VERSION="${CHART_SHORT_VERSION}.${CHART_REV}"
-sed -i".tmp5" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp6" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
 
 
 # update docs version
@@ -101,13 +102,14 @@ echo "Creating tag $RELEASE_TAG at the head of $GIT_BRANCH"
 git tag $RELEASE_TAG
 
 # Create next version
-sed -i".tmp6" 's/version = .*$/version = '"$NEXT_VERSION"'/g' gradle.properties
-sed -i".tmp7" 's/    version=.*$/    version="'"$PYGRAVITINO_NEXT_VERSION"'",/g' clients/client-python/setup.py
-sed -i".tmp8" 's/^version = .*$/version = \"'"$NEXT_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
-sed -i".tmp9" 's/appVersion: .*$/appVersion: '"$NEXT_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp7" 's/version = .*$/version = '"$NEXT_VERSION"'/g' gradle.properties
+sed -i".tmp8" 's/    version=.*$/    version="'"$PYGRAVITINO_NEXT_VERSION"'",/g' clients/client-python/setup.py
+sed -i".tmp9" 's/^version = .*$/version = \"'"$NEXT_VERSION"'\"/g' clients/filesystem-fuse/Cargo.toml
+sed -i".tmp10" 's/appVersion: .*$/appVersion: '"$NEXT_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp11" '22s/  tag: .*$/  tag: '"$NEXT_VERSION"'/' dev/charts/gravitino/values.yaml
 CHART_REV=$((CHART_REV + 1))
 NEXT_CHART_VERSION="${CHART_SHORT_VERSION}.${CHART_REV}"
-sed -i".tmp10" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
+sed -i".tmp12" 's/^version: .*$/version: '"$NEXT_CHART_VERSION"'/g' dev/charts/gravitino/Chart.yaml
 
 git commit -a -m "Preparing development version $NEXT_VERSION"
 
