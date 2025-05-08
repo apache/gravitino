@@ -19,7 +19,14 @@
 
 package org.apache.gravitino.model;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Lists;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -29,6 +36,8 @@ import org.apache.gravitino.annotation.Evolving;
  */
 @Evolving
 public interface ModelVersionChange {
+  /** A Joiner for comma-separated values. */
+  Joiner COMMA_JOINER = Joiner.on(",").skipNulls();
 
   /**
    * Create a ModelVersionChange for updating the comment of a model version.
@@ -59,6 +68,32 @@ public interface ModelVersionChange {
    */
   static ModelVersionChange removeProperty(String property) {
     return new ModelVersionChange.RemoveProperty(property);
+  }
+
+  /**
+   * Create a ModelVersionChange for updating the uri of a model version.
+   *
+   * @param newUri The new uri to be set for the model version.
+   * @return A new ModelVersionChange instance for updating the uri of a model version.
+   */
+  static ModelVersionChange updateUri(String newUri) {
+    return new ModelVersionChange.UpdateUri(newUri);
+  }
+
+  /**
+   * Create a ModelVersionChange for updating the aliases of a model version.
+   *
+   * @param aliasesToAdd The new aliases to be added for the model version.
+   * @param aliasesToDelete The aliases to be removed from the model version.
+   * @return A new ModelVersionChange instance for updating the aliases of a model version.
+   */
+  static ModelVersionChange updateAliases(String[] aliasesToAdd, String[] aliasesToDelete) {
+    String[] toAdd = aliasesToAdd == null ? new String[0] : aliasesToAdd;
+    String[] toDelete = aliasesToDelete == null ? new String[0] : aliasesToDelete;
+
+    return new UpdateAliases(
+        Arrays.stream(toAdd).collect(Collectors.toList()),
+        Arrays.stream(toDelete).collect(Collectors.toList()));
   }
 
   /** A ModelVersionChange to update the model version comment. */
@@ -254,6 +289,155 @@ public interface ModelVersionChange {
     @Override
     public String toString() {
       return "REMOVEPROPERTY " + property;
+    }
+  }
+
+  /** A ModelVersionChange to update the uri of a model version. */
+  final class UpdateUri implements ModelVersionChange {
+    private final String newUri;
+
+    /**
+     * Creates a new {@link UpdateUri} instance with the specified new uri.
+     *
+     * @param newUri The new uri to be set for the model version.
+     */
+    public UpdateUri(String newUri) {
+      this.newUri = newUri;
+    }
+
+    /**
+     * Returns the new uri to be set for the model version.
+     *
+     * @return The new uri to be set for the model version.
+     */
+    public String newUri() {
+      return newUri;
+    }
+
+    /**
+     * Compares this UpdateUri instance with another object for equality. The comparison is based on
+     * the new uri of the model version.
+     *
+     * @param obj The object to compare with this instance.
+     * @return {@code true} if the given object represents the same model update operation; {@code
+     *     false} otherwise.
+     */
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == this) return true;
+      if (!(obj instanceof UpdateUri)) return false;
+      UpdateUri other = (UpdateUri) obj;
+      return Objects.equals(newUri, other.newUri);
+    }
+
+    /**
+     * Generates a hash code for this UpdateUri instance. The hash code is based on the new uri of
+     * the model.
+     *
+     * @return A hash code value for this model renaming operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(newUri);
+    }
+
+    /**
+     * Provides a string representation of the UpdateUri instance. This string format includes the
+     * class name followed by the new uri to be set.
+     *
+     * @return A string summary of the UpdateUri instance.
+     */
+    @Override
+    public String toString() {
+      return "UpdateUri " + newUri;
+    }
+  }
+
+  /**
+   * Represents an update to a model version’s aliases, specifying which aliases to add and which to
+   * remove.
+   *
+   * <p>Both alias sets are stored as immutable.
+   */
+  final class UpdateAliases implements ModelVersionChange {
+    private final ImmutableSortedSet<String> aliasesToAdd;
+    private final ImmutableSortedSet<String> aliasesToDelete;
+
+    /**
+     * Constructs a new aliases-update operation, specifying the aliases to add and remove.
+     *
+     * @param aliasesToAdd the aliases to add, or null for none
+     * @param aliasesToDelete the aliases to remove, or null for none
+     */
+    public UpdateAliases(List<String> aliasesToAdd, List<String> aliasesToDelete) {
+      this.aliasesToAdd =
+          ImmutableSortedSet.copyOf(aliasesToAdd != null ? aliasesToAdd : Lists.newArrayList());
+      this.aliasesToDelete =
+          ImmutableSortedSet.copyOf(
+              aliasesToDelete != null ? aliasesToDelete : Lists.newArrayList());
+    }
+
+    /**
+     * Returns the set of aliases to add.
+     *
+     * @return an immutable, sorted set of aliases to add
+     */
+    public Set<String> aliasesToAdd() {
+      return aliasesToAdd;
+    }
+
+    /**
+     * Returns the set of aliases to remove.
+     *
+     * @return an immutable, sorted set of aliases to remove
+     */
+    public Set<String> aliasesToDelete() {
+      return aliasesToDelete;
+    }
+
+    /**
+     * Compares this UpdateAlias instance with another object for equality. The comparison is based
+     * on the both new and removed aliases of the model version.
+     *
+     * @param o The object to compare with this instance.
+     * @return {@code true} if the given object represents the same model update operation; {@code
+     *     false} otherwise.
+     */
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof UpdateAliases)) return false;
+      UpdateAliases that = (UpdateAliases) o;
+      return aliasesToAdd.equals(that.aliasesToAdd) && aliasesToDelete.equals(that.aliasesToDelete);
+    }
+
+    /**
+     * Generates a hash code for this UpdateAlias instance. The hash code is based on the both new
+     * and removed aliases of the model.
+     *
+     * @return A hash code value for this model renaming operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(aliasesToAdd, aliasesToDelete);
+    }
+
+    /**
+     * Provides a string representation of the UpdateAlias instance. This string format includes the
+     * class name followed by the new and removed aliases to be set and removed.
+     *
+     * @return A string summary of the UpdateAlias instance.
+     */
+    @Override
+    public String toString() {
+      return "UpdateAlias "
+          + "AliasToAdd: ("
+          + COMMA_JOINER.join(aliasesToAdd)
+          + ")"
+          + " "
+          + "AliasToDelete: ("
+          + COMMA_JOINER.join(aliasesToDelete)
+          + ")";
     }
   }
 }
