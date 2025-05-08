@@ -153,7 +153,7 @@ class ModelVersionUpdateRequest:
         def __init__(self, add_aliases: Set[str], remove_aliases: Set[str]):
             super().__init__("updateAliases")
             self._aliases_to_add = add_aliases
-            self._delete_aliases = remove_aliases
+            self._aliases_to_remove = remove_aliases
 
         def add_aliases(self):
             """Retrieves the new aliases of the model version.
@@ -167,7 +167,7 @@ class ModelVersionUpdateRequest:
             Returns:
                 The new aliases of the model version.
             """
-            return self._delete_aliases
+            return self._aliases_to_remove
 
         def validate(self):
             """Validates the fields of the request. Always pass."""
@@ -181,5 +181,5 @@ class ModelVersionUpdateRequest:
             """
             return ModelVersionChange.UpdateAliases(
                 self._add_aliases,
-                self._delete_aliases,
+                self._aliases_to_remove,
             )
