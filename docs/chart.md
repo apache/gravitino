@@ -17,7 +17,7 @@ This Helm chart deploys Apache Gravitino on Kubernetes with customizable configu
 ## Update Chart Dependency
 
 The Gravitino Helm chart has not yet been officially released.   
-To proceed, please clone the repository, navigate to the chart directory, and execute the Helm dependency update command.
+To proceed, please clone the repository, navigate to the chart directory `/path/to/gravitino/dev/charts`, and execute the Helm dependency update command.
 
 ```console
 helm dependency update [CHART]
