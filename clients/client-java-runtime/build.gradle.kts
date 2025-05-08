@@ -27,7 +27,7 @@ plugins {
 configurations.all {
   resolutionStrategy.eachDependency {
     if (requested.group == "org.apache.logging.log4j") {
-      throw GradleException("Forbidden dependency 'org.apache.logging.log4j' found!")
+      throw GradleException("Dependency 'org.apache.logging.log4j' is not allowed.")
     }
   }
 }
