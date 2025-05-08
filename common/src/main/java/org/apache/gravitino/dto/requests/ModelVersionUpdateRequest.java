@@ -178,16 +178,16 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
   @ToString
   @Getter
   class UpdateModelVersionAliasesRequest implements ModelVersionUpdateRequest {
-    @JsonProperty("addAliases")
-    private final String[] addAliases;
+    @JsonProperty("aliasesToAdd")
+    private final String[] aliasesToAdd;
 
-    @JsonProperty("deleteAliases")
-    private final String[] deleteAliases;
+    @JsonProperty("aliasesToRemove")
+    private final String[] aliasesToRemove;
 
     /** {@inheritDoc} */
     @Override
     public ModelVersionChange modelVersionChange() {
-      return ModelVersionChange.updateAliases(addAliases, deleteAliases);
+      return ModelVersionChange.updateAliases(aliasesToAdd, aliasesToRemove);
     }
 
     /**

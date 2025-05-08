@@ -218,7 +218,7 @@ public class TestModelVersionChange {
     Assertions.assertEquals(
         ImmutableSet.of("alias add 1", "alias add 2"), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(
-        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToDelete());
+        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
         "UpdateAlias "
             + "AliasToAdd: (alias add 1,alias add 2)"
@@ -236,7 +236,7 @@ public class TestModelVersionChange {
     ModelVersionChange.UpdateAliases updateAliasesChange =
         (ModelVersionChange.UpdateAliases) modelVersionChange;
     Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToAdd());
-    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToDelete());
+    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
         "UpdateAlias AliasToAdd: () AliasToDelete: ()", updateAliasesChange.toString());
   }
@@ -256,7 +256,7 @@ public class TestModelVersionChange {
     Assertions.assertEquals(
         ImmutableSet.of("alias add 1", "alias add 2"), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(
-        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToDelete());
+        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
         "UpdateAlias "
             + "AliasToAdd: (alias add 1,alias add 2)"
@@ -274,7 +274,7 @@ public class TestModelVersionChange {
     ModelVersionChange.UpdateAliases updateAliasesChange =
         (ModelVersionChange.UpdateAliases) modelVersionChange;
     Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToAdd());
-    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToDelete());
+    Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
         "UpdateAlias AliasToAdd: () AliasToDelete: ()", updateAliasesChange.toString());
   }

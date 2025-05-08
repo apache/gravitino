@@ -257,7 +257,7 @@ class ModelVersionChange(ABC):
 
         def __init__(self, aliases_to_add, aliases_to_delete):
             self.aliases_to_add = set(aliases_to_add)
-            self.aliases_to_delete = set(aliases_to_delete)
+            self.aliases_to_remove = set(aliases_to_delete)
 
         def add_aliases(self):
             """Retrieves the aliases to add.
@@ -266,12 +266,12 @@ class ModelVersionChange(ABC):
             """
             return self.aliases_to_add
 
-        def delete_aliases(self):
+        def remove_aliases(self):
             """Retrieves the aliases to delete.
             Returns:
                 The aliases to delete.
             """
-            return self.aliases_to_delete
+            return self.aliases_to_remove
 
         def __eq__(self, other) -> bool:
             """Compares this UpdateAliases instance with another object for equality. Two instances are
@@ -286,7 +286,7 @@ class ModelVersionChange(ABC):
                 return False
             return (
                 self.aliases_to_add == other.aliases_to_add
-                and self.aliases_to_delete == other.aliases_to_delete
+                and self.aliases_to_remove == other.aliases_to_delete
             )
 
         def __hash__(self) -> int:
@@ -295,7 +295,7 @@ class ModelVersionChange(ABC):
             Returns:
                 A hash code value for this alias update operation.
             """
-            return hash((self.aliases_to_add, self.aliases_to_delete))
+            return hash((self.aliases_to_add, self.aliases_to_remove))
 
         def __str__(self) -> str:
             """Returns a string representation of the UpdateAliases instance. This string includes the
@@ -304,5 +304,5 @@ class ModelVersionChange(ABC):
                 A string summary of this alias update operation.
             """
             add_str = ", ".join(sorted(self.aliases_to_add))
-            delete_str = ", ".join(sorted(self.aliases_to_delete))
+            delete_str = ", ".join(sorted(self.aliases_to_remove))
             return f"UpdateAlias AliasToAdd: ({add_str}) AliasToDelete: ({delete_str})"

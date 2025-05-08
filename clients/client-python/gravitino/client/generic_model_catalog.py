@@ -552,7 +552,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         if isinstance(change, ModelVersionChange.UpdateAliases):
             return ModelVersionUpdateRequest.ModelVersionAliasesRequest(
-                change.add_aliases(), change.delete_aliases()
+                change.add_aliases(), change.remove_aliases()
             )
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")

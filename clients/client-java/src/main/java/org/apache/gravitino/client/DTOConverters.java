@@ -412,7 +412,7 @@ class DTOConverters {
       ModelVersionChange.UpdateAliases updateAliases = (ModelVersionChange.UpdateAliases) change;
       return new ModelVersionUpdateRequest.UpdateModelVersionAliasesRequest(
           (updateAliases.aliasesToAdd().toArray(new String[0])),
-          updateAliases.aliasesToDelete().toArray(new String[0]));
+          updateAliases.aliasesToRemove().toArray(new String[0]));
 
     } else {
       throw new IllegalArgumentException(
