@@ -685,5 +685,60 @@ public class TestJcasbinModel {
             MetadataObject.Type.TABLE.name(),
             "table1",
             Privilege.Name.SELECT_TABLE.name()));
+
+    // ”user4" has the privilege of role1 in metalake1.
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4", "metalake1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
+
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.SELECT_TABLE.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake1",
+            Privilege.Name.USE_CATALOG.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.SELECT_TABLE.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.SELECT_TABLE.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4",
+            "metalake1",
+            MetadataObject.Type.METALAKE.name(),
+            "metalake2",
+            Privilege.Name.USE_CATALOG.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table2",
+            Privilege.Name.SELECT_TABLE.name()));
+    Assertions.assertFalse(
+        enforcer.enforce(
+            "user4",
+            "metalake1",
+            MetadataObject.Type.TABLE.name(),
+            "table1",
+            Privilege.Name.MODIFY_TABLE.name()));
   }
 }

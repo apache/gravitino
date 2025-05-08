@@ -21,8 +21,9 @@ p, role5, metalake1, METALAKE, metalake1, SELECT_TABLE, allow
 p, role5, metalake1, METALAKE, metalake1, USE_CATALOG, allow
 p, role5, metalake1, TABLE, table1, SELECT_TABLE, allow
 
-g, user1, role5
-g, group1, role5
-g, user2, group1
-g, user3, role1
-g, user3, group1
+g, user1, role5, metalake1
+g, group1, role5, metalake1
+g, user2, group1, metalake1
+g, user3, role1, metalake1
+g, user3, group1, metalake1
+g, user4, role1, metalake2
