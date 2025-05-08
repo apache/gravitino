@@ -41,10 +41,10 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino using the default settings, specify container image versions using --set image.tag=0.x.0-incubating (replace x with target version):
+Run the following command to deploy Gravitino using the default settings, specify container image versions using --set image.tag=x.y.z-incubating (replace x, y, z with the expected version numbers):
 
 ```console
-helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set image.tag=<0.*.0-incubating>
+helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace --set image.tag=<x.y.z-incubating>
 ```
 
 ### Deploy with Custom Configuration
