@@ -132,7 +132,6 @@ jobs:
         run: |
           sudo useradd ranger
           sudo usermod -aG docker ranger
-          sudo usermod -aG adm ranger
 
       - name: Verify user creation
         run: |
