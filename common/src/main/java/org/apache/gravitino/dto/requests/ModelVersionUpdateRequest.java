@@ -171,6 +171,7 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
     }
   }
 
+  /** Request to update the aliases of a model version. */
   @EqualsAndHashCode
   @AllArgsConstructor
   @NoArgsConstructor(force = true)
