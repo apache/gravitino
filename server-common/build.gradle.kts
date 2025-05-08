@@ -40,6 +40,7 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.prometheus.servlet)
+  implementation(libs.jcasbin)
 
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
