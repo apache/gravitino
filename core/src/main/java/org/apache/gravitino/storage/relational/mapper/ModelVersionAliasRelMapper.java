@@ -36,6 +36,12 @@ public interface ModelVersionAliasRelMapper {
   void insertModelVersionAliasRels(
       @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs);
 
+  @UpdateProvider(
+      type = ModelVersionAliasSQLProviderFactory.class,
+      method = "updateModelVersionAliasRel")
+  void updateModelVersionAliasRel(
+      @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs);
+
   @SelectProvider(
       type = ModelVersionAliasSQLProviderFactory.class,
       method = "selectModelVersionAliasRelsByModelId")

@@ -23,15 +23,19 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -1064,6 +1068,18 @@ public class TestCatalogOperations
         ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
         newProps.put(setProperty.property(), setProperty.value());
 
+      } else if (change instanceof ModelVersionChange.UpdateAliases) {
+        ModelVersionChange.UpdateAliases updateAliasesChange =
+            (ModelVersionChange.UpdateAliases) change;
+
+        Set<String> addTmpSet = updateAliasesChange.aliasesToAdd();
+        Set<String> deleteTmpSet = updateAliasesChange.aliasesToDelete();
+        Set<String> aliasToAdd = Sets.difference(addTmpSet, deleteTmpSet).immutableCopy();
+        Set<String> aliasToDelete = Sets.difference(deleteTmpSet, addTmpSet).immutableCopy();
+
+        newAliases = doDeleteAlias(newAliases, aliasToDelete);
+        newAliases = doSetAlias(newAliases, aliasToAdd);
+
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
         newUri = updateUriChange.newUri();
@@ -1084,6 +1100,10 @@ public class TestCatalogOperations
             .build();
 
     modelVersions.put(versionPair, updatedModelVersion);
+
+    Arrays.stream(newAliases)
+        .map(alias -> Pair.of(ident, alias))
+        .forEach(pair -> modelAliasToVersion.put(pair, newVersion));
     return updatedModelVersion;
   }
 
@@ -1283,5 +1303,25 @@ public class TestCatalogOperations
         .map(TestColumn.class::cast)
         .sorted(Comparator.comparingInt(TestColumn::position))
         .toArray(TestColumn[]::new);
+  }
+
+  private String[] doDeleteAlias(String[] entityAliases, Set<String> aliasToDelete) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    aliasList.removeAll(aliasToDelete);
+
+    return aliasList.toArray(new String[0]);
+  }
+
+  private String[] doSetAlias(String[] entityAliases, Set<String> aliasToAdd) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    Set<String> aliasSet = new HashSet<>(aliasList);
+
+    for (String alias : aliasToAdd) {
+      if (aliasSet.add(alias)) {
+        aliasList.add(alias);
+      }
+    }
+
+    return aliasList.toArray(new String[0]);
   }
 }
