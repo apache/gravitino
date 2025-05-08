@@ -26,7 +26,6 @@ services:
     image: ranger-build
     container_name: ranger-build
     hostname: ranger-build.example.com
-    privileged: true
     networks:
       - ranger
     volumes:
