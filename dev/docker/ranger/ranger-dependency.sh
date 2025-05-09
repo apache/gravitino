@@ -24,11 +24,10 @@ ranger_dir="$(cd "${ranger_dir}">/dev/null; pwd)"
 # Environment variables definition
 RANGER_VERSION=2.4.0
 RANGER_PACKAGE_NAME="ranger-${RANGER_VERSION}-admin.tar.gz" # Must export this variable for Dockerfile
-RANGER_DOWNLOAD_URL=https://github.com/datastrato/apache-ranger/releases/download/release-ranger-${RANGER_VERSION}/ranger-${RANGER_VERSION}-admin.tar.gz
 
 MYSQL_CONNECTOR_VERSION=8.0.28
 MYSQL_CONNECTOR_PACKAGE_NAME="mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar"
-MYSQL_CONNECTOR_DOWNLOAD_URL=https://search.maven.org/remotecontent?filepath=mysql/mysql-connector-java/${MYSQL_CONNECTOR_VERSION}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar
+MYSQL_CONNECTOR_DOWNLOAD_URL="https://search.maven.org/remotecontent?filepath=mysql/mysql-connector-java/${MYSQL_CONNECTOR_VERSION}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar"
 
 # Prepare download packages
 if [[ ! -d "${ranger_dir}/packages" ]]; then
@@ -39,6 +38,7 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
   # Package not exist, we need to build them from source
   if [ ! -d "${ranger_dir}/packages/apache-ranger" ]; then
     git clone https://github.com/apache/ranger --branch master --single-branch ${ranger_dir}/packages/apache-ranger
+    cd ${ranger_dir}/packages/apache-ranger
     # set the commit to RANGER-5146: 500 API Error When Deleting TagDef with a Linked Tag
     # https://github.com/apache/ranger/commit/ff36aabe36169b94862c51a5b403f59c9d728b94
     git reset --hard ff36aabe36169b94862c51a5b403f59c9d728b94
@@ -60,6 +60,10 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
   docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
   # copy packages from volume to host
   docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
+
+  pwd
+  ls .
+  ls -l ./dist
 
   cp ./dist/* ${ranger_dir}/packages
 
