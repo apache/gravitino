@@ -570,6 +570,7 @@ components:
         - $ref: "#/components/schemas/SetModelVersionPropertyRequest"
         - $ref: "#/components/schemas/RemoveModelVersionPropertyRequest"
         - $ref: "#/components/schemas/UpdateModelVersionUriRequest"
+        - $ref: "#/components/schemas/UpdateModelVersionAliasesRequest"
       discriminator:
         propertyName: "@type"
         mapping:
@@ -577,6 +578,7 @@ components:
           setProperty: "#/components/schemas/SetModelVersionPropertyRequest"
           removeProperty: "#/components/schemas/RemoveModelVersionPropertyRequest"
           updateUri: "#/components/schemas/UpdateModelVersionUriRequest"
+          updateAliases: "#/components/schemas/UpdateModelVersionAliasesRequest"
 
     UpdateModelVersionCommentRequest:
       type: object
@@ -657,6 +659,35 @@ components:
         "newUri": "s3://path/to/model"
       }
 
+    UpdateModelVersionAliasesRequest:
+      type: object
+      required:
+        - "@type"
+        - aliasesToAdd
+        - aliasesToRemove
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - updateAliases
+        aliasesToAdd:
+          type: array
+          description: The aliases to add
+          nullable: true
+          items:
+            type: string
+        aliasesToRemove:
+          type: array
+          description: The aliases to remove
+          nullable: true
+          items:
+            type: string
+      example: {
+        "@type": "updateAliases",
+        "aliasesToAdd": ["alias1", "alias2"],
+        "aliasesToRemove": ["alias3", "alias4"]
+      }
 
   responses:
     ModelResponse:

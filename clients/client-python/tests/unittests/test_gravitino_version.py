@@ -57,7 +57,9 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.patch, 0)
 
         version = GravitinoVersion(
-            VersionDTO("0.9.0-incubating-SNAPSHOT-0.8.0-SNAPSHOT", "2023-01-01", "1234567")
+            VersionDTO(
+                "0.9.0-incubating-SNAPSHOT-0.8.0-SNAPSHOT", "2023-01-01", "1234567"
+            )
         )
 
         self.assertEqual(version.major, 0)
@@ -72,7 +74,9 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.patch, 0)
 
         # Test a valid the version string with alpha and hyphen separator
-        version = GravitinoVersion(VersionDTO("0.6.0-alpha-0.6.0-alpha", "2023-01-01", "1234567"))
+        version = GravitinoVersion(
+            VersionDTO("0.6.0-alpha-0.6.0-alpha", "2023-01-01", "1234567")
+        )
 
         self.assertEqual(version.major, 0)
         self.assertEqual(version.minor, 6)
@@ -86,7 +90,9 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.patch, 0)
 
         # Test a valid the version string with pypi format and hyphen separator
-        version = GravitinoVersion(VersionDTO("0.6.0.dev21-0.6.0.dev21", "2023-01-01", "1234567"))
+        version = GravitinoVersion(
+            VersionDTO("0.6.0.dev21-0.6.0.dev21", "2023-01-01", "1234567")
+        )
 
         self.assertEqual(version.major, 0)
         self.assertEqual(version.minor, 6)
@@ -166,7 +172,9 @@ class TestGravitinoVersion(unittest.TestCase):
         version1 = GravitinoVersion(
             VersionDTO("0.6.0-SNAPSHOT-0.6.0", "2023-01-01", "1234567")
         )
-        version2 = GravitinoVersion(VersionDTO("0.6.0-0.6.0-SNAPSHOT", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(
+            VersionDTO("0.6.0-0.6.0-SNAPSHOT", "2023-01-01", "1234567")
+        )
 
         self.assertEqual(version1, version2)
 

@@ -30,18 +30,19 @@ import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.ModelVersionChange;
 
-/** Update the comment of a model version. */
-public class UpdateModelVersionComment extends Command {
+/** Update the aliases of a model version. */
+public class UpdateModelVersionAliases extends Command {
   protected final String metalake;
   protected final String catalog;
   protected final String schema;
   protected final String model;
   protected final Integer version;
   private final String alias;
-  private final String comment;
+  private final String[] aliasesToAdd;
+  private final String[] aliasesToRemove;
 
   /**
-   * Constructs a new {@link UpdateModelVersionComment} instance.
+   * Constructs a new {@link UpdateModelVersionAliases} instance with the specified parameters.
    *
    * @param context The command context.
    * @param metalake The name of the metalake.
@@ -49,10 +50,11 @@ public class UpdateModelVersionComment extends Command {
    * @param schema The name of the schema.
    * @param model The name of the model.
    * @param version The version of the model.
-   * @param alias The alias of the model version.
-   * @param comment The new comment for the model version.
+   * @param alias The alias to update.
+   * @param aliasesToAdd The aliases to add.
+   * @param aliasesToRemove The aliases to remove.
    */
-  public UpdateModelVersionComment(
+  public UpdateModelVersionAliases(
       CommandContext context,
       String metalake,
       String catalog,
@@ -60,7 +62,8 @@ public class UpdateModelVersionComment extends Command {
       String model,
       Integer version,
       String alias,
-      String comment) {
+      String[] aliasesToAdd,
+      String[] aliasesToRemove) {
     super(context);
     this.metalake = metalake;
     this.catalog = catalog;
@@ -68,16 +71,17 @@ public class UpdateModelVersionComment extends Command {
     this.model = model;
     this.version = version;
     this.alias = alias;
-    this.comment = comment;
+    this.aliasesToAdd = aliasesToAdd;
+    this.aliasesToRemove = aliasesToRemove;
   }
 
-  /** Update the comment of a model version. */
+  /** Update the aliases of a model version. */
   @Override
   public void handle() {
     try {
       NameIdentifier modelIdent = NameIdentifier.of(schema, model);
       GravitinoClient client = buildClient(metalake);
-      ModelVersionChange change = ModelVersionChange.updateComment(comment);
+      ModelVersionChange change = ModelVersionChange.updateAliases(aliasesToAdd, aliasesToRemove);
       if (alias != null) {
         client.loadCatalog(catalog).asModelCatalog().alterModelVersion(modelIdent, alias, change);
       } else {
@@ -98,9 +102,9 @@ public class UpdateModelVersionComment extends Command {
     }
 
     if (alias != null) {
-      printInformation(model + " alias " + alias + " comment changed.");
+      printInformation(model + " alias " + alias + " aliases changed.");
     } else {
-      printInformation(model + " version " + version + " comment changed.");
+      printInformation(model + " version " + version + " aliases changed.");
     }
   }
 
