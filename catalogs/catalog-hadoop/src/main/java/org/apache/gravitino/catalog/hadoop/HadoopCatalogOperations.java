@@ -53,6 +53,9 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.cache.CacheConfig;
+import org.apache.gravitino.cache.CaffeineMetaCache;
+import org.apache.gravitino.cache.MetaCache;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
@@ -110,9 +113,12 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   private Map<String, FileSystemProvider> fileSystemProvidersMap;
 
   private FileSystemProvider defaultFileSystemProvider;
+  private MetaCache fileCache;
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
+    // TODO retrieve from GravitinoEnv
+    this.fileCache = CaffeineMetaCache.getInstance(new CacheConfig(), store);
   }
 
   public HadoopCatalogOperations() {
@@ -202,8 +208,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     try {
-      FilesetEntity filesetEntity =
-          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
+      Entity entity = fileCache.getOrLoadMetadataByName(ident, Entity.EntityType.FILESET);
+      FilesetEntity filesetEntity = (FilesetEntity) entity;
 
       return HadoopFileset.builder()
           .withName(ident.name())
@@ -337,6 +343,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
     }
 
+    fileCache.removeByName(ident);
     try {
       FilesetEntity updatedFilesetEntity =
           store.update(
@@ -386,6 +393,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
         }
       }
 
+      fileCache.removeByName(ident);
       return store.delete(ident, Entity.EntityType.FILESET);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
@@ -537,6 +545,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
       Path schemaPath = getSchemaPath(ident.name(), properties);
 
+      filesets.forEach(s -> fileCache.removeByName(s.nameIdentifier()));
       boolean dropped = super.dropSchema(ident, cascade);
       if (!dropped) {
         return false;
@@ -674,6 +683,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     String newName = ident.name();
     String newComment = filesetEntity.comment();
 
+    fileCache.removeByName(ident);
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetProperty) {
         FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) change;
