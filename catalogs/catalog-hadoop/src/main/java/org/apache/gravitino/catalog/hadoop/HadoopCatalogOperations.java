@@ -322,14 +322,18 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to create fileset " + ident, ioe);
     }
 
-    return HadoopFileset.builder()
-        .withName(ident.name())
-        .withComment(comment)
-        .withType(type)
-        .withStorageLocation(filesetPath.toString())
-        .withProperties(filesetEntity.properties())
-        .withAuditInfo(filesetEntity.auditInfo())
-        .build();
+    HadoopFileset fileset =
+        HadoopFileset.builder()
+            .withName(ident.name())
+            .withComment(comment)
+            .withType(type)
+            .withStorageLocation(filesetPath.toString())
+            .withProperties(filesetEntity.properties())
+            .withAuditInfo(filesetEntity.auditInfo())
+            .build();
+
+    fileCache.put(filesetEntity);
+    return fileset;
   }
 
   @Override
@@ -352,6 +356,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               Entity.EntityType.FILESET,
               e -> updateFilesetEntity(ident, e, changes));
 
+      fileCache.put(updatedFilesetEntity);
       return HadoopFileset.builder()
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())
@@ -683,7 +688,6 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     String newName = ident.name();
     String newComment = filesetEntity.comment();
 
-    fileCache.removeByName(ident);
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetProperty) {
         FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) change;

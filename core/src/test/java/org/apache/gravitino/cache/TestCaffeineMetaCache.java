@@ -596,11 +596,10 @@ public class TestCaffeineMetaCache {
 
   @Test
   void testRemoveNonExistentEntity() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> cache.removeById(9999L, Entity.EntityType.TABLE));
+    Assertions.assertDoesNotThrow(() -> cache.removeById(9999L, Entity.EntityType.TABLE));
 
     NameIdentifier unknownIdent = NameIdentifier.of("metalakeZ", "catalogZ", "schemaZ", "tableZ");
-    Assertions.assertThrows(IllegalArgumentException.class, () -> cache.removeByName(unknownIdent));
+    Assertions.assertDoesNotThrow(() -> cache.removeByName(unknownIdent));
   }
 
   @Test
