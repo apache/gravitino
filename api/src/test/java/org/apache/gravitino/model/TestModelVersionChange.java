@@ -206,10 +206,10 @@ public class TestModelVersionChange {
   @Test
   void testCreateUpdateVersionAliasUseStaticMethod() {
     String[] aliasesToAdd = {"alias add 1", "alias add 2"};
-    String[] aliasesToDelete = {"alias delete 1", "alias delete 2"};
+    String[] aliasesToRemove = {"alias remove 1", "alias remove 2"};
 
     ModelVersionChange modelVersionChange =
-        ModelVersionChange.updateAliases(aliasesToAdd, aliasesToDelete);
+        ModelVersionChange.updateAliases(aliasesToAdd, aliasesToRemove);
 
     Assertions.assertEquals(ModelVersionChange.UpdateAliases.class, modelVersionChange.getClass());
 
@@ -218,13 +218,13 @@ public class TestModelVersionChange {
     Assertions.assertEquals(
         ImmutableSet.of("alias add 1", "alias add 2"), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(
-        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToRemove());
+        ImmutableSet.of("alias remove 1", "alias remove 2"), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
         "UpdateAlias "
             + "AliasToAdd: (alias add 1,alias add 2)"
             + " "
-            + "AliasToDelete: (alias "
-            + "delete 1,alias delete 2)",
+            + "AliasToRemove: (alias "
+            + "remove 1,alias remove 2)",
         updateAliasesChange.toString());
   }
 
@@ -238,16 +238,16 @@ public class TestModelVersionChange {
     Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
-        "UpdateAlias AliasToAdd: () AliasToDelete: ()", updateAliasesChange.toString());
+        "UpdateAlias AliasToAdd: () AliasToRemove: ()", updateAliasesChange.toString());
   }
 
   @Test
   void testCreateUpdateVersionAliasUseConstructor() {
     List<String> aliasesToAdd = Lists.newArrayList("alias add 1", "alias add 2");
-    List<String> aliasesToDelete = Lists.newArrayList("alias delete 1", "alias delete 2");
+    List<String> aliasesToRemove = Lists.newArrayList("alias remove 1", "alias remove 2");
 
     ModelVersionChange modelVersionChange =
-        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToRemove);
 
     Assertions.assertEquals(ModelVersionChange.UpdateAliases.class, modelVersionChange.getClass());
 
@@ -256,13 +256,13 @@ public class TestModelVersionChange {
     Assertions.assertEquals(
         ImmutableSet.of("alias add 1", "alias add 2"), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(
-        ImmutableSet.of("alias delete 1", "alias delete 2"), updateAliasesChange.aliasesToRemove());
+        ImmutableSet.of("alias remove 1", "alias remove 2"), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
         "UpdateAlias "
             + "AliasToAdd: (alias add 1,alias add 2)"
             + " "
-            + "AliasToDelete: (alias "
-            + "delete 1,alias delete 2)",
+            + "AliasToRemove: (alias "
+            + "remove 1,alias remove 2)",
         updateAliasesChange.toString());
   }
 
@@ -276,25 +276,25 @@ public class TestModelVersionChange {
     Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToAdd());
     Assertions.assertEquals(ImmutableSet.of(), updateAliasesChange.aliasesToRemove());
     Assertions.assertEquals(
-        "UpdateAlias AliasToAdd: () AliasToDelete: ()", updateAliasesChange.toString());
+        "UpdateAlias AliasToAdd: () AliasToRemove: ()", updateAliasesChange.toString());
   }
 
   @Test
   void testUpdateVersionAliasChangeEquals() {
     List<String> aliasesToAdd = Lists.newArrayList("alias add 1", "alias add 2");
-    List<String> aliasesToDelete = Lists.newArrayList("alias delete 1", "alias delete 2");
+    List<String> aliasesToRemove = Lists.newArrayList("alias remove 1", "alias remove 2");
 
     List<String> differentAliasesToAdd = Lists.newArrayList("alias add 1", "alias add 3");
-    List<String> differentAliasesToDelete = Lists.newArrayList("alias delete 1", "alias delete 3");
+    List<String> differentAliasesToRemove = Lists.newArrayList("alias remove 1", "alias remove 3");
 
     ModelVersionChange modelVersionChange1 =
-        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToRemove);
     ModelVersionChange modelVersionChange2 =
-        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, aliasesToRemove);
     ModelVersionChange modelVersionChange3 =
-        new ModelVersionChange.UpdateAliases(differentAliasesToAdd, aliasesToDelete);
+        new ModelVersionChange.UpdateAliases(differentAliasesToAdd, aliasesToRemove);
     ModelVersionChange modelVersionChange4 =
-        new ModelVersionChange.UpdateAliases(aliasesToAdd, differentAliasesToDelete);
+        new ModelVersionChange.UpdateAliases(aliasesToAdd, differentAliasesToRemove);
 
     Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
     Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
