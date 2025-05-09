@@ -203,8 +203,10 @@ public class CaffeineMetaCache extends BaseMetaCache {
   public void removeById(Long id, Entity.EntityType type) {
     Entity entity = cacheData.getIfPresent(MetaCacheKey.of(id, type));
     if (entity == null) {
-      throw new IllegalArgumentException(
-          "Entity with id " + id + " and type " + type + " not found in cache");
+      if (LOG.isTraceEnabled()) {
+        LOG.debug("Cache miss [byId] for id={}, type={}, skipping removal", id, type);
+      }
+      return;
     }
 
     removeFromEntity(entity);
@@ -215,7 +217,10 @@ public class CaffeineMetaCache extends BaseMetaCache {
   public void removeByName(NameIdentifier ident) {
     MetaCacheKey idKey = cacheIndex.getValueForExactKey(ident.toString());
     if (idKey == null) {
-      throw new IllegalArgumentException("Entity with name " + ident + " not found in cache");
+      if (LOG.isTraceEnabled()) {
+        LOG.debug("Cache miss [byName] for name={}, skipping removal", ident);
+      }
+      return;
     }
     Entity entity = cacheData.getIfPresent(idKey);
 
@@ -255,6 +260,12 @@ public class CaffeineMetaCache extends BaseMetaCache {
           cacheData.invalidateAll();
           cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void put(Entity entity) {
+    syncEntityToCache(entity);
   }
 
   /**

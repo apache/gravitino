@@ -92,6 +92,13 @@ public interface MetaCache {
   long sizeOfCacheData();
 
   /**
+   * Put an entity into the cache.
+   *
+   * @param entity the entity to cache.
+   */
+  void put(Entity entity);
+
+  /**
    * Returns the current number of entries stored in the index structures.
    *
    * @return the size of the index (number of indexed keys)

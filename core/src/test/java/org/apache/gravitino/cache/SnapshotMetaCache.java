@@ -175,7 +175,9 @@ public class SnapshotMetaCache extends BaseMetaCache {
     return snapshotRef.get().index.size();
   }
 
-  private void put(Entity entity) {
+  /** {@inheritDoc} */
+  @Override
+  public void put(Entity entity) {
     long id = CacheUtils.getIdFromEntity(entity);
     NameIdentifier ident = CacheUtils.getIdentFromEntity(entity);
     Entity.EntityType tp = entity.type();
