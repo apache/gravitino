@@ -28,6 +28,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
@@ -43,11 +44,13 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.tag.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class TestPlainFormat {
 
@@ -257,6 +260,50 @@ public class TestPlainFormat {
   }
 
   @Test
+  void testTagDetailsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    PlainFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("tag1,comment for tag1", output);
+  }
+
+  @Test
+  void testTagDetailsWithPlainFormatWithNullValues() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = getMockTag("tag1", null);
+
+    PlainFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("tag1,N/A", output);
+  }
+
+  @Test
+  void testListAllTagsWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1");
+    Tag mockTag2 = getMockTag("tag2", "comment for tag2");
+    Tag mockTag3 = getMockTag("tag3", "comment for tag3");
+
+    PlainFormat.output(new Tag[] {mockTag1, mockTag2, mockTag3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("tag1\n" + "tag2\n" + "tag3", output);
+  }
+
+  @Test
+  void testListTagPropertiesWithPlainFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    PlainFormat.output(mockTag1.properties(), mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("k1,v1\n" + "k2,v2", output);
+  }
+
+  @Test
   void testOutputWithUnsupportType() {
     CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
@@ -450,5 +497,18 @@ public class TestPlainFormat {
     when(mockGroup.roles()).thenReturn(roles);
 
     return mockGroup;
+  }
+
+  private Tag getMockTag(String name, String comment) {
+    return getMockTag(name, comment, ImmutableMap.of("k1", "v2", "k2", "v2"));
+  }
+
+  private Tag getMockTag(String name, String comment, Map<String, String> properties) {
+    Tag mockTag = mock(Tag.class);
+    when(mockTag.name()).thenReturn(name);
+    when(mockTag.comment()).thenReturn(comment);
+    when(mockTag.properties()).thenReturn(properties);
+
+    return mockTag;
   }
 }
