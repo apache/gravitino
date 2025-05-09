@@ -94,6 +94,11 @@ public class EventListenerPluginWrapper implements EventListenerPlugin {
     }
   }
 
+  @Override
+  public PreEvent transformPreEvent(PreEvent preEvent) {
+    return userEventListener.transformPreEvent(preEvent);
+  }
+
   @VisibleForTesting
   public EventListenerPlugin getUserEventListener() {
     return userEventListener;
