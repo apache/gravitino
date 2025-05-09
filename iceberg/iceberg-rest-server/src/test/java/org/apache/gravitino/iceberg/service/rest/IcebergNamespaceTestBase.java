@@ -29,6 +29,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -44,33 +45,29 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
   private final Map<String, String> properties = ImmutableMap.of("a", "b");
   private final Map<String, String> updatedProperties = ImmutableMap.of("b", "c");
 
-  protected Response doCreateNamespace(String... name) {
+  protected Response doCreateNamespace(Namespace name) {
     CreateNamespaceRequest request =
-        CreateNamespaceRequest.builder()
-            .withNamespace(Namespace.of(name))
-            .setProperties(properties)
-            .build();
+        CreateNamespaceRequest.builder().withNamespace(name).setProperties(properties).build();
     return getNamespaceClientBuilder()
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doRegisterTable(String tableName) {
+  private Response doRegisterTable(String tableName, Namespace ns) {
     RegisterTableRequest request =
         ImmutableRegisterTableRequest.builder().name(tableName).metadataLocation("mock").build();
-    return getNamespaceClientBuilder(
-            Optional.of("register_ns"), Optional.of("register"), Optional.empty())
+    return getNamespaceClientBuilder(Optional.of(ns), Optional.of("register"), Optional.empty())
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doListNamespace(Optional<String> parent) {
+  private Response doListNamespace(Optional<Namespace> parent) {
     Optional<Map<String, String>> queryParam =
         parent.isPresent()
-            ? Optional.of(ImmutableMap.of("parent", parent.get()))
+            ? Optional.of(ImmutableMap.of("parent", RESTUtil.encodeNamespace(parent.get())))
             : Optional.empty();
     return getNamespaceClientBuilder(Optional.empty(), Optional.empty(), queryParam).get();
   }
 
-  private Response doUpdateNamespace(String name) {
+  private Response doUpdateNamespace(Namespace name) {
     UpdateNamespacePropertiesRequest request =
         UpdateNamespacePropertiesRequest.builder()
             .removeAll(Arrays.asList("a", "a1"))
@@ -80,68 +77,72 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doLoadNamespace(String name) {
+  private Response doLoadNamespace(Namespace name) {
     return getNamespaceClientBuilder(Optional.of(name)).get();
   }
 
-  private Response doNamespaceExists(String name) {
+  private Response doNamespaceExists(Namespace name) {
     return getNamespaceClientBuilder(Optional.of(name)).head();
   }
 
-  private Response doDropNamespace(String name) {
+  private Response doDropNamespace(Namespace name) {
     return getNamespaceClientBuilder(Optional.of(name)).delete();
   }
 
-  protected void verifyLoadNamespaceFail(int status, String name) {
+  protected void verifyLoadNamespaceFail(int status, Namespace name) {
     Response response = doLoadNamespace(name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  protected void verifyLoadNamespaceSucc(String name) {
+  protected void verifyLoadNamespaceSucc(Namespace name) {
     Response response = doLoadNamespace(name);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
 
     GetNamespaceResponse r = response.readEntity(GetNamespaceResponse.class);
-    Assertions.assertEquals(name, r.namespace().toString());
+    Assertions.assertEquals(name, r.namespace());
     Assertions.assertEquals(properties, r.properties());
   }
 
-  protected void verifyDropNamespaceSucc(String name) {
+  protected void verifyDropNamespaceSucc(Namespace name) {
     Response response = doDropNamespace(name);
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
-  protected void verifyDropNamespaceFail(int status, String name) {
+  protected void verifyDropNamespaceFail(int status, Namespace name) {
     Response response = doDropNamespace(name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  protected void verifyNamespaceExistsStatusCode(int status, String name) {
+  protected void verifyNamespaceExistsStatusCode(int status, Namespace name) {
     Response response = doNamespaceExists(name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
   protected void verifyCreateNamespaceSucc(String... name) {
+    verifyCreateNamespaceSucc(Namespace.of(name));
+  }
+
+  protected void verifyCreateNamespaceSucc(Namespace name) {
     Response response = doCreateNamespace(name);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
 
     CreateNamespaceResponse namespaceResponse = response.readEntity(CreateNamespaceResponse.class);
-    Assertions.assertTrue(namespaceResponse.namespace().equals(Namespace.of(name)));
+    Assertions.assertTrue(namespaceResponse.namespace().equals(name));
 
     Assertions.assertEquals(namespaceResponse.properties(), properties);
   }
 
-  protected void verifyRegisterTableSucc(String tableName) {
-    Response response = doRegisterTable(tableName);
+  protected void verifyRegisterTableSucc(String tableName, Namespace ns) {
+    Response response = doRegisterTable(tableName, ns);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
   }
 
-  protected void verifyRegisterTableFail(int statusCode, String tableName) {
-    Response response = doRegisterTable(tableName);
+  protected void verifyRegisterTableFail(int statusCode, String tableName, Namespace ns) {
+    Response response = doRegisterTable(tableName, ns);
     Assertions.assertEquals(statusCode, response.getStatus());
   }
 
-  protected void verifyCreateNamespaceFail(int statusCode, String... name) {
+  protected void verifyCreateNamespaceFail(int statusCode, Namespace name) {
     Response response = doCreateNamespace(name);
     Assertions.assertEquals(statusCode, response.getStatus());
   }
@@ -151,15 +152,15 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
 
     ListNamespacesResponse r = response.readEntity(ListNamespacesResponse.class);
-    r.namespaces().forEach(n -> doDropNamespace(n.toString()));
+    r.namespaces().forEach(n -> doDropNamespace(n));
   }
 
-  protected void verifyListNamespaceFail(Optional<String> parent, int status) {
+  protected void verifyListNamespaceFail(Optional<Namespace> parent, int status) {
     Response response = doListNamespace(parent);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  protected void verifyListNamespaceSucc(Optional<String> parent, List<String> schemas) {
+  protected void verifyListNamespaceSucc(Optional<Namespace> parent, List<String> schemas) {
     Response response = doListNamespace(parent);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
 
@@ -168,7 +169,7 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
     Assertions.assertEquals(schemas, ns);
   }
 
-  protected void verifyUpdateNamespaceSucc(String name) {
+  protected void verifyUpdateNamespaceSucc(Namespace name) {
     Response response = doUpdateNamespace(name);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
 
@@ -179,7 +180,7 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
     Assertions.assertEquals(Arrays.asList("b"), r.updated());
   }
 
-  protected void verifyUpdateNamespaceFail(int status, String name) {
+  protected void verifyUpdateNamespaceFail(int status, Namespace name) {
     Response response = doUpdateNamespace(name);
     Assertions.assertEquals(status, response.getStatus());
   }

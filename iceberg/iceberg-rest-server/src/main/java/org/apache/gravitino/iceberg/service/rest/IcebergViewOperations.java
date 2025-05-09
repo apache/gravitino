@@ -27,6 +27,7 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.POST;
@@ -74,7 +75,7 @@ public class IcebergViewOperations {
   @Timed(name = "list-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-view", absolute = true)
   public Response listView(
-      @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+      @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg views, catalog: {}, namespace: {}", catalogName, icebergNS);
@@ -89,7 +90,7 @@ public class IcebergViewOperations {
   @ResponseMetered(name = "create-view", absolute = true)
   public Response createView(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       CreateViewRequest createViewRequest) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
@@ -112,7 +113,7 @@ public class IcebergViewOperations {
   @ResponseMetered(name = "load-view", absolute = true)
   public Response loadView(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
@@ -132,7 +133,7 @@ public class IcebergViewOperations {
   @ResponseMetered(name = "replace-view", absolute = true)
   public Response replaceView(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view,
       UpdateTableRequest replaceViewRequest) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
@@ -157,13 +158,13 @@ public class IcebergViewOperations {
   @ResponseMetered(name = "drop-view", absolute = true)
   public Response dropView(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
         "Drop Iceberg view, catalog: {}, namespace: {}, view: {}", catalogName, icebergNS, view);
-    TableIdentifier viewIdentifier = TableIdentifier.of(namespace, view);
+    TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, view);
     IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     viewOperationDispatcher.dropView(context, viewIdentifier);
     return IcebergRestUtils.noContent();
@@ -176,7 +177,7 @@ public class IcebergViewOperations {
   @ResponseMetered(name = "view-exits", absolute = true)
   public Response viewExists(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("view") String view) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);

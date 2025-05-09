@@ -73,9 +73,8 @@ import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
@@ -100,160 +99,166 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     return resourceConfig;
   }
 
-  @Test
-  void testCreateTable() {
-    verifyCreateTableFail("create_foo1", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateTable(Namespace namespace) {
+    verifyCreateTableFail(namespace, "create_foo1", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateTablePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergCreateTableFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateNamespaceSucc(namespace);
 
-    verifyCreateTableSucc("create_foo1");
+    verifyCreateTableSucc(namespace, "create_foo1");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergCreateTableEvent);
 
-    verifyCreateTableFail("create_foo1", 409);
-    verifyCreateTableFail("", 400);
+    verifyCreateTableFail(namespace, "create_foo1", 409);
+    verifyCreateTableFail(namespace, "", 400);
   }
 
-  @Test
-  void testLoadTable() {
-    verifyLoadTableFail("load_foo1", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadTable(Namespace namespace) {
+    verifyLoadTableFail(namespace, "load_foo1", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadTablePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergLoadTableFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("load_foo1");
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "load_foo1");
 
     dummyEventListener.clearEvent();
-    verifyLoadTableSucc("load_foo1");
+    verifyLoadTableSucc(namespace, "load_foo1");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergLoadTableEvent);
-
-    verifyLoadTableFail("load_foo2", 404);
   }
 
-  @Test
-  void testDropTable() {
-    verifyDropTableFail("drop_foo1", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testDropTable(Namespace namespace) {
+    verifyDropTableFail(namespace, "drop_foo1", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropTablePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergDropTableFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyDropTableFail("drop_foo1", 404);
+    verifyCreateNamespaceSucc(namespace);
+    verifyDropTableFail(namespace, "drop_foo1", 404);
 
-    verifyCreateTableSucc("drop_foo1");
+    verifyCreateTableSucc(namespace, "drop_foo1");
 
     dummyEventListener.clearEvent();
-    verifyDropTableSucc("drop_foo1");
+    verifyDropTableSucc(namespace, "drop_foo1");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergDropTableEvent);
 
-    verifyLoadTableFail("drop_foo1", 404);
+    verifyLoadTableFail(namespace, "drop_foo1", 404);
   }
 
-  @Test
-  void testUpdateTable() {
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("update_foo1");
-    TableMetadata metadata = getTableMeta("update_foo1");
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testUpdateTable(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "update_foo1");
+    TableMetadata metadata = getTableMeta(namespace, "update_foo1");
 
     dummyEventListener.clearEvent();
-    verifyUpdateSucc("update_foo1", metadata);
+    verifyUpdateSucc(namespace, "update_foo1", metadata);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergUpdateTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergUpdateTableEvent);
 
-    verifyDropTableSucc("update_foo1");
+    verifyDropTableSucc(namespace, "update_foo1");
 
     dummyEventListener.clearEvent();
-    verifyUpdateTableFail("update_foo1", 404, metadata);
+    verifyUpdateTableFail(namespace, "update_foo1", 404, metadata);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergUpdateTablePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergUpdateTableFailureEvent);
 
-    verifyDropNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyUpdateTableFail("update_foo1", 404, metadata);
+    verifyDropNamespaceSucc(namespace);
+    verifyUpdateTableFail(namespace, "update_foo1", 404, metadata);
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  void testListTables(String prefix) {
+  @MethodSource(
+      "org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testPrefixesAndNamespaces")
+  void testListTables(String prefix, Namespace namespace) {
     setUrlPathWithPrefix(prefix);
-    verifyListTableFail(404);
+    verifyListTableFail(namespace, 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListTablePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergListTableFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("list_foo1");
-    verifyCreateTableSucc("list_foo2");
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "list_foo1");
+    verifyCreateTableSucc(namespace, "list_foo2");
 
     dummyEventListener.clearEvent();
-    verifyListTableSucc(ImmutableSet.of("list_foo1", "list_foo2"));
+    verifyListTableSucc(namespace, ImmutableSet.of("list_foo1", "list_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListTableEvent);
   }
 
-  @Test
-  void testTableExits() {
-    verifyTableExistsStatusCode("exists_foo2", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testTableExits(Namespace namespace) {
+    verifyTableExistsStatusCode(namespace, "exists_foo2", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergTableExistsPreEvent);
     Event postEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(postEvent instanceof IcebergTableExistsEvent);
     Assertions.assertEquals(false, ((IcebergTableExistsEvent) postEvent).isExists());
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyTableExistsStatusCode("exists_foo2", 404);
+    verifyCreateNamespaceSucc(namespace);
+    verifyTableExistsStatusCode(namespace, "exists_foo2", 404);
 
-    verifyCreateTableSucc("exists_foo1");
+    verifyCreateTableSucc(namespace, "exists_foo1");
     dummyEventListener.clearEvent();
-    verifyTableExistsStatusCode("exists_foo1", 204);
+    verifyTableExistsStatusCode(namespace, "exists_foo1", 204);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergTableExistsPreEvent);
     postEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(postEvent instanceof IcebergTableExistsEvent);
     Assertions.assertEquals(true, ((IcebergTableExistsEvent) postEvent).isExists());
 
-    verifyLoadTableSucc("exists_foo1");
+    verifyLoadTableSucc(namespace, "exists_foo1");
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  void testRenameTable(String prefix) {
+  @MethodSource(
+      "org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testPrefixesAndNamespaces")
+  void testRenameTable(String prefix, Namespace namespace) {
     setUrlPathWithPrefix(prefix);
     // namespace not exits
-    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
+    verifyRenameTableFail(namespace, "rename_foo1", "rename_foo3", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRenameTablePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergRenameTableFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("rename_foo1");
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "rename_foo1");
 
     dummyEventListener.clearEvent();
     // rename
-    verifyRenameTableSucc("rename_foo1", "rename_foo2");
+    verifyRenameTableSucc(namespace, "rename_foo1", "rename_foo2");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRenameTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergRenameTableEvent);
 
-    verifyLoadTableFail("rename_foo1", 404);
-    verifyLoadTableSucc("rename_foo2");
+    verifyLoadTableFail(namespace, "rename_foo1", 404);
+    verifyLoadTableSucc(namespace, "rename_foo2");
 
     // source table not exists
-    verifyRenameTableFail("rename_foo1", "rename_foo3", 404);
+    verifyRenameTableFail(namespace, "rename_foo1", "rename_foo3", 404);
 
     // dest table exists
-    verifyCreateTableSucc("rename_foo3");
-    verifyRenameTableFail("rename_foo2", "rename_foo3", 409);
+    verifyCreateTableSucc(namespace, "rename_foo3");
+    verifyRenameTableFail(namespace, "rename_foo2", "rename_foo3", 409);
   }
 
-  @Test
-  void testReportTableMetrics() {
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testReportTableMetrics(Namespace namespace) {
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateTableSucc("metrics_foo1");
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "metrics_foo1");
 
     ImmutableCommitMetricsResult commitMetrics = ImmutableCommitMetricsResult.builder().build();
     CommitReport commitReport =
@@ -266,25 +271,26 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
             .build();
     ReportMetricsRequest request = ReportMetricsRequest.of(commitReport);
     Response response =
-        getReportMetricsClientBuilder("metrics_foo1")
+        getReportMetricsClientBuilder("metrics_foo1", namespace)
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
-  @Test
-  void testCreateTableWithCredentialVending() {
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateTableWithCredentialVending(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
 
     // create the table without credential vending
-    Response response = doCreateTable("create_without_credential_vending");
+    Response response = doCreateTable(namespace, "create_without_credential_vending");
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
 
     // create the table with credential vending
     String tableName = "create_with_credential_vending";
-    response = doCreateTableWithCredentialVending(tableName);
+    response = doCreateTableWithCredentialVending(namespace, tableName);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
@@ -292,13 +298,13 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
 
     // load the table without credential vending
-    response = doLoadTable(tableName);
+    response = doLoadTable(namespace, tableName);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertTrue(!loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
 
     // load the table with credential vending
-    response = doLoadTableWithCredentialVending(tableName);
+    response = doLoadTableWithCredentialVending(namespace, tableName);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
@@ -306,96 +312,88 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
   }
 
-  private Response doCreateTableWithCredentialVending(String name) {
+  private Response doCreateTableWithCredentialVending(Namespace ns, String name) {
     CreateTableRequest createTableRequest =
         CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
-    return getTableClientBuilder()
+    return getTableClientBuilder(ns, Optional.empty())
         .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doCreateTable(String name) {
+  private Response doCreateTable(Namespace ns, String name) {
     CreateTableRequest createTableRequest =
         CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
-    return getTableClientBuilder()
+    return getTableClientBuilder(ns, Optional.empty())
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doRenameTable(String source, String dest) {
+  private Response doRenameTable(Namespace ns, String source, String dest) {
     RenameTableRequest renameTableRequest =
         RenameTableRequest.builder()
-            .withSource(
-                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), source))
-            .withDestination(
-                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), dest))
+            .withSource(TableIdentifier.of(ns, source))
+            .withDestination(TableIdentifier.of(ns, dest))
             .build();
     return getRenameTableClientBuilder()
         .post(Entity.entity(renameTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doListTable() {
-    return getTableClientBuilder().get();
+  private Response doListTable(Namespace ns) {
+    return getTableClientBuilder(ns, Optional.empty()).get();
   }
 
-  private Response doDropTable(String name) {
-    return getTableClientBuilder(Optional.of(name)).delete();
+  private Response doDropTable(Namespace ns, String name) {
+    return getTableClientBuilder(ns, Optional.of(name)).delete();
   }
 
-  private Response doTableExists(String name) {
-    return getTableClientBuilder(Optional.of(name)).head();
+  private Response doTableExists(Namespace ns, String name) {
+    return getTableClientBuilder(ns, Optional.of(name)).head();
   }
 
-  private Response doLoadTableWithCredentialVending(String name) {
-    return getTableClientBuilder(Optional.of(name))
+  private Response doLoadTableWithCredentialVending(Namespace ns, String name) {
+    return getTableClientBuilder(ns, Optional.of(name))
         .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
         .get();
   }
 
-  private Response doLoadTable(String name) {
-    return getTableClientBuilder(Optional.of(name)).get();
+  private Response doLoadTable(Namespace ns, String name) {
+    return getTableClientBuilder(ns, Optional.of(name)).get();
   }
 
-  private Response doUpdateTable(String name, TableMetadata base) {
+  private Response doUpdateTable(Namespace ns, String name, TableMetadata base) {
     TableMetadata newMetadata = base.updateSchema(newTableSchema, base.lastColumnId());
     List<MetadataUpdate> metadataUpdates = newMetadata.changes();
     List<UpdateRequirement> requirements = UpdateRequirements.forUpdateTable(base, metadataUpdates);
     UpdateTableRequest updateTableRequest = new UpdateTableRequest(requirements, metadataUpdates);
-    return getTableClientBuilder(Optional.of(name))
+    return getTableClientBuilder(ns, Optional.of(name))
         .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private TableMetadata getTableMeta(String tableName) {
-    Response response = doLoadTable(tableName);
+  private TableMetadata getTableMeta(Namespace ns, String tableName) {
+    Response response = doLoadTable(ns, tableName);
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     return loadTableResponse.tableMetadata();
   }
 
-  private void verifyUpdateTableFail(String name, int status, TableMetadata base) {
-    Response response = doUpdateTable(name, base);
+  private void verifyUpdateTableFail(Namespace ns, String name, int status, TableMetadata base) {
+    Response response = doUpdateTable(ns, name, base);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyUpdateSucc(String name, TableMetadata base) {
-    Response response = doUpdateTable(name, base);
+  private void verifyUpdateSucc(Namespace ns, String name, TableMetadata base) {
+    Response response = doUpdateTable(ns, name, base);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     Assertions.assertEquals(
         newTableSchema.columns(), loadTableResponse.tableMetadata().schema().columns());
   }
 
-  private TableMetadata doGetTableMetaData(String name) {
-    Response response = doLoadTable(name);
-    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
-    return loadTableResponse.tableMetadata();
-  }
-
-  private void verifyLoadTableFail(String name, int status) {
-    Response response = doLoadTable(name);
+  private void verifyLoadTableFail(Namespace ns, String name, int status) {
+    Response response = doLoadTable(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyLoadTableSucc(String name) {
-    Response response = doLoadTable(name);
+  private void verifyLoadTableSucc(Namespace ns, String name) {
+    Response response = doLoadTable(ns, name);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
 
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
@@ -403,48 +401,48 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         tableSchema.columns(), loadTableResponse.tableMetadata().schema().columns());
   }
 
-  private void verifyDropTableSucc(String name) {
-    Response response = doDropTable(name);
+  private void verifyDropTableSucc(Namespace ns, String name) {
+    Response response = doDropTable(ns, name);
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
-  private void verifyTableExistsStatusCode(String name, int status) {
-    Response response = doTableExists(name);
+  private void verifyTableExistsStatusCode(Namespace ns, String name, int status) {
+    Response response = doTableExists(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyDropTableFail(String name, int status) {
-    Response response = doDropTable(name);
+  private void verifyDropTableFail(Namespace ns, String name, int status) {
+    Response response = doDropTable(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyCreateTableSucc(String name) {
-    Response response = doCreateTable(name);
+  private void verifyCreateTableSucc(Namespace ns, String name) {
+    Response response = doCreateTable(ns, name);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
     Schema schema = loadTableResponse.tableMetadata().schema();
     Assertions.assertEquals(schema.columns(), tableSchema.columns());
   }
 
-  private void verifyRenameTableSucc(String source, String dest) {
-    Response response = doRenameTable(source, dest);
+  private void verifyRenameTableSucc(Namespace ns, String source, String dest) {
+    Response response = doRenameTable(ns, source, dest);
     System.out.println(response);
     System.out.flush();
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
-  private void verifyRenameTableFail(String source, String dest, int status) {
-    Response response = doRenameTable(source, dest);
+  private void verifyRenameTableFail(Namespace ns, String source, String dest, int status) {
+    Response response = doRenameTable(ns, source, dest);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyListTableFail(int status) {
-    Response response = doListTable();
+  private void verifyListTableFail(Namespace ns, int status) {
+    Response response = doListTable(ns);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyListTableSucc(Set<String> expectedTableNames) {
-    Response response = doListTable();
+  private void verifyListTableSucc(Namespace ns, Set<String> expectedTableNames) {
+    Response response = doListTable(ns);
     Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
     ListTablesResponse listTablesResponse = response.readEntity(ListTablesResponse.class);
     Set<String> tableNames =
@@ -454,8 +452,8 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(expectedTableNames, tableNames);
   }
 
-  private void verifyCreateTableFail(String name, int status) {
-    Response response = doCreateTable(name);
+  private void verifyCreateTableFail(Namespace ns, String name, int status) {
+    Response response = doCreateTable(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 }

@@ -65,9 +65,8 @@ import org.apache.iceberg.view.ImmutableViewVersion;
 import org.apache.iceberg.view.ViewMetadata;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
   private static final Schema viewSchema =
@@ -94,152 +93,159 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  void testListViews(String prefix) {
+  @MethodSource(
+      "org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testPrefixesAndNamespaces")
+  void testListViews(String prefix, Namespace namespace) {
     setUrlPathWithPrefix(prefix);
-    verifyListViewFail(404);
+    verifyListViewFail(namespace, 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListViewFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateViewSucc("list_foo1");
-    verifyCreateViewSucc("list_foo2");
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "list_foo1");
+    verifyCreateViewSucc(namespace, "list_foo2");
 
     dummyEventListener.clearEvent();
-    verifyLisViewSucc(ImmutableSet.of("list_foo1", "list_foo2"));
+    verifyLisViewSucc(namespace, ImmutableSet.of("list_foo1", "list_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListViewEvent);
   }
 
-  @Test
-  void testCreateView() {
-    verifyCreateViewFail("create_foo1", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateView(Namespace namespace) {
+    verifyCreateViewFail(namespace, "create_foo1", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateViewPreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergCreateViewFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
+    verifyCreateNamespaceSucc(namespace);
 
-    verifyCreateViewSucc("create_foo1");
+    verifyCreateViewSucc(namespace, "create_foo1");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergCreateViewEvent);
 
-    verifyCreateViewFail("create_foo1", 409);
-    verifyCreateViewFail("", 400);
+    verifyCreateViewFail(namespace, "create_foo1", 409);
+    verifyCreateViewFail(namespace, "", 400);
   }
 
-  @Test
-  void testLoadView() {
-    verifyLoadViewFail("load_foo1", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testLoadView(Namespace namespace) {
+    verifyLoadViewFail(namespace, "load_foo1", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergLoadViewFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateViewSucc("load_foo1");
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "load_foo1");
 
     dummyEventListener.clearEvent();
-    verifyLoadViewSucc("load_foo1");
+    verifyLoadViewSucc(namespace, "load_foo1");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergLoadViewEvent);
 
-    verifyLoadViewFail("load_foo2", 404);
+    verifyLoadViewFail(namespace, "load_foo2", 404);
   }
 
-  @Test
-  void testReplaceView() {
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateViewSucc("replace_foo1");
-    ViewMetadata metadata = getViewMeta("replace_foo1");
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testReplaceView(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "replace_foo1");
+    ViewMetadata metadata = getViewMeta(namespace, "replace_foo1");
 
     dummyEventListener.clearEvent();
-    verifyReplaceSucc("replace_foo1", metadata);
+    verifyReplaceSucc(namespace, "replace_foo1", metadata);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergReplaceViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergReplaceViewEvent);
 
-    verifyDropViewSucc("replace_foo1");
+    verifyDropViewSucc(namespace, "replace_foo1");
 
     dummyEventListener.clearEvent();
-    verifyUpdateViewFail("replace_foo1", 404, metadata);
+    verifyUpdateViewFail(namespace, "replace_foo1", 404, metadata);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergReplaceViewPreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergReplaceViewFailureEvent);
 
-    verifyDropNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyUpdateViewFail("replace_foo1", 404, metadata);
+    verifyDropNamespaceSucc(namespace);
+    verifyUpdateViewFail(namespace, "replace_foo1", 404, metadata);
   }
 
-  @Test
-  void testDropView() {
-    verifyDropViewFail("drop_foo1", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testDropView(Namespace namespace) {
+    verifyDropViewFail(namespace, "drop_foo1", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergDropViewFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyDropViewFail("drop_foo1", 404);
+    verifyCreateNamespaceSucc(namespace);
+    verifyDropViewFail(namespace, "drop_foo1", 404);
 
-    verifyCreateViewSucc("drop_foo1");
+    verifyCreateViewSucc(namespace, "drop_foo1");
 
     dummyEventListener.clearEvent();
-    verifyDropViewSucc("drop_foo1");
+    verifyDropViewSucc(namespace, "drop_foo1");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergDropViewEvent);
 
-    verifyLoadViewFail("drop_foo1", 404);
+    verifyLoadViewFail(namespace, "drop_foo1", 404);
   }
 
-  @Test
-  void testViewExits() {
-    verifyViewExistsStatusCode("exists_foo2", 404);
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testViewExits(Namespace namespace) {
+    verifyViewExistsStatusCode(namespace, "exists_foo2", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergViewExistsPreEvent);
     Event postEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(postEvent instanceof IcebergViewExistsEvent);
     Assertions.assertEquals(false, ((IcebergViewExistsEvent) postEvent).isExists());
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyViewExistsStatusCode("exists_foo2", 404);
+    verifyCreateNamespaceSucc(namespace);
+    verifyViewExistsStatusCode(namespace, "exists_foo2", 404);
 
-    verifyCreateViewSucc("exists_foo1");
+    verifyCreateViewSucc(namespace, "exists_foo1");
     dummyEventListener.clearEvent();
-    verifyViewExistsStatusCode("exists_foo1", 204);
+    verifyViewExistsStatusCode(namespace, "exists_foo1", 204);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergViewExistsPreEvent);
     postEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(postEvent instanceof IcebergViewExistsEvent);
     Assertions.assertEquals(true, ((IcebergViewExistsEvent) postEvent).isExists());
 
-    verifyLoadViewSucc("exists_foo1");
+    verifyLoadViewSucc(namespace, "exists_foo1");
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  void testRenameTable(String prefix) {
+  @MethodSource(
+      "org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testPrefixesAndNamespaces")
+  void testRenameTable(String prefix, Namespace namespace) {
     setUrlPathWithPrefix(prefix);
     // namespace not exits
-    verifyRenameViewFail("rename_foo1", "rename_foo3", 404);
+    verifyRenameViewFail(namespace, "rename_foo1", "rename_foo3", 404);
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRenameViewPreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergRenameViewFailureEvent);
 
-    verifyCreateNamespaceSucc(IcebergRestTestUtil.TEST_NAMESPACE_NAME);
-    verifyCreateViewSucc("rename_foo1");
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateViewSucc(namespace, "rename_foo1");
 
     dummyEventListener.clearEvent();
     // rename
-    verifyRenameViewSucc("rename_foo1", "rename_foo2");
+    verifyRenameViewSucc(namespace, "rename_foo1", "rename_foo2");
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRenameViewPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergRenameViewEvent);
 
-    verifyLoadViewFail("rename_foo1", 404);
-    verifyLoadViewSucc("rename_foo2");
+    verifyLoadViewFail(namespace, "rename_foo1", 404);
+    verifyLoadViewSucc(namespace, "rename_foo2");
 
     // source view not exists
-    verifyRenameViewFail("rename_foo1", "rename_foo3", 404);
+    verifyRenameViewFail(namespace, "rename_foo1", "rename_foo3", 404);
 
     // dest view exists
-    verifyCreateViewSucc("rename_foo3");
-    verifyRenameViewFail("rename_foo2", "rename_foo3", 409);
+    verifyCreateViewSucc(namespace, "rename_foo3");
+    verifyRenameViewFail(namespace, "rename_foo2", "rename_foo3", 409);
   }
 
-  private Response doCreateView(String name) {
+  private Response doCreateView(Namespace ns, String name) {
     CreateViewRequest createViewRequest =
         ImmutableCreateViewRequest.builder()
             .name(name)
@@ -249,7 +255,7 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
                     .versionId(1)
                     .timestampMillis(System.currentTimeMillis())
                     .schemaId(1)
-                    .defaultNamespace(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME))
+                    .defaultNamespace(IcebergRestTestUtil.TEST_NAMESPACE_NAME)
                     .addRepresentations(
                         ImmutableSQLViewRepresentation.builder()
                             .sql(VIEW_QUERY)
@@ -257,49 +263,49 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
                             .build())
                     .build())
             .build();
-    return getViewClientBuilder()
+    return getViewClientBuilder(ns)
         .post(Entity.entity(createViewRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doLoadView(String name) {
-    return getViewClientBuilder(Optional.of(name)).get();
+  private Response doLoadView(Namespace ns, String name) {
+    return getViewClientBuilder(ns, Optional.of(name)).get();
   }
 
-  private void verifyLoadViewSucc(String name) {
-    Response response = doLoadView(name);
+  private void verifyLoadViewSucc(Namespace ns, String name) {
+    Response response = doLoadView(ns, name);
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
     LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
     Assertions.assertEquals(viewSchema.columns(), loadViewResponse.metadata().schema().columns());
   }
 
-  private void verifyCreateViewFail(String name, int status) {
-    Response response = doCreateView(name);
+  private void verifyCreateViewFail(Namespace ns, String name, int status) {
+    Response response = doCreateView(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyCreateViewSucc(String name) {
-    Response response = doCreateView(name);
+  private void verifyCreateViewSucc(Namespace ns, String name) {
+    Response response = doCreateView(ns, name);
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
     Schema schema = loadViewResponse.metadata().schema();
     Assertions.assertEquals(schema.columns(), viewSchema.columns());
   }
 
-  private void verifyLoadViewFail(String name, int status) {
-    Response response = doLoadView(name);
+  private void verifyLoadViewFail(Namespace ns, String name, int status) {
+    Response response = doLoadView(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyReplaceSucc(String name, ViewMetadata base) {
-    Response response = doReplaceView(name, base);
+  private void verifyReplaceSucc(Namespace ns, String name, ViewMetadata base) {
+    Response response = doReplaceView(ns, name, base);
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
     Assertions.assertEquals(
         newViewSchema.columns(), loadViewResponse.metadata().schema().columns());
   }
 
-  private Response doReplaceView(String name, ViewMetadata base) {
+  private Response doReplaceView(Namespace ns, String name, ViewMetadata base) {
     ViewMetadata.Builder builder =
         ViewMetadata.buildFrom(base).setCurrentVersion(base.currentVersion(), newViewSchema);
     ViewMetadata replacement = builder.build();
@@ -308,55 +314,55 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
             null,
             UpdateRequirements.forReplaceView(base, replacement.changes()),
             replacement.changes());
-    return getViewClientBuilder(Optional.of(name))
+    return getViewClientBuilder(ns, Optional.of(name))
         .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private ViewMetadata getViewMeta(String viewName) {
-    Response response = doLoadView(viewName);
+  private ViewMetadata getViewMeta(Namespace ns, String viewName) {
+    Response response = doLoadView(ns, viewName);
     LoadViewResponse loadViewResponse = response.readEntity(LoadViewResponse.class);
     return loadViewResponse.metadata();
   }
 
-  private void verifyUpdateViewFail(String name, int status, ViewMetadata base) {
-    Response response = doReplaceView(name, base);
+  private void verifyUpdateViewFail(Namespace ns, String name, int status, ViewMetadata base) {
+    Response response = doReplaceView(ns, name, base);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyDropViewSucc(String name) {
-    Response response = doDropView(name);
+  private void verifyDropViewSucc(Namespace ns, String name) {
+    Response response = doDropView(ns, name);
     Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
-  private Response doDropView(String name) {
-    return getViewClientBuilder(Optional.of(name)).delete();
+  private Response doDropView(Namespace ns, String name) {
+    return getViewClientBuilder(ns, Optional.of(name)).delete();
   }
 
-  private void verifyDropViewFail(String name, int status) {
-    Response response = doDropView(name);
+  private void verifyDropViewFail(Namespace ns, String name, int status) {
+    Response response = doDropView(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private void verifyViewExistsStatusCode(String name, int status) {
-    Response response = doViewExists(name);
+  private void verifyViewExistsStatusCode(Namespace ns, String name, int status) {
+    Response response = doViewExists(ns, name);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private Response doViewExists(String name) {
-    return getViewClientBuilder(Optional.of(name)).head();
+  private Response doViewExists(Namespace ns, String name) {
+    return getViewClientBuilder(ns, Optional.of(name)).head();
   }
 
-  private void verifyListViewFail(int status) {
-    Response response = doListView();
+  private void verifyListViewFail(Namespace ns, int status) {
+    Response response = doListView(ns);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private Response doListView() {
-    return getViewClientBuilder().get();
+  private Response doListView(Namespace ns) {
+    return getViewClientBuilder(ns).get();
   }
 
-  private void verifyLisViewSucc(Set<String> expectedTableNames) {
-    Response response = doListView();
+  private void verifyLisViewSucc(Namespace ns, Set<String> expectedTableNames) {
+    Response response = doListView(ns);
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     ListTablesResponse listTablesResponse = response.readEntity(ListTablesResponse.class);
     Set<String> tableNames =
@@ -366,25 +372,23 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(expectedTableNames, tableNames);
   }
 
-  private void verifyRenameViewFail(String source, String dest, int status) {
-    Response response = doRenameView(source, dest);
+  private void verifyRenameViewFail(Namespace ns, String source, String dest, int status) {
+    Response response = doRenameView(ns, source, dest);
     Assertions.assertEquals(status, response.getStatus());
   }
 
-  private Response doRenameView(String source, String dest) {
+  private Response doRenameView(Namespace ns, String source, String dest) {
     RenameTableRequest renameTableRequest =
         RenameTableRequest.builder()
-            .withSource(
-                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), source))
-            .withDestination(
-                TableIdentifier.of(Namespace.of(IcebergRestTestUtil.TEST_NAMESPACE_NAME), dest))
+            .withSource(TableIdentifier.of(ns, source))
+            .withDestination(TableIdentifier.of(ns, dest))
             .build();
     return getRenameViewClientBuilder()
         .post(Entity.entity(renameTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private void verifyRenameViewSucc(String source, String dest) {
-    Response response = doRenameView(source, dest);
+  private void verifyRenameViewSucc(Namespace ns, String source, String dest) {
+    Response response = doRenameView(ns, source, dest);
     Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 }

@@ -39,6 +39,7 @@ import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
+import org.apache.iceberg.catalog.Namespace;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -66,7 +67,7 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergCreateNamespaceEvent);
 
     // Already Exists Exception
-    verifyCreateNamespaceFail(409, "create_foo1");
+    verifyCreateNamespaceFail(409, Namespace.of("create_foo1"));
     Assertions.assertTrue(
         dummyEventListener.popPreEvent() instanceof IcebergCreateNamespacePreEvent);
     Assertions.assertTrue(
@@ -75,7 +76,7 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     // multi level namespaces
     verifyCreateNamespaceSucc("create_foo2", "create_foo3");
 
-    verifyCreateNamespaceFail(400, "");
+    verifyCreateNamespaceFail(400, Namespace.of(""));
   }
 
   @Test
@@ -83,20 +84,23 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc("load_foo1");
     dummyEventListener.clearEvent();
 
-    verifyLoadNamespaceSucc("load_foo1");
+    verifyLoadNamespaceSucc(Namespace.of("load_foo1"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadNamespacePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergLoadNamespaceEvent);
 
     // load a schema not exists
-    verifyLoadNamespaceFail(404, "load_foo2");
+    verifyLoadNamespaceFail(404, Namespace.of("load_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergLoadNamespacePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergLoadNamespaceFailureEvent);
+
+    verifyCreateNamespaceSucc(Namespace.of("load_foo3", "a"));
+    verifyLoadNamespaceSucc(Namespace.of("load_foo3", "a"));
   }
 
   @Test
   void testNamespaceExists() {
-    verifyNamespaceExistsStatusCode(404, "exists_foo1");
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo1"));
     Assertions.assertTrue(
         dummyEventListener.popPreEvent() instanceof IcebergNamespaceExistsPreEvent);
     Event postEvent = dummyEventListener.popPostEvent();
@@ -105,46 +109,69 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
 
     verifyCreateNamespaceSucc("exists_foo1");
     dummyEventListener.clearEvent();
-    verifyNamespaceExistsStatusCode(204, "exists_foo1");
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo1"));
     Assertions.assertTrue(
         dummyEventListener.popPreEvent() instanceof IcebergNamespaceExistsPreEvent);
     postEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(postEvent instanceof IcebergNamespaceExistsEvent);
     Assertions.assertEquals(true, ((IcebergNamespaceExistsEvent) postEvent).isExists());
+
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
+    verifyCreateNamespaceSucc("exists_foo2");
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
+    verifyCreateNamespaceSucc(Namespace.of("exists_foo2", "a"));
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "b"));
+
+    verifyDropNamespaceSucc(Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
+
+    verifyDropNamespaceSucc(Namespace.of("exists_foo2", "a"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
   }
 
   @Test
   void testDropNamespace() {
     verifyCreateNamespaceSucc("drop_foo1");
     dummyEventListener.clearEvent();
-    verifyDropNamespaceSucc("drop_foo1");
+    verifyDropNamespaceSucc(Namespace.of("drop_foo1"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropNamespacePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergDropNamespaceEvent);
 
-    verifyLoadNamespaceFail(404, "drop_foo1");
+    verifyLoadNamespaceFail(404, Namespace.of("drop_foo1"));
 
     // drop fail, no such namespace
     dummyEventListener.clearEvent();
-    verifyDropNamespaceFail(404, "drop_foo2");
+    verifyDropNamespaceFail(404, Namespace.of("drop_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergDropNamespacePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergDropNamespaceFailureEvent);
 
     // jersery route failed
-    verifyDropNamespaceFail(500, "");
+    verifyDropNamespaceFail(500, Namespace.of(""));
+
+    verifyCreateNamespaceSucc(Namespace.of("drop_foo3", "a"));
+    verifyDropNamespaceFail(404, Namespace.of("drop_foo3", "b"));
+    verifyDropNamespaceSucc(Namespace.of("drop_foo3", "a"));
   }
 
   @Test
   void testRegisterTable() {
-    verifyRegisterTableSucc("register_foo1");
+    verifyRegisterTableSucc("register_foo1", Namespace.of("register_ns"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRegisterTablePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergRegisterTableEvent);
 
     // Iceberg REST service will throw AlreadyExistsException in test if table name contains 'fail'
-    verifyRegisterTableFail(409, "fail_register_foo1");
+    verifyRegisterTableFail(409, "fail_register_foo1", Namespace.of("register_ns"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergRegisterTablePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergRegisterTableFailureEvent);
+
+    verifyRegisterTableSucc("register_foo2", Namespace.of("register_ns_2", "a"));
   }
 
   @ParameterizedTest
@@ -154,30 +181,42 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     dropAllExistingNamespace();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
 
-    doCreateNamespace("list_foo1");
-    doCreateNamespace("list_foo2");
-    doCreateNamespace("list_foo3", "a");
-    doCreateNamespace("list_foo3", "b");
+    doCreateNamespace(Namespace.of("list_foo1"));
+    doCreateNamespace(Namespace.of("list_foo2"));
+    doCreateNamespace(Namespace.of("list_foo3", "a"));
+    doCreateNamespace(Namespace.of("list_foo3", "b"));
+    doCreateNamespace(Namespace.of("list_foo3", "a", "z"));
+    doCreateNamespace(Namespace.of("list_foo3", "a", "y"));
 
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList("list_foo1", "list_foo2", "list_foo3"));
-    verifyListNamespaceSucc(Optional.of("list_foo3"), Arrays.asList("list_foo3.a", "list_foo3.b"));
+    verifyListNamespaceSucc(
+        Optional.of(Namespace.of("list_foo3")), Arrays.asList("list_foo3.a", "list_foo3.b"));
+    verifyListNamespaceSucc(
+        Optional.of(Namespace.of("list_foo3", "a")),
+        Arrays.asList("list_foo3.a.y", "list_foo3.a.z"));
 
-    verifyListNamespaceFail(Optional.of("list_fooxx"), 404);
+    verifyListNamespaceFail(Optional.of(Namespace.of("list_fooxx")), 404);
+    verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "c")), 404);
+    verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "a", "x")), 404);
   }
 
   @Test
   void testUpdateNamespace() {
     verifyCreateNamespaceSucc("update_foo1");
     dummyEventListener.clearEvent();
-    verifyUpdateNamespaceSucc("update_foo1");
+    verifyUpdateNamespaceSucc(Namespace.of("update_foo1"));
     Assertions.assertTrue(
         dummyEventListener.popPreEvent() instanceof IcebergUpdateNamespacePreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergUpdateNamespaceEvent);
 
-    verifyUpdateNamespaceFail(404, "update_foo2");
+    verifyUpdateNamespaceFail(404, Namespace.of("update_foo2"));
     Assertions.assertTrue(
         dummyEventListener.popPreEvent() instanceof IcebergUpdateNamespacePreEvent);
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergUpdateNamespaceFailureEvent);
+
+    verifyCreateNamespaceSucc(Namespace.of("update_foo3", "a"));
+    dummyEventListener.clearEvent();
+    verifyUpdateNamespaceSucc(Namespace.of("update_foo3", "a"));
   }
 }

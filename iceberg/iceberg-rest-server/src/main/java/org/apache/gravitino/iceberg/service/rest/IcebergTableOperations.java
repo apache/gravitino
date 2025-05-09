@@ -28,6 +28,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
+import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.HeaderParam;
@@ -88,7 +89,7 @@ public class IcebergTableOperations {
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
   public Response listTable(
-      @PathParam("prefix") String prefix, @PathParam("namespace") String namespace) {
+      @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
@@ -103,7 +104,7 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   public Response createTable(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
@@ -131,7 +132,7 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "update-table", absolute = true)
   public Response updateTable(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
@@ -158,7 +159,7 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "drop-table", absolute = true)
   public Response dropTable(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
@@ -169,7 +170,7 @@ public class IcebergTableOperations {
         icebergNS,
         table,
         purgeRequested);
-    TableIdentifier tableIdentifier = TableIdentifier.of(namespace, table);
+    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
     IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
     tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
     return IcebergRestUtils.noContent();
@@ -182,7 +183,7 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   public Response loadTable(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
@@ -213,7 +214,7 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "table-exits", absolute = true)
   public Response tableExists(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
@@ -239,7 +240,7 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "report-table-metrics", absolute = true)
   public Response reportTableMetrics(
       @PathParam("prefix") String prefix,
-      @PathParam("namespace") String namespace,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       ReportMetricsRequest request) {
     icebergMetricsManager.recordMetric(request.report());
