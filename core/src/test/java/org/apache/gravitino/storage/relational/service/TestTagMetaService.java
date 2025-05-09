@@ -43,6 +43,7 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -987,5 +988,39 @@ public class TestTagMetaService extends TestJDBCBackend {
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
     Assertions.assertEquals(1, countActiveTagRel(tagEntity1.id()));
     Assertions.assertEquals(18, countAllTagRel(tagEntity1.id()));
+  }
+
+  @Test
+  void testInsertAndGetTagByID() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+
+    // Test no tag entity.
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    Exception excep =
+        Assertions.assertThrows(
+            NoSuchEntityException.class,
+            () ->
+                tagMetaService.getTagByIdentifier(NameIdentifierUtil.ofTag(metalakeName, "tag1")));
+    Assertions.assertEquals("No such tag entity: tag1", excep.getMessage());
+
+    // Test get tag entity
+    long tagID = RandomIdGenerator.INSTANCE.nextId();
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(tagID)
+            .withName("tag1")
+            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withComment("comment")
+            .withProperties(props)
+            .withAuditInfo(auditInfo)
+            .build();
+    tagMetaService.insertTag(tagEntity, false);
+
+    TagPO tagPOByID = tagMetaService.getTagPOByID(tagID);
+    Assertions.assertEquals(tagID, tagPOByID.getTagId());
+    Assertions.assertEquals("tag1", tagPOByID.getTagName());
+    Assertions.assertEquals("comment", tagPOByID.getComment());
   }
 }
