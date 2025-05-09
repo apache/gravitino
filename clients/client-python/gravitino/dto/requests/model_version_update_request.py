@@ -150,19 +150,19 @@ class ModelVersionUpdateRequest:
             metadata=config(field_name="aliasesToRemove")
         )
 
-        def __init__(self, add_aliases: Set[str], remove_aliases: Set[str]):
+        def __init__(self, aliases_to_add: Set[str], aliases_to_remove: Set[str]):
             super().__init__("updateAliases")
-            self._aliases_to_add = add_aliases
-            self._aliases_to_remove = remove_aliases
+            self._aliases_to_add = aliases_to_add
+            self._aliases_to_remove = aliases_to_remove
 
-        def add_aliases(self):
+        def aliases_to_add(self):
             """Retrieves the new aliases of the model version.
             Returns:
                 The new aliases of the model version.
             """
-            return self._add_aliases
+            return self._aliases_to_add
 
-        def remove_aliases(self):
+        def aliases_to_remove(self):
             """Retrieves the new aliases of the model version.
             Returns:
                 The new aliases of the model version.
@@ -171,7 +171,10 @@ class ModelVersionUpdateRequest:
 
         def validate(self):
             """Validates the fields of the request. Always pass."""
-            pass
+            if not self._aliases_to_add or not self._aliases_to_remove:
+                raise ValueError(
+                    '"aliasesToAdd" and "aliasesToRemove" field are required'
+                )
 
         def model_version_change(self):
             """
@@ -180,6 +183,6 @@ class ModelVersionUpdateRequest:
                 ModelVersionChange: The ModelVersionChange object representing the update aliases operation.
             """
             return ModelVersionChange.UpdateAliases(
-                self._add_aliases,
+                self._aliases_to_add,
                 self._aliases_to_remove,
             )

@@ -84,16 +84,16 @@ public interface ModelVersionChange {
    * Create a ModelVersionChange for updating the aliases of a model version.
    *
    * @param aliasesToAdd The new aliases to be added for the model version.
-   * @param aliasesToDelete The aliases to be removed from the model version.
+   * @param aliasesToRemove The aliases to be removed from the model version.
    * @return A new ModelVersionChange instance for updating the aliases of a model version.
    */
-  static ModelVersionChange updateAliases(String[] aliasesToAdd, String[] aliasesToDelete) {
+  static ModelVersionChange updateAliases(String[] aliasesToAdd, String[] aliasesToRemove) {
     String[] toAdd = aliasesToAdd == null ? new String[0] : aliasesToAdd;
-    String[] toDelete = aliasesToDelete == null ? new String[0] : aliasesToDelete;
+    String[] toRemove = aliasesToRemove == null ? new String[0] : aliasesToRemove;
 
     return new UpdateAliases(
         Arrays.stream(toAdd).collect(Collectors.toList()),
-        Arrays.stream(toDelete).collect(Collectors.toList()));
+        Arrays.stream(toRemove).collect(Collectors.toList()));
   }
 
   /** A ModelVersionChange to update the model version comment. */
@@ -435,7 +435,7 @@ public interface ModelVersionChange {
           + COMMA_JOINER.join(aliasesToAdd)
           + ")"
           + " "
-          + "AliasToDelete: ("
+          + "AliasToRemove: ("
           + COMMA_JOINER.join(aliasesToRemove)
           + ")";
     }

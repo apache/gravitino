@@ -191,13 +191,15 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
     }
 
     /**
-     * Validates the request, i.e., always pass.
+     * Validates the request
      *
      * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      // always pass
+      Preconditions.checkNotNull(aliasesToAdd, "aliasesToAdd field is required and cannot be null");
+      Preconditions.checkNotNull(
+          aliasesToRemove, "aliasesToRemove field is required and cannot be null");
     }
   }
 }

@@ -66,15 +66,15 @@ class ModelVersionChange(ABC):
         return ModelVersionChange.UpdateUri(uri)
 
     @staticmethod
-    def update_aliases(add_aliases, delete_aliases):
+    def update_aliases(aliases_to_add, aliases_to_remove):
         """Creates a new model version change to update the aliases of the model version.
         Args:
-            add_aliases: The new aliases to add to the model version.
-            delete_aliases: The new aliases to delete from the model version.
+            aliases_to_add: The new aliases to add to the model version.
+            aliases_to_remove: The aliases to remove from the model version.
         Returns:
             The model version change.
         """
-        return ModelVersionChange.UpdateAliases(add_aliases, delete_aliases)
+        return ModelVersionChange.UpdateAliases(aliases_to_add, aliases_to_remove)
 
     class UpdateComment:
         """A model version change to update the comment of the model version."""
@@ -255,27 +255,27 @@ class ModelVersionChange(ABC):
     class UpdateAliases:
         """A model version change to update the aliases of the model version."""
 
-        def __init__(self, aliases_to_add, aliases_to_delete):
-            self.aliases_to_add = set(aliases_to_add)
-            self.aliases_to_remove = set(aliases_to_delete)
+        def __init__(self, aliases_to_add, aliases_to_remove):
+            self._aliases_to_add = set(aliases_to_add)
+            self._aliases_to_remove = set(aliases_to_remove)
 
-        def add_aliases(self):
+        def aliases_to_add(self):
             """Retrieves the aliases to add.
             Returns:
                 The aliases to add.
             """
-            return self.aliases_to_add
+            return self._aliases_to_add
 
-        def remove_aliases(self):
-            """Retrieves the aliases to delete.
+        def aliases_to_remove(self):
+            """Retrieves the aliases to remove.
             Returns:
-                The aliases to delete.
+                The aliases to remove.
             """
-            return self.aliases_to_remove
+            return self._aliases_to_remove
 
         def __eq__(self, other) -> bool:
             """Compares this UpdateAliases instance with another object for equality. Two instances are
-            considered equal if they designate the same aliases to add and delete for the model version.
+            considered equal if they designate the same aliases to add and remove from the model version.
             Args:
                 other: The object to compare with this instance.
             Returns:
@@ -285,24 +285,24 @@ class ModelVersionChange(ABC):
             if not isinstance(other, ModelVersionChange.UpdateAliases):
                 return False
             return (
-                self.aliases_to_add == other.aliases_to_add
-                and self.aliases_to_remove == other.aliases_to_delete
+                self.aliases_to_add() == other.aliases_to_add()
+                and self.aliases_to_remove() == other.aliases_to_remove()
             )
 
         def __hash__(self) -> int:
             """Generates a hash code for this UpdateAliases instance. The hash code is primarily based on
-            the aliases to add and delete for the model version.
+            the aliases to add and remove from the model version.
             Returns:
                 A hash code value for this alias update operation.
             """
-            return hash((self.aliases_to_add, self.aliases_to_remove))
+            return hash((self._aliases_to_add, self._aliases_to_remove))
 
         def __str__(self) -> str:
             """Returns a string representation of the UpdateAliases instance. This string includes the
-            class name followed by the aliases to add and delete for the model version.
+            class name followed by the aliases to add and remove for the model version.
             Returns:
                 A string summary of this alias update operation.
             """
-            add_str = ", ".join(sorted(self.aliases_to_add))
-            delete_str = ", ".join(sorted(self.aliases_to_remove))
-            return f"UpdateAlias AliasToAdd: ({add_str}) AliasToDelete: ({delete_str})"
+            add_str = ", ".join(sorted(self._aliases_to_add))
+            remove_str = ", ".join(sorted(self._aliases_to_remove))
+            return f"UpdateAlias AliasToAdd: ({add_str}) AliasToRemove: ({remove_str})"
