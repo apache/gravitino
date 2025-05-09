@@ -96,4 +96,8 @@ public class TagMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTagMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String selectTagMetaByTagId(@Param("tagId") Long tagId) {
+    return getProvider().selectTagMetaByTagId(tagId);
+  }
 }
