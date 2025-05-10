@@ -41,5 +41,10 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+    return true;
+  }
+
+  @Override
   public void close() throws IOException {}
 }
