@@ -18,8 +18,12 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-GravitinoTypeT = TypeVar("GravitinoTypeT")
-DeserializedTypeT = TypeVar("DeserializedTypeT")
+from dataclasses_json.core import Json
+
+from gravitino.api.types.types import Type
+
+GravitinoTypeT = TypeVar("GravitinoTypeT", bound=Type)
+DeserializedTypeT = TypeVar("DeserializedTypeT", bound=Json)
 
 
 class JsonSerializable(ABC, Generic[GravitinoTypeT, DeserializedTypeT]):
