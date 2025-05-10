@@ -64,14 +64,12 @@ public class AuthorizationExpressionConverter {
             if (AuthConstants.OWNER.equals(privilegeOrOwner)) {
               replacement =
                   String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", metadataType);
-
             } else {
               replacement =
                   String.format(
                       "authorizer.authorize(principal,METALAKE_NAME,%s,"
                           + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
                       metadataType, privilegeOrOwner);
-              matcher.appendReplacement(result, replacement);
             }
             matcher.appendReplacement(result, replacement);
           }
