@@ -34,5 +34,4 @@ module.exports = {
   insertPragma: false,
   bracketSameLine: false,
   proseWrap: 'preserve',
-  trailingComma: 'none'
 }
