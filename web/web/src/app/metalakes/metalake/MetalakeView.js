@@ -44,7 +44,7 @@ import {
   getTopicDetails,
   getModelDetails,
   getVersionDetails,
-  setSelectedNodes
+  setSelectedNodes,
 } from '@/lib/store/metalakes'
 
 const MetalakeView = () => {
@@ -69,7 +69,7 @@ const MetalakeView = () => {
       fileset: searchParams.get('fileset'),
       topic: searchParams.get('topic'),
       model: searchParams.get('model'),
-      version: searchParams.get('version')
+      version: searchParams.get('version'),
     }
     async function fetchDependsData() {
       if ([...searchParams.keys()].length) {

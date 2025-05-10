@@ -26,10 +26,10 @@ export const filesetProviders = [
         key: 'location',
         value: '',
         required: false,
-        description: 'The storage location of the fileset'
-      }
-    ]
-  }
+        description: 'The storage location of the fileset',
+      },
+    ],
+  },
 ]
 
 export const messagingProviders = [
@@ -41,10 +41,10 @@ export const messagingProviders = [
         key: 'bootstrap.servers',
         value: '',
         required: true,
-        description: 'The Apache Kafka brokers to connect to, allowing for multiple brokers separated by commas'
-      }
-    ]
-  }
+        description: 'The Apache Kafka brokers to connect to, allowing for multiple brokers separated by commas',
+      },
+    ],
+  },
 ]
 
 export const providers = [
@@ -56,25 +56,25 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.mysql.jdbc.Driver'
+        description: 'e.g. com.mysql.jdbc.Driver',
       },
       {
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:mysql://localhost:9030'
+        description: 'e.g. jdbc:mysql://localhost:9030',
       },
       {
         key: 'jdbc-user',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-password',
         value: '',
-        required: true
-      }
-    ]
+        required: true,
+      },
+    ],
   },
   {
     label: 'Apache Hive',
@@ -84,9 +84,9 @@ export const providers = [
         key: 'metastore.uris',
         value: '',
         required: true,
-        description: 'The Apache Hive metastore URIs'
-      }
-    ]
+        description: 'The Apache Hive metastore URIs',
+      },
+    ],
   },
   {
     label: 'Apache Hudi',
@@ -98,15 +98,15 @@ export const providers = [
         defaultValue: 'hms',
         required: true,
         select: ['hms'],
-        description: 'Apache Hudi catalog type choose properties'
+        description: 'Apache Hudi catalog type choose properties',
       },
       {
         key: 'uri',
         value: '',
         required: true,
-        description: 'Apache Hudi catalog uri config'
-      }
-    ]
+        description: 'Apache Hudi catalog uri config',
+      },
+    ],
   },
   {
     label: 'Apache Iceberg',
@@ -118,13 +118,13 @@ export const providers = [
         defaultValue: 'hive',
         required: true,
         description: 'Apache Iceberg catalog type choose properties',
-        select: ['hive', 'jdbc', 'rest']
+        select: ['hive', 'jdbc', 'rest'],
       },
       {
         key: 'uri',
         value: '',
         required: true,
-        description: 'Apache Iceberg catalog uri config'
+        description: 'Apache Iceberg catalog uri config',
       },
       {
         key: 'warehouse',
@@ -132,7 +132,7 @@ export const providers = [
         required: true,
         parentField: 'catalog-backend',
         hide: ['rest'],
-        description: 'Apache Iceberg catalog warehouse config'
+        description: 'Apache Iceberg catalog warehouse config',
       },
       {
         key: 'jdbc-driver',
@@ -140,21 +140,21 @@ export const providers = [
         required: true,
         parentField: 'catalog-backend',
         hide: ['hive', 'rest'],
-        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
+        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`,
       },
       {
         key: 'jdbc-user',
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive', 'rest']
+        hide: ['hive', 'rest'],
       },
       {
         key: 'jdbc-password',
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive', 'rest']
+        hide: ['hive', 'rest'],
       },
       {
         key: 'authentication.type',
@@ -163,7 +163,7 @@ export const providers = [
         required: false,
         description:
           'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
-        select: ['simple', 'Kerberos']
+        select: ['simple', 'Kerberos'],
       },
       {
         key: 'authentication.kerberos.principal',
@@ -171,7 +171,7 @@ export const providers = [
         required: true,
         description: 'The principal of the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: ['simple']
+        hide: ['simple'],
       },
       {
         key: 'authentication.kerberos.keytab-uri',
@@ -179,9 +179,9 @@ export const providers = [
         required: true,
         description: 'The URI of The keytab for the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: ['simple']
-      }
-    ]
+        hide: ['simple'],
+      },
+    ],
   },
   {
     label: 'Apache Paimon',
@@ -192,7 +192,7 @@ export const providers = [
         value: 'filesystem',
         defaultValue: 'filesystem',
         required: true,
-        select: ['filesystem', 'hive', 'jdbc']
+        select: ['filesystem', 'hive', 'jdbc'],
       },
       {
         key: 'uri',
@@ -201,13 +201,13 @@ export const providers = [
         description:
           'e.g. thrift://127.0.0.1:9083 or jdbc:postgresql://127.0.0.1:5432/db_name or jdbc:mysql://127.0.0.1:3306/metastore_db',
         parentField: 'catalog-backend',
-        hide: ['filesystem']
+        hide: ['filesystem'],
       },
       {
         key: 'warehouse',
         value: '',
         required: true,
-        description: 'e.g. file:///user/hive/warehouse-paimon/ or hdfs://namespace/hdfs/path'
+        description: 'e.g. file:///user/hive/warehouse-paimon/ or hdfs://namespace/hdfs/path',
       },
       {
         key: 'jdbc-driver',
@@ -215,21 +215,21 @@ export const providers = [
         required: true,
         parentField: 'catalog-backend',
         hide: ['hive', 'filesystem'],
-        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`
+        description: `"com.mysql.jdbc.Driver" or "com.mysql.cj.jdbc.Driver" for MySQL, "org.postgresql.Driver" for PostgreSQL`,
       },
       {
         key: 'jdbc-user',
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive', 'filesystem']
+        hide: ['hive', 'filesystem'],
       },
       {
         key: 'jdbc-password',
         value: '',
         required: true,
         parentField: 'catalog-backend',
-        hide: ['hive', 'filesystem']
+        hide: ['hive', 'filesystem'],
       },
       {
         key: 'authentication.type',
@@ -238,7 +238,7 @@ export const providers = [
         required: false,
         description:
           'The type of authentication for Paimon catalog backend, currently Gravitino only supports Kerberos and simple',
-        select: ['simple', 'Kerberos']
+        select: ['simple', 'Kerberos'],
       },
       {
         key: 'authentication.kerberos.principal',
@@ -246,7 +246,7 @@ export const providers = [
         required: true,
         description: 'The principal of the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: ['simple']
+        hide: ['simple'],
       },
       {
         key: 'authentication.kerberos.keytab-uri',
@@ -254,9 +254,9 @@ export const providers = [
         required: true,
         description: 'The URI of The keytab for the Kerberos authentication.',
         parentField: 'authentication.type',
-        hide: ['simple']
-      }
-    ]
+        hide: ['simple'],
+      },
+    ],
   },
   {
     label: 'MySQL',
@@ -266,25 +266,25 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver'
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver',
       },
       {
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:mysql://localhost:3306'
+        description: 'e.g. jdbc:mysql://localhost:3306',
       },
       {
         key: 'jdbc-user',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-password',
         value: '',
-        required: true
-      }
-    ]
+        required: true,
+      },
+    ],
   },
   {
     label: 'OceanBase',
@@ -294,25 +294,25 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver or com.oceanbase.jdbc.Driver'
+        description: 'e.g. com.mysql.jdbc.Driver or com.mysql.cj.jdbc.Driver or com.oceanbase.jdbc.Driver',
       },
       {
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:mysql://localhost:2881 or jdbc:oceanbase://localhost:2881'
+        description: 'e.g. jdbc:mysql://localhost:2881 or jdbc:oceanbase://localhost:2881',
       },
       {
         key: 'jdbc-user',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-password',
         value: '',
-        required: true
-      }
-    ]
+        required: true,
+      },
+    ],
   },
   {
     label: 'PostgreSQL',
@@ -322,31 +322,31 @@ export const providers = [
         key: 'jdbc-driver',
         value: '',
         required: true,
-        description: 'e.g. org.postgresql.Driver'
+        description: 'e.g. org.postgresql.Driver',
       },
       {
         key: 'jdbc-url',
         value: '',
         required: true,
-        description: 'e.g. jdbc:postgresql://localhost:5432/your_database'
+        description: 'e.g. jdbc:postgresql://localhost:5432/your_database',
       },
       {
         key: 'jdbc-user',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-password',
         value: '',
-        required: true
+        required: true,
       },
       {
         key: 'jdbc-database',
         value: '',
-        required: true
-      }
-    ]
-  }
+        required: true,
+      },
+    ],
+  },
 ]
 
 const parameterizedColumnTypes = {
@@ -356,7 +356,7 @@ const parameterizedColumnTypes = {
       if (params.length !== 1) {
         return {
           valid: false,
-          message: 'Please set length'
+          message: 'Please set length',
         }
       }
 
@@ -365,14 +365,14 @@ const parameterizedColumnTypes = {
       if (length <= 0) {
         return {
           valid: false,
-          message: 'The length must be greater than 0'
+          message: 'The length must be greater than 0',
         }
       }
 
       return {
-        valid: true
+        valid: true,
       }
-    }
+    },
   },
   decimal: {
     params: ['precision', 'scale'],
@@ -380,7 +380,7 @@ const parameterizedColumnTypes = {
       if (params.length !== 2) {
         return {
           valid: false,
-          message: 'Please set precision and scale'
+          message: 'Please set precision and scale',
         }
       }
 
@@ -388,21 +388,21 @@ const parameterizedColumnTypes = {
       if (param1 <= 0 || param1 > 38) {
         return {
           valid: false,
-          message: 'The precision must be between 1 and 38'
+          message: 'The precision must be between 1 and 38',
         }
       }
 
       if (param2 < 0 || param2 > param1) {
         return {
           valid: false,
-          message: 'The scale must be between 0 and the precision'
+          message: 'The scale must be between 0 and the precision',
         }
       }
 
       return {
-        valid: true
+        valid: true,
       }
-    }
+    },
   },
   fixed: {
     params: ['length'],
@@ -410,7 +410,7 @@ const parameterizedColumnTypes = {
       if (params.length !== 1) {
         return {
           valid: false,
-          message: 'Please set length'
+          message: 'Please set length',
         }
       }
 
@@ -419,14 +419,14 @@ const parameterizedColumnTypes = {
       if (length <= 0) {
         return {
           valid: false,
-          message: 'The length must be greater than 0'
+          message: 'The length must be greater than 0',
         }
       }
 
       return {
-        valid: true
+        valid: true,
       }
-    }
+    },
   },
   varchar: {
     params: ['length'],
@@ -434,7 +434,7 @@ const parameterizedColumnTypes = {
       if (params.length !== 1) {
         return {
           valid: false,
-          message: 'Please set length'
+          message: 'Please set length',
         }
       }
 
@@ -443,15 +443,15 @@ const parameterizedColumnTypes = {
       if (length <= 0) {
         return {
           valid: false,
-          message: 'The length must be greater than 0'
+          message: 'The length must be greater than 0',
         }
       }
 
       return {
-        valid: true
+        valid: true,
       }
-    }
-  }
+    },
+  },
 }
 
 export const getParameterizedColumnType = type => {
@@ -475,7 +475,7 @@ const relationalColumnTypeMap = {
     'time',
     'timestamp',
     'timestamp_tz',
-    'uuid'
+    'uuid',
   ],
   hive: [
     'binary',
@@ -493,7 +493,7 @@ const relationalColumnTypeMap = {
     'short',
     'string',
     'timestamp',
-    'varchar'
+    'varchar',
   ],
   'jdbc-mysql': [
     'binary',
@@ -513,7 +513,7 @@ const relationalColumnTypeMap = {
     'string',
     'time',
     'timestamp',
-    'varchar'
+    'varchar',
   ],
   'jdbc-postgresql': [
     'binary',
@@ -530,7 +530,7 @@ const relationalColumnTypeMap = {
     'time',
     'timestamp',
     'timestamp_tz',
-    'varchar'
+    'varchar',
   ],
   'jdbc-doris': [
     'boolean',
@@ -545,7 +545,7 @@ const relationalColumnTypeMap = {
     'short',
     'string',
     'timestamp',
-    'varchar'
+    'varchar',
   ],
   'lakehouse-paimon': [
     'binary',
@@ -564,7 +564,7 @@ const relationalColumnTypeMap = {
     'time',
     'timestamp',
     'timestamp_tz',
-    'varchar'
+    'varchar',
   ],
   'jdbc-oceanbase': [
     'binary',
@@ -584,8 +584,8 @@ const relationalColumnTypeMap = {
     'string',
     'time',
     'timestamp',
-    'varchar'
-  ]
+    'varchar',
+  ],
 }
 
 export const getRelationalColumnType = catalog => {
@@ -607,39 +607,39 @@ const relationalTablePropInfoMap = {
       'serde-name',
       'serde-lib',
       'serde.parameter',
-      'table-type'
+      'table-type',
     ],
     allowDelete: true,
-    allowAdd: true
+    allowAdd: true,
   },
   'jdbc-doris': {
     reserved: [],
     allowDelete: true,
-    allowAdd: true
+    allowAdd: true,
   },
   'jdbc-mysql': {
     reserved: [],
     immutable: ['auto-increment-offset', 'engine'],
     allowDelete: false,
-    allowAdd: true
+    allowAdd: true,
   },
   'jdbc-oceanbase': {
     reserved: [],
     immutable: [],
     allowDelete: false,
-    allowAdd: false
+    allowAdd: false,
   },
   'jdbc-postgresql': {
     reserved: [],
     immutable: [],
     allowDelete: false,
-    allowAdd: false
+    allowAdd: false,
   },
   'lakehouse-hudi': {
     reserved: [],
     immutable: [],
     allowDelete: true,
-    allowAdd: true
+    allowAdd: true,
   },
   'lakehouse-iceberg': {
     reserved: [
@@ -649,11 +649,11 @@ const relationalTablePropInfoMap = {
       'current-snapshot-id',
       'identifier-fields',
       'sort-order',
-      'write.distribution-mode'
+      'write.distribution-mode',
     ], // Can't be set or modified
     immutable: ['location', 'provider', 'format', 'format-version'], // Can't be modified after creation
     allowDelete: true,
-    allowAdd: true
+    allowAdd: true,
   },
   'lakehouse-paimon': {
     reserved: [
@@ -664,12 +664,12 @@ const relationalTablePropInfoMap = {
       'partition',
       'primary-key',
       'rowkind.field',
-      'sequence.field'
+      'sequence.field',
     ],
     immutable: ['merge-engine', 'rowkind.field', 'sequence.field'],
     allowDelete: true,
-    allowAdd: true
-  }
+    allowAdd: true,
+  },
 }
 
 export const getRelationalTablePropInfo = catalog => {
@@ -681,6 +681,6 @@ export const getRelationalTablePropInfo = catalog => {
     reserved: [],
     immutable: [],
     allowDelete: true,
-    allowAdd: true
+    allowAdd: true,
   }
 }

@@ -34,21 +34,21 @@ module.exports = {
         allowBlockStart: true,
         allowClassStart: true,
         allowObjectStart: true,
-        allowArrayStart: true
-      }
+        allowArrayStart: true,
+      },
     ],
     'newline-before-return': 'error',
 
     'import/newline-after-import': [
       'error',
       {
-        count: 1
-      }
+        count: 1,
+      },
     ],
     'padding-line-between-statements': [
       'error',
       { blankLine: 'always', prev: ['export'], next: ['*'] },
-      { blankLine: 'always', prev: ['*'], next: ['multiline-const', 'multiline-let', 'multiline-var', 'export'] }
-    ]
-  }
+      { blankLine: 'always', prev: ['*'], next: ['multiline-const', 'multiline-let', 'multiline-var', 'export'] },
+    ],
+  },
 }

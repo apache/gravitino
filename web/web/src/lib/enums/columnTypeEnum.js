@@ -43,7 +43,7 @@ const ColumnTypeColorEnum = Object.freeze({
 
   byte: 'success',
   uuid: 'success',
-  binary: 'success'
+  binary: 'success',
 })
 
 export { ColumnTypeColorEnum }

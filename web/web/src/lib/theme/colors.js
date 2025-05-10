@@ -39,39 +39,39 @@ const colors = {
     light: lightColor,
     dark: darkColor,
     lightBg: lightBgColor,
-    darkBg: darkBgColor
+    darkBg: darkBgColor,
   },
   primary: {
     main: primaryColor,
     light: lighten(primaryColor),
-    dark: darken(primaryColor, 0.3)
+    dark: darken(primaryColor, 0.3),
   },
   secondary: {
     light: '#97A2B1',
     main: '#8592A3',
-    dark: '#798594'
+    dark: '#798594',
   },
   success: {
     light: '#86E255',
     main: '#71DD37',
-    dark: '#67C932'
+    dark: '#67C932',
   },
   error: {
     light: '#FF5B3F',
     main: '#FF3E1D',
-    dark: '#E8381A'
+    dark: '#E8381A',
   },
   warning: {
     light: '#FFB826',
     main: '#FFAB00',
-    dark: '#E89C00'
+    dark: '#E89C00',
   },
   info: {
     light: '#29CCEF',
     main: '#03C3EC',
-    dark: '#03B1D7'
+    dark: '#03B1D7',
   },
-  grey: {}
+  grey: {},
 }
 
 export default colors

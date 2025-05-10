@@ -23,7 +23,7 @@ import tailwindTheme from './src/lib/theme/tailwind'
 const tailwindConfig = {
   darkMode: 'class',
   corePlugins: {
-    preflight: false
+    preflight: false,
   },
   important: true,
   prefix: 'twc-',
@@ -33,13 +33,13 @@ const tailwindConfig = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './lib/**/*.{js,ts,jsx,tsx,mdx}',
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './views/**/*.{js,ts,jsx,tsx,mdx}'
+    './views/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: tailwindTheme,
   variants: {
-    extends: {}
+    extends: {},
   },
-  plugins: []
+  plugins: [],
 }
 
 module.exports = tailwindConfig

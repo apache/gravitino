@@ -31,7 +31,7 @@ import { DataGrid } from '@mui/x-data-grid'
 import {
   VisibilityOutlined as ViewIcon,
   EditOutlined as EditIcon,
-  DeleteOutlined as DeleteIcon
+  DeleteOutlined as DeleteIcon,
 } from '@mui/icons-material'
 
 import Icon from '@/components/Icon'
@@ -56,7 +56,7 @@ import {
   deleteTable,
   deleteModel,
   deleteVersion,
-  setCatalogInUse
+  setCatalogInUse,
 } from '@/lib/store/metalakes'
 
 import { to } from '@/lib/utils'
@@ -83,8 +83,8 @@ const CustomTooltip = styled(({ className, ...props }) => <Tooltip {...props} cl
     [`& .${tooltipClasses.tooltip}`]: {
       backgroundColor: '#23282a',
       padding: 0,
-      border: '1px solid #dadde9'
-    }
+      border: '1px solid #dadde9',
+    },
   })
 )
 
@@ -168,7 +168,7 @@ const TableView = () => {
                     p: 1.5,
                     px: 4,
                     borderTopLeftRadius: 4,
-                    borderTopRightRadius: 4
+                    borderTopRightRadius: 4,
                   }}
                 >
                   <Typography color='white' fontWeight={700} fontSize={14} sx={{ textTransform: 'capitalize' }}>
@@ -195,7 +195,7 @@ const TableView = () => {
                             sx={{
                               display: 'block',
                               my: 1,
-                              borderTop: theme => `1px solid ${theme.palette.grey[800]}`
+                              borderTop: theme => `1px solid ${theme.palette.grey[800]}`,
                             }}
                           ></Box>
                         )}
@@ -233,7 +233,7 @@ const TableView = () => {
               {...(path
                 ? {
                     component: Link,
-                    href: path
+                    href: path,
                   }
                 : {})}
               onClick={() => handleClickUrl(path)}
@@ -241,15 +241,15 @@ const TableView = () => {
                 fontWeight: 400,
                 color: 'primary.main',
                 textDecoration: 'none',
-                '&:hover': { color: 'primary.main', textDecoration: 'underline' }
+                '&:hover': { color: 'primary.main', textDecoration: 'underline' },
               }}
             >
               {name}
             </Typography>
           </Box>
         )
-      }
-    }
+      },
+    },
   ]
 
   const actionsColumns = [
@@ -272,7 +272,7 @@ const TableView = () => {
                   {...(path
                     ? {
                         component: Link,
-                        href: path
+                        href: path,
                       }
                     : {})}
                   onClick={() => handleClickUrl(path)}
@@ -280,7 +280,7 @@ const TableView = () => {
                     fontWeight: 400,
                     color: 'primary.main',
                     textDecoration: 'none',
-                    '&:hover': { color: 'primary.main', textDecoration: 'underline' }
+                    '&:hover': { color: 'primary.main', textDecoration: 'underline' },
                   }}
                 >
                   {name}
@@ -301,7 +301,7 @@ const TableView = () => {
             )}
           </Box>
         )
-      }
+      },
     },
     {
       flex: 0.1,
@@ -349,8 +349,8 @@ const TableView = () => {
             </IconButton>
           )}
         </>
-      )
-    }
+      ),
+    },
   ]
 
   const tableColumns = [
@@ -373,7 +373,7 @@ const TableView = () => {
                 pr: 4,
                 fontWeight: 400,
                 color: 'text.main',
-                textDecoration: 'none'
+                textDecoration: 'none',
               }}
             >
               {name}
@@ -386,7 +386,7 @@ const TableView = () => {
             </Stack>
           </Box>
         )
-      }
+      },
     },
     {
       flex: 0.1,
@@ -403,7 +403,7 @@ const TableView = () => {
             <ColumnTypeChip type={type} />
           </Box>
         )
-      }
+      },
     },
     {
       flex: 0.1,
@@ -423,14 +423,14 @@ const TableView = () => {
               sx={{
                 fontWeight: 400,
                 color: 'text.secondary',
-                textDecoration: 'none'
+                textDecoration: 'none',
               }}
             >
               {typeof nullable !== 'undefined' && `${nullable}`}
             </Typography>
           </Box>
         )
-      }
+      },
     },
     {
       flex: 0.1,
@@ -450,7 +450,7 @@ const TableView = () => {
               sx={{
                 fontWeight: 400,
                 color: 'text.secondary',
-                textDecoration: 'none'
+                textDecoration: 'none',
               }}
             >
               {`${autoIncrement}`}
@@ -459,7 +459,7 @@ const TableView = () => {
         ) : (
           <EmptyText />
         )
-      }
+      },
     },
     {
       flex: 0.1,
@@ -480,7 +480,7 @@ const TableView = () => {
               sx={{
                 fontWeight: 400,
                 color: 'text.secondary',
-                textDecoration: 'none'
+                textDecoration: 'none',
               }}
             >
               {comment}
@@ -489,8 +489,8 @@ const TableView = () => {
         ) : (
           <EmptyText />
         )
-      }
-    }
+      },
+    },
   ]
 
   const handleShowDetails = async ({ row, type }) => {
@@ -775,8 +775,8 @@ const TableView = () => {
           '& .MuiDataGrid-columnHeaders': {
             borderTopLeftRadius: 0,
             borderTopRightRadius: 0,
-            borderTop: 0
-          }
+            borderTop: 0,
+          },
         }}
         data-refer='table-grid'
         loading={store.tableLoading}

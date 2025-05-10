@@ -113,7 +113,7 @@ export const setIntervalId = createAsyncThunk('auth/setIntervalId', async (expir
   }, expired || defaultExpired)
 
   return {
-    intervalId
+    intervalId,
   }
 })
 
@@ -125,7 +125,7 @@ export const authSlice = createSlice({
     authToken: null,
     authParams: null,
     expiredIn: null,
-    intervalId: null
+    intervalId: null,
   },
   reducers: {
     setIntervalId(state, action) {
@@ -143,7 +143,7 @@ export const authSlice = createSlice({
     },
     setExpiredIn(state, action) {
       state.expiredIn = action.payload
-    }
+    },
   },
   extraReducers: builder => {
     builder.addCase(getAuthConfigs.fulfilled, (state, action) => {
@@ -154,7 +154,7 @@ export const authSlice = createSlice({
       state.authToken = action.payload.token
       state.expiredIn = action.payload.expiredIn
     })
-  }
+  },
 })
 
 export const { setAuthToken, setAuthParams, setExpiredIn } = authSlice.actions

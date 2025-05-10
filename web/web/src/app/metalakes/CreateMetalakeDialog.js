@@ -32,7 +32,7 @@ import {
   Grid,
   TextField,
   FormControl,
-  FormHelperText
+  FormHelperText,
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -50,11 +50,11 @@ import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 
 const defaultValues = {
   name: '',
-  comment: ''
+  comment: '',
 }
 
 const schema = yup.object().shape({
-  name: yup.string().required().matches(nameRegex, nameRegexDesc)
+  name: yup.string().required().matches(nameRegex, nameRegexDesc),
 })
 
 const Transition = forwardRef(function Transition(props, ref) {
@@ -76,11 +76,11 @@ const CreateMetalakeDialog = props => {
     reset,
     setValue,
     handleSubmit,
-    formState: { errors }
+    formState: { errors },
   } = useForm({
     defaultValues,
     mode: 'onChange',
-    resolver: yupResolver(schema)
+    resolver: yupResolver(schema),
   })
 
   const handleFormChange = (index, event) => {
@@ -158,7 +158,7 @@ const CreateMetalakeDialog = props => {
 
     const metalakeData = {
       ...data,
-      properties
+      properties,
     }
 
     if (type === 'create') {
@@ -188,7 +188,7 @@ const CreateMetalakeDialog = props => {
       const propsArr = Object.keys(properties).map(item => {
         return {
           key: item,
-          value: properties[item]
+          value: properties[item],
         }
       })
 
@@ -206,7 +206,7 @@ const CreateMetalakeDialog = props => {
           className={'twc-relative twc-pb-8'}
           sx={{
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`]
+            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`],
           }}
         >
           <IconButton

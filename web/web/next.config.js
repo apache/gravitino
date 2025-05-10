@@ -18,7 +18,7 @@
  */
 
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true'
+  enabled: process.env.ANALYZE === 'true',
 })
 
 const isProdEnv = process.env.NODE_ENV === 'production'
@@ -38,25 +38,25 @@ const nextConfig = {
             fallback: [
               {
                 source: '/api/:path*',
-                destination: `${apiUrl}/api/:path*`
+                destination: `${apiUrl}/api/:path*`,
               },
               {
                 source: '/configs',
-                destination: `${apiUrl}/configs`
+                destination: `${apiUrl}/configs`,
               },
               {
                 source: `${oauthPath}`,
-                destination: `${oauthUri}${oauthPath}`
-              }
-            ]
+                destination: `${oauthUri}${oauthPath}`,
+              },
+            ],
           }
-        }
+        },
       }),
   output: process.env.OUTPUT_MODE || 'standalone',
   basePath: process.env.BASE_PATH,
   distDir: process.env.DIST_DIR,
   trailingSlash: false,
-  reactStrictMode: true
+  reactStrictMode: true,
 }
 
 module.exports = withBundleAnalyzer(nextConfig)
