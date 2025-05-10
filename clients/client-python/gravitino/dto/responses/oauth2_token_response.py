@@ -26,7 +26,6 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 @dataclass
 class OAuth2TokenResponse(BaseResponse):
-
     _access_token: str = field(metadata=config(field_name="access_token"))
     _issue_token_type: Optional[str] = field(
         metadata=config(field_name="issued_token_type")

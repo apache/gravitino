@@ -15,6 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.utils.http_client import Response, HTTPClient, unpack
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff        # runs the linter
+      - id: ruff-format # runs the formatter
 
-__all__ = ["Response", "HTTPClient", "unpack"]
+default_stages: [pre-commit]

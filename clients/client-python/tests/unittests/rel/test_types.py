@@ -21,7 +21,6 @@ from gravitino.api.types.types import Types, Name
 
 
 class TestTypes(unittest.TestCase):
-
     def test_null_type(self):
         instance: Types.NullType = Types.NullType.get()
         self.assertIsInstance(instance, Types.NullType)

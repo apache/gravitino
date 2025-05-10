@@ -34,7 +34,6 @@ class MockExpression(Expression):
 
 
 class TestDistributions(unittest.TestCase):
-
     def setUp(self):
         # Create mock expressions for testing
         self.expr1 = MockExpression()  # Use the MockExpression class

@@ -61,7 +61,6 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         audit: AuditDTO = None,
         rest_client: HTTPClient = None,
     ):
-
         super().__init__(
             namespace,
             name,

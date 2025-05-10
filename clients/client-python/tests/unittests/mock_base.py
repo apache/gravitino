@@ -131,5 +131,4 @@ def mock_data(cls):
 
 
 def mock_name_identifier_json(name, namespace):
-
     return json.dumps({"name": name, "namespace": namespace}).encode("utf-8")

@@ -21,7 +21,6 @@ from dataclasses import dataclass
 
 @dataclass
 class OAuth2ClientCredentialRequest:
-
     grant_type: str
     client_id: Optional[str]
     client_secret: str

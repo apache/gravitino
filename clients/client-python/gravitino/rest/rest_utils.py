@@ -20,7 +20,6 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 
 def encode_string(to_encode: str):
-
     if to_encode is None:
         raise IllegalArgumentException("Invalid string to encode: None")
 

@@ -31,7 +31,6 @@ from tests.unittests import mock_base
 
 @mock_base.mock_data
 class TestFilesetCatalogApi(unittest.TestCase):
-
     def test_get_file_location(self, *mock_method):
         json_data = {"code": 0, "fileLocation": "file:/test/1"}
         json_str = json.dumps(json_data)

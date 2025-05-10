@@ -147,7 +147,7 @@ class Catalog(Auditable):
             "Catalog does not support schema operations"
         )
 
-    def as_table_catalog(self) -> "TableCatalog":
+    def as_table_catalog(self) -> "TableCatalog":  # noqa: F821
         """
         Raises:
             UnsupportedOperationException if the catalog does not support table operations.
@@ -157,7 +157,7 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support table operations")
 
-    def as_fileset_catalog(self) -> "FilesetCatalog":
+    def as_fileset_catalog(self) -> "FilesetCatalog":  # noqa: F821
         """
         Raises:
             UnsupportedOperationException if the catalog does not support fileset operations.
@@ -169,7 +169,7 @@ class Catalog(Auditable):
             "Catalog does not support fileset operations"
         )
 
-    def as_topic_catalog(self) -> "TopicCatalog":
+    def as_topic_catalog(self) -> "TopicCatalog":  # noqa: F821
         """
         Returns:
             the {@link TopicCatalog} if the catalog supports topic operations.
@@ -179,7 +179,7 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support topic operations")
 
-    def as_model_catalog(self) -> "ModelCatalog":
+    def as_model_catalog(self) -> "ModelCatalog":  # noqa: F821
         """
         Returns:
             the {@link ModelCatalog} if the catalog supports model operations.
