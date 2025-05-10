@@ -17,11 +17,24 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.PATTERN;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Test for {@link AuthorizationExpressionConverter} */
 public class TestAuthorizationExpressionConverter {
+
+  /** Test for PATTERN. */
+  @Test
+  public void testPattern() {
+    assertFalse(PATTERN.matcher("::").matches());
+    assertFalse(PATTERN.matcher("KEY::").matches());
+    assertFalse(PATTERN.matcher("::VALUE").matches());
+    assertTrue(PATTERN.matcher("CATALOG::CREATE_TABLE").matches());
+  }
 
   @Test
   public void testConvertToOgnlWithoutOwnerExpression() {

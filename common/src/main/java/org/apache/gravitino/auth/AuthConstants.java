@@ -44,6 +44,9 @@ public final class AuthConstants {
   /** The default username used for anonymous access. */
   public static final String ANONYMOUS_USER = "anonymous";
 
+  /** OWNER. */
+  public static final String OWNER = "OWNER";
+
   /**
    * The default name of the attribute that stores the authenticated principal in the request.
    *

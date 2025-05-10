@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 
 /**
@@ -29,7 +30,7 @@ import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 public class AuthorizationExpressionConverter {
 
   /** Match authorization expressions */
-  private static final Pattern PATTERN = Pattern.compile("([A-Z_]+)::([A-Z_]+)");
+  public static final Pattern PATTERN = Pattern.compile("([A-Z_]+)::([A-Z_]+)");
 
   /**
    * The EXPRESSION_CACHE caches the result of converting authorization expressions into an OGNL
@@ -59,18 +60,20 @@ public class AuthorizationExpressionConverter {
           while (matcher.find()) {
             String metadataType = matcher.group(1);
             String privilegeOrOwner = matcher.group(2);
-            if ("OWNER".equals(privilegeOrOwner)) {
-              String replacement =
+            String replacement;
+            if (AuthConstants.OWNER.equals(privilegeOrOwner)) {
+              replacement =
                   String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", metadataType);
-              matcher.appendReplacement(result, replacement);
+
             } else {
-              String replacement =
+              replacement =
                   String.format(
                       "authorizer.authorize(principal,METALAKE_NAME,%s,"
                           + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
                       metadataType, privilegeOrOwner);
               matcher.appendReplacement(result, replacement);
             }
+            matcher.appendReplacement(result, replacement);
           }
           matcher.appendTail(result);
 
