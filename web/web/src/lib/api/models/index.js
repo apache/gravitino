@@ -55,18 +55,18 @@ const Apis = {
     return `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
     )}/schemas/${encodeURIComponent(schema)}/models/${encodeURIComponent(model)}/versions/${version}`
-  }
+  },
 }
 
 export const getModelsApi = params => {
   return defHttp.get({
-    url: `${Apis.GET(params)}`
+    url: `${Apis.GET(params)}`,
   })
 }
 
 export const getModelDetailsApi = ({ metalake, catalog, schema, model }) => {
   return defHttp.get({
-    url: `${Apis.GET_DETAIL({ metalake, catalog, schema, model })}`
+    url: `${Apis.GET_DETAIL({ metalake, catalog, schema, model })}`,
   })
 }
 
@@ -84,7 +84,7 @@ export const deleteModelApi = ({ metalake, catalog, schema, model }) => {
 
 export const getModelVersionsApi = params => {
   return defHttp.get({
-    url: `${Apis.GET_VERSIONS(params)}`
+    url: `${Apis.GET_VERSIONS(params)}`,
   })
 }
 
@@ -95,18 +95,18 @@ export const linkVersionApi = ({ metalake, catalog, schema, model, data }) => {
 export const updateVersionApi = ({ metalake, catalog, schema, model, version, data }) => {
   return defHttp.put({
     url: `${Apis.UPDATE_VERSION({ metalake, catalog, schema, model, version })}`,
-    data
+    data,
   })
 }
 
 export const getVersionDetailsApi = ({ metalake, catalog, schema, model, version }) => {
   return defHttp.get({
-    url: `${Apis.GET_VERSION_DETAIL({ metalake, catalog, schema, model, version })}`
+    url: `${Apis.GET_VERSION_DETAIL({ metalake, catalog, schema, model, version })}`,
   })
 }
 
 export const deleteVersionApi = ({ metalake, catalog, schema, model, version }) => {
   return defHttp.delete({
-    url: `${Apis.DELETE_VERSION({ metalake, catalog, schema, model, version })}`
+    url: `${Apis.DELETE_VERSION({ metalake, catalog, schema, model, version })}`,
   })
 }

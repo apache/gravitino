@@ -21,7 +21,7 @@ import { defHttp } from '@/lib/utils/axios'
 
 export const getAuthConfigsApi = () => {
   return defHttp.get({
-    url: '/configs'
+    url: '/configs',
   })
 }
 
@@ -29,7 +29,7 @@ export const loginApi = (url, params) => {
   return defHttp.post(
     {
       url,
-      params
+      params,
     },
     { withToken: false }
   )

@@ -71,7 +71,7 @@ export default function EmotionProvider({ children }) {
           key={style.name}
           data-emotion={`${cache.key}-global`}
           dangerouslySetInnerHTML={{
-            __html: style.css
+            __html: style.css,
           }}
         />
       )),
@@ -79,9 +79,9 @@ export default function EmotionProvider({ children }) {
         key='css'
         data-emotion={`${cache.key} ${nonGlobalNames.join(' ')}`}
         dangerouslySetInnerHTML={{
-          __html: styles
+          __html: styles,
         }}
-      />
+      />,
     ]
   })
 

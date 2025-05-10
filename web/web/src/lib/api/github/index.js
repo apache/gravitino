@@ -20,14 +20,14 @@
 import { defHttp } from '@/lib/utils/axios'
 
 const githubApis = {
-  GET: 'https://api.github.com/repos/apache/gravitino'
+  GET: 'https://api.github.com/repos/apache/gravitino',
 }
 
 export const getGitHubApi = () => {
   return defHttp.get({
     url: `${githubApis.GET}`,
     headers: {
-      Accept: 'application/vnd.github+json'
-    }
+      Accept: 'application/vnd.github+json',
+    },
   })
 }

@@ -39,14 +39,14 @@ const defaultValues = {
   grant_type: 'client_credentials',
   client_id: '',
   client_secret: '',
-  scope: ''
+  scope: '',
 }
 
 const schema = yup.object().shape({
   grant_type: yup.string().required(),
   client_id: yup.string().required(),
   client_secret: yup.string().required(),
-  scope: yup.string().required()
+  scope: yup.string().required(),
 })
 
 const LoginPage = () => {
@@ -57,11 +57,11 @@ const LoginPage = () => {
     control,
     handleSubmit,
     reset,
-    formState: { errors }
+    formState: { errors },
   } = useForm({
     defaultValues: Object.assign({}, defaultValues),
     mode: 'onChange',
-    resolver: yupResolver(schema)
+    resolver: yupResolver(schema),
   })
 
   const onSubmit = async data => {

@@ -34,8 +34,8 @@ export default function StyledToast() {
           duration: toastDuration,
           style: {
             borderRadius: '8px',
-            maxWidth: 500
-          }
+            maxWidth: 500,
+          },
         }}
       >
         {t => (

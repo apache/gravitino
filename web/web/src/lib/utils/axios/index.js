@@ -285,7 +285,7 @@ const transform = {
     originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
 
     return Promise.reject(error)
-  }
+  },
 }
 
 /**
@@ -302,7 +302,7 @@ function createAxios(opt) {
         timeout: 0,
         headers: {
           'Content-Type': ContentTypeEnum.JSON,
-          Accept: 'application/vnd.gravitino.v1+json'
+          Accept: 'application/vnd.gravitino.v1+json',
         },
         transform: clone(transform),
 
@@ -322,9 +322,9 @@ function createAxios(opt) {
           retryRequest: {
             isOpenRetry: false,
             count: 5,
-            waitTime: 100
-          }
-        }
+            waitTime: 100,
+          },
+        },
       },
       opt || {}
     )

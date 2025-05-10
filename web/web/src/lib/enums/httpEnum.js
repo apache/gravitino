@@ -28,7 +28,7 @@ SOFTWARE.
 const ContentTypeEnum = Object.freeze({
   JSON: 'application/json;charset=UTF-8',
   FORM_URLENCODED: 'application/x-www-form-urlencoded;charset=UTF-8',
-  FORM_DATA: 'multipart/form-data;charset=UTF-8'
+  FORM_DATA: 'multipart/form-data;charset=UTF-8',
 })
 
 /**
@@ -38,7 +38,7 @@ const RequestEnum = Object.freeze({
   GET: 'GET',
   POST: 'POST',
   PUT: 'PUT',
-  DELETE: 'DELETE'
+  DELETE: 'DELETE',
 })
 
 /**
@@ -48,7 +48,7 @@ const ResultEnum = Object.freeze({
   SUCCESS: 0,
   ERROR: -1,
   TIMEOUT: 401,
-  TYPE: 'success'
+  TYPE: 'success',
 })
 
 export { ContentTypeEnum, RequestEnum, ResultEnum }

@@ -26,7 +26,7 @@ const tailwindTheme = {
   fontFamily: {},
   fontSize: {},
   backgroundImage: {},
-  extend: {}
+  extend: {},
 }
 
 export default tailwindTheme

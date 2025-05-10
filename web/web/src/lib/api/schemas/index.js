@@ -31,18 +31,18 @@ const Apis = {
   UPDATE: ({ metalake, catalog, schema }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}`,
   DELETE: ({ metalake, catalog, schema }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}`
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}`,
 }
 
 export const getSchemasApi = params => {
   return defHttp.get({
-    url: `${Apis.GET(params)}`
+    url: `${Apis.GET(params)}`,
   })
 }
 
 export const getSchemaDetailsApi = ({ metalake, catalog, schema }) => {
   return defHttp.get({
-    url: `${Apis.GET_DETAIL({ metalake, catalog, schema })}`
+    url: `${Apis.GET_DETAIL({ metalake, catalog, schema })}`,
   })
 }
 
