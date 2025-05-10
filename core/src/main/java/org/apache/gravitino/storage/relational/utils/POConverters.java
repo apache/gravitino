@@ -1433,6 +1433,28 @@ public class POConverters {
     }
   }
 
+  /**
+   * Construct a new ModelVersionAliasRelPO object with the given alias.
+   *
+   * @param oldModelVersionAliasRelPOs The old ModelVersionAliasRelPOs object
+   * @param newModelVersion The new {@link ModelVersionEntity} object
+   * @return The new ModelVersionAliasRelPO object
+   */
+  public static List<ModelVersionAliasRelPO> updateModelVersionAliasRelPO(
+      List<ModelVersionAliasRelPO> oldModelVersionAliasRelPOs, ModelVersionEntity newModelVersion) {
+
+    if (!oldModelVersionAliasRelPOs.isEmpty()) {
+      ModelVersionAliasRelPO oldModelVersionAliasRelPO = oldModelVersionAliasRelPOs.get(0);
+      return newModelVersion.aliases().stream()
+          .map(alias -> createAliasRelPO(oldModelVersionAliasRelPO, alias))
+          .collect(Collectors.toList());
+    } else {
+      return newModelVersion.aliases().stream()
+          .map(alias -> createAliasRelPO(newModelVersion, alias))
+          .collect(Collectors.toList());
+    }
+  }
+
   public static ModelVersionPO initializeModelVersionPO(
       ModelVersionEntity modelVersionEntity, ModelVersionPO.Builder builder) {
     try {
@@ -1468,5 +1490,24 @@ public class POConverters {
                     .withDeletedAt(DEFAULT_DELETED_AT)
                     .build())
         .collect(Collectors.toList());
+  }
+
+  private static ModelVersionAliasRelPO createAliasRelPO(
+      ModelVersionAliasRelPO oldModelVersionAliasRelPO, String alias) {
+    return ModelVersionAliasRelPO.builder()
+        .withModelVersion(oldModelVersionAliasRelPO.getModelVersion())
+        .withModelVersionAlias(alias)
+        .withModelId(oldModelVersionAliasRelPO.getModelId())
+        .withDeletedAt(DEFAULT_DELETED_AT)
+        .build();
+  }
+
+  private static ModelVersionAliasRelPO createAliasRelPO(ModelVersionEntity entity, String alias) {
+    return ModelVersionAliasRelPO.builder()
+        .withModelVersion(entity.version())
+        .withModelVersionAlias(alias)
+        .withModelId(entity.id())
+        .withDeletedAt(DEFAULT_DELETED_AT)
+        .build();
   }
 }

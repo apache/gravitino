@@ -288,7 +288,7 @@ public class ModelVersionMetaService {
           ident.toString());
     }
 
-    List<ModelVersionAliasRelPO> aliasRelPOs =
+    List<ModelVersionAliasRelPO> oldAliasRelPOs =
         SessionUtils.getWithoutCommit(
             ModelVersionAliasRelMapper.class,
             mapper -> {
@@ -302,7 +302,7 @@ public class ModelVersionMetaService {
             });
 
     ModelVersionEntity oldModelVersionEntity =
-        POConverters.fromModelVersionPO(modelIdent, oldModelVersionPO, aliasRelPOs);
+        POConverters.fromModelVersionPO(modelIdent, oldModelVersionPO, oldAliasRelPOs);
     ModelVersionEntity newModelVersionEntity =
         (ModelVersionEntity) updater.apply((E) oldModelVersionEntity);
 
@@ -312,25 +312,64 @@ public class ModelVersionMetaService {
         newModelVersionEntity.version(),
         oldModelVersionEntity.version());
 
-    Integer updateResult;
+    boolean isAliasChanged =
+        isModelVersionAliasUpdated(oldModelVersionEntity, newModelVersionEntity);
+    List<ModelVersionAliasRelPO> newAliasRelPOs =
+        POConverters.updateModelVersionAliasRelPO(oldAliasRelPOs, newModelVersionEntity);
+
+    final AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              ModelVersionMetaMapper.class,
-              mapper ->
-                  mapper.updateModelVersionMeta(
-                      POConverters.updateModelVersionPO(oldModelVersionPO, newModelVersionEntity),
-                      oldModelVersionPO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.doWithoutCommitAndFetchResult(
+                      ModelVersionMetaMapper.class,
+                      mapper ->
+                          mapper.updateModelVersionMeta(
+                              POConverters.updateModelVersionPO(
+                                  oldModelVersionPO, newModelVersionEntity),
+                              oldModelVersionPO))),
+          () -> {
+            if (isAliasChanged) {
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
+                  mapper -> {
+                    oldModelVersionEntity
+                        .aliases()
+                        .forEach(
+                            alias ->
+                                mapper.softDeleteModelVersionAliasRelsByModelIdAndAlias(
+                                    modelEntity.id(), alias));
+                  });
+
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
+                  mapper -> mapper.updateModelVersionAliasRel(newAliasRelPOs));
+            }
+          });
+
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, newModelVersionEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult.get() > 0) {
       return newModelVersionEntity;
     } else {
       throw new IOException("Failed to update the entity: " + ident);
     }
+  }
+
+  private boolean isModelVersionAliasUpdated(
+      ModelVersionEntity oldModelVersionEntity, ModelVersionEntity newModelVersionEntity) {
+    List<String> oldAliases = oldModelVersionEntity.aliases();
+    List<String> newAliases = newModelVersionEntity.aliases();
+
+    if (oldAliases.size() != newAliases.size()) {
+      return true;
+    }
+
+    return !oldAliases.equals(newAliases);
   }
 }
