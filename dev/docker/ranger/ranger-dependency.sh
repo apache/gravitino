@@ -38,11 +38,13 @@ fi
 if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
   # Package not exist, we need to build them from source
   if [ ! -d "${ranger_dir}/packages/apache-ranger" ]; then
-    git clone https://github.com/apache/ranger --branch master --single-branch ${ranger_dir}/packages/apache-ranger
+    # git clone https://github.com/apache/ranger --branch master --single-branch ${ranger_dir}/packages/apache-ranger
+    git clone https://github.com/apache/ranger --branch release-ranger-2.4.0 --single-branch ${ranger_dir}/packages/apache-ranger
+
     # set the commit to RANGER-5146: 500 API Error When Deleting TagDef with a Linked Tag
     # https://github.com/apache/ranger/commit/ff36aabe36169b94862c51a5b403f59c9d728b94
     cd ${ranger_dir}/packages/apache-ranger
-    git reset --hard ff36aabe36169b94862c51a5b403f59c9d728b94
+    # git reset --hard ff36aabe36169b94862c51a5b403f59c9d728b94
   fi
 
   cp ${ranger_dir}/.env ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
