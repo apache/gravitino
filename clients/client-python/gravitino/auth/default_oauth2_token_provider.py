@@ -72,7 +72,6 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
             raise IllegalArgumentException("OAuth2TokenProvider must set path")
 
     def _get_access_token(self) -> Optional[str]:
-
         expires = self._expires_at_millis()
 
         if expires is None:
@@ -102,7 +101,6 @@ class DefaultOAuth2TokenProvider(OAuth2TokenProvider):
         return client_id, client_secret
 
     def _fetch_token(self) -> str:
-
         client_id, client_secret = self._parse_credential()
 
         client_credential_request = OAuth2ClientCredentialRequest(

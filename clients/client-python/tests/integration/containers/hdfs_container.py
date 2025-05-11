@@ -70,7 +70,6 @@ async def check_hdfs_container_status(hdfs_container):
 
 
 class HDFSContainer(BaseContainer):
-
     def __init__(self):
         container_name = "python-hdfs"
         image_name = os.environ.get("GRAVITINO_CI_HIVE_DOCKER_IMAGE")

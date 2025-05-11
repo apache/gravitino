@@ -26,3 +26,17 @@ from gravitino.client.gravitino_admin_client import GravitinoAdminClient
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.name_identifier import NameIdentifier
 from gravitino.filesystem import gvfs
+
+__all__ = [
+    "Catalog",
+    "Schema",
+    "Fileset",
+    "FilesetChange",
+    "MetalakeChange",
+    "SchemaChange",
+    "GravitinoClient",
+    "GravitinoAdminClient",
+    "GravitinoMetalake",
+    "NameIdentifier",
+    "gvfs",
+]
