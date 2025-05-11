@@ -15,6 +15,9 @@
 # limitations under the License.
 #
 
+# This file is copied from commit ff36aabe36169b94862c51a5b403f59c9d728b94
+# with some modification, e.g. Adding :Z option to volume mount to make build successful in GitHub Action.
+# RANGER-5146: 500 API Error When Deleting TagDef with a Linked Tag# https://github.com/apache/ranger/blob/ff36aabe36169b94862c51a5b403f59c9d728b94/dev-support/ranger-docker/docker-compose.ranger-build.yml
 version: "3"
 services:
   ranger-build:
@@ -35,6 +38,7 @@ services:
       - ./scripts:/home/ranger/scripts
       - ./patches:/home/ranger/patches
       - dist:/home/ranger/dist:Z
+      # mount from host src to container's src
       - ${RANGER_HOME:-./../../}:/home/ranger/src:Z
     depends_on:
       - ranger-base
