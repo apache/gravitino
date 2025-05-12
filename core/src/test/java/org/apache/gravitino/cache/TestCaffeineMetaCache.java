@@ -739,12 +739,12 @@ public class TestCaffeineMetaCache {
   }
 
   private void initIdMock() {
-    doReturn(schema1).when(cache).loadEntityFromDBById(1L, Entity.EntityType.SCHEMA);
-    doReturn(schema2).when(cache).loadEntityFromDBById(2L, Entity.EntityType.SCHEMA);
-    doReturn(table1).when(cache).loadEntityFromDBById(2L, Entity.EntityType.TABLE);
-    doReturn(table2).when(cache).loadEntityFromDBById(3L, Entity.EntityType.TABLE);
-    doReturn(table3).when(cache).loadEntityFromDBById(4L, Entity.EntityType.TABLE);
-    doReturn(catalog).when(cache).loadEntityFromDBById(5L, Entity.EntityType.CATALOG);
-    doReturn(metalake).when(cache).loadEntityFromDBById(6L, Entity.EntityType.METALAKE);
+    doReturn(schema1).when(cache).loadMetadataFromDBById(1L, Entity.EntityType.SCHEMA);
+    doReturn(schema2).when(cache).loadMetadataFromDBById(2L, Entity.EntityType.SCHEMA);
+    doReturn(table1).when(cache).loadMetadataFromDBById(2L, Entity.EntityType.TABLE);
+    doReturn(table2).when(cache).loadMetadataFromDBById(3L, Entity.EntityType.TABLE);
+    doReturn(table3).when(cache).loadMetadataFromDBById(4L, Entity.EntityType.TABLE);
+    doReturn(catalog).when(cache).loadMetadataFromDBById(5L, Entity.EntityType.CATALOG);
+    doReturn(metalake).when(cache).loadMetadataFromDBById(6L, Entity.EntityType.METALAKE);
   }
 }

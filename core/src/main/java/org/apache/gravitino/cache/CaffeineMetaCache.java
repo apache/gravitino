@@ -130,7 +130,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
               }
               try {
                 LOG.debug("Expired [byId] key={}, scheduling removal", key);
-                removeExpiredEntityFromDataCache(value);
+                removeExpiredMetadataFromDataCache(value);
               } catch (Throwable t) {
                 LOG.error("Async removal failed for {}", value, t);
               }
@@ -162,8 +162,8 @@ public class CaffeineMetaCache extends BaseMetaCache {
         key -> {
           LOG.debug("Cache miss [byId] for id={}, type={}, loading from DB", id, type);
           // ???: Should we check if the entity is null?
-          Entity entity = loadEntityFromDBById(id, type);
-          syncEntityToIndex(entity);
+          Entity entity = loadMetadataFromDBById(id, type);
+          syncMetadataToIndex(entity);
 
           return entity;
         });
@@ -188,8 +188,8 @@ public class CaffeineMetaCache extends BaseMetaCache {
         LOG.debug("Cache miss [byName] for name={}, type={}, loading from DB", ident, type);
       }
       // ???: Should we check if the entity is null?
-      Entity entity = loadEntityFromDBByName(ident, type);
-      syncEntityToCache(entity);
+      Entity entity = loadMetadataFromDBByName(ident, type);
+      syncMetadataToCache(entity);
 
       return entity;
     } catch (IOException e) {
@@ -209,7 +209,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
       return;
     }
 
-    removeFromEntity(entity);
+    removeFromMetadata(entity);
   }
 
   /** {@inheritDoc} */
@@ -224,7 +224,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
     }
     Entity entity = cacheData.getIfPresent(idKey);
 
-    removeFromEntity(entity);
+    removeFromMetadata(entity);
   }
 
   /** {@inheritDoc} */
@@ -265,7 +265,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
   /** {@inheritDoc} */
   @Override
   public void put(Entity entity) {
-    syncEntityToCache(entity);
+    syncMetadataToCache(entity);
   }
 
   /**
@@ -273,7 +273,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
    *
    * @param entity The entity to synchronize
    */
-  private void syncEntityToIndex(Entity entity) {
+  private void syncMetadataToIndex(Entity entity) {
     NameIdentifier nameIdent = CacheUtils.getIdentFromEntity(entity);
     long id = CacheUtils.getIdFromEntity(entity);
 
@@ -292,7 +292,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
    *
    * @param entity The entity to synchronize
    */
-  private void syncEntityToCache(Entity entity) {
+  private void syncMetadataToCache(Entity entity) {
     NameIdentifier nameIdent = CacheUtils.getIdentFromEntity(entity);
     long id = CacheUtils.getIdFromEntity(entity);
 
@@ -314,7 +314,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
    * @param entity The entity to remove,
    */
   @Override
-  protected void removeExpiredEntityFromDataCache(Entity entity) {
+  protected void removeExpiredMetadataFromDataCache(Entity entity) {
     NameIdentifier identifier = CacheUtils.getIdentFromEntity(entity);
 
     withLock(
@@ -335,7 +335,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
    *
    * @param rootEntity The root entity to remove.
    */
-  private void removeFromEntity(Entity rootEntity) {
+  private void removeFromMetadata(Entity rootEntity) {
     NameIdentifier prefix = CacheUtils.getIdentFromEntity(rootEntity);
 
     withLock(

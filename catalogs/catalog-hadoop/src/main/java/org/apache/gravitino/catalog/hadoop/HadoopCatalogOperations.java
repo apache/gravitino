@@ -113,12 +113,12 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   private Map<String, FileSystemProvider> fileSystemProvidersMap;
 
   private FileSystemProvider defaultFileSystemProvider;
-  private MetaCache fileCache;
+  private MetaCache filesetCache;
 
   HadoopCatalogOperations(EntityStore store) {
     this.store = store;
     // TODO retrieve from GravitinoEnv
-    this.fileCache = CaffeineMetaCache.getInstance(new CacheConfig(), store);
+    this.filesetCache = CaffeineMetaCache.getInstance(new CacheConfig(), store);
   }
 
   public HadoopCatalogOperations() {
@@ -208,7 +208,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     try {
-      Entity entity = fileCache.getOrLoadMetadataByName(ident, Entity.EntityType.FILESET);
+      Entity entity = filesetCache.getOrLoadMetadataByName(ident, Entity.EntityType.FILESET);
       FilesetEntity filesetEntity = (FilesetEntity) entity;
 
       return HadoopFileset.builder()
@@ -332,7 +332,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             .withAuditInfo(filesetEntity.auditInfo())
             .build();
 
-    fileCache.put(filesetEntity);
+    filesetCache.put(filesetEntity);
     return fileset;
   }
 
@@ -347,7 +347,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
     }
 
-    fileCache.removeByName(ident);
+    filesetCache.removeByName(ident);
     try {
       FilesetEntity updatedFilesetEntity =
           store.update(
@@ -356,7 +356,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               Entity.EntityType.FILESET,
               e -> updateFilesetEntity(ident, e, changes));
 
-      fileCache.put(updatedFilesetEntity);
+      filesetCache.put(updatedFilesetEntity);
       return HadoopFileset.builder()
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())
@@ -398,7 +398,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
         }
       }
 
-      fileCache.removeByName(ident);
+      filesetCache.removeByName(ident);
       return store.delete(ident, Entity.EntityType.FILESET);
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
@@ -550,7 +550,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           Optional.ofNullable(schemaEntity.properties()).orElse(Collections.emptyMap());
       Path schemaPath = getSchemaPath(ident.name(), properties);
 
-      filesets.forEach(s -> fileCache.removeByName(s.nameIdentifier()));
+      filesets.forEach(s -> filesetCache.removeByName(s.nameIdentifier()));
       boolean dropped = super.dropSchema(ident, cascade);
       if (!dropped) {
         return false;

@@ -76,7 +76,7 @@ public abstract class BaseMetaCache implements MetaCache {
    * @param type The type of the entity to load.
    * @return The loaded entity, or null if it was not found.
    */
-  protected Entity loadEntityFromDBById(Long id, Entity.EntityType type) {
+  protected Entity loadMetadataFromDBById(Long id, Entity.EntityType type) {
     switch (type) {
       case METALAKE:
         return MetalakeMetaService.getInstance().getMetalakeById(id);
@@ -122,7 +122,7 @@ public abstract class BaseMetaCache implements MetaCache {
    * @return The loaded entity, or null if it was not found.
    * @throws IOException If an error occurs while loading the entity.
    */
-  protected Entity loadEntityFromDBByName(NameIdentifier ident, Entity.EntityType type)
+  protected Entity loadMetadataFromDBByName(NameIdentifier ident, Entity.EntityType type)
       throws IOException {
     return entityStore.get(ident, type, CacheUtils.getEntityClass(type));
   }
@@ -132,5 +132,5 @@ public abstract class BaseMetaCache implements MetaCache {
    *
    * @param entity The expired entity to remove.
    */
-  protected abstract void removeExpiredEntityFromDataCache(Entity entity);
+  protected abstract void removeExpiredMetadataFromDataCache(Entity entity);
 }

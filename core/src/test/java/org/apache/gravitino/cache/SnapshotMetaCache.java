@@ -85,7 +85,7 @@ public class SnapshotMetaCache extends BaseMetaCache {
 
   /** {@inheritDoc} */
   @Override
-  protected void removeExpiredEntityFromDataCache(Entity entity) {}
+  protected void removeExpiredMetadataFromDataCache(Entity entity) {}
 
   /** {@inheritDoc} */
   @Override
@@ -98,7 +98,7 @@ public class SnapshotMetaCache extends BaseMetaCache {
       return e;
     }
 
-    Entity loaded = loadEntityFromDBById(id, type);
+    Entity loaded = loadMetadataFromDBById(id, type);
     put(loaded);
     return loaded;
   }
@@ -114,7 +114,7 @@ public class SnapshotMetaCache extends BaseMetaCache {
     }
 
     try {
-      Entity loaded = loadEntityFromDBByName(ident, type);
+      Entity loaded = loadMetadataFromDBByName(ident, type);
       put(loaded);
       return loaded;
     } catch (IOException ex) {
