@@ -129,7 +129,6 @@ public class CaffeineMetaCache extends BaseMetaCache {
                 return;
               }
               try {
-                LOG.debug("Expired [byId] key={}, scheduling removal", key);
                 removeExpiredMetadataFromDataCache(value);
               } catch (Throwable t) {
                 LOG.error("Async removal failed for {}", value, t);
@@ -155,14 +154,14 @@ public class CaffeineMetaCache extends BaseMetaCache {
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
     MetaCacheKey metaCacheKey = MetaCacheKey.of(id, type);
-    LOG.debug("getById: checking cache for key={} type={}", id, type);
 
     return cacheData.get(
         metaCacheKey,
         key -> {
-          LOG.debug("Cache miss [byId] for id={}, type={}, loading from DB", id, type);
-          // ???: Should we check if the entity is null?
           Entity entity = loadMetadataFromDBById(id, type);
+          if (entity == null) {
+            throw new RuntimeException("Entity not found for id=" + id + " type=" + type);
+          }
           syncMetadataToIndex(entity);
 
           return entity;
@@ -175,20 +174,15 @@ public class CaffeineMetaCache extends BaseMetaCache {
     Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("getByName: checking cache for key={} type={}", ident, type);
-    }
-
     MetaCacheKey idKey = cacheIndex.getValueForExactKey(ident.toString());
     if (idKey != null) {
       return cacheData.getIfPresent(idKey);
     }
     try {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Cache miss [byName] for name={}, type={}, loading from DB", ident, type);
-      }
-      // ???: Should we check if the entity is null?
       Entity entity = loadMetadataFromDBByName(ident, type);
+      if (entity == null) {
+        throw new RuntimeException("Entity not found for name=" + ident + " type=" + type);
+      }
       syncMetadataToCache(entity);
 
       return entity;
@@ -203,13 +197,10 @@ public class CaffeineMetaCache extends BaseMetaCache {
   public void removeById(Long id, Entity.EntityType type) {
     Entity entity = cacheData.getIfPresent(MetaCacheKey.of(id, type));
     if (entity == null) {
-      if (LOG.isTraceEnabled()) {
-        LOG.debug("Cache miss [byId] for id={}, type={}, skipping removal", id, type);
-      }
       return;
     }
 
-    removeFromMetadata(entity);
+    removeByMetadata(entity);
   }
 
   /** {@inheritDoc} */
@@ -217,14 +208,11 @@ public class CaffeineMetaCache extends BaseMetaCache {
   public void removeByName(NameIdentifier ident) {
     MetaCacheKey idKey = cacheIndex.getValueForExactKey(ident.toString());
     if (idKey == null) {
-      if (LOG.isTraceEnabled()) {
-        LOG.debug("Cache miss [byName] for name={}, skipping removal", ident);
-      }
       return;
     }
     Entity entity = cacheData.getIfPresent(idKey);
 
-    removeFromMetadata(entity);
+    removeByMetadata(entity);
   }
 
   /** {@inheritDoc} */
@@ -256,7 +244,6 @@ public class CaffeineMetaCache extends BaseMetaCache {
   public void clear() {
     withLock(
         () -> {
-          LOG.info("Clearing entire cache and rebuilding indexTree");
           cacheData.invalidateAll();
           cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
@@ -269,78 +256,63 @@ public class CaffeineMetaCache extends BaseMetaCache {
   }
 
   /**
-   * Synchronizes the entity to the index.
+   * Synchronizes the Metadata to the index.
    *
-   * @param entity The entity to synchronize
+   * @param metadata The Metadata to synchronize
    */
-  private void syncMetadataToIndex(Entity entity) {
-    NameIdentifier nameIdent = CacheUtils.getIdentFromEntity(entity);
-    long id = CacheUtils.getIdFromEntity(entity);
+  private void syncMetadataToIndex(Entity metadata) {
+    NameIdentifier nameIdent = CacheUtils.getIdentFromMetadata(metadata);
+    long id = CacheUtils.getIdFromMetadata(metadata);
 
     withLock(
         () -> {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("SyncFromIdCache: putting name={} for entity id={}", nameIdent, id);
-          }
-
-          cacheIndex.put(nameIdent.toString(), MetaCacheKey.of(id, entity.type()));
+          cacheIndex.put(nameIdent.toString(), MetaCacheKey.of(id, metadata.type()));
         });
   }
 
   /**
-   * Synchronizes the entity to the cache.
+   * Synchronizes the metadata to the cache.
    *
-   * @param entity The entity to synchronize
+   * @param metadata The metadata to synchronize
    */
-  private void syncMetadataToCache(Entity entity) {
-    NameIdentifier nameIdent = CacheUtils.getIdentFromEntity(entity);
-    long id = CacheUtils.getIdFromEntity(entity);
+  private void syncMetadataToCache(Entity metadata) {
+    NameIdentifier nameIdent = CacheUtils.getIdentFromMetadata(metadata);
+    long id = CacheUtils.getIdFromMetadata(metadata);
 
     withLock(
         () -> {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("SyncFromIndexCache: putting id={} for entity name={}", id, nameIdent);
-          }
-
-          cacheData.put(MetaCacheKey.of(id, entity.type()), entity);
-          cacheIndex.put(nameIdent.toString(), MetaCacheKey.of(id, entity.type()));
+          cacheData.put(MetaCacheKey.of(id, metadata.type()), metadata);
+          cacheIndex.put(nameIdent.toString(), MetaCacheKey.of(id, metadata.type()));
         });
   }
 
   /**
-   * Removes the expired entity from the cache. This method is a hook method for the Cache, when an
-   * entry expires, it will call this method.
+   * Removes the expired metadata from the cache. This method is a hook method for the Cache, when
+   * an entry expires, it will call this method.
    *
-   * @param entity The entity to remove,
+   * @param metadata The metadata to remove,
    */
   @Override
-  protected void removeExpiredMetadataFromDataCache(Entity entity) {
-    NameIdentifier identifier = CacheUtils.getIdentFromEntity(entity);
+  protected void removeExpiredMetadataFromDataCache(Entity metadata) {
+    NameIdentifier identifier = CacheUtils.getIdentFromMetadata(metadata);
 
     withLock(
         () -> {
-          if (LOG.isTraceEnabled()) {
-            LOG.trace(
-                "Expired removal [byId]: removing id={} name={}",
-                CacheUtils.getIdFromEntity(entity),
-                identifier);
-          }
-
           cacheIndex.remove(identifier.toString());
         });
   }
 
   /**
-   * Removes the entity from the cache. This method will remove all entries with the same prefix.
+   * Removes the metadata from the cache. This method will also remove all metadata with the same
+   * prefix.
    *
-   * @param rootEntity The root entity to remove.
+   * @param rootMetadata The root metadata to remove.
    */
-  private void removeFromMetadata(Entity rootEntity) {
-    NameIdentifier prefix = CacheUtils.getIdentFromEntity(rootEntity);
+  private void removeByMetadata(Entity rootMetadata) {
+    NameIdentifier prefix = CacheUtils.getIdentFromMetadata(rootMetadata);
 
     withLock(
         () -> {
-          LOG.debug("Manual remove: prefix={}, removing matching entries", prefix);
           // 1. find all keys starting with prefix
           List<MetaCacheKey> toRemovedId = Lists.newArrayList();
           List<String> toRemovedIdent = Lists.newArrayList();
@@ -350,7 +322,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
             toRemovedId.add(idKey);
 
             if (entityToRemove != null) {
-              toRemovedIdent.add(CacheUtils.getIdentFromEntity(entityToRemove).toString());
+              toRemovedIdent.add(CacheUtils.getIdentFromMetadata(entityToRemove).toString());
             }
           }
 
@@ -376,13 +348,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
   private <KEY, VALUE> Caffeine<KEY, VALUE> newBaseBuilder(CacheConfig cacheConfig) {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
 
-    if (cacheConfig.isWeightedCacheEnabled()) {
-      builder
-          .weigher(MetadataEntityWeigher.getInstance())
-          .maximumWeight(cacheConfig.getEntityCacheWeigherTarget());
-    } else {
-      builder.maximumSize(cacheConfig.getMaxSize());
-    }
+    builder.maximumSize(cacheConfig.getMaxSize());
 
     if (cacheConfig.isExpirationEnabled()) {
       builder.expireAfterWrite(

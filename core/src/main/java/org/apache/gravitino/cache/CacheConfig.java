@@ -32,23 +32,6 @@ import org.apache.gravitino.config.ConfigEntry;
  */
 public class CacheConfig extends Config {
 
-  // Whether to use a weighted cache
-  public static final ConfigEntry<Boolean> USE_WEIGHTED_CACHE =
-      new ConfigBuilder("gravitino.server.cache.weighted.enabled")
-          .doc("Whether to use a weighted cache.")
-          .version(ConfigConstants.VERSION_0_9_0)
-          .booleanConf()
-          .createWithDefault(false);
-
-  // Target weight of the cache
-  public static final ConfigEntry<Long> ENTITY_CACHE_WEIGHER_TARGET =
-      new ConfigBuilder("gravitino.server.cache.weighted.target")
-          .doc("The target weight of the cache.")
-          .version(ConfigConstants.VERSION_0_9_0)
-          .longConf()
-          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(100 * MetadataEntityWeigher.WEIGHT_PER_MB);
-
   // Maximum number of entries in the cache
   public static final ConfigEntry<Integer> CACHE_MAX_SIZE =
       new ConfigBuilder("gravitino.server.cache.max.size")
@@ -77,7 +60,7 @@ public class CacheConfig extends Config {
 
   // Whether to enable cache status
   public static final ConfigEntry<Boolean> CACHE_STATUS_ENABLED =
-      new ConfigBuilder("gravitino.server.cache.status.enabled")
+      new ConfigBuilder("gravitino.server.cache.enabled")
           .doc("Whether to enable cache status.")
           .version(ConfigConstants.VERSION_0_9_0)
           .booleanConf()
@@ -134,24 +117,6 @@ public class CacheConfig extends Config {
    */
   public TimeUnit getExpirationTimeUnit() {
     return expirationTimeUnit;
-  }
-
-  /**
-   * Checks if weighted cache is enabled
-   *
-   * @return {@code true} if weighted cache is enabled, {@code false} otherwise
-   */
-  public boolean isWeightedCacheEnabled() {
-    return get(USE_WEIGHTED_CACHE);
-  }
-
-  /**
-   * Gets the target weight of the cache
-   *
-   * @return the target weight of the cache
-   */
-  public long getEntityCacheWeigherTarget() {
-    return get(ENTITY_CACHE_WEIGHER_TARGET);
   }
 
   /**

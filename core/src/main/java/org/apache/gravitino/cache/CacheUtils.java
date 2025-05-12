@@ -19,13 +19,7 @@
 
 package org.apache.gravitino.cache;
 
-import static org.apache.gravitino.Entity.EntityType.CATALOG;
-import static org.apache.gravitino.Entity.EntityType.METALAKE;
-import static org.apache.gravitino.Entity.EntityType.MODEL;
-import static org.apache.gravitino.Entity.EntityType.SCHEMA;
-import static org.apache.gravitino.Entity.EntityType.TAG;
-import static org.apache.gravitino.Entity.EntityType.TOPIC;
-
+import com.google.common.base.Preconditions;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -60,9 +54,8 @@ public class CacheUtils {
    * @throws IllegalArgumentException if the entity type is not supported
    */
   public static <E extends Entity & HasIdentifier> Class<E> getEntityClass(Entity.EntityType type) {
-    if (type == null) {
-      throw new IllegalArgumentException("EntityType must not be null");
-    }
+    Preconditions.checkNotNull(type, "EntityType must not be null");
+
     switch (type) {
       case METALAKE:
         return (Class<E>) BaseMetalake.class;
@@ -94,33 +87,33 @@ public class CacheUtils {
   }
 
   /**
-   * Returns the {@link NameIdentifier} of the entity based on its type.
+   * Returns the {@link NameIdentifier} of the metadata based on its type.
    *
-   * @param entity The entity
-   * @return The {@link NameIdentifier} of the entity
+   * @param metadata The entity
+   * @return The {@link NameIdentifier} of the metadata
    */
-  public static NameIdentifier getIdentFromEntity(Entity entity) {
-    if (entity instanceof HasIdentifier) {
-      HasIdentifier hasIdentifier = (HasIdentifier) entity;
+  public static NameIdentifier getIdentFromMetadata(Entity metadata) {
+    if (metadata instanceof HasIdentifier) {
+      HasIdentifier hasIdentifier = (HasIdentifier) metadata;
       return hasIdentifier.nameIdentifier();
     }
 
-    throw new IllegalArgumentException("Unsupported EntityType: " + entity.type().getShortName());
+    throw new IllegalArgumentException("Unsupported EntityType: " + metadata.type().getShortName());
   }
 
   /**
-   * Returns the id of the entity based on its type.
+   * Returns the id of the metadata based on its type.
    *
-   * @param entity The entity
-   * @return The id of the entity
+   * @param metadata The metadata
+   * @return The id of the metadata
    */
-  public static long getIdFromEntity(Entity entity) {
-    if (entity instanceof HasIdentifier) {
-      HasIdentifier hasIdentifier = (HasIdentifier) entity;
+  public static long getIdFromMetadata(Entity metadata) {
+    if (metadata instanceof HasIdentifier) {
+      HasIdentifier hasIdentifier = (HasIdentifier) metadata;
       return hasIdentifier.id();
     }
 
-    throw new IllegalArgumentException("Unsupported EntityType: " + entity.type().getShortName());
+    throw new IllegalArgumentException("Unsupported EntityType: " + metadata.type().getShortName());
   }
 
   /**
@@ -237,7 +230,8 @@ public class CacheUtils {
    */
   public static String getMetalakeName(MetaCache cache, Long metalakeId) {
     if (cache.containsById(metalakeId, Entity.EntityType.METALAKE)) {
-      return getIdentFromEntity(cache.getOrLoadMetadataById(metalakeId, Entity.EntityType.METALAKE))
+      return getIdentFromMetadata(
+              cache.getOrLoadMetadataById(metalakeId, Entity.EntityType.METALAKE))
           .name();
     } else {
       return MetalakeMetaService.getInstance().getMetalakePOById(metalakeId).getMetalakeName();
@@ -254,7 +248,7 @@ public class CacheUtils {
    */
   public static String getCatalogName(MetaCache cache, Long catalogId) {
     if (cache.containsById(catalogId, Entity.EntityType.CATALOG)) {
-      return getIdentFromEntity(cache.getOrLoadMetadataById(catalogId, Entity.EntityType.CATALOG))
+      return getIdentFromMetadata(cache.getOrLoadMetadataById(catalogId, Entity.EntityType.CATALOG))
           .name();
     } else {
       return CatalogMetaService.getInstance().getCatalogPOById(catalogId).getCatalogName();
@@ -271,7 +265,7 @@ public class CacheUtils {
    */
   public static String getSchemaName(MetaCache cache, Long schemaId) {
     if (cache.containsById(schemaId, Entity.EntityType.SCHEMA)) {
-      return getIdentFromEntity(cache.getOrLoadMetadataById(schemaId, Entity.EntityType.SCHEMA))
+      return getIdentFromMetadata(cache.getOrLoadMetadataById(schemaId, Entity.EntityType.SCHEMA))
           .name();
     } else {
       return SchemaMetaService.getInstance().getSchemaPOById(schemaId).getSchemaName();

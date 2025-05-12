@@ -28,9 +28,6 @@ public class TestCacheConfig {
   void testDefaultCacheConfig() {
     CacheConfig cacheConfig = new CacheConfig();
 
-    Assertions.assertFalse(cacheConfig.isWeightedCacheEnabled());
-    Assertions.assertEquals(
-        100 * MetadataEntityWeigher.WEIGHT_PER_MB, cacheConfig.getEntityCacheWeigherTarget());
     Assertions.assertEquals(10_000, cacheConfig.getMaxSize());
     Assertions.assertTrue(cacheConfig.isExpirationEnabled());
     Assertions.assertEquals(60, cacheConfig.getExpirationTime());
