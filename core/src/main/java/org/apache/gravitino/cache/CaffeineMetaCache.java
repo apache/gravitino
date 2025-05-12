@@ -154,18 +154,26 @@ public class CaffeineMetaCache extends BaseMetaCache {
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
     MetaCacheKey metaCacheKey = MetaCacheKey.of(id, type);
+    // Get method will automatically load the entity from the database and put it in the cache if it
+    // is not present.
+    Entity metadata = cacheData.getIfPresent(metaCacheKey);
+    if (metadata != null) {
+      return metadata;
+    }
 
-    return cacheData.get(
-        metaCacheKey,
-        key -> {
-          Entity entity = loadMetadataFromDBById(id, type);
-          if (entity == null) {
-            throw new RuntimeException("Entity not found for id=" + id + " type=" + type);
-          }
-          syncMetadataToIndex(entity);
+    try {
+      Entity entity = loadMetadataFromDBById(id, type);
+      if (entity == null) {
+        throw new RuntimeException("Entity not found for id=" + id + " type=" + type);
+      }
 
-          return entity;
-        });
+      syncMetadataToCache(entity);
+
+      return entity;
+    } catch (Exception e) {
+      LOG.error("Error while loading entity by id", e);
+      throw new RuntimeException("Error while loading entity by id", e);
+    }
   }
 
   /** {@inheritDoc} */
@@ -253,21 +261,6 @@ public class CaffeineMetaCache extends BaseMetaCache {
   @Override
   public void put(Entity entity) {
     syncMetadataToCache(entity);
-  }
-
-  /**
-   * Synchronizes the Metadata to the index.
-   *
-   * @param metadata The Metadata to synchronize
-   */
-  private void syncMetadataToIndex(Entity metadata) {
-    NameIdentifier nameIdent = CacheUtils.getIdentFromMetadata(metadata);
-    long id = CacheUtils.getIdFromMetadata(metadata);
-
-    withLock(
-        () -> {
-          cacheIndex.put(nameIdent.toString(), MetaCacheKey.of(id, metadata.type()));
-        });
   }
 
   /**
