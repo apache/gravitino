@@ -25,8 +25,9 @@ import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchModelException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.model.ModelVersionChange;
 
 /** Update the uri of a model version. */
@@ -88,8 +89,10 @@ public class UpdateModelVersionUri extends Command {
       exitWithError(ErrorMessages.UNKNOWN_CATALOG);
     } catch (NoSuchSchemaException err) {
       exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchTableException err) {
-      exitWithError(ErrorMessages.UNKNOWN_TABLE);
+    } catch (NoSuchModelException err) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL);
+    } catch (NoSuchModelVersionException err) {
+      exitWithError(ErrorMessages.UNKNOWN_MODEL_VERSION);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
