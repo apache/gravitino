@@ -18,7 +18,7 @@
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Set
 
 from dataclasses_json import config
 
@@ -138,3 +138,51 @@ class ModelVersionUpdateRequest:
                 ModelVersionChange: The ModelVersionChange object representing the update uri operation.
             """
             return ModelVersionChange.update_uri(self._new_uri)
+
+    @dataclass
+    class ModelVersionAliasesRequest(ModelVersionUpdateRequestBase):
+        """Request to update model version aliases"""
+
+        _aliases_to_add: Optional[Set[str]] = field(
+            metadata=config(field_name="aliasesToAdd")
+        )
+        _aliases_to_remove: Optional[Set[str]] = field(
+            metadata=config(field_name="aliasesToRemove")
+        )
+
+        def __init__(self, aliases_to_add: Set[str], aliases_to_remove: Set[str]):
+            super().__init__("updateAliases")
+            self._aliases_to_add = aliases_to_add
+            self._aliases_to_remove = aliases_to_remove
+
+        def aliases_to_add(self):
+            """Retrieves the new aliases of the model version.
+            Returns:
+                The new aliases of the model version.
+            """
+            return self._aliases_to_add
+
+        def aliases_to_remove(self):
+            """Retrieves the new aliases of the model version.
+            Returns:
+                The new aliases of the model version.
+            """
+            return self._aliases_to_remove
+
+        def validate(self):
+            """Validates the fields of the request."""
+            if self._aliases_to_add is None and self._aliases_to_remove is None:
+                raise ValueError(
+                    "At least one of aliasesToAdd or aliasesToRemove must be non-null"
+                )
+
+        def model_version_change(self):
+            """
+            Returns a ModelVersionChange object representing the update aliases operation.
+            Returns:
+                ModelVersionChange: The ModelVersionChange object representing the update aliases operation.
+            """
+            return ModelVersionChange.UpdateAliases(
+                self._aliases_to_add,
+                self._aliases_to_remove,
+            )
