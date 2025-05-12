@@ -442,7 +442,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         ModelVersionChange.UpdateAliases updateAliasesChange =
             (ModelVersionChange.UpdateAliases) change;
         Set<String> addTmpSet = updateAliasesChange.aliasesToAdd();
-        Set<String> deleteTmpSet = updateAliasesChange.aliasesToDelete();
+        Set<String> deleteTmpSet = updateAliasesChange.aliasesToRemove();
         Set<String> aliasToAdd = Sets.difference(addTmpSet, deleteTmpSet).immutableCopy();
         Set<String> aliasToDelete = Sets.difference(deleteTmpSet, addTmpSet).immutableCopy();
 
