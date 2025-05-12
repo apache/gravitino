@@ -170,10 +170,10 @@ class ModelVersionUpdateRequest:
             return self._aliases_to_remove
 
         def validate(self):
-            """Validates the fields of the request. Always pass."""
-            if not self._aliases_to_add or not self._aliases_to_remove:
+            """Validates the fields of the request."""
+            if self._aliases_to_add is None and self._aliases_to_remove is None:
                 raise ValueError(
-                    '"aliasesToAdd" and "aliasesToRemove" field are required'
+                    "At least one of aliasesToAdd or aliasesToRemove must be non-null"
                 )
 
         def model_version_change(self):

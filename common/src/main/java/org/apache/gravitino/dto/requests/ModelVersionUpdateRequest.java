@@ -197,9 +197,9 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {
-      Preconditions.checkNotNull(aliasesToAdd, "aliasesToAdd field is required and cannot be null");
-      Preconditions.checkNotNull(
-          aliasesToRemove, "aliasesToRemove field is required and cannot be null");
+      Preconditions.checkArgument(
+          aliasesToAdd != null || aliasesToRemove != null,
+          "At least one of aliasesToAdd or aliasesToRemove must be non-null");
     }
   }
 }

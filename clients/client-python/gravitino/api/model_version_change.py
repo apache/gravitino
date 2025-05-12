@@ -256,8 +256,10 @@ class ModelVersionChange(ABC):
         """A model version change to update the aliases of the model version."""
 
         def __init__(self, aliases_to_add, aliases_to_remove):
-            self._aliases_to_add = set(aliases_to_add)
-            self._aliases_to_remove = set(aliases_to_remove)
+            self._aliases_to_add = set(aliases_to_add) if aliases_to_add else set()
+            self._aliases_to_remove = (
+                set(aliases_to_remove) if aliases_to_remove else set()
+            )
 
         def aliases_to_add(self):
             """Retrieves the aliases to add.
