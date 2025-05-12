@@ -30,7 +30,9 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
@@ -47,10 +49,12 @@ import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.tag.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class TestTableFormat {
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -673,6 +677,96 @@ public class TestTableFormat {
   }
 
   @Test
+  void testTagDetailsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = getMockTag("tag1", "comment for tag1");
+
+    TableFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------+------------------+\n"
+            + "| Name |     Comment      |\n"
+            + "+------+------------------+\n"
+            + "| tag1 | comment for tag1 |\n"
+            + "+------+------------------+",
+        output);
+  }
+
+  @Test
+  void testTagDetailsWithTableFormatWithNullValues() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = mock(Tag.class);
+    when(mockTag.name()).thenReturn("tag1");
+    when(mockTag.comment()).thenReturn(null);
+
+    TableFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------+---------+\n"
+            + "| Name | Comment |\n"
+            + "+------+---------+\n"
+            + "| tag1 | N/A     |\n"
+            + "+------+---------+",
+        output);
+  }
+
+  @Test
+  void testListAllTagsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1");
+    Tag mockTag2 = getMockTag("tag2", "comment for tag2");
+    Tag mockTag3 = getMockTag("tag3", "comment for tag3");
+
+    TableFormat.output(new Tag[] {mockTag1, mockTag2, mockTag3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------+\n"
+            + "| Name |\n"
+            + "+------+\n"
+            + "| tag1 |\n"
+            + "| tag2 |\n"
+            + "| tag3 |\n"
+            + "+------+",
+        output);
+  }
+
+  @Test
+  void testListTagPropertiesWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1");
+
+    TableFormat.output(mockTag1.properties(), mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----+-------+\n"
+            + "| Key | Value |\n"
+            + "+-----+-------+\n"
+            + "| k1  | v1    |\n"
+            + "| k2  | v2    |\n"
+            + "+-----+-------+",
+        output);
+  }
+
+  @Test
+  void testListTagPropertiesWithTableFormatWithEmptyMap() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1", Collections.emptyMap());
+
+    TableFormat.output(mockTag1.properties(), mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----+-------+\n"
+            + "| Key | Value |\n"
+            + "+-----+-------+\n"
+            + "| N/A | N/A   |\n"
+            + "+-----+-------+",
+        output);
+  }
+
+  @Test
   void testOutputWithUnsupportType() {
     CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
@@ -802,5 +896,18 @@ public class TestTableFormat {
     when(mockGroup.roles()).thenReturn(roles);
 
     return mockGroup;
+  }
+
+  private Tag getMockTag(String name, String comment) {
+    return getMockTag(name, comment, ImmutableMap.of("k1", "v1", "k2", "v2"));
+  }
+
+  private Tag getMockTag(String name, String comment, Map<String, String> properties) {
+    Tag mockTag = mock(Tag.class);
+    when(mockTag.name()).thenReturn(name);
+    when(mockTag.comment()).thenReturn(comment);
+    when(mockTag.properties()).thenReturn(properties);
+
+    return mockTag;
   }
 }
