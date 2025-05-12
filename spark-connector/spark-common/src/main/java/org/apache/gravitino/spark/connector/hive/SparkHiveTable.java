@@ -113,6 +113,22 @@ public class SparkHiveTable extends HiveTable implements SupportsPartitionManage
   }
 
   @Override
+  public boolean partitionExists(InternalRow ident) {
+    String[] partitionNames = partitionSchema().names();
+    if (ident.numFields() == partitionNames.length) {
+      return hiveGravitinoOperationOperator.partitionExists(
+          partitionNames, ident, partitionSchema());
+    } else {
+      throw new IllegalArgumentException(
+          "The number of fields ("
+              + ident.numFields()
+              + ") in the partition identifier is not equal to the partition schema length ("
+              + partitionNames.length
+              + "). The identifier might not refer to one partition.");
+    }
+  }
+
+  @Override
   public Object productElement(int n) {
     if (n == 0) {
       return gravitinoTableInfoHelper;

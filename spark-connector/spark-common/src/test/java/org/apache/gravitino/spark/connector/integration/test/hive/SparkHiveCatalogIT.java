@@ -162,6 +162,18 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(2, partitionInfo.size());
     Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
     Assertions.assertEquals("age_p1=22/age_p2=twenty two", partitionInfo.get(1)[0]);
+
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=21)");
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> {
+              sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
+            });
+    Assertions.assertTrue(exception.getMessage().contains("Partition already exists"));
   }
 
   @ParameterizedTest
