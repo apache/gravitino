@@ -84,16 +84,16 @@ public interface ModelVersionChange {
    * Create a ModelVersionChange for updating the aliases of a model version.
    *
    * @param aliasesToAdd The new aliases to be added for the model version.
-   * @param aliasesToDelete The aliases to be removed from the model version.
+   * @param aliasesToRemove The aliases to be removed from the model version.
    * @return A new ModelVersionChange instance for updating the aliases of a model version.
    */
-  static ModelVersionChange updateAliases(String[] aliasesToAdd, String[] aliasesToDelete) {
+  static ModelVersionChange updateAliases(String[] aliasesToAdd, String[] aliasesToRemove) {
     String[] toAdd = aliasesToAdd == null ? new String[0] : aliasesToAdd;
-    String[] toDelete = aliasesToDelete == null ? new String[0] : aliasesToDelete;
+    String[] toRemove = aliasesToRemove == null ? new String[0] : aliasesToRemove;
 
     return new UpdateAliases(
         Arrays.stream(toAdd).collect(Collectors.toList()),
-        Arrays.stream(toDelete).collect(Collectors.toList()));
+        Arrays.stream(toRemove).collect(Collectors.toList()));
   }
 
   /** A ModelVersionChange to update the model version comment. */
@@ -361,20 +361,20 @@ public interface ModelVersionChange {
    */
   final class UpdateAliases implements ModelVersionChange {
     private final ImmutableSortedSet<String> aliasesToAdd;
-    private final ImmutableSortedSet<String> aliasesToDelete;
+    private final ImmutableSortedSet<String> aliasesToRemove;
 
     /**
      * Constructs a new aliases-update operation, specifying the aliases to add and remove.
      *
      * @param aliasesToAdd the aliases to add, or null for none
-     * @param aliasesToDelete the aliases to remove, or null for none
+     * @param aliasesToRemove the aliases to remove, or null for none
      */
-    public UpdateAliases(List<String> aliasesToAdd, List<String> aliasesToDelete) {
+    public UpdateAliases(List<String> aliasesToAdd, List<String> aliasesToRemove) {
       this.aliasesToAdd =
           ImmutableSortedSet.copyOf(aliasesToAdd != null ? aliasesToAdd : Lists.newArrayList());
-      this.aliasesToDelete =
+      this.aliasesToRemove =
           ImmutableSortedSet.copyOf(
-              aliasesToDelete != null ? aliasesToDelete : Lists.newArrayList());
+              aliasesToRemove != null ? aliasesToRemove : Lists.newArrayList());
     }
 
     /**
@@ -391,8 +391,8 @@ public interface ModelVersionChange {
      *
      * @return an immutable, sorted set of aliases to remove
      */
-    public Set<String> aliasesToDelete() {
-      return aliasesToDelete;
+    public Set<String> aliasesToRemove() {
+      return aliasesToRemove;
     }
 
     /**
@@ -408,7 +408,7 @@ public interface ModelVersionChange {
       if (this == o) return true;
       if (!(o instanceof UpdateAliases)) return false;
       UpdateAliases that = (UpdateAliases) o;
-      return aliasesToAdd.equals(that.aliasesToAdd) && aliasesToDelete.equals(that.aliasesToDelete);
+      return aliasesToAdd.equals(that.aliasesToAdd) && aliasesToRemove.equals(that.aliasesToRemove);
     }
 
     /**
@@ -419,7 +419,7 @@ public interface ModelVersionChange {
      */
     @Override
     public int hashCode() {
-      return Objects.hash(aliasesToAdd, aliasesToDelete);
+      return Objects.hash(aliasesToAdd, aliasesToRemove);
     }
 
     /**
@@ -435,8 +435,8 @@ public interface ModelVersionChange {
           + COMMA_JOINER.join(aliasesToAdd)
           + ")"
           + " "
-          + "AliasToDelete: ("
-          + COMMA_JOINER.join(aliasesToDelete)
+          + "AliasToRemove: ("
+          + COMMA_JOINER.join(aliasesToRemove)
           + ")";
     }
   }
