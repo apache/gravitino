@@ -44,6 +44,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
@@ -55,6 +56,7 @@ import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.tag.Tag;
 
 /**
  * Abstract base class for formatting entity information into ASCII-art tables. Provides
@@ -106,8 +108,15 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new AuditTableFormat(context).output((Audit) entity);
     } else if (entity instanceof org.apache.gravitino.rel.Column[]) {
       new ColumnListTableFormat(context).output((org.apache.gravitino.rel.Column[]) entity);
+    } else if (entity instanceof Tag) {
+      new TagDetailsTableFormat(context).output((Tag) entity);
+    } else if (entity instanceof Tag[]) {
+      new TagListTableFormat(context).output((Tag[]) entity);
+    } else if (entity instanceof Map) {
+      new PropertiesListTableFormat(context).output((Map<?, ?>) entity);
     } else {
-      throw new IllegalArgumentException("Unsupported object type");
+      throw new IllegalArgumentException(
+          "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
     }
   }
 
@@ -900,6 +909,90 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       Arrays.stream(groups).forEach(group -> name.addCell(group.name()));
 
       return getTableFormat(name);
+    }
+  }
+
+  /**
+   * Formats a single {@link org.apache.gravitino.tag.Tag} instance into a two-column table display.
+   * Displays tag details including name and comment information.
+   */
+  static final class TagDetailsTableFormat extends TableFormat<Tag> {
+    public TagDetailsTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Tag tag) {
+      Column columnName = new Column(context, "name");
+      Column columnComment = new Column(context, "comment");
+
+      columnName.addCell(tag.name());
+      columnComment.addCell(LineUtil.getComment(tag));
+
+      return getTableFormat(columnName, columnComment);
+    }
+  }
+
+  /** Formats an array of {@link org.apache.gravitino.tag.Tag} names into table display. */
+  static final class TagListTableFormat extends TableFormat<Tag[]> {
+
+    /**
+     * Creates a new {@link TableFormat} with the specified properties.
+     *
+     * @param context the command context.
+     */
+    public TagListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Tag[] tags) {
+      Column columnName = new Column(context, "name");
+
+      for (Tag t : tags) {
+        columnName.addCell(t.name());
+      }
+
+      return getTableFormat(columnName);
+    }
+  }
+
+  /**
+   * Formats a {@link java.util.Map} which key and value are {@link String} into table display.
+   * Lists all key, values in a vertical format.
+   */
+  static final class PropertiesListTableFormat extends TableFormat<Map<?, ?>> {
+
+    /**
+     * Creates a new {@link TableFormat} with the specified properties.
+     *
+     * @param context the command context.
+     */
+    public PropertiesListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Map<?, ?> properties) {
+      Column columnKey = new Column(context, "key");
+      Column columnValue = new Column(context, "value");
+
+      properties.forEach(
+          (key, value) -> {
+            columnKey.addCell(key.toString());
+            columnValue.addCell(value.toString());
+          });
+
+      // if we have empty property, add a placeholder to it.
+      if (properties.isEmpty()) {
+        columnKey.addCell(LineUtil.NULL_DEFAULT_VALUE);
+        columnValue.addCell(LineUtil.NULL_DEFAULT_VALUE);
+      }
+
+      return getTableFormat(columnKey, columnValue);
     }
   }
 }
