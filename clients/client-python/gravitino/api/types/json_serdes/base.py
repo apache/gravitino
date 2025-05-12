@@ -23,32 +23,31 @@ from dataclasses_json.core import Json
 from gravitino.api.types.types import Type
 
 GravitinoTypeT = TypeVar("GravitinoTypeT", bound=Type)
-DeserializedTypeT = TypeVar("DeserializedTypeT", bound=Json)
 
 
-class JsonSerializable(ABC, Generic[GravitinoTypeT, DeserializedTypeT]):
+class JsonSerializable(ABC, Generic[GravitinoTypeT]):
     """Customized generic Serializer for DataClassJson."""
 
     @classmethod
     @abstractmethod
-    def serialize(cls, data_type: GravitinoTypeT) -> DeserializedTypeT:
+    def serialize(cls, data_type: GravitinoTypeT) -> Json:
         """To serialize the given `data`.
 
         Args:
             data (GravitinoTypeT): The data to be serialized.
 
         Returns:
-            DeserializedTypeT: The serialized data.
+            Json: The serialized data.
         """
         pass
 
     @classmethod
     @abstractmethod
-    def deserialize(cls, data: DeserializedTypeT) -> GravitinoTypeT:
+    def deserialize(cls, data: Json) -> GravitinoTypeT:
         """To deserialize the given `data`.
 
         Args:
-            data (DeserializedTypeT): The data to be deserialized.
+            data (Json): The data to be deserialized.
 
         Returns:
             GravitinoTypeT: The deserialized data.
