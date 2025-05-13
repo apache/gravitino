@@ -299,10 +299,10 @@ public class CaffeineMetaCache extends BaseMetaCache {
    * Removes the metadata from the cache. This method will also remove all metadata with the same
    * prefix.
    *
-   * @param rootMetadata The root metadata to remove.
+   * @param entity The metadata to remove.
    */
-  private void removeByMetadata(Entity rootMetadata) {
-    NameIdentifier prefix = CacheUtils.getIdentFromMetadata(rootMetadata);
+  private void removeByMetadata(Entity entity) {
+    NameIdentifier parentIdent = CacheUtils.getIdentFromMetadata(entity);
 
     withLock(
         () -> {
@@ -310,7 +310,8 @@ public class CaffeineMetaCache extends BaseMetaCache {
           List<MetaCacheKey> toRemovedId = Lists.newArrayList();
           List<String> toRemovedIdent = Lists.newArrayList();
 
-          for (MetaCacheKey idKey : cacheIndex.getValuesForKeysStartingWith(prefix.toString())) {
+          for (MetaCacheKey idKey :
+              cacheIndex.getValuesForKeysStartingWith(parentIdent.toString())) {
             Entity entityToRemove = cacheData.getIfPresent(idKey);
             toRemovedId.add(idKey);
 
