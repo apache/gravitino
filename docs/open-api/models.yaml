@@ -176,36 +176,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-
-    put:
-      tags:
-        - model
-      summary: Update model version
-      operationId: updateModelVersions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
-      responses:
-        "200":
-          $ref: "#/components/responses/ModelVersionResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The target model or model version does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchModelException:
-                  $ref: "#/components/examples/NoSuchModelException"
-                NoSuchModelVersionException:
-                  $ref: "#/components/examples/NoSuchModelVersionException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
     post:
       tags:
         - model
@@ -284,6 +254,35 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    put:
+      tags:
+        - model
+      summary: Update model version
+      operationId: updateModelVersions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model or model version does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -322,6 +321,35 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - model
+      summary: Update model version by alias
+      operationId: updateModelVersionsByAlias
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model or model version does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
