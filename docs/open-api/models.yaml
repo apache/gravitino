@@ -300,7 +300,7 @@ paths:
         "200":
           $ref: "#/components/responses/ModelVersionResponse"
         "404":
-          description: Not Found - The target model version does not exist
+          description: Not Found - The target model version does not exist.
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -340,7 +340,7 @@ paths:
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
-          description: Not Found - The target model or model version does not exist
+          description: Not Found - The target model or model version does not exist.
           content:
             application/vnd.gravitino.v1+json:
               schema:
