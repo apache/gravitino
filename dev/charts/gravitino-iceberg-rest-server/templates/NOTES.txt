@@ -1,0 +1,38 @@
+{{- /*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  */}}
+
+🚀 Gravitino Iceberg REST Server has been successfully deployed!
+
+1. Check Pod status:
+   kubectl get pods -n {{ include "gravitino-iceberg-rest-server.namespace" . }} \
+     -l app={{ include "gravitino-iceberg-rest-server.name" . }}
+
+2. View service:
+   kubectl get svc -n {{ include "gravitino-iceberg-rest-server.namespace" . }} \
+     -l app={{ include "gravitino-iceberg-rest-server.name" . }}
+
+3. View config:
+   kubectl get cm {{ include "gravitino-iceberg-rest-server.fullname" . }} -n \
+     {{ include "gravitino-iceberg-rest-server.namespace" . }} -o json | jq -r '.data["gravitino-iceberg-rest-server.conf"]'
+
+4. Access service:
+   kubectl port-forward -n {{ include "gravitino-iceberg-rest-server.namespace" . }} \
+     svc/{{ include "gravitino-iceberg-rest-server.name" . }} \
+     {{ .Values.service.port }}:{{ .Values.service.port }}
+   Then visit: http://localhost:{{ .Values.service.port }}{{ .Values.livenessProbe.httpGet.path }}
