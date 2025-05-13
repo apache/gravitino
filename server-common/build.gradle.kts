@@ -39,8 +39,8 @@ dependencies {
   implementation(libs.bundles.metrics)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.prometheus.servlet)
   implementation(libs.jcasbin)
+  implementation(libs.prometheus.servlet)
 
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
