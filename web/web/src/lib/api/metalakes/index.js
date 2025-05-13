@@ -24,50 +24,50 @@ const Apis = {
   CREATE: '/api/metalakes',
   DELETE: '/api/metalakes',
   UPDATE: '/api/metalakes',
-  UPDATEINUSE: '/api/metalakes',
+  UPDATEINUSE: '/api/metalakes'
 }
 
 export const getMetalakesApi = () => {
   return defHttp.get({
-    url: `${Apis.GET}`,
+    url: `${Apis.GET}`
   })
 }
 
 export const getMetalakeDetailsApi = name => {
   return defHttp.get({
-    url: `${Apis.GET}/${name}`,
+    url: `${Apis.GET}/${name}`
   })
 }
 
 export const createMetalakeApi = data => {
   return defHttp.post({
     url: `${Apis.CREATE}`,
-    data,
+    data
   })
 }
 
 export const deleteMetalakeApi = name => {
   return defHttp.delete({
-    url: `${Apis.DELETE}/${name}`,
+    url: `${Apis.DELETE}/${name}`
   })
 }
 
 export const updateMetalakeApi = ({ name, data }) => {
   return defHttp.put({
     url: `${Apis.UPDATE}/${name}`,
-    data,
+    data
   })
 }
 
 export const getMetalakeDataApi = url => {
   return defHttp.get({
-    url: `/api${url}`,
+    url: `/api${url}`
   })
 }
 
 export const switchInUseApi = ({ name, isInUse }) => {
   return defHttp.patch({
     url: `${Apis.UPDATEINUSE}/${name}`,
-    data: { inUse: isInUse },
+    data: { inUse: isInUse }
   })
 }

@@ -36,7 +36,7 @@ import {
   MenuItem,
   InputLabel,
   FormControl,
-  FormHelperText,
+  FormHelperText
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -59,7 +59,7 @@ const defaultValues = {
   type: 'relational',
   provider: '',
   comment: '',
-  propItems: [],
+  propItems: []
 }
 
 const schema = yup.object().shape({
@@ -83,10 +83,10 @@ const schema = yup.object().shape({
       key: yup.string().required(),
       value: yup.string().when('required', {
         is: true,
-        then: schema => schema.required(),
-      }),
+        then: schema => schema.required()
+      })
     })
-  ),
+  )
 })
 
 const Transition = forwardRef(function Transition(props, ref) {
@@ -114,11 +114,11 @@ const CreateCatalogDialog = props => {
     getValues,
     handleSubmit,
     trigger,
-    formState: { errors },
+    formState: { errors }
   } = useForm({
     defaultValues,
     mode: 'all',
-    resolver: yupResolver(schema),
+    resolver: yupResolver(schema)
   })
 
   const providerSelect = watch('provider')
@@ -282,24 +282,24 @@ const CreateCatalogDialog = props => {
           properties = {
             'catalog-backend': catalogBackend,
             uri: uri,
-            ...others,
+            ...others
           }
         } else if (catalogBackend && catalogBackend === 'filesystem' && providerSelect === 'lakehouse-paimon') {
           properties = {
             'catalog-backend': catalogBackend,
-            ...others,
+            ...others
           }
           uri && (properties['uri'] = uri)
         } else if (catalogBackend && catalogBackend === 'rest' && providerSelect === 'lakehouse-iceberg') {
           properties = {
             'catalog-backend': catalogBackend,
             uri: uri,
-            ...others,
+            ...others
           }
         } else {
           properties = {
             uri: uri,
-            ...others,
+            ...others
           }
           catalogBackend && (properties['catalog-backend'] = catalogBackend)
           jdbcDriver && (properties['jdbc-driver'] = jdbcDriver)
@@ -312,7 +312,7 @@ const CreateCatalogDialog = props => {
 
         const catalogData = {
           ...mainData,
-          properties,
+          properties
         }
 
         if (type === 'create') {
@@ -426,7 +426,7 @@ const CreateCatalogDialog = props => {
       propsItems = propsItems.map((it, idx) => {
         let propItem = {
           ...it,
-          disabled: it.key === 'catalog-backend' && type === 'update',
+          disabled: it.key === 'catalog-backend' && type === 'update'
         }
 
         const findProp = Object.keys(properties).find(i => i === it.key)
@@ -444,7 +444,7 @@ const CreateCatalogDialog = props => {
         if (findPropIndex === -1) {
           let propItem = {
             key: item,
-            value: properties[item],
+            value: properties[item]
           }
           propsItems.push(propItem)
         }
@@ -463,7 +463,7 @@ const CreateCatalogDialog = props => {
             position: 'relative',
             pb: theme => `${theme.spacing(8)} !important`,
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`],
+            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
           <IconButton
@@ -669,7 +669,7 @@ const CreateCatalogDialog = props => {
                           <FormHelperText
                             sx={{
                               color: item.required && item.value === '' ? 'error.main' : 'text.main',
-                              maxWidth: 'calc(100% - 40px)',
+                              maxWidth: 'calc(100% - 40px)'
                             }}
                           >
                             {item.description}
@@ -711,7 +711,7 @@ const CreateCatalogDialog = props => {
           sx={{
             justifyContent: 'center',
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`],
+            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
           <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-catalog'>

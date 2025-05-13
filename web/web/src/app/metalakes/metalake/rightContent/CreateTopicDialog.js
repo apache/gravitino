@@ -34,7 +34,7 @@ import {
   IconButton,
   InputLabel,
   TextField,
-  Typography,
+  Typography
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -55,7 +55,7 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 const defaultValues = {
   name: '',
   comment: '',
-  propItems: [],
+  propItems: []
 }
 
 const schema = yup.object().shape({
@@ -66,10 +66,10 @@ const schema = yup.object().shape({
       key: yup.string().required(),
       value: yup.string().when('required', {
         is: true,
-        then: schema => schema.required(),
-      }),
+        then: schema => schema.required()
+      })
     })
-  ),
+  )
 })
 
 const Transition = forwardRef(function Transition(props, ref) {
@@ -96,11 +96,11 @@ const CreateTopicDialog = props => {
     getValues,
     handleSubmit,
     trigger,
-    formState: { errors },
+    formState: { errors }
   } = useForm({
     defaultValues,
     mode: 'all',
-    resolver: yupResolver(schema),
+    resolver: yupResolver(schema)
   })
 
   const handleFormChange = ({ index, event }) => {
@@ -180,7 +180,7 @@ const CreateTopicDialog = props => {
         const schemaData = {
           name: data.name,
           comment: data.comment,
-          properties,
+          properties
         }
 
         if (type === 'create') {
@@ -202,7 +202,7 @@ const CreateTopicDialog = props => {
                 type: catalogType,
                 schema: schemaName,
                 topic: cacheData.name,
-                data: reqData,
+                data: reqData
               })
             ).then(res => {
               if (!res.payload?.err) {
@@ -232,7 +232,7 @@ const CreateTopicDialog = props => {
       const propsItems = Object.entries(properties).map(([key, value]) => {
         return {
           key,
-          value,
+          value
         }
       })
 
@@ -249,7 +249,7 @@ const CreateTopicDialog = props => {
             position: 'relative',
             pb: theme => `${theme.spacing(8)} !important`,
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`],
+            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
           <IconButton
@@ -364,7 +364,7 @@ const CreateTopicDialog = props => {
                         <FormHelperText
                           sx={{
                             color: item.required && item.value === '' ? 'error.main' : 'text.main',
-                            maxWidth: 'calc(100% - 40px)',
+                            maxWidth: 'calc(100% - 40px)'
                           }}
                         >
                           {item.description}
@@ -405,7 +405,7 @@ const CreateTopicDialog = props => {
           sx={{
             justifyContent: 'center',
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`],
+            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
           <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-topic'>

@@ -38,7 +38,7 @@ import {
   FormControl,
   FormHelperText,
   Tooltip,
-  Switch,
+  Switch
 } from '@mui/material'
 
 import Icon from '@/components/Icon'
@@ -60,7 +60,7 @@ const defaultValues = {
   type: 'managed',
   storageLocations: [{ name: '', location: '', defaultLocation: true }],
   comment: '',
-  propItems: [],
+  propItems: []
 }
 
 const schema = yup.object().shape({
@@ -73,13 +73,13 @@ const schema = yup.object().shape({
         name: yup.string().when('type', {
           is: 'external',
           then: schema => schema.required(),
-          otherwise: schema => schema,
+          otherwise: schema => schema
         }),
         location: yup.string().when('name', {
           is: name => !!name,
           then: schema => schema.required(),
-          otherwise: schema => schema,
-        }),
+          otherwise: schema => schema
+        })
       })
     )
     .test('unique', 'Location name must be unique', (storageLocations, ctx) => {
@@ -91,7 +91,7 @@ const schema = yup.object().shape({
 
         return ctx.createError({
           path: `storageLocations.${duplicateIndex}.name`,
-          message: 'This storage location name is duplicated',
+          message: 'This storage location name is duplicated'
         })
       }
 
@@ -103,10 +103,10 @@ const schema = yup.object().shape({
       key: yup.string().required(),
       value: yup.string().when('required', {
         is: true,
-        then: schema => schema.required(),
-      }),
+        then: schema => schema.required()
+      })
     })
-  ),
+  )
 })
 
 const Transition = forwardRef(function Transition(props, ref) {
@@ -132,11 +132,11 @@ const CreateFilesetDialog = props => {
     getValues,
     handleSubmit,
     trigger,
-    formState: { errors },
+    formState: { errors }
   } = useForm({
     defaultValues,
     mode: 'all',
-    resolver: yupResolver(schema),
+    resolver: yupResolver(schema)
   })
 
   const defaultLocationProps = watch('propItems').filter(item => item.key === 'default-location-name')[0]
@@ -187,7 +187,7 @@ const CreateFilesetDialog = props => {
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: 'storageLocations',
+    name: 'storageLocations'
   })
 
   const onChangeDefaultLocation = ({ index, event }) => {
@@ -244,7 +244,7 @@ const CreateFilesetDialog = props => {
             return acc
           }, {}),
           comment: data.comment,
-          properties,
+          properties
         }
 
         if (type === 'create') {
@@ -266,7 +266,7 @@ const CreateFilesetDialog = props => {
                 type: catalogType,
                 schema: schemaName,
                 fileset: cacheData.name,
-                data: reqData,
+                data: reqData
               })
             ).then(res => {
               if (!res.payload?.err) {
@@ -298,14 +298,14 @@ const CreateFilesetDialog = props => {
         return {
           name: key,
           location: value,
-          defaultLocation: properties['default-location-name'] === key,
+          defaultLocation: properties['default-location-name'] === key
         }
       })
 
       const propsItems = Object.entries(properties).map(([key, value]) => {
         return {
           key,
-          value,
+          value
         }
       })
 
@@ -323,7 +323,7 @@ const CreateFilesetDialog = props => {
             position: 'relative',
             pb: theme => `${theme.spacing(8)} !important`,
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`],
+            pt: theme => [`${theme.spacing(8)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
           <IconButton
@@ -602,7 +602,7 @@ const CreateFilesetDialog = props => {
                         <FormHelperText
                           sx={{
                             color: item.required && item.value === '' ? 'error.main' : 'text.main',
-                            maxWidth: 'calc(100% - 40px)',
+                            maxWidth: 'calc(100% - 40px)'
                           }}
                         >
                           {item.description}
@@ -643,7 +643,7 @@ const CreateFilesetDialog = props => {
           sx={{
             justifyContent: 'center',
             px: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(15)} !important`],
-            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`],
+            pb: theme => [`${theme.spacing(5)} !important`, `${theme.spacing(12.5)} !important`]
           }}
         >
           <Button variant='contained' sx={{ mr: 1 }} type='submit' data-refer='handle-submit-fileset'>

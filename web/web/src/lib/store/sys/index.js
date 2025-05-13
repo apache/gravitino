@@ -55,7 +55,7 @@ export const fetchGitHubInfo = createAsyncThunk('sys/fetchGitHubInfo', async (pa
 
   return {
     stars: stars,
-    forks: forks,
+    forks: forks
   }
 })
 
@@ -64,7 +64,7 @@ export const sysSlice = createSlice({
   initialState: {
     version: '',
     stars: 0,
-    forks: 0,
+    forks: 0
   },
   reducers: {
     setVersion(state, action) {
@@ -75,7 +75,7 @@ export const sysSlice = createSlice({
     },
     setForks(state, action) {
       state.forks = action.payload
-    },
+    }
   },
   extraReducers: builder => {
     builder
@@ -86,7 +86,7 @@ export const sysSlice = createSlice({
         state.stars = action.payload.stars
         state.forks = action.payload.forks
       })
-  },
+  }
 })
 
 export const { setVersion, setStars, setForks } = sysSlice.actions

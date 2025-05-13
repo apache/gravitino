@@ -33,18 +33,18 @@ const Apis = {
   UPDATE: ({ metalake, catalog, schema, fileset }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/filesets/${encodeURIComponent(fileset)}`,
   DELETE: ({ metalake, catalog, schema, fileset }) =>
-    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/filesets/${encodeURIComponent(fileset)}`,
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(catalog)}/schemas/${encodeURIComponent(schema)}/filesets/${encodeURIComponent(fileset)}`
 }
 
 export const getFilesetsApi = params => {
   return defHttp.get({
-    url: `${Apis.GET(params)}`,
+    url: `${Apis.GET(params)}`
   })
 }
 
 export const getFilesetDetailsApi = ({ metalake, catalog, schema, fileset }) => {
   return defHttp.get({
-    url: `${Apis.GET_DETAIL({ metalake, catalog, schema, fileset })}`,
+    url: `${Apis.GET_DETAIL({ metalake, catalog, schema, fileset })}`
   })
 }
 

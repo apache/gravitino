@@ -41,7 +41,7 @@ import {
   getTopicDetails,
   getModelDetails,
   fetchModelVersions,
-  getVersionDetails,
+  getVersionDetails
 } from '@/lib/store/metalakes'
 
 import { extractPlaceholder } from '@/lib/utils'
@@ -309,7 +309,7 @@ const MetalakeTree = props => {
             whiteSpace: 'nowrap',
             maxWidth,
             overflow: 'hidden',
-            textOverflow: 'ellipsis',
+            textOverflow: 'ellipsis'
           }}
           data-refer='tree-node'
           data-refer-node={nodeData.key}
@@ -346,8 +346,8 @@ const MetalakeTree = props => {
           ref={treeRef}
           rootStyle={{
             '& .antTreeTitle': {
-              width: '100%',
-            },
+              width: '100%'
+            }
           }}
           treeData={store.metalakeTree}
           loadData={onLoadData}
@@ -375,7 +375,7 @@ const MetalakeTree = props => {
 
             '[&_.ant-tree-node-content-wrapper]:twc-inline-flex',
             '[&_.ant-tree-node-content-wrapper]:twc-items-center',
-            '[&_.ant-tree-node-content-wrapper]:twc-leading-[28px]',
+            '[&_.ant-tree-node-content-wrapper]:twc-leading-[28px]'
           ])}
           data-refer='tree-view'
           icon={nodeProps => renderIcon(nodeProps)}

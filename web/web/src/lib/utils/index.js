@@ -97,7 +97,7 @@ export const genUpdates = (originalData, newData) => {
         fieldName: [newColumn.name],
         type: newColumn.type,
         nullable: newColumn.nullable,
-        comment: newColumn.comment,
+        comment: newColumn.comment
       })
     }
   }
@@ -110,28 +110,28 @@ export const genUpdates = (originalData, newData) => {
         updates.push({
           '@type': 'renameColumn',
           oldFieldName: [originalColumnsMap[key].name],
-          newFieldName: newColumnsMap[key].name,
+          newFieldName: newColumnsMap[key].name
         })
       }
       if ((originalColumnsMap[key].type + originalColumnsMap[key].typeSuffix || '') !== newColumnsMap[key].type) {
         updates.push({
           '@type': 'updateColumnType',
           fieldName: [newColumnsMap[key].name],
-          newType: newColumnsMap[key].type,
+          newType: newColumnsMap[key].type
         })
       }
       if (originalColumnsMap[key].nullable !== newColumnsMap[key].nullable) {
         updates.push({
           '@type': 'updateColumnNullability',
           fieldName: [newColumnsMap[key].name],
-          nullable: newColumnsMap[key].nullable,
+          nullable: newColumnsMap[key].nullable
         })
       }
       if (originalColumnsMap[key].comment !== newColumnsMap[key].comment) {
         updates.push({
           '@type': 'updateColumnComment',
           fieldName: [newColumnsMap[key].name],
-          newComment: newColumnsMap[key].comment,
+          newComment: newColumnsMap[key].comment
         })
       }
     }
@@ -207,14 +207,14 @@ export const updateTreeData = (list = [], key, children = []) => {
       return {
         ...node,
         isLeaf: children?.length === 0,
-        children,
+        children
       }
     }
     if (node.children && node.children.length > 0) {
       return {
         ...node,
         isLeaf: node.children.length === 0,
-        children: updateTreeData(node.children, key, children),
+        children: updateTreeData(node.children, key, children)
       }
     }
 
