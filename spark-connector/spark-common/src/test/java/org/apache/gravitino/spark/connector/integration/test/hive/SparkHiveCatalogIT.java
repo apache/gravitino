@@ -167,6 +167,10 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(1, partitionInfo.size());
     Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
 
+    // test exactly match
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=2)");
+    Assertions.assertEquals(0, partitionInfo.size());
+
     Exception exception =
         Assertions.assertThrows(
             Exception.class,

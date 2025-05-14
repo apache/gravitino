@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.hive;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
@@ -115,17 +116,15 @@ public class SparkHiveTable extends HiveTable implements SupportsPartitionManage
   @Override
   public boolean partitionExists(InternalRow ident) {
     String[] partitionNames = partitionSchema().names();
-    if (ident.numFields() == partitionNames.length) {
-      return hiveGravitinoOperationOperator.partitionExists(
-          partitionNames, ident, partitionSchema());
-    } else {
-      throw new IllegalArgumentException(
-          "The number of fields ("
-              + ident.numFields()
-              + ") in the partition identifier is not equal to the partition schema length ("
-              + partitionNames.length
-              + "). The identifier might not refer to one partition.");
-    }
+    Preconditions.checkArgument(
+        ident.numFields() == partitionNames.length,
+        String.format(
+            "The number of fields (%d) in the partition identifier is not equal to "
+                + "the partition schema length (%d). "
+                + "The identifier might not refer to one partition.",
+            ident.numFields(), partitionNames.length));
+
+    return hiveGravitinoOperationOperator.partitionExists(partitionNames, ident, partitionSchema());
   }
 
   @Override

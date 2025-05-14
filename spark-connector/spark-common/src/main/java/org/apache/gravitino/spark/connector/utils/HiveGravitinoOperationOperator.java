@@ -83,11 +83,52 @@ public class HiveGravitinoOperationOperator {
     String[] allPartitions = gravitinoTable.supportPartitions().listPartitionNames();
 
     boolean isNeedAll = names != null && names.length == 0 ? true : false;
-    String partitionName = getHivePartitionName(names, ident, partitionSchema);
+
+    String[] partitionNames =
+        getHivePartitionName(names, ident, partitionSchema).split(PARTITION_NAME_DELIMITER);
+    String[] partitionNamesWithDelimiter =
+        Arrays.stream(partitionNames)
+            .map(name -> name + PARTITION_NAME_DELIMITER)
+            .toArray(String[]::new);
+
     return Arrays.stream(allPartitions)
-        .filter(e -> isNeedAll ? true : e.contains(partitionName))
+        .map(e -> e + PARTITION_NAME_DELIMITER)
+        .filter(
+            e -> {
+              if (isNeedAll) {
+                return true;
+              }
+              for (String name : partitionNamesWithDelimiter) {
+                // exactly match
+                if (!e.contains(name)) {
+                  return false;
+                }
+              }
+              return true;
+            })
+        .map(e -> e.substring(0, e.length() - 1))
         .map(e -> toSparkPartition(e, partitionSchema))
         .toArray(GenericInternalRow[]::new);
+  }
+
+  public Map<String, String> loadPartitionMetadata(InternalRow ident, StructType partitionSchema) {
+    String partitionName = getHivePartitionName(ident, partitionSchema);
+    Partition partition = gravitinoTable.supportPartitions().getPartition(partitionName);
+    return partition == null ? Collections.emptyMap() : partition.properties();
+  }
+
+  public boolean partitionExists(String[] names, InternalRow ident, StructType partitionSchema) {
+    // Get all partitions
+    if (names != null && names.length == 0) {
+      return gravitinoTable.supportPartitions().listPartitionNames().length > 0;
+    }
+
+    String partitionName = getHivePartitionName(names, ident, partitionSchema);
+    try {
+      return gravitinoTable.supportPartitions().partitionExists(partitionName);
+    } catch (NoSuchPartitionException noSuchPartitionException) {
+      return false;
+    }
   }
 
   private InternalRow toSparkPartition(String partitionName, StructType partitionSchema) {
@@ -133,25 +174,5 @@ public class HiveGravitinoOperationOperator {
       }
     }
     return partitionName.toString();
-  }
-
-  public Map<String, String> loadPartitionMetadata(InternalRow ident, StructType partitionSchema) {
-    String partitionName = getHivePartitionName(ident, partitionSchema);
-    Partition partition = gravitinoTable.supportPartitions().getPartition(partitionName);
-    return partition == null ? Collections.emptyMap() : partition.properties();
-  }
-
-  public boolean partitionExists(String[] names, InternalRow ident, StructType partitionSchema) {
-    // Get all partitions
-    if (names != null && names.length == 0) {
-      return gravitinoTable.supportPartitions().listPartitionNames().length > 0;
-    }
-
-    String partitionName = getHivePartitionName(names, ident, partitionSchema);
-    try {
-      return gravitinoTable.supportPartitions().partitionExists(partitionName);
-    } catch (NoSuchPartitionException noSuchPartitionException) {
-      return false;
-    }
   }
 }
