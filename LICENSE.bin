@@ -258,7 +258,6 @@
    Airlift
    The Netty Project
    Open Telemetry
-   Open Lineage
    Trino
    Jakarta Dependency Injection
    Jakarta Bean Validation
@@ -376,9 +375,7 @@
    Rome
    Jettison
    Awaitility
-   npgall concurrent-trees
    Ognl
-   Jcasbin
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1

@@ -46,6 +46,7 @@ dependencies {
   implementation(libs.jcasbin)
   implementation(libs.ognl)
   implementation(libs.prometheus.servlet)
+  implementation(libs.ognl)
 
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
