@@ -35,6 +35,10 @@ mkdir -p "${gravitino_dir}/packages"
 
 cp -r "${gravitino_home}/distribution/package" "${gravitino_dir}/packages/gravitino"
 
+mkdir -p "${gravitino_dir}/packages/gravitino/bin"
+cp "${gravitino_dir}/rewrite_config.py" "${gravitino_dir}/packages/gravitino/bin/"
+cp "${gravitino_dir}/start-gravitino.sh" "${gravitino_dir}/packages/gravitino/bin/"
+
 # Copy the Aliyun, AWS, GCP and Azure bundles to the Hadoop catalog libs
 cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/hadoop/libs"
 cp ${gravitino_home}/bundles/aws-bundle/build/libs/*.jar "${gravitino_dir}/packages/gravitino/catalogs/hadoop/libs"

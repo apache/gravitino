@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -16,16 +17,13 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM openjdk:17-jdk-buster
-LABEL maintainer="dev@gravitino.apache.org"
 
-WORKDIR /root/gravitino
+set -ex
+bin_dir="$(dirname "${BASH_SOURCE-$0}")"
+gravitino_dir="$(cd "${bin_dir}/../">/dev/null; pwd)"
 
-COPY packages/gravitino /root/gravitino
+cd ${gravitino_dir}
 
-EXPOSE 8090
-EXPOSE 9001
+python bin/rewrite_config.py
 
-RUN chmod +x /root/gravitino/bin/start-gravitino.sh
-
-ENTRYPOINT ["/bin/bash", "/root/gravitino/bin/start-gravitino.sh"]
+./bin/gravitino.sh start 
