@@ -44,6 +44,7 @@ dependencies {
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
   implementation(libs.prometheus.servlet)
+  implementation(libs.ognl)
 
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
