@@ -21,13 +21,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.Entity;
+import java.util.Objects;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
-import org.apache.gravitino.server.authorization.MockGravitinoAuthorizer;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
@@ -52,20 +56,21 @@ public class TestAuthorizationExpressionEvaluator {
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      Map<Entity.EntityType, NameIdentifier> metadataNames = new HashMap<>();
-      metadataNames.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("testMetalake"));
+      Map<MetadataObject.Type, NameIdentifier> metadataNames = new HashMap<>();
       metadataNames.put(
-          Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog("testMetalake", "testCatalog"));
+          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("testMetalake"));
       metadataNames.put(
-          Entity.EntityType.SCHEMA,
+          MetadataObject.Type.CATALOG, NameIdentifierUtil.ofCatalog("testMetalake", "testCatalog"));
+      metadataNames.put(
+          MetadataObject.Type.SCHEMA,
           NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema"));
       metadataNames.put(
-          Entity.EntityType.TABLE,
+          MetadataObject.Type.TABLE,
           NameIdentifierUtil.ofTable(
               "testMetalake", "testCatalog", "testSchema", "testTableHasNotPermission"));
       Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
       metadataNames.put(
-          Entity.EntityType.TABLE,
+          MetadataObject.Type.TABLE,
           NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "testSchema", "testTable"));
       Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
     }
@@ -85,16 +90,60 @@ public class TestAuthorizationExpressionEvaluator {
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      Map<Entity.EntityType, NameIdentifier> metadataNames = new HashMap<>();
+      Map<MetadataObject.Type, NameIdentifier> metadataNames = new HashMap<>();
       metadataNames.put(
-          Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOutOwner"));
+          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOutOwner"));
       metadataNames.put(
-          Entity.EntityType.CATALOG,
+          MetadataObject.Type.CATALOG,
           NameIdentifierUtil.ofCatalog("metalakeWithOwner", "testCatalog"));
       Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
       metadataNames.put(
-          Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOwner"));
+          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOwner"));
       Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
     }
+  }
+
+  private static class MockGravitinoAuthorizer implements GravitinoAuthorizer {
+
+    @Override
+    public void initialize() {}
+
+    @Override
+    public boolean authorize(
+        Principal principal,
+        String metalake,
+        MetadataObject metadataObject,
+        Privilege.Name privilege) {
+      if (!("tester".equals(principal.getName()) && "testMetalake".equals(metalake))) {
+        return false;
+      }
+      String name = metadataObject.name();
+      MetadataObject.Type type = metadataObject.type();
+      if (type == MetadataObject.Type.CATALOG
+          && "testCatalog".equals(name)
+          && privilege == Privilege.Name.USE_CATALOG) {
+        return true;
+      }
+      if (type == MetadataObject.Type.SCHEMA
+          && "testSchema".equals(name)
+          && privilege == Privilege.Name.USE_SCHEMA) {
+        return true;
+      }
+      return type == MetadataObject.Type.TABLE
+          && "testTable".equals(name)
+          && privilege == Privilege.Name.SELECT_TABLE;
+    }
+
+    @Override
+    public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+      if (!("tester".equals(principal.getName()) && "metalakeWithOwner".equals(metalake))) {
+        return false;
+      }
+      return Objects.equals(metadataObject.type(), MetadataObject.Type.METALAKE)
+          && Objects.equals("metalakeWithOwner", metadataObject.name());
+    }
+
+    @Override
+    public void close() throws IOException {}
   }
 }
