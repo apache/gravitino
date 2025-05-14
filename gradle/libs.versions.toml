@@ -280,7 +280,7 @@ google-auth-credentials = { group = "com.google.auth", name = "google-auth-libra
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
-jcasbin = {group='org.casbin',name='jcasbin',version.ref="jcasbin"}
+jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
