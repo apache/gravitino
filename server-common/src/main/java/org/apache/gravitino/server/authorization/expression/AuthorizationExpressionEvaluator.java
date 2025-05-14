@@ -22,7 +22,6 @@ import java.util.Map;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -62,7 +61,10 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put("authorizer", gravitinoAuthorizer);
     metadataNames.forEach(
         (metadataType, metadataName) -> {
-          MetadataObject metadataObject = buildMetadataObject(metadataType, metadataName);
+          if (metadataType == MetadataObject.Type.METALAKE) {
+            return;
+          }
+          MetadataObject metadataObject = MetadataObjects.of(metadataType, metadataName);
           ognlContext.put(metadataType.name(), metadataObject);
         });
     NameIdentifier nameIdentifier = metadataNames.get(MetadataObject.Type.METALAKE);
@@ -73,22 +75,5 @@ public class AuthorizationExpressionEvaluator {
     } catch (OgnlException e) {
       throw new RuntimeException("ognl evaluate error", e);
     }
-  }
-
-  /**
-   * Build the MetadataObject through metadataType and metadataName.
-   *
-   * @param metadataType metadata type
-   * @param metadataName metadata NameIdentifier
-   * @return MetadataObject
-   */
-  private MetadataObject buildMetadataObject(
-      MetadataObject.Type metadataType, NameIdentifier metadataName) {
-    String namespaceWithMetalake = metadataName.namespace().toString();
-    String metadataParent = StringUtils.substringAfter(namespaceWithMetalake, ".");
-    if ("".equals(metadataParent)) {
-      return MetadataObjects.of(null, metadataName.name(), metadataType);
-    }
-    return MetadataObjects.of(metadataParent, metadataName.name(), metadataType);
   }
 }

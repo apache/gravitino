@@ -39,6 +39,22 @@ public class MetadataObjects {
   private MetadataObjects() {}
 
   /**
+   * Build the MetadataObject through metadataType and metadataName.
+   *
+   * @param metadataType metadata type
+   * @param metadataName metadata NameIdentifier
+   * @return MetadataObject
+   */
+  public static MetadataObject of(MetadataObject.Type metadataType, NameIdentifier metadataName) {
+    String namespaceWithMetalake = metadataName.namespace().toString();
+    String metadataParent = StringUtils.substringAfter(namespaceWithMetalake, ".");
+    if ("".equals(metadataParent)) {
+      return MetadataObjects.of(null, metadataName.name(), metadataType);
+    }
+    return MetadataObjects.of(metadataParent, metadataName.name(), metadataType);
+  }
+
+  /**
    * Create the metadata object with the given name, parent and type.
    *
    * @param parent The parent of the metadata object
