@@ -44,11 +44,12 @@ dependencies {
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
   implementation(libs.prometheus.servlet)
+  implementation(libs.ognl)
 
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.commons.io)
   testImplementation(libs.minikdc) {
     exclude("org.apache.directory.api", "api-ldap-schema-data")
