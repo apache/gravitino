@@ -27,8 +27,13 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -46,52 +51,88 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
    * @throws IllegalArgumentException if the object type is not supported
    */
   public static void output(Object entity, CommandContext context) {
+
     if (entity instanceof Metalake) {
       new MetalakePlainFormat(context).output((Metalake) entity);
+
     } else if (entity instanceof Metalake[]) {
       new MetalakeListPlainFormat(context).output((Metalake[]) entity);
+
     } else if (entity instanceof Catalog) {
       new CatalogPlainFormat(context).output((Catalog) entity);
+
     } else if (entity instanceof Catalog[]) {
       new CatalogListPlainFormat(context).output((Catalog[]) entity);
+
     } else if (entity instanceof Schema) {
       new SchemaPlainFormat(context).output((Schema) entity);
+
     } else if (entity instanceof Schema[]) {
       new SchemaListPlainFormat(context).output((Schema[]) entity);
+
     } else if (entity instanceof Table) {
       new TablePlainFormat(context).output((Table) entity);
+
     } else if (entity instanceof Table[]) {
       new TableListPlainFormat(context).output((Table[]) entity);
+
     } else if (entity instanceof Model) {
       new ModelDetailPlainFormat(context).output((Model) entity);
+
     } else if (entity instanceof Model[]) {
       new ModelListPlainFormat(context).output((Model[]) entity);
+
     } else if (entity instanceof User) {
       new UserDetailsPlainFormat(context).output((User) entity);
+
     } else if (entity instanceof User[]) {
       new UserListPlainFormat(context).output((User[]) entity);
+
     } else if (entity instanceof Group) {
       new GroupDetailsPlainFormat(context).output((Group) entity);
+
     } else if (entity instanceof Group[]) {
       new GroupListPlainFormat(context).output((Group[]) entity);
+
     } else if (entity instanceof Audit) {
       new AuditPlainFormat(context).output((Audit) entity);
+
     } else if (entity instanceof Column[]) {
       new ColumnListPlainFormat(context).output((Column[]) entity);
+    } else if (entity instanceof Role) {
+      new RoleDetailsPlainFormat(context).output((Role) entity);
+
+    } else if (entity instanceof Role[]) {
+      new RoleListPlainFormat(context).output((Role[]) entity);
+
+    } else if (entity instanceof Fileset) {
+      new FilesetDetailsPlainFormat(context).output((Fileset) entity);
+
+    } else if (entity instanceof Fileset[]) {
+      new FilesetListPlainFormat(context).output((Fileset[]) entity);
+
+    } else if (entity instanceof Topic) {
+      new TopicDetailsPlainFormat(context).output((Topic) entity);
+
+    } else if (entity instanceof Topic[]) {
+      new TopicListPlainFormat(context).output((Topic[]) entity);
+
     } else if (entity instanceof Tag) {
       new TagDetailsPlainFormat(context).output((Tag) entity);
+
     } else if (entity instanceof Tag[]) {
       new TagListPlainFormat(context).output((Tag[]) entity);
+
     } else if (entity instanceof Map) {
       new PropertiesListPlainFormat(context).output((Map<?, ?>) entity);
+
     } else {
-      throw new IllegalArgumentException(
-          "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
+      throw new IllegalArgumentException("Unsupported object type");
     }
   }
 
   /**
-   * Creates a new {@link PlainFormat} with the specified output properties.
+   * Creates a new {@link PlainFormat} with the specified command context.
    *
    * @param context The command context.
    */
@@ -267,7 +308,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
   static final class ColumnListPlainFormat extends PlainFormat<Column[]> {
 
     /**
-     * Creates a new {@link ColumnListPlainFormat} with the specified output properties.
+     * Creates a new {@link ColumnListPlainFormat} with the specified command context.
      *
      * @param context The command context.
      */
@@ -483,6 +524,146 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
           });
 
       return data.toString();
+    }
+  }
+
+  /**
+   * Format a {@link Role} instance with their details. Output format: securable object details
+   * which belongs to the role,
+   */
+  static final class RoleDetailsPlainFormat extends PlainFormat<Role> {
+
+    /**
+     * Creates a new {@link PlainFormat} with the specified CommandContext.
+     *
+     * @param context The command context.
+     */
+    public RoleDetailsPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Role entity) {
+      List<SecurableObject> objects = entity.securableObjects();
+      StringBuilder sb = new StringBuilder();
+      for (SecurableObject object : objects) {
+        sb.append(object.name()).append(",").append(object.type()).append(",").append("\n");
+        sb.append(
+            String.join(
+                "\n",
+                object.privileges().stream().map(Privilege::simpleString).toArray(String[]::new)));
+        sb.append("\n");
+      }
+
+      return sb.toString();
+    }
+  }
+
+  /** Format an array of {@link Role} instances with their names. Output format: role name */
+  static final class RoleListPlainFormat extends PlainFormat<Role[]> {
+    /**
+     * Creates a new {@link PlainFormat} with the specified CommandContext.
+     *
+     * @param context The command context.
+     */
+    public RoleListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Role[] entity) {
+      List<String> roleList = Arrays.stream(entity).map(Role::name).collect(Collectors.toList());
+      return String.join(",", roleList);
+    }
+  }
+
+  /**
+   * Format a {@link Fileset} instance with their details. Output format: fileset name, type,
+   * comment and storage location
+   */
+  static final class FilesetDetailsPlainFormat extends PlainFormat<Fileset> {
+
+    /**
+     * Creates a new {@link PlainFormat} with the specified CommandContext.
+     *
+     * @param context The command context.
+     */
+    public FilesetDetailsPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    @Override
+    public String getOutput(Fileset entity) {
+      String filesetType = (entity.type() == Fileset.Type.MANAGED) ? "managed" : "external";
+      return entity.name()
+          + ","
+          + filesetType
+          + ","
+          + entity.comment()
+          + ","
+          + entity.storageLocation();
+    }
+  }
+
+  /** Format an array of {@link Fileset} instances with their names. Output format: fileset name */
+  static final class FilesetListPlainFormat extends PlainFormat<Fileset[]> {
+
+    /**
+     * Creates a new {@link PlainFormat} with the specified CommandContext.
+     *
+     * @param context The command context.
+     */
+    public FilesetListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Fileset[] entity) {
+      List<String> filesetList =
+          Arrays.stream(entity).map(Fileset::name).collect(Collectors.toList());
+      return String.join(",", filesetList);
+    }
+  }
+
+  /** Format a {@link Topic} instance with their details. Output format: topic name, comment */
+  static final class TopicDetailsPlainFormat extends PlainFormat<Topic> {
+
+    /**
+     * Creates a new {@link PlainFormat} with the specified CommandContext.
+     *
+     * @param context The command context.
+     */
+    public TopicDetailsPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Topic entity) {
+      return entity.name() + "," + entity.comment();
+    }
+  }
+
+  /** Format an array of {@link Topic} instances with their names. Output format: topic name */
+  static final class TopicListPlainFormat extends PlainFormat<Topic[]> {
+
+    /**
+     * Creates a new {@link PlainFormat} with the specified CommandContext.
+     *
+     * @param context The command context.
+     */
+    public TopicListPlainFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Topic[] entity) {
+      List<String> topicList = Arrays.stream(entity).map(Topic::name).collect(Collectors.toList());
+      return String.join(",", topicList);
     }
   }
 }

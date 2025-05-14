@@ -23,7 +23,9 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
@@ -40,6 +42,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.tag.Tag;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
 
 public class TestCliUtil {
@@ -298,5 +301,33 @@ public class TestCliUtil {
     }
 
     return mockObject;
+  }
+
+  /**
+   * Create a mock Tag object with the given name and comment.
+   *
+   * @param name The name of the tag object
+   * @param comment The comment of the tag object
+   * @return A mock tag object
+   */
+  public static Tag getMockTag(String name, String comment) {
+    return getMockTag(name, comment, ImmutableMap.of("k1", "v2", "k2", "v2"));
+  }
+
+  /**
+   * Create a mock Tag object with the given name, comment, and properties.
+   *
+   * @param name The name of the tag object
+   * @param comment The comment of the tag object
+   * @param properties The properties of the tag object
+   * @return A mock tag object
+   */
+  public static Tag getMockTag(String name, String comment, Map<String, String> properties) {
+    Tag mockTag = mock(Tag.class);
+    when(mockTag.name()).thenReturn(name);
+    when(mockTag.comment()).thenReturn(comment);
+    when(mockTag.properties()).thenReturn(properties);
+
+    return mockTag;
   }
 }
