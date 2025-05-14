@@ -15,17 +15,36 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization.annotations;
+package org.apache.gravitino.server.authorization;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.io.IOException;
+import java.security.Principal;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.Privilege;
 
 /**
- * This annotation is used to implement unified authentication in AOP. Use Expressions to define the
- * required privileges for an API.
+ * The default implementation of GravitinoAuthorizer, indicating that metadata permission control is
+ * not enabled.
  */
-@Target({ElementType.METHOD})
-@Retention(RetentionPolicy.RUNTIME)
-public @interface ExpressionsAuthorizeApi {}
+public class PassThroughAuthorizer implements GravitinoAuthorizer {
+
+  @Override
+  public void initialize() {}
+
+  @Override
+  public boolean authorize(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      Privilege.Name privilege) {
+    return true;
+  }
+
+  @Override
+  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+    return true;
+  }
+
+  @Override
+  public void close() throws IOException {}
+}
