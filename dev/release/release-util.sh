@@ -113,19 +113,19 @@ function get_release_info {
   #   - If it has not, we're building the next RC of the previous version.
   if [ $REV != 0 ]; then
     local PREV_REL_REV=$((REV - 1))
-    local PREV_REL_TAG="v${SHORT_VERSION}.${PREV_REL_REV}-incubating"
+    local PREV_REL_TAG="v${SHORT_VERSION}.${PREV_REL_REV}"
     if check_for_tag "$PREV_REL_TAG"; then
       RC_COUNT=1
       REV=$((REV + 1))
-      NEXT_VERSION="${SHORT_VERSION}.${REV}-incubating-SNAPSHOT"
+      NEXT_VERSION="${SHORT_VERSION}.${REV}-SNAPSHOT"
     else
-      RELEASE_VERSION="${SHORT_VERSION}.${PREV_REL_REV}-incubating"
+      RELEASE_VERSION="${SHORT_VERSION}.${PREV_REL_REV}"
       RC_COUNT=$(git ls-remote --tags "$ASF_REPO" "v${RELEASE_VERSION}-rc*" | wc -l)
       RC_COUNT=$((RC_COUNT + 1))
     fi
   else
     REV=$((REV + 1))
-    NEXT_VERSION="${SHORT_VERSION}.${REV}-incubating-SNAPSHOT"
+    NEXT_VERSION="${SHORT_VERSION}.${REV}-SNAPSHOT"
     RC_COUNT=1
   fi
 

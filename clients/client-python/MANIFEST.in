@@ -21,6 +21,5 @@ include requirements-dev.txt
 include README.md
 include LICENSE
 include NOTICE
-include DISCLAIMER.txt
 include gravitino/version.ini
 graft licenses

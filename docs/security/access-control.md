@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Apache Gravitino(incubating) is a technical data catalog that uses a unified metadata paradigm to manage multiple data sources while still allowing multiple engines like Spark, Trino, and Flink, or Python to connect to these data sources for data processing through Gravitino.
+Apache Gravitino is a technical data catalog that uses a unified metadata paradigm to manage multiple data sources while still allowing multiple engines like Spark, Trino, and Flink, or Python to connect to these data sources for data processing through Gravitino.
 
 Because each underlying data source will have its own access control system, it can be difficult to plug in data engines with the intent of querying multiple of these data at once.
 This is especially important for data governance practitioners who have to worry about data access restrictions and data compliance issues, but this is streamlined through Gravitino.

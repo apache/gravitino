@@ -540,8 +540,6 @@ tasks.rat {
     "**/LICENSE.*",
     "**/NOTICE.*",
     "**/trino-ci-testset",
-    "DISCLAIMER.txt",
-    "DISCLAIMER_WIP.txt",
     "ROADMAP.md",
     "clients/cli/src/main/resources/*.txt",
     "clients/client-python/.pytest_cache/*",
@@ -641,7 +639,6 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("package") }
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
@@ -694,7 +691,6 @@ tasks {
         from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".rest", "")
@@ -713,7 +709,6 @@ tasks {
         from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".trino", "")

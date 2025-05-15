@@ -29,7 +29,7 @@ usage: release-build.sh <package|docs|publish-release|finalize>
 Creates build deliverables from a Apache Gravitino commit.
 
 Top level targets are
-  package: Create binary packages and commit them to dist.apache.org/repos/dist/dev/incubator/gravitino/
+  package: Create binary packages and commit them to dist.apache.org/repos/dist/dev/gravitino/
   docs: Build the Java and Python docs, and copy them to a local path.
   publish-release: Publish a release to Apache release repo
   finalize: Finalize the release after an RC passes vote
@@ -37,8 +37,8 @@ Top level targets are
 All other inputs are environment variables
 
 GIT_REF - Release tag or commit to build from
-GRAVITINO_PACKAGE_VERSION - Release identifier in top level package directory (e.g. 0.6.0-incubating-rc1)
-GRAVITINO_VERSION - (optional) Version of Gravitino being built (e.g. 0.6.0-incubating)
+GRAVITINO_PACKAGE_VERSION - Release identifier in top level package directory (e.g. 0.10.0-rc1)
+GRAVITINO_VERSION - (optional) Version of Gravitino being built (e.g. 0.10.0)
 
 ASF_USERNAME - Username of ASF committer account
 ASF_PASSWORD - Password of ASF committer account
@@ -85,8 +85,8 @@ export LANG=C.UTF-8
 # Commit ref to checkout when building
 GIT_REF=${GIT_REF:-main}
 
-RELEASE_STAGING_LOCATION="https://dist.apache.org/repos/dist/dev/incubator/gravitino"
-RELEASE_LOCATION="https://dist.apache.org/repos/dist/release/incubator/gravitino"
+RELEASE_STAGING_LOCATION="https://dist.apache.org/repos/dist/dev/gravitino"
+RELEASE_LOCATION="https://dist.apache.org/repos/dist/release/gravitino"
 
 GPG="gpg -u $GPG_KEY --no-tty --batch --pinentry-mode loopback"
 NEXUS_ROOT=https://repository.apache.org/service/local/staging
@@ -122,7 +122,7 @@ if [[ "$1" == "finalize" ]]; then
     echo "git tag v$RELEASE_VERSION created"
   fi
 
-  PYGRAVITINO_VERSION="${RELEASE_VERSION/-incubating}"
+  PYGRAVITINO_VERSION="${RELEASE_VERSION}"
   git clone "https://$ASF_USERNAME:$ENCODED_ASF_PASSWORD@$ASF_GRAVITINO_REPO" -b "v$RELEASE_VERSION"
   cd gravitino
   $GRADLE :clients:client-python:distribution -x test

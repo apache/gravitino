@@ -1,4 +1,4 @@
-Apache Gravitino (incubating)
+Apache Gravitino
 Copyright 2025 The Apache Software Foundation
 
 This product includes software developed at
@@ -255,7 +255,7 @@ Copyright 2016 Josh Elser
 AWS EventStream for Java
 Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-Apache Gravitino (incubating)
+Apache Gravitino
 Copyright 2024 The Apache Software Foundation
 
 The initial code for the Gravitino project was donated
