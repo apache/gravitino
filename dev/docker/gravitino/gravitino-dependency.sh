@@ -26,7 +26,7 @@ gravitino_staging_dir="${gravitino_package_dir}/staging"
 gravitino_iceberg_rest_dir="${gravitino_package_dir}/iceberg-rest-server/libs/"
 
 # Build the Gravitino project
-${gravitino_home}/gradlew clean build -x test -x rat
+${gravitino_home}/gradlew clean build -x test
 
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
