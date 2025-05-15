@@ -19,23 +19,30 @@
 
 package org.apache.gravitino.spark.connector.hive;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.utils.GravitinoTableInfoHelper;
+import org.apache.gravitino.spark.connector.utils.HiveGravitinoOperationOperator;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.InternalRow;
+import org.apache.spark.sql.catalyst.analysis.NoSuchPartitionException;
+import org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.SupportsPartitionManagement;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructType;
 
 /** Keep consistent behavior with the SparkIcebergTable */
-public class SparkHiveTable extends HiveTable {
+public class SparkHiveTable extends HiveTable implements SupportsPartitionManagement {
 
   private GravitinoTableInfoHelper gravitinoTableInfoHelper;
+  private HiveGravitinoOperationOperator hiveGravitinoOperationOperator;
 
   public SparkHiveTable(
       Identifier identifier,
@@ -54,6 +61,7 @@ public class SparkHiveTable extends HiveTable {
             propertiesConverter,
             sparkTransformConverter,
             sparkTypeConverter);
+    this.hiveGravitinoOperationOperator = new HiveGravitinoOperationOperator(gravitinoTable);
   }
 
   @Override
@@ -75,5 +83,70 @@ public class SparkHiveTable extends HiveTable {
   @Override
   public Transform[] partitioning() {
     return gravitinoTableInfoHelper.partitioning();
+  }
+
+  @Override
+  public void createPartition(InternalRow ident, Map<String, String> properties)
+      throws PartitionAlreadyExistsException, UnsupportedOperationException {
+    hiveGravitinoOperationOperator.createPartition(ident, properties, partitionSchema());
+  }
+
+  @Override
+  public boolean dropPartition(InternalRow ident) {
+    return hiveGravitinoOperationOperator.dropPartition(ident, partitionSchema());
+  }
+
+  @Override
+  public void replacePartitionMetadata(InternalRow ident, Map<String, String> properties)
+      throws NoSuchPartitionException, UnsupportedOperationException {
+    throw new UnsupportedOperationException("Replace partition is not supported");
+  }
+
+  @Override
+  public Map<String, String> loadPartitionMetadata(InternalRow ident)
+      throws UnsupportedOperationException {
+    return hiveGravitinoOperationOperator.loadPartitionMetadata(ident, partitionSchema());
+  }
+
+  @Override
+  public InternalRow[] listPartitionIdentifiers(String[] names, InternalRow ident) {
+    return hiveGravitinoOperationOperator.listPartitionIdentifiers(names, ident, partitionSchema());
+  }
+
+  @Override
+  public boolean partitionExists(InternalRow ident) {
+    String[] partitionNames = partitionSchema().names();
+    Preconditions.checkArgument(
+        ident.numFields() == partitionNames.length,
+        String.format(
+            "The number of fields (%d) in the partition identifier is not equal to "
+                + "the partition schema length (%d). "
+                + "The identifier might not refer to one partition.",
+            ident.numFields(), partitionNames.length));
+
+    return hiveGravitinoOperationOperator.partitionExists(partitionNames, ident, partitionSchema());
+  }
+
+  @Override
+  public Object productElement(int n) {
+    if (n == 0) {
+      return gravitinoTableInfoHelper;
+    }
+
+    if (n == 1) {
+      return hiveGravitinoOperationOperator;
+    }
+
+    throw new IndexOutOfBoundsException("Invalid index: " + n);
+  }
+
+  @Override
+  public int productArity() {
+    return 2;
+  }
+
+  @Override
+  public boolean canEqual(Object that) {
+    return that instanceof SparkHiveTable;
   }
 }
