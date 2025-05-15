@@ -285,7 +285,6 @@ tasks {
       generatePypiProjectHomePage()
       delete("dist")
       copy {
-        from("${project.rootDir}/DISCLAIMER.txt") { into("./") }
         into("${project.rootDir}/clients/client-python")
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -298,7 +297,6 @@ tasks {
 
     doLast {
       delete("README.md")
-      delete("DISCLAIMER.txt")
     }
   }
 

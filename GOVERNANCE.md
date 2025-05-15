@@ -19,4 +19,4 @@
 
 # Governance Policy
 
-The Apache Gravitino project follows the standard [ASF governance model](https://www.apache.org/foundation/governance/) and [ASF policies](https://www.apache.org/foundation/policies/) and [ASF Incubator policies] (https://incubator.apache.org/policy/incubation.html).
+The Apache Gravitino project follows the standard [ASF governance model](https://www.apache.org/foundation/governance/) and [ASF policies](https://www.apache.org/foundation/policies/).
