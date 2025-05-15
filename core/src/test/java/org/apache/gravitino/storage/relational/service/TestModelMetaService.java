@@ -202,6 +202,25 @@ public class TestModelMetaService extends TestJDBCBackend {
   }
 
   @Test
+  void testInsertModelAndSelectByID() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+    Map<String, String> properties = ImmutableMap.of("k1", "v1");
+    long modelID = RandomIdGenerator.INSTANCE.nextId();
+
+    ModelEntity modelEntity =
+        createModelEntity(modelID, MODEL_NS, "model1", "model1 comment", 0, properties, auditInfo);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    ModelPO modelPOById = ModelMetaService.getInstance().getModelPOById(modelID);
+    Assertions.assertEquals(modelID, modelPOById.getModelId());
+    Assertions.assertEquals("model1", modelPOById.getModelName());
+    Assertions.assertEquals("model1 comment", modelPOById.getModelComment());
+    Assertions.assertEquals(0, modelPOById.getModelLatestVersion());
+  }
+
+  @Test
   void testAlterModel() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
     Map<String, String> properties = ImmutableMap.of("k1", "v1");

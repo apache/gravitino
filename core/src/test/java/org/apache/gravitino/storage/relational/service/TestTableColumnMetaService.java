@@ -35,6 +35,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Lists;
@@ -145,6 +146,24 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
     Assertions.assertEquals(createdTable3.auditInfo(), retrievedTable3.auditInfo());
     Assertions.assertEquals(createdTable3.columns().size(), retrievedTable3.columns().size());
     compareTwoColumns(createdTable3.columns(), retrievedTable3.columns());
+  }
+
+  @Test
+  void testInsertAndGetTableByID() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+
+    // Create a table entity without columns
+    long tableID = RandomIdGenerator.INSTANCE.nextId();
+    TableEntity createdTable =
+        createTableEntity(
+            tableID, Namespace.of(METALAKE_NAME, catalogName, schemaName), "table1", auditInfo);
+    TableMetaService.getInstance().insertTable(createdTable, false);
+
+    TablePO retrievedTable = TableMetaService.getInstance().getTablePOById(tableID);
+    Assertions.assertEquals(createdTable.id(), retrievedTable.getTableId());
+    Assertions.assertEquals(createdTable.name(), retrievedTable.getTableName());
   }
 
   @Test
