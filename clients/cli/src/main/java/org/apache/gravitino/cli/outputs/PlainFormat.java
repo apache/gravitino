@@ -54,78 +54,54 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
 
     if (entity instanceof Metalake) {
       new MetalakePlainFormat(context).output((Metalake) entity);
-
     } else if (entity instanceof Metalake[]) {
       new MetalakeListPlainFormat(context).output((Metalake[]) entity);
-
     } else if (entity instanceof Catalog) {
       new CatalogPlainFormat(context).output((Catalog) entity);
-
     } else if (entity instanceof Catalog[]) {
       new CatalogListPlainFormat(context).output((Catalog[]) entity);
-
     } else if (entity instanceof Schema) {
       new SchemaPlainFormat(context).output((Schema) entity);
-
     } else if (entity instanceof Schema[]) {
       new SchemaListPlainFormat(context).output((Schema[]) entity);
-
     } else if (entity instanceof Table) {
       new TablePlainFormat(context).output((Table) entity);
-
     } else if (entity instanceof Table[]) {
       new TableListPlainFormat(context).output((Table[]) entity);
-
     } else if (entity instanceof Model) {
       new ModelDetailPlainFormat(context).output((Model) entity);
-
     } else if (entity instanceof Model[]) {
       new ModelListPlainFormat(context).output((Model[]) entity);
-
     } else if (entity instanceof User) {
       new UserDetailsPlainFormat(context).output((User) entity);
-
     } else if (entity instanceof User[]) {
       new UserListPlainFormat(context).output((User[]) entity);
-
     } else if (entity instanceof Group) {
       new GroupDetailsPlainFormat(context).output((Group) entity);
-
     } else if (entity instanceof Group[]) {
       new GroupListPlainFormat(context).output((Group[]) entity);
-
     } else if (entity instanceof Audit) {
       new AuditPlainFormat(context).output((Audit) entity);
-
     } else if (entity instanceof Column[]) {
       new ColumnListPlainFormat(context).output((Column[]) entity);
     } else if (entity instanceof Role) {
       new RoleDetailsPlainFormat(context).output((Role) entity);
-
     } else if (entity instanceof Role[]) {
       new RoleListPlainFormat(context).output((Role[]) entity);
-
     } else if (entity instanceof Fileset) {
       new FilesetDetailsPlainFormat(context).output((Fileset) entity);
-
     } else if (entity instanceof Fileset[]) {
       new FilesetListPlainFormat(context).output((Fileset[]) entity);
-
     } else if (entity instanceof Topic) {
       new TopicDetailsPlainFormat(context).output((Topic) entity);
-
     } else if (entity instanceof Topic[]) {
       new TopicListPlainFormat(context).output((Topic[]) entity);
-
     } else if (entity instanceof Tag) {
       new TagDetailsPlainFormat(context).output((Tag) entity);
-
     } else if (entity instanceof Tag[]) {
       new TagListPlainFormat(context).output((Tag[]) entity);
-
     } else if (entity instanceof Map) {
       new PropertiesListPlainFormat(context).output((Map<?, ?>) entity);
-
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }

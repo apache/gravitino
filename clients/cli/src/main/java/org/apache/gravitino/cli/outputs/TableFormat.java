@@ -84,79 +84,54 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
   public static void output(Object entity, CommandContext context) {
     if (entity instanceof Metalake) {
       new MetalakeTableFormat(context).output((Metalake) entity);
-
     } else if (entity instanceof Metalake[]) {
       new MetalakeListTableFormat(context).output((Metalake[]) entity);
-
     } else if (entity instanceof Catalog) {
       new CatalogTableFormat(context).output((Catalog) entity);
-
     } else if (entity instanceof Catalog[]) {
       new CatalogListTableFormat(context).output((Catalog[]) entity);
-
     } else if (entity instanceof Schema) {
       new SchemaTableFormat(context).output((Schema) entity);
-
     } else if (entity instanceof Schema[]) {
       new SchemaListTableFormat(context).output((Schema[]) entity);
-
     } else if (entity instanceof Table) {
       new TableDetailsTableFormat(context).output((Table) entity);
-
     } else if (entity instanceof Table[]) {
       new TableListTableFormat(context).output((Table[]) entity);
-
     } else if (entity instanceof Model) {
       new ModelDetailsTableFormat(context).output((Model) entity);
-
     } else if (entity instanceof Model[]) {
       new ModelListTableFormat(context).output((Model[]) entity);
-
     } else if (entity instanceof User) {
       new UserDetailsTableFormat(context).output((User) entity);
-
     } else if (entity instanceof User[]) {
       new UserListTableFormat(context).output((User[]) entity);
-
     } else if (entity instanceof Group) {
       new GroupDetailsTableFormat(context).output((Group) entity);
-
     } else if (entity instanceof Group[]) {
       new GroupListTableFormat(context).output((Group[]) entity);
-
     } else if (entity instanceof Audit) {
-
       new AuditTableFormat(context).output((Audit) entity);
-
     } else if (entity instanceof org.apache.gravitino.rel.Column[]) {
       new ColumnListTableFormat(context).output((org.apache.gravitino.rel.Column[]) entity);
     } else if (entity instanceof Role) {
       new RoleDetailsTableFormat(context).output((Role) entity);
-
     } else if (entity instanceof Role[]) {
       new RoleListTableFormat(context).output((Role[]) entity);
-
     } else if (entity instanceof Fileset) {
       new FilesetDetailsTableFormat(context).output((Fileset) entity);
-
     } else if (entity instanceof Fileset[]) {
       new FilesetListTableFormat(context).output((Fileset[]) entity);
-
     } else if (entity instanceof Topic) {
       new TopicDetailsTableFormat(context).output((Topic) entity);
-
     } else if (entity instanceof Topic[]) {
       new TopicListTableFormat(context).output((Topic[]) entity);
-
     } else if (entity instanceof Tag) {
       new TagDetailsTableFormat(context).output((Tag) entity);
-
     } else if (entity instanceof Tag[]) {
       new TagListTableFormat(context).output((Tag[]) entity);
-
     } else if (entity instanceof Map) {
       new PropertiesListTableFormat(context).output((Map<?, ?>) entity);
-
     } else {
       throw new IllegalArgumentException("Unsupported object type");
     }
