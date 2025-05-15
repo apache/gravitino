@@ -133,7 +133,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     } else if (entity instanceof Map) {
       new PropertiesListTableFormat(context).output((Map<?, ?>) entity);
     } else {
-      throw new IllegalArgumentException("Unsupported object type");
+      throw new IllegalArgumentException(
+          "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
     }
   }
 

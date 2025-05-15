@@ -103,7 +103,8 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
     } else if (entity instanceof Map) {
       new PropertiesListPlainFormat(context).output((Map<?, ?>) entity);
     } else {
-      throw new IllegalArgumentException("Unsupported object type");
+      throw new IllegalArgumentException(
+          "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
     }
   }
 
