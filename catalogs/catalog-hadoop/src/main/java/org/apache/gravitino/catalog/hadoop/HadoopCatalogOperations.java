@@ -202,8 +202,8 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     try {
-      Entity entity = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-      FilesetEntity filesetEntity = (FilesetEntity) entity;
+      FilesetEntity filesetEntity =
+          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
 
       return HadoopFileset.builder()
           .withName(ident.name())
@@ -316,17 +316,14 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to create fileset " + ident, ioe);
     }
 
-    HadoopFileset fileset =
-        HadoopFileset.builder()
-            .withName(ident.name())
-            .withComment(comment)
-            .withType(type)
-            .withStorageLocation(filesetPath.toString())
-            .withProperties(filesetEntity.properties())
-            .withAuditInfo(filesetEntity.auditInfo())
-            .build();
-
-    return fileset;
+    return HadoopFileset.builder()
+        .withName(ident.name())
+        .withComment(comment)
+        .withType(type)
+        .withStorageLocation(filesetPath.toString())
+        .withProperties(filesetEntity.properties())
+        .withAuditInfo(filesetEntity.auditInfo())
+        .build();
   }
 
   @Override
