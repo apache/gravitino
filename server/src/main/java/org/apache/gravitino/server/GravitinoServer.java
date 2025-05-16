@@ -19,9 +19,8 @@
 package org.apache.gravitino.server;
 
 import java.io.File;
-import java.util.HashSet;
 import java.io.IOException;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -98,7 +97,6 @@ public class GravitinoServer extends ResourceConfig {
     server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
-
 
     lineageService.initialize(
         new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
