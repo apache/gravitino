@@ -159,7 +159,7 @@ public class ModelMetaService {
     return modelId;
   }
 
-  ModelPO getModelPOById(Long modelId) {
+  public ModelPO getModelPOById(Long modelId) {
     ModelPO modelPO =
         SessionUtils.getWithoutCommit(
             ModelMetaMapper.class, mapper -> mapper.selectModelMetaByModelId(modelId));

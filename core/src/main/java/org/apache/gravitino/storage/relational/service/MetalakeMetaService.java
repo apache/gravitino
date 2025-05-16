@@ -104,6 +104,12 @@ public class MetalakeMetaService {
     return POConverters.fromMetalakePO(metalakePO);
   }
 
+  public BaseMetalake getMetalakeById(Long id) {
+    MetalakePO metalakePO = getMetalakePOById(id);
+
+    return POConverters.fromMetalakePO(metalakePO);
+  }
+
   // Metalake may be deleted, so the MetalakePO may be null.
   public MetalakePO getMetalakePOById(Long id) {
     MetalakePO metalakePO =

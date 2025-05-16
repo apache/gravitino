@@ -386,6 +386,20 @@ public class TagMetaService {
     return tagPO;
   }
 
+  public TagPO getTagPOByID(long id) {
+    TagPO tagPO =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class, mapper -> mapper.selectTagMetaByTagId(id));
+
+    if (tagPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TAG.name().toLowerCase(),
+          String.valueOf(id));
+    }
+    return tagPO;
+  }
+
   private List<TagPO> getTagPOsByMetalakeAndNames(String metalakeName, List<String> tagNames) {
     return SessionUtils.getWithoutCommit(
         TagMetaMapper.class,

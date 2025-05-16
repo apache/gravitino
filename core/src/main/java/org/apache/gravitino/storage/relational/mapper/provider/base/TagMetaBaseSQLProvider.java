@@ -195,4 +195,22 @@ public class TagMetaBaseSQLProvider {
         + TAG_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String selectTagMetaByTagId(@Param("tagId") Long tagId) {
+    return "SELECT "
+        + "tag_id         AS tagId, "
+        + "tag_name       AS tagName, "
+        + "metalake_id    AS metalakeId, "
+        + "tag_comment    AS comment, "
+        + "properties     AS properties, "
+        + "audit_info     AS auditInfo, "
+        + "current_version AS currentVersion, "
+        + "last_version   AS lastVersion, "
+        + "deleted_at     AS deletedAt "
+        + "FROM "
+        + TAG_TABLE_NAME
+        + " "
+        + "WHERE tag_id = #{tagId} "
+        + "AND deleted_at = 0";
+  }
 }
