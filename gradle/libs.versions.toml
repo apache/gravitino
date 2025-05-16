@@ -302,5 +302,5 @@ shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow-plugin"
 node = { id = "com.github.node-gradle.node", version.ref = "node-plugin" }
 tasktree = {id = "com.dorongold.task-tree", version = "2.1.1"}
 dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.9"}
-bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
+bom = {id = "org.cyclonedx.bom", version = "2.3.0"}
 errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}
