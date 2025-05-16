@@ -21,6 +21,7 @@ package org.apache.gravitino.cache;
 
 import java.io.IOException;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 
 /** MetaCache defines a generic caching interface for metadata entities in Gravitino. */
@@ -33,7 +34,7 @@ public interface MetaCache {
    * @param type the type of the entity
    * @return the cached or newly loaded Entity instance
    */
-  Entity getOrLoadMetadataById(Long id, Entity.EntityType type);
+  <E extends Entity & HasIdentifier> E getOrLoadMetadataById(Long id, Entity.EntityType type);
 
   /**
    * Retrieves an entity by its name identifier and type. If the entity is not present in the cache,
@@ -44,7 +45,8 @@ public interface MetaCache {
    * @return the cached or newly loaded Entity instance
    * @throws IOException if loading the entity from the store fails
    */
-  Entity getOrLoadMetadataByName(NameIdentifier ident, Entity.EntityType type) throws IOException;
+  <E extends Entity & HasIdentifier> E getOrLoadMetadataByName(
+      NameIdentifier ident, Entity.EntityType type) throws IOException;
 
   /**
    * Removes an entity (and any sub-entities) from the cache by its id and type.
@@ -96,7 +98,7 @@ public interface MetaCache {
    *
    * @param entity the entity to cache.
    */
-  void put(Entity entity);
+  <E extends Entity & HasIdentifier> void put(E entity);
 
   /**
    * Returns the current number of entries stored in the index structures.

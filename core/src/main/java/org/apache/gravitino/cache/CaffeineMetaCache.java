@@ -39,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -271,7 +272,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
 
   /** {@inheritDoc} */
   @Override
-  public void put(Entity entity) {
+  public <E extends Entity & HasIdentifier> void put(E entity) {
     syncMetadataToCache(entity);
   }
 

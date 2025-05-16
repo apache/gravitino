@@ -25,6 +25,9 @@ import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.cache.CacheConfig;
+import org.apache.gravitino.cache.MetaCache;
+import org.apache.gravitino.cache.provider.CacheFactory;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -74,6 +77,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.CachedEntityStore;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
 import org.slf4j.Logger;
@@ -133,6 +137,7 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
+  private MetaCache metaCache;
 
   protected GravitinoEnv() {}
 
@@ -354,6 +359,10 @@ public class GravitinoEnv {
     return futureGrantManager;
   }
 
+  public MetaCache metaCache() {
+    return metaCache;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -418,6 +427,9 @@ public class GravitinoEnv {
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
+    // TODO make it configurable
+    this.metaCache = CacheFactory.getMetaCache("Caffeine", new CacheConfig(), entityStore);
+    this.entityStore = new CachedEntityStore(entityStore, metaCache);
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
