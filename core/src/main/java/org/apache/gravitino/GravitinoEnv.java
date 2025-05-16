@@ -26,8 +26,8 @@ import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.cache.CacheConfig;
+import org.apache.gravitino.cache.CaffeineMetaCache;
 import org.apache.gravitino.cache.MetaCache;
-import org.apache.gravitino.cache.provider.CacheFactory;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -428,7 +428,7 @@ public class GravitinoEnv {
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
     // TODO make it configurable
-    this.metaCache = CacheFactory.getMetaCache("Caffeine", new CacheConfig(), entityStore);
+    this.metaCache = CaffeineMetaCache.getInstance(new CacheConfig(), entityStore);
     this.entityStore = new CachedEntityStore(entityStore, metaCache);
 
     // create and initialize a random id generator
