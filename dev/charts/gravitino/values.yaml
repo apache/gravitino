@@ -169,7 +169,38 @@ icebergRest:
   catalogBackend: memory
   ## The warehouse directory of Iceberg catalog for Iceberg REST service
   ##
-  warehouse: /tmp/
+  warehouse: "gs://strato-iceberg/test"
+  # uri: thrift://localhost:9083
+  # catalogBackendName: memory
+  # jdbc:
+  #   user: ""
+  #   password: ""
+  #   initialize: True
+  #   driver: "com.mysql.cj.jdbc.Driver"
+  # ## Storage
+  ioImpl: "org.apache.iceberg.gcp.gcs.GCSFileIO"
+  credentialProviders: "gcs-token"
+  # s3:
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
+  #   roleArn: ""
+  #   endpoint: ""
+  #   region: ""
+  #   externalId: ""
+  #   tokenServiceEndpoint: ""
+  # oss:
+  #   endpoint: ""
+  #   region: ""
+  #   accessKeyId: ""
+  #   secretAccessKey: ""
+  #   roleArn: ""
+  #   externalId: ""
+  # azure:
+  #   storageAccountName: ""
+  #   storageAccountKey: ""
+  #   tenantId: ""
+  #   clientId: ""
+  #   clientSecret: ""
 
 ## Authentication mechanisms configuration. Support simple, OAuth and Kerberos.
 ##
