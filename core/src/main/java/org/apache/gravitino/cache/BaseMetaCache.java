@@ -31,12 +31,16 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
@@ -80,6 +84,11 @@ public abstract class BaseMetaCache implements MetaCache {
     map.put(Entity.EntityType.MODEL, ModelEntity.class);
     map.put(Entity.EntityType.TOPIC, TopicEntity.class);
     map.put(Entity.EntityType.TAG, TagEntity.class);
+    map.put(Entity.EntityType.MODEL_VERSION, ModelVersionEntity.class);
+    map.put(Entity.EntityType.COLUMN, ColumnEntity.class);
+    map.put(Entity.EntityType.USER, UserEntity.class);
+    map.put(Entity.EntityType.GROUP, Entity.class);
+    map.put(Entity.EntityType.ROLE, RoleEntity.class);
     ENTITY_CLASS_MAP = Collections.unmodifiableMap(map);
   }
 

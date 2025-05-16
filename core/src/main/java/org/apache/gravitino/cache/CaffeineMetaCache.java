@@ -41,6 +41,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -282,6 +283,9 @@ public class CaffeineMetaCache extends BaseMetaCache {
    * @param metadata The metadata to synchronize
    */
   private void syncMetadataToCache(Entity metadata) {
+    if (!isValidEntityKey(metadata)) {
+      return;
+    }
     NameIdentifier nameIdent = getIdentFromMetadata(metadata);
     long id = getIdFromMetadata(metadata);
 
@@ -405,5 +409,15 @@ public class CaffeineMetaCache extends BaseMetaCache {
     } finally {
       opLock.unlock();
     }
+  }
+
+  /**
+   * Checks if the given entity is a valid entity key, which has id and nameIdentifier.
+   *
+   * @param entity The entity to check
+   * @return True if the entity is a valid entity key, otherwise false.
+   */
+  private boolean isValidEntityKey(Entity entity) {
+    return !(entity instanceof ModelVersionEntity);
   }
 }
