@@ -163,16 +163,16 @@ RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIV
 # add users and groups
 RUN groupadd hdfs && groupadd hadoop && groupadd hive && groupadd mapred
 
-RUN useradd -g hadoop datastrato && echo "datastrato:ds123" | chpasswd && adduser datastrato sudo
-RUN usermod -s /bin/bash datastrato
+RUN useradd -g hadoop gravitino && echo "gravitino:ds123" | chpasswd && adduser gravitino sudo
+RUN usermod -s /bin/bash gravitino
 
-RUN usermod -a -G hdfs datastrato
-RUN usermod -a -G hadoop datastrato
-RUN usermod -a -G hive datastrato
-RUN usermod -a -G mapred datastrato
+RUN usermod -a -G hdfs gravitino
+RUN usermod -a -G hadoop gravitino
+RUN usermod -a -G hive gravitino
+RUN usermod -a -G mapred gravitino
 
-RUN mkdir /home/datastrato
-RUN chown -R datastrato:hadoop /home/datastrato
+RUN mkdir /home/gravitino
+RUN chown -R gravitino:hadoop /home/gravitino
 
 ################################################################################
 # removed install packages
