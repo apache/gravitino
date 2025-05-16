@@ -130,20 +130,20 @@ if echo "${builders}" | grep -q "${BUILDER_NAME}"; then
   echo "BuildKit builder '${BUILDER_NAME}' already exists."
 else
   echo "BuildKit builder '${BUILDER_NAME}' does not exist."
-  docker buildx create --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=10000000 --platform linux/amd64,linux/arm64 --use --name ${BUILDER_NAME}
+  docker buildx create --driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=10000000 --platform linux/amd64,linux/arm64 --name ${BUILDER_NAME}
 fi
 
 cd ${script_dir}/${component_type}
 if [[ "${platform_type}" == "all" ]]; then
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=linux/amd64,linux/arm64 ${build_args} --push --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 else
   if [ ${build_latest} -eq 1 ]; then
-    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:latest -t ${image_name}:${tag_name} .
   else
-    docker buildx build --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
+    docker buildx build --builder ${BUILDER_NAME} --no-cache --pull --platform=${platform_type} ${build_args} --output type=docker --progress plain -f Dockerfile -t ${image_name}:${tag_name} .
   fi
 fi
