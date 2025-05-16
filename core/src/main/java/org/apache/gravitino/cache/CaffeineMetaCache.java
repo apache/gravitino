@@ -282,8 +282,8 @@ public class CaffeineMetaCache extends BaseMetaCache {
    * @param metadata The metadata to synchronize
    */
   private void syncMetadataToCache(Entity metadata) {
-    NameIdentifier nameIdent = CacheUtils.getIdentFromMetadata(metadata);
-    long id = CacheUtils.getIdFromMetadata(metadata);
+    NameIdentifier nameIdent = getIdentFromMetadata(metadata);
+    long id = getIdFromMetadata(metadata);
 
     withLock(
         () -> {
@@ -300,7 +300,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
    */
   @Override
   protected void removeExpiredMetadataFromDataCache(Entity metadata) {
-    NameIdentifier identifier = CacheUtils.getIdentFromMetadata(metadata);
+    NameIdentifier identifier = getIdentFromMetadata(metadata);
 
     withLock(
         () -> {
@@ -315,7 +315,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
    * @param entity The metadata to remove.
    */
   private void removeByMetadata(Entity entity) {
-    NameIdentifier parentIdent = CacheUtils.getIdentFromMetadata(entity);
+    NameIdentifier parentIdent = getIdentFromMetadata(entity);
 
     withLock(
         () -> {
@@ -329,7 +329,7 @@ public class CaffeineMetaCache extends BaseMetaCache {
             toRemovedId.add(idKey);
 
             if (entityToRemove != null) {
-              toRemovedIdent.add(CacheUtils.getIdentFromMetadata(entityToRemove).toString());
+              toRemovedIdent.add(getIdentFromMetadata(entityToRemove).toString());
             }
           }
 

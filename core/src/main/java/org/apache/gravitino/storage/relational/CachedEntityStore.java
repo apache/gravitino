@@ -40,7 +40,7 @@ import org.apache.gravitino.utils.Executable;
 /** Cached Entity store, which caches metadata in memory. */
 public class CachedEntityStore
     implements EntityStore, SupportsTagOperations, SupportsRelationOperations {
-  RelationalEntityStore entityStore;
+  private final RelationalEntityStore entityStore;
 
   private final MetaCache metaCache;
 
@@ -55,6 +55,7 @@ public class CachedEntityStore
     this.metaCache = metaCache;
   }
 
+  /** {@inheritDoc} */
   @Override
   public void initialize(Config config) throws RuntimeException {
     // do nothing
@@ -116,22 +117,6 @@ public class CachedEntityStore
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
     return metaCache.getOrLoadMetadataByName(ident, entityType);
-  }
-
-  /**
-   * Gets an entity by its id and type.
-   *
-   * @param id The id of the entity to retrieve.
-   * @param entityType The type of the entity to retrieve.
-   * @return The entity with the specified id and type.
-   * @param <E> the class of entity
-   * @throws NoSuchEntityException if the entity does not exist.
-   * @throws IOException if an error occurs while retrieving the entity.
-   */
-  public <E extends Entity & HasIdentifier> E get(long id, Entity.EntityType entityType)
-      throws NoSuchEntityException, IOException {
-    // TODO new method cache by id
-    return metaCache.getOrLoadMetadataById(id, entityType);
   }
 
   /** {@inheritDoc} */

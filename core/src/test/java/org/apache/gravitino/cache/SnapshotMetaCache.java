@@ -192,8 +192,8 @@ public class SnapshotMetaCache extends BaseMetaCache {
   /** {@inheritDoc} */
   @Override
   public void put(Entity entity) {
-    long id = CacheUtils.getIdFromMetadata(entity);
-    NameIdentifier ident = CacheUtils.getIdentFromMetadata(entity);
+    long id = getIdFromMetadata(entity);
+    NameIdentifier ident = getIdentFromMetadata(entity);
     Entity.EntityType tp = entity.type();
 
     while (true) {
@@ -219,7 +219,7 @@ public class SnapshotMetaCache extends BaseMetaCache {
    * @param entity The entity to remove.
    */
   private void remove(Entity entity) {
-    String prefix = CacheUtils.getIdentFromMetadata(entity).toString();
+    String prefix = getIdentFromMetadata(entity).toString();
 
     while (true) {
       Snapshot old = snapshotRef.get();
@@ -245,7 +245,7 @@ public class SnapshotMetaCache extends BaseMetaCache {
       for (NameIdentifier ident : toRemove) {
         Entity removed = newByName.remove(ident);
         if (removed != null) {
-          newById.remove(Pair.of(CacheUtils.getIdFromMetadata(removed), removed.type()));
+          newById.remove(Pair.of(getIdFromMetadata(removed), removed.type()));
         }
         newIndex.remove(ident.toString());
       }
