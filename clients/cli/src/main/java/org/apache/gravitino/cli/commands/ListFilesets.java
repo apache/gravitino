@@ -19,7 +19,8 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
+import java.util.Arrays;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cli.CommandContext;
@@ -28,6 +29,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.Fileset;
 
 /** List all fileset names in a schema. */
 public class ListFilesets extends Command {
@@ -70,8 +72,31 @@ public class ListFilesets extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all = filesets.length == 0 ? "No filesets exist." : Joiner.on(",").join(filesets);
+    if (filesets.length == 0) {
+      printInformation("No filesets exist.");
+    } else {
+      Fileset[] filesetObjects =
+          Arrays.stream(filesets).map(ident -> getFileset(ident.name())).toArray(Fileset[]::new);
+      printResults(filesetObjects);
+    }
+  }
 
-    printResults(all);
+  private Fileset getFileset(String name) {
+    return new Fileset() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public Type type() {
+        return null;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return null;
+      }
+    };
   }
 }

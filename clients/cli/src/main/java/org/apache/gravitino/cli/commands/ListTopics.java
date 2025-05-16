@@ -19,14 +19,15 @@
 
 package org.apache.gravitino.cli.commands;
 
-import com.google.common.base.Joiner;
 import java.util.Arrays;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.messaging.Topic;
 
 /** List the topics. */
 public class ListTopics extends Command {
@@ -65,10 +66,26 @@ public class ListTopics extends Command {
       exitWithError(exp.getMessage());
     }
 
-    String all =
-        topics.length == 0
-            ? "No topics exist."
-            : Joiner.on(",").join(Arrays.stream(topics).map(topic -> topic.name()).iterator());
-    printResults(all);
+    if (topics.length == 0) {
+      printInformation("No topics exist.");
+    } else {
+      Topic[] topicObjects =
+          Arrays.stream(topics).map(ident -> getTopic(ident.name())).toArray(Topic[]::new);
+      printResults(topicObjects);
+    }
+  }
+
+  private Topic getTopic(String name) {
+    return new Topic() {
+      @Override
+      public String name() {
+        return name;
+      }
+
+      @Override
+      public Audit auditInfo() {
+        return null;
+      }
+    };
   }
 }
