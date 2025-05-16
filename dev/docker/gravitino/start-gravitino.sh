@@ -24,6 +24,6 @@ gravitino_dir="$(cd "${bin_dir}/../">/dev/null; pwd)"
 
 cd ${gravitino_dir}
 
-python bin/rewrite_config.py
+python bin/rewrite_gravitino_server_config.py
 
 ./bin/gravitino.sh start 
