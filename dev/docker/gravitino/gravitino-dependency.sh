@@ -49,7 +49,7 @@ cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_iceberg_rest_dir}"
 cp "${gravitino_staging_dir}/${mysql_driver}" "${gravitino_package_dir}/libs/"
 
 pg_driver="postgresql-42.7.0.jar"
-wget "https://jdbc.postgresql.org/download/$pg_driver" -O "${gravitino_staging_dir}/${pg_driver}"
+wget "https://jdbc.postgresql.org/download/${pg_driver}" -O "${gravitino_staging_dir}/${pg_driver}"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/jdbc-postgresql/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_package_dir}/catalogs/lakehouse-iceberg/libs/"
 cp "${gravitino_staging_dir}/${pg_driver}" "${gravitino_iceberg_rest_dir}"
