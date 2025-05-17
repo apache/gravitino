@@ -94,6 +94,16 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     return true;
   }
 
+  @Override
+  protected boolean supportsUpdateColumnPosition() {
+    return true;
+  }
+
+  @Override
+  protected boolean supportListTable() {
+    return true;
+  }
+
   @Test
   void testCreateHiveFormatPartitionTable() {
     String tableName = "hive_partition_table";
@@ -117,6 +127,57 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     // write to static partition
     checkTableReadWrite(tableInfo);
     checkPartitionDirExists(tableInfo);
+  }
+
+  @Test
+  void testManagePartitionTable() {
+    String tableName = "hive_partition_ops_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
+    sql(createTableSQL);
+
+    List<Object[]> partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(0, partitionInfo.size());
+
+    sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=20, age_p2='twenty')");
+    sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, partitionInfo.size());
+    Assertions.assertEquals("age_p1=20/age_p2=twenty", partitionInfo.get(0)[0]);
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(1)[0]);
+
+    sql("ALTER TABLE  " + tableName + " DROP PARTITION (age_p1=20, age_p2='twenty')");
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+
+    sql(
+        "ALTER TABLE  "
+            + tableName
+            + " ADD PARTITION (age_p1=22, age_p2='twenty two') "
+            + "LOCATION '/user/hive/warehouse/hive_partition_ops_table/age_p1=22/age_p2=twentytwo' ");
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+    Assertions.assertEquals("age_p1=22/age_p2=twenty two", partitionInfo.get(1)[0]);
+
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=21)");
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+
+    // test exactly match
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=2)");
+    Assertions.assertEquals(0, partitionInfo.size());
+
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> {
+              sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
+            });
+    Assertions.assertTrue(exception.getMessage().contains("Partition already exists"));
   }
 
   @ParameterizedTest
@@ -442,5 +503,22 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     Assertions.assertEquals("2", row[0]);
     Assertions.assertEquals("gravitino_it_test", (String) row[1]);
     Assertions.assertEquals("2", row[2]);
+  }
+
+  @Test
+  void testCreateTableWithTimestamp() {
+    String databaseName = "test_db_with_timestamp";
+    String tableName = "test_table_with_timestamp";
+    createDatabaseIfNotExists(databaseName, getProvider());
+    sql(String.format("USE %s", databaseName));
+    sql(String.format("CREATE TABLE %s (id int, ts timestamp)", tableName));
+    sql(String.format("describe extended %s", tableName));
+
+    SparkTableInfo tableInfo = getTableInfo(tableName);
+    List<SparkColumnInfo> expectedSparkInfo =
+        Arrays.asList(
+            SparkColumnInfo.of("id", DataTypes.IntegerType),
+            SparkColumnInfo.of("ts", DataTypes.TimestampType));
+    checkTableColumns(tableName, expectedSparkInfo, tableInfo);
   }
 }

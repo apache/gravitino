@@ -60,4 +60,42 @@ public class TestModelChange {
     Assertions.assertNotEquals(renameModel1.hashCode(), renameModel2.hashCode());
     Assertions.assertEquals(renameModel1.hashCode(), renameModel3.hashCode());
   }
+
+  @Test
+  void testUpdateModelCommentWithStaticMethod() {
+    String newComment = "newComment";
+    ModelChange modelChange = ModelChange.updateComment(newComment);
+    Assertions.assertEquals(ModelChange.UpdateComment.class, modelChange.getClass());
+
+    ModelChange.UpdateComment updateComment = (ModelChange.UpdateComment) modelChange;
+    Assertions.assertEquals(newComment, updateComment.newComment());
+    Assertions.assertEquals("UpdateComment newComment", updateComment.toString());
+  }
+
+  @Test
+  void testUpdateModelCommentWithConstructor() {
+    String newComment = "newComment";
+    ModelChange.UpdateComment updateComment = new ModelChange.UpdateComment(newComment);
+    Assertions.assertEquals(newComment, updateComment.newComment());
+    Assertions.assertEquals("UpdateComment newComment", updateComment.toString());
+  }
+
+  @Test
+  void testUpdateModelCommentEquals() {
+    String newComment1 = "This is a demo model";
+    String newComment2 = "This is a test model";
+    String newComment3 = "This is a demo model";
+
+    ModelChange.UpdateComment updateComment1 = new ModelChange.UpdateComment(newComment1);
+    ModelChange.UpdateComment updateComment2 = new ModelChange.UpdateComment(newComment2);
+    ModelChange.UpdateComment updateComment3 = new ModelChange.UpdateComment(newComment3);
+
+    Assertions.assertEquals(updateComment1, updateComment3);
+    Assertions.assertNotEquals(updateComment1, updateComment2);
+    Assertions.assertEquals(updateComment1, updateComment3);
+
+    Assertions.assertNotEquals(updateComment1.hashCode(), updateComment2.hashCode());
+    Assertions.assertEquals(updateComment1.hashCode(), updateComment3.hashCode());
+    Assertions.assertEquals(updateComment1.toString(), updateComment3.toString());
+  }
 }

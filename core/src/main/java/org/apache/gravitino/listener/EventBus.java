@@ -21,6 +21,7 @@ package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
@@ -33,11 +34,18 @@ import org.apache.gravitino.listener.api.event.PreEvent;
  * within its internal management.
  */
 public class EventBus {
-  // Holds instances of EventListenerPlugin. These instances can either be
-  // EventListenerPluginWrapper,
-  // which are meant for synchronous event listening, or AsyncQueueListener, designed for
-  // asynchronous event processing.
+  /**
+   * Holds all instances of {@link EventListenerPlugin}. These instances can either be {@link
+   * EventListenerPluginWrapper} which are used for synchronous event process, or {@link
+   * AsyncQueueListener} for asynchronous event processing.
+   */
   private final List<EventListenerPlugin> eventListeners;
+
+  /**
+   * Holds instances of {@link AsyncQueueListener}, mainly used to check the status of async queue,
+   * like {@link #isHighWatermark()}.
+   */
+  private final List<AsyncQueueListener> asyncQueueListeners;
 
   /**
    * Constructs an EventBus with a predefined list of event listeners.
@@ -47,6 +55,11 @@ public class EventBus {
    */
   public EventBus(List<EventListenerPlugin> eventListeners) {
     this.eventListeners = eventListeners;
+    this.asyncQueueListeners =
+        eventListeners.stream()
+            .filter(AsyncQueueListener.class::isInstance)
+            .map(AsyncQueueListener.class::cast)
+            .collect(Collectors.toList());
   }
 
   /**
@@ -65,6 +78,10 @@ public class EventBus {
     }
   }
 
+  public boolean isHighWatermark() {
+    return asyncQueueListeners.stream().anyMatch(AsyncQueueListener::isHighWatermark);
+  }
+
   /**
    * Retrieves the list of registered post-event listeners. This method is primarily intended for
    * testing purposes to verify the correct registration and functioning of event listeners.
@@ -73,7 +90,7 @@ public class EventBus {
    *     EventBus.
    */
   @VisibleForTesting
-  List<EventListenerPlugin> getEventListeners() {
+  public List<EventListenerPlugin> getEventListeners() {
     return eventListeners;
   }
 

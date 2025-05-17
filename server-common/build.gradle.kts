@@ -26,6 +26,7 @@ plugins {
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":catalogs:catalog-common"))
   implementation(project(":common")) {
     exclude("com.fasterxml.jackson.core")
     exclude("com.fasterxml.jackson.datatype")
@@ -39,6 +40,9 @@ dependencies {
   implementation(libs.bundles.metrics)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.jackson.datatype.jdk8)
+  implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jackson.databind)
   implementation(libs.prometheus.servlet)
   implementation(libs.ognl)
 

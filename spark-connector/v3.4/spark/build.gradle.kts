@@ -123,6 +123,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
   // org.apache.iceberg.rest.RESTSerializers#registerAll(ObjectMapper) has different method signature for iceberg-core and iceberg-spark-runtime package, we must make sure iceberg-core is in front to start up MiniGravitino server.
@@ -167,6 +168,7 @@ tasks.test {
     dependsOn(":iceberg:iceberg-rest-server:jar")
     dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
+    dependsOn(":catalogs:catalog-jdbc-postgresql:jar")
   }
 }
 

@@ -31,6 +31,13 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.minor, 6)
         self.assertEqual(version.patch, 0)
 
+        # Test a valid the version string with hyphen separator
+        version = GravitinoVersion(VersionDTO("0.6.0-0.6.0", "2023-01-01", "1234567"))
+
+        self.assertEqual(version.major, 0)
+        self.assertEqual(version.minor, 6)
+        self.assertEqual(version.patch, 0)
+
         # Test a valid the version string with SNAPSHOT
         version = GravitinoVersion(
             VersionDTO("0.6.0-SNAPSHOT", "2023-01-01", "1234567")
@@ -40,8 +47,36 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.minor, 6)
         self.assertEqual(version.patch, 0)
 
+        # Test a valid the version string with SNAPSHOT and hyphen separator
+        version = GravitinoVersion(
+            VersionDTO("0.6.0-SNAPSHOT-0.6.0-SNAPSHOT", "2023-01-01", "1234567")
+        )
+
+        self.assertEqual(version.major, 0)
+        self.assertEqual(version.minor, 6)
+        self.assertEqual(version.patch, 0)
+
+        version = GravitinoVersion(
+            VersionDTO(
+                "0.9.0-incubating-SNAPSHOT-0.8.0-SNAPSHOT", "2023-01-01", "1234567"
+            )
+        )
+
+        self.assertEqual(version.major, 0)
+        self.assertEqual(version.minor, 9)
+        self.assertEqual(version.patch, 0)
+
         # Test a valid the version string with alpha
         version = GravitinoVersion(VersionDTO("0.6.0-alpha", "2023-01-01", "1234567"))
+
+        self.assertEqual(version.major, 0)
+        self.assertEqual(version.minor, 6)
+        self.assertEqual(version.patch, 0)
+
+        # Test a valid the version string with alpha and hyphen separator
+        version = GravitinoVersion(
+            VersionDTO("0.6.0-alpha-0.6.0-alpha", "2023-01-01", "1234567")
+        )
 
         self.assertEqual(version.major, 0)
         self.assertEqual(version.minor, 6)
@@ -54,18 +89,40 @@ class TestGravitinoVersion(unittest.TestCase):
         self.assertEqual(version.minor, 6)
         self.assertEqual(version.patch, 0)
 
+        # Test a valid the version string with pypi format and hyphen separator
+        version = GravitinoVersion(
+            VersionDTO("0.6.0.dev21-0.6.0.dev21", "2023-01-01", "1234567")
+        )
+
+        self.assertEqual(version.major, 0)
+        self.assertEqual(version.minor, 6)
+        self.assertEqual(version.patch, 0)
+
         # Test an invalid the version string with 2 part
         with self.assertRaises(BadRequestException):
             GravitinoVersion(VersionDTO("0.6", "2023-01-01", "1234567"))
+
+        # Test an invalid the version string with 2 part and hyphen separator
+        with self.assertRaises(BadRequestException):
+            GravitinoVersion(VersionDTO("0.6-0.6", "2023-01-01", "1234567"))
 
         # Test an invalid the version string with not number
         with self.assertRaises(BadRequestException):
             GravitinoVersion(VersionDTO("a.b.c", "2023-01-01", "1234567"))
 
+        # Test an invalid the version string with not number and hyphen separator
+        with self.assertRaises(BadRequestException):
+            GravitinoVersion(VersionDTO("a.b.c-a.b.c", "2023-01-01", "1234567"))
+
     def test_version_compare(self):
         # test equal
         version1 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
         version2 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
+
+        self.assertEqual(version1, version2)
+
+        version1 = GravitinoVersion(VersionDTO("0.6.0-0.7.0", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(VersionDTO("0.6.0-0.7.0", "2023-01-01", "1234567"))
 
         self.assertEqual(version1, version2)
 
@@ -75,11 +132,34 @@ class TestGravitinoVersion(unittest.TestCase):
 
         self.assertLess(version1, version2)
 
+        version1 = GravitinoVersion(VersionDTO("0.6.0-0.12.0", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(VersionDTO("0.12.0-0.6.0", "2023-01-01", "1234567"))
+
+        self.assertLess(version1, version2)
+
         # test greater than
         version1 = GravitinoVersion(VersionDTO("1.6.0", "2023-01-01", "1234567"))
         version2 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
 
         self.assertGreater(version1, version2)
+
+        version1 = GravitinoVersion(VersionDTO("1.6.0-0.6.0", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(VersionDTO("0.6.0-1.6.0", "2023-01-01", "1234567"))
+
+        self.assertGreater(version1, version2)
+
+        # version1.minor < version2.minor and version1.patch > version.patch
+        version1 = GravitinoVersion(VersionDTO("0.6.1", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(VersionDTO("0.7.0", "2023-01-01", "1234567"))
+
+        self.assertFalse(version1 > version2)
+        self.assertGreater(version2, version1)
+
+        version1 = GravitinoVersion(VersionDTO("0.6.1-0.7.0", "2023-01-01", "1234567"))
+        version2 = GravitinoVersion(VersionDTO("0.7.0-0.6.1", "2023-01-01", "1234567"))
+
+        self.assertFalse(version1 > version2)
+        self.assertGreater(version2, version1)
 
         # test equal with suffix
         version1 = GravitinoVersion(
@@ -89,10 +169,25 @@ class TestGravitinoVersion(unittest.TestCase):
 
         self.assertEqual(version1, version2)
 
+        version1 = GravitinoVersion(
+            VersionDTO("0.6.0-SNAPSHOT-0.6.0", "2023-01-01", "1234567")
+        )
+        version2 = GravitinoVersion(
+            VersionDTO("0.6.0-0.6.0-SNAPSHOT", "2023-01-01", "1234567")
+        )
+
+        self.assertEqual(version1, version2)
+
         # test compare with other class
 
         version1 = GravitinoVersion(VersionDTO("0.6.0", "2023-01-01", "1234567"))
         version2 = "0.6.0"
+
+        self.assertRaises(GravitinoRuntimeException, version1.__eq__, version2)
+        self.assertRaises(GravitinoRuntimeException, version1.__gt__, version2)
+
+        version1 = GravitinoVersion(VersionDTO("0.6.0-0.6.0", "2023-01-01", "1234567"))
+        version2 = "0.6.0-0.6.0"
 
         self.assertRaises(GravitinoRuntimeException, version1.__eq__, version2)
         self.assertRaises(GravitinoRuntimeException, version1.__gt__, version2)

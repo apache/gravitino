@@ -21,7 +21,6 @@ from gravitino.api.metadata_object import MetadataObject
 
 
 class MetadataObjectImpl(MetadataObject):
-
     _DOT: ClassVar[str] = "."
 
     def __init__(self, names: List[str], metadata_object_type: MetadataObject.Type):

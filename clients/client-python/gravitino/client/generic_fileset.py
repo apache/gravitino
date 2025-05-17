@@ -31,7 +31,6 @@ from gravitino.utils import HTTPClient
 
 
 class GenericFileset(Fileset, SupportsCredentials):
-
     _fileset: FilesetDTO
     """The fileset data transfer object"""
 
@@ -56,8 +55,8 @@ class GenericFileset(Fileset, SupportsCredentials):
     def type(self) -> Fileset.Type:
         return self._fileset.type()
 
-    def storage_location(self) -> str:
-        return self._fileset.storage_location()
+    def storage_locations(self) -> Dict[str, str]:
+        return self._fileset.storage_locations()
 
     def comment(self) -> Optional[str]:
         return self._fileset.comment()

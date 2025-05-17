@@ -39,14 +39,14 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface FilesetVersionMapper {
   String VERSION_TABLE_NAME = "fileset_version_info";
 
-  @InsertProvider(type = FilesetVersionSQLProviderFactory.class, method = "insertFilesetVersion")
-  void insertFilesetVersion(@Param("filesetVersion") FilesetVersionPO filesetVersionPO);
+  @InsertProvider(type = FilesetVersionSQLProviderFactory.class, method = "insertFilesetVersions")
+  void insertFilesetVersions(@Param("filesetVersions") List<FilesetVersionPO> filesetVersionPOs);
 
   @InsertProvider(
       type = FilesetVersionSQLProviderFactory.class,
-      method = "insertFilesetVersionOnDuplicateKeyUpdate")
-  void insertFilesetVersionOnDuplicateKeyUpdate(
-      @Param("filesetVersion") FilesetVersionPO filesetVersionPO);
+      method = "insertFilesetVersionsOnDuplicateKeyUpdate")
+  void insertFilesetVersionsOnDuplicateKeyUpdate(
+      @Param("filesetVersions") List<FilesetVersionPO> filesetVersionPOs);
 
   @UpdateProvider(
       type = FilesetVersionSQLProviderFactory.class,

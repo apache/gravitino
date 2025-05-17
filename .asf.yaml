@@ -37,6 +37,8 @@ github:
     issues: true
     # Enable projects for project management boards
     projects: true
+    # Enable GitHub Discussions for community discussions
+    discussions: true
   enabled_merge_buttons:
     squash: true
     merge: false
@@ -50,8 +52,6 @@ github:
         required_approving_review_count: 1
   dependabot_alerts: true
   dependabot_updates: false
-  protected_tags:
-    - "v*.*.*"
   collaborators:
     - noidname01
     - orenccl
@@ -65,3 +65,4 @@ notifications:
   commits: commits@gravitino.apache.org
   issues: commits@gravitino.apache.org
   pullrequests: commits@gravitino.apache.org
+  discussions: dev@gravitino.apache.org

@@ -1,0 +1,50 @@
+# Copyright The Helm Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: str()
+home: str(required=False)
+version: str()
+apiVersion: str()
+appVersion: any(str(), num(), required=False)
+description: str(required=False)
+keywords: list(str(), required=False)
+sources: list(str(), required=False)
+maintainers: list(include('maintainer'), required=False)
+dependencies: list(include('dependency'), required=False)
+icon: str(required=False)
+engine: str(required=False)
+condition: str(required=False)
+tags: str(required=False)
+deprecated: bool(required=False)
+kubeVersion: str(required=False)
+annotations: map(str(), str(), required=False)
+type: str(required=False)
+---
+maintainer:
+  name: str()
+  email: str(required=False)
+  url: str(required=False)
+---
+dependency:
+  name: str()
+  version: str()
+  repository: str(required=False)
+  condition: str(required=False)
+  tags: list(str(), required=False)
+  enabled: bool(required=False)
+  import-values: any(list(str()), list(include('import-value')), required=False)
+  alias: str(required=False)
+---
+import-value:
+  child: str()
+  parent: str()

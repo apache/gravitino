@@ -50,8 +50,8 @@ plugins {
     alias(libs.plugins.spotless)
   } else {
     throw GradleException(
-      "Gravitino Gradle toolchain current doesn't support " +
-        "Java version: ${JavaVersion.current()}. Please use JDK8 to 17."
+      "The Gravitino Gradle toolchain currently does not support " +
+        "Java version ${JavaVersion.current()}. Please use JDK versions 8 through 17."
     )
   }
 
@@ -66,14 +66,14 @@ plugins {
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
   throw GradleException(
-    "Gravitino current doesn't support building with " +
-      "Java version: ${extra["jdkVersion"]}. Please use JDK8, 11 or 17."
+    "The Gravitino Gradle toolchain currently does not support building with " +
+      "Java version ${extra["jdkVersion"]}. Please use JDK versions 8, 11 or 17."
   )
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
-  throw GradleException("Found unsupported Scala version: $scalaVersion")
+  throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
@@ -213,9 +213,11 @@ allprojects {
         param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/web/dist/")
         param.systemProperty("testMode", "embedded")
       } else {
-        throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+        throw GradleException(
+          "Gravitino integration tests are only compatible with the modes " +
+            "[-PtestMode=embedded] or [-PtestMode=deploy]."
+        )
       }
-
       param.useJUnitPlatform()
       val skipUTs = project.hasProperty("skipTests")
       if (skipUTs) {
@@ -387,6 +389,11 @@ subprojects {
         if (name == "sourcesJar") {
           include("LICENSE")
           include("NOTICE")
+        } else if (project.name == "web") {
+          include("web/web/LICENSE.bin")
+          rename("LICENSE.bin", "LICENSE")
+          include("web/web/NOTICE.bin")
+          rename("NOTICE.bin", "NOTICE")
         } else {
           include("LICENSE.bin")
           rename("LICENSE.bin", "LICENSE")
@@ -552,6 +559,8 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "docs/**/*.md",
+    "gradle/wrapper/gradle-wrapper.properties",
+    "lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java",
     "spark-connector/spark-common/src/test/resources/**",
     "web/web/.**",
     "web/web/dist/**/*",
@@ -633,6 +642,9 @@ tasks {
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
         from(projectDir.file("DISCLAIMER.txt")) { into("package") }
+        from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
+        from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
+        from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -660,7 +672,7 @@ tasks {
           into("${rootProject.name}-iceberg-rest-server/conf")
         }
         from(projectDir.dir("bin")) {
-          include("common.sh", "${rootProject.name}-iceberg-rest-server.sh")
+          include("common.sh.template", "${rootProject.name}-iceberg-rest-server.sh.template")
           into("${rootProject.name}-iceberg-rest-server/bin")
         }
         into(outputDir)

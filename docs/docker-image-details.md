@@ -20,6 +20,9 @@ docker run --rm -d -p 8090:8090 -p 9001:9001 apache/gravitino:0.7.0-incubating
 Changelog
 
 
+- apache/gravitino:0.9.0-incubating
+  - Based on Gravitino 0.9.0-incubating, you can know more information from 0.9.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.9.0-incubating).
+
 - apache/gravitino:0.8.0-incubating
   - Based on Gravitino 0.8.0-incubating, you can know more information from 0.8.0-incubating [release notes](https://github.com/apache/gravitino/releases/tag/v0.8.0-incubating).
 
@@ -63,8 +66,10 @@ docker run --rm -d -p 9001:9001 apache/gravitino-iceberg-rest:0.7.0-incubating
 ```
 
 Changelog
-- apache/gravitino-iceberg-rest:0.8.0-incubating
-  - Supports OSS and ADLS storage.
+- apache/gravitino-iceberg-rest:0.9.0-incubating
+  - Upgrade Iceberg version from 1.5 to 1.6.
+  - Supports s3 path-style-access property.
+  - Bug fix for warehouse is hard code in Iceberg memory catalog backend.
 
 
 - apache/gravitino-iceberg-rest:0.8.0-incubating
@@ -111,6 +116,9 @@ Changelog
 
 Changelog
 
+
+- apache/gravitino-playground:trino-435-gravitino-0.9.0-incubating
+  - Use Gravitino release 0.9.0-incubating Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-0.8.0-incubating
   - Use Gravitino release 0.8.0-incubating Dockerfile to build the image.

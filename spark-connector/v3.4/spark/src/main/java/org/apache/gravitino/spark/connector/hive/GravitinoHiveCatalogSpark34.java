@@ -21,12 +21,11 @@ package org.apache.gravitino.spark.connector.hive;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
-import org.apache.gravitino.spark.connector.SparkTypeConverter34;
 
 public class GravitinoHiveCatalogSpark34 extends GravitinoHiveCatalog {
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkTypeConverter34();
+    return new SparkHiveTypeConverter34();
   }
 
   @Override

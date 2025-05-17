@@ -40,12 +40,12 @@ import {
 import Icon from '@/components/Icon'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
-import { registerModel } from '@/lib/store/metalakes'
+import { registerModel, updateModel } from '@/lib/store/metalakes'
 
 import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
-
+import { genUpdates } from '@/lib/utils'
 import { groupBy } from 'lodash-es'
 import { nameRegex, nameRegexDesc, keyRegex } from '@/lib/utils/regex'
 import { useSearchParams } from 'next/navigation'
@@ -190,6 +190,25 @@ const RegisterModelDialog = props => {
               }
             }
           )
+        } else {
+          const reqData = { updates: genUpdates(cacheData, schemaData) }
+
+          if (reqData.updates.length !== 0) {
+            dispatch(
+              updateModel({
+                metalake,
+                catalog,
+                type: catalogType,
+                schema: schemaName,
+                model: cacheData.name,
+                data: reqData
+              })
+            ).then(res => {
+              if (!res.payload?.err) {
+                handleClose()
+              }
+            })
+          }
         }
       })
       .catch(err => {
@@ -258,7 +277,6 @@ const RegisterModelDialog = props => {
                       label='Name'
                       onChange={onChange}
                       placeholder=''
-                      disabled={type === 'update'}
                       error={Boolean(errors.name)}
                       data-refer='model-name-field'
                     />

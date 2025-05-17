@@ -34,6 +34,11 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
+  @Override
+  protected boolean supportsNestedNamespaces() {
+    return false;
+  }
+
   public IcebergRESTHiveCatalogIT() {
     catalogType = IcebergCatalogBackend.HIVE;
   }
