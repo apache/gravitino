@@ -160,9 +160,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             schema_name=cls.schema_name, comment="", properties={}
         )
 
-        cls.fileset_storage_location: str = (
-            f"hdfs://{cls.hdfs_container.get_ip()}:9000/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
-        )
+        cls.fileset_storage_location: str = f"hdfs://{cls.hdfs_container.get_ip()}:9000/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
         cls.fileset_gvfs_location = (
             f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
         )
