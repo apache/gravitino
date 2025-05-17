@@ -22,6 +22,7 @@ package org.apache.gravitino.cache;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
 
 /**
  * Represents a key for the meta cache.
@@ -29,41 +30,41 @@ import org.apache.gravitino.Entity;
  * <p>The key consists of the entity's id and type.
  */
 public class MetaCacheKey {
-  private final Long id;
+  private final NameIdentifier identifier;
   private final Entity.EntityType type;
 
   /**
    * Creates a new instance of {@link MetaCacheKey}.
    *
-   * @param id The entity id
-   * @param type The entity type
+   * @param ident The NameIdentifier of the entity
+   * @param type The type of the entity
    * @return The new instance
    */
-  public static MetaCacheKey of(long id, Entity.EntityType type) {
-    return new MetaCacheKey(id, type);
+  public static MetaCacheKey of(NameIdentifier ident, Entity.EntityType type) {
+    return new MetaCacheKey(ident, type);
   }
 
   /**
    * Creates a new instance of {@link MetaCacheKey}.
    *
-   * @param id The entity id
+   * @param identifier The NameIdentifier of the entity
    * @param type The entity type
    */
-  public MetaCacheKey(Long id, Entity.EntityType type) {
-    Preconditions.checkArgument(id != null, "Id cannot be null");
+  public MetaCacheKey(NameIdentifier identifier, Entity.EntityType type) {
+    Preconditions.checkArgument(identifier != null, "Id cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
-    this.id = id;
+    this.identifier = identifier;
     this.type = type;
   }
 
   /**
-   * Returns the entity id.
+   * Returns the entity's NameIdentifier.
    *
-   * @return The entity id
+   * @return The entity's NameIdentifier
    */
-  public Long id() {
-    return id;
+  public NameIdentifier identifier() {
+    return identifier;
   }
 
   /**
@@ -76,8 +77,8 @@ public class MetaCacheKey {
   }
 
   /**
-   * Compares two instances of {@link MetaCacheKey}. The comparison is based on the entity id and
-   * type.
+   * Compares two instances of {@link MetaCacheKey}. The comparison is based on the entity
+   * nameIdentifier and type.
    *
    * @param obj The object to compare to
    * @return {@code true} if the two instances are equal, {@code false} otherwise
@@ -87,16 +88,27 @@ public class MetaCacheKey {
     if (this == obj) return true;
     if (!(obj instanceof MetaCacheKey)) return false;
     MetaCacheKey other = (MetaCacheKey) obj;
-    return id.equals(other.id()) && type.equals(other.type());
+    return Objects.equals(identifier, other.identifier) && Objects.equals(type, other.type);
   }
 
   /**
-   * Returns the hash code of this instance. The hash code is based on the entity id and type.
+   * Returns the hash code of this instance. The hash code is based on the entity nameIdentifier and
+   * type.
    *
    * @return The hash code of this instance
    */
   @Override
   public int hashCode() {
-    return 31 * Objects.hashCode(id) + Objects.hashCode(type);
+    return Objects.hash(identifier, type);
+  }
+
+  /**
+   * Returns a string representation of this instance.
+   *
+   * @return A string representation of this instance
+   */
+  @Override
+  public String toString() {
+    return type.getShortName() + "." + identifier.toString();
   }
 }

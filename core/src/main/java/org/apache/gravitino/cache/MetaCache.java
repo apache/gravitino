@@ -20,6 +20,7 @@
 package org.apache.gravitino.cache;
 
 import java.io.IOException;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -32,17 +33,6 @@ import org.apache.gravitino.NameIdentifier;
  */
 public interface MetaCache {
   /**
-   * Retrieves an entity based on its id and type. If the entity is not present in the cache, it
-   * will be fetched from the underlying EntityStore.
-   *
-   * @param id The unique id of the entity
-   * @param type The type of the entity
-   * @return The cached or newly loaded Entity instance
-   * @param <E> The class of the entity
-   */
-  <E extends Entity & HasIdentifier> E getOrLoadMetadataById(Long id, Entity.EntityType type);
-
-  /**
    * Retrieves an entity by its name identifier and type. If the entity is not present in the cache,
    * it will be loaded from the backing EntityStore.
    *
@@ -52,35 +42,50 @@ public interface MetaCache {
    * @param <E> The class of the entity
    * @throws IOException if the operation fails
    */
-  <E extends Entity & HasIdentifier> E getOrLoadMetadataByName(
-      NameIdentifier ident, Entity.EntityType type) throws IOException;
+  <E extends Entity & HasIdentifier> E getOrLoad(NameIdentifier ident, Entity.EntityType type)
+      throws IOException;
 
   /**
-   * Removes an entity (and any sub-entities) from the cache by its id and type.
+   * Retrieves an entity from the cache if it exists. Will not attempt to load from the store if
+   * missing.
    *
-   * @param id the unique id of the entity to remove
-   * @param type the type of the entity
-   * @return {@code true} if the entity was removed from the cache; {@code false} otherwise
+   * @param ident the name identifier
+   * @param type the entity type
+   * @param <E> the entity class
+   * @return an optional entity if cached
    */
-  boolean removeById(Long id, Entity.EntityType type);
+  <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
+      NameIdentifier ident, Entity.EntityType type);
 
   /**
-   * Removes an entity (and any sub-entities) from the cache by its name identifier and type.
+   * Invalidates the cache entry for the given entity. Does not affect the underlying storage.
    *
-   * @param ident the name identifier of the entity to remove
-   * @param type the type of the entity
-   * @return {@code true} if the entity was removed from the cache; {@code false} otherwise
+   * @param ident the name identifier
+   * @param type the entity type
+   * @return true if the cache entry was removed
    */
-  boolean removeByName(NameIdentifier ident, Entity.EntityType type);
+  boolean invalidate(NameIdentifier ident, Entity.EntityType type);
 
   /**
-   * Checks whether an entity with the given id and type is present in the cache.
+   * Removes the entity from both cache and optionally the underlying store.
    *
-   * @param id the unique id of the entity
-   * @param type the type of the entity
-   * @return {@code true} if the entity is cached; {@code false} otherwise
+   * @param ident the name identifier
+   * @param type the entity type
+   * @param removeFromStore true to also delete from store
+   * @return true if removed from cache
    */
-  boolean containsById(Long id, Entity.EntityType type);
+  boolean remove(NameIdentifier ident, Entity.EntityType type, boolean removeFromStore);
+
+  /**
+   * Shortcut to remove from both cache and store.
+   *
+   * @param ident the name identifier
+   * @param type the entity type
+   * @return true if removed
+   */
+  default boolean remove(NameIdentifier ident, Entity.EntityType type) {
+    return remove(ident, type, true);
+  }
 
   /**
    * Checks whether an entity with the given name identifier and type is present in the cache.
@@ -89,21 +94,14 @@ public interface MetaCache {
    * @param type the type of the entity
    * @return {@code true} if the entity is cached; {@code false} otherwise
    */
-  boolean containsByName(NameIdentifier ident, Entity.EntityType type);
+  boolean contains(NameIdentifier ident, Entity.EntityType type);
 
   /**
    * Returns the current number of entries stored in the data cache.
    *
    * @return the estimated size of the data cache
    */
-  long sizeOfCacheData();
-
-  /**
-   * Returns the current number of entries stored in the index structures.
-   *
-   * @return the size of the index (number of indexed keys)
-   */
-  long sizeOfCacheIndex();
+  long size();
 
   /**
    * Clears all entries from the cache, including data and index structures, resetting it to an
@@ -112,11 +110,11 @@ public interface MetaCache {
   void clear();
 
   /**
-   * Puts an action into the cache.
+   * Executes the given action within a cache context.
    *
    * @param action The action to cache
    */
-  void put(Runnable action);
+  void withAction(Runnable action);
 
   /**
    * Puts an entity into the cache.
