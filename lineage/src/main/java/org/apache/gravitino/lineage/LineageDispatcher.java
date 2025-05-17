@@ -30,7 +30,7 @@ import java.io.Closeable;
  *
  * <ol>
  *   <li>{@link #initialize(LineageConfig)} with required configurations
- *   <li>Repeated calls to {@link #dispatchLineageEvent(io.openlineage.server.OpenLineage.RunEvent)}
+ *   <li>Repeated calls to {@link #dispatchLineageEvent(RunEvent)}
  *   <li>{@link #close()} for resource cleanup
  * </ol>
  */

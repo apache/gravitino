@@ -19,7 +19,7 @@
 
 image:
   repository: apache/gravitino
-  tag: 1.0.0-SNAPSHOT
+  tag: 0.10.0-incubating-SNAPSHOT
   pullPolicy: IfNotPresent
   ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
@@ -242,6 +242,11 @@ persistence:
   # existingClaim:
   # storageClassName:
 
+## Whether redirect the log files to the container stdout and stderr
+##
+log:
+  containerStdout: false
+
 ## Gravitino log4j2 configuration items in log4j2.properties can be customized
 ##
 log4j2Properties: {}
@@ -281,12 +286,12 @@ log4j2Properties: {}
 
 ## Additional log4j2 configuration items in log4j2.properties can be added
 ##
-additionalLog4j2Properties:
-  appender.console.type: Console
-  appender.console.name: consoleLogger
-  appender.console.layout.type: PatternLayout
-  appender.console.layout.pattern: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%t] %c{1}:%L - %m%n"
-  rootLogger.appenderRef.console.ref: consoleLogger
+additionalLog4j2Properties: {}
+  # appender.console.type: Console
+  # appender.console.name: console
+  # appender.console.layout.type: PatternLayout
+  # appender.console.layout.pattern: "%d{HH:mm:ss.SSS} %level %msg%n"
+  # rootLogger.appenderRef.console.ref: console
 
 ## Expose the gravitino service to be accessed from outside the cluster (LoadBalancer service).
 ## or access it from within the cluster (ClusterIP service). Set the service type and the port to serve it.

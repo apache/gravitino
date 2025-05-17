@@ -41,7 +41,6 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.CallerContext;
-import org.apache.gravitino.catalog.FilesetFileOps;
 import org.apache.gravitino.catalog.hadoop.authentication.UserContext;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -59,7 +58,6 @@ import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
@@ -72,11 +70,7 @@ import org.slf4j.LoggerFactory;
 
 @SuppressWarnings("removal")
 public class SecureHadoopCatalogOperations
-    implements CatalogOperations,
-        SupportsSchemas,
-        FilesetCatalog,
-        FilesetFileOps,
-        SupportsPathBasedCredentials {
+    implements CatalogOperations, SupportsSchemas, FilesetCatalog, SupportsPathBasedCredentials {
 
   public static final Logger LOG = LoggerFactory.getLogger(SecureHadoopCatalogOperations.class);
 
@@ -239,12 +233,6 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
-      throws NoSuchFilesetException, IOException {
-    return hadoopCatalogOperations.listFiles(ident, locationName, subPath);
-  }
-
-  @Override
   public Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException {
     return hadoopCatalogOperations.loadFileset(ident);
   }
@@ -295,8 +283,7 @@ public class SecureHadoopCatalogOperations
         .collect(Collectors.toList());
   }
 
-  @VisibleForTesting
-  protected String getTargetLocation(Fileset fileset) {
+  private String getTargetLocation(Fileset fileset) {
     CallerContext callerContext = CallerContext.CallerContextHolder.get();
     String targetLocationName;
     String targetLocation;
@@ -331,7 +318,7 @@ public class SecureHadoopCatalogOperations
           StringUtils.isNotBlank(targetLocationName),
           "The default location name of the fileset %s should not be empty.",
           fileset.name());
-      targetLocation = fileset.storageLocations().get(targetLocationName);
+      targetLocation = fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
     }
 
     Preconditions.checkArgument(

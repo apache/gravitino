@@ -65,7 +65,6 @@ public abstract class BaseFileset implements Fileset {
   }
 
   /** @return The storage locations of the fileset. */
-  @Override
   public Map<String, String> storageLocations() {
     return storageLocations;
   }

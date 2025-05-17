@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.spark.connector.utils;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -146,7 +145,6 @@ public class HiveGravitinoOperationOperator {
   private @NotNull String getHivePartitionName(
       String[] names, InternalRow ident, StructType partitionSchema) {
     StringBuilder partitionName = new StringBuilder();
-    Preconditions.checkArgument(names != null, "Partition column names must not be null");
     for (int i = 0; i < names.length; i++) {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();

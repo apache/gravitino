@@ -161,22 +161,9 @@ paths:
         - model
       summary: List model versions
       operationId: listModelVersions
-      parameters:
-        - $ref: "#/components/parameters/details"
       responses:
         "200":
-          description: Returns the list of model version objects if {details} is true, otherwise returns the list of model version numbers
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                oneOf:
-                  - $ref: "#/components/schemas/ModelVersionListResponse"
-                  - $ref: "#/components/schemas/ModelVersionInfoListResponse"
-              examples:
-                ModelVersionListResponse:
-                  $ref: "#/components/examples/ModelVersionListResponse"
-                ModelVersionInfoListResponse:
-                  $ref: "#/components/examples/ModelVersionInfoListResponse"
+          $ref: "#/components/responses/ModelVersionListResponse"
         "404":
           description: Not Found - The target model does not exist
           content:
@@ -382,14 +369,6 @@ components:
       description: The alias of the model version
       schema:
         type: string
-    details:
-      name: details
-      in: query
-      description: Include detailed information about the model versions
-      required: false
-      schema:
-        type: boolean
-        default: false
 
   schemas:
     Model:
@@ -738,36 +717,6 @@ components:
         "aliasesToRemove": ["alias3", "alias4"]
       }
 
-    ModelVersionListResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        versions:
-          type: array
-          description: The list of model versions
-          items:
-            format: int32
-
-    ModelVersionInfoListResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        infos:
-          type: array
-          description: The list of model version objects
-          items:
-            $ref: "#/components/schemas/ModelVersion"
-
   responses:
     ModelResponse:
       description: The response of model object
@@ -787,7 +736,27 @@ components:
           examples:
             ModelResponse:
               $ref: "#/components/examples/ModelResponse"
-
+    ModelVersionListResponse:
+      description: The response of model version list
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              versions:
+                type: array
+                description: The list of model versions
+                items:
+                  format: int32
+          examples:
+            ModelVersionListResponse:
+              $ref: "#/components/examples/ModelVersionListResponse"
     ModelVersionResponse:
       description: The response of model version object
       content:
@@ -853,29 +822,6 @@ components:
       value: {
         "code": 0,
         "versions": [0, 1, 2]
-      }
-
-    ModelVersionInfoListResponse:
-      value: {
-        "code": 0,
-        "infos": [
-          {
-            "uri": "hdfs://path/to/model",
-            "version": 0,
-            "aliases": ["alias1", "alias2"],
-            "comment": "This is a comment",
-            "properties": {
-              "key1": "value1",
-              "key2": "value2"
-            },
-            "audit": {
-              "creator": "user1",
-              "createTime": "2021-01-01T00:00:00Z",
-              "lastModifier": "user1",
-              "lastModifiedTime": "2021-01-01T00:00:00Z"
-            }
-          }
-        ]
       }
 
     ModelVersionResponse:

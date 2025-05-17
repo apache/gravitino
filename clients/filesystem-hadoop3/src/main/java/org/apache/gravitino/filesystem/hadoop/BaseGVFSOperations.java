@@ -138,7 +138,7 @@ public abstract class BaseGVFSOperations implements Closeable {
    *
    * @param configuration the configuration
    */
-  protected BaseGVFSOperations(Configuration configuration) {
+  public BaseGVFSOperations(Configuration configuration) {
     this.metalakeName =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
     Preconditions.checkArgument(
@@ -440,7 +440,8 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   private void createFilesetLocationIfNeed(
-      NameIdentifier filesetIdent, FileSystem fs, Path filesetPath) {
+      NameIdentifier filesetIdent, FileSystem fs, Path filesetPath)
+      throws FilesetPathNotFoundException {
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     // If the server-side filesystem ops are disabled, the fileset directory may not exist. In such
