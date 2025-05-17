@@ -112,6 +112,13 @@ public interface MetaCache {
   void clear();
 
   /**
+   * Puts an action into the cache.
+   *
+   * @param action The action to cache
+   */
+  void put(Runnable action);
+
+  /**
    * Puts an entity into the cache.
    *
    * @param entity The entity to cache
