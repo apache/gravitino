@@ -64,7 +64,9 @@ public interface MetaCache {
    * @param type the entity type
    * @return true if the cache entry was removed
    */
-  boolean invalidate(NameIdentifier ident, Entity.EntityType type);
+  default boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
+    return remove(ident, type, false);
+  }
 
   /**
    * Removes the entity from both cache and optionally the underlying store.
@@ -108,13 +110,6 @@ public interface MetaCache {
    * empty state.
    */
   void clear();
-
-  /**
-   * Executes the given action within a cache context.
-   *
-   * @param action The action to cache
-   */
-  void withAction(Runnable action);
 
   /**
    * Puts an entity into the cache.
