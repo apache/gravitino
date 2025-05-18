@@ -118,4 +118,11 @@ public interface MetaCache {
    * @param <E> The class of the entity
    */
   <E extends Entity & HasIdentifier> void put(E entity);
+
+  /**
+   * Executes the given action within a cache context.
+   *
+   * @param action The action to cache
+   */
+  void withCacheLock(Runnable action);
 }
