@@ -21,6 +21,7 @@ package org.apache.gravitino.cache;
 
 import java.io.IOException;
 import java.util.Optional;
+import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -111,12 +112,22 @@ public interface EntityCache {
   void clear();
 
   /**
+   * Puts an entity into the cache, without writing to the backing store.
+   *
+   * @param entity The entity to cache
+   * @param <E> The class of the entity
+   */
+  default <E extends Entity & HasIdentifier> void put(E entity) {
+    put(entity, false);
+  }
+
+  /**
    * Puts an entity into the cache.
    *
    * @param entity The entity to cache
    * @param <E> The class of the entity
    */
-  <E extends Entity & HasIdentifier> void put(E entity);
+  <E extends Entity & HasIdentifier> void put(E entity, boolean putToStore);
 
   /**
    * Executes the given action within a cache context.
@@ -124,4 +135,13 @@ public interface EntityCache {
    * @param action The action to cache
    */
   void withCacheLock(Runnable action);
+
+  /**
+   * Executes the given action within a cache context and returns the result.
+   *
+   * @param action The action to cache
+   * @param <E> The class of the entity
+   * @return The result of the action
+   */
+  <E extends Entity & HasIdentifier> E withCacheLock(Supplier<E> action);
 }
