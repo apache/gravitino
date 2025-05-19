@@ -42,6 +42,7 @@ import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.info.RoleInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -93,6 +94,34 @@ public class TestRoleEvent {
   }
 
   @Test
+  void testRoleInfo() {
+    role = getMockRole(roleName, properties, securableObjects);
+    RoleInfo roleInfo = new RoleInfo(role);
+
+    Assertions.assertEquals(roleName, roleInfo.roleName());
+    Assertions.assertEquals(properties, roleInfo.properties());
+    Assertions.assertEquals(securableObjects, roleInfo.securableObjects());
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> roleInfo.securableObjects().add(null));
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> roleInfo.properties().put("test", "test"));
+  }
+
+  @Test
+  void testRoleInfoWithNullSecurableObjects() {
+    RoleInfo roleInfo = new RoleInfo("test_role", ImmutableMap.of("comment", "test comment"), null);
+    Assertions.assertEquals("test_role", roleInfo.roleName());
+    Assertions.assertEquals(ImmutableMap.of("comment", "test comment"), roleInfo.properties());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> roleInfo.properties().put("testKey", "testVal"));
+    Assertions.assertEquals(Collections.emptyList(), roleInfo.securableObjects());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> roleInfo.securableObjects().add(null));
+  }
+
+  @Test
   void testCreateRole() {
     dispatcher.createRole(
         METALAKE, roleName, ImmutableMap.of("comment", "test comment"), securableObjects);
@@ -112,6 +141,70 @@ public class TestRoleEvent {
   }
 
   @Test
+  void testCreateRoleEvent() {
+    dispatcher.createRole(
+        METALAKE, roleName, ImmutableMap.of("comment", "test comment"), securableObjects);
+    Role roleObject = getMockRole(roleName, properties, securableObjects);
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CreateRoleEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.CREATE_ROLE, event.operationType());
+
+    CreateRoleEvent createRoleEvent = (CreateRoleEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), createRoleEvent.identifier());
+    RoleInfo roleInfo = createRoleEvent.createdRoleInfo();
+
+    validateRoleInfo(roleInfo, roleObject);
+  }
+
+  @Test
+  void testCreateRoleFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.createRole(METALAKE, roleName, properties, securableObjects));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CreateRoleFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.CREATE_ROLE, event.operationType());
+
+    CreateRoleFailureEvent createRoleFailureEvent = (CreateRoleFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), createRoleFailureEvent.identifier());
+    RoleInfo roleInfo = createRoleFailureEvent.createRoleRequest();
+    Assertions.assertEquals(roleName, roleInfo.roleName());
+    Assertions.assertEquals(properties, roleInfo.properties());
+    Assertions.assertEquals(securableObjects, roleInfo.securableObjects());
+  }
+
+  @Test
+  void testCreateRoleFailureEventWithNullSecurableObjects() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.createRole(METALAKE, roleName, properties, null));
+
+    // Validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CreateRoleFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    CreateRoleFailureEvent createRoleFailureEvent = (CreateRoleFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), createRoleFailureEvent.identifier());
+
+    RoleInfo roleInfo = createRoleFailureEvent.createRoleRequest();
+    Assertions.assertEquals(roleName, roleInfo.roleName());
+    Assertions.assertEquals(properties, roleInfo.properties());
+    Assertions.assertNotNull(roleInfo.securableObjects());
+    Assertions.assertTrue(roleInfo.securableObjects().isEmpty());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> roleInfo.securableObjects().add(null));
+  }
+
+  @Test
   void testDeleteRolePreEvent() {
     dispatcher.deleteRole(METALAKE, roleName);
 
@@ -125,6 +218,56 @@ public class TestRoleEvent {
     Assertions.assertEquals(
         NameIdentifierUtil.ofRole(METALAKE, roleName), deleteRolePreEvent.identifier());
     Assertions.assertEquals(roleName, deleteRolePreEvent.roleName());
+  }
+
+  @Test
+  void testDeleteRoleEventWithExistIdentifier() {
+    dispatcher.deleteRole(METALAKE, roleName);
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(DeleteRoleEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.DELETE_ROLE, event.operationType());
+
+    DeleteRoleEvent deleteRoleEvent = (DeleteRoleEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), deleteRoleEvent.identifier());
+    Assertions.assertEquals(roleName, deleteRoleEvent.roleName());
+    Assertions.assertTrue(deleteRoleEvent.isExists());
+  }
+
+  @Test
+  void testDeleteRoleEventWithNotExistIdentifier() {
+    dispatcher.deleteRole(METALAKE, otherRoleName);
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(DeleteRoleEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.DELETE_ROLE, event.operationType());
+
+    DeleteRoleEvent deleteRoleEvent = (DeleteRoleEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, otherRoleName), deleteRoleEvent.identifier());
+    Assertions.assertEquals(otherRoleName, deleteRoleEvent.roleName());
+  }
+
+  @Test
+  void testDeleteRoleFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.deleteRole(METALAKE, roleName));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(DeleteRoleFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.DELETE_ROLE, event.operationType());
+
+    DeleteRoleFailureEvent deleteRoleFailureEvent = (DeleteRoleFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), deleteRoleFailureEvent.identifier());
+    Assertions.assertEquals(roleName, deleteRoleFailureEvent.roleName());
   }
 
   @Test
@@ -144,7 +287,42 @@ public class TestRoleEvent {
   }
 
   @Test
-  void testListRolesEvent() {
+  void testGetRoleEvent() {
+    dispatcher.getRole(METALAKE, roleName);
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetRoleEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_ROLE, event.operationType());
+
+    GetRoleEvent getRoleEvent = (GetRoleEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), getRoleEvent.identifier());
+    RoleInfo roleInfo = getRoleEvent.roleInfo();
+
+    validateRoleInfo(roleInfo, roleName, properties, securableObjects);
+  }
+
+  @Test
+  void testGetRoleFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.getRole(METALAKE, roleName));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetRoleFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_ROLE, event.operationType());
+
+    GetRoleFailureEvent getRoleFailureEvent = (GetRoleFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), getRoleFailureEvent.identifier());
+    Assertions.assertEquals(roleName, getRoleFailureEvent.roleName());
+  }
+
+  @Test
+  void testListRolesPreEvent() {
     dispatcher.listRoleNames(METALAKE);
 
     // validate pre-event
@@ -159,7 +337,38 @@ public class TestRoleEvent {
   }
 
   @Test
-  void testListRolesFromObject() {
+  void testListRolesEvent() {
+    dispatcher.listRoleNames(METALAKE);
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListRoleNamesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_ROLE_NAMES, event.operationType());
+
+    ListRoleNamesEvent listRoleNamesEvent = (ListRoleNamesEvent) event;
+    Assertions.assertEquals(identifier, listRoleNamesEvent.identifier());
+    Assertions.assertFalse(listRoleNamesEvent.object().isPresent());
+  }
+
+  @Test
+  void testListRolesFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listRoleNames(METALAKE));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListRoleNamesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_ROLE_NAMES, event.operationType());
+
+    ListRoleNamesFailureEvent listRoleNamesFailureEvent = (ListRoleNamesFailureEvent) event;
+    Assertions.assertEquals(identifier, listRoleNamesFailureEvent.identifier());
+    Assertions.assertFalse(listRoleNamesFailureEvent.metadataObject().isPresent());
+  }
+
+  @Test
+  void testListRolesFromObjectPreEvent() {
     dispatcher.listRoleNamesByObject(METALAKE, securableObjects.get(0));
 
     // validate pre-event
@@ -175,7 +384,42 @@ public class TestRoleEvent {
   }
 
   @Test
-  void testGrantPrivilegesToRole() {
+  void testListRoleFromObjectEvent() {
+    dispatcher.listRoleNamesByObject(METALAKE, securableObjects.get(0));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListRoleNamesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_ROLE_NAMES, event.operationType());
+
+    ListRoleNamesEvent listRoleNamesEvent = (ListRoleNamesEvent) event;
+    Assertions.assertEquals(identifier, listRoleNamesEvent.identifier());
+    Assertions.assertTrue(listRoleNamesEvent.object().isPresent());
+    Assertions.assertEquals(securableObjects.get(0), listRoleNamesEvent.object().get());
+  }
+
+  @Test
+  void testListRoleFromObjectFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.listRoleNamesByObject(METALAKE, securableObjects.get(0)));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListRoleNamesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_ROLE_NAMES, event.operationType());
+
+    ListRoleNamesFailureEvent listRoleNamesFailureEvent = (ListRoleNamesFailureEvent) event;
+    Assertions.assertEquals(identifier, listRoleNamesFailureEvent.identifier());
+    Assertions.assertTrue(listRoleNamesFailureEvent.metadataObject().isPresent());
+    Assertions.assertEquals(
+        securableObjects.get(0), listRoleNamesFailureEvent.metadataObject().get());
+  }
+
+  @Test
+  void testGrantPrivilegesToRolePreEvent() {
     dispatcher.grantPrivilegeToRole(METALAKE, roleName, metadataObject, privileges);
 
     // validate pre-event
@@ -193,7 +437,70 @@ public class TestRoleEvent {
   }
 
   @Test
-  void testRevokePrivilegesFromRole() {
+  void testGrantPrivilegesToRoleEvent() {
+    dispatcher.grantPrivilegeToRole(METALAKE, roleName, metadataObject, privileges);
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GrantPrivilegesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.GRANT_PRIVILEGES, event.operationType());
+
+    GrantPrivilegesEvent grantPrivilegesEvent = (GrantPrivilegesEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), grantPrivilegesEvent.identifier());
+    RoleInfo roleInfo = grantPrivilegesEvent.grantedRoleInfo();
+    validateRoleInfo(roleInfo, roleName, properties, securableObjects);
+  }
+
+  @Test
+  void testGrantPrivilegesToRoleFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.grantPrivilegeToRole(METALAKE, roleName, metadataObject, privileges));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GrantPrivilegesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.GRANT_PRIVILEGES, event.operationType());
+
+    GrantPrivilegesFailureEvent grantPrivilegesFailureEvent = (GrantPrivilegesFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), grantPrivilegesFailureEvent.identifier());
+    Assertions.assertEquals(roleName, grantPrivilegesFailureEvent.roleName());
+    Assertions.assertEquals(metadataObject, grantPrivilegesFailureEvent.object());
+    Assertions.assertEquals(privileges, grantPrivilegesFailureEvent.privileges());
+  }
+
+  @Test
+  void testGrantPrivilegesFailureEventWithNullPrivileges() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.grantPrivilegeToRole(METALAKE, roleName, metadataObject, null));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GrantPrivilegesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.GRANT_PRIVILEGES, event.operationType());
+
+    GrantPrivilegesFailureEvent grantPrivilegesFailureEvent = (GrantPrivilegesFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), grantPrivilegesFailureEvent.identifier());
+    Assertions.assertEquals(roleName, grantPrivilegesFailureEvent.roleName());
+    Assertions.assertEquals(metadataObject, grantPrivilegesFailureEvent.object());
+    Assertions.assertNotNull(grantPrivilegesFailureEvent.privileges());
+    Assertions.assertTrue(grantPrivilegesFailureEvent.privileges().isEmpty());
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> grantPrivilegesFailureEvent.privileges().add(null));
+  }
+
+  @Test
+  void testRevokePrivilegesFromRolePreEvent() {
     dispatcher.revokePrivilegesFromRole(METALAKE, roleName, metadataObject, privileges);
 
     // validate pre-event
@@ -208,6 +515,46 @@ public class TestRoleEvent {
     Assertions.assertEquals(roleName, revokePrivilegesPreEvent.roleName());
     Assertions.assertEquals(metadataObject, revokePrivilegesPreEvent.object());
     Assertions.assertEquals(privileges, revokePrivilegesPreEvent.privileges());
+  }
+
+  @Test
+  void testRevokePrivilegesFromRoleEvent() {
+    dispatcher.revokePrivilegesFromRole(METALAKE, roleName, metadataObject, privileges);
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RevokePrivilegesEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.REVOKE_PRIVILEGES, event.operationType());
+
+    RevokePrivilegesEvent revokePrivilegesEvent = (RevokePrivilegesEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), revokePrivilegesEvent.identifier());
+    RoleInfo roleInfo = revokePrivilegesEvent.revokedRoleInfo();
+    validateRoleInfo(roleInfo, roleName, properties, securableObjects);
+  }
+
+  @Test
+  void testRevokePrivilegesFromRoleFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.revokePrivilegesFromRole(
+                METALAKE, roleName, metadataObject, privileges));
+
+    // validate event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RevokePrivilegesFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.REVOKE_PRIVILEGES, event.operationType());
+
+    RevokePrivilegesFailureEvent revokePrivilegesFailureEvent =
+        (RevokePrivilegesFailureEvent) event;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofRole(METALAKE, roleName), revokePrivilegesFailureEvent.identifier());
+    Assertions.assertEquals(roleName, revokePrivilegesFailureEvent.roleName());
+    Assertions.assertEquals(metadataObject, revokePrivilegesFailureEvent.metadataObject());
+    Assertions.assertEquals(privileges, revokePrivilegesFailureEvent.privileges());
   }
 
   private AccessControlEventDispatcher mockRoleDispatcher() {
@@ -287,5 +634,21 @@ public class TestRoleEvent {
     when(mockMetadataObject.type()).thenReturn(type);
 
     return mockMetadataObject;
+  }
+
+  private void validateRoleInfo(RoleInfo roleinfo, Role roleObject) {
+    Assertions.assertEquals(roleObject.name(), roleinfo.roleName());
+    Assertions.assertEquals(roleObject.properties(), roleinfo.properties());
+    Assertions.assertEquals(roleObject.securableObjects(), roleinfo.securableObjects());
+  }
+
+  private void validateRoleInfo(
+      RoleInfo roleinfo,
+      String roleName,
+      Map<String, String> properties,
+      List<SecurableObject> securableObjects) {
+    Assertions.assertEquals(roleName, roleinfo.roleName());
+    Assertions.assertEquals(properties, roleinfo.properties());
+    Assertions.assertEquals(securableObjects, roleinfo.securableObjects());
   }
 }

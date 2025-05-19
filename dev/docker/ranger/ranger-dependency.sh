@@ -36,7 +36,35 @@ if [[ ! -d "${ranger_dir}/packages" ]]; then
 fi
 
 if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
-  curl -L -s -o "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ${RANGER_DOWNLOAD_URL}
+  # Package not exist, we need to build them from source
+  if [ ! -d "${ranger_dir}/packages/apache-ranger" ]; then
+    git clone https://github.com/apache/ranger --branch master --single-branch ${ranger_dir}/packages/apache-ranger
+    # set the commit to RANGER-5146: 500 API Error When Deleting TagDef with a Linked Tag
+    # https://github.com/apache/ranger/commit/ff36aabe36169b94862c51a5b403f59c9d728b94
+    git reset --hard ff36aabe36169b94862c51a5b403f59c9d728b94
+  fi
+
+  cp ${ranger_dir}/.env ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
+  cd ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
+
+  # Prevent builder to pull remote image
+  # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
+  docker builder prune -f
+  docker builder use default
+
+  export DOCKER_BUILDKIT=1
+  export COMPOSE_DOCKER_CLI_BUILD=1
+  export RANGER_DB_TYPE=mysql
+
+  # run docker compose command to build packages
+  docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
+  # copy packages from volume to host
+  docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
+
+  cp ./dist/* ${ranger_dir}/packages
+
+  # change back to gravitino-builder
+  docker builder use gravitino-builder
 fi
 
 if [ ! -f "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ]; then

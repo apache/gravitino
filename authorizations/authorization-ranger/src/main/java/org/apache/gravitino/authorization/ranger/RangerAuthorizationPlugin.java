@@ -474,9 +474,9 @@ public abstract class RangerAuthorizationPlugin
             .build();
     if (preOwner != null) {
       if (preOwner.type() == Owner.Type.USER) {
-        preOwnerUserName = newOwner.name();
+        preOwnerUserName = preOwner.name();
       } else {
-        preOwnerGroupName = newOwner.name();
+        preOwnerGroupName = preOwner.name();
       }
     }
     if (newOwner.type() == Owner.Type.USER) {
@@ -1028,10 +1028,7 @@ public abstract class RangerAuthorizationPlugin
 
   /** Generate authorization securable object */
   public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      List<String> names,
-      String path,
-      AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges);
+      AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges);
 
   public boolean validAuthorizationOperation(List<SecurableObject> securableObjects) {
     return securableObjects.stream()

@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
 public class AsyncQueueListener implements EventListenerPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(AsyncQueueListener.class);
   private static final String NAME_PREFIX = "async-queue-listener-";
+  private static final float HIGH_WATERMARK_RATIO = 0.9f;
 
   private final List<EventListenerPlugin> eventListeners;
   private final BlockingQueue<BaseEvent> queue;
@@ -54,6 +55,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final AtomicLong lastDropEventCounters = new AtomicLong(0);
   private Instant lastRecordDropEventTime;
   private final String asyncQueueListenerName;
+  private final int highWatermarkThreshold;
 
   public AsyncQueueListener(
       List<EventListenerPlugin> listeners,
@@ -65,6 +67,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
     this.queue = new LinkedBlockingQueue<>(queueCapacity);
     this.asyncProcessor = new Thread(() -> processEvents());
     this.dispatcherJoinSeconds = dispatcherJoinSeconds;
+    this.highWatermarkThreshold = (int) (queueCapacity * HIGH_WATERMARK_RATIO);
     asyncProcessor.setDaemon(true);
     asyncProcessor.setName(asyncQueueListenerName);
   }
@@ -104,8 +107,12 @@ public class AsyncQueueListener implements EventListenerPlugin {
     eventListeners.forEach(listenerPlugin -> listenerPlugin.stop());
   }
 
+  public boolean isHighWatermark() {
+    return queue.size() > highWatermarkThreshold;
+  }
+
   @VisibleForTesting
-  List<EventListenerPlugin> getEventListeners() {
+  public List<EventListenerPlugin> getEventListeners() {
     return this.eventListeners;
   }
 

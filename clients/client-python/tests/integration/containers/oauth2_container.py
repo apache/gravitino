@@ -36,7 +36,6 @@ async def check_oauth2_container_status(oauth2_container: "OAuth2Container"):
 
 
 class OAuth2Container(BaseContainer):
-
     def __init__(self):
         container_name = "sample-auth-server"
         image_name = os.environ.get("GRAVITINO_OAUTH2_SAMPLE_SERVER")

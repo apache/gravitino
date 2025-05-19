@@ -149,9 +149,9 @@ public class FilesetMetaService {
                   FilesetVersionMapper.class,
                   mapper -> {
                     if (overwrite) {
-                      mapper.insertFilesetVersionOnDuplicateKeyUpdate(po.getFilesetVersionPO());
+                      mapper.insertFilesetVersionsOnDuplicateKeyUpdate(po.getFilesetVersionPOs());
                     } else {
-                      mapper.insertFilesetVersion(po.getFilesetVersionPO());
+                      mapper.insertFilesetVersions(po.getFilesetVersionPOs());
                     }
                   }));
     } catch (RuntimeException re) {
@@ -183,7 +183,8 @@ public class FilesetMetaService {
     Integer updateResult;
     try {
       boolean checkNeedUpdateVersion =
-          POConverters.checkFilesetVersionNeedUpdate(oldFilesetPO.getFilesetVersionPO(), newEntity);
+          POConverters.checkFilesetVersionNeedUpdate(
+              oldFilesetPO.getFilesetVersionPOs(), newEntity);
       FilesetPO newFilesetPO =
           POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, checkNeedUpdateVersion);
       if (checkNeedUpdateVersion) {
@@ -196,7 +197,7 @@ public class FilesetMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     FilesetVersionMapper.class,
-                    mapper -> mapper.insertFilesetVersion(newFilesetPO.getFilesetVersionPO())),
+                    mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
             () ->
                 SessionUtils.doWithoutCommit(
                     FilesetMetaMapper.class,

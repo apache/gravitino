@@ -17,7 +17,7 @@
 
 import logging
 from random import randint
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from gravitino import (
     NameIdentifier,
@@ -48,10 +48,12 @@ class TestFilesetCatalog(IntegrationTestEnv):
     schema_name: str = "schema"
 
     fileset_name: str = "fileset"
+    multiple_locations_fileset_name: str = "multiple_locations_fileset"
     fileset_alter_name: str = fileset_name + "Alter"
     fileset_comment: str = "fileset_comment"
 
     fileset_location: str = "/tmp/TestFilesetCatalog"
+    fileset_location2: str = "/tmp/TestFilesetCatalog2"
     fileset_properties_key1: str = "fileset_properties_key1"
     fileset_properties_value1: str = "fileset_properties_value1"
     fileset_properties_key2: str = "fileset_properties_key2"
@@ -60,6 +62,10 @@ class TestFilesetCatalog(IntegrationTestEnv):
         fileset_properties_key1: fileset_properties_value1,
         fileset_properties_key2: fileset_properties_value2,
     }
+    multiple_locations_fileset_properties: Dict[str, str] = {
+        Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "location1",
+        **fileset_properties,
+    }
     fileset_new_name = fileset_name + "_new"
 
     catalog_ident: NameIdentifier = NameIdentifier.of(metalake_name, catalog_name)
@@ -67,6 +73,9 @@ class TestFilesetCatalog(IntegrationTestEnv):
         metalake_name, catalog_name, schema_name
     )
     fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
+    multiple_locations_fileset_ident: NameIdentifier = NameIdentifier.of(
+        schema_name, multiple_locations_fileset_name
+    )
     fileset_new_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_new_name)
 
     gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
@@ -81,7 +90,6 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.clean_test_data()
 
     def clean_test_data(self):
-
         self.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=self.metalake_name
         )
@@ -163,16 +171,55 @@ class TestFilesetCatalog(IntegrationTestEnv):
             properties=self.fileset_properties,
         )
 
+    def create_multiple_locations_fileset(self) -> Fileset:
+        catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
+        return catalog.as_fileset_catalog().create_multiple_location_fileset(
+            ident=self.multiple_locations_fileset_ident,
+            fileset_type=Fileset.Type.MANAGED,
+            comment=self.fileset_comment,
+            storage_locations={
+                "location1": self.fileset_location,
+                "location2": self.fileset_location2,
+            },
+            properties=self.multiple_locations_fileset_properties,
+        )
+
     def create_custom_fileset(
-        self, ident: NameIdentifier, storage_location: str
+        self,
+        ident: NameIdentifier,
+        storage_location: Optional[str],
+        storage_locations: Optional[Dict[str, str]] = None,
+        default_location_name: Optional[str] = None,
     ) -> Fileset:
         catalog = self.gravitino_client.load_catalog(name=self.catalog_name)
-        return catalog.as_fileset_catalog().create_fileset(
+        if storage_locations is None:
+            return catalog.as_fileset_catalog().create_fileset(
+                ident=ident,
+                fileset_type=Fileset.Type.MANAGED,
+                comment=self.fileset_comment,
+                storage_location=storage_location,
+                properties=(
+                    self.fileset_properties
+                    if default_location_name is None
+                    else {
+                        Fileset.PROPERTY_DEFAULT_LOCATION_NAME: default_location_name,
+                        **self.fileset_properties,
+                    }
+                ),
+            )
+        return catalog.as_fileset_catalog().create_multiple_location_fileset(
             ident=ident,
             fileset_type=Fileset.Type.MANAGED,
             comment=self.fileset_comment,
-            storage_location=storage_location,
-            properties=self.fileset_properties,
+            storage_locations=storage_locations,
+            properties=(
+                self.fileset_properties
+                if default_location_name is None
+                else {
+                    Fileset.PROPERTY_DEFAULT_LOCATION_NAME: default_location_name,
+                    **self.fileset_properties,
+                }
+            ),
         )
 
     def test_create_fileset(self):
@@ -180,7 +227,36 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.type(), Fileset.Type.MANAGED)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(fileset.properties(), self.fileset_properties)
+        self.assertEqual(
+            fileset.properties(),
+            {
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
+                **self.fileset_properties,
+            },
+        )
+        self.assertEqual(fileset.storage_location(), f"file:{self.fileset_location}")
+
+    def test_create_fileset_with_multiple_locations(self):
+        fileset = self.create_multiple_locations_fileset()
+        self.assertIsNotNone(fileset)
+        self.assertEqual(fileset.type(), Fileset.Type.MANAGED)
+        self.assertEqual(fileset.comment(), self.fileset_comment)
+        self.assertEqual(
+            fileset.properties(), self.multiple_locations_fileset_properties
+        )
+        self.assertEqual(
+            fileset.storage_location(),
+            f"file:/tmp/test1/{self.schema_name}/{self.multiple_locations_fileset_name}",
+        )
+        self.assertEqual(
+            fileset.storage_locations(),
+            {
+                Fileset.LOCATION_NAME_UNKNOWN: f"file:/tmp/test1/"
+                f"{self.schema_name}/{self.multiple_locations_fileset_name}",
+                "location1": f"file:{self.fileset_location}",
+                "location2": f"file:{self.fileset_location2}",
+            },
+        )
 
     def test_drop_fileset(self):
         self.create_fileset()
@@ -207,7 +283,13 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.assertIsNotNone(fileset)
         self.assertEqual(fileset.name(), self.fileset_name)
         self.assertEqual(fileset.comment(), self.fileset_comment)
-        self.assertEqual(fileset.properties(), self.fileset_properties)
+        self.assertEqual(
+            fileset.properties(),
+            {
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: Fileset.LOCATION_NAME_UNKNOWN,
+                **self.fileset_properties,
+            },
+        )
         self.assertEqual(fileset.audit_info().creator(), "anonymous")
 
     def test_failed_load_fileset(self):
@@ -257,6 +339,26 @@ class TestFilesetCatalog(IntegrationTestEnv):
         )
 
         self.assertEqual(actual_file_location, f"file:{fileset_location}/test/test.txt")
+
+        # test get file location from multiple locations fileset
+        fileset_ident: NameIdentifier = NameIdentifier.of(
+            self.schema_name, "test_get_file_location_multiple_locations"
+        )
+        locations = {
+            "default": "/tmp/test_get_file_location",
+            "location1": "/tmp/test_get_file_location1",
+            "location2": "/tmp/test_get_file_location2",
+        }
+        self.create_custom_fileset(fileset_ident, None, locations, "location1")
+        actual_file_location = (
+            self.gravitino_client.load_catalog(name=self.catalog_name)
+            .as_fileset_catalog()
+            .get_file_location(fileset_ident, "/test/test.txt")
+        )
+
+        self.assertEqual(
+            actual_file_location, f"file:{locations['location1']}/test/test.txt"
+        )
 
         # test rename without sub path should throw an exception
         caller_context = CallerContext(

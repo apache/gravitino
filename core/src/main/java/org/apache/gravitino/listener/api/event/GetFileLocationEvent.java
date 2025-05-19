@@ -29,6 +29,7 @@ public final class GetFileLocationEvent extends FilesetEvent {
   private final String actualFileLocation;
   private final String subPath;
   private final Map<String, String> context;
+  private final String locationName;
 
   /**
    * Constructs a new {@code GetFileLocationEvent}, recording the attempt to get a file location.
@@ -45,8 +46,29 @@ public final class GetFileLocationEvent extends FilesetEvent {
       String actualFileLocation,
       String subPath,
       Map<String, String> context) {
+    this(user, identifier, actualFileLocation, subPath, null, context);
+  }
+
+  /**
+   * Constructs a new {@code GetFileLocationEvent}, recording the attempt to get a file location.
+   *
+   * @param user The user who initiated the get file location.
+   * @param identifier The identifier of the file location that was attempted to be got.
+   * @param actualFileLocation The actual file location which want to get.
+   * @param subPath The accessing sub path of the get file location operation.
+   * @param locationName The location name of the file location.
+   * @param context The audit context, this param can be null.
+   */
+  public GetFileLocationEvent(
+      String user,
+      NameIdentifier identifier,
+      String actualFileLocation,
+      String subPath,
+      String locationName,
+      Map<String, String> context) {
     super(user, identifier);
     this.actualFileLocation = actualFileLocation;
+    this.locationName = locationName;
     this.subPath = subPath;
     this.context = context;
   }
@@ -76,6 +98,15 @@ public final class GetFileLocationEvent extends FilesetEvent {
    */
   public Map<String, String> context() {
     return context;
+  }
+
+  /**
+   * Get the location name of the file location.
+   *
+   * @return The location name.
+   */
+  public String locationName() {
+    return locationName;
   }
 
   /**

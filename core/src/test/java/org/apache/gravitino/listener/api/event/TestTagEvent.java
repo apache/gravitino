@@ -255,7 +255,7 @@ public class TestTagEvent {
   }
 
   @Test
-  void testAssociateTagsForMetadataObject() {
+  void testAssociateTagsForMetadataObjectPreEvent() {
     MetadataObject metadataObject =
         NameIdentifierUtil.toMetadataObject(
             NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
@@ -271,6 +271,9 @@ public class TestTagEvent {
 
     Assertions.assertEquals(identifier.toString(), preEvent.identifier().toString());
     Assertions.assertEquals(AssociateTagsForMetadataObjectPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG,
+        ((AssociateTagsForMetadataObjectPreEvent) preEvent).objectType());
     Assertions.assertArrayEquals(
         tagsToAdd, ((AssociateTagsForMetadataObjectPreEvent) preEvent).tagsToAdd());
     Assertions.assertArrayEquals(
@@ -283,6 +286,9 @@ public class TestTagEvent {
     Event postevent = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier.toString(), postevent.identifier().toString());
     Assertions.assertEquals(AssociateTagsForMetadataObjectEvent.class, postevent.getClass());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG,
+        ((AssociateTagsForMetadataObjectEvent) postevent).objectType());
     Assertions.assertArrayEquals(
         tagsToAdd, ((AssociateTagsForMetadataObjectEvent) postevent).tagsToAdd());
     Assertions.assertArrayEquals(
@@ -482,6 +488,9 @@ public class TestTagEvent {
     Assertions.assertEquals(
         GravitinoRuntimeException.class,
         ((AssociateTagsForMetadataObjectFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG,
+        ((AssociateTagsForMetadataObjectFailureEvent) event).objectType());
     Assertions.assertEquals(
         tagsToAssociate, ((AssociateTagsForMetadataObjectFailureEvent) event).tagsToAdd());
     Assertions.assertEquals(

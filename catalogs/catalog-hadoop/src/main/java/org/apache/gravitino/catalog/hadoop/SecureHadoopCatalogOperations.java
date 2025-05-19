@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -38,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.catalog.hadoop.authentication.UserContext;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -45,11 +48,13 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -105,11 +110,11 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public Fileset createFileset(
+  public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,
       Fileset.Type type,
-      String storageLocation,
+      Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     String apiUser = PrincipalUtils.getCurrentUserName();
@@ -120,8 +125,8 @@ public class SecureHadoopCatalogOperations
     return userContext.doAs(
         () -> {
           setUser(apiUser);
-          return hadoopCatalogOperations.createFileset(
-              ident, comment, type, storageLocation, properties);
+          return hadoopCatalogOperations.createMultipleLocationFileset(
+              ident, comment, type, storageLocations, properties);
         },
         ident);
   }
@@ -233,9 +238,9 @@ public class SecureHadoopCatalogOperations
   }
 
   @Override
-  public String getFileLocation(NameIdentifier ident, String subPath)
-      throws NoSuchFilesetException {
-    return hadoopCatalogOperations.getFileLocation(ident, subPath);
+  public String getFileLocation(NameIdentifier ident, String subPath, String locationName)
+      throws NoSuchFilesetException, NoSuchLocationNameException {
+    return hadoopCatalogOperations.getFileLocation(ident, subPath, locationName);
   }
 
   @Override
@@ -260,13 +265,11 @@ public class SecureHadoopCatalogOperations
   @Override
   public List<PathContext> getPathContext(NameIdentifier filesetIdentifier) {
     Fileset fileset = loadFileset(filesetIdentifier);
-    String path = fileset.storageLocation();
-    Preconditions.checkState(
-        StringUtils.isNotBlank(path), "The location of fileset should not be empty.");
+    String path = getTargetLocation(fileset);
 
     Set<String> providers =
         CredentialUtils.getCredentialProvidersByOrder(
-            () -> fileset.properties(),
+            fileset::properties,
             () -> {
               Namespace namespace = filesetIdentifier.namespace();
               NameIdentifier schemaIdentifier =
@@ -278,6 +281,52 @@ public class SecureHadoopCatalogOperations
     return providers.stream()
         .map(provider -> new PathContext(path, provider))
         .collect(Collectors.toList());
+  }
+
+  private String getTargetLocation(Fileset fileset) {
+    CallerContext callerContext = CallerContext.CallerContextHolder.get();
+    String targetLocationName;
+    String targetLocation;
+    if (callerContext != null
+        && callerContext
+            .context()
+            .containsKey(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME)) {
+      // case 1: target location name is passed in the header
+      targetLocationName =
+          callerContext.context().get(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME);
+      Preconditions.checkArgument(
+          fileset.storageLocations().containsKey(targetLocationName),
+          "The location name %s is not in the fileset %s, expected location names are %s",
+          targetLocationName,
+          fileset.name(),
+          fileset.storageLocations().keySet());
+      targetLocation = fileset.storageLocations().get(targetLocationName);
+
+    } else if (fileset.storageLocations().size() == 1) {
+      // case 2: target location name is not passed in the header, but there is only one location.
+      // note: mainly used for backward compatibility since the old code does not pass the header
+      // and only supports one location
+      targetLocation = fileset.storageLocations().values().iterator().next();
+      targetLocationName = fileset.storageLocations().keySet().iterator().next();
+
+    } else {
+      // case 3: target location name is not passed in the header, and there are multiple locations.
+      // use the default location name
+      targetLocationName = fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+      // this should never happen, but just in case
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(targetLocationName),
+          "The default location name of the fileset %s should not be empty.",
+          fileset.name());
+      targetLocation = fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+    }
+
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(targetLocation),
+        "The location with the location name %s of the fileset %s should not be empty.",
+        targetLocationName,
+        fileset.name());
+    return targetLocation;
   }
 
   /**

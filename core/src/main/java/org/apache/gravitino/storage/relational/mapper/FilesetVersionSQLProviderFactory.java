@@ -19,6 +19,7 @@ package org.apache.gravitino.storage.relational.mapper;
  */
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetVersionBaseSQLProvider;
@@ -50,14 +51,14 @@ public class FilesetVersionSQLProviderFactory {
 
   static class FilesetVersionH2Provider extends FilesetVersionBaseSQLProvider {}
 
-  public static String insertFilesetVersion(
-      @Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
-    return getProvider().insertFilesetVersion(filesetVersionPO);
+  public static String insertFilesetVersions(
+      @Param("filesetVersions") List<FilesetVersionPO> filesetVersionPOs) {
+    return getProvider().insertFilesetVersions(filesetVersionPOs);
   }
 
-  public static String insertFilesetVersionOnDuplicateKeyUpdate(
-      @Param("filesetVersion") FilesetVersionPO filesetVersionPO) {
-    return getProvider().insertFilesetVersionOnDuplicateKeyUpdate(filesetVersionPO);
+  public static String insertFilesetVersionsOnDuplicateKeyUpdate(
+      @Param("filesetVersions") List<FilesetVersionPO> filesetVersionPOs) {
+    return getProvider().insertFilesetVersionsOnDuplicateKeyUpdate(filesetVersionPOs);
   }
 
   public static String softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {

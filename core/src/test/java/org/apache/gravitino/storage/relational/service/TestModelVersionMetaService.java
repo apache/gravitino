@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -35,6 +38,7 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -461,6 +465,339 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     verifyModelVersionExists(getModelVersionIdent(modelEntity.nameIdentifier(), "alias2"));
   }
 
+  @Test
+  void testUpdateVersionComment() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+
+    Map<String, String> properties = ImmutableMap.of("k1", "v1");
+    String modelName = randomModelName();
+    String modelComment = "model1 comment";
+    String modelVersionUri = "S3://test/path/to/model/version";
+    List<String> modelVersionAliases = ImmutableList.of("alias1", "alias2");
+    String modelVersionComment = "test comment";
+    String updatedComment = "new comment";
+    int version = 0;
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            modelName,
+            modelComment,
+            0,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            version,
+            modelVersionUri,
+            modelVersionAliases,
+            modelVersionComment,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity updatedModelVersionEntity =
+        createModelVersionEntity(
+            modelVersionEntity.modelIdentifier(),
+            modelVersionEntity.version(),
+            modelVersionEntity.uri(),
+            modelVersionEntity.aliases(),
+            updatedComment,
+            modelVersionEntity.properties(),
+            modelVersionEntity.auditInfo());
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
+
+    Function<ModelVersionEntity, ModelVersionEntity> updateCommentUpdater =
+        oldModelVersionEntity -> updatedModelVersionEntity;
+
+    ModelVersionEntity alteredModelVersionEntity =
+        ModelVersionMetaService.getInstance()
+            .updateModelVersion(modelVersionEntity.nameIdentifier(), updateCommentUpdater);
+
+    Assertions.assertEquals(updatedModelVersionEntity, alteredModelVersionEntity);
+
+    // Test update a non-exist model
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME,
+                        CATALOG_NAME,
+                        SCHEMA_NAME,
+                        "non_exist_model",
+                        "non_exist_version"),
+                    updateCommentUpdater));
+
+    // Test update a non-exist model version
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, modelName, "non_exist_version"),
+                    updateCommentUpdater));
+  }
+
+  @Test
+  void testAlterModelVersionProperties() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+
+    Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
+    String modelName = randomModelName();
+    String modelComment = "model1 comment";
+    String modelVersionUri = "S3://test/path/to/model/version";
+    List<String> modelVersionAliases = ImmutableList.of("alias1", "alias2");
+    String modelVersionComment = "test comment";
+    Map<String, String> updatedProperties =
+        ImmutableMap.of("k1", "new value", "k2", "v2", "k3", "v3");
+    int version = 0;
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            modelName,
+            modelComment,
+            0,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            version,
+            modelVersionUri,
+            modelVersionAliases,
+            modelVersionComment,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity updatedModelVersionEntity =
+        createModelVersionEntity(
+            modelVersionEntity.modelIdentifier(),
+            modelVersionEntity.version(),
+            modelVersionEntity.uri(),
+            modelVersionEntity.aliases(),
+            modelVersionEntity.comment(),
+            updatedProperties,
+            modelVersionEntity.auditInfo());
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
+
+    Function<ModelVersionEntity, ModelVersionEntity> updatePropertiesUpdater =
+        oldModelVersionEntity -> updatedModelVersionEntity;
+
+    ModelVersionEntity alteredModelVersionEntity =
+        ModelVersionMetaService.getInstance()
+            .updateModelVersion(modelVersionEntity.nameIdentifier(), updatePropertiesUpdater);
+
+    Assertions.assertEquals(updatedModelVersionEntity, alteredModelVersionEntity);
+
+    // Test update a non-exist model
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME,
+                        CATALOG_NAME,
+                        SCHEMA_NAME,
+                        "non_exist_model",
+                        "non_exist_version"),
+                    updatePropertiesUpdater));
+
+    // Test update a non-exist model version
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, modelName, "non_exist_version"),
+                    updatePropertiesUpdater));
+  }
+
+  @Test
+  void testUpdateModelVersionUri() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+
+    Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
+    String modelName = randomModelName();
+    String modelComment = "model1 comment";
+    String modelVersionUri = "S3://test/path/to/model/version";
+    List<String> modelVersionAliases = ImmutableList.of("alias1", "alias2");
+    String modelVersionComment = "test comment";
+    String updatedUri = "S3://test/path/to/new/model/version";
+    int version = 0;
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            modelName,
+            modelComment,
+            0,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            version,
+            modelVersionUri,
+            modelVersionAliases,
+            modelVersionComment,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity updatedModelVersionEntity =
+        createModelVersionEntity(
+            modelVersionEntity.modelIdentifier(),
+            modelVersionEntity.version(),
+            updatedUri,
+            modelVersionEntity.aliases(),
+            modelVersionEntity.comment(),
+            modelVersionEntity.properties(),
+            modelVersionEntity.auditInfo());
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
+
+    Function<ModelVersionEntity, ModelVersionEntity> updatePropertiesUpdater =
+        oldModelVersionEntity -> updatedModelVersionEntity;
+
+    ModelVersionEntity alteredModelVersionEntity =
+        ModelVersionMetaService.getInstance()
+            .updateModelVersion(modelVersionEntity.nameIdentifier(), updatePropertiesUpdater);
+
+    Assertions.assertEquals(updatedModelVersionEntity, alteredModelVersionEntity);
+
+    // Test update a non-exist model
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME,
+                        CATALOG_NAME,
+                        SCHEMA_NAME,
+                        "non_exist_model",
+                        "non_exist_version"),
+                    updatePropertiesUpdater));
+
+    // Test update a non-exist model version
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, modelName, "non_exist_version"),
+                    updatePropertiesUpdater));
+  }
+
+  @Test
+  void testUpdateModelVersionAliases() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+
+    Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
+    String modelName = randomModelName();
+    String modelComment = "model1 comment";
+    String modelVersionUri = "S3://test/path/to/model/version";
+    List<String> modelVersionAliases = ImmutableList.of("alias1", "alias2");
+    List<String> updatedVersionAliases = ImmutableList.of("alias2", "alias3");
+    String modelVersionComment = "test comment";
+    int version = 0;
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            modelName,
+            modelComment,
+            0,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            version,
+            modelVersionUri,
+            modelVersionAliases,
+            modelVersionComment,
+            properties,
+            auditInfo);
+
+    ModelVersionEntity updatedModelVersionEntity =
+        createModelVersionEntity(
+            modelVersionEntity.modelIdentifier(),
+            modelVersionEntity.version(),
+            modelVersionEntity.uri(),
+            updatedVersionAliases,
+            modelVersionEntity.comment(),
+            modelVersionEntity.properties(),
+            modelVersionEntity.auditInfo());
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
+
+    Function<ModelVersionEntity, ModelVersionEntity> updatePropertiesUpdater =
+        oldModelVersionEntity -> updatedModelVersionEntity;
+
+    ModelVersionEntity alteredModelVersionEntity =
+        ModelVersionMetaService.getInstance()
+            .updateModelVersion(modelVersionEntity.nameIdentifier(), updatePropertiesUpdater);
+
+    Assertions.assertEquals(updatedModelVersionEntity, alteredModelVersionEntity);
+
+    // Test update a non-exist model
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME,
+                        CATALOG_NAME,
+                        SCHEMA_NAME,
+                        "non_exist_model",
+                        "non_exist_version"),
+                    updatePropertiesUpdater));
+
+    // Test update a non-exist model version
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    NameIdentifierUtil.ofModelVersion(
+                        METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, modelName, "non_exist_version"),
+                    updatePropertiesUpdater));
+  }
+
   private NameIdentifier getModelVersionIdent(NameIdentifier modelIdent, int version) {
     List<String> parts = Lists.newArrayList(modelIdent.namespace().levels());
     parts.add(modelIdent.name());
@@ -487,5 +824,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         () -> ModelVersionMetaService.getInstance().getModelVersionByIdentifier(ident));
 
     Assertions.assertFalse(ModelVersionMetaService.getInstance().deleteModelVersion(ident));
+  }
+
+  private String randomModelName() {
+    return "model_" + UUID.randomUUID().toString().replace("-", "");
   }
 }

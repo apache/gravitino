@@ -47,6 +47,31 @@ appender.rolling.strategy.delete.ifLastModified.type = IfLastModified
 # Delete all files older than 30 days
 appender.rolling.strategy.delete.ifLastModified.age = 30d
 
+
+## use seperate file for lineage log
+appender.lineage_file.type=RollingFile
+appender.lineage_file.name=lineage_file
+appender.lineage_file.fileName=${basePath}/gravitino_lineage.log
+appender.lineage_file.filePattern=${basePath}/gravitino_lineage_%d{yyyyMMdd}.log.gz
+appender.lineage_file.layout.type=PatternLayout
+appender.lineage_file.layout.pattern=[%d{yyyy-MM-dd HH:mm:ss}] %m%n
+appender.lineage_file.policies.type = Policies
+
+appender.lineage_file.policies.time.type = TimeBasedTriggeringPolicy
+appender.lineage_file.policies.time.interval = 1
+appender.lineage_file.policies.time.modulate = true
+appender.lineage_file.strategy.type = DefaultRolloverStrategy
+appender.lineage_file.strategy.delete.type = Delete
+appender.lineage_file.strategy.delete.basePath = ${basePath}
+appender.lineage_file.strategy.delete.maxDepth = 10
+appender.lineage_file.strategy.delete.ifLastModified.type = IfLastModified
+appender.lineage_file.strategy.delete.ifLastModified.age = 30d
+
+logger.lineage.name = org.apache.gravitino.lineage.sink.LineageLogSink$LineageLogger
+logger.lineage.level = info
+logger.lineage.appenderRef.lineage_file.ref = lineage_file
+logger.lineage.additivity = false
+
 # Configure root logger
 rootLogger.level = info
 rootLogger.appenderRef.rolling.ref = fileLogger
