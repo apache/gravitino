@@ -25,32 +25,32 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 
 /**
- * Represents a key for the meta cache.
+ * Represents a key for the entity cache.
  *
- * <p>The key consists of the entity's id and type.
+ * <p>The key consists of the entity's nameIdentifier and type.
  */
-public class MetaCacheKey {
+public class EntityCacheKey {
   private final NameIdentifier identifier;
   private final Entity.EntityType type;
 
   /**
-   * Creates a new instance of {@link MetaCacheKey}.
+   * Creates a new instance of {@link EntityCacheKey}.
    *
    * @param ident The NameIdentifier of the entity
    * @param type The type of the entity
    * @return The new instance
    */
-  public static MetaCacheKey of(NameIdentifier ident, Entity.EntityType type) {
-    return new MetaCacheKey(ident, type);
+  public static EntityCacheKey of(NameIdentifier ident, Entity.EntityType type) {
+    return new EntityCacheKey(ident, type);
   }
 
   /**
-   * Creates a new instance of {@link MetaCacheKey}.
+   * Creates a new instance of {@link EntityCacheKey}.
    *
-   * @param identifier The NameIdentifier of the entity
+   * @param identifier The {@link NameIdentifier} of the entity
    * @param type The entity type
    */
-  public MetaCacheKey(NameIdentifier identifier, Entity.EntityType type) {
+  public EntityCacheKey(NameIdentifier identifier, Entity.EntityType type) {
     Preconditions.checkArgument(identifier != null, "Id cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
@@ -77,7 +77,7 @@ public class MetaCacheKey {
   }
 
   /**
-   * Compares two instances of {@link MetaCacheKey}. The comparison is based on the entity
+   * Compares two instances of {@link EntityCacheKey}. The comparison is based on the entity
    * nameIdentifier and type.
    *
    * @param obj The object to compare to
@@ -86,8 +86,8 @@ public class MetaCacheKey {
   @Override
   public boolean equals(Object obj) {
     if (this == obj) return true;
-    if (!(obj instanceof MetaCacheKey)) return false;
-    MetaCacheKey other = (MetaCacheKey) obj;
+    if (!(obj instanceof EntityCacheKey)) return false;
+    EntityCacheKey other = (EntityCacheKey) obj;
     return Objects.equals(identifier, other.identifier) && Objects.equals(type, other.type);
   }
 
@@ -105,7 +105,7 @@ public class MetaCacheKey {
   /**
    * Returns a string representation of this instance.
    *
-   * @return A string representation of this instance
+   * @return A string representation of this instance, in the format "nameIdentifier.entityType"
    */
   @Override
   public String toString() {

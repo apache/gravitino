@@ -26,12 +26,12 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 
 /**
- * {@code MetaCache} is a cache interface in Gravitino designed to accelerate metadata access for
- * entities. It maintains a bidirectional mapping between an {@link Entity} and its {@code id}, as
- * well as its {@link NameIdentifier}. The cache also supports cascading removal of entries,
- * ensuring related sub-entities are cleared together.
+ * {@code EntityCache} is a cache interface in Gravitino designed to accelerate metadata access for
+ * entities. It maintains a bidirectional mapping between an {@link Entity} and its {@code
+ * NameIdentifier}. The cache also supports cascading removal of entries, ensuring related
+ * sub-entities are cleared together.
  */
-public interface MetaCache {
+public interface EntityCache {
   /**
    * Retrieves an entity by its name identifier and type. If the entity is not present in the cache,
    * it will be loaded from the backing EntityStore.
@@ -73,8 +73,8 @@ public interface MetaCache {
    *
    * @param ident the name identifier
    * @param type the entity type
-   * @param removeFromStore true to also delete from store
-   * @return true if removed from cache
+   * @param removeFromStore {@code true} to also delete from store
+   * @return {@code true} if removed from cache or store, {@code false} if cache does nothing.
    */
   boolean remove(NameIdentifier ident, Entity.EntityType type, boolean removeFromStore);
 
@@ -106,8 +106,7 @@ public interface MetaCache {
   long size();
 
   /**
-   * Clears all entries from the cache, including data and index structures, resetting it to an
-   * empty state.
+   * Clears all entries from the cache, including data and index, resetting it to an empty state.
    */
   void clear();
 
