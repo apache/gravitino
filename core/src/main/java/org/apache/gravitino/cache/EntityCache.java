@@ -59,36 +59,13 @@ public interface EntityCache {
       NameIdentifier ident, Entity.EntityType type);
 
   /**
-   * Invalidates the cache entry for the given entity. Does not affect the underlying storage.
+   * Invalidates the cache entry for the given entity.
    *
    * @param ident the name identifier
    * @param type the entity type
    * @return true if the cache entry was removed
    */
-  default boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
-    return remove(ident, type, false);
-  }
-
-  /**
-   * Removes the entity from both cache and optionally the underlying store.
-   *
-   * @param ident the name identifier
-   * @param type the entity type
-   * @param removeFromStore {@code true} to also delete from store
-   * @return {@code true} if removed from cache or store, {@code false} if cache does nothing.
-   */
-  boolean remove(NameIdentifier ident, Entity.EntityType type, boolean removeFromStore);
-
-  /**
-   * Shortcut to remove from both cache and store.
-   *
-   * @param ident the name identifier
-   * @param type the entity type
-   * @return true if removed
-   */
-  default boolean remove(NameIdentifier ident, Entity.EntityType type) {
-    return remove(ident, type, true);
-  }
+  boolean invalidate(NameIdentifier ident, Entity.EntityType type);
 
   /**
    * Checks whether an entity with the given name identifier and type is present in the cache.
@@ -112,22 +89,12 @@ public interface EntityCache {
   void clear();
 
   /**
-   * Puts an entity into the cache, without writing to the backing store.
-   *
-   * @param entity The entity to cache
-   * @param <E> The class of the entity
-   */
-  default <E extends Entity & HasIdentifier> void put(E entity) {
-    put(entity, false);
-  }
-
-  /**
    * Puts an entity into the cache.
    *
    * @param entity The entity to cache
    * @param <E> The class of the entity
    */
-  <E extends Entity & HasIdentifier> void put(E entity, boolean putToStore);
+  <E extends Entity & HasIdentifier> void put(E entity);
 
   /**
    * Executes the given action within a cache context.
@@ -143,5 +110,5 @@ public interface EntityCache {
    * @param <E> The class of the entity
    * @return The result of the action
    */
-  <E extends Entity & HasIdentifier> E withCacheLock(Supplier<E> action);
+  <E> E withCacheLock(Supplier<E> action);
 }
