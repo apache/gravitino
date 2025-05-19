@@ -109,6 +109,6 @@ public class MetaCacheKey {
    */
   @Override
   public String toString() {
-    return type.getShortName() + "." + identifier.toString();
+    return identifier.toString() + "." + type.getShortName();
   }
 }

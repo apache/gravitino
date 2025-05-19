@@ -80,6 +80,6 @@ public class TestMetaCacheKey {
     Assertions.assertNotEquals(metaCacheKey3.hashCode(), metaCacheKey4.hashCode());
     Assertions.assertEquals(metaCacheKey1.hashCode(), metaCacheKey5.hashCode());
 
-    Assertions.assertEquals("mo.m1.c1.s1.t1", metaCacheKey1.toString());
+    Assertions.assertEquals("m1.c1.s1.t1.mo", metaCacheKey1.toString());
   }
 }
