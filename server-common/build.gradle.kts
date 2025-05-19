@@ -47,7 +47,6 @@ dependencies {
   implementation(libs.ognl)
   implementation(libs.prometheus.servlet)
 
-
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
