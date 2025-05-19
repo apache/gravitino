@@ -30,7 +30,7 @@ ${gravitino_home}/gradlew clean build -x test
 
 rm -rf ${gravitino_home}/distribution
 # Prepare compile Gravitino packages
-${gravitino_home}/gradlew compileDistribution -x test -x rat
+${gravitino_home}/gradlew compileDistribution -x test
 
 # Removed old packages, Avoid multiple re-executions using the wrong file
 rm -rf "${gravitino_dir}/packages"
