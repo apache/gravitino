@@ -61,6 +61,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -1003,5 +1004,36 @@ public class CatalogDorisIT extends BaseIT {
 
       tableCatalog.dropTable(tableIdentifier);
     }
+  }
+
+  @Test
+  void testAllDistributionWithAuto() {
+    Distribution distribution =
+        Distributions.auto(Strategy.HASH, NamedReference.field(DORIS_COL_NAME1));
+
+    String tableName = GravitinoITUtils.genRandomName("test_distribution_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    Index[] indexes = Indexes.EMPTY_INDEXES;
+    Map<String, String> properties = createTableProperties();
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        null,
+        indexes);
+    // load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    Assertions.assertEquals(distribution.strategy(), loadTable.distribution().strategy());
+    Assertions.assertEquals(distribution.number(), loadTable.distribution().number());
+    Assertions.assertArrayEquals(
+        distribution.expressions(), loadTable.distribution().expressions());
+    tableCatalog.dropTable(tableIdentifier);
   }
 }
