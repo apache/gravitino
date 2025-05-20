@@ -25,6 +25,9 @@ import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.cache.CacheConfig;
+import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -75,6 +78,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.CachedEntityStore;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
 import org.slf4j.Logger;
@@ -134,6 +138,7 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
+  private EntityCache entityCache;
 
   protected GravitinoEnv() {}
 
@@ -356,6 +361,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Return the Entity cache
+   *
+   * @return the entity cache
+   */
+  public EntityCache entityCache() {
+    return entityCache;
+  }
+
+  /**
    * Get the EventListenerManager associated with the Gravitino environment.
    *
    * @return The EventListenerManager instance.
@@ -428,6 +442,8 @@ public class GravitinoEnv {
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
+    this.entityCache = CaffeineEntityCache.getInstance(new CacheConfig(), entityStore);
+    this.entityStore = new CachedEntityStore(entityStore, entityCache);
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();

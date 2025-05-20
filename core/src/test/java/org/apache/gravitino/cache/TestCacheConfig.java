@@ -19,28 +19,21 @@
 
 package org.apache.gravitino.cache;
 
-import org.apache.gravitino.Entity;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestMetaCacheKey {
-
+public class TestCacheConfig {
   @Test
-  void testCreateMetaCacheKeyUseConstructor() {
-    MetaCacheKey metaCacheKey = new MetaCacheKey(100L, Entity.EntityType.MODEL);
-    Assertions.assertEquals(100L, metaCacheKey.id());
-    Assertions.assertEquals(Entity.EntityType.MODEL, metaCacheKey.type());
-  }
+  void testDefaultCacheConfig() {
+    CacheConfig cacheConfig = new CacheConfig();
 
-  @Test
-  void testCreateMetaCacheKeyUseStaticMethod() {
-    MetaCacheKey metaCacheKey = MetaCacheKey.of(100L, Entity.EntityType.MODEL);
-    Assertions.assertEquals(100L, metaCacheKey.id());
-    Assertions.assertEquals(Entity.EntityType.MODEL, metaCacheKey.type());
-  }
-
-  @Test
-  void testCreateMetaCacheKeyWithNullArguments() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> MetaCacheKey.of(100L, null));
+    Assertions.assertEquals(10_000, cacheConfig.getMaxSize());
+    Assertions.assertTrue(cacheConfig.isExpirationEnabled());
+    Assertions.assertEquals(60, cacheConfig.getExpirationTime());
+    Assertions.assertEquals(TimeUnit.MINUTES, cacheConfig.getExpirationTimeUnit());
+    Assertions.assertFalse(cacheConfig.isCacheStatusEnabled());
+    Assertions.assertTrue(cacheConfig.isWeigherEnabled());
+    Assertions.assertEquals(200_302_000, cacheConfig.getMaxWeight());
   }
 }
