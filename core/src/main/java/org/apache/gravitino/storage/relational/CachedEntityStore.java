@@ -51,7 +51,7 @@ public class CachedEntityStore
    * Constructs a new instance of CachedEntityStore.
    *
    * @param entityStore The {@link RelationalEntityStore} instance to do the real work.
-   * @param cache The {@link EntityCache} instance to cache metadata.
+   * @param cache The {@link EntityCache} instance to cache metadata in memory.
    */
   public CachedEntityStore(EntityStore entityStore, EntityCache cache) {
     this.entityStore = (RelationalEntityStore) entityStore;
@@ -61,7 +61,7 @@ public class CachedEntityStore
   /** {@inheritDoc} */
   @Override
   public void initialize(Config config) throws RuntimeException {
-    // do nothing
+    entityStore.initialize(config);
   }
 
   /** {@inheritDoc} */
@@ -76,7 +76,7 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
       throws IOException {
-    return entityStore.list(namespace, type, entityType);
+    return entityStore.list(namespace, type, entityType, allFields);
   }
 
   /** {@inheritDoc} */
@@ -129,7 +129,8 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    return cache.getOrLoad(ident, entityType);
+    // TODO
+    return entityStore.get(ident, entityType, e);
   }
 
   /** {@inheritDoc} */

@@ -45,7 +45,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
 
   /** Singleton instance */
-  private static volatile CaffeineEntityCache INSTANCE;
+  private static volatile CaffeineEntityCache INSTANCE = null;
 
   /** Cache part */
   private final Cache<EntityCacheKey, Entity> cacheData;
@@ -55,7 +55,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private final ReentrantLock opLock = new ReentrantLock();
 
   @VisibleForTesting
-  static void resetForTest() {
+  public static void resetForTest() {
     INSTANCE = null;
   }
 
@@ -151,7 +151,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     return withLock(
         () -> {
           try {
-            Entity entity = loadMetadataFromDB(ident, type);
+            Entity entity = entityStore.get(ident, type, getEntityClass(type));
             syncMetadataToCache(entity);
 
             return entity;
