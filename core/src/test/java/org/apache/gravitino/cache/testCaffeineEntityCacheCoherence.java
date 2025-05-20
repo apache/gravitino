@@ -271,8 +271,14 @@ public class testCaffeineEntityCacheCoherence {
     }
 
     @Actor
-    public void actor2(L_Result r) throws IOException {
-      Entity result = cache.getOrLoad(ident7, Entity.EntityType.METALAKE);
+    public void actor2(L_Result r) {
+
+      Entity result = null;
+      try {
+        result = cache.getOrLoad(ident7, Entity.EntityType.METALAKE);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
       r.r1 = result != null ? "ENTITY" : "NULL";
     }
   }
