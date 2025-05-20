@@ -32,7 +32,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -211,10 +210,16 @@ public class TestCachedEntityStore {
     when(cache.invalidate(ident1, Entity.EntityType.SCHEMA)).thenReturn(true);
     when(cache.invalidate(ident2, Entity.EntityType.FILESET)).thenReturn(true);
     when(cache.invalidate(ident3, Entity.EntityType.MODEL)).thenReturn(false);
-    when(cache.withCacheLock(any(Supplier.class)))
+    when(cache.withCacheLockIO(any()))
         .then(
             invocationOnMock -> {
-              Supplier<Object> supplier = invocationOnMock.getArgument(0);
+              EntityCache.ThrowingSupplier<?, ?> supplier = invocationOnMock.getArgument(0);
+              return supplier.get();
+            });
+    when(cache.withCacheLock(any(EntityCache.ThrowingSupplier.class)))
+        .then(
+            invocationOnMock -> {
+              EntityCache.ThrowingSupplier<?, ?> supplier = invocationOnMock.getArgument(0);
               return supplier.get();
             });
 

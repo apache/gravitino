@@ -59,7 +59,7 @@ public class CachedEntityStore
   /** {@inheritDoc} */
   @Override
   public void initialize(Config config) throws RuntimeException {
-    // do nothing
+    entityStore.initialize(config);
   }
 
   /** {@inheritDoc} */
@@ -90,17 +90,11 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return cache.withCacheLock(
+    return cache.withCacheLockIO(
         () -> {
           cache.invalidate(ident, entityType);
 
-          E updatedEntity;
-          try {
-            updatedEntity = entityStore.update(ident, type, entityType, updater);
-          } catch (IOException e) {
-            LOG.error("Failed to update entity in entity store", e);
-            throw new RuntimeException(e);
-          }
+          E updatedEntity = entityStore.update(ident, type, entityType, updater);
           cache.put(updatedEntity);
 
           return updatedEntity;
@@ -119,16 +113,10 @@ public class CachedEntityStore
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    return cache.withCacheLock(
+    return cache.withCacheLockIO(
         () -> {
           cache.invalidate(ident, entityType);
-
-          try {
-            return entityStore.delete(ident, entityType, cascade);
-          } catch (IOException e) {
-            LOG.error("Failed to delete entity in entity store", e);
-            throw new RuntimeException(e);
-          }
+          return entityStore.delete(ident, entityType, cascade);
         });
   }
 
