@@ -210,12 +210,7 @@ public class TestCachedEntityStore {
     when(cache.invalidate(ident1, Entity.EntityType.SCHEMA)).thenReturn(true);
     when(cache.invalidate(ident2, Entity.EntityType.FILESET)).thenReturn(true);
     when(cache.invalidate(ident3, Entity.EntityType.MODEL)).thenReturn(false);
-    when(cache.withCacheLockIO(any()))
-        .then(
-            invocationOnMock -> {
-              EntityCache.ThrowingSupplier<?, ?> supplier = invocationOnMock.getArgument(0);
-              return supplier.get();
-            });
+
     when(cache.withCacheLock(any(EntityCache.ThrowingSupplier.class)))
         .then(
             invocationOnMock -> {
@@ -225,11 +220,11 @@ public class TestCachedEntityStore {
 
     doAnswer(
             invocation -> {
-              Runnable r = invocation.getArgument(0);
+              EntityCache.ThrowingRunnable<?> r = invocation.getArgument(0);
               r.run();
               return null;
             })
         .when(cache)
-        .withCacheLock(any(Runnable.class));
+        .withCacheLock(any(EntityCache.ThrowingRunnable.class));
   }
 }

@@ -100,7 +100,7 @@ public interface EntityCache {
    *
    * @param action The action to cache
    */
-  void withCacheLock(Runnable action);
+  <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E;
 
   /**
    * Executes the given action within a cache context and returns the result.
@@ -114,18 +114,6 @@ public interface EntityCache {
   <T, E extends Exception> T withCacheLock(ThrowingSupplier<T, E> action) throws E;
 
   /**
-   * Executes the given action within a cache context and returns the result.
-   *
-   * @param action The action to cache
-   * @param <E> The type of exception that may be thrown
-   * @return The result of the action
-   * @throws IOException if the action throws an IOException
-   */
-  default <E> E withCacheLockIO(ThrowingSupplier<E, IOException> action) throws IOException {
-    return withCacheLock(action);
-  }
-
-  /**
    * A functional interface that represents a supplier that may throw an exception.
    *
    * @param <T> The type of result supplied by this supplier
@@ -135,5 +123,16 @@ public interface EntityCache {
   @FunctionalInterface
   interface ThrowingSupplier<T, E extends Exception> {
     T get() throws E;
+  }
+
+  /**
+   * A functional interface that represents a runnable that may throw an exception.
+   *
+   * @param <E> The type of exception that may be thrown
+   * @see java.lang.Runnable
+   */
+  @FunctionalInterface
+  interface ThrowingRunnable<E extends Exception> {
+    void run() throws E;
   }
 }

@@ -35,13 +35,10 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Cached Entity store, which caches metadata in memory. */
 public class CachedEntityStore
     implements EntityStore, SupportsTagOperations, SupportsRelationOperations {
-  private static final Logger LOG = LoggerFactory.getLogger(CachedEntityStore.class.getName());
   private final RelationalEntityStore entityStore;
   private final EntityCache cache;
 
@@ -74,13 +71,7 @@ public class CachedEntityStore
       throws IOException, EntityAlreadyExistsException {
     cache.withCacheLock(
         () -> {
-          try {
-            entityStore.put(e, overwritten);
-          } catch (IOException ex) {
-            LOG.error("Failed to put entity in entity store", ex);
-            throw new RuntimeException(ex);
-          }
-
+          entityStore.put(e, overwritten);
           cache.put(e);
         });
   }
@@ -90,10 +81,9 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return cache.withCacheLockIO(
+    return cache.withCacheLock(
         () -> {
           cache.invalidate(ident, entityType);
-
           E updatedEntity = entityStore.update(ident, type, entityType, updater);
           cache.put(updatedEntity);
 
@@ -113,7 +103,7 @@ public class CachedEntityStore
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    return cache.withCacheLockIO(
+    return cache.withCacheLock(
         () -> {
           cache.invalidate(ident, entityType);
           return entityStore.delete(ident, entityType, cascade);
