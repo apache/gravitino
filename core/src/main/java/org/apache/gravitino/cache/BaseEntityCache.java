@@ -20,7 +20,6 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
@@ -52,8 +51,6 @@ import org.apache.gravitino.meta.UserEntity;
  */
 public abstract class BaseEntityCache implements EntityCache {
   private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAP;
-  private static final String NULL_ENTITY_STORE =
-      "EntityStore cannot be null if you want to operate underlying " + "database";
   // The entity store used by the cache, initialized through the constructor.
   protected final EntityStore entityStore;
   protected final CacheConfig cacheConfig;
@@ -120,20 +117,6 @@ public abstract class BaseEntityCache implements EntityCache {
   public BaseEntityCache(CacheConfig cacheConfig, EntityStore entityStore) {
     this.cacheConfig = cacheConfig;
     this.entityStore = entityStore;
-  }
-
-  /**
-   * Loads an entity from the entity store by its name identifier.
-   *
-   * @param ident The {@link NameIdentifier} of the entity to load.
-   * @param type The type of the entity to load.
-   * @return The loaded entity, or null if it was not found.
-   * @throws IOException If an error occurs while loading the entity.
-   */
-  protected Entity loadMetadataFromDB(NameIdentifier ident, Entity.EntityType type)
-      throws IOException {
-    Preconditions.checkNotNull(entityStore, NULL_ENTITY_STORE);
-    return entityStore.get(ident, type, getEntityClass(type));
   }
 
   /**

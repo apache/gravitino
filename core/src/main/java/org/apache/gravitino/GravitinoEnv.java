@@ -440,10 +440,10 @@ public class GravitinoEnv {
 
   private void initGravitinoServerComponents() {
     // Initialize EntityStore
-    this.entityStore = EntityStoreFactory.createEntityStore(config);
-    entityStore.initialize(config);
-    this.entityCache = CaffeineEntityCache.getInstance(new CacheConfig(), entityStore);
-    this.entityStore = new CachedEntityStore(entityStore, entityCache);
+    EntityStore relationEntityStore = EntityStoreFactory.createEntityStore(config);
+    this.entityCache = CaffeineEntityCache.getInstance(new CacheConfig(), relationEntityStore);
+    this.entityStore = new CachedEntityStore(relationEntityStore, entityCache);
+    this.entityStore.initialize(config);
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
