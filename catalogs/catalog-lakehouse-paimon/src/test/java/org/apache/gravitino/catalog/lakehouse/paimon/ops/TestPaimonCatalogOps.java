@@ -34,6 +34,7 @@ import static org.apache.gravitino.rel.TableChange.updateColumnPosition;
 import static org.apache.gravitino.rel.TableChange.updateColumnType;
 import static org.apache.gravitino.rel.TableChange.updateComment;
 import static org.apache.paimon.CoreOptions.BUCKET;
+import static org.apache.paimon.CoreOptions.BUCKET_KEY;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -92,7 +93,8 @@ public class TestPaimonCatalogOps {
   private static final String TABLE = "test_table_ops_table";
   private static final String COMMENT = "table_ops_table_comment";
   private static final NameIdentifier IDENTIFIER = NameIdentifier.of(Namespace.of(DATABASE), TABLE);
-  private static final Map<String, String> OPTIONS = ImmutableMap.of(BUCKET.key(), "10");
+  private static final Map<String, String> OPTIONS =
+      ImmutableMap.of(BUCKET.key(), "10", BUCKET_KEY.key(), "col_1");
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -218,7 +220,7 @@ public class TestPaimonCatalogOps {
         IllegalArgumentException.class, () -> assertUpdateColumnPosition(5, defaultPos()));
     // Test NullPointerException with UpdateColumnPosition for after non-existent column.
     assertThrowsExactly(
-        NullPointerException.class, () -> assertUpdateColumnPosition(1, after("col_5")));
+        IllegalArgumentException.class, () -> assertUpdateColumnPosition(1, after("col_5")));
   }
 
   @Test

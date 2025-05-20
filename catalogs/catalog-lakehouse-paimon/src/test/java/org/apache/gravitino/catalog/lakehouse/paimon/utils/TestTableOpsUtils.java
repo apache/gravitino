@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.base.Joiner;
 import java.util.Arrays;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.tuple.Pair;
@@ -87,7 +88,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_1", addColumn.fieldName());
+          assertEquals("col_1", filedPath(addColumn.fieldNames()));
           assertEquals(DataTypeRoot.INTEGER, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNotNull(addColumn.move());
@@ -111,7 +112,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_2", addColumn.fieldName());
+          assertEquals("col_2", filedPath(addColumn.fieldNames()));
           assertEquals(DataTypeRoot.FLOAT, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNotNull(addColumn.move());
@@ -135,7 +136,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_3", addColumn.fieldName());
+          assertEquals("col_3", filedPath(addColumn.fieldNames()));
           assertEquals(DataTypeRoot.ARRAY, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNull(addColumn.move());
@@ -156,7 +157,7 @@ public class TestTableOpsUtils {
         AddColumn.class,
         schemaChange -> {
           AddColumn addColumn = (AddColumn) schemaChange;
-          assertEquals("col_4", addColumn.fieldName());
+          assertEquals("col_4", filedPath(addColumn.fieldNames()));
           assertEquals(DataTypeRoot.MAP, addColumn.dataType().getTypeRoot());
           assertEquals(AddColumn.class.getSimpleName(), addColumn.description());
           assertNull(addColumn.move());
@@ -196,7 +197,7 @@ public class TestTableOpsUtils {
         UpdateColumnType.class,
         schemaChange -> {
           UpdateColumnType updateColumnType = (UpdateColumnType) schemaChange;
-          assertEquals("col_4", updateColumnType.fieldName());
+          assertEquals("col_4", filedPath(updateColumnType.fieldNames()));
           assertEquals(DataTypeRoot.DOUBLE, updateColumnType.newDataType().getTypeRoot());
         });
   }
@@ -208,7 +209,7 @@ public class TestTableOpsUtils {
         RenameColumn.class,
         schemaChange -> {
           RenameColumn renameColumn = (RenameColumn) schemaChange;
-          assertEquals("col_1", renameColumn.fieldName());
+          assertEquals("col_1", filedPath(renameColumn.fieldNames()));
           assertEquals("col_5", renameColumn.newName());
         });
   }
@@ -220,7 +221,7 @@ public class TestTableOpsUtils {
         DropColumn.class,
         schemaChange -> {
           DropColumn dropColumn = (DropColumn) schemaChange;
-          assertEquals("col_2", dropColumn.fieldName());
+          assertEquals("col_2", filedPath(dropColumn.fieldNames()));
         });
   }
 
@@ -329,5 +330,9 @@ public class TestTableOpsUtils {
         assertThrowsExactly(
             IllegalArgumentException.class, () -> buildSchemaChange(tableChange.getKey()));
     assertEquals(tableChange.getValue(), exception.getMessage());
+  }
+
+  private static String filedPath(String[] fieldNames) {
+    return Joiner.on(".").join(fieldNames);
   }
 }
