@@ -36,13 +36,10 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Cached Entity store, which caches metadata in memory. */
 public class CachedEntityStore
     implements EntityStore, SupportsTagOperations, SupportsRelationOperations {
-  private static final Logger LOG = LoggerFactory.getLogger(CachedEntityStore.class.getName());
   private final RelationalEntityStore entityStore;
 
   private final EntityCache cache;
@@ -91,13 +88,7 @@ public class CachedEntityStore
       throws IOException, EntityAlreadyExistsException {
     cache.withCacheLock(
         () -> {
-          try {
-            entityStore.put(e, overwritten);
-          } catch (IOException ex) {
-            LOG.error("Failed to put entity in entity store", ex);
-            throw new RuntimeException(ex);
-          }
-
+          entityStore.put(e, overwritten);
           cache.put(e);
         });
   }
@@ -124,7 +115,7 @@ public class CachedEntityStore
       throws NoSuchEntityException, IOException {
 
     return (E)
-        cache.withCacheLockIO(
+        cache.withCacheLock(
             () -> {
               if (cache.contains(ident, entityType)) {
                 return cache.getIfPresent(ident, entityType).get();

@@ -216,8 +216,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public void withCacheLock(Runnable action) {
-    withLock(action);
+  public <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E {
+    withLockAndThrow(action);
   }
 
   /** {@inheritDoc} */
@@ -343,6 +343,22 @@ public class CaffeineEntityCache extends BaseEntityCache {
     opLock.lock();
     try {
       return action.get();
+    } finally {
+      opLock.unlock();
+    }
+  }
+
+  /**
+   * Runs the given action with the lock and throws the exception if it occurs.
+   *
+   * @param action The action to run with the lock
+   * @param <E> The type of the exception
+   * @throws E If an exception occurs during the action
+   */
+  private <E extends Exception> void withLockAndThrow(ThrowingRunnable<E> action) throws E {
+    opLock.lock();
+    try {
+      action.run();
     } finally {
       opLock.unlock();
     }
