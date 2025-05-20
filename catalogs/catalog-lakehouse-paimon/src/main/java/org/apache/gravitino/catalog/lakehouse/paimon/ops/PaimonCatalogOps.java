@@ -64,7 +64,7 @@ public class PaimonCatalogOps implements AutoCloseable {
   }
 
   public Map<String, String> loadDatabase(String databaseName) throws DatabaseNotExistException {
-    return catalog.loadDatabaseProperties(databaseName);
+    return catalog.getDatabase(databaseName).options();
   }
 
   public void createDatabase(String databaseName, Map<String, String> properties)
