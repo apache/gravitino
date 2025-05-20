@@ -21,7 +21,6 @@ package org.apache.gravitino.cache;
 
 import java.io.IOException;
 import java.util.Optional;
-import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -107,8 +106,34 @@ public interface EntityCache {
    * Executes the given action within a cache context and returns the result.
    *
    * @param action The action to cache
-   * @param <E> The class of the entity
    * @return The result of the action
+   * @param <E> The type of exception that may be thrown
+   * @param <T> The type of the result
+   * @throws E if the action throws an exception of type E
    */
-  <E> E withCacheLock(Supplier<E> action);
+  <T, E extends Exception> T withCacheLock(ThrowingSupplier<T, E> action) throws E;
+
+  /**
+   * Executes the given action within a cache context and returns the result.
+   *
+   * @param action The action to cache
+   * @return The result of the action
+   * @param <E> The type of exception that may be thrown
+   * @throws IOException if the action throws an IOException
+   */
+  default <E> E withCacheLockIO(ThrowingSupplier<E, IOException> action) throws IOException {
+    return withCacheLock(action);
+  }
+
+  /**
+   * A functional interface that represents a supplier that may throw an exception.
+   *
+   * @param <T> The type of result supplied by this supplier
+   * @param <E> The type of exception that may be thrown
+   * @see java.util.function.Supplier
+   */
+  @FunctionalInterface
+  interface ThrowingSupplier<T, E extends Exception> {
+    T get() throws E;
+  }
 }

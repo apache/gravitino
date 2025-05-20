@@ -120,7 +120,12 @@ public class testCaffeineEntityCacheCoherence {
 
     @Actor
     public void actor2(L_Result r) {
-      Entity e = cache.getOrLoad(ident1, Entity.EntityType.SCHEMA);
+      Entity e = null;
+      try {
+        e = cache.getOrLoad(ident1, Entity.EntityType.SCHEMA);
+      } catch (IOException ex) {
+        throw new RuntimeException(ex);
+      }
       r.r1 = e != null ? "ENTITY" : "NULL";
     }
   }
@@ -158,7 +163,7 @@ public class testCaffeineEntityCacheCoherence {
     }
 
     @Actor
-    public void actor2(L_Result r) {
+    public void actor2(L_Result r) throws IOException {
       Entity e = cache.getOrLoad(ident3, Entity.EntityType.TABLE);
       r.r1 = (e != null) ? "ENTITY" : "NULL";
     }
@@ -266,7 +271,7 @@ public class testCaffeineEntityCacheCoherence {
     }
 
     @Actor
-    public void actor2(L_Result r) {
+    public void actor2(L_Result r) throws IOException {
       Entity result = cache.getOrLoad(ident7, Entity.EntityType.METALAKE);
       r.r1 = result != null ? "ENTITY" : "NULL";
     }

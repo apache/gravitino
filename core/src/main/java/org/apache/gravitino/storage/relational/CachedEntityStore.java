@@ -110,14 +110,7 @@ public class CachedEntityStore
     return cache.withCacheLock(
         () -> {
           cache.invalidate(ident, entityType);
-
-          E updatedEntity;
-          try {
-            updatedEntity = entityStore.update(ident, type, entityType, updater);
-          } catch (IOException e) {
-            LOG.error("Failed to update entity in entity store", e);
-            throw new RuntimeException(e);
-          }
+          E updatedEntity = entityStore.update(ident, type, entityType, updater);
           cache.put(updatedEntity);
 
           return updatedEntity;
@@ -129,8 +122,19 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    // TODO
-    return entityStore.get(ident, entityType, e);
+
+    return (E)
+        cache.withCacheLockIO(
+            () -> {
+              if (cache.contains(ident, entityType)) {
+                return cache.getIfPresent(ident, entityType).get();
+              }
+
+              E entity = entityStore.get(ident, entityType, e);
+              cache.put(entity);
+
+              return entity;
+            });
   }
 
   /** {@inheritDoc} */
@@ -140,13 +144,7 @@ public class CachedEntityStore
     return cache.withCacheLock(
         () -> {
           cache.invalidate(ident, entityType);
-
-          try {
-            return entityStore.delete(ident, entityType, cascade);
-          } catch (IOException e) {
-            LOG.error("Failed to delete entity in entity store", e);
-            throw new RuntimeException(e);
-          }
+          return entityStore.delete(ident, entityType, cascade);
         });
   }
 

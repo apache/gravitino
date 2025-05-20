@@ -27,6 +27,7 @@ import com.google.common.base.Preconditions;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -138,7 +139,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public Entity getOrLoad(NameIdentifier ident, Entity.EntityType type) {
+  public Entity getOrLoad(NameIdentifier ident, Entity.EntityType type) throws IOException {
     Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
@@ -148,17 +149,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
       return cachedEntity;
     }
 
-    return withLock(
+    return withLockAndThrow(
         () -> {
-          try {
-            Entity entity = entityStore.get(ident, type, getEntityClass(type));
-            syncMetadataToCache(entity);
+          Entity entity = entityStore.get(ident, type, getEntityClass(type));
+          syncMetadataToCache(entity);
 
-            return entity;
-          } catch (Exception e) {
-            LOG.error("Error while loading entity by name", e);
-            throw new RuntimeException("Error while loading entity by name", e);
-          }
+          return entity;
         });
   }
 
@@ -226,8 +222,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E> E withCacheLock(Supplier<E> action) {
-    return withLock(action);
+  public <E, T extends Exception> E withCacheLock(ThrowingSupplier<E, T> action) throws T {
+    return withLockAndThrow(action);
   }
 
   /**
@@ -327,6 +323,23 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param <T> The type of the result
    */
   private <T> T withLock(Supplier<T> action) {
+    opLock.lock();
+    try {
+      return action.get();
+    } finally {
+      opLock.unlock();
+    }
+  }
+
+  /**
+   * Runs the given action with the lock and throws the exception if it occurs.
+   *
+   * @param action The action to run with the lock
+   * @param <T> The type of the result
+   * @return The result of the action
+   * @throws IOException If an exception occurs during the action
+   */
+  private <T, E extends Exception> T withLockAndThrow(ThrowingSupplier<T, E> action) throws E {
     opLock.lock();
     try {
       return action.get();
