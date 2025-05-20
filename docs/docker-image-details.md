@@ -193,6 +193,8 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- apache/gravitino-ci:hive-0.1.19
+  - Build ranger packages from source.
 
 - apache/gravitino-ci:hive-0.1.18
   - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. 
@@ -367,6 +369,9 @@ Changelog
 You can use this image to control Trino's permissions.
 
 Changelog
+
+- apache/gravitino-ci:ranger-0.1.2
+  - Build ranger packages from source.
 
 - apache/gravitino-ci:ranger-0.1.1 (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
