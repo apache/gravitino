@@ -412,7 +412,7 @@ public class TestCaffeineEntityCache {
         .thenThrow(new IOException("Simulated IO failure"));
 
     Assertions.assertThrows(
-        RuntimeException.class, () -> cache.getOrLoad(badIdent, Entity.EntityType.SCHEMA));
+        IOException.class, () -> cache.getOrLoad(badIdent, Entity.EntityType.SCHEMA));
   }
 
   @Test
