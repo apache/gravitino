@@ -41,30 +41,32 @@ if [ ! -f "${ranger_dir}/packages/${RANGER_PACKAGE_NAME}" ]; then
     git clone https://github.com/apache/ranger --branch master --single-branch ${ranger_dir}/packages/apache-ranger
     # set the commit to RANGER-5146: 500 API Error When Deleting TagDef with a Linked Tag
     # https://github.com/apache/ranger/commit/ff36aabe36169b94862c51a5b403f59c9d728b94
+    cd ${ranger_dir}/packages/apache-ranger
     git reset --hard ff36aabe36169b94862c51a5b403f59c9d728b94
   fi
 
   cp ${ranger_dir}/.env ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
+  # overwrite docker-compose.ranger-base.yml in apache-ranger, add :Z option to volume to solve
+  # SELinux problem
+  cp ${ranger_dir}/docker-compose.ranger-build.yml ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
   cd ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker
 
-  # Prevent builder to pull remote image
-  # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
-  docker builder prune -f
-  docker builder use default
+  mkdir -p ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker/dist
 
-  export DOCKER_BUILDKIT=1
-  export COMPOSE_DOCKER_CLI_BUILD=1
-  export RANGER_DB_TYPE=mysql
+  # run command in subshell to avoid environment variable pollution
+  (
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
+    export RANGER_DB_TYPE=mysql
+    # Prevent builder to pull remote image
+    # https://github.com/moby/buildkit/issues/2343#issuecomment-1311890308
+    export BUILDX_BUILDER=default
 
-  # run docker compose command to build packages
-  docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
-  # copy packages from volume to host
-  docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
+    docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml up --pull=never
+    docker compose -f docker-compose.ranger-base.yml -f docker-compose.ranger-build.yml cp ranger-build:/home/ranger/dist .
+  )
 
-  cp ./dist/* ${ranger_dir}/packages
-
-  # change back to gravitino-builder
-  docker builder use gravitino-builder
+  cp ${ranger_dir}/packages/apache-ranger/dev-support/ranger-docker/dist/* ${ranger_dir}/packages
 fi
 
 if [ ! -f "${ranger_dir}/packages/${MYSQL_CONNECTOR_PACKAGE_NAME}" ]; then
