@@ -70,7 +70,7 @@ public class EventBus {
    */
   public void dispatchEvent(BaseEvent baseEvent) {
     if (baseEvent instanceof PreEvent) {
-      dispatchPreEvent((PreEvent) baseEvent);
+      dispatchAndTransformPreEvent((PreEvent) baseEvent);
     } else if (baseEvent instanceof Event) {
       dispatchPostEvent((Event) baseEvent);
     } else {
@@ -98,7 +98,17 @@ public class EventBus {
     eventListeners.forEach(eventListener -> eventListener.onPostEvent(postEvent));
   }
 
-  private void dispatchPreEvent(PreEvent preEvent) throws ForbiddenException {
-    eventListeners.forEach(eventListener -> eventListener.onPreEvent(preEvent));
+  public PreEvent dispatchAndTransformPreEvent(PreEvent originalEvent) throws ForbiddenException {
+    PreEvent transformedEvent = transformPreEvent(originalEvent);
+    eventListeners.forEach(eventListener -> eventListener.onPreEvent(transformedEvent));
+    return transformedEvent;
+  }
+
+  private PreEvent transformPreEvent(PreEvent preEvent) {
+    PreEvent tmpPreEvent = preEvent;
+    for (EventListenerPlugin eventListener : eventListeners) {
+      tmpPreEvent = eventListener.transformPreEvent(tmpPreEvent);
+    }
+    return tmpPreEvent;
   }
 }
