@@ -37,6 +37,7 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkUtilIT;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
@@ -203,7 +204,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .set(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true")
             .set("hive.exec.dynamic.partition.mode", "nonstrict")
             .set("spark.sql.warehouse.dir", warehouse)
-            .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
+            .set("spark.sql.session.timeZone", TIME_ZONE_UTC)
+            .set("spark.sql.extensions", PaimonSparkSessionExtensions.class.getName());
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
