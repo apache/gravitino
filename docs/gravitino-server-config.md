@@ -259,7 +259,54 @@ You could put HDFS configuration file to the catalog properties configuration di
 
 ## How to set up runtime environment variables
 
-The Gravitino server lets you set up runtime environment variables by editing the `gravitino-env.sh` file, located in the `conf` directory.
+The Gravitino server supports configuring runtime environment variables in two ways:
+
+1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
+2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 0.10.0-incubating)*
+
+### Local runtime environment
+
+Edit the `gravitino-env.sh` script to set environment variables for local development.
+
+### Docker-based Environment Variable Injection
+
+The Gravitino Docker image supports injecting configuration values via environment variables by translating them to corresponding entries in `gravitino.conf` at container startup.
+
+This is done using a startup script that parses environment variables prefixed with `GRAVITINO_` and rewrites the configuration file accordingly. Usage Example: 
+
+To start a container and override the default HTTP port:
+
+```shell
+docker run --rm -d \
+  -e GRAVITINO_SERVER_WEBSERVER_HTTP_PORT=8080 \
+  -p 8080:8080 \
+  apache/gravitino:<tag>
+```
+
+To configure JDBC backend with PostgreSQL:
+
+```shell
+docker run --rm -d \
+  -e GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL="jdbc:postgresql://localhost:5432/database1" \
+  -e GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_DRIVER="org.postgresql.Driver" \
+  -p 8090:8090 \
+  apache/gravitino:<tag>
+```
+
+You can verify that the configuration was applied correctly by inspecting the container's `gravitino.conf`:
+
+```shell
+docker exec -it <container_id> cat /root/gravitino/conf/gravitino.conf
+```
+
+Supported Variable Format:  variables must follow the pattern where periods (`.`) in the config key are replaced with underscores (`_`). For example:
+
+- `gravitino.server.webserver.httpPort` to `GRAVITINO_SERVER_WEBSERVER_HTTP_PORT`
+- `gravitino.entity.store.relational.jdbcUrl` to `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`
+
+:::NOTE
+If both `gravitino.conf` and environment variable exist, the container’s startup script will overwrite the config file value with the environment variable.
+:::
 
 ### How to access Apache Hadoop
 
