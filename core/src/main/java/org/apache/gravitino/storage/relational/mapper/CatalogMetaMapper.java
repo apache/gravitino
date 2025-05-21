@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -38,6 +39,11 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface CatalogMetaMapper {
   String TABLE_NAME = "catalog_meta";
 
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "listCatalogPOsByMetalakeName")
+  List<CatalogPO> listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName);
+
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByMetalakeId")
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
@@ -50,11 +56,19 @@ public interface CatalogMetaMapper {
   Long selectCatalogIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
 
+  @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogIdByName")
+  Long selectCatalogIdByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String name);
+
   @SelectProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "selectCatalogMetaByMetalakeIdAndName")
   CatalogPO selectCatalogMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name);
+
+  @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaByName")
+  CatalogPO selectCatalogMetaByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
 
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
@@ -87,4 +101,10 @@ public interface CatalogMetaMapper {
       method = "deleteCatalogMetasByLegacyTimeline")
   Integer deleteCatalogMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogIdByMetalakeNameAndCatalogName")
+  CatalogIds selectCatalogIdByMetalakeNameAndCatalogName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName);
 }

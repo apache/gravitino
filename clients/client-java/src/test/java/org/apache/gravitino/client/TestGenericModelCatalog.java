@@ -19,6 +19,7 @@
 package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableList;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
@@ -32,7 +33,11 @@ import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.ModelRegisterRequest;
+import org.apache.gravitino.dto.requests.ModelUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelUpdatesRequest;
 import org.apache.gravitino.dto.requests.ModelVersionLinkRequest;
+import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
+import org.apache.gravitino.dto.requests.ModelVersionUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -504,6 +509,214 @@ public class TestGenericModelCatalog extends TestBase {
     Assertions.assertThrows(
         RuntimeException.class,
         () -> catalog.asModelCatalog().deleteModelVersion(modelId, "alias1"),
+        "internal error");
+  }
+
+  @Test
+  public void testAlterModel() throws JsonProcessingException {
+    String comment = "comment";
+    String schema = "schema1";
+    String oldName = "model1";
+    String newName = "new_model";
+    NameIdentifier modelId = NameIdentifier.of(schema, oldName);
+    String modelPath =
+        withSlash(
+            GenericModelCatalog.formatModelRequestPath(
+                    Namespace.of(METALAKE_NAME, CATALOG_NAME, schema))
+                + "/"
+                + modelId.name());
+
+    // Test rename the model
+    ModelUpdateRequest.RenameModelRequest renameModelReq =
+        new ModelUpdateRequest.RenameModelRequest(newName);
+    ModelDTO renamedDTO = mockModelDTO(newName, 0, comment, Collections.emptyMap());
+    ModelResponse commentResp = new ModelResponse(renamedDTO);
+    buildMockResource(
+        Method.PUT,
+        modelPath,
+        new ModelUpdatesRequest(ImmutableList.of(renameModelReq)),
+        commentResp,
+        HttpStatus.SC_OK);
+    Model renamedModel = catalog.asModelCatalog().alterModel(modelId, renameModelReq.modelChange());
+    compareModel(renamedDTO, renamedModel);
+
+    Assertions.assertEquals(newName, renamedModel.name());
+    Assertions.assertEquals(comment, renamedModel.comment());
+    Assertions.assertEquals(Collections.emptyMap(), renamedModel.properties());
+
+    // Test NoSuchModelException
+    ErrorResponse notFoundResp =
+        ErrorResponse.notFound(NoSuchModelException.class.getSimpleName(), "model not found");
+    buildMockResource(
+        Method.PUT,
+        modelPath,
+        new ModelUpdatesRequest(ImmutableList.of(renameModelReq)),
+        notFoundResp,
+        HttpStatus.SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> catalog.asModelCatalog().alterModel(modelId, renameModelReq.modelChange()),
+        "model not found");
+
+    // Test RuntimeException
+    ErrorResponse internalErrorResp = ErrorResponse.internalError("internal error");
+    buildMockResource(
+        Method.PUT,
+        modelPath,
+        new ModelUpdatesRequest(ImmutableList.of(renameModelReq)),
+        internalErrorResp,
+        HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> catalog.asModelCatalog().alterModel(modelId, renameModelReq.modelChange()),
+        "internal error");
+  }
+
+  @Test
+  void testUpdateModelVersionComment() throws JsonProcessingException {
+    String newComment = "new comment";
+    String uri = "uri";
+    int version = 0;
+    String[] aliases = new String[] {"alias1", "alias2"};
+
+    NameIdentifier modelId = NameIdentifier.of("schema1", "model1");
+    String modelVersionPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "schema1", "model1"))
+                + "/versions/0");
+
+    ModelVersionDTO mockModelVersion =
+        mockModelVersion(version, uri, aliases, newComment, Collections.emptyMap());
+    ModelVersionResponse resp = new ModelVersionResponse(mockModelVersion);
+    ModelVersionUpdateRequest.UpdateModelVersionComment updateCommentReq =
+        new ModelVersionUpdateRequest.UpdateModelVersionComment(newComment);
+
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        resp,
+        HttpStatus.SC_OK);
+
+    ModelVersion updatedModelVersion =
+        catalog
+            .asModelCatalog()
+            .alterModelVersion(modelId, version, updateCommentReq.modelVersionChange());
+    compareModelVersion(mockModelVersion, updatedModelVersion);
+
+    Assertions.assertEquals(uri, updatedModelVersion.uri());
+    Assertions.assertEquals(newComment, updatedModelVersion.comment());
+    Assertions.assertEquals(Collections.emptyMap(), updatedModelVersion.properties());
+    Assertions.assertEquals(version, updatedModelVersion.version());
+    Assertions.assertArrayEquals(aliases, updatedModelVersion.aliases());
+
+    // Test NoSuchModelException
+    ErrorResponse notFoundResp =
+        ErrorResponse.notFound(
+            NoSuchModelVersionException.class.getSimpleName(), "model version not found");
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        notFoundResp,
+        HttpStatus.SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchModelVersionException.class,
+        () ->
+            catalog
+                .asModelCatalog()
+                .alterModelVersion(modelId, version, updateCommentReq.modelVersionChange()),
+        "model not found");
+
+    // Test RuntimeException
+    ErrorResponse internalErrorResp = ErrorResponse.internalError("internal error");
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        internalErrorResp,
+        HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            catalog
+                .asModelCatalog()
+                .alterModelVersion(modelId, version, updateCommentReq.modelVersionChange()),
+        "internal error");
+  }
+
+  @Test
+  void testUpdateModelVersionCommentByAlias() throws JsonProcessingException {
+    String newComment = "new comment";
+    String uri = "uri";
+    int version = 0;
+    String[] aliases = new String[] {"alias1", "alias2"};
+
+    NameIdentifier modelId = NameIdentifier.of("schema1", "model1");
+    String modelVersionPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "schema1", "model1"))
+                + "/aliases/alias1");
+
+    ModelVersionDTO mockModelVersion =
+        mockModelVersion(version, uri, aliases, newComment, Collections.emptyMap());
+    ModelVersionResponse resp = new ModelVersionResponse(mockModelVersion);
+    ModelVersionUpdateRequest.UpdateModelVersionComment updateCommentReq =
+        new ModelVersionUpdateRequest.UpdateModelVersionComment(newComment);
+
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        resp,
+        HttpStatus.SC_OK);
+
+    ModelVersion updatedModelVersion =
+        catalog
+            .asModelCatalog()
+            .alterModelVersion(modelId, aliases[0], updateCommentReq.modelVersionChange());
+    compareModelVersion(mockModelVersion, updatedModelVersion);
+
+    Assertions.assertEquals(uri, updatedModelVersion.uri());
+    Assertions.assertEquals(newComment, updatedModelVersion.comment());
+    Assertions.assertEquals(Collections.emptyMap(), updatedModelVersion.properties());
+    Assertions.assertEquals(version, updatedModelVersion.version());
+    Assertions.assertArrayEquals(aliases, updatedModelVersion.aliases());
+
+    // Test NoSuchModelException
+    ErrorResponse notFoundResp =
+        ErrorResponse.notFound(
+            NoSuchModelVersionException.class.getSimpleName(), "model version not found");
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        notFoundResp,
+        HttpStatus.SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchModelVersionException.class,
+        () ->
+            catalog
+                .asModelCatalog()
+                .alterModelVersion(modelId, aliases[0], updateCommentReq.modelVersionChange()),
+        "model not found");
+
+    // Test RuntimeException
+    ErrorResponse internalErrorResp = ErrorResponse.internalError("internal error");
+    buildMockResource(
+        Method.PUT,
+        modelVersionPath,
+        new ModelVersionUpdatesRequest(ImmutableList.of(updateCommentReq)),
+        internalErrorResp,
+        HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            catalog
+                .asModelCatalog()
+                .alterModelVersion(modelId, aliases[0], updateCommentReq.modelVersionChange()),
         "internal error");
   }
 

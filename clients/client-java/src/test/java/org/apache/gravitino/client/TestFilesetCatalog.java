@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
@@ -57,6 +58,7 @@ import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
@@ -236,7 +238,7 @@ public class TestFilesetCatalog extends TestBase {
             .properties(ImmutableMap.of("k1", "v1"))
             .build();
     FilesetResponse resp = new FilesetResponse(mockFileset);
-    buildMockResource(Method.POST, filesetPath, req, resp, SC_OK);
+    buildMockResource(Method.POST, filesetPath, toMultipleLocationReq(req), resp, SC_OK);
     Fileset loadedFileset =
         catalog
             .asFilesetCatalog()
@@ -253,7 +255,7 @@ public class TestFilesetCatalog extends TestBase {
     ErrorResponse errResp =
         ErrorResponse.alreadyExists(
             FilesetAlreadyExistsException.class.getSimpleName(), "fileset already exists");
-    buildMockResource(Method.POST, filesetPath, req, errResp, SC_CONFLICT);
+    buildMockResource(Method.POST, filesetPath, toMultipleLocationReq(req), errResp, SC_CONFLICT);
     Assertions.assertThrows(
         AlreadyExistsException.class,
         () ->
@@ -282,6 +284,19 @@ public class TestFilesetCatalog extends TestBase {
                     "mock location",
                     ImmutableMap.of("k1", "v1")),
         "internal error");
+  }
+
+  private FilesetCreateRequest toMultipleLocationReq(FilesetCreateRequest req) {
+    return FilesetCreateRequest.builder()
+        .name(req.getName())
+        .type(req.getType())
+        .comment(req.getComment())
+        .storageLocations(
+            req.getStorageLocation() == null
+                ? ImmutableMap.of()
+                : ImmutableMap.of(LOCATION_NAME_UNKNOWN, req.getStorageLocation()))
+        .properties(req.getProperties())
+        .build();
   }
 
   @Test
@@ -439,6 +454,21 @@ public class TestFilesetCatalog extends TestBase {
     Assertions.assertTrue(StringUtils.isNotBlank(actualFileLocation));
     Assertions.assertEquals(mockFileLocation, actualFileLocation);
 
+    // get location by location name
+    String mockLocationName = "location1";
+    queryParams.put("location_name", mockLocationName);
+    buildMockResource(Method.GET, filesetPath, queryParams, null, resp, SC_OK);
+
+    actualFileLocation =
+        catalog
+            .asFilesetCatalog()
+            .getFileLocation(
+                NameIdentifier.of(fileset.namespace().level(2), fileset.name()),
+                mockSubPath,
+                mockLocationName);
+    Assertions.assertTrue(StringUtils.isNotBlank(actualFileLocation));
+    Assertions.assertEquals(mockFileLocation, actualFileLocation);
+
     // Throw schema not found exception
     ErrorResponse errResp =
         ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
@@ -474,6 +504,22 @@ public class TestFilesetCatalog extends TestBase {
                 .getFileLocation(
                     NameIdentifier.of(fileset.namespace().level(2), fileset.name()), mockSubPath),
         "internal error");
+
+    // throw NoSuchLocationNameException
+    ErrorResponse errResp3 =
+        ErrorResponse.notFound(
+            NoSuchLocationNameException.class.getSimpleName(), "location name not found");
+    buildMockResource(Method.GET, filesetPath, null, errResp3, SC_NOT_FOUND);
+    Assertions.assertThrows(
+        NoSuchLocationNameException.class,
+        () ->
+            catalog
+                .asFilesetCatalog()
+                .getFileLocation(
+                    NameIdentifier.of(fileset.namespace().level(2), fileset.name()),
+                    mockSubPath,
+                    mockLocationName),
+        "location name not found");
   }
 
   @Test
@@ -544,11 +590,13 @@ public class TestFilesetCatalog extends TestBase {
       String comment,
       String location,
       Map<String, String> properties) {
+    Map<String, String> locations =
+        location == null ? ImmutableMap.of() : ImmutableMap.of(LOCATION_NAME_UNKNOWN, location);
     return FilesetDTO.builder()
         .name(name)
         .type(type)
         .comment(comment)
-        .storageLocation(location)
+        .storageLocations(locations)
         .properties(properties)
         .audit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

@@ -17,16 +17,25 @@
 
 from typing import Dict, List
 
-from gravitino.name_identifier import NameIdentifier
 from gravitino.api.catalog import Catalog
 from gravitino.api.model.model import Model
 from gravitino.api.model.model_version import ModelVersion
+from gravitino.api.model_change import ModelChange
+from gravitino.api.model_version_change import ModelVersionChange
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_model import GenericModel
 from gravitino.client.generic_model_version import GenericModelVersion
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.requests.model_register_request import ModelRegisterRequest
+from gravitino.dto.requests.model_update_request import ModelUpdateRequest
+from gravitino.dto.requests.model_updates_request import ModelUpdatesRequest
 from gravitino.dto.requests.model_version_link_request import ModelVersionLinkRequest
+from gravitino.dto.requests.model_version_update_request import (
+    ModelVersionUpdateRequest,
+)
+from gravitino.dto.requests.model_version_updates_request import (
+    ModelVersionUpdatesRequest,
+)
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
@@ -34,6 +43,7 @@ from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
 from gravitino.exceptions.handlers.model_error_handler import MODEL_ERROR_HANDLER
+from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
@@ -269,6 +279,115 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         return GenericModelVersion(model_version_resp.model_version())
 
+    def alter_model(self, model_ident: NameIdentifier, *changes: ModelChange) -> Model:
+        """Alter the schema by applying the changes.
+        Args:
+            model_ident: The identifier of the model.
+            changes: The changes to apply to the model.
+        Raises:
+            NoSuchSchemaException: If the schema does not exist.
+            IllegalArgumentException: If the changes are invalid.
+        Returns:
+            The updated schema object.
+        """
+        self._check_model_ident(model_ident)
+        model_full_ns = self._model_full_namespace(model_ident.namespace())
+
+        update_requests = [
+            GenericModelCatalog.to_model_update_request(change) for change in changes
+        ]
+
+        req = ModelUpdatesRequest(update_requests)
+        req.validate()
+
+        resp = self.rest_client.put(
+            f"{self._format_model_request_path(model_full_ns)}/{encode_string(model_ident.name())}",
+            req,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+        model_response = ModelResponse.from_json(resp.body, infer_missing=True)
+        model_response.validate()
+        return GenericModel(model_response.model())
+
+    def alter_model_version(
+        self, model_ident: NameIdentifier, version: int, *changes: ModelVersionChange
+    ):
+        """
+        Alter the model version by applying the changes.
+        Args:
+            model_ident: The identifier of the model.
+            version: The version of the model version.
+            changes: The changes to apply to the model version.
+        Raises:
+            NoSuchModelVersionException: If the model version does not exist.
+            IllegalArgumentException: If the changes are invalid.
+        Returns:
+            The updated model version object.
+        """
+        self._check_model_ident(model_ident)
+
+        model_full_ident = self._model_full_identifier(model_ident)
+
+        update_requests = [
+            GenericModelCatalog.to_model_version_update_request(change)
+            for change in changes
+        ]
+
+        req = ModelVersionUpdatesRequest(update_requests)
+        req.validate()
+
+        resp = self.rest_client.put(
+            f"{self._format_model_version_request_path(model_full_ident)}/versions/{version}",
+            req,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+
+        model_version_response = ModelVersionResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        model_version_response.validate()
+        return GenericModelVersion(model_version_response.model_version())
+
+    def alter_model_version_by_alias(
+        self, model_ident: NameIdentifier, alias: str, *changes: ModelVersionChange
+    ):
+        """
+        Alter the model version by applying the changes.
+        Args:
+            model_ident: The identifier of the model.
+            alias: The alias of the model version.
+            changes: The changes to apply to the model version.
+        Raises:
+            NoSuchModelVersionException: If the model version does not exist.
+            IllegalArgumentException: If the changes are invalid.
+        Returns:
+            The updated model version object.
+        """
+        self._check_model_ident(model_ident)
+
+        model_full_ident = self._model_full_identifier(model_ident)
+
+        update_requests = [
+            GenericModelCatalog.to_model_version_update_request(change)
+            for change in changes
+        ]
+
+        req = ModelVersionUpdatesRequest(update_requests)
+        req.validate()
+
+        resp = self.rest_client.put(
+            f"{self._format_model_version_request_path(model_full_ident)}/aliases/"
+            f"{encode_string(alias)}",
+            req,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+
+        model_version_response = ModelVersionResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        model_version_response.validate()
+        return GenericModelVersion(model_version_response.model_version())
+
     def link_model_version(
         self,
         model_ident: NameIdentifier,
@@ -390,6 +509,53 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model = self.register_model(ident, comment, properties)
         self.link_model_version(ident, uri, aliases, comment, properties)
         return model
+
+    @staticmethod
+    def to_model_update_request(change: ModelChange):
+        if isinstance(change, ModelChange.RenameModel):
+            return ModelUpdateRequest.UpdateModelNameRequest(change.new_name())
+
+        if isinstance(change, ModelChange.SetProperty):
+            return ModelUpdateRequest.ModelSetPropertyRequest(
+                change.property(), change.value()
+            )
+
+        if isinstance(change, ModelChange.RemoveProperty):
+            return ModelUpdateRequest.ModelRemovePropertyRequest(change.property())
+
+        if isinstance(change, ModelChange.UpdateComment):
+            return ModelUpdateRequest.UpdateModelCommentRequest(change.new_comment())
+
+        raise ValueError(f"Unknown change type: {type(change).__name__}")
+
+    @staticmethod
+    def to_model_version_update_request(change: ModelVersionChange):
+        if isinstance(change, ModelVersionChange.UpdateComment):
+            return ModelVersionUpdateRequest.UpdateModelVersionComment(
+                change.new_comment()
+            )
+
+        if isinstance(change, ModelVersionChange.SetProperty):
+            return ModelVersionUpdateRequest.SetModelVersionPropertyRequest(
+                change.property(), change.value()
+            )
+
+        if isinstance(change, ModelVersionChange.RemoveProperty):
+            return ModelVersionUpdateRequest.RemoveModelVersionPropertyRequest(
+                change.property()
+            )
+
+        if isinstance(change, ModelVersionChange.UpdateUri):
+            return ModelVersionUpdateRequest.UpdateModelVersionUriRequest(
+                change.new_uri()
+            )
+
+        if isinstance(change, ModelVersionChange.UpdateAliases):
+            return ModelVersionUpdateRequest.ModelVersionAliasesRequest(
+                change.aliases_to_add(), change.aliases_to_remove()
+            )
+
+        raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def _check_model_namespace(self, namespace: Namespace):
         """Check the validity of the model namespace.

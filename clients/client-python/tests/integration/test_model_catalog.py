@@ -16,20 +16,21 @@
 # under the License.
 from random import randint
 
-from gravitino import GravitinoAdminClient, GravitinoClient, Catalog, NameIdentifier
+from gravitino import Catalog, GravitinoAdminClient, GravitinoClient, NameIdentifier
+from gravitino.api.model_change import ModelChange
+from gravitino.api.model_version_change import ModelVersionChange
 from gravitino.exceptions.base import (
     ModelAlreadyExistsException,
-    NoSuchSchemaException,
-    NoSuchModelException,
     ModelVersionAliasesAlreadyExistException,
+    NoSuchModelException,
     NoSuchModelVersionException,
+    NoSuchSchemaException,
 )
 from gravitino.namespace import Namespace
 from tests.integration.integration_test_env import IntegrationTestEnv
 
 
 class TestModelCatalog(IntegrationTestEnv):
-
     _metalake_name: str = "model_it_metalake" + str(randint(0, 1000))
     _catalog_name: str = "model_it_catalog" + str(randint(0, 1000))
     _schema_name: str = "model_it_schema" + str(randint(0, 1000))
@@ -132,7 +133,6 @@ class TestModelCatalog(IntegrationTestEnv):
             )
 
     def test_register_list_models(self):
-
         model_name1 = "model_it_model1" + str(randint(0, 1000))
         model_name2 = "model_it_model2" + str(randint(0, 1000))
         model_ident1 = NameIdentifier.of(self._schema_name, model_name1)
@@ -200,6 +200,290 @@ class TestModelCatalog(IntegrationTestEnv):
                 NameIdentifier.of(self._schema_name, "non_existent_model")
             )
         )
+
+    def test_register_rename_model(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_new_name = f"model_it_model_new{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        renamed_ident = NameIdentifier.of(self._schema_name, model_new_name)
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+
+        renamed_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(model_name, renamed_model.name())
+        self.assertEqual(comment, renamed_model.comment())
+        self.assertEqual(0, renamed_model.latest_version())
+        self.assertEqual(properties, renamed_model.properties())
+
+        changes = [ModelChange.rename(model_new_name)]
+
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
+        renamed_model = self._catalog.as_model_catalog().get_model(renamed_ident)
+        self.assertEqual(model_new_name, renamed_model.name())
+        self.assertEqual(comment, renamed_model.comment())
+        self.assertEqual(0, renamed_model.latest_version())
+        self.assertEqual(properties, renamed_model.properties())
+
+    def test_register_set_model_property(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        origin_model = self._catalog.as_model_catalog().get_model(model_ident)
+
+        self.assertEqual(origin_model.name(), model_name)
+        self.assertEqual(origin_model.comment(), comment)
+        self.assertEqual(origin_model.latest_version(), 0)
+        self.assertEqual(origin_model.properties(), properties)
+
+        changes = [
+            ModelChange.set_property("k1", "v11"),
+            ModelChange.set_property("k3", "v3"),
+        ]
+
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
+        update_property_model = self._catalog.as_model_catalog().get_model(model_ident)
+
+        self.assertEqual(update_property_model.name(), model_name)
+        self.assertEqual(update_property_model.comment(), comment)
+        self.assertEqual(update_property_model.latest_version(), 0)
+        self.assertEqual(
+            update_property_model.properties(), {"k1": "v11", "k2": "v2", "k3": "v3"}
+        )
+
+    def test_register_remove_model_property(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        origin_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(origin_model.name(), model_name)
+        self.assertEqual(origin_model.comment(), comment)
+        self.assertEqual(origin_model.latest_version(), 0)
+        self.assertEqual(origin_model.properties(), properties)
+
+        changes = [ModelChange.remove_property("k1")]
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
+        update_property_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(update_property_model.name(), model_name)
+        self.assertEqual(update_property_model.comment(), comment)
+        self.assertEqual(update_property_model.latest_version(), 0)
+        self.assertEqual(update_property_model.properties(), {"k2": "v2"})
+
+    def test_register_update_model_comment(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        comment = "comment"
+        new_comment = "new comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+
+        # Retrieve the original model
+        origin_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(origin_model.name(), model_name)
+        self.assertEqual(origin_model.comment(), comment)
+        self.assertEqual(origin_model.latest_version(), 0)
+        self.assertEqual(origin_model.properties(), properties)
+
+        # Alter model and validate the updated model
+        changes = [ModelChange.update_comment(new_comment)]
+        self._catalog.as_model_catalog().alter_model(model_ident, *changes)
+        update_comment_model = self._catalog.as_model_catalog().get_model(model_ident)
+        self.assertEqual(update_comment_model.name(), model_name)
+        self.assertEqual(update_comment_model.comment(), new_comment)
+        self.assertEqual(update_comment_model.latest_version(), 0)
+        self.assertEqual(update_comment_model.properties(), properties)
+
+    def test_link_update_model_version_comment(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        self._catalog.as_model_catalog().register_model(model_ident, "comment", {})
+
+        # Test link model version
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri",
+            aliases=["alias1", "alias2"],
+            comment="comment",
+            properties={"k1": "v1", "k2": "v2"},
+        )
+
+        model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+        self.assertEqual(0, model_version.version())
+        self.assertEqual("uri", model_version.uri())
+        self.assertEqual(["alias1", "alias2"], model_version.aliases())
+        self.assertEqual("comment", model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, model_version.properties())
+
+        model_version = self._catalog.as_model_catalog().get_model_version_by_alias(
+            model_ident, "alias1"
+        )
+        self.assertEqual(0, model_version.version())
+        self.assertEqual("uri", model_version.uri())
+
+        model_version = self._catalog.as_model_catalog().get_model_version_by_alias(
+            model_ident, "alias2"
+        )
+        self.assertEqual(0, model_version.version())
+        self.assertEqual("uri", model_version.uri())
+
+        changes = [ModelVersionChange.update_comment("new comment")]
+        self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
+        updated_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+
+        self.assertEqual(0, updated_model_version.version())
+        self.assertEqual("new comment", updated_model_version.comment())
+        self.assertEqual(["alias1", "alias2"], updated_model_version.aliases())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+        self.assertEqual("uri", updated_model_version.uri())
+
+    def test_link_update_model_version_property(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        aliases = ["alias1", "alias2"]
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri",
+            aliases=aliases,
+            comment="comment",
+            properties={"k1": "v1", "k2": "v2"},
+        )
+
+        original_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+
+        self.assertEqual(0, original_model_version.version())
+        self.assertEqual("uri", original_model_version.uri())
+        self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
+        self.assertEqual("comment", original_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+
+        changes = [
+            ModelVersionChange.set_property("k1", "v11"),
+            ModelVersionChange.set_property("k3", "v3"),
+            ModelVersionChange.remove_property("k2"),
+        ]
+
+        self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
+        update_property_model = (
+            self._catalog.as_model_catalog().get_model_version_by_alias(
+                model_ident, aliases[0]
+            )
+        )
+
+        self.assertEqual(update_property_model.version(), 0)
+        self.assertEqual(update_property_model.uri(), "uri")
+        self.assertEqual(update_property_model.comment(), comment)
+        self.assertEqual(update_property_model.aliases(), aliases)
+        self.assertEqual(update_property_model.properties(), {"k1": "v11", "k3": "v3"})
+
+    def test_link_update_model_version_uri(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        aliases = ["alias1", "alias2"]
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri",
+            aliases=aliases,
+            comment="comment",
+            properties={"k1": "v1", "k2": "v2"},
+        )
+
+        original_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+
+        self.assertEqual(0, original_model_version.version())
+        self.assertEqual("uri", original_model_version.uri())
+        self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
+        self.assertEqual("comment", original_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+
+        changes = [ModelVersionChange.update_uri("new_uri")]
+        self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
+
+        updated_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+        self.assertEqual(0, updated_model_version.version())
+        self.assertEqual("new_uri", updated_model_version.uri())
+        self.assertEqual(["alias1", "alias2"], updated_model_version.aliases())
+        self.assertEqual("comment", updated_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+
+    def test_link_update_model_version_aliases(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        aliases = ["alias1", "alias2"]
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri",
+            aliases=aliases,
+            comment="comment",
+            properties={"k1": "v1", "k2": "v2"},
+        )
+
+        original_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+
+        self.assertEqual(0, original_model_version.version())
+        self.assertEqual("uri", original_model_version.uri())
+        self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
+        self.assertEqual("comment", original_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+
+        # todo
+        changes = [
+            ModelVersionChange.update_aliases(
+                ["alias2", "alias3"],
+                ["alias1", "alias2"],
+            )
+        ]
+        self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
+
+        updated_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+        self.assertEqual(0, updated_model_version.version())
+        self.assertEqual("uri", updated_model_version.uri())
+        self.assertEqual(["alias2", "alias3"], updated_model_version.aliases())
+        self.assertEqual("comment", updated_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
 
     def test_link_get_model_version(self):
         model_name = "model_it_model" + str(randint(0, 1000))

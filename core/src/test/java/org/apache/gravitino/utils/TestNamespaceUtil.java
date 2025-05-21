@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.utils;
 
+import com.google.common.base.Joiner;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.junit.jupiter.api.Assertions;
@@ -81,5 +83,38 @@ public class TestNamespaceUtil {
             IllegalNamespaceException.class, () -> NamespaceUtil.checkModelVersion(ab));
     Assertions.assertTrue(
         excep5.getMessage().contains("Model version namespace must be non-null and have 4 levels"));
+  }
+
+  @Test
+  void testOfUser() {
+    String metalake = "metalake";
+    Assertions.assertEquals(
+        Joiner.on(".").join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_SCHEMA_NAME),
+        NamespaceUtil.ofUser(metalake).toString());
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.ofUser(null));
+  }
+
+  @Test
+  void testOfGroup() {
+    String metalake = "metalake";
+    Namespace namespace = NamespaceUtil.ofGroup(metalake);
+
+    Assertions.assertEquals(
+        Joiner.on(".")
+            .join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_SCHEMA_NAME),
+        namespace.toString());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.ofGroup(null));
+  }
+
+  @Test
+  void testOfRole() {
+    String metalake = "metalake";
+    Namespace namespace = NamespaceUtil.ofRole(metalake);
+
+    Assertions.assertEquals(
+        Joiner.on(".").join(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME),
+        namespace.toString());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> NamespaceUtil.ofRole(null));
   }
 }

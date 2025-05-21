@@ -221,14 +221,25 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   IllegalArgumentException.class);
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
-          // Case 1: The table is not created by Gravitino.
+          // Case 1: The table is not created by Gravitino and this table is never imported.
+          TableEntity te = null;
           if (stringId == null) {
-            return EntityCombinedTable.of(alteredTable)
-                .withHiddenProperties(
-                    getHiddenPropertyNames(
-                        getCatalogIdentifier(ident),
-                        HasPropertyMetadata::tablePropertiesMetadata,
-                        alteredTable.properties()));
+            te = getEntity(ident, TABLE, TableEntity.class);
+            if (te == null) {
+              return EntityCombinedTable.of(alteredTable)
+                  .withHiddenProperties(
+                      getHiddenPropertyNames(
+                          getCatalogIdentifier(ident),
+                          HasPropertyMetadata::tablePropertiesMetadata,
+                          alteredTable.properties()));
+            }
+          }
+
+          long tableId;
+          if (stringId != null) {
+            tableId = stringId.id();
+          } else {
+            tableId = te.id();
           }
 
           TableEntity updatedTableEntity =
@@ -266,7 +277,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                                 .build();
                           }),
                   "UPDATE",
-                  stringId.id());
+                  tableId);
 
           return EntityCombinedTable.of(alteredTable, updatedTableEntity)
               .withHiddenProperties(
@@ -457,7 +468,21 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     // Case 1: The table is not created by Gravitino or the external system does not support storing
     // string identifier.
     if (stringId == null) {
-      return EntityCombinedTable.of(table)
+      TableEntity tableEntity = getEntity(ident, TABLE, TableEntity.class);
+      if (tableEntity == null) {
+        return EntityCombinedTable.of(table)
+            .withHiddenProperties(
+                getHiddenPropertyNames(
+                    catalogIdentifier,
+                    HasPropertyMetadata::tablePropertiesMetadata,
+                    table.properties()))
+            // Some tables don't have properties or are not created by Gravitino,
+            // we can't use stringIdentifier to judge whether schema is ever imported or not.
+            // We need to check whether the entity exists.
+            .withImported(false);
+      }
+
+      return EntityCombinedTable.of(table, tableEntity)
           .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
@@ -466,7 +491,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           // Some tables don't have properties or are not created by Gravitino,
           // we can't use stringIdentifier to judge whether schema is ever imported or not.
           // We need to check whether the entity exists.
-          .withImported(isEntityExist(ident, TABLE));
+          .withImported(true);
     }
 
     TableEntity tableEntity =

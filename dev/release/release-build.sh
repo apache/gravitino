@@ -177,6 +177,10 @@ fi
 if [[ "$PYGRAVITINO_VERSION" == *"dev"* ]]; then
   RC_PYGRAVITINO_VERSION="${PYGRAVITINO_VERSION}"
 else
+  if [ -z "$RC_COUNT" ]; then
+    echo "ERROR: RC_COUNT must be set to run this script"
+    exit_with_usage
+  fi
   RC_PYGRAVITINO_VERSION="${PYGRAVITINO_VERSION}rc${RC_COUNT}"
 fi
 
@@ -207,8 +211,8 @@ if [[ "$1" == "package" ]]; then
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.rest
   rm -f gravitino-$GRAVITINO_VERSION-src/LICENSE.trino
   rm -f gravitino-$GRAVITINO_VERSION-src/NOTICE.trino
-  rm -f gravitino-$GRAVITINO_VERSION-src/web/LICENSE.bin
-  rm -f gravitino-$GRAVITINO_VERSION-src/web/NOTICE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web/web/LICENSE.bin
+  rm -f gravitino-$GRAVITINO_VERSION-src/web/web/NOTICE.bin
 
   rm -f *.asc
   tar cvzf gravitino-$GRAVITINO_VERSION-src.tar.gz --exclude gravitino-$GRAVITINO_VERSION-src/.git gravitino-$GRAVITINO_VERSION-src

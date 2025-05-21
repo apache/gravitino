@@ -109,6 +109,33 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    put:
+      tags:
+        - model
+      summary: Update model
+      operationId: updateModel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
     delete:
       tags:
         - model
@@ -227,6 +254,35 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    put:
+      tags:
+        - model
+      summary: Update model version
+      operationId: updateModelVersions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model or model version does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -244,7 +300,7 @@ paths:
         "200":
           $ref: "#/components/responses/ModelVersionResponse"
         "404":
-          description: Not Found - The target model version does not exist
+          description: Not Found - The target model version does not exist.
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -265,6 +321,35 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+    put:
+      tags:
+        - model
+      summary: Update model version by alias
+      operationId: updateModelVersionsByAlias
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model or model version does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -366,6 +451,110 @@ components:
           additionalProperties:
             type: string
 
+    ModelUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelUpdateRequest"
+
+    ModelUpdateRequest:
+      type: object
+      oneOf:
+        - $ref: "#/components/schemas/RenameModelRequest"
+        - $ref: "#/components/schemas/SetModelPropertyRequest"
+        - $ref: "#/components/schemas/RemoveModelPropertyRequest"
+        - $ref: "#/components/schemas/UpdateModelCommentRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          rename: "#/components/schemas/RenameModelRequest"
+          setProperty: "#/components/schemas/SetModelPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveModelPropertyRequest"
+          updateComment: "#/components/schemas/UpdateModelCommentRequest"
+
+    RenameModelRequest:
+      type: object
+      required:
+        - "@type"
+        - newName
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "rename"
+        newName:
+          type: string
+          description: The new name of the model
+      example: {
+        "@type": "rename",
+        "newName": "my_model_new"
+      }
+
+    SetModelPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - setProperty
+        property:
+          type: string
+          description: The name of the property to set
+        value:
+          type: string
+          description: The value of the property to set
+      example: {
+        "@type": "setProperty",
+        "property": "key",
+        "value": "value"
+      }
+
+    RemoveModelPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - removeProperty
+        property:
+          type: string
+          description: The property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key1"
+      }
+
+    UpdateModelCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateComment"
+        newComment:
+          type: string
+          description: The new comment of the model
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is a new comment"
+      }
+
     ModelVersionLinkRequest:
       type: object
       required:
@@ -391,6 +580,142 @@ components:
           default: {}
           additionalProperties:
             type: string
+
+    ModelVersionUpdatesRequest:
+      type: object
+      required:
+        - updates
+      properties:
+        updates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelVersionUpdateRequest"
+
+    ModelVersionUpdateRequest:
+      type: object
+      oneOf:
+        - $ref: "#/components/schemas/UpdateModelVersionCommentRequest"
+        - $ref: "#/components/schemas/SetModelVersionPropertyRequest"
+        - $ref: "#/components/schemas/RemoveModelVersionPropertyRequest"
+        - $ref: "#/components/schemas/UpdateModelVersionUriRequest"
+        - $ref: "#/components/schemas/UpdateModelVersionAliasesRequest"
+      discriminator:
+        propertyName: "@type"
+        mapping:
+          updateComment: "#/components/schemas/UpdateModelVersionCommentRequest"
+          setProperty: "#/components/schemas/SetModelVersionPropertyRequest"
+          removeProperty: "#/components/schemas/RemoveModelVersionPropertyRequest"
+          updateUri: "#/components/schemas/UpdateModelVersionUriRequest"
+          updateAliases: "#/components/schemas/UpdateModelVersionAliasesRequest"
+
+    UpdateModelVersionCommentRequest:
+      type: object
+      required:
+        - "@type"
+        - newComment
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateComment"
+        newComment:
+          type: string
+          description: The new comment of the model version
+      example: {
+        "@type": "updateComment",
+        "newComment": "This is a new comment"
+      }
+
+    SetModelVersionPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - value
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - setProperty
+        property:
+          type: string
+          description: The name of the property to set
+        value:
+          type: string
+          description: The value of the property to set
+      example: {
+        "@type": "setProperty",
+        "property": "key",
+        "value": "value"
+      }
+
+    RemoveModelVersionPropertyRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - removeProperty
+        property:
+          type: string
+          description: The property to remove
+      example: {
+        "@type": "removeProperty",
+        "property": "key1"
+      }
+
+    UpdateModelVersionUriRequest:
+      type: object
+      required:
+        - "@type"
+        - newUri
+      properties:
+        "@type":
+          type: string
+          enum:
+            - "updateUri"
+        newUri:
+          type: string
+          description: The new uri of the model version
+      example: {
+        "@type": "updateUri",
+        "newUri": "s3://path/to/model"
+      }
+
+    UpdateModelVersionAliasesRequest:
+      type: object
+      required:
+        - "@type"
+        - aliasesToAdd
+        - aliasesToRemove
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - updateAliases
+        aliasesToAdd:
+          type: array
+          description: The aliases to add
+          nullable: true
+          items:
+            type: string
+        aliasesToRemove:
+          type: array
+          description: The aliases to remove
+          nullable: true
+          items:
+            type: string
+      example: {
+        "@type": "updateAliases",
+        "aliasesToAdd": ["alias1", "alias2"],
+        "aliasesToRemove": ["alias3", "alias4"]
+      }
 
   responses:
     ModelResponse:

@@ -233,12 +233,13 @@ public abstract class OperationDispatcher {
         IllegalArgumentException.class);
   }
 
-  protected boolean isEntityExist(NameIdentifier ident, Entity.EntityType type) {
+  protected <E extends Entity & HasIdentifier> E getEntity(
+      NameIdentifier ident, Entity.EntityType type, Class<E> entityClass) {
     try {
-      return store.exists(ident, type);
+      return store.get(ident, type, entityClass);
     } catch (Exception e) {
-      LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "exists", ident, e);
-      throw new RuntimeException("Fail to check if entity is existed", e);
+      LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e.getMessage(), e);
+      return null;
     }
   }
 

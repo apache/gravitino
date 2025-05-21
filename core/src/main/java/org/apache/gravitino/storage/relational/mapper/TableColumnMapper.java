@@ -71,4 +71,7 @@ public interface TableColumnMapper {
 
   @SelectProvider(type = TableColumnSQLProviderFactory.class, method = "selectColumnPOById")
   ColumnPO selectColumnPOById(@Param("columnId") Long columnId);
+
+  @SelectProvider(type = TableColumnSQLProviderFactory.class, method = "listColumnPOsByColumnIds")
+  List<ColumnPO> listColumnPOsByColumnIds(@Param("columnIds") List<Long> columnIds);
 }

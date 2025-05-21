@@ -49,9 +49,7 @@ from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HAND
 
 
 class TestErrorHandler(unittest.TestCase):
-
     def test_rest_error_handler(self):
-
         with self.assertRaises(RESTException):
             REST_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(RESTException, "mock error")
@@ -106,7 +104,6 @@ class TestErrorHandler(unittest.TestCase):
             )
 
     def test_fileset_error_handler(self):
-
         with self.assertRaises(NoSuchFilesetException):
             FILESET_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
@@ -132,7 +129,6 @@ class TestErrorHandler(unittest.TestCase):
             )
 
     def test_credential_error_handler(self):
-
         with self.assertRaises(NoSuchCredentialException):
             CREDENTIAL_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
@@ -151,7 +147,6 @@ class TestErrorHandler(unittest.TestCase):
             )
 
     def test_metalake_error_handler(self):
-
         with self.assertRaises(NoSuchMetalakeException):
             METALAKE_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
@@ -177,7 +172,6 @@ class TestErrorHandler(unittest.TestCase):
             )
 
     def test_catalog_error_handler(self):
-
         with self.assertRaises(ConnectionFailedException):
             CATALOG_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
@@ -217,7 +211,6 @@ class TestErrorHandler(unittest.TestCase):
             )
 
     def test_schema_error_handler(self):
-
         with self.assertRaises(NoSuchCatalogException):
             SCHEMA_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(

@@ -40,6 +40,14 @@ public final class EntityCombinedModel implements Model {
     this.modelEntity = modelEntity;
   }
 
+  public ModelEntity modelEntity() {
+    return modelEntity;
+  }
+
+  public Model model() {
+    return model;
+  }
+
   public static EntityCombinedModel of(Model model, ModelEntity modelEntity) {
     return new EntityCombinedModel(model, modelEntity);
   }
@@ -69,6 +77,7 @@ public final class EntityCombinedModel implements Model {
         ? null
         : model.properties().entrySet().stream()
             .filter(e -> !hiddenProperties.contains(e.getKey()))
+            .filter(entry -> entry.getKey() != null && entry.getValue() != null)
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 

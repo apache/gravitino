@@ -45,12 +45,6 @@ public class ListProperties extends Command {
    * @param properties The name, value pairs of properties.
    */
   public void printProperties(Map<String, String> properties) {
-    StringBuilder all = new StringBuilder();
-
-    for (Map.Entry<String, String> property : properties.entrySet()) {
-      all.append(property.getKey() + "," + property.getValue() + System.lineSeparator());
-    }
-
-    System.out.print(all);
+    printResults(properties);
   }
 }

@@ -33,7 +33,9 @@ import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 
 public class ModelNormalizeDispatcher implements ModelDispatcher {
   private final CatalogManager catalogManager;
@@ -126,6 +128,29 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   @Override
   public boolean deleteModelVersion(NameIdentifier ident, String alias) {
     return dispatcher.deleteModelVersion(normalizeCaseSensitive(ident), alias);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    return dispatcher.alterModel(normalizeCaseSensitive(ident), changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
+    return dispatcher.alterModelVersion(normalizeCaseSensitive(ident), version, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    return dispatcher.alterModelVersion(normalizeCaseSensitive(ident), alias, changes);
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {

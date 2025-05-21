@@ -22,7 +22,6 @@ from gravitino.dto.model_version_dto import ModelVersionDTO
 
 
 class GenericModelVersion(ModelVersion):
-
     _model_version_dto: ModelVersionDTO
     """The model version DTO object."""
 

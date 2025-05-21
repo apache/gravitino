@@ -22,10 +22,26 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaBaseSQLProvider {
+  public String listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return "SELECT cm.catalog_id as catalogId, cm.catalog_name as catalogName,"
+        + " cm.metalake_id as metalakeId, cm.type, cm.provider,"
+        + " cm.catalog_comment as catalogComment, cm.properties, cm.audit_info as auditInfo,"
+        + " cm.current_version as currentVersion, cm.last_version as lastVersion,"
+        + " cm.deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " cm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND mm.deleted_at = 0 AND cm.deleted_at = 0";
+  }
+
   public String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT catalog_id as catalogId, catalog_name as catalogName,"
         + " metalake_id as metalakeId, type, provider,"
@@ -55,6 +71,17 @@ public class CatalogMetaBaseSQLProvider {
         + "</script>";
   }
 
+  public String selectCatalogIdByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return "SELECT cm.catalog_id as catalogId FROM "
+        + TABLE_NAME
+        + " cm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE catalog_name = #{catalogName} AND mm.metalake_name = #{metalakeName}"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
+  }
+
   public String selectCatalogIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("catalogName") String name) {
     return "SELECT catalog_id as catalogId FROM "
@@ -72,6 +99,31 @@ public class CatalogMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND catalog_name = #{catalogName} AND deleted_at = 0";
+  }
+
+  public String selectCatalogMetaByName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return "SELECT cm.catalog_id as catalogId, cm.catalog_name as catalogName,"
+        + " cm.metalake_id as metalakeId, cm.type, cm.provider,"
+        + " cm.catalog_comment as catalogComment, cm.properties, cm.audit_info as auditInfo,"
+        + " cm.current_version as currentVersion, cm.last_version as lastVersion,"
+        + " cm.deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " cm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON cm.metalake_id = mm.metalake_id"
+        + " WHERE cm.catalog_name = #{catalogName} AND mm.metalake_name = #{metalakeName}"
+        + " AND cm.deleted_at = 0 AND mm.deleted_at = 0";
+  }
+
+  public String selectCatalogIdByMetalakeNameAndCatalogName(
+      @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
+    return "SELECT me.metalake_id as metalakeId, ca.catalog_id as catalogId FROM "
+        + TABLE_NAME
+        + " ca INNER JOIN metalake_meta me ON ca.metalake_id = me.metalake_id"
+        + " WHERE me.metalake_name = #{metalakeName} AND ca.catalog_name = #{catalogName} "
+        + " AND ca.deleted_at = 0 AND me.deleted_at = 0";
   }
 
   public String selectCatalogMetaById(@Param("catalogId") Long catalogId) {

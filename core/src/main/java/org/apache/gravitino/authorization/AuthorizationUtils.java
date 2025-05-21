@@ -22,13 +22,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -62,6 +60,9 @@ import org.slf4j.LoggerFactory;
 /* The utilization class of authorization module*/
 public class AuthorizationUtils {
   private static final Logger LOG = LoggerFactory.getLogger(AuthorizationUtils.class);
+  private static final String FILESET_CATALOG_LOCATION = "location";
+  private static final String FILESET_SCHEMA_LOCATION = "location";
+  private static final String HIVE_LOCATION = "location";
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
@@ -75,6 +76,12 @@ public class AuthorizationUtils {
   private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
+
+  private static final Set<Privilege.Name> MODEL_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_MODEL,
+          Privilege.Name.USE_MODEL,
+          Privilege.Name.CREATE_MODEL_VERSION);
 
   private AuthorizationUtils() {}
 
@@ -244,6 +251,10 @@ public class AuthorizationUtils {
         if (TOPIC_PRIVILEGES.contains(privilege.name())) {
           checkCatalogType(catalogIdent, Catalog.Type.MESSAGING, privilege);
         }
+
+        if (MODEL_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.MODEL, privilege);
+        }
       } catch (NoSuchCatalogException ne) {
         throw new NoSuchMetadataObjectException(
             "Securable object %s doesn't exist", object.fullName());
@@ -286,14 +297,20 @@ public class AuthorizationUtils {
 
   public static void authorizationPluginRenamePrivileges(
       NameIdentifier ident, Entity.EntityType type, String newName) {
+    authorizationPluginRenamePrivileges(ident, type, newName, null);
+  }
+
+  public static void authorizationPluginRenamePrivileges(
+      NameIdentifier ident, Entity.EntityType type, String newName, List<String> locations) {
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.
     if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
       MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       MetadataObject newMetadataObject =
           NameIdentifierUtil.toMetadataObject(NameIdentifier.of(ident.namespace(), newName), type);
-      MetadataObjectChange renameObject =
-          MetadataObjectChange.rename(oldMetadataObject, newMetadataObject);
+
+      MetadataObjectChange renameChange =
+          MetadataObjectChange.rename(oldMetadataObject, newMetadataObject, locations);
 
       String metalake = type == Entity.EntityType.METALAKE ? newName : ident.namespace().level(0);
 
@@ -303,7 +320,7 @@ public class AuthorizationUtils {
           metalake,
           newMetadataObject,
           authorizationPlugin -> {
-            authorizationPlugin.onMetadataUpdated(renameObject);
+            authorizationPlugin.onMetadataUpdated(renameChange);
           });
     }
   }
@@ -427,30 +444,15 @@ public class AuthorizationUtils {
   public static List<String> getMetadataObjectLocation(
       NameIdentifier ident, Entity.EntityType type) {
     List<String> locations = new ArrayList<>();
+
+    // If we don't enable authorization, the location should return empty collection.
+    if (GravitinoEnv.getInstance().accessControlDispatcher() == null) {
+      return locations;
+    }
+
     try {
       switch (type) {
         case METALAKE:
-          {
-            NameIdentifier[] identifiers =
-                GravitinoEnv.getInstance()
-                    .catalogDispatcher()
-                    .listCatalogs(Namespace.of(ident.name()));
-            Arrays.stream(identifiers)
-                .collect(Collectors.toList())
-                .forEach(
-                    identifier -> {
-                      Catalog catalogObj =
-                          GravitinoEnv.getInstance().catalogDispatcher().loadCatalog(identifier);
-                      if (catalogObj.provider().equals("hive")) {
-                        // The Hive default schema location is Hive warehouse directory
-                        String defaultSchemaLocation =
-                            getHiveDefaultLocation(ident.name(), catalogObj.name());
-                        if (defaultSchemaLocation != null && !defaultSchemaLocation.isEmpty()) {
-                          locations.add(defaultSchemaLocation);
-                        }
-                      }
-                    });
-          }
           break;
         case CATALOG:
           {
@@ -466,30 +468,54 @@ public class AuthorizationUtils {
           }
           break;
         case SCHEMA:
-          {
-            Catalog catalogObj =
-                GravitinoEnv.getInstance()
-                    .catalogDispatcher()
-                    .loadCatalog(
-                        NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
-            LOG.info("Catalog provider is %s", catalogObj.provider());
-            if (catalogObj.provider().equals("hive")) {
-              Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
-              if (schema.properties().containsKey(HiveConstants.LOCATION)) {
-                String schemaLocation = schema.properties().get(HiveConstants.LOCATION);
+          Catalog catalogObj =
+              GravitinoEnv.getInstance()
+                  .catalogDispatcher()
+                  .loadCatalog(
+                      NameIdentifier.of(ident.namespace().level(0), ident.namespace().level(1)));
+          Schema schema = GravitinoEnv.getInstance().schemaDispatcher().loadSchema(ident);
+
+          switch (catalogObj.type()) {
+            case RELATIONAL:
+              if ("hive".equals(catalogObj.provider())
+                  && schema.properties().containsKey(HIVE_LOCATION)) {
+                String schemaLocation = schema.properties().get(HIVE_LOCATION);
                 if (StringUtils.isNotBlank(schemaLocation)) {
                   locations.add(schemaLocation);
                 } else {
                   LOG.warn("Schema {} location is not found", ident);
                 }
               }
-            }
-            // TODO: [#6133] Supports get Fileset schema location in the AuthorizationUtils
+              break;
+
+            case FILESET:
+              if ("hadoop".equals(catalogObj.provider())) {
+                if (schema.properties().containsKey(FILESET_SCHEMA_LOCATION)) {
+                  String schemaLocation = schema.properties().get(FILESET_SCHEMA_LOCATION);
+                  if (StringUtils.isNotBlank(schemaLocation)) {
+                    locations.add(schemaLocation);
+                  } else if (catalogObj.properties().containsKey(FILESET_CATALOG_LOCATION)) {
+                    String catalogLocation = schema.properties().get(FILESET_CATALOG_LOCATION);
+                    if (StringUtils.isNotBlank(catalogLocation)) {
+                      schemaLocation = catalogLocation + "/" + schema.name();
+                      locations.add(schemaLocation);
+                    }
+                  } else {
+                    LOG.warn("Schema {} location is not found", ident);
+                  }
+                }
+              }
+              break;
+
+            default:
+              LOG.warn("Unsupported catalog type {}", catalogObj.type());
+              break;
           }
           break;
+
         case TABLE:
           {
-            Catalog catalogObj =
+            catalogObj =
                 GravitinoEnv.getInstance()
                     .catalogDispatcher()
                     .loadCatalog(
@@ -517,6 +543,9 @@ public class AuthorizationUtils {
               filesetLocation != null, String.format("Fileset %s location is not found", ident));
           locations.add(filesetLocation);
           break;
+        case TOPIC:
+          // Topic doesn't have locations now.
+          break;
         default:
           throw new AuthorizationPluginException(
               "Failed to get location paths for metadata object %s type %s", ident, type);
@@ -526,10 +555,5 @@ public class AuthorizationUtils {
     }
 
     return locations;
-  }
-
-  private static NameIdentifier getObjectNameIdentifier(
-      String metalake, MetadataObject metadataObject) {
-    return NameIdentifier.parse(String.format("%s.%s", metalake, metadataObject.fullName()));
   }
 }

@@ -32,8 +32,8 @@ class FilesetDTO(Fileset, DataClassJsonMixin):
     _comment: Optional[str] = field(metadata=config(field_name="comment"))
     _type: Fileset.Type = field(metadata=config(field_name="type"))
     _properties: Dict[str, str] = field(metadata=config(field_name="properties"))
-    _storage_location: str = field(
-        default=None, metadata=config(field_name="storageLocation")
+    _storage_locations: Dict[str, str] = field(
+        metadata=config(field_name="storageLocations")
     )
     _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))
 
@@ -43,8 +43,8 @@ class FilesetDTO(Fileset, DataClassJsonMixin):
     def type(self) -> Fileset.Type:
         return self._type
 
-    def storage_location(self) -> str:
-        return self._storage_location
+    def storage_locations(self) -> Dict[str, str]:
+        return self._storage_locations
 
     def comment(self) -> Optional[str]:
         return self._comment

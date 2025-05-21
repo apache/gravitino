@@ -151,7 +151,7 @@ public class IcebergRESTS3TokenIT extends IcebergRESTJdbcCatalogIT {
 
   @Test
   void testCredentialWithMultiLocations() {
-    String namespaceName = ICEBERG_REST_NS_PREFIX + "credential";
+    String namespaceName = getTestNamespace("credential");
     String tableName = namespaceName + ".multi_location";
 
     String writeDataPath = this.s3Warehouse + "/test_data_location";

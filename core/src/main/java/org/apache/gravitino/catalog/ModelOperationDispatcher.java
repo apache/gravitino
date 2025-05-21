@@ -36,8 +36,12 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.ThrowableFunction;
 
 public class ModelOperationDispatcher extends OperationDispatcher implements ModelDispatcher {
 
@@ -207,6 +211,73 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 getCatalogIdentifier(ident),
                 c -> c.doWithModelOps(m -> m.deleteModelVersion(ident, alias)),
                 RuntimeException.class));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+    Model alteredModel =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.WRITE,
+            () ->
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithModelOps(f -> f.alterModel(ident, changes)),
+                    NoSuchModelException.class,
+                    IllegalArgumentException.class));
+
+    return EntityCombinedModel.of(alteredModel)
+        .withHiddenProperties(
+            getHiddenPropertyNames(
+                catalogIdent,
+                HasPropertyMetadata::modelPropertiesMetadata,
+                alteredModel.properties()));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelVersionException, IllegalArgumentException {
+    validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
+    return executeAlterModelVersion(ident, f -> f.alterModelVersion(ident, version, changes));
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
+    return executeAlterModelVersion(ident, f -> f.alterModelVersion(ident, alias, changes));
+  }
+
+  private ModelVersion executeAlterModelVersion(
+      NameIdentifier ident, ThrowableFunction<ModelCatalog, ModelVersion> fn) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+    ModelVersion alteredModelVersion =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.WRITE,
+            () ->
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithModelOps(fn),
+                    NoSuchModelVersionException.class,
+                    IllegalArgumentException.class));
+
+    return EntityCombinedModelVersion.of(alteredModelVersion)
+        .withHiddenProperties(
+            getHiddenPropertyNames(
+                catalogIdent,
+                HasPropertyMetadata::modelPropertiesMetadata,
+                alteredModelVersion.properties()));
   }
 
   private ModelVersion internalGetModelVersion(

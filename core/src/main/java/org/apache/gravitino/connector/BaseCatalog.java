@@ -205,9 +205,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             LOG.info("Authorization provider is not set!");
             return;
           }
-          try {
-            BaseAuthorization<?> authorization =
-                BaseAuthorization.createAuthorization(classLoader, authorizationProvider);
+
+          // use try-with-resources to auto-close authorization object if exit with exception
+          try (BaseAuthorization<?> authorization =
+              BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
 
             authorizationPlugin =
                 classLoader.withClassLoader(

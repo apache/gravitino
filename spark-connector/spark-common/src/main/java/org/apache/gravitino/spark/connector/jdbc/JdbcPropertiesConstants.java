@@ -25,6 +25,7 @@ public class JdbcPropertiesConstants {
   public static final String GRAVITINO_JDBC_PASSWORD = "jdbc-password";
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String GRAVITINO_JDBC_URL = "jdbc-url";
+  public static final String GRAVITINO_JDBC_DATABASE = "jdbc-database";
 
   public static final String SPARK_JDBC_URL = "url";
   public static final String SPARK_JDBC_USER = "user";

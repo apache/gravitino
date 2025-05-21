@@ -48,7 +48,7 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
    *
    * <p>$ - End of the string
    */
-  private static final String CATALOG_NAME_PATTERN = "^\\w[\\w]{0,63}$";
+  private static final String CATALOG_NAME_PATTERN = "^\\w[\\w-]{0,63}$";
 
   private final CatalogDispatcher dispatcher;
 

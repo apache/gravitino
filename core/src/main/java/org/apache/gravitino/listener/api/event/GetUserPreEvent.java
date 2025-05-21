@@ -19,31 +19,31 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before get a user from specific metalake */
+/** Represents an event triggered before retrieving a user from a specific metalake. */
 @DeveloperApi
 public class GetUserPreEvent extends UserPreEvent {
   private final String userName;
 
   /**
-   * Construct a new {@link GetUserPreEvent} instance with the specified user, identifier and user
+   * Constructs a new {@link GetUserPreEvent} instance with the specified user, identifier, and user
    * info.
    *
-   * @param initiator the user who initiated the add-user request.
-   * @param identifier the identifier of the metalake which the user is getting retrieved from.
-   * @param userName the username which is requested to be retrieved.
+   * @param initiator The name of the user who initiated the get-user request.
+   * @param metalake The name of the metalake where the user is being retrieved from.
+   * @param userName The username that is requested to be retrieved.
    */
-  public GetUserPreEvent(String initiator, NameIdentifier identifier, String userName) {
-    super(initiator, identifier);
+  public GetUserPreEvent(String initiator, String metalake, String userName) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
     this.userName = userName;
   }
 
   /**
-   * Returns the user info for the user which is getting retrieved.
+   * Returns the username for the user being retrieved.
    *
-   * @return the username which is requested to be retrieved.
+   * @return The username that is requested to be retrieved.
    */
   public String userName() {
     return userName;

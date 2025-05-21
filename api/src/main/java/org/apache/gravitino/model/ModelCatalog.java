@@ -236,4 +236,51 @@ public interface ModelCatalog {
    * @return True if the model version is deleted, false if the model version does not exist.
    */
   boolean deleteModelVersion(NameIdentifier ident, String alias);
+
+  /**
+   * Applies the {@link ModelChange changes} to a model in the catalog.
+   *
+   * <p>Implementations may reject the changes. If any change is rejected, no changes should be
+   * applied to the model.
+   *
+   * @param ident the {@link NameIdentifier} instance of the model to alter
+   * @param changes the several {@link ModelChange} instances to apply to the model
+   * @return the updated {@link Model} instance
+   * @throws NoSuchModelException If the model does not exist
+   * @throws IllegalArgumentException If the change is rejected by the implementation
+   */
+  Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException;
+
+  /**
+   * Applies the specified {@link ModelVersionChange changes} to a model version identified by its
+   * version number.
+   *
+   * <p>If any change is rejected by the implementation, no changes will be applied.
+   *
+   * @param ident the {@link NameIdentifier} of the model to be altered
+   * @param version the version number of the model version to be altered
+   * @param changes one or more {@link ModelVersionChange} instances to apply
+   * @return the updated {@link ModelVersion} instance
+   * @throws NoSuchModelVersionException if the specified model version does not exist
+   * @throws IllegalArgumentException if any change is rejected by the implementation
+   */
+  ModelVersion alterModelVersion(NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException;
+
+  /**
+   * Applies the specified {@link ModelVersionChange changes} to a model version identified by its
+   * alias.
+   *
+   * <p>If any change is rejected by the implementation, no changes will be applied.
+   *
+   * @param ident the {@link NameIdentifier} of the model to be altered
+   * @param alias the alias of the model version to be altered
+   * @param changes one or more {@link ModelVersionChange} instances to apply
+   * @return the updated {@link ModelVersion} instance
+   * @throws NoSuchModelVersionException if the specified model version does not exist
+   * @throws IllegalArgumentException if any change is rejected by the implementation
+   */
+  ModelVersion alterModelVersion(NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException;
 }

@@ -28,6 +28,12 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.listener.api.event.AlterModelEvent;
+import org.apache.gravitino.listener.api.event.AlterModelFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterModelPreEvent;
+import org.apache.gravitino.listener.api.event.AlterModelVersionEvent;
+import org.apache.gravitino.listener.api.event.AlterModelVersionFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelFailureEvent;
 import org.apache.gravitino.listener.api.event.DeleteModelPreEvent;
@@ -55,10 +61,13 @@ import org.apache.gravitino.listener.api.event.RegisterAndLinkModelPreEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelFailureEvent;
 import org.apache.gravitino.listener.api.event.RegisterModelPreEvent;
+import org.apache.gravitino.listener.api.info.Either;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -271,6 +280,71 @@ public class ModelEventDispatcher implements ModelDispatcher {
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new DeleteModelVersionFailureEvent(user, ident, e, alias, null));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new AlterModelPreEvent(user, ident, changes));
+    try {
+      Model modelObject = dispatcher.alterModel(ident, changes);
+      ModelInfo modelInfo = new ModelInfo(modelObject);
+      eventBus.dispatchEvent(new AlterModelEvent(user, ident, modelInfo, changes));
+
+      return modelObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new AlterModelFailureEvent(user, ident, e, changes));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new AlterModelVersionPreEvent(initiator, ident, Either.right(version), changes));
+    try {
+      ModelVersion modelVersion = dispatcher.alterModelVersion(ident, version, changes);
+      eventBus.dispatchEvent(
+          new AlterModelVersionEvent(
+              initiator, ident, new ModelVersionInfo(modelVersion), changes));
+
+      return modelVersion;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new AlterModelVersionFailureEvent(initiator, ident, e, Either.right(version), changes));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(
+        new AlterModelVersionPreEvent(initiator, ident, Either.left(alias), changes));
+    try {
+      ModelVersion modelVersion = dispatcher.alterModelVersion(ident, alias, changes);
+      eventBus.dispatchEvent(
+          new AlterModelVersionEvent(
+              initiator, ident, new ModelVersionInfo(modelVersion), changes));
+
+      return modelVersion;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new AlterModelVersionFailureEvent(initiator, ident, e, Either.left(alias), changes));
       throw e;
     }
   }

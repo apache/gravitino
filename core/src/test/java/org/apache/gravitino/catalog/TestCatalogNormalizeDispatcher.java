@@ -19,6 +19,9 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.Catalog.Type.RELATIONAL;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
+import static org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -98,7 +101,14 @@ public class TestCatalogNormalizeDispatcher {
     String[] legalNames = {"catalog", "_catalog", "1_catalog", "_", "1"};
     for (String legalName : legalNames) {
       NameIdentifier catalogIdent = NameIdentifier.of(metalake, legalName);
-      Map<String, String> props = ImmutableMap.of("key1", "value1", "key2", "value2");
+      Map<String, String> props =
+          ImmutableMap.of(
+              PROPERTY_KEY1,
+              "value1",
+              PROPERTY_KEY2,
+              "value2",
+              PROPERTY_KEY5_PREFIX + "1",
+              "value3");
       Catalog catalog =
           catalogNormalizeDispatcher.createCatalog(catalogIdent, RELATIONAL, "test", null, props);
       Assertions.assertEquals(legalName, catalog.name());
@@ -116,7 +126,6 @@ public class TestCatalogNormalizeDispatcher {
     Assertions.assertEquals("The catalog name '*' is reserved.", exception.getMessage());
 
     String[] illegalNames = {
-      "catalog-xxx",
       "catalog/xxx",
       "catalog.xxx",
       "catalog xxx",

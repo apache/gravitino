@@ -34,6 +34,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -76,6 +77,16 @@ public class SchemaMetaService {
           schemaName);
     }
     return schemaPO;
+  }
+
+  public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+      String metalakeName, String catalogName, String schemaName) {
+    System.out.println("test");
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class,
+        mapper ->
+            mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+                metalakeName, catalogName, schemaName));
   }
 
   // Schema may be deleted, so the SchemaPO may be null.

@@ -19,31 +19,32 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
-/** Represents an event triggered before remove a group from specific metalake. */
+/** Represents an event triggered before removing a group from a specific metalake. */
 @DeveloperApi
 public class RemoveGroupPreEvent extends GroupPreEvent {
   private final String groupName;
 
   /**
-   * Construct a new {@link RemoveGroupPreEvent} instance with initiator, identifier and group name.
+   * Constructs a new {@link RemoveGroupPreEvent} with the specified initiator, metalake name, and
+   * group name.
    *
    * @param initiator the user who initiated the remove group operation.
-   * @param identifier the identifier of the metalake where the group is removed.
-   * @param groupName the group name which is requested to be removed from the metalake.
+   * @param metalake the name of the metalake from which the group will be removed.
+   * @param groupName the name of the group that is requested to be removed from the metalake.
    */
-  protected RemoveGroupPreEvent(String initiator, NameIdentifier identifier, String groupName) {
-    super(initiator, identifier);
+  protected RemoveGroupPreEvent(String initiator, String metalake, String groupName) {
+    super(initiator, NameIdentifierUtil.ofGroup(metalake, groupName));
 
     this.groupName = groupName;
   }
 
   /**
-   * Returns the group information which is being removed from the metalake.
+   * Returns the name of the group that is being removed from the metalake.
    *
-   * @return the group name which is requested to be removed from the metalake.
+   * @return the name of the group requested to be removed.
    */
   public String groupName() {
     return groupName;

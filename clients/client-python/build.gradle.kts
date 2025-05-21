@@ -147,7 +147,7 @@ fun generatePypiProjectHomePage() {
     val readmeFile = file("README.md")
     readmeFile.writeText(contentUpdateImage)
   } catch (e: Exception) {
-    throw GradleException("client-python README.md file not generated!")
+    throw GradleException("Failed to generate client-python/README.md.")
   }
 }
 

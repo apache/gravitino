@@ -302,6 +302,118 @@ model: Model = catalog.as_model_catalog().get_model(ident=NameIdentifier.of("mod
 </TabItem>
 </Tabs>
 
+### Alter a model
+
+You can modify a model's metadata (e.g. rename, update comment, or modify properties) by 
+sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
+{schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
+
+<Tabs groupId="language" queryString>
+ <TabItem value="shell" label="Shell">
+
+```shell
+cat <<EOF >model.json
+{
+  "updates": [
+    {
+      "@type": "updateComment",
+      "newComment": "Updated model comment"
+    },
+    {
+      "@type": "rename",
+      "newName": "new_name"
+    },
+    {
+      "@type": "setProperty",
+      "property": "k2",
+      "value": "v2"
+    },
+    {
+      "@type": "removeProperty",
+      "property": "k1"
+    }
+  ]
+}
+EOF
+ 
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@model.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/models/mymodel
+ ```
+
+
+ </TabItem>
+ <TabItem value="java" label="Java">
+
+ ```java
+ // Load the catalog and model
+ GravitinoClient gravitinoClient = GravitinoClient
+     .builder("http://localhost:8090")
+     .withMetalake("example")
+     .build();
+
+ Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+ ModelCatalog modelCatalog = catalog.asModelCatalog();
+
+ // Define modifications
+ ModelChange[] changes = {
+     ModelChange.rename("example_model_renamed"),
+     ModelChange.updatComment("new comment"),
+     ModelChange.setProperty("k2", "v2"),
+     ModelChange.removeProperty("k1")
+ };
+
+ // Apply changes
+ Model updatedModel = modelCatalog.alterModel(
+     NameIdentifier.of("model_schema", "example_model"),
+     changes
+ );
+ ```
+
+ </TabItem>
+<TabItem value="python" label="Python">
+
+ ```python
+client = GravitinoClient(uri="http://localhost:8090", 
+                         metalake_name="mymetalake")
+
+catalog = client.load_catalog(name="mycatalog").as_model_catalog()
+
+# Define modifications
+changes = (
+    ModelChange.rename("renamed"),
+    ModelChange.update_comment("new comment"),
+    ModelChange.set_property("k2", "v2"),
+    ModelChange.remove_property("k1"),
+)
+
+# Apply changes
+updated_model = model_catalog.alter_model(
+    ident=NameIdentifier.of("myschema", "mymodel"), *changes
+)
+ ```
+ </TabItem>
+ </Tabs>
+
+#### Supported modifications
+
+The following operations are supported for altering a model:
+
+
+| Operation           | JSON Example                                               | Java Method                                | Python Method                               |
+ |---------------------|------------------------------------------------------------|--------------------------------------------|---------------------------------------------|
+| **Rename model**    | `{"@type":"rename","newName":"new_name"}`                  | `ModelChange.rename("new_name")`           | `ModelChange.rename("new_name")`            |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new comment"}`     | `ModelChange.updateComment("new comment")` | `ModelChange.update_comment("new comment")` |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelChange.setProperty("key", "value")`  | `ModelChange.set_property("key", "value")`  |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelChange.removeProperty("key")`        | `ModelChange.remove_property("key")`        |
+
+:::note
+- Multiple modifications can be applied in a single request.
+- If the target model does not exist, a `404 Not Found` error will be returned.
+  :::
+
 ### Delete a model
 
 You can delete a model by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
@@ -518,6 +630,259 @@ model_version: ModelVersion = catalog.as_model_catalog().get_model_version_by_al
 
 </TabItem>
 </Tabs>
+
+### Alter a ModelVersion
+
+You can modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties) 
+by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}
+/schemas/{schema_name} /models/{model_name}/versions/{version_number}` endpoint or using the Gravitino 
+Java/Python client. The following is an example of modifying a model version:
+
+<Tabs groupId="language" queryString>
+ <TabItem value="shell" label="Shell">
+
+```shell
+cat <<EOF >model.json
+{
+  "updates": [
+    {
+      "@type": "updateComment",
+      "newComment": "Updated comment of model version"
+    },
+    {
+      "@type": "updateUri",
+      "newUri": "new_uri"
+    },
+    {
+      "@type": "setProperty",
+      "property": "key",
+      "value": "value"
+    },
+    {
+      "@type": "removeProperty",
+      "property": "key"
+    },
+    {
+      "@type": "updateAliases",
+      "aliasesToAdd": [
+          "alias1",
+          "alias2"
+      ],
+      "aliasesToRemove": [
+          "alias3"
+      ]
+    }
+  ]
+}
+EOF
+ 
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@model.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/models/mymodel/versions/0
+```
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// Load the model catalog
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://localhost:8090")
+    .withMetalake("example")
+    .build();
+
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+ModelCatalog modelCatalog = catalog.asModelCatalog();
+
+// Define modifications
+ModelVersionChange[] changes = {
+     ModelVersionChange.updateComment("Updated comment of model version"),
+     ModelVersionChange.updateUri("new_uri"),
+     ModelVersionChange.setProperty("key", "value"),
+     ModelVersionChange.removeProperty("key"),
+     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
+ };
+
+// Apply changes
+ModelVersion updatedModelVersion = modelCatalog.alterModelVersion(
+     NameIdentifier.of("model_schema", "example_model"),
+     0,
+     changes
+ );
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client = GravitinoClient(
+    uri="http://localhost:8090", metalake_name="mymetalake"
+)
+
+# Load Model Catalog
+model_catalog = client.load_catalog(name="mycatalog").as_model_catalog()
+
+# Define modifications
+changes = (
+    ModelVersionChange.update_comment("Updated comment of model version"),
+    ModelVersionChange.update_uri("new_uri"),
+    ModelVersionChange.set_property("k2", "v2"),
+    ModelVersionChange.remove_property("k1"),
+    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
+)
+
+# Apply changes
+updated_model = model_catalog.alter_model_version(
+    NameIdentifier.of("myschema", "mymodel"), 0, *changes
+)
+```
+
+</TabItem>
+</Tabs>
+
+#### Supported modifications
+
+| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
+|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
+| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+
+:::note
+- Multiple modifications can be applied in a single request.
+- If the target model does not exist, a `404 Not Found` error will be returned.
+- If the target model version does not exist, a `404 Not Found` error will be returned.
+  :::
+
+### Alter a ModelVersion by alias
+
+You can also modify a modelVersion's metadata (e.g. update uri, update comment, or modify 
+properties) by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/
+{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or using the Gravitino
+Java/Python client. The following is an example of modifying a model version:
+
+<Tabs groupId="language" queryString>
+ <TabItem value="shell" label="Shell">
+
+```shell
+cat <<EOF >model.json
+{
+  "updates": [
+    {
+      "@type": "updateComment",
+      "newComment": "Updated comment of model version"
+    },
+    {
+      "@type": "updateUri",
+      "newUri": "new_uri"
+    },
+    {
+      "@type": "setProperty",
+      "property": "key",
+      "value": "value"
+    },
+    {
+      "@type": "removeProperty",
+      "property": "key"
+    },
+    {
+      "@type": "updateAliases",
+      "aliasesToAdd": [
+          "alias1",
+          "alias2"
+      ],
+      "aliasesToRemove": [
+          "alias3"
+      ]
+    }
+  ]
+}
+EOF
+ 
+curl -X PUT \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '@model.json' \
+  http://localhost:8090/api/metalakes/mymetalake/catalogs/mycatalog/schemas/myschema/models/mymodel/aliases/myalias
+```
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// Load the model catalog
+GravitinoClient gravitinoClient = GravitinoClient
+    .builder("http://localhost:8090")
+    .withMetalake("example")
+    .build();
+
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+ModelCatalog modelCatalog = catalog.asModelCatalog();
+
+// Define modifications
+ModelVersionChange[] changes = {
+     ModelVersionChange.updateComment("Updated comment of model version"),
+     ModelVersionChange.updateUri("new_uri"),
+     ModelVersionChange.setProperty("key", "value"),
+     ModelVersionChange.removeProperty("key"),
+     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
+ };
+
+// Apply changes
+ModelVersion updatedModelVersion = modelCatalog.alterModelVersion(
+     NameIdentifier.of("model_schema", "example_model"),
+     "myalias",
+     changes
+ );
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client = GravitinoClient(
+    uri="http://localhost:8090", metalake_name="mymetalake"
+)
+
+# Load Model Catalog
+model_catalog = client.load_catalog(name="mycatalog").as_model_catalog()
+
+# Define modifications
+changes = (
+    ModelVersionChange.update_comment("Updated comment of model version"),
+    ModelVersionChange.update_uri("new_uri"),
+    ModelVersionChange.set_property("k2", "v2"),
+    ModelVersionChange.remove_property("k1"),
+    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
+)
+
+# Apply changes
+updated_model = model_catalog.alter_model_version_by_alias(
+    NameIdentifier.of("myschema", "myalias", "mymodel"), *changes
+)
+```
+
+</TabItem>
+</Tabs>
+
+#### Supported modifications
+
+| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
+|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
+| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
+
+
+:::note
+- Multiple modifications can be applied in a single request.
+- If the target model does not exist, a `404 Not Found` error will be returned.
+- If the target model version does not exist, a `404 Not Found` error will be returned.
+  :::
 
 ### Delete a ModelVersion
 

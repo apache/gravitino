@@ -38,7 +38,9 @@ import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -52,6 +54,12 @@ public class TestModelEvent {
   private DummyEventListener dummyEventListener;
   private Model modelA;
   private Model modelB;
+  private Model alterNameModel;
+  private ModelVersion alterCommentModelVersion;
+  private ModelVersion otherAlterCommentModelVersion;
+  private ModelChange modelRenameChange;
+  private String newModelVersionComment;
+  private ModelVersionChange modelUpdateCommentChange;
   private NameIdentifier existingIdentA;
   private NameIdentifier existingIdentB;
   private NameIdentifier notExistingIdent;
@@ -61,12 +69,30 @@ public class TestModelEvent {
 
   @BeforeAll
   void init() {
+    this.newModelVersionComment = "new comment";
     this.namespace = Namespace.of("metalake", "catalog", "schema");
     this.existingIdentA = NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "modelA");
     this.existingIdentB = NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "modelB");
 
     this.modelA = getMockModel("modelA", "commentA");
     this.modelB = getMockModel("modelB", "commentB");
+    this.alterNameModel = getMockModel("modelA_rename", "commentA");
+    this.alterCommentModelVersion =
+        getMockModelVersion(
+            "uriA",
+            1,
+            new String[] {"aliasProduction"},
+            newModelVersionComment,
+            ImmutableMap.of("color", "#FFFFFF"));
+    this.otherAlterCommentModelVersion =
+        getMockModelVersion(
+            "uriB",
+            2,
+            new String[] {"aliasTest"},
+            newModelVersionComment,
+            ImmutableMap.of("color", "#FFFFFF"));
+    this.modelRenameChange = getMockModelChange("modelA_rename");
+    this.modelUpdateCommentChange = getMockModelVersionChange("new comment");
 
     this.firstModelVersion =
         mockModelVersion("uriA", new String[] {"aliasProduction"}, "versionInfoA");
@@ -716,12 +742,210 @@ public class TestModelEvent {
     Assertions.assertEquals(existingIdentA, listModelVersionsFailureEvent.identifier());
   }
 
+  @Test
+  void testAlterModelPreEvent() {
+    dispatcher.alterModel(existingIdentA, modelRenameChange);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(AlterModelPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    AlterModelPreEvent alterModelPreEvent = (AlterModelPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, alterModelPreEvent.identifier());
+    ModelChange[] changes = alterModelPreEvent.modelChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelRenameChange, changes[0]);
+  }
+
+  @Test
+  void testAlterModelEvent() {
+    dispatcher.alterModel(existingIdentA, modelRenameChange);
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AlterModelEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    AlterModelEvent alterModelEvent = (AlterModelEvent) postEvent;
+    ModelChange[] changes = alterModelEvent.modelChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelRenameChange, changes[0]);
+    ModelInfo modelInfo = alterModelEvent.updatedModelInfo();
+
+    checkModelInfo(modelInfo, alterNameModel);
+  }
+
+  @Test
+  void testAlterModelFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.alterModel(existingIdentA, modelRenameChange));
+
+    // validate failure event
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(AlterModelFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class, ((AlterModelFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    AlterModelFailureEvent alterModelFailureEvent = (AlterModelFailureEvent) event;
+    ModelChange[] changes = alterModelFailureEvent.modelChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelRenameChange, changes[0]);
+  }
+
   private ModelDispatcher mockExceptionModelDispatcher() {
     return mock(
         ModelDispatcher.class,
         invocation -> {
           throw new GravitinoRuntimeException("Exception for all methods");
         });
+  }
+
+  @Test
+  void testAlterModelVersionPreEventWithVersion() {
+    dispatcher.alterModelVersion(existingIdentA, 1, modelUpdateCommentChange);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(AlterModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    AlterModelVersionPreEvent alterModelVersionPreEvent = (AlterModelVersionPreEvent) preEvent;
+    ModelVersionChange[] changes = alterModelVersionPreEvent.modelVersionChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
+
+    // validate alias and version fields
+    Assertions.assertEquals(1, alterModelVersionPreEvent.version());
+  }
+
+  @Test
+  void testAlterModelVersionPreEventWithAlias() {
+    dispatcher.alterModelVersion(existingIdentB, "aliasTest", modelUpdateCommentChange);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(AlterModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL_VERSION, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    AlterModelVersionPreEvent alterModelVersionPreEvent = (AlterModelVersionPreEvent) preEvent;
+    ModelVersionChange[] changes = alterModelVersionPreEvent.modelVersionChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
+
+    // validate alias and version fields
+    Assertions.assertEquals("aliasTest", alterModelVersionPreEvent.alias());
+  }
+
+  @Test
+  void testAlterModelVersionEventWithVersion() {
+    dispatcher.alterModelVersion(existingIdentA, 1, modelUpdateCommentChange);
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AlterModelVersionEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    AlterModelVersionEvent alterModelVersionEvent = (AlterModelVersionEvent) postEvent;
+    ModelVersionChange[] changes = alterModelVersionEvent.modelVersionChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
+    ModelVersionInfo modelVersionInfo = alterModelVersionEvent.alteredModelVersionInfo();
+
+    // validate ModelVersionInfo
+    Assertions.assertEquals("uriA", modelVersionInfo.uri());
+    Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
+    Assertions.assertArrayEquals(
+        new String[] {"aliasProduction"}, modelVersionInfo.aliases().get());
+    Assertions.assertTrue(modelVersionInfo.comment().isPresent());
+    Assertions.assertEquals(newModelVersionComment, modelVersionInfo.comment().get());
+    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelVersionInfo.properties());
+  }
+
+  @Test
+  void testAlterModelVersionEventWithAlias() {
+    dispatcher.alterModelVersion(existingIdentB, "aliasTest", modelUpdateCommentChange);
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AlterModelVersionEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL_VERSION, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    AlterModelVersionEvent alterModelVersionEvent = (AlterModelVersionEvent) postEvent;
+    ModelVersionChange[] changes = alterModelVersionEvent.modelVersionChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
+    ModelVersionInfo modelVersionInfo = alterModelVersionEvent.alteredModelVersionInfo();
+
+    // validate ModelVersionInfo
+    Assertions.assertEquals("uriB", modelVersionInfo.uri());
+    Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
+    Assertions.assertArrayEquals(new String[] {"aliasTest"}, modelVersionInfo.aliases().get());
+    Assertions.assertTrue(modelVersionInfo.comment().isPresent());
+    Assertions.assertEquals(newModelVersionComment, modelVersionInfo.comment().get());
+    Assertions.assertEquals(ImmutableMap.of("color", "#FFFFFF"), modelVersionInfo.properties());
+  }
+
+  @Test
+  void testAlterModelVersionFailureEventWithVersion() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.alterModelVersion(existingIdentA, 1, modelUpdateCommentChange));
+
+    // validate failure event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AlterModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((AlterModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    AlterModelVersionFailureEvent alterModelVersionFailureEvent =
+        (AlterModelVersionFailureEvent) event;
+    ModelVersionChange[] changes = alterModelVersionFailureEvent.modelVersionChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
+
+    // validate alias and version fields
+    Assertions.assertEquals(1, alterModelVersionFailureEvent.version());
+  }
+
+  @Test
+  void testAlterModelVersionFailureEventWithAlias() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.alterModelVersion(
+                existingIdentB, "aliasTest", modelUpdateCommentChange));
+
+    // validate failure event
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AlterModelVersionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((AlterModelVersionFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.ALTER_MODEL_VERSION, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    AlterModelVersionFailureEvent alterModelVersionFailureEvent =
+        (AlterModelVersionFailureEvent) event;
+    ModelVersionChange[] changes = alterModelVersionFailureEvent.modelVersionChanges();
+    Assertions.assertEquals(1, changes.length);
+    Assertions.assertEquals(modelUpdateCommentChange, changes[0]);
+
+    // validate alias and version fields
+    Assertions.assertEquals("aliasTest", alterModelVersionFailureEvent.alias());
   }
 
   private ModelDispatcher mockModelDispatcher() {
@@ -756,6 +980,13 @@ public class TestModelEvent {
     when(dispatcher.deleteModelVersion(existingIdentA, 3)).thenReturn(false);
 
     when(dispatcher.listModelVersions(existingIdentA)).thenReturn(new int[] {1, 2});
+    when(dispatcher.alterModel(existingIdentA, new ModelChange[] {modelRenameChange}))
+        .thenReturn(alterNameModel);
+
+    when(dispatcher.alterModelVersion(existingIdentA, 1, modelUpdateCommentChange))
+        .thenReturn(alterCommentModelVersion);
+    when(dispatcher.alterModelVersion(existingIdentB, "aliasTest", modelUpdateCommentChange))
+        .thenReturn(otherAlterCommentModelVersion);
 
     return dispatcher;
   }
@@ -773,6 +1004,18 @@ public class TestModelEvent {
     when(mockModel.auditInfo()).thenReturn(null);
 
     return mockModel;
+  }
+
+  private ModelVersion getMockModelVersion(
+      String uri, int version, String[] aliases, String comment, Map<String, String> properties) {
+    ModelVersion mockModelVersion = mock(ModelVersion.class);
+    when(mockModelVersion.version()).thenReturn(version);
+    when(mockModelVersion.uri()).thenReturn(uri);
+    when(mockModelVersion.aliases()).thenReturn(aliases);
+    when(mockModelVersion.comment()).thenReturn(comment);
+    when(mockModelVersion.properties()).thenReturn(properties);
+
+    return mockModelVersion;
   }
 
   private Model getMockModelWithAudit(String name, String comment) {
@@ -868,5 +1111,19 @@ public class TestModelEvent {
     Assertions.assertNotNull(actual);
     Assertions.assertEquals(expected.length, actual.length);
     Assertions.assertArrayEquals(expected, actual);
+  }
+
+  private ModelChange getMockModelChange(String newName) {
+    ModelChange.RenameModel mockObject = mock(ModelChange.RenameModel.class);
+    when(mockObject.newName()).thenReturn(newName);
+
+    return mockObject;
+  }
+
+  private ModelVersionChange getMockModelVersionChange(String newName) {
+    ModelVersionChange.UpdateComment mockObject = mock(ModelVersionChange.UpdateComment.class);
+    when(mockObject.newComment()).thenReturn(newName);
+
+    return mockObject;
   }
 }

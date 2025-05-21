@@ -61,6 +61,10 @@ class NoSuchFilesetException(NotFoundException):
     """Exception thrown when a file with specified name is not existed."""
 
 
+class NoSuchLocationNameException(NotFoundException):
+    """Exception thrown when a fileset location name is not found."""
+
+
 class NoSuchCredentialException(NotFoundException):
     """Exception thrown when a credential with specified credential type is not existed."""
 
@@ -159,3 +163,11 @@ class BadRequestException(GravitinoRuntimeException):
 
 class IllegalStateException(GravitinoRuntimeException):
     """An exception thrown when the state is invalid."""
+
+
+class NoSuchTagException(NotFoundException):
+    """An exception thrown when a tag with specified name is not existed."""
+
+
+class TagAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a tag with specified name already associated to a metadata object."""

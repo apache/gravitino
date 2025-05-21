@@ -18,16 +18,24 @@
  */
 package org.apache.gravitino.connector;
 
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -55,6 +63,7 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -74,7 +83,9 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -398,15 +409,32 @@ public class TestCatalogOperations
   }
 
   @Override
-  public Fileset createFileset(
+  public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,
       Fileset.Type type,
-      String storageLocation,
+      Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    if (storageLocations != null && storageLocations.size() == 1) {
+      properties =
+          Optional.ofNullable(properties)
+              .map(
+                  props ->
+                      ImmutableMap.<String, String>builder()
+                          .putAll(props)
+                          .put(
+                              PROPERTY_DEFAULT_LOCATION_NAME,
+                              storageLocations.keySet().iterator().next())
+                          .build())
+              .orElseGet(
+                  () ->
+                      ImmutableMap.of(
+                          PROPERTY_DEFAULT_LOCATION_NAME,
+                          storageLocations.keySet().iterator().next()));
+    }
     TestFileset fileset =
         TestFileset.builder()
             .withName(ident.name())
@@ -414,7 +442,7 @@ public class TestCatalogOperations
             .withProperties(properties)
             .withAuditInfo(auditInfo)
             .withType(type)
-            .withStorageLocation(storageLocation)
+            .withStorageLocations(storageLocations)
             .build();
 
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
@@ -480,7 +508,7 @@ public class TestCatalogOperations
             .withProperties(newProps)
             .withAuditInfo(updatedAuditInfo)
             .withType(fileset.type())
-            .withStorageLocation(fileset.storageLocation())
+            .withStorageLocations(fileset.storageLocations())
             .build();
     filesets.put(newIdent, updatedFileset);
     return updatedFileset;
@@ -497,7 +525,7 @@ public class TestCatalogOperations
   }
 
   @Override
-  public String getFileLocation(NameIdentifier ident, String subPath) {
+  public String getFileLocation(NameIdentifier ident, String subPath, String locationName) {
     Preconditions.checkArgument(subPath != null, "subPath must not be null");
     String processedSubPath;
     if (!subPath.trim().isEmpty() && !subPath.trim().startsWith(SLASH)) {
@@ -507,8 +535,16 @@ public class TestCatalogOperations
     }
 
     Fileset fileset = loadFileset(ident);
+    Map<String, String> storageLocations = fileset.storageLocations();
+    String targetLocationName =
+        Optional.ofNullable(locationName)
+            .orElse(fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
+    if (storageLocations == null || !storageLocations.containsKey(targetLocationName)) {
+      throw new NoSuchLocationNameException(
+          "The location name: %s does not exist in the fileset: %s", targetLocationName, ident);
+    }
 
-    boolean isSingleFile = checkSingleFile(fileset);
+    boolean isSingleFile = checkSingleFile(storageLocations.get(targetLocationName));
     // if the storage location is a single file, it cannot have sub path to access.
     if (isSingleFile && StringUtils.isBlank(processedSubPath)) {
       throw new GravitinoRuntimeException(
@@ -895,15 +931,191 @@ public class TestCatalogOperations
     return true;
   }
 
+  @Override
+  public Model alterModel(NameIdentifier ident, ModelChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestModel model = models.get(ident);
+    Map<String, String> newProps =
+        model.properties() == null ? ImmutableMap.of() : new HashMap<>(model.properties());
+    String newComment = model.comment();
+    int newLatestVersion = model.latestVersion();
+
+    NameIdentifier newIdent = ident;
+    for (ModelChange change : changes) {
+      if (change instanceof ModelChange.RenameModel) {
+        String newName = ((ModelChange.RenameModel) change).newName();
+        newIdent = NameIdentifier.of(ident.namespace(), newName);
+        if (models.containsKey(newIdent)) {
+          throw new ModelAlreadyExistsException("Model %s already exists", ident);
+        }
+
+      } else if (change instanceof ModelChange.RemoveProperty) {
+        ModelChange.RemoveProperty removeProperty = (ModelChange.RemoveProperty) change;
+        newProps.remove(removeProperty.property());
+
+      } else if (change instanceof ModelChange.SetProperty) {
+        ModelChange.SetProperty setProperty = (ModelChange.SetProperty) change;
+        newProps.put(setProperty.property(), setProperty.value());
+
+      } else if (change instanceof ModelChange.UpdateComment) {
+        ModelChange.UpdateComment updateComment = (ModelChange.UpdateComment) change;
+        newComment = updateComment.newComment();
+
+      } else {
+        throw new IllegalArgumentException("Unsupported model change: " + change);
+      }
+    }
+    TestModel updatedModel =
+        TestModel.builder()
+            .withName(newIdent.name())
+            .withComment(newComment)
+            .withProperties(new HashMap<>(newProps))
+            .withAuditInfo(updatedAuditInfo)
+            .withLatestVersion(newLatestVersion)
+            .build();
+
+    models.put(ident, updatedModel);
+    return updatedModel;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
+
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelVersionException("Model %s does not exist", ident);
+    }
+
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", versionPair);
+    }
+
+    return internalUpdateModelVersion(ident, version, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion alterModelVersion(
+      NameIdentifier ident, String alias, ModelVersionChange... changes)
+      throws NoSuchModelException, IllegalArgumentException {
+
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelVersionException("Model %s does not exist", ident);
+    }
+
+    Pair<NameIdentifier, String> aliasPair = Pair.of(ident, alias);
+    if (!modelAliasToVersion.containsKey(aliasPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", alias);
+    }
+
+    int version = modelAliasToVersion.get(aliasPair);
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    if (!modelVersions.containsKey(versionPair)) {
+      throw new NoSuchModelVersionException("Model version %s does not exist", versionPair);
+    }
+
+    return internalUpdateModelVersion(ident, version, changes);
+  }
+
+  private ModelVersion internalUpdateModelVersion(
+      NameIdentifier ident, int version, ModelVersionChange... changes)
+      throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
+
+    Pair<NameIdentifier, Integer> versionPair = Pair.of(ident, version);
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator("test")
+            .withCreateTime(Instant.now())
+            .withLastModifier("test")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    TestModelVersion testModelVersion = modelVersions.get(versionPair);
+    Map<String, String> newProps =
+        testModelVersion.properties() != null
+            ? Maps.newHashMap(testModelVersion.properties())
+            : Maps.newHashMap();
+    String newComment = testModelVersion.comment();
+    int newVersion = testModelVersion.version();
+    String[] newAliases = testModelVersion.aliases();
+    String newUri = testModelVersion.uri();
+
+    for (ModelVersionChange change : changes) {
+      if (change instanceof ModelVersionChange.UpdateComment) {
+        newComment = ((ModelVersionChange.UpdateComment) change).newComment();
+
+      } else if (change instanceof ModelVersionChange.RemoveProperty) {
+        ModelVersionChange.RemoveProperty removeProperty =
+            (ModelVersionChange.RemoveProperty) change;
+        newProps.remove(removeProperty.property());
+
+      } else if (change instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
+        newProps.put(setProperty.property(), setProperty.value());
+
+      } else if (change instanceof ModelVersionChange.UpdateAliases) {
+        ModelVersionChange.UpdateAliases updateAliasesChange =
+            (ModelVersionChange.UpdateAliases) change;
+
+        Set<String> addTmpSet = updateAliasesChange.aliasesToAdd();
+        Set<String> deleteTmpSet = updateAliasesChange.aliasesToRemove();
+        Set<String> aliasToAdd = Sets.difference(addTmpSet, deleteTmpSet).immutableCopy();
+        Set<String> aliasToDelete = Sets.difference(deleteTmpSet, addTmpSet).immutableCopy();
+
+        newAliases = doDeleteAlias(newAliases, aliasToDelete);
+        newAliases = doSetAlias(newAliases, aliasToAdd);
+
+      } else if (change instanceof ModelVersionChange.UpdateUri) {
+        ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
+        newUri = updateUriChange.newUri();
+
+      } else {
+        throw new IllegalArgumentException("Unsupported model version change: " + change);
+      }
+    }
+
+    TestModelVersion updatedModelVersion =
+        TestModelVersion.builder()
+            .withVersion(newVersion)
+            .withComment(newComment)
+            .withProperties(newProps)
+            .withAuditInfo(updatedAuditInfo)
+            .withUri(newUri)
+            .withAliases(newAliases)
+            .build();
+
+    modelVersions.put(versionPair, updatedModelVersion);
+
+    Arrays.stream(newAliases)
+        .map(alias -> Pair.of(ident, alias))
+        .forEach(pair -> modelAliasToVersion.put(pair, newVersion));
+    return updatedModelVersion;
+  }
+
   private boolean hasCallerContext() {
     return CallerContext.CallerContextHolder.get() != null
         && CallerContext.CallerContextHolder.get().context() != null
         && !CallerContext.CallerContextHolder.get().context().isEmpty();
   }
 
-  private boolean checkSingleFile(Fileset fileset) {
+  private boolean checkSingleFile(String location) {
     try {
-      File locationPath = new File(fileset.storageLocation());
+      File locationPath = new File(location);
       return locationPath.isFile();
     } catch (Exception e) {
       return false;
@@ -1091,5 +1303,25 @@ public class TestCatalogOperations
         .map(TestColumn.class::cast)
         .sorted(Comparator.comparingInt(TestColumn::position))
         .toArray(TestColumn[]::new);
+  }
+
+  private String[] doDeleteAlias(String[] entityAliases, Set<String> aliasToDelete) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    aliasList.removeAll(aliasToDelete);
+
+    return aliasList.toArray(new String[0]);
+  }
+
+  private String[] doSetAlias(String[] entityAliases, Set<String> aliasToAdd) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    Set<String> aliasSet = new HashSet<>(aliasList);
+
+    for (String alias : aliasToAdd) {
+      if (aliasSet.add(alias)) {
+        aliasList.add(alias);
+      }
+    }
+
+    return aliasList.toArray(new String[0]);
   }
 }

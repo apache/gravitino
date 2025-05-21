@@ -18,8 +18,11 @@
  */
 package org.apache.gravitino.filesystem.hadoop.integration.test;
 
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,6 +38,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -64,6 +68,7 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
   protected Configuration conf = new Configuration();
   protected int defaultBlockSize = 128 * 1024 * 1024;
   protected int defaultReplication = 3;
+  protected Map<String, String> properties = Maps.newHashMap();
 
   @BeforeAll
   public void startUp() throws Exception {
@@ -72,7 +77,6 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     metalake = client.createMetalake(metalakeName, "metalake comment", Collections.emptyMap());
     Assertions.assertTrue(client.metalakeExists(metalakeName));
 
-    Map<String, String> properties = Maps.newHashMap();
     Catalog catalog =
         metalake.createCatalog(
             catalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", properties);
@@ -119,6 +123,53 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
   }
 
   @Test
+  public void testCurrentLocationName() throws IOException {
+    // create multiple locations fileset
+    String filesetName = GravitinoITUtils.genRandomName("test_location_selector");
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    Catalog catalog = metalake.loadCatalog(catalogName);
+    String defaultStorageLocation = genStorageLocation(filesetName);
+    String storageLocation1 = genStorageLocation(filesetName + "_1");
+    String locationName1 = "location1";
+    catalog
+        .asFilesetCatalog()
+        .createMultipleLocationFileset(
+            filesetIdent,
+            "fileset comment",
+            Fileset.Type.MANAGED,
+            ImmutableMap.of(
+                LOCATION_NAME_UNKNOWN, defaultStorageLocation, locationName1, storageLocation1),
+            ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, LOCATION_NAME_UNKNOWN));
+    Assertions.assertTrue(catalog.asFilesetCatalog().filesetExists(filesetIdent));
+
+    // set location1 to current location
+    Configuration configuration = new Configuration(conf);
+    configuration.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME, locationName1);
+
+    Path hdfsPath1 = new Path(storageLocation1);
+    try (FileSystem fs =
+        hdfsPath1.getFileSystem(convertGvfsConfigToRealFileSystemConfig(configuration))) {
+      Path gvfsPath = genGvfsPath(filesetName);
+      try (FileSystem gvfs = gvfsPath.getFileSystem(configuration)) {
+        if (!gvfs.exists(gvfsPath)) {
+          gvfs.mkdirs(gvfsPath);
+        }
+        String fileName = "test.txt";
+        Path createPath = new Path(gvfsPath + "/" + fileName);
+        // GCS need to close the stream to create the file manually.
+        gvfs.create(createPath).close();
+
+        Assertions.assertTrue(gvfs.exists(createPath));
+        Assertions.assertTrue(fs.exists(new Path(storageLocation1 + "/" + fileName)));
+        Assertions.assertFalse(fs.exists(new Path(defaultStorageLocation + "/" + fileName)));
+      }
+    }
+
+    catalog.asFilesetCatalog().dropFileset(filesetIdent);
+  }
+
+  @Test
   public void testCreate() throws IOException {
     // create fileset
     String filesetName = GravitinoITUtils.genRandomName("test_fileset_create");
@@ -138,10 +189,11 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     // test gvfs create
     Path hdfsPath = new Path(storageLocation);
     try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
-      Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-        Assertions.assertTrue(gvfs.exists(gvfsPath));
+        if (!gvfs.exists(gvfsPath)) {
+          gvfs.mkdirs(gvfsPath);
+        }
         String fileName = "test.txt";
         Path createPath = new Path(gvfsPath + "/" + fileName);
         // GCS need to close the stream to create the file manually.
@@ -175,13 +227,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     // test gvfs append
     Path hdfsPath = new Path(storageLocation);
     try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
-      Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String fileName = "test.txt";
       Path appendPath = new Path(gvfsPath + "/" + fileName);
 
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-        Assertions.assertTrue(gvfs.exists(gvfsPath));
+        if (!gvfs.exists(gvfsPath)) {
+          gvfs.mkdirs(gvfsPath);
+        }
         gvfs.create(appendPath).close();
         Assertions.assertTrue(gvfs.exists(appendPath));
         Assertions.assertTrue(gvfs.getFileStatus(appendPath).isFile());
@@ -236,12 +289,13 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     // test gvfs delete
     Path hdfsPath = new Path(storageLocation);
     try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
-      Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String fileName = "test.txt";
       Path deletePath = new Path(gvfsPath + "/" + fileName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-        Assertions.assertTrue(gvfs.exists(gvfsPath));
+        if (!gvfs.exists(gvfsPath)) {
+          gvfs.mkdirs(gvfsPath);
+        }
         gvfs.create(deletePath).close();
         Assertions.assertTrue(gvfs.exists(deletePath));
         Assertions.assertTrue(gvfs.getFileStatus(deletePath).isFile());
@@ -277,12 +331,13 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     // test gvfs get status
     Path hdfsPath = new Path(storageLocation);
     try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
-      Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String fileName = "test.txt";
       Path statusPath = new Path(gvfsPath + "/" + fileName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-        Assertions.assertTrue(gvfs.exists(gvfsPath));
+        if (!gvfs.exists(gvfsPath)) {
+          gvfs.mkdirs(gvfsPath);
+        }
         gvfs.create(statusPath).close();
         Assertions.assertTrue(gvfs.exists(statusPath));
         Assertions.assertTrue(gvfs.getFileStatus(statusPath).isFile());
@@ -321,13 +376,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     // test gvfs list status
     Path hdfsPath = new Path(storageLocation);
     try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
-      Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       for (int i = 0; i < 10; i++) {
         String fileName = "test_" + i + ".txt";
         Path statusPath = new Path(gvfsPath + "/" + fileName);
         try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-          Assertions.assertTrue(gvfs.exists(gvfsPath));
+          if (!gvfs.exists(gvfsPath)) {
+            gvfs.mkdirs(gvfsPath);
+          }
           gvfs.create(statusPath).close();
           Assertions.assertTrue(gvfs.exists(statusPath));
           Assertions.assertTrue(gvfs.getFileStatus(statusPath).isFile());
@@ -379,10 +435,11 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     // test gvfs mkdirs
     Path hdfsPath = new Path(storageLocation);
     try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
-      Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-        Assertions.assertTrue(gvfs.exists(gvfsPath));
+        if (!gvfs.exists(gvfsPath)) {
+          gvfs.mkdirs(gvfsPath);
+        }
         String dirName = "test";
         Path dirPath = new Path(gvfsPath + "/" + dirName);
         gvfs.mkdirs(dirPath);
@@ -415,13 +472,14 @@ public class GravitinoVirtualFileSystemIT extends BaseIT {
     // test gvfs rename
     Path hdfsPath = new Path(storageLocation);
     try (FileSystem fs = hdfsPath.getFileSystem(convertGvfsConfigToRealFileSystemConfig(conf))) {
-      Assertions.assertTrue(fs.exists(hdfsPath));
       Path gvfsPath = genGvfsPath(filesetName);
       String srcName = "test_src";
       Path srcPath = new Path(gvfsPath + "/" + srcName);
 
       try (FileSystem gvfs = gvfsPath.getFileSystem(conf)) {
-        Assertions.assertTrue(gvfs.exists(gvfsPath));
+        if (!gvfs.exists(gvfsPath)) {
+          gvfs.mkdirs(gvfsPath);
+        }
         gvfs.mkdirs(srcPath);
         Assertions.assertTrue(gvfs.exists(srcPath));
         Assertions.assertTrue(gvfs.getFileStatus(srcPath).isDirectory());

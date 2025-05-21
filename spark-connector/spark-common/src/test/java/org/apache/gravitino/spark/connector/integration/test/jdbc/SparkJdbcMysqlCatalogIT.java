@@ -72,6 +72,16 @@ public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
   }
 
   @Override
+  protected boolean supportsUpdateColumnPosition() {
+    return true;
+  }
+
+  @Override
+  protected boolean supportListTable() {
+    return true;
+  }
+
+  @Override
   protected String getCatalogName() {
     return "jdbc_mysql";
   }

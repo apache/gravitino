@@ -18,6 +18,12 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
+import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
+import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.hadoop.authentication.AuthenticationConfig;
@@ -31,9 +37,45 @@ public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
-    builder.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
-    builder.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
-    builder.putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
+    builder
+        .put(
+            PROPERTY_CATALOG_PLACEHOLDER,
+            PropertyEntry.stringReservedPropertyEntry(
+                PROPERTY_CATALOG_PLACEHOLDER,
+                "The placeholder will be replaced to catalog name in the location",
+                true /* hidden */))
+        .put(
+            PROPERTY_SCHEMA_PLACEHOLDER,
+            PropertyEntry.stringReservedPropertyEntry(
+                PROPERTY_SCHEMA_PLACEHOLDER,
+                "The placeholder will be replaced to schema name in the location",
+                true /* hidden */))
+        .put(
+            PROPERTY_FILESET_PLACEHOLDER,
+            PropertyEntry.stringReservedPropertyEntry(
+                PROPERTY_FILESET_PLACEHOLDER,
+                "The placeholder will be replaced to fileset name in the location",
+                true /* hidden */))
+        .put(
+            PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
+            PropertyEntry.stringImmutablePropertyPrefixEntry(
+                PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
+                "The prefix of fileset placeholder property",
+                false /* required */,
+                null /* default value */,
+                false /* hidden */,
+                false /* reserved */))
+        .put(
+            PROPERTY_DEFAULT_LOCATION_NAME,
+            PropertyEntry.stringOptionalPropertyEntry(
+                PROPERTY_DEFAULT_LOCATION_NAME,
+                "The default location name for the fileset",
+                true /* immutable */,
+                null,
+                false /* hidden */))
+        .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
+        .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
+        .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);
     return builder.build();
   }
 }

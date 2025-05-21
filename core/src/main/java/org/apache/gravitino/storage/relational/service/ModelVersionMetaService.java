@@ -24,10 +24,13 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -44,6 +47,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.jersey.internal.guava.Lists;
+import org.glassfish.jersey.internal.guava.Preconditions;
 
 public class ModelVersionMetaService {
 
@@ -246,5 +250,126 @@ public class ModelVersionMetaService {
                         mapper.deleteModelVersionAliasRelsByLegacyTimeline(legacyTimeline, limit)));
 
     return modelVersionDeletedCount[0] + modelVersionAliasRelDeletedCount[0];
+  }
+
+  /**
+   * Updates the model version entity.
+   *
+   * @param ident the {@link NameIdentifier} instance of the model version to update
+   * @param updater the function to update the model version entity
+   * @return the updated model version entity
+   * @param <E> the type of the entity to update
+   * @throws IOException if an error occurs while updating the entity
+   */
+  public <E extends Entity & HasIdentifier> ModelVersionEntity updateModelVersion(
+      NameIdentifier ident, Function<E, E> updater) throws IOException {
+    NameIdentifierUtil.checkModelVersion(ident);
+    NameIdentifier modelIdent = NameIdentifier.of(ident.namespace().levels());
+
+    boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
+    ModelEntity modelEntity = ModelMetaService.getInstance().getModelByIdentifier(modelIdent);
+
+    ModelVersionPO oldModelVersionPO =
+        SessionUtils.getWithoutCommit(
+            ModelVersionMetaMapper.class,
+            mapper -> {
+              if (isVersionNumber) {
+                return mapper.selectModelVersionMeta(
+                    modelEntity.id(), Integer.valueOf(ident.name()));
+              } else {
+                return mapper.selectModelVersionMetaByAlias(modelEntity.id(), ident.name());
+              }
+            });
+
+    if (oldModelVersionPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.MODEL_VERSION.name().toLowerCase(Locale.ROOT),
+          ident.toString());
+    }
+
+    List<ModelVersionAliasRelPO> oldAliasRelPOs =
+        SessionUtils.getWithoutCommit(
+            ModelVersionAliasRelMapper.class,
+            mapper -> {
+              if (isVersionNumber) {
+                return mapper.selectModelVersionAliasRelsByModelIdAndVersion(
+                    modelEntity.id(), Integer.valueOf(ident.name()));
+              } else {
+                return mapper.selectModelVersionAliasRelsByModelIdAndAlias(
+                    modelEntity.id(), ident.name());
+              }
+            });
+
+    ModelVersionEntity oldModelVersionEntity =
+        POConverters.fromModelVersionPO(modelIdent, oldModelVersionPO, oldAliasRelPOs);
+    ModelVersionEntity newModelVersionEntity =
+        (ModelVersionEntity) updater.apply((E) oldModelVersionEntity);
+
+    Preconditions.checkArgument(
+        Objects.equals(oldModelVersionEntity.version(), newModelVersionEntity.version()),
+        "The updated model version: %s should be same with the table entity version before: %s",
+        newModelVersionEntity.version(),
+        oldModelVersionEntity.version());
+
+    boolean isAliasChanged =
+        isModelVersionAliasUpdated(oldModelVersionEntity, newModelVersionEntity);
+    List<ModelVersionAliasRelPO> newAliasRelPOs =
+        POConverters.updateModelVersionAliasRelPO(oldAliasRelPOs, newModelVersionEntity);
+
+    final AtomicInteger updateResult = new AtomicInteger(0);
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.doWithoutCommitAndFetchResult(
+                      ModelVersionMetaMapper.class,
+                      mapper ->
+                          mapper.updateModelVersionMeta(
+                              POConverters.updateModelVersionPO(
+                                  oldModelVersionPO, newModelVersionEntity),
+                              oldModelVersionPO))),
+          () -> {
+            if (isAliasChanged) {
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
+                  mapper -> {
+                    oldModelVersionEntity
+                        .aliases()
+                        .forEach(
+                            alias ->
+                                mapper.softDeleteModelVersionAliasRelsByModelIdAndAlias(
+                                    modelEntity.id(), alias));
+                  });
+
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
+                  mapper -> mapper.updateModelVersionAliasRel(newAliasRelPOs));
+            }
+          });
+
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.CATALOG, newModelVersionEntity.nameIdentifier().toString());
+      throw re;
+    }
+
+    if (updateResult.get() > 0) {
+      return newModelVersionEntity;
+    } else {
+      throw new IOException("Failed to update the entity: " + ident);
+    }
+  }
+
+  private boolean isModelVersionAliasUpdated(
+      ModelVersionEntity oldModelVersionEntity, ModelVersionEntity newModelVersionEntity) {
+    List<String> oldAliases = oldModelVersionEntity.aliases();
+    List<String> newAliases = newModelVersionEntity.aliases();
+
+    if (oldAliases.size() != newAliases.size()) {
+      return true;
+    }
+
+    return !oldAliases.equals(newAliases);
   }
 }
