@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -65,7 +66,13 @@ public class CachedEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
-    return entityStore.list(namespace, type, entityType);
+    return cache.withCacheLock(
+        () -> {
+          List<E> entities = entityStore.list(namespace, type, entityType);
+          entities.forEach(cache::put);
+
+          return entities;
+        });
   }
 
   /** {@inheritDoc} */
@@ -73,13 +80,25 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
       throws IOException {
-    return entityStore.list(namespace, type, entityType, allFields);
+    return cache.withCacheLock(
+        () -> {
+          List<E> entities = entityStore.list(namespace, type, entityType, allFields);
+          entities.forEach(cache::put);
+
+          return entities;
+        });
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    return entityStore.exists(ident, entityType);
+    return cache.withCacheLock(
+        () -> {
+          if (cache.contains(ident, entityType)) {
+            return true;
+          }
+          return entityStore.exists(ident, entityType);
+        });
   }
 
   /** {@inheritDoc} */
@@ -150,7 +169,11 @@ public class CachedEntityStore
   /** {@inheritDoc} */
   @Override
   public void close() throws IOException {
-    entityStore.close();
+    cache.withCacheLock(
+        () -> {
+          entityStore.close();
+          cache.clearStore();
+        });
   }
 
   /** {@inheritDoc} */
@@ -212,6 +235,20 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
+    cache.withCacheLock(
+        () -> {
+          Optional<List<E>> cachedEntities = cache.getIfPresent(relType, nameIdentifier, identType);
+          if (cachedEntities.isPresent()) {
+            return cachedEntities.get();
+          } else {
+            List<E> entitiesFromStore =
+                entityStore.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+            entitiesFromStore.forEach(cache::put);
+
+            return entitiesFromStore;
+          }
+        });
+
     return entityStore.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
   }
 

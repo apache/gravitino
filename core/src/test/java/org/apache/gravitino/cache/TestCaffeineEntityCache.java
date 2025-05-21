@@ -29,7 +29,6 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -44,6 +43,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.TestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -53,7 +53,7 @@ import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestCaffeineEntityCache {
-  private EntityStore mockStore;
+  private RelationalEntityStore mockStore;
   private CaffeineEntityCache real;
   private CaffeineEntityCache cache;
 
@@ -128,7 +128,7 @@ public class TestCaffeineEntityCache {
     cache.put(testRoleEntity);
     cache.put(testModelVersionEntity);
 
-    Assertions.assertEquals(12, cache.size());
+    Assertions.assertEquals(12, cache.sizeOfData());
     Assertions.assertTrue(
         cache.getIfPresent(testMetalake.nameIdentifier(), Entity.EntityType.METALAKE).isPresent());
     Assertions.assertTrue(
@@ -172,7 +172,7 @@ public class TestCaffeineEntityCache {
     Assertions.assertTrue(cache.getIfPresent(ident1, Entity.EntityType.SCHEMA).isPresent());
     Assertions.assertTrue(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
     Assertions.assertTrue(cache.getIfPresent(ident3, Entity.EntityType.TABLE).isPresent());
-    Assertions.assertEquals(cache.size(), 3);
+    Assertions.assertEquals(cache.sizeOfData(), 3);
 
     Assertions.assertFalse(cache.getIfPresent(ident4, Entity.EntityType.TABLE).isPresent());
     Assertions.assertFalse(cache.getIfPresent(ident5, Entity.EntityType.TABLE).isPresent());
@@ -235,7 +235,7 @@ public class TestCaffeineEntityCache {
     cache.put(entity2);
     cache.put(entity3);
 
-    Assertions.assertEquals(3, cache.size());
+    Assertions.assertEquals(3, cache.sizeOfData());
   }
 
   @Test
@@ -248,11 +248,11 @@ public class TestCaffeineEntityCache {
     cache.put(entity6);
     cache.put(entity7);
 
-    Assertions.assertEquals(7, cache.size());
+    Assertions.assertEquals(7, cache.sizeOfData());
 
-    cache.clear();
+    cache.clearStore();
 
-    Assertions.assertEquals(0, cache.size());
+    Assertions.assertEquals(0, cache.sizeOfData());
     Assertions.assertFalse(cache.getIfPresent(ident1, Entity.EntityType.SCHEMA).isPresent());
     Assertions.assertFalse(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
     Assertions.assertFalse(cache.getIfPresent(ident3, Entity.EntityType.TABLE).isPresent());
@@ -272,11 +272,11 @@ public class TestCaffeineEntityCache {
     cache.put(entity6);
     cache.put(entity7);
 
-    Assertions.assertEquals(7, cache.size());
+    Assertions.assertEquals(7, cache.sizeOfData());
 
     cache.invalidate(ident7, Entity.EntityType.METALAKE);
 
-    Assertions.assertEquals(1, cache.size());
+    Assertions.assertEquals(1, cache.sizeOfData());
     Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
     Assertions.assertTrue(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
 
@@ -306,7 +306,7 @@ public class TestCaffeineEntityCache {
     cache.put(entity6);
     cache.put(entity7);
 
-    Assertions.assertEquals(7, cache.size());
+    Assertions.assertEquals(7, cache.sizeOfData());
     Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
     Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
     Assertions.assertTrue(cache.contains(ident3, Entity.EntityType.TABLE));
@@ -316,7 +316,7 @@ public class TestCaffeineEntityCache {
     Assertions.assertTrue(cache.contains(ident7, Entity.EntityType.METALAKE));
 
     cache.invalidate(ident6, Entity.EntityType.CATALOG);
-    Assertions.assertEquals(3, cache.size());
+    Assertions.assertEquals(3, cache.sizeOfData());
 
     Assertions.assertTrue(cache.getIfPresent(ident7, Entity.EntityType.METALAKE).isPresent());
     Assertions.assertTrue(cache.getIfPresent(ident4, Entity.EntityType.TABLE).isPresent());
@@ -338,7 +338,7 @@ public class TestCaffeineEntityCache {
     cache.put(entity6);
     cache.put(entity7);
 
-    Assertions.assertEquals(7, cache.size());
+    Assertions.assertEquals(7, cache.sizeOfData());
     Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
     Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
     Assertions.assertTrue(cache.contains(ident3, Entity.EntityType.TABLE));
@@ -349,7 +349,7 @@ public class TestCaffeineEntityCache {
 
     cache.invalidate(ident1, Entity.EntityType.SCHEMA);
 
-    Assertions.assertEquals(5, cache.size());
+    Assertions.assertEquals(5, cache.sizeOfData());
 
     Assertions.assertTrue(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
     Assertions.assertTrue(cache.getIfPresent(ident4, Entity.EntityType.TABLE).isPresent());
@@ -371,7 +371,7 @@ public class TestCaffeineEntityCache {
     cache.put(entity6);
     cache.put(entity7);
 
-    Assertions.assertEquals(7, cache.size());
+    Assertions.assertEquals(7, cache.sizeOfData());
     Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
     Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
     Assertions.assertTrue(cache.contains(ident3, Entity.EntityType.TABLE));
@@ -382,7 +382,7 @@ public class TestCaffeineEntityCache {
 
     cache.invalidate(ident3, Entity.EntityType.TABLE);
 
-    Assertions.assertEquals(6, cache.size());
+    Assertions.assertEquals(6, cache.sizeOfData());
     Assertions.assertTrue(cache.getIfPresent(ident1, Entity.EntityType.SCHEMA).isPresent());
     Assertions.assertTrue(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
     Assertions.assertTrue(cache.getIfPresent(ident4, Entity.EntityType.TABLE).isPresent());
@@ -397,7 +397,7 @@ public class TestCaffeineEntityCache {
   void testRemoveNonExistentEntity() {
     cache.put(entity1);
 
-    Assertions.assertEquals(1, cache.size());
+    Assertions.assertEquals(1, cache.sizeOfData());
     Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
 
     Assertions.assertDoesNotThrow(() -> cache.invalidate(ident2, Entity.EntityType.SCHEMA));
@@ -430,8 +430,8 @@ public class TestCaffeineEntityCache {
     Assertions.assertDoesNotThrow(() -> cache.getIfPresent(ident1, Entity.EntityType.SCHEMA));
     Assertions.assertDoesNotThrow(() -> cache.invalidate(ident1, Entity.EntityType.SCHEMA));
     Assertions.assertDoesNotThrow(() -> cache.contains(ident1, Entity.EntityType.SCHEMA));
-    Assertions.assertDoesNotThrow(() -> cache.size());
-    Assertions.assertDoesNotThrow(() -> cache.clear());
+    Assertions.assertDoesNotThrow(() -> cache.sizeOfData());
+    Assertions.assertDoesNotThrow(() -> cache.clearStore());
     Assertions.assertThrows(
         RuntimeException.class, () -> cache.getOrLoad(ident1, Entity.EntityType.SCHEMA));
   }
@@ -441,19 +441,19 @@ public class TestCaffeineEntityCache {
     Entity firstLoadEntity = cache.getOrLoad(ident1, Entity.EntityType.SCHEMA);
     Assertions.assertEquals(firstLoadEntity, entity1);
     Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
-    Assertions.assertEquals(1, cache.size());
+    Assertions.assertEquals(1, cache.sizeOfData());
 
     cache.invalidate(ident1, Entity.EntityType.SCHEMA);
     Entity secondLoadEntity = cache.getOrLoad(ident1, Entity.EntityType.SCHEMA);
     Assertions.assertEquals(firstLoadEntity, secondLoadEntity);
     Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
-    Assertions.assertEquals(1, cache.size());
+    Assertions.assertEquals(1, cache.sizeOfData());
 
     verify(mockStore, times(2)).get(ident1, Entity.EntityType.SCHEMA, SchemaEntity.class);
   }
 
   private void initMockStore() throws IOException {
-    mockStore = mock(EntityStore.class);
+    mockStore = mock(RelationalEntityStore.class);
 
     when(mockStore.get(ident1, Entity.EntityType.SCHEMA, SchemaEntity.class)).thenReturn(entity1);
     when(mockStore.get(ident2, Entity.EntityType.SCHEMA, SchemaEntity.class)).thenReturn(entity2);

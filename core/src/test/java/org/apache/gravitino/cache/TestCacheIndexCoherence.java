@@ -43,14 +43,14 @@ public class TestCacheIndexCoherence {
   @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "Key not found")
   @State
   public static class SameKeyConcurrentInsertTest {
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<StoreEntityCacheKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
     private final Entity entity =
         TestUtil.getTestSchemaEntity(
             123L, "schema1", Namespace.of("metalake1", "catalog1"), "ident1");
-    private final EntityCacheKey key = EntityCacheKey.of(ident, entity.type());
+    private final StoreEntityCacheKey key = StoreEntityCacheKey.of(ident, entity.type());
     private final String keyStr = key.toString();
 
     @Actor
@@ -65,7 +65,7 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
+      StoreEntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
       r.r1 =
           (valueForExactKey != null
                   && Objects.equals(valueForExactKey, key)
@@ -80,7 +80,7 @@ public class TestCacheIndexCoherence {
   @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "some Key not found")
   @State
   public static class MultipleKeyConcurrentInsertTest {
-    private final RadixTree<EntityCacheKey> indexTree =
+    private final RadixTree<StoreEntityCacheKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
@@ -91,8 +91,8 @@ public class TestCacheIndexCoherence {
     private final Entity entity2 =
         TestUtil.getTestSchemaEntity(
             456L, "schema2", Namespace.of("metalake1", "catalog1"), "ident2");
-    private final EntityCacheKey key1 = EntityCacheKey.of(ident1, entity1.type());
-    private final EntityCacheKey key2 = EntityCacheKey.of(ident2, entity2.type());
+    private final StoreEntityCacheKey key1 = StoreEntityCacheKey.of(ident1, entity1.type());
+    private final StoreEntityCacheKey key2 = StoreEntityCacheKey.of(ident2, entity2.type());
     private final String key1Str = key1.toString();
     private final String key2Str = key2.toString();
 
@@ -108,8 +108,8 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      EntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
-      EntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
+      StoreEntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
+      StoreEntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
       r.r1 =
           (valueForExactKey1 != null
                   && valueForExactKey2 != null
@@ -194,6 +194,29 @@ public class TestCacheIndexCoherence {
           ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith(PREFIX));
       r.r1 = values.contains("v1") ? 1 : 0;
       r.r2 = values.contains("v2") ? 1 : 0;
+    }
+  }
+
+  @JCStressTest
+  @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Get sees the value")
+  @Outcome(
+      id = "0",
+      expect = Expect.ACCEPTABLE_INTERESTING,
+      desc = "Get sees nothing due to timing")
+  @State
+  public static class PutAndGetTest {
+    private final RadixTree<String> indexTree =
+        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    private final String key = "catalog.schema.table";
+
+    @Actor
+    public void actorPut() {
+      indexTree.put(key, "v1");
+    }
+
+    @Actor
+    public void actorGet(I_Result r) {
+      r.r1 = indexTree.getValueForExactKey(key) != null ? 1 : 0;
     }
   }
 }

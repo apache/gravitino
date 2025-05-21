@@ -24,10 +24,12 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -38,6 +40,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +52,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static volatile CaffeineEntityCache INSTANCE = null;
 
   /** Cache part */
-  private final Cache<EntityCacheKey, Entity> cacheData;
+  private final Cache<StoreEntityCacheKey, Entity> cacheData;
+
+  private final Cache<RelationEntityCacheKey, List<Entity>> cacheRelations;
   /** Index part */
-  private RadixTree<EntityCacheKey> cacheIndex;
+  private RadixTree<StoreEntityCacheKey> cacheDataIndex;
+
+  private RadixTree<RelationEntityCacheKey> cacheRelationsIndex;
 
   private final ReentrantLock opLock = new ReentrantLock();
 
@@ -99,7 +106,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   private CaffeineEntityCache(CacheConfig cacheConfig, EntityStore entityStore) {
     super(cacheConfig, entityStore);
-    cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    cacheDataIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    cacheRelationsIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+
     /**
      * Executor for async cache cleanup, when a cache expires then use this executor to sync other
      * cache and index trees
@@ -118,7 +127,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             },
             new ThreadPoolExecutor.CallerRunsPolicy());
 
-    Caffeine<EntityCacheKey, Entity> cacheDataBuilder = newBaseBuilder(cacheConfig);
+    Caffeine<StoreEntityCacheKey, Entity> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
     cacheDataBuilder
         .executor(cleanupExec)
@@ -128,44 +137,107 @@ public class CaffeineEntityCache extends BaseEntityCache {
                 return;
               }
               try {
-                invalidateExpiredItemByMetadata(value);
+                invalidateExpiredDataItemByMetadata(value);
+              } catch (Throwable t) {
+                LOG.error("Async removal failed for {}", value, t);
+              }
+            });
+
+    Caffeine<RelationEntityCacheKey, List<Entity>> cacheRelationsBuilder =
+        newBaseBuilder(cacheConfig);
+    cacheRelationsBuilder
+        .executor(cleanupExec)
+        .removalListener(
+            (key, value, cause) -> {
+              if (cause != RemovalCause.EXPIRED) {
+                return;
+              }
+              try {
+                invalidateExpiredRelationItemByMetadata(key);
               } catch (Throwable t) {
                 LOG.error("Async removal failed for {}", value, t);
               }
             });
 
     this.cacheData = cacheDataBuilder.build();
+    this.cacheRelations = cacheRelationsBuilder.build();
   }
 
   /** {@inheritDoc} */
   @Override
-  public Entity getOrLoad(NameIdentifier ident, Entity.EntityType type) throws IOException {
+  public <E extends Entity & HasIdentifier> List<E> getOrLoad(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
+      throws IOException {
     Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
+    Preconditions.checkArgument(relType != null, "SupportsRelationOperations.Type cannot be null");
 
-    Entity cachedEntity = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
+    RelationEntityCacheKey relationEntityCacheKey = RelationEntityCacheKey.of(ident, type, relType);
+    List<Entity> ifPresent = cacheRelations.getIfPresent(relationEntityCacheKey);
 
-    if (cachedEntity != null) {
-      return cachedEntity;
+    if (ifPresent != null) {
+      return convertSafe(ifPresent);
     }
-
     return withLockAndThrow(
         () -> {
-          Entity entity = entityStore.get(ident, type, getEntityClass(type));
-          syncMetadataToCache(entity);
+          List<E> entities = entityStore.listEntitiesByRelation(relType, ident, type);
+          syncEntityToRelationCache(ident, type, relType, toEntityList(entities));
 
-          return entity;
+          return entities;
         });
   }
 
   /** {@inheritDoc} */
   @Override
+  public <E extends Entity & HasIdentifier> E getOrLoad(
+      NameIdentifier ident, Entity.EntityType type) throws IOException {
+    Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
+    Preconditions.checkArgument(type != null, "EntityType cannot be null");
+
+    Entity entityFromCache = cacheData.getIfPresent(StoreEntityCacheKey.of(ident, type));
+
+    if (entityFromCache != null) {
+      return convertSafe(entityFromCache);
+    }
+
+    return withLockAndThrow(
+        () -> {
+          E entityFromDb = entityStore.get(ident, type, getEntityClass(type));
+          syncEntityToDataCache(entityFromDb);
+
+          return entityFromDb;
+        });
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType) {
+    return withLock(
+        () -> {
+          RelationEntityCacheKey relationEntityCacheKey =
+              RelationEntityCacheKey.of(nameIdentifier, identType, relType);
+          List<Entity> entitiesFromCache = cacheRelations.getIfPresent(relationEntityCacheKey);
+
+          if (entitiesFromCache != null) {
+            List<E> convertedEntities = convertSafe(entitiesFromCache);
+            return Optional.of(convertedEntities);
+          }
+          return Optional.empty();
+        });
+  }
+
+  /** {@inheritDoc} */
+  @SuppressWarnings("unchecked")
+  @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
       NameIdentifier ident, Entity.EntityType type) {
     return withLock(
         () -> {
-          Entity cachedEntity = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
-          return Optional.ofNullable((E) cachedEntity);
+          E cachedEntity = (E) cacheData.getIfPresent(StoreEntityCacheKey.of(ident, type));
+          return Optional.ofNullable(cachedEntity);
         });
   }
 
@@ -173,11 +245,28 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     return withLock(
         () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
+          StoreEntityCacheKey storeEntityCacheKey = StoreEntityCacheKey.of(ident, type);
 
           boolean existed = contains(ident, type);
           if (existed) {
-            invalidateEntities(entityCacheKey);
+            invalidateEntities(storeEntityCacheKey.identifier());
+          }
+
+          return existed;
+        });
+  }
+
+  @Override
+  public boolean invalidate(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    return withLock(
+        () -> {
+          RelationEntityCacheKey relationEntityCacheKey =
+              RelationEntityCacheKey.of(ident, type, relType);
+
+          boolean existed = contains(ident, type, relType);
+          if (existed) {
+            invalidateEntities(relationEntityCacheKey.identifier());
           }
 
           return existed;
@@ -187,22 +276,59 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null);
+    return withLock(() -> cacheData.getIfPresent(StoreEntityCacheKey.of(ident, type)) != null);
   }
 
   /** {@inheritDoc} */
   @Override
-  public long size() {
+  public boolean contains(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    return withLock(
+        () -> cacheRelations.getIfPresent(RelationEntityCacheKey.of(ident, type, relType)) != null);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public long sizeOfData() {
     return cacheData.estimatedSize();
   }
 
   /** {@inheritDoc} */
   @Override
+  public long sizeOfRelations() {
+    return cacheRelations.estimatedSize();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void clearStore() {
+    withLock(
+        () -> {
+          cacheData.invalidateAll();
+
+          cacheDataIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+        });
+  }
+
+  @Override
+  public void clearRelations(Entity entity) {
+    withLock(
+        () -> {
+          cacheRelations.invalidateAll();
+
+          cacheRelationsIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+        });
+  }
+
+  @Override
   public void clear() {
     withLock(
         () -> {
           cacheData.invalidateAll();
-          cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+          cacheRelations.invalidateAll();
+
+          cacheDataIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+          cacheRelationsIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
         });
   }
 
@@ -210,7 +336,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public <E extends Entity & HasIdentifier> void put(E entity) {
     withLock(
         () -> {
-          syncMetadataToCache(entity);
+          syncEntityToDataCache(entity);
+        });
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void put(
+      E srcEntity, E destEntity, SupportsRelationOperations.Type relType) {
+    withLock(
+        () -> {
+          syncEntityToRelationCache(
+              getIdentFromMetadata(srcEntity), srcEntity.type(), relType, destEntity);
         });
   }
 
@@ -231,13 +367,43 @@ public class CaffeineEntityCache extends BaseEntityCache {
    *
    * @param metadata The metadata to synchronize
    */
-  private void syncMetadataToCache(Entity metadata) {
+  private void syncEntityToDataCache(Entity metadata) {
     NameIdentifier nameIdent = getIdentFromMetadata(metadata);
     Entity.EntityType type = metadata.type();
-    EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdent, type);
+    StoreEntityCacheKey storeEntityCacheKey = StoreEntityCacheKey.of(nameIdent, type);
 
-    cacheData.put(entityCacheKey, metadata);
-    cacheIndex.put(entityCacheKey.toString(), entityCacheKey);
+    cacheData.put(storeEntityCacheKey, metadata);
+    cacheDataIndex.put(storeEntityCacheKey.toString(), storeEntityCacheKey);
+  }
+
+  private void syncEntityToRelationCache(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      Entity dstEntity) {
+    RelationEntityCacheKey relationEntityCacheKey = RelationEntityCacheKey.of(ident, type, relType);
+    List<Entity> cachedEntityList = cacheRelations.getIfPresent(relationEntityCacheKey);
+
+    cacheRelationsIndex.put(relationEntityCacheKey.toString(), relationEntityCacheKey);
+    if (cachedEntityList != null) {
+      cachedEntityList.add(dstEntity);
+    } else {
+      cacheRelations.put(relationEntityCacheKey, Lists.newArrayList(dstEntity));
+    }
+  }
+
+  private void syncEntityToRelationCache(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      List<Entity> dstEntities) {
+    RelationEntityCacheKey relationEntityCacheKey = RelationEntityCacheKey.of(ident, type, relType);
+    List<Entity> cachedEntityList = cacheRelations.getIfPresent(relationEntityCacheKey);
+    if (cachedEntityList != null) {
+      cachedEntityList.addAll(dstEntities);
+    } else {
+      cacheRelations.put(relationEntityCacheKey, dstEntities);
+    }
   }
 
   /**
@@ -247,14 +413,29 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param metadata The metadata to remove,
    */
   @Override
-  protected void invalidateExpiredItemByMetadata(Entity metadata) {
+  protected void invalidateExpiredDataItemByMetadata(Entity metadata) {
     NameIdentifier identifier = getIdentFromMetadata(metadata);
     Entity.EntityType type = metadata.type();
-    EntityCacheKey cacheKey = EntityCacheKey.of(identifier, type);
+    StoreEntityCacheKey cacheKey = StoreEntityCacheKey.of(identifier, type);
 
     withLock(
         () -> {
-          cacheIndex.remove(cacheKey.toString());
+          cacheDataIndex.remove(cacheKey.toString());
+          Iterable<RelationEntityCacheKey> relationKeysToRemove =
+              cacheRelationsIndex.getValuesForKeysStartingWith(identifier.toString());
+
+          relationKeysToRemove.forEach(key -> cacheRelationsIndex.remove(key.toString()));
+          cacheRelations.invalidateAll(relationKeysToRemove);
+        });
+  }
+
+  @Override
+  protected void invalidateExpiredRelationItemByMetadata(RelationEntityCacheKey key) {
+    StoreEntityCacheKey storeEntityCacheKey = key.storeEntityCacheKey();
+    withLock(
+        () -> {
+          cacheData.invalidate(storeEntityCacheKey);
+          cacheRelationsIndex.remove(key.toString());
         });
   }
 
@@ -266,6 +447,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param <VALUE> The value type
    * @return The new instance of Caffeine cache builder
    */
+  @SuppressWarnings("unchecked")
   private <KEY, VALUE> Caffeine<KEY, VALUE> newBaseBuilder(CacheConfig cacheConfig) {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
 
@@ -291,14 +473,19 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /**
    * Invalidates the entities by the given metadata key.
    *
-   * @param entityCacheKey The metadata key to invalidate the entities
+   * @param identifier The identifier of the entities to invalidate
    */
-  private void invalidateEntities(EntityCacheKey entityCacheKey) {
-    Iterable<EntityCacheKey> keyToRemove =
-        cacheIndex.getValuesForKeysStartingWith(entityCacheKey.identifier().toString());
+  private void invalidateEntities(NameIdentifier identifier) {
+    Iterable<StoreEntityCacheKey> storeKeysToRemove =
+        cacheDataIndex.getValuesForKeysStartingWith(identifier.toString());
+    Iterable<RelationEntityCacheKey> relationKeysToRemove =
+        cacheRelationsIndex.getValuesForKeysStartingWith(identifier.toString());
 
-    cacheData.invalidateAll(keyToRemove);
-    keyToRemove.forEach(key -> cacheIndex.remove(key.toString()));
+    cacheData.invalidateAll(storeKeysToRemove);
+    cacheRelations.invalidateAll(relationKeysToRemove);
+
+    storeKeysToRemove.forEach(key -> cacheDataIndex.remove(key.toString()));
+    relationKeysToRemove.forEach(key -> cacheRelationsIndex.remove(key.toString()));
   }
 
   /**

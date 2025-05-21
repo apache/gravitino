@@ -35,7 +35,7 @@ import org.checkerframework.checker.index.qual.NonNegative;
  *   <li>Other: 15 bytes
  * </ul>
  */
-public class EntityCacheWeigher implements Weigher<EntityCacheKey, Entity> {
+public class EntityCacheWeigher implements Weigher<StoreEntityCacheKey, Entity> {
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
 
   private EntityCacheWeigher() {}
@@ -68,7 +68,8 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, Entity> {
 
   /** {@inheritDoc} */
   @Override
-  public @NonNegative int weigh(@NonNull EntityCacheKey entityCacheKey, @NonNull Entity entity) {
+  public @NonNegative int weigh(
+      @NonNull StoreEntityCacheKey storeEntityCacheKey, @NonNull Entity entity) {
     return calculateWeight(entity.type());
   }
 
