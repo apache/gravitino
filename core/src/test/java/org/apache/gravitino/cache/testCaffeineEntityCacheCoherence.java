@@ -252,7 +252,7 @@ public class testCaffeineEntityCacheCoherence {
 
     @Actor
     public void actor2() {
-      cache.clear();
+      cache.clearStore();
     }
 
     @Arbiter
@@ -272,7 +272,7 @@ public class testCaffeineEntityCacheCoherence {
   public static class ClearVsGetOrLoadTest {
     @Actor
     public void actor1() {
-      cache.clear();
+      cache.clearStore();
     }
 
     @Actor

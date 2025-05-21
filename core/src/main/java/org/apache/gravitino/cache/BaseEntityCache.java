@@ -22,7 +22,9 @@ package org.apache.gravitino.cache;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -39,6 +41,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 
 /**
  * An abstract class that provides a basic implementation for the MetaCache interface. This class is
@@ -52,7 +55,7 @@ import org.apache.gravitino.meta.UserEntity;
 public abstract class BaseEntityCache implements EntityCache {
   private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAP;
   // The entity store used by the cache, initialized through the constructor.
-  protected final EntityStore entityStore;
+  protected final RelationalEntityStore entityStore;
   protected final CacheConfig cacheConfig;
 
   static {
@@ -98,7 +101,7 @@ public abstract class BaseEntityCache implements EntityCache {
    * @param metadata The entity
    * @return The {@link NameIdentifier} of the metadata
    */
-  public static NameIdentifier getIdentFromMetadata(Entity metadata) {
+  protected static NameIdentifier getIdentFromMetadata(Entity metadata) {
 
     if (metadata instanceof HasIdentifier) {
       HasIdentifier hasIdentifier = (HasIdentifier) metadata;
@@ -109,6 +112,54 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
+   * Converts a list of entities to a new list.
+   *
+   * @param entities Thr original list of entities.
+   * @return A list of converted entities.
+   * @param <E> The type of the entities in the list.
+   */
+  @SuppressWarnings("unchecked")
+  protected static <E extends Entity & HasIdentifier> List<E> convertSafe(List<Entity> entities) {
+    for (Entity e : entities) {
+      if (!(e instanceof HasIdentifier)) {
+        throw new IllegalStateException(
+            "Cached entity " + e + " is not of expected type: " + HasIdentifier.class.getName());
+      }
+    }
+
+    return (List<E>) (List<? extends Entity>) entities;
+  }
+
+  /**
+   * Converts an entity to a new entity.
+   *
+   * @param entity The original entity.
+   * @return A new entity.
+   * @param <E> The type of the entity.
+   */
+  @SuppressWarnings("unchecked")
+  protected static <E extends Entity & HasIdentifier> E convertSafe(Entity entity) {
+    if (!(entity instanceof HasIdentifier)) {
+      throw new IllegalStateException(
+          "Cached entity " + entity + " is not of expected type: " + HasIdentifier.class.getName());
+    }
+
+    return (E) entity;
+  }
+
+  /**
+   * Converts a list of entities to a list of entities.
+   *
+   * @param sourceList The original list of entities.
+   * @return A list of entities.
+   * @param <E> The type of the elements in the list.
+   */
+  protected static <E extends Entity & HasIdentifier> List<Entity> toEntityList(
+      List<E> sourceList) {
+    return sourceList.stream().map(e -> (Entity) e).collect(Collectors.toList());
+  }
+
+  /**
    * Constructs a new {@link BaseEntityCache} instance. If the provided entityStore is null, it will
    * use the entity store configured in the Gravitino environment.
    *
@@ -116,7 +167,7 @@ public abstract class BaseEntityCache implements EntityCache {
    */
   public BaseEntityCache(CacheConfig cacheConfig, EntityStore entityStore) {
     this.cacheConfig = cacheConfig;
-    this.entityStore = entityStore;
+    this.entityStore = (RelationalEntityStore) entityStore;
   }
 
   /**
@@ -124,5 +175,13 @@ public abstract class BaseEntityCache implements EntityCache {
    *
    * @param entity The expired entity to remove.
    */
-  protected abstract void invalidateExpiredItemByMetadata(Entity entity);
+  protected abstract void invalidateExpiredDataItemByMetadata(Entity entity);
+
+  /**
+   * Removes an expired entity from the relation cache.
+   *
+   * @param relationEntityCacheKey The expired relation entity cache key to remove.
+   */
+  protected abstract void invalidateExpiredRelationItemByMetadata(
+      RelationEntityCacheKey relationEntityCacheKey);
 }
