@@ -24,33 +24,29 @@ import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 
-/**
- * Represents a key for the entity cache.
- *
- * <p>The key consists of the entity's nameIdentifier and type.
- */
-public class EntityCacheKey {
+/** key for storing entities in store cache. */
+public class StoreEntityCacheKey {
   private final NameIdentifier identifier;
   private final Entity.EntityType type;
 
   /**
-   * Creates a new instance of {@link EntityCacheKey}.
+   * Creates a new instance of {@link StoreEntityCacheKey}.
    *
    * @param ident The NameIdentifier of the entity
    * @param type The type of the entity
    * @return The new instance
    */
-  public static EntityCacheKey of(NameIdentifier ident, Entity.EntityType type) {
-    return new EntityCacheKey(ident, type);
+  public static StoreEntityCacheKey of(NameIdentifier ident, Entity.EntityType type) {
+    return new StoreEntityCacheKey(ident, type);
   }
 
   /**
-   * Creates a new instance of {@link EntityCacheKey}.
+   * Creates a new instance of {@link StoreEntityCacheKey}.
    *
-   * @param identifier The {@link NameIdentifier} of the entity
+   * @param identifier The NameIdentifier of the entity
    * @param type The entity type
    */
-  public EntityCacheKey(NameIdentifier identifier, Entity.EntityType type) {
+  public StoreEntityCacheKey(NameIdentifier identifier, Entity.EntityType type) {
     Preconditions.checkArgument(identifier != null, "Id cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
@@ -77,7 +73,7 @@ public class EntityCacheKey {
   }
 
   /**
-   * Compares two instances of {@link EntityCacheKey}. The comparison is based on the entity
+   * Compares two instances of {@link StoreEntityCacheKey}. The comparison is based on the entity
    * nameIdentifier and type.
    *
    * @param obj The object to compare to
@@ -86,8 +82,8 @@ public class EntityCacheKey {
   @Override
   public boolean equals(Object obj) {
     if (this == obj) return true;
-    if (!(obj instanceof EntityCacheKey)) return false;
-    EntityCacheKey other = (EntityCacheKey) obj;
+    if (!(obj instanceof StoreEntityCacheKey)) return false;
+    StoreEntityCacheKey other = (StoreEntityCacheKey) obj;
     return Objects.equals(identifier, other.identifier) && Objects.equals(type, other.type);
   }
 
@@ -105,10 +101,10 @@ public class EntityCacheKey {
   /**
    * Returns a string representation of this instance.
    *
-   * @return A string representation of this instance, in the format "nameIdentifier.entityType"
+   * @return A string representation of this instance
    */
   @Override
   public String toString() {
-    return identifier.toString() + "." + type.getShortName();
+    return identifier.toString() + ":" + type.getShortName();
   }
 }
