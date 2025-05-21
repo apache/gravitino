@@ -17,37 +17,15 @@
 
 package org.apache.gravitino.server.authorization;
 
-import java.io.IOException;
-import java.security.Principal;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.authorization.Privilege;
 
-/**
- * The default implementation of GravitinoAuthorizer, indicating that metadata permission control is
- * not enabled.
- */
-public class PassThroughAuthorizer implements GravitinoAuthorizer {
+/** It is used to convert MetadataObject to MetadataId */
+public class MetadataIdConverter {
 
-  @Override
-  public void initialize() {}
+  private MetadataIdConverter() {}
 
-  @Override
-  public boolean authorize(
-      Principal principal,
-      String metalake,
-      MetadataObject metadataObject,
-      Privilege.Name privilege) {
-    return true;
+  public static Long doConvert(MetadataObject metadataObject) {
+    // TODO Rely on MetaCache
+    return 0L;
   }
-
-  @Override
-  public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
-    return true;
-  }
-
-  @Override
-  public void handleRolePrivilegeChange(Long roleId) {}
-
-  @Override
-  public void close() throws IOException {}
 }

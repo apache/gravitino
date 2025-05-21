@@ -144,6 +144,9 @@ public class TestAuthorizationExpressionEvaluator {
     }
 
     @Override
+    public void handleRolePrivilegeChange(Long roleId) {}
+
+    @Override
     public void close() throws IOException {}
   }
 }

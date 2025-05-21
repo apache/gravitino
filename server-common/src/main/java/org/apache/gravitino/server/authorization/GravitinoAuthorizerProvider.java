@@ -19,6 +19,7 @@ package org.apache.gravitino.server.authorization;
 
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.ServerConfig;
+import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 
 /**
  * Used to initialize and store {@link GravitinoAuthorizer}. When Gravitino Server starts up, it
@@ -46,13 +47,11 @@ public class GravitinoAuthorizerProvider {
         if (gravitinoAuthorizer == null) {
           boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
           if (enableAuthorization) {
-            // TODO
+            gravitinoAuthorizer = new JcasbinAuthorizer();
           } else {
             gravitinoAuthorizer = new PassThroughAuthorizer();
           }
-          if (gravitinoAuthorizer != null) {
-            gravitinoAuthorizer.initialize();
-          }
+          gravitinoAuthorizer.initialize();
         }
       }
     }
