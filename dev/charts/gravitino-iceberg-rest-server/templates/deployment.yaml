@@ -141,33 +141,6 @@ spec:
           configMap:
             name: {{ include "gravitino-iceberg-rest-server.fullname" . }}
 
-        # Storage volume configuration
-        {{- if not .Values.persistence.enabled }}
-        - name: storage
-          emptyDir: {}
-
-        {{- else if .Values.persistence.existingClaim }}
-        - name: storage
-          persistentVolumeClaim:
-            claimName: {{ .Values.persistence.existingClaim }}
-
-        {{- else }}
-        volumeClaimTemplates:
-          - metadata:
-              name: storage
-              labels:
-                {{- toYaml .Values.persistence.labels | nindent 8 }}
-              annotations:
-                {{- toYaml .Values.persistence.annotations | nindent 8 }}
-            spec:
-              accessModes:
-                {{- toYaml .Values.persistence.accessModes | nindent 8 }}
-              resources:
-                requests:
-                  storage: {{ .Values.persistence.size | quote }}
-              storageClassName: {{ .Values.persistence.storageClassName }}
-        {{- end }}
-
         # Additional volumes
         {{- if .Values.extraVolumes }}
         {{- toYaml .Values.extraVolumes | nindent 8 }}
