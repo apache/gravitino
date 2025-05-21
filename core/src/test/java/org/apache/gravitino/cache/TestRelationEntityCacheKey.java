@@ -34,7 +34,7 @@ public class TestRelationEntityCacheKey {
     RelationEntityCacheKey key =
         new RelationEntityCacheKey(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
-    Assertions.assertEquals("metalake.system.role.role1:ROLE:ROLE_GROUP_REL", key.toString());
+    Assertions.assertEquals("metalake.system.role.role1:ro:ROLE_GROUP_REL", key.toString());
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "system", "role", "role1"), key.identifier());
     Assertions.assertEquals(Entity.EntityType.ROLE, key.entityType());
@@ -49,7 +49,7 @@ public class TestRelationEntityCacheKey {
     RelationEntityCacheKey key =
         RelationEntityCacheKey.of(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
-    Assertions.assertEquals("metalake.system.role.role1:ROLE:ROLE_GROUP_REL", key.toString());
+    Assertions.assertEquals("metalake.system.role.role1:ro:ROLE_GROUP_REL", key.toString());
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "system", "role", "role1"), key.identifier());
     Assertions.assertEquals(Entity.EntityType.ROLE, key.entityType());
