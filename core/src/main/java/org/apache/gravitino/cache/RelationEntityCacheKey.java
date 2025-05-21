@@ -145,6 +145,6 @@ public class RelationEntityCacheKey {
    */
   @Override
   public String toString() {
-    return identifier.name() + ":" + type.name() + ":" + relationType.name();
+    return identifier.toString() + ":" + type.getShortName() + ":" + relationType.name();
   }
 }
