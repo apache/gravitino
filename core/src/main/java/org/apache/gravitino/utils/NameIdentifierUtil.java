@@ -105,6 +105,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the policy {@link NameIdentifier} with the given metalake and policy name.
+   *
+   * @param metalake The metalake name
+   * @param policyName The policy name
+   * @return the created policy {@link NameIdentifier}
+   */
+  public static NameIdentifier ofPolicy(String metalake, String policyName) {
+    return NameIdentifier.of(NamespaceUtil.ofPolicy(metalake), policyName);
+  }
+
+  /**
    * Create the user {@link NameIdentifier} with the given metalake and username.
    *
    * @param metalake The metalake name
