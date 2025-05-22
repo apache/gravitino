@@ -61,9 +61,6 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put("authorizer", gravitinoAuthorizer);
     metadataNames.forEach(
         (metadataType, metadataName) -> {
-          if (metadataType == MetadataObject.Type.METALAKE) {
-            return;
-          }
           MetadataObject metadataObject = MetadataObjects.of(metadataType, metadataName);
           ognlContext.put(metadataType.name(), metadataObject);
         });
