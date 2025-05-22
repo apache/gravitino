@@ -65,8 +65,8 @@ You can use either to manage metadata. See
 
 Also, you can find the complete REST API definition in
 [Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Java doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/index.html),
-and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/python/index.html).
+Java SDK definition in [Gravitino Java doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/java/index.html),
+and Python SDK definition in [Gravitino Python doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/python/index.html).
 
 Gravitino also provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`.
 See [Gravitino web UI](./webui.md) for details.
@@ -184,8 +184,8 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 ### Programming guides
 
 * [Gravitino Open API](./api/rest/gravitino-rest-api): provides the complete Open API definition of Gravitino.
-* [Gravitino Java doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
-* [Gravitino Python doc](pathname:///docs/0.9.0-incubating-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
+* [Gravitino Java doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/java/index.html): provides the Javadoc for the Gravitino API.
+* [Gravitino Python doc](pathname:///docs/0.10.0-incubating-SNAPSHOT/api/python/index.html): provides the Python doc for the Gravitino API.
 
 ### Development guides
 

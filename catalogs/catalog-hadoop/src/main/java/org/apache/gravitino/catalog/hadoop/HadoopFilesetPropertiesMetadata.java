@@ -18,10 +18,11 @@
  */
 package org.apache.gravitino.catalog.hadoop;
 
-import static org.apache.gravitino.file.Fileset.LOCATION_PLACEHOLDER_PREFIX;
-import static org.apache.gravitino.file.Fileset.RESERVED_CATALOG_PLACEHOLDER;
-import static org.apache.gravitino.file.Fileset.RESERVED_FILESET_PLACEHOLDER;
-import static org.apache.gravitino.file.Fileset.RESERVED_SCHEMA_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
+import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
+import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PREFIX;
+import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -38,32 +39,40 @@ public class HadoopFilesetPropertiesMetadata extends BasePropertiesMetadata {
     ImmutableMap.Builder<String, PropertyEntry<?>> builder = ImmutableMap.builder();
     builder
         .put(
-            RESERVED_CATALOG_PLACEHOLDER,
+            PROPERTY_CATALOG_PLACEHOLDER,
             PropertyEntry.stringReservedPropertyEntry(
-                RESERVED_CATALOG_PLACEHOLDER,
+                PROPERTY_CATALOG_PLACEHOLDER,
                 "The placeholder will be replaced to catalog name in the location",
                 true /* hidden */))
         .put(
-            RESERVED_SCHEMA_PLACEHOLDER,
+            PROPERTY_SCHEMA_PLACEHOLDER,
             PropertyEntry.stringReservedPropertyEntry(
-                RESERVED_SCHEMA_PLACEHOLDER,
+                PROPERTY_SCHEMA_PLACEHOLDER,
                 "The placeholder will be replaced to schema name in the location",
                 true /* hidden */))
         .put(
-            RESERVED_FILESET_PLACEHOLDER,
+            PROPERTY_FILESET_PLACEHOLDER,
             PropertyEntry.stringReservedPropertyEntry(
-                RESERVED_FILESET_PLACEHOLDER,
+                PROPERTY_FILESET_PLACEHOLDER,
                 "The placeholder will be replaced to fileset name in the location",
                 true /* hidden */))
         .put(
-            LOCATION_PLACEHOLDER_PREFIX,
+            PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
             PropertyEntry.stringImmutablePropertyPrefixEntry(
-                LOCATION_PLACEHOLDER_PREFIX,
+                PROPERTY_LOCATION_PLACEHOLDER_PREFIX,
                 "The prefix of fileset placeholder property",
                 false /* required */,
                 null /* default value */,
                 false /* hidden */,
                 false /* reserved */))
+        .put(
+            PROPERTY_DEFAULT_LOCATION_NAME,
+            PropertyEntry.stringOptionalPropertyEntry(
+                PROPERTY_DEFAULT_LOCATION_NAME,
+                "The default location name for the fileset",
+                true /* immutable */,
+                null,
+                false /* hidden */))
         .putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES)
         .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)
         .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES);

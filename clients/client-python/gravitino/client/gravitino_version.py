@@ -61,13 +61,9 @@ class GravitinoVersion(VersionDTO):
             raise GravitinoRuntimeException(
                 f"{GravitinoVersion.__name__} can't compare with {other.__class__.__name__}"
             )
-        if self.major > other.major:
-            return True
-        if self.minor > other.minor:
-            return True
-        if self.patch > other.patch:
-            return True
-        return False
+        v1 = (self.major, self.minor, self.patch)
+        v2 = (other.major, other.minor, other.patch)
+        return v1 > v2
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, GravitinoVersion):

@@ -84,8 +84,8 @@ public class RangerITEnv {
   public static final String SEARCH_FILTER_COLUMN = SearchFilter.RESOURCE_PREFIX + RESOURCE_COLUMN;
   // Search filter prefix file path constants
   public static final String SEARCH_FILTER_PATH = SearchFilter.RESOURCE_PREFIX + RESOURCE_PATH;
-  public static RangerAuthorizationPlugin rangerAuthHivePlugin;
-  public static RangerAuthorizationPlugin rangerAuthHDFSPlugin;
+  public static RangerAuthorizationHadoopSQLPlugin rangerAuthHivePlugin;
+  public static RangerAuthorizationHDFSPlugin rangerAuthHDFSPlugin;
   protected static RangerHelper rangerHelper;
   protected static RangerHelper rangerHDFSHelper;
   public static String RANGER_ADMIN_URL = null;

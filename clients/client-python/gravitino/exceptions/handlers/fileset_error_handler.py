@@ -22,13 +22,12 @@ from gravitino.exceptions.base import (
     NoSuchFilesetException,
     NoSuchSchemaException,
     CatalogNotInUseException,
+    NoSuchLocationNameException,
 )
 
 
 class FilesetErrorHandler(RestErrorHandler):
-
     def handle(self, error_response: ErrorResponse):
-
         error_message = error_response.format_error_message()
         code = error_response.code()
         exception_type = error_response.type()
@@ -38,6 +37,8 @@ class FilesetErrorHandler(RestErrorHandler):
                 raise NoSuchSchemaException(error_message)
             if exception_type == NoSuchFilesetException.__name__:
                 raise NoSuchFilesetException(error_message)
+            if exception_type == NoSuchLocationNameException.__name__:
+                raise NoSuchLocationNameException(error_message)
 
         if code == ErrorConstants.NOT_IN_USE_CODE:
             raise CatalogNotInUseException(error_message)

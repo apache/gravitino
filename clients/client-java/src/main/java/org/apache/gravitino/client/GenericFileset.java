@@ -79,8 +79,8 @@ class GenericFileset implements Fileset, SupportsTags, SupportsRoles, SupportsCr
   }
 
   @Override
-  public String storageLocation() {
-    return filesetDTO.storageLocation();
+  public Map<String, String> storageLocations() {
+    return filesetDTO.storageLocations();
   }
 
   @Override

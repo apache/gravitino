@@ -18,10 +18,9 @@
  */
 package org.apache.gravitino.server;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Properties;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -34,6 +33,9 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.lineage.LineageConfig;
+import org.apache.gravitino.lineage.LineageDispatcher;
+import org.apache.gravitino.lineage.LineageService;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -78,10 +80,13 @@ public class GravitinoServer extends ResourceConfig {
 
   private final GravitinoEnv gravitinoEnv;
 
+  private final LineageService lineageService;
+
   public GravitinoServer(ServerConfig config, GravitinoEnv gravitinoEnv) {
-    serverConfig = config;
-    server = new JettyServer();
+    this.serverConfig = config;
+    this.server = new JettyServer();
     this.gravitinoEnv = gravitinoEnv;
+    this.lineageService = new LineageService();
   }
 
   public void initialize() {
@@ -93,6 +98,8 @@ public class GravitinoServer extends ResourceConfig {
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
+    lineageService.initialize(
+        new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
     GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
 
     // initialize Jersey REST API resources.
@@ -104,9 +111,11 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   private void initializeRestApi() {
-    List<String> restApiPackages = Lists.newArrayList("org.apache.gravitino.server.web.rest");
-    restApiPackages.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
-    packages(restApiPackages.toArray(new String[0]));
+    HashSet<String> restApiPackagesSet = new HashSet<>();
+    restApiPackagesSet.add("org.apache.gravitino.server.web.rest");
+    restApiPackagesSet.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
+    restApiPackagesSet.addAll(lineageService.getRESTPackages());
+    packages(restApiPackagesSet.toArray(new String[0]));
 
     boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
     register(
@@ -125,6 +134,7 @@ public class GravitinoServer extends ResourceConfig {
                 .to(CredentialOperationDispatcher.class)
                 .ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
+            bind(lineageService).to(LineageDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);
@@ -171,6 +181,9 @@ public class GravitinoServer extends ResourceConfig {
     }
     server.stop();
     gravitinoEnv.shutdown();
+    if (lineageService != null) {
+      lineageService.close();
+    }
   }
 
   public static void main(String[] args) {

@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.hadoop;
 
 import static org.apache.gravitino.catalog.hadoop.authentication.kerberos.KerberosConfig.KERBEROS_PROPERTY_ENTRIES;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
+import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -54,8 +56,27 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
    */
   public static final String DEFAULT_FS_PROVIDER = "default-filesystem-provider";
 
+  /** The interval in milliseconds to evict the fileset cache. */
+  public static final String FILESET_CACHE_EVICTION_INTERVAL_MS =
+      "fileset-cache-eviction-interval-ms";
+
+  /** The maximum number of the filesets the cache may contain. */
+  public static final String FILESET_CACHE_MAX_SIZE = "fileset-cache-max-size";
+
+  /** The value to indicate the cache value is not set. */
+  public static final long CACHE_VALUE_NOT_SET = -1;
+
   static final String FILESYSTEM_CONNECTION_TIMEOUT_SECONDS = "filesystem-conn-timeout-secs";
   static final int DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS = 6;
+
+  /**
+   * The property to disable file system operations like list, exists, mkdir operations in the
+   * server side, so that the server side catalog can be used as a metadata only catalog, no need to
+   * configure the file system access related configurations. By default, it is false.
+   */
+  static final String DISABLE_FILESYSTEM_OPS = "disable-filesystem-ops";
+
+  static final boolean DEFAULT_DISABLE_FILESYSTEM_OPS = false;
 
   private static final Map<String, PropertyEntry<?>> HADOOP_CATALOG_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
@@ -67,6 +88,21 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* immutable */,
                   null,
                   false /* hidden */))
+          .put(
+              PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
+              PropertyEntry.stringReservedPropertyEntry(
+                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX + LOCATION_NAME_UNKNOWN,
+                  "The storage location equivalent to property 'location'",
+                  true /* hidden */))
+          .put(
+              PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
+              PropertyEntry.stringImmutablePropertyPrefixEntry(
+                  PROPERTY_MULTIPLE_LOCATIONS_PREFIX,
+                  "The prefix of the location name",
+                  false /* required */,
+                  null /* default value */,
+                  false /* hidden */,
+                  false /* reserved */))
           .put(
               FILESYSTEM_PROVIDERS,
               PropertyEntry.stringOptionalPropertyEntry(
@@ -91,6 +127,32 @@ public class HadoopCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   false /* immutable */,
                   DEFAULT_GET_FILESYSTEM_TIMEOUT_SECONDS,
                   false /* hidden */))
+          .put(
+              FILESET_CACHE_EVICTION_INTERVAL_MS,
+              PropertyEntry.longOptionalPropertyEntry(
+                  FILESET_CACHE_EVICTION_INTERVAL_MS,
+                  "The interval in milliseconds to evict the fileset cache, -1 means never evict.",
+                  false /* immutable */,
+                  60 * 60 * 1000L /* 1 hour */,
+                  false /* hidden */))
+          .put(
+              FILESET_CACHE_MAX_SIZE,
+              PropertyEntry.longOptionalPropertyEntry(
+                  FILESET_CACHE_MAX_SIZE,
+                  "The maximum number of the filesets the cache may contain, -1 means no limit.",
+                  false /* immutable */,
+                  200_000L,
+                  false /* hidden */))
+          .put(
+              DISABLE_FILESYSTEM_OPS,
+              PropertyEntry.booleanPropertyEntry(
+                  DISABLE_FILESYSTEM_OPS,
+                  "Disable file system operations in the server side",
+                  false /* required */,
+                  true /* immutable */,
+                  DEFAULT_DISABLE_FILESYSTEM_OPS,
+                  false /* hidden */,
+                  false /* reserved */))
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES)

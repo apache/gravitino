@@ -241,20 +241,24 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
           StringIdentifier stringId = getStringIdFromProperties(alteredSchema.properties());
           // Case 1: The schema is not created by Gravitino and this schema is never imported.
-          if (stringId == null && !isEntityExist(ident, SCHEMA)) {
-            return EntityCombinedSchema.of(alteredSchema)
-                .withHiddenProperties(
-                    getHiddenPropertyNames(
-                        catalogIdent,
-                        HasPropertyMetadata::schemaPropertiesMetadata,
-                        alteredSchema.properties()));
+          SchemaEntity se = null;
+          if (stringId == null) {
+            se = getEntity(ident, SCHEMA, SchemaEntity.class);
+            if (se == null) {
+              return EntityCombinedSchema.of(alteredSchema)
+                  .withHiddenProperties(
+                      getHiddenPropertyNames(
+                          catalogIdent,
+                          HasPropertyMetadata::schemaPropertiesMetadata,
+                          alteredSchema.properties()));
+            }
           }
 
           long schemaId;
           if (stringId != null) {
             schemaId = stringId.id();
           } else {
-            schemaId = getEntity(ident, SCHEMA, SchemaEntity.class).id();
+            schemaId = se.id();
           }
 
           SchemaEntity updatedSchemaEntity =
@@ -329,7 +333,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // return value of the store operation into account. We only take the return value of the
           // catalog into account.
           try {
-            store.delete(ident, SCHEMA, cascade);
+            store.delete(ident, SCHEMA, true);
           } catch (NoSuchEntityException e) {
             LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
           } catch (Exception e) {
@@ -418,7 +422,18 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Case 1: The schema is not created by Gravitino or the external system does not support
     // storing string identifiers.
     if (stringId == null) {
-      return EntityCombinedSchema.of(schema)
+      SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
+      if (schemaEntity == null) {
+        return EntityCombinedSchema.of(schema)
+            .withHiddenProperties(
+                getHiddenPropertyNames(
+                    catalogIdentifier,
+                    HasPropertyMetadata::schemaPropertiesMetadata,
+                    schema.properties()))
+            .withImported(false);
+      }
+
+      return EntityCombinedSchema.of(schema, schemaEntity)
           .withHiddenProperties(
               getHiddenPropertyNames(
                   catalogIdentifier,
@@ -427,7 +442,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // For some catalogs like PG, the identifier information is not stored in the schema's
           // metadata, we need to check if this schema is existed in the store, if so we don't
           // need to import.
-          .withImported(isEntityExist(ident, SCHEMA));
+          .withImported(true);
     }
 
     SchemaEntity schemaEntity =

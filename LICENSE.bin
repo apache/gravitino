@@ -258,6 +258,7 @@
    Airlift
    The Netty Project
    Open Telemetry
+   Open Lineage
    Trino
    Jakarta Dependency Injection
    Jakarta Bean Validation
@@ -376,6 +377,7 @@
    Jettison
    Awaitility
    Ognl
+   Jcasbin
 
    This product bundles various third-party components also under the
    Apache Software Foundation License 1.1

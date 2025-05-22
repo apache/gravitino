@@ -52,6 +52,14 @@ public class EntityCombinedTopic implements Topic {
     this.imported = false;
   }
 
+  public TopicEntity topicEntity() {
+    return topicEntity;
+  }
+
+  public Topic topic() {
+    return topic;
+  }
+
   public static EntityCombinedTopic of(Topic topic, TopicEntity topicEntity) {
     return new EntityCombinedTopic(topic, topicEntity);
   }

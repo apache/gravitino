@@ -24,6 +24,8 @@ import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -31,7 +33,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiSchema;
 import org.apache.gravitino.catalog.lakehouse.hudi.HudiTable;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.AuthenticationConfig;
+import org.apache.gravitino.catalog.lakehouse.hudi.backend.hms.kerberos.KerberosClient;
 import org.apache.gravitino.catalog.lakehouse.hudi.ops.HudiCatalogBackendOps;
+import org.apache.gravitino.catalog.lakehouse.hudi.utils.CatalogUtils;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -52,9 +57,11 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HudiHMSBackendOps implements HudiCatalogBackendOps {
-
+  private static final Logger LOG = LoggerFactory.getLogger(HudiHMSBackendOps.class);
   // Mapping from Gravitino config to Hive config
   private static final Map<String, String> CONFIG_CONVERTER =
       ImmutableMap.of(URI, HiveConf.ConfVars.METASTOREURIS.varname);
@@ -63,9 +70,12 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
 
   @VisibleForTesting CachedClientPool clientPool;
 
+  public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-lakehouse-hudi-%s-keytab";
+
   @Override
   public void initialize(Map<String, String> properties) {
-    this.clientPool = new CachedClientPool(buildHiveConf(properties), properties);
+    HiveConf hiveConf = buildHiveConfAndInitKerberosAuth(properties);
+    this.clientPool = new CachedClientPool(hiveConf, properties);
   }
 
   @Override
@@ -225,7 +235,7 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
         && table.getSd().getInputFormat().startsWith(HUDI_PACKAGE_PREFIX);
   }
 
-  private HiveConf buildHiveConf(Map<String, String> properties) {
+  private HiveConf buildHiveConfAndInitKerberosAuth(Map<String, String> properties) {
     Configuration hadoopConf = new Configuration();
 
     Map<String, String> byPassConfigs = Maps.newHashMap();
@@ -236,12 +246,29 @@ public class HudiHMSBackendOps implements HudiCatalogBackendOps {
             byPassConfigs.put(key.substring(CATALOG_BYPASS_PREFIX.length()), value);
           } else if (CONFIG_CONVERTER.containsKey(key)) {
             convertedConfigs.put(CONFIG_CONVERTER.get(key), value);
+          } else {
+            hadoopConf.set(key, value);
           }
         });
     byPassConfigs.forEach(hadoopConf::set);
-    // Gravitino conf has higher priority than bypass conf
     convertedConfigs.forEach(hadoopConf::set);
-
+    initKerberosAuth(properties, hadoopConf);
     return new HiveConf(hadoopConf, HudiHMSBackendOps.class);
+  }
+
+  private void initKerberosAuth(Map<String, String> properties, Configuration hadoopConf) {
+    AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
+    if (authenticationConfig.isKerberosAuth()) {
+      try (KerberosClient kerberosClient = new KerberosClient(properties, hadoopConf, true)) {
+        String keytabPath =
+            String.format(
+                GRAVITINO_KEYTAB_FORMAT, properties.getOrDefault(CatalogUtils.CATALOG_ID_KEY, "0"));
+        File keytabFile = kerberosClient.saveKeyTabFileFromUri(keytabPath);
+        kerberosClient.login(keytabFile.getAbsolutePath());
+        LOG.info("Login with kerberos success");
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to login with kerberos", e);
+      }
+    }
   }
 }

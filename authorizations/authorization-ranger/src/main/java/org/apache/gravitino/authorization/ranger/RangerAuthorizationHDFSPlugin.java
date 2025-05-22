@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +32,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.apache.commons.lang.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -107,6 +110,12 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             RangerPrivileges.RangerHdfsPrivilege.EXECUTE),
         Privilege.Name.WRITE_FILESET,
         ImmutableSet.of(
+            RangerPrivileges.RangerHdfsPrivilege.READ,
+            RangerPrivileges.RangerHdfsPrivilege.WRITE,
+            RangerPrivileges.RangerHdfsPrivilege.EXECUTE),
+        Privilege.Name.CREATE_FILESET,
+        ImmutableSet.of(
+            RangerPrivileges.RangerHdfsPrivilege.READ,
             RangerPrivileges.RangerHdfsPrivilege.WRITE,
             RangerPrivileges.RangerHdfsPrivilege.EXECUTE));
   }
@@ -196,8 +205,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       MetadataObject.Type operationType,
       AuthorizationMetadataObject oldAuthzMetaObject,
       AuthorizationMetadataObject newAuthzMetaObject) {
-    PathBasedMetadataObject newPathBasedMetadataObject =
-        (PathBasedMetadataObject) newAuthzMetaObject;
     List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaObject);
     List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaObject);
     if (oldPolicies.isEmpty()) {
@@ -211,14 +218,48 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         policy -> {
           try {
             // Update the policy name is following Gravitino's spec
-            policy.setName(getAuthorizationPath(newPathBasedMetadataObject));
+            // Only Hive managed table rename will use this case
+            String oldResource =
+                policy
+                    .getResources()
+                    .get(rangerHelper.policyResourceDefines.get(0))
+                    .getValues()
+                    .get(0);
+            List<String> oldResourceNames =
+                Arrays.stream(oldResource.split("/"))
+                    .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
+                    .collect(Collectors.toList());
+            List<String> newResourceNames =
+                Arrays.stream(
+                        getAuthorizationPath((PathBasedMetadataObject) newAuthzMetaObject)
+                            .split("/"))
+                    .filter(path -> StringUtils.isNotBlank(path) && !".".equals(path))
+                    .collect(Collectors.toList());
+
+            int minLen = Math.min(oldResourceNames.size(), newResourceNames.size());
+            for (int i = 0; i < minLen; i++) {
+              String oldName = oldResourceNames.get(i);
+              String newName = newResourceNames.get(i);
+              if (!oldName.equals(newName)) {
+                if (oldName.equals(oldAuthzMetaObject.name())
+                    && newName.equals(newAuthzMetaObject.name())) {
+                  oldResourceNames.set(i, newAuthzMetaObject.name());
+                  break;
+                } else {
+                  // If resource doesn't match, ignore this resource
+                  return;
+                }
+              }
+            }
+            String newResourcePath = "/" + String.join("/", oldResourceNames);
+
+            policy.setName(newResourcePath);
             // Update the policy resource name to new name
             policy
                 .getResources()
                 .put(
                     rangerHelper.policyResourceDefines.get(0),
-                    new RangerPolicy.RangerPolicyResource(
-                        getAuthorizationPath(newPathBasedMetadataObject)));
+                    new RangerPolicy.RangerPolicyResource(newResourcePath));
 
             boolean alreadyExist =
                 existNewPolicies.stream()
@@ -252,11 +293,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
    */
   @Override
   protected void removeMetadataObject(AuthorizationMetadataObject authzMetadataObject) {
-    if (authzMetadataObject.type().equals(PathBasedMetadataObject.SCHEMA_PATH)) {
+    if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.SCHEMA) {
       removeSchemaMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.type().equals(PathBasedMetadataObject.TABLE_PATH)) {
+    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.TABLE) {
       removeTableMetadataObject(authzMetadataObject);
-    } else if (authzMetadataObject.type().equals(PathBasedMetadataObject.FILESET_PATH)) {
+    } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.FILESET) {
       removePolicyByMetadataObject(authzMetadataObject);
     } else if (authzMetadataObject.metadataObjectType() == MetadataObject.Type.METALAKE
         || authzMetadataObject.metadataObjectType() == MetadataObject.Type.CATALOG) {
@@ -275,7 +316,12 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     Preconditions.checkArgument(
         authzMetadataObject instanceof PathBasedMetadataObject,
         "The metadata object must be a PathBasedMetadataObject");
-    // TODO: The remove schema logic will be implemented when schema is supported
+    Preconditions.checkArgument(
+        authzMetadataObject.names().size() == 2, "The metadata object's name size must be 2");
+    Preconditions.checkArgument(
+        authzMetadataObject.type().equals(PathBasedMetadataObject.SCHEMA_PATH),
+        "The metadata object type must be a path");
+    removePolicyByMetadataObject(authzMetadataObject);
   }
 
   /**
@@ -305,29 +351,26 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     policy.setName(getAuthorizationPath(pathBasedMetadataObject));
     RangerPolicy.RangerPolicyResource policyResource =
         new RangerPolicy.RangerPolicyResource(
-            getAuthorizationPath(pathBasedMetadataObject), false, true);
+            getAuthorizationPath(pathBasedMetadataObject),
+            false,
+            pathBasedMetadataObject.recursive());
     policy.getResources().put(RangerDefines.PolicyResource.PATH.getName(), policyResource);
     return policy;
   }
 
   @Override
   public AuthorizationSecurableObject generateAuthorizationSecurableObject(
-      List<String> names,
-      String path,
-      AuthorizationMetadataObject.Type type,
-      Set<AuthorizationPrivilege> privileges) {
-    AuthorizationMetadataObject authMetadataObject =
-        new PathBasedMetadataObject(
-            AuthorizationMetadataObject.getParentFullName(names),
-            AuthorizationMetadataObject.getLastName(names),
-            path,
-            type);
-    authMetadataObject.validateAuthorizationMetadataObject();
+      AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges) {
+    object.validateAuthorizationMetadataObject();
+    Preconditions.checkArgument(
+        object instanceof PathBasedMetadataObject, "Object must be a path based metadata object");
+    PathBasedMetadataObject metadataObject = (PathBasedMetadataObject) object;
     return new PathBasedSecurableObject(
-        authMetadataObject.parent(),
-        authMetadataObject.name(),
-        path,
-        authMetadataObject.type(),
+        metadataObject.parent(),
+        metadataObject.name(),
+        metadataObject.path(),
+        metadataObject.type(),
+        metadataObject.recursive(),
         privileges);
   }
 
@@ -388,7 +431,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   switch (securableObject.type()) {
                     case METALAKE:
                       extractMetalakeLocations(
-                          securableObject, identifier, rangerSecurableObjects, rangerPrivileges);
+                          securableObject,
+                          identifier,
+                          rangerSecurableObjects,
+                          rangerPrivileges,
+                          true);
                       break;
                     case CATALOG:
                     case SCHEMA:
@@ -400,7 +447,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                     securableObject,
                                     locationPath,
                                     rangerSecurableObjects,
-                                    rangerPrivileges);
+                                    rangerPrivileges,
+                                    true);
                               });
                       break;
                     default:
@@ -414,7 +462,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   switch (securableObject.type()) {
                     case METALAKE:
                       extractMetalakeLocations(
-                          securableObject, identifier, rangerSecurableObjects, rangerPrivileges);
+                          securableObject,
+                          identifier,
+                          rangerSecurableObjects,
+                          rangerPrivileges,
+                          false);
                       break;
                     case CATALOG:
                       AuthorizationUtils.getMetadataObjectLocation(
@@ -425,7 +477,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                                       securableObject,
                                       locationPath,
                                       rangerSecurableObjects,
-                                      rangerPrivileges));
+                                      rangerPrivileges,
+                                      false));
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -435,54 +488,37 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                   }
                   break;
                 case SELECT_TABLE:
-                case CREATE_TABLE:
                 case MODIFY_TABLE:
-                  AuthorizationUtils.getMetadataObjectLocation(
-                          identifier, MetadataObjectUtil.toEntityType(securableObject))
-                      .forEach(
-                          locationPath -> {
-                            PathBasedMetadataObject pathBaseMetadataObject =
-                                new PathBasedMetadataObject(
-                                    securableObject.parent(),
-                                    securableObject.name(),
-                                    locationPath,
-                                    PathBasedMetadataObject.PathType.get(securableObject.type()));
-                            pathBaseMetadataObject.validateAuthorizationMetadataObject();
-                            rangerSecurableObjects.add(
-                                generateAuthorizationSecurableObject(
-                                    pathBaseMetadataObject.names(),
-                                    locationPath,
-                                    PathBasedMetadataObject.PathType.get(securableObject.type()),
-                                    rangerPrivileges));
-                          });
-                  break;
-                case CREATE_FILESET:
-                  // Ignore the Gravitino privilege `CREATE_FILESET` in the
-                  // RangerAuthorizationHDFSPlugin
-                  break;
                 case READ_FILESET:
                 case WRITE_FILESET:
+                  if (!gravitinoPrivilege.canBindTo(securableObject.type())) {
+                    throw new AuthorizationPluginException(
+                        ErrorMessages.PRIVILEGE_NOT_SUPPORTED,
+                        gravitinoPrivilege.name(),
+                        securableObject.type());
+                  }
+                  createSecurableObjects(
+                      securableObject,
+                      rangerSecurableObjects,
+                      identifier,
+                      rangerPrivileges,
+                      true,
+                      new TableOrFilesetPathExtractor());
+                  break;
+                case CREATE_TABLE:
+                case CREATE_FILESET:
                   switch (securableObject.type()) {
                     case METALAKE:
                     case CATALOG:
                     case SCHEMA:
-                      break;
-                    case FILESET:
-                      translateMetadataObject(securableObject)
-                          .forEach(
-                              metadataObject -> {
-                                Preconditions.checkArgument(
-                                    metadataObject instanceof PathBasedMetadataObject,
-                                    "The metadata object must be a PathBasedMetadataObject");
-                                PathBasedMetadataObject pathBasedMetadataObject =
-                                    (PathBasedMetadataObject) metadataObject;
-                                rangerSecurableObjects.add(
-                                    generateAuthorizationSecurableObject(
-                                        pathBasedMetadataObject.names(),
-                                        getAuthorizationPath(pathBasedMetadataObject),
-                                        PathBasedMetadataObject.FILESET_PATH,
-                                        rangerPrivileges));
-                              });
+                      createSecurableObjects(
+                          securableObject,
+                          rangerSecurableObjects,
+                          identifier,
+                          rangerPrivileges,
+                          false,
+                          new SchemaPathExtractor());
+
                       break;
                     default:
                       throw new AuthorizationPluginException(
@@ -502,11 +538,58 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     return rangerSecurableObjects;
   }
 
+  private void createSecurableObjects(
+      SecurableObject securableObject,
+      List<AuthorizationSecurableObject> rangerSecurableObjects,
+      NameIdentifier identifier,
+      Set<AuthorizationPrivilege> rangerPrivileges,
+      boolean recursive,
+      PathExtractor pathExtractor) {
+    Entity.EntityType type = MetadataObjectUtil.toEntityType(securableObject);
+    List<String> locations = Lists.newArrayList();
+    if (type == Entity.EntityType.METALAKE) {
+      NameIdentifier[] catalogs =
+          GravitinoEnv.getInstance()
+              .catalogDispatcher()
+              .listCatalogs(Namespace.of(identifier.name()));
+      for (NameIdentifier catalog : catalogs) {
+        locations.addAll(
+            AuthorizationUtils.getMetadataObjectLocation(catalog, Entity.EntityType.CATALOG));
+      }
+    } else {
+      locations.addAll(AuthorizationUtils.getMetadataObjectLocation(identifier, type));
+    }
+
+    locations.forEach(
+        locationPath -> {
+          Entity.EntityType pathEntityType;
+          MetadataObject.Type pathObjectType;
+          if (type == Entity.EntityType.METALAKE) {
+            pathEntityType = Entity.EntityType.CATALOG;
+            pathObjectType = MetadataObject.Type.CATALOG;
+          } else {
+            pathEntityType = type;
+            pathObjectType = securableObject.type();
+          }
+          PathBasedMetadataObject pathBaseMetadataObject =
+              new PathBasedMetadataObject(
+                  securableObject.parent(),
+                  securableObject.name(),
+                  pathExtractor.getPath(pathEntityType, locationPath),
+                  PathBasedMetadataObject.PathType.get(pathObjectType),
+                  recursive);
+          pathBaseMetadataObject.validateAuthorizationMetadataObject();
+          rangerSecurableObjects.add(
+              generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
+        });
+  }
+
   private void extractMetalakeLocations(
       SecurableObject securableObject,
       NameIdentifier identifier,
       List<AuthorizationSecurableObject> rangerSecurableObjects,
-      Set<AuthorizationPrivilege> rangerPrivileges) {
+      Set<AuthorizationPrivilege> rangerPrivileges,
+      boolean recursive) {
     NameIdentifier[] catalogs =
         GravitinoEnv.getInstance()
             .catalogDispatcher()
@@ -516,7 +599,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           .forEach(
               locationPath ->
                   createPathBasedMetadataObject(
-                      securableObject, locationPath, rangerSecurableObjects, rangerPrivileges));
+                      securableObject,
+                      locationPath,
+                      rangerSecurableObjects,
+                      rangerPrivileges,
+                      recursive));
     }
   }
 
@@ -524,18 +611,18 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       SecurableObject securableObject,
       String locationPath,
       List<AuthorizationSecurableObject> rangerSecurableObjects,
-      Set<AuthorizationPrivilege> rangerPrivileges) {
+      Set<AuthorizationPrivilege> rangerPrivileges,
+      boolean recursive) {
     PathBasedMetadataObject pathBaseMetadataObject =
         new PathBasedMetadataObject(
             securableObject.parent(),
             securableObject.name(),
             locationPath,
-            PathBasedMetadataObject.PathType.get(securableObject.type()));
+            PathBasedMetadataObject.PathType.get(securableObject.type()),
+            recursive);
     pathBaseMetadataObject.validateAuthorizationMetadataObject();
     rangerSecurableObjects.add(
-        generateAuthorizationSecurableObject(
-            pathBaseMetadataObject.names(), locationPath,
-            PathBasedMetadataObject.PathType.get(securableObject.type()), rangerPrivileges));
+        generateAuthorizationSecurableObject(pathBaseMetadataObject, rangerPrivileges));
   }
 
   @Override
@@ -545,7 +632,6 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       case METALAKE:
       case CATALOG:
       case SCHEMA:
-        break;
       case FILESET:
       case TABLE:
         translateMetadataObject(gravitinoMetadataObject)
@@ -558,10 +644,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                       (PathBasedMetadataObject) metadataObject;
                   rangerSecurableObjects.add(
                       generateAuthorizationSecurableObject(
-                          pathBasedMetadataObject.names(),
-                          getAuthorizationPath(pathBasedMetadataObject),
-                          pathBasedMetadataObject.type(),
-                          ownerMappingRule()));
+                          pathBasedMetadataObject, ownerMappingRule()));
                 });
         break;
       default:
@@ -580,7 +663,21 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
         metadataObject.type().equals(MetadataObject.Type.METALAKE)
             ? NameIdentifier.of(metadataObject.fullName())
             : NameIdentifier.parse(String.join(".", metalake, metadataObject.fullName()));
-    List<String> locations = AuthorizationUtils.getMetadataObjectLocation(identifier, entityType);
+
+    List<String> locations = Lists.newArrayList();
+    if (metadataObject.type() == MetadataObject.Type.METALAKE) {
+      NameIdentifier[] catalogs =
+          GravitinoEnv.getInstance()
+              .catalogDispatcher()
+              .listCatalogs(Namespace.of(identifier.name()));
+      for (NameIdentifier catalog : catalogs) {
+        locations.addAll(
+            AuthorizationUtils.getMetadataObjectLocation(catalog, Entity.EntityType.CATALOG));
+      }
+    } else {
+      locations.addAll(AuthorizationUtils.getMetadataObjectLocation(identifier, entityType));
+    }
+
     locations.forEach(
         locationPath -> {
           AuthorizationMetadataObject.Type type =
@@ -739,5 +836,57 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
                 RangerAuthorizationProperties.FS_DEFAULT_NAME,
                 RangerAuthorizationProperties.FS_DEFAULT_VALUE))
         .build();
+  }
+
+  private interface PathExtractor {
+    String getPath(Entity.EntityType type, String location);
+  }
+
+  /** The extractor will extra the table or fileset level location path for this entity */
+  private static class TableOrFilesetPathExtractor implements PathExtractor {
+    /**
+     * This method will return table or fileset level path for this entity
+     *
+     * @param type The entity type
+     * @param location The location of this entity
+     * @return The table or file locations of this entity
+     */
+    @Override
+    public String getPath(Entity.EntityType type, String location) {
+      if (type == Entity.EntityType.CATALOG) {
+        return String.format("%s/*/*", location);
+      } else if (type == Entity.EntityType.SCHEMA) {
+        return String.format("%s/*", location);
+      }
+      if (type == Entity.EntityType.TABLE || type == Entity.EntityType.FILESET) {
+        return location;
+      } else {
+        throw new AuthorizationPluginException(
+            "It's not allowed to extract table or fileset path from entity %s", type);
+      }
+    }
+  }
+
+  /** The extractor will extra the schema level location path for this entity */
+  private static class SchemaPathExtractor implements PathExtractor {
+
+    /**
+     * This method will return schema level path for this entity
+     *
+     * @param type The entity type
+     * @param location The location of this entity
+     * @return The schema locations of this entity
+     */
+    @Override
+    public String getPath(Entity.EntityType type, String location) {
+      if (type == Entity.EntityType.CATALOG) {
+        return String.format("%s/*/", location);
+      } else if (type == Entity.EntityType.SCHEMA) {
+        return location;
+      } else {
+        throw new AuthorizationPluginException(
+            "It's not allowed to extract table or fileset path from entity %s", type);
+      }
+    }
   }
 }

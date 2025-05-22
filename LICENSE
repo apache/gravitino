@@ -287,6 +287,9 @@
    ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/KafkaEmbedded.java
    ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/ZooKeeperEmbedded.java
 
+   OpenLineage
+   ./lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java
+
    Trino
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CloseableGroup.java
    ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
@@ -304,6 +307,13 @@
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXGroupList.java
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUser.java
    ./authorizations/authorization-ranger/src/main/java/org/apache/gravitino/authorization/ranger/reference/VXUserList.java
+
+   Helm chart-testing
+   ./dev/ci/chart_schema.yaml
+   ./dev/ci/lintconf.yaml
+
+   AWS SDK
+   ./core/src/main/java/org/apache/gravitino/listener/api/info/Either.java
 
    This product bundles a third-party component under the
    MIT License.

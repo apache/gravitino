@@ -25,12 +25,14 @@ import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -46,6 +48,14 @@ public class Utils {
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  public static Response created() {
+    return Response.status(Response.Status.CREATED).type(MediaType.APPLICATION_JSON).build();
+  }
+
+  public static Response tooManyRequests() {
+    return Response.status(Status.TOO_MANY_REQUESTS).type(MediaType.APPLICATION_JSON).build();
   }
 
   public static Response ok() {
@@ -210,6 +220,18 @@ public class Utils {
           FilesetDataOperation.checkValid(dataOperation)
               ? dataOperation
               : FilesetDataOperation.UNKNOWN.name());
+    }
+    return filteredHeaders;
+  }
+
+  public static Map<String, String> filterFilesetCredentialHeaders(HttpServletRequest httpRequest) {
+    Map<String, String> filteredHeaders = Maps.newHashMap();
+
+    String currentLocationName =
+        httpRequest.getHeader(CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME);
+    if (StringUtils.isNotBlank(currentLocationName)) {
+      filteredHeaders.put(
+          CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, currentLocationName);
     }
     return filteredHeaders;
   }

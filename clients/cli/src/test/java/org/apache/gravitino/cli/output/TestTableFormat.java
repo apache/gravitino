@@ -29,23 +29,32 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.outputs.Column;
 import org.apache.gravitino.cli.outputs.TableFormat;
+import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.tag.Tag;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class TestTableFormat {
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -560,6 +569,204 @@ public class TestTableFormat {
   }
 
   @Test
+  void testListModelWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Model model1 = getMockModel("model1", "This is a demo model", 1);
+    Model model2 = getMockModel("model2", "This is another demo model", 2);
+    Model model3 = getMockModel("model3", "This is a third demo model", 3);
+
+    TableFormat.output(new Model[] {model1, model2, model3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+--------+\n"
+            + "|  Name  |\n"
+            + "+--------+\n"
+            + "| model1 |\n"
+            + "| model2 |\n"
+            + "| model3 |\n"
+            + "+--------+",
+        output);
+  }
+
+  @Test
+  void testModelDetailsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Model mockModel = getMockModel("demo_model", "This is a demo model", 1);
+
+    TableFormat.output(mockModel, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------------+----------------------+----------------+\n"
+            + "|    Name    |       Comment        | Latest version |\n"
+            + "+------------+----------------------+----------------+\n"
+            + "| demo_model | This is a demo model | 1              |\n"
+            + "+------------+----------------------+----------------+",
+        output);
+  }
+
+  @Test
+  void testListUserWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    User user1 = getMockUser("user1", Arrays.asList("role1", "role2"));
+    User user2 = getMockUser("user2", Arrays.asList("role3", "role4"));
+    User user3 = getMockUser("user3", Arrays.asList("role5"));
+
+    TableFormat.output(new User[] {user1, user2, user3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-------+\n"
+            + "| Name  |\n"
+            + "+-------+\n"
+            + "| user1 |\n"
+            + "| user2 |\n"
+            + "| user3 |\n"
+            + "+-------+",
+        output);
+  }
+
+  @Test
+  void testUserDetailsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    User mockUser = getMockUser("demo_user", Arrays.asList("role1", "role2"));
+
+    TableFormat.output(mockUser, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----------+--------------+\n"
+            + "|   Name    |    Roles     |\n"
+            + "+-----------+--------------+\n"
+            + "| demo_user | role1, role2 |\n"
+            + "+-----------+--------------+",
+        output);
+  }
+
+  @Test
+  void testListGroupWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Group group1 = getMockGroup("group1", Arrays.asList("role1", "role2"));
+    Group group2 = getMockGroup("group2", Arrays.asList("role3", "role4"));
+    Group group3 = getMockGroup("group3", Arrays.asList("role5"));
+
+    TableFormat.output(new Group[] {group1, group2, group3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+--------+\n"
+            + "|  Name  |\n"
+            + "+--------+\n"
+            + "| group1 |\n"
+            + "| group2 |\n"
+            + "| group3 |\n"
+            + "+--------+",
+        output);
+  }
+
+  @Test
+  void testGroupDetailsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Group mockGroup = getMockGroup("demo_group", Arrays.asList("role1", "role2"));
+
+    TableFormat.output(mockGroup, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------------+--------------+\n"
+            + "|    Name    |    Roles     |\n"
+            + "+------------+--------------+\n"
+            + "| demo_group | role1, role2 |\n"
+            + "+------------+--------------+",
+        output);
+  }
+
+  @Test
+  void testTagDetailsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = getMockTag("tag1", "comment for tag1");
+
+    TableFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------+------------------+\n"
+            + "| Name |     Comment      |\n"
+            + "+------+------------------+\n"
+            + "| tag1 | comment for tag1 |\n"
+            + "+------+------------------+",
+        output);
+  }
+
+  @Test
+  void testTagDetailsWithTableFormatWithNullValues() {
+    CommandContext mockContext = getMockContext();
+    Tag mockTag = mock(Tag.class);
+    when(mockTag.name()).thenReturn("tag1");
+    when(mockTag.comment()).thenReturn(null);
+
+    TableFormat.output(mockTag, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------+---------+\n"
+            + "| Name | Comment |\n"
+            + "+------+---------+\n"
+            + "| tag1 | N/A     |\n"
+            + "+------+---------+",
+        output);
+  }
+
+  @Test
+  void testListAllTagsWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1");
+    Tag mockTag2 = getMockTag("tag2", "comment for tag2");
+    Tag mockTag3 = getMockTag("tag3", "comment for tag3");
+
+    TableFormat.output(new Tag[] {mockTag1, mockTag2, mockTag3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+------+\n"
+            + "| Name |\n"
+            + "+------+\n"
+            + "| tag1 |\n"
+            + "| tag2 |\n"
+            + "| tag3 |\n"
+            + "+------+",
+        output);
+  }
+
+  @Test
+  void testListTagPropertiesWithTableFormat() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1");
+
+    TableFormat.output(mockTag1.properties(), mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----+-------+\n"
+            + "| Key | Value |\n"
+            + "+-----+-------+\n"
+            + "| k1  | v1    |\n"
+            + "| k2  | v2    |\n"
+            + "+-----+-------+",
+        output);
+  }
+
+  @Test
+  void testListTagPropertiesWithTableFormatWithEmptyMap() {
+    CommandContext mockContext = getMockContext();
+
+    Tag mockTag1 = getMockTag("tag1", "comment for tag1", Collections.emptyMap());
+
+    TableFormat.output(mockTag1.properties(), mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "+-----+-------+\n"
+            + "| Key | Value |\n"
+            + "+-----+-------+\n"
+            + "| N/A | N/A   |\n"
+            + "+-----+-------+",
+        output);
+  }
+
+  @Test
   void testOutputWithUnsupportType() {
     CommandContext mockContext = getMockContext();
     Object mockObject = new Object();
@@ -664,5 +871,43 @@ public class TestTableFormat {
     when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
 
     return mockColumn;
+  }
+
+  private Model getMockModel(String name, String comment, int lastVersion) {
+    Model mockModel = mock(Model.class);
+    when(mockModel.name()).thenReturn(name);
+    when(mockModel.comment()).thenReturn(comment);
+    when(mockModel.latestVersion()).thenReturn(lastVersion);
+
+    return mockModel;
+  }
+
+  private User getMockUser(String name, List<String> roles) {
+    User mockUser = mock(User.class);
+    when(mockUser.name()).thenReturn(name);
+    when(mockUser.roles()).thenReturn(roles);
+
+    return mockUser;
+  }
+
+  private Group getMockGroup(String name, List<String> roles) {
+    Group mockGroup = mock(Group.class);
+    when(mockGroup.name()).thenReturn(name);
+    when(mockGroup.roles()).thenReturn(roles);
+
+    return mockGroup;
+  }
+
+  private Tag getMockTag(String name, String comment) {
+    return getMockTag(name, comment, ImmutableMap.of("k1", "v1", "k2", "v2"));
+  }
+
+  private Tag getMockTag(String name, String comment, Map<String, String> properties) {
+    Tag mockTag = mock(Tag.class);
+    when(mockTag.name()).thenReturn(name);
+    when(mockTag.comment()).thenReturn(comment);
+    when(mockTag.properties()).thenReturn(properties);
+
+    return mockTag;
   }
 }

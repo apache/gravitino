@@ -29,6 +29,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 @DeveloperApi
 public final class GetFileLocationFailureEvent extends FilesetFailureEvent {
   private final String subPath;
+  private final String locationName;
 
   /**
    * Constructs a new {@code GetFileLocationFailureEvent}.
@@ -42,8 +43,29 @@ public final class GetFileLocationFailureEvent extends FilesetFailureEvent {
    */
   public GetFileLocationFailureEvent(
       String user, NameIdentifier identifier, String subPath, Exception exception) {
+    this(user, identifier, subPath, null, exception);
+  }
+
+  /**
+   * Constructs a new {@code GetFileLocationFailureEvent}.
+   *
+   * @param user The user who initiated the get a file location.
+   * @param identifier The identifier of the file location that was attempted to be got.
+   * @param subPath The sub path of the actual file location which want to get.
+   * @param locationName The name of the location.
+   * @param exception The exception that was thrown during the get a file location. This exception
+   *     is key to diagnosing the failure, providing insights into what went wrong during the
+   *     operation.
+   */
+  public GetFileLocationFailureEvent(
+      String user,
+      NameIdentifier identifier,
+      String subPath,
+      String locationName,
+      Exception exception) {
     super(user, identifier, exception);
     this.subPath = subPath;
+    this.locationName = locationName;
   }
 
   /**
@@ -53,6 +75,15 @@ public final class GetFileLocationFailureEvent extends FilesetFailureEvent {
    */
   public String subPath() {
     return subPath;
+  }
+
+  /**
+   * Get the audit context map of the get file location operation.
+   *
+   * @return The audit context map.
+   */
+  public String locationName() {
+    return locationName;
   }
 
   /**

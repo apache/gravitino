@@ -91,6 +91,18 @@ public class TestTypeConverter {
         () -> CONVERTER.fromGravitino(Types.ExternalType.of(USER_DEFINED_TYPE)));
   }
 
+  @Test
+  public void testTimestampWithTimeZoneThrowsException() {
+    Types.TimestampType timestampWithTimeZone = Types.TimestampType.withTimeZone();
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> HiveDataTypeConverter.CONVERTER.fromGravitino(timestampWithTimeZone));
+    Assertions.assertEquals(
+        "Unsupported conversion: Please use the TIMESTAMP WITHOUT TIMEZONE type. TIMESTAMP WITH TIMEZONE type is not supported by Hive.",
+        exception.getMessage());
+  }
+
   private void testConverter(String typeName) {
     TypeInfo hiveType = getTypeInfoFromTypeString(typeName);
     TypeInfo convertedType = CONVERTER.fromGravitino(CONVERTER.toGravitino(hiveType.getTypeName()));

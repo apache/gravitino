@@ -18,27 +18,28 @@
 import logging
 from typing import List, Dict
 
+from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
+
 from gravitino.api.catalog import Catalog
-from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.credential.credential import Credential
+from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_fileset import GenericFileset
 from gravitino.dto.audit_dto import AuditDTO
-from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 from gravitino.dto.requests.fileset_update_request import FilesetUpdateRequest
 from gravitino.dto.requests.fileset_updates_request import FilesetUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.fileset_response import FilesetResponse
+from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
-from gravitino.utils import HTTPClient
 from gravitino.rest.rest_utils import encode_string
-from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
+from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,6 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         audit: AuditDTO = None,
         rest_client: HTTPClient = None,
     ):
-
         super().__init__(
             namespace,
             name,
@@ -158,6 +158,39 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         Returns:
             The created fileset metadata
         """
+        locations = (
+            {Fileset.LOCATION_NAME_UNKNOWN: storage_location}
+            if storage_location
+            else {}
+        )
+        return self.create_multiple_location_fileset(
+            ident, comment, fileset_type, locations, properties
+        )
+
+    def create_multiple_location_fileset(
+        self,
+        ident: NameIdentifier,
+        comment: str,
+        fileset_type: Fileset.Type,
+        storage_locations: Dict[str, str],
+        properties: Dict[str, str],
+    ):
+        """Create a fileset metadata in the catalog with multiple storage locations.
+
+        Args:
+            ident: A fileset identifier, which should be "schema.fileset" format.
+            comment: The comment of the fileset.
+            fileset_type: The type of the fileset.
+            storage_locations: The location names and storage locations of the fileset.
+            properties: The properties of the fileset.
+
+        Raises:
+            NoSuchSchemaException If the schema does not exist.
+            FilesetAlreadyExistsException If the fileset already exists.
+
+        Returns:
+            The created fileset metadata
+        """
         self.check_fileset_name_identifier(ident)
 
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
@@ -166,9 +199,10 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
             name=encode_string(ident.name()),
             comment=comment,
             fileset_type=fileset_type,
-            storage_location=storage_location,
+            storage_locations=storage_locations,
             properties=properties,
         )
+        req.validate()
 
         resp = self.rest_client.post(
             self.format_fileset_request_path(full_namespace),
@@ -239,12 +273,23 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
 
         return drop_resp.dropped()
 
-    def get_file_location(self, ident: NameIdentifier, sub_path: str) -> str:
-        """Get the actual location of a file or directory based on the storage location of Fileset and the sub path.
+    def get_file_location(
+        self,
+        ident: NameIdentifier,
+        sub_path: str,
+        location_name: str = None,
+    ) -> str:
+        """Get the actual location of a file or directory based on the
+        specified storage location of Fileset and the sub path.
 
         Args:
              ident: A fileset identifier, which should be "schema.fileset" format.
              sub_path: The sub path of the file or directory.
+             location_name: The location name of the fileset, if not specified,
+                           the default location will be used.
+
+        Raises:
+            NoSuchLocationNameException If the location name does not exist.
 
         Returns:
              The actual location of the file or directory.
@@ -254,7 +299,11 @@ class FilesetCatalog(BaseSchemaCatalog, SupportsCredentials):
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
         try:
             caller_context: CallerContext = CallerContextHolder.get()
-            params = {"sub_path": encode_string(sub_path)}
+            params = {
+                "sub_path": encode_string(sub_path),
+            }
+            if location_name is not None:
+                params["location_name"] = encode_string(location_name)
 
             resp = self.rest_client.get(
                 self.format_file_location_request_path(full_namespace, ident.name()),

@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.spark.sql.AnalysisException;
@@ -45,14 +46,50 @@ import org.junit.jupiter.api.condition.EnabledIf;
 @TestInstance(Lifecycle.PER_CLASS)
 public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
-  protected static final String ICEBERG_REST_NS_PREFIX = "iceberg_rest_";
+  protected boolean supportsNestedNamespaces() {
+    return true;
+  }
+
+  protected String getTestNamespace() {
+    return getTestNamespace(null);
+  }
+
+  protected String getTestNamespace(@Nullable String childNamespace) {
+    String separator;
+    String parentNamespace;
+
+    if (supportsNestedNamespaces()) {
+      parentNamespace = "iceberg_rest.nested.table_test";
+      separator = ".";
+    } else {
+      parentNamespace = "iceberg_rest";
+      separator = "_";
+    }
+
+    if (childNamespace != null) {
+      return parentNamespace + separator + childNamespace;
+    } else {
+      return parentNamespace;
+    }
+  }
 
   @BeforeAll
   void prepareSQLContext() {
     // use rest catalog
     sql("USE rest");
     purgeAllIcebergTestNamespaces();
-    sql("CREATE DATABASE IF NOT EXISTS iceberg_rest_table_test");
+    if (supportsNestedNamespaces()) {
+      // create all parent namespaces
+      final String[] parentNamespace = {""};
+      Arrays.stream(getTestNamespace().split("\\."))
+          .forEach(
+              ns -> {
+                sql("CREATE DATABASE IF NOT EXISTS " + parentNamespace[0] + ns);
+                parentNamespace[0] += ns + ".";
+              });
+    }
+
+    sql(String.format("CREATE DATABASE IF NOT EXISTS %s", getTestNamespace()));
   }
 
   @AfterAll
@@ -60,28 +97,59 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     purgeAllIcebergTestNamespaces();
   }
 
+  private boolean namespaceExists(String namespace) {
+    try {
+      sql(String.format("DESCRIBE DATABASE %s ", namespace));
+      return true;
+    } catch (Exception e) {
+      // can't directly catch NoSuchNamespaceException because it's a checked exception,
+      // and it's not thrown by sparkSession.sql
+      if (e instanceof NoSuchNamespaceException) {
+        // ignore non existing namespace
+        return false;
+      } else {
+        throw e;
+      }
+    }
+  }
+
   private void purgeTable(String namespace, String table) {
     sql(String.format("DROP TABLE %s.%s PURGE", namespace, table));
   }
 
-  private void purgeNameSpace(String namespace) {
+  private void purgeNamespace(String namespace) {
+    if (!namespaceExists(namespace)) {
+      return;
+    }
+
+    if (supportsNestedNamespaces()) {
+      // list and purge child namespaces
+      List<Object[]> childNamespaces = sql(String.format("SHOW DATABASES IN %s ", namespace));
+      Set<String> childNamespacesString = convertToStringSet(childNamespaces, 0);
+      childNamespacesString.forEach(this::purgeNamespace);
+    }
+
     Set<String> tables = convertToStringSet(sql("SHOW TABLES IN " + namespace), 1);
     tables.forEach(table -> purgeTable(namespace, table));
     sql("DROP database " + namespace);
   }
 
   private void purgeAllIcebergTestNamespaces() {
-    List<Object[]> databases =
-        sql(String.format("SHOW DATABASES like '%s*'", ICEBERG_REST_NS_PREFIX));
-    Set<String> databasesString = convertToStringSet(databases, 0);
-    databasesString.stream()
-        .filter(ns -> ns.startsWith(ICEBERG_REST_NS_PREFIX))
-        .forEach(ns -> purgeNameSpace(ns));
+    if (supportsNestedNamespaces()) {
+      purgeNamespace(getTestNamespace());
+    } else {
+      List<Object[]> databases =
+          sql(String.format("SHOW DATABASES like '%s*'", getTestNamespace()));
+      Set<String> databasesString = convertToStringSet(databases, 0);
+      databasesString.stream()
+          .filter(ns -> ns.startsWith(getTestNamespace() + '.'))
+          .forEach(this::purgeNamespace);
+    }
   }
 
   @Test
   void testCreateNamespace() {
-    String namespaceName = ICEBERG_REST_NS_PREFIX + "create";
+    String namespaceName = getTestNamespace("create");
     sql(
         String.format(
             "CREATE DATABASE %s COMMENT 'This is customer database' "
@@ -109,19 +177,28 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
   @Test
   void testListNamespace() {
-    sql(String.format("CREATE DATABASE %slist_foo1", ICEBERG_REST_NS_PREFIX));
-    sql(String.format("CREATE DATABASE %slist_foo2", ICEBERG_REST_NS_PREFIX));
-    List<Object[]> databases =
-        sql(String.format("SHOW DATABASES like '%slist_foo*'", ICEBERG_REST_NS_PREFIX));
+    String separator = supportsNestedNamespaces() ? "." : "_";
+    sql(String.format("CREATE DATABASE %s%slist_foo1", getTestNamespace(), separator));
+    sql(String.format("CREATE DATABASE %s%slist_foo2", getTestNamespace(), separator));
+    List<Object[]> databases;
+    if (supportsNestedNamespaces()) {
+      databases = sql(String.format("SHOW DATABASES IN %s LIKE '*list_foo*'", getTestNamespace()));
+    } else {
+      databases =
+          sql(String.format("SHOW DATABASES '%s%slist_foo*'", getTestNamespace(), separator));
+    }
+
     Set<String> databasesString = convertToStringSet(databases, 0);
     Assertions.assertEquals(
-        ImmutableSet.of(ICEBERG_REST_NS_PREFIX + "list_foo1", ICEBERG_REST_NS_PREFIX + "list_foo2"),
+        ImmutableSet.of(
+            getTestNamespace() + separator + "list_foo1",
+            getTestNamespace() + separator + "list_foo2"),
         databasesString);
   }
 
   @Test
   void testDropNameSpace() {
-    String namespaceName = ICEBERG_REST_NS_PREFIX + "foo1";
+    String namespaceName = getTestNamespace("foo1");
     sql("CREATE DATABASE IF NOT EXISTS " + namespaceName);
     sql("DESC DATABASE " + namespaceName);
     sql(
@@ -145,7 +222,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
   @Test
   void testNameSpaceProperties() {
-    String namespaceName = ICEBERG_REST_NS_PREFIX + "alter_foo1";
+    String namespaceName = getTestNamespace("alter_foo1");
     sql("DROP DATABASE if exists " + namespaceName);
     sql("CREATE DATABASE if not exists " + namespaceName);
     sql(String.format("ALTER DATABASE %s SET PROPERTIES(id = 2)", namespaceName));
@@ -164,7 +241,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
   @Test
   void testDML() {
-    String namespaceName = ICEBERG_REST_NS_PREFIX + "dml";
+    String namespaceName = getTestNamespace("dml");
     String tableName = namespaceName + ".test";
     sql("CREATE DATABASE IF NOT EXISTS " + namespaceName);
     sql(
@@ -196,10 +273,11 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testCreateTable() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.create_foo1"
+        String.format("CREATE TABLE %s.create_foo1", getTestNamespace())
             + "( id bigint, data string, ts timestamp)"
             + "USING iceberg PARTITIONED BY (bucket(16, id), days(ts))");
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.create_foo1");
+    Map<String, String> tableInfo =
+        getTableInfo(String.format("%s.create_foo1", getTestNamespace()));
     Map<String, String> m =
         ImmutableMap.of(
             "id", "bigint",
@@ -212,25 +290,27 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
     Assertions.assertThrowsExactly(
         TableAlreadyExistsException.class,
-        () -> sql("CREATE TABLE iceberg_rest_table_test.create_foo1"));
+        () -> sql(String.format("CREATE TABLE %s.create_foo1", getTestNamespace())));
   }
 
   @Test
   void testDropTable() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.drop_foo1"
+        String.format("CREATE TABLE %s.drop_foo1", getTestNamespace())
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
-    sql("DROP TABLE iceberg_rest_table_test.drop_foo1");
+    sql(String.format("DROP TABLE %s.drop_foo1", getTestNamespace()));
     Assertions.assertThrowsExactly(
-        AnalysisException.class, () -> sql("DESC TABLE iceberg_rest_table_test.drop_foo1"));
+        AnalysisException.class,
+        () -> sql(String.format("DESC TABLE %s.drop_foo1", getTestNamespace())));
 
     Assertions.assertThrowsExactly(
-        NoSuchTableException.class, () -> sql("DROP TABLE iceberg_rest_table_test.drop_foo1"));
+        NoSuchTableException.class,
+        () -> sql(String.format("DROP TABLE %s.drop_foo1", getTestNamespace())));
   }
 
   @Test
   void testListTable() {
-    String namespaceName = ICEBERG_REST_NS_PREFIX + "list_db";
+    String namespaceName = getTestNamespace("list_db");
     sql("CREATE DATABASE if not exists " + namespaceName);
     sql(
         String.format(
@@ -248,49 +328,52 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testRenameTable() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.rename_foo1"
+        String.format("CREATE TABLE %s.rename_foo1", getTestNamespace())
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
     sql(
-        "ALTER TABLE iceberg_rest_table_test.rename_foo1 "
-            + "RENAME TO iceberg_rest_table_test.rename_foo2");
-    sql("desc table iceberg_rest_table_test.rename_foo2");
+        String.format("ALTER TABLE %s.rename_foo1 ", getTestNamespace())
+            + String.format("RENAME TO %s.rename_foo2", getTestNamespace()));
+    sql(String.format("desc table %s.rename_foo2", getTestNamespace()));
     Assertions.assertThrowsExactly(
-        AnalysisException.class, () -> sql("desc table iceberg_rest_table_test.rename_foo1"));
+        AnalysisException.class,
+        () -> sql(String.format("desc table %s.rename_foo1", getTestNamespace())));
 
     sql(
-        "CREATE TABLE iceberg_rest_table_test.rename_foo1"
+        String.format("CREATE TABLE %s.rename_foo1", getTestNamespace())
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
 
     Assertions.assertThrowsExactly(
         TableAlreadyExistsException.class,
         () ->
             sql(
-                "ALTER TABLE iceberg_rest_table_test.rename_foo2 "
-                    + "RENAME TO iceberg_rest_table_test.rename_foo1"));
+                String.format("ALTER TABLE %s.rename_foo2 ", getTestNamespace())
+                    + String.format("RENAME TO %s.rename_foo1", getTestNamespace())));
   }
 
   @Test
   void testSetTableProperties() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.set_foo1"
+        String.format("CREATE TABLE %s.set_foo1", getTestNamespace())
             + " (id bigint COMMENT 'unique id',data string) using iceberg");
     sql(
-        "ALTER TABLE iceberg_rest_table_test.set_foo1 SET TBLPROPERTIES "
+        String.format("ALTER TABLE %s.set_foo1 SET TBLPROPERTIES ", getTestNamespace())
             + "('read.split.target-size'='268435456')");
-    Map<String, String> m = getTableInfo("iceberg_rest_table_test.set_foo1");
+    Map<String, String> m = getTableInfo(getTestNamespace() + ".set_foo1");
     Assertions.assertTrue(
         m.getOrDefault("Table Properties", "").contains("read.split.target-size=268435456"));
 
     sql(
-        "ALTER TABLE iceberg_rest_table_test.set_foo1 "
+        String.format("ALTER TABLE %s.set_foo1 ", getTestNamespace())
             + "UNSET TBLPROPERTIES ('read.split.target-size')");
-    m = getTableInfo("iceberg_rest_table_test.set_foo1");
+    m = getTableInfo(getTestNamespace() + ".set_foo1");
     Assertions.assertFalse(
         m.getOrDefault("Table Properties", "read.split.target-size")
             .contains("read.split.target-size"));
 
-    sql("ALTER TABLE iceberg_rest_table_test.set_foo1 SET TBLPROPERTIES ('comment'='a')");
-    m = getTableInfo("iceberg_rest_table_test.set_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.set_foo1 SET TBLPROPERTIES ('comment'='a')", getTestNamespace()));
+    m = getTableInfo(getTestNamespace() + ".set_foo1");
     // comment is hidden
     Assertions.assertFalse(m.getOrDefault("Table Properties", "").contains("comment=a"));
   }
@@ -298,26 +381,30 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAddColumns() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.add_foo1"
+        String.format("CREATE TABLE %s.add_foo1", getTestNamespace())
             + " (id string COMMENT 'unique id',data string) using iceberg");
 
     Assertions.assertThrowsExactly(
         AnalysisException.class,
         () ->
             sql(
-                "ALTER TABLE iceberg_rest_table_test.add_foo1 "
+                String.format("ALTER TABLE %s.add_foo1 ", getTestNamespace())
                     + "ADD COLUMNS foo_after String After not_exits"));
 
-    sql("ALTER TABLE iceberg_rest_table_test.add_foo1 ADD COLUMNS foo_after String After id");
-    List<String> columns = getTableColumns("iceberg_rest_table_test.add_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.add_foo1 ADD COLUMNS foo_after String After id", getTestNamespace()));
+    List<String> columns = getTableColumns(getTestNamespace() + ".add_foo1");
     Assertions.assertEquals(Arrays.asList("id", "foo_after", "data"), columns);
 
-    sql("ALTER TABLE iceberg_rest_table_test.add_foo1 ADD COLUMNS foo_last String");
-    columns = getTableColumns("iceberg_rest_table_test.add_foo1");
+    sql(String.format("ALTER TABLE %s.add_foo1 ADD COLUMNS foo_last String", getTestNamespace()));
+    columns = getTableColumns(getTestNamespace() + ".add_foo1");
     Assertions.assertEquals(Arrays.asList("id", "foo_after", "data", "foo_last"), columns);
 
-    sql("ALTER TABLE iceberg_rest_table_test.add_foo1 ADD COLUMNS foo_first String FIRST");
-    columns = getTableColumns("iceberg_rest_table_test.add_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.add_foo1 ADD COLUMNS foo_first String FIRST", getTestNamespace()));
+    columns = getTableColumns(getTestNamespace() + ".add_foo1");
     Assertions.assertEquals(
         Arrays.asList("foo_first", "id", "foo_after", "data", "foo_last"), columns);
   }
@@ -325,11 +412,13 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testRenameColumns() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.renameC_foo1"
+        String.format("CREATE TABLE %s.renameC_foo1", getTestNamespace())
             + " (id bigint COMMENT 'unique id',data string) using iceberg");
-    sql("ALTER TABLE iceberg_rest_table_test.renameC_foo1 RENAME COLUMN data TO data1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.renameC_foo1 RENAME COLUMN data TO data1", getTestNamespace()));
 
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.renameC_foo1");
+    Map<String, String> tableInfo = getTableInfo(getTestNamespace() + ".renameC_foo1");
     Map<String, String> m =
         ImmutableMap.of(
             "id", "bigint",
@@ -341,15 +430,18 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testDropColumns() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.dropC_foo1 "
+        String.format("CREATE TABLE %s.dropC_foo1 ", getTestNamespace())
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
 
     Assertions.assertThrowsExactly(
         AnalysisException.class,
-        () -> sql("ALTER TABLE iceberg_rest_table_test.dropC_foo1 DROP COLUMNS not_exits"));
+        () ->
+            sql(
+                String.format(
+                    "ALTER TABLE %s.dropC_foo1 DROP COLUMNS not_exits", getTestNamespace())));
 
-    sql("ALTER TABLE iceberg_rest_table_test.dropC_foo1 DROP COLUMNS data");
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.dropC_foo1");
+    sql(String.format("ALTER TABLE %s.dropC_foo1 DROP COLUMNS data", getTestNamespace()));
+    Map<String, String> tableInfo = getTableInfo(getTestNamespace() + ".dropC_foo1");
     Map<String, String> m = ImmutableMap.of("id", "bigint");
     checkMapContains(m, tableInfo);
     Assertions.assertFalse(m.containsKey("data"));
@@ -358,14 +450,16 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testUpdateColumnType() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.updateC_foo1 "
+        String.format("CREATE TABLE %s.updateC_foo1 ", getTestNamespace())
             + "(id int COMMENT 'unique id',data string) using iceberg");
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.updateC_foo1");
+    Map<String, String> tableInfo = getTableInfo(getTestNamespace() + ".updateC_foo1");
     Map<String, String> m = ImmutableMap.of("id", "int");
     checkMapContains(m, tableInfo);
 
-    sql("ALTER TABLE iceberg_rest_table_test.updateC_foo1 ALTER COLUMN id TYPE bigint");
-    tableInfo = getTableInfo("iceberg_rest_table_test.updateC_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.updateC_foo1 ALTER COLUMN id TYPE bigint", getTestNamespace()));
+    tableInfo = getTableInfo(getTestNamespace() + ".updateC_foo1");
     m = ImmutableMap.of("id", "bigint");
     checkMapContains(m, tableInfo);
   }
@@ -373,30 +467,38 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testUpdateColumnPosition() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.updateP_foo1 "
+        String.format("CREATE TABLE %s.updateP_foo1 ", getTestNamespace())
             + "(id string COMMENT 'unique id',data string) using iceberg");
-    List<String> columns = getTableColumns("iceberg_rest_table_test.updateP_foo1");
+    List<String> columns = getTableColumns(getTestNamespace() + ".updateP_foo1");
     Assertions.assertEquals(Arrays.asList("id", "data"), columns);
 
-    sql("ALTER TABLE iceberg_rest_table_test.updateP_foo1 ALTER COLUMN id AFTER data");
-    columns = getTableColumns("iceberg_rest_table_test.updateP_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.updateP_foo1 ALTER COLUMN id AFTER data", getTestNamespace()));
+    columns = getTableColumns(getTestNamespace() + ".updateP_foo1");
     Assertions.assertEquals(Arrays.asList("data", "id"), columns);
 
-    sql("ALTER TABLE iceberg_rest_table_test.updateP_foo1 ALTER COLUMN id FIRST");
-    columns = getTableColumns("iceberg_rest_table_test.updateP_foo1");
+    sql(String.format("ALTER TABLE %s.updateP_foo1 ALTER COLUMN id FIRST", getTestNamespace()));
+    columns = getTableColumns(getTestNamespace() + ".updateP_foo1");
     Assertions.assertEquals(Arrays.asList("id", "data"), columns);
   }
 
   @Test
   void testAlterPartitions() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.part_foo1"
+        String.format("CREATE TABLE %s.part_foo1", getTestNamespace())
             + "( id bigint, data string, ts timestamp) USING iceberg");
-    sql("ALTER TABLE iceberg_rest_table_test.part_foo1 ADD PARTITION FIELD bucket(16, id)");
-    sql("ALTER TABLE iceberg_rest_table_test.part_foo1 ADD PARTITION FIELD truncate(4, data)");
-    sql("ALTER TABLE iceberg_rest_table_test.part_foo1 ADD PARTITION FIELD years(ts)");
+    sql(
+        String.format(
+            "ALTER TABLE %s.part_foo1 ADD PARTITION FIELD bucket(16, id)", getTestNamespace()));
+    sql(
+        String.format(
+            "ALTER TABLE %s.part_foo1 ADD PARTITION FIELD truncate(4, data)", getTestNamespace()));
+    sql(
+        String.format(
+            "ALTER TABLE %s.part_foo1 ADD PARTITION FIELD years(ts)", getTestNamespace()));
 
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.part_foo1");
+    Map<String, String> tableInfo = getTableInfo(getTestNamespace() + ".part_foo1");
     Map<String, String> partitions =
         ImmutableMap.of(
             "Part 0", "bucket(16, id)",
@@ -409,10 +511,12 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         IllegalArgumentException.class,
         () ->
             sql(
-                "ALTER TABLE iceberg_rest_table_test.part_foo1 "
+                String.format("ALTER TABLE %s.part_foo1 ", getTestNamespace())
                     + "DROP PARTITION FIELD bucket(8, id)"));
-    sql("ALTER TABLE iceberg_rest_table_test.part_foo1 DROP PARTITION FIELD bucket(16, id)");
-    tableInfo = getTableInfo("iceberg_rest_table_test.part_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.part_foo1 DROP PARTITION FIELD bucket(16, id)", getTestNamespace()));
+    tableInfo = getTableInfo(getTestNamespace() + ".part_foo1");
     partitions =
         ImmutableMap.of(
             "Part 0", "truncate(4, data)",
@@ -424,12 +528,12 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
         IllegalArgumentException.class,
         () ->
             sql(
-                "ALTER TABLE iceberg_rest_table_test.part_foo1 "
+                String.format("ALTER TABLE %s.part_foo1 ", getTestNamespace())
                     + "REPLACE PARTITION FIELD months(ts) WITH days(ts)"));
     sql(
-        "ALTER TABLE iceberg_rest_table_test.part_foo1 "
+        String.format("ALTER TABLE %s.part_foo1 ", getTestNamespace())
             + "REPLACE PARTITION FIELD years(ts) WITH days(ts)");
-    tableInfo = getTableInfo("iceberg_rest_table_test.part_foo1");
+    tableInfo = getTableInfo(getTestNamespace() + ".part_foo1");
     partitions =
         ImmutableMap.of(
             "Part 0", "truncate(4, data)",
@@ -441,23 +545,28 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAlterSortBy() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.sort_foo1"
+        String.format("CREATE TABLE %s.sort_foo1", getTestNamespace())
             + "( id bigint, data string, ts timestamp) USING iceberg");
     Assertions.assertThrowsExactly(
         ValidationException.class,
-        () -> sql("ALTER TABLE iceberg_rest_table_test.sort_foo1 WRITE ORDERED BY xx, id"));
+        () ->
+            sql(
+                String.format(
+                    "ALTER TABLE %s.sort_foo1 WRITE ORDERED BY xx, id", getTestNamespace())));
     sql(
-        "ALTER TABLE iceberg_rest_table_test.sort_foo1 "
+        String.format("ALTER TABLE %s.sort_foo1 ", getTestNamespace())
             + "WRITE ORDERED BY data ASC NULLS FIRST, id ASC NULLS FIRST");
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.sort_foo1");
+    Map<String, String> tableInfo = getTableInfo(getTestNamespace() + ".sort_foo1");
     Assertions.assertTrue(
         tableInfo
             .get("Table Properties")
             .contains("sort-order=data ASC NULLS FIRST, id ASC NULLS FIRST,"));
 
     // replace with new one
-    sql("ALTER TABLE iceberg_rest_table_test.sort_foo1 WRITE ORDERED BY ts ASC NULLS FIRST");
-    tableInfo = getTableInfo("iceberg_rest_table_test.sort_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.sort_foo1 WRITE ORDERED BY ts ASC NULLS FIRST", getTestNamespace()));
+    tableInfo = getTableInfo(getTestNamespace() + ".sort_foo1");
     Assertions.assertTrue(
         tableInfo.get("Table Properties").contains("sort-order=ts ASC NULLS FIRST,"));
   }
@@ -465,10 +574,12 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAlterPartitionBy() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.partby_foo1"
+        String.format("CREATE TABLE %s.partby_foo1", getTestNamespace())
             + "( id bigint, data string, ts timestamp) USING iceberg");
-    sql("ALTER TABLE iceberg_rest_table_test.partby_foo1 WRITE DISTRIBUTED BY PARTITION");
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.partby_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.partby_foo1 WRITE DISTRIBUTED BY PARTITION", getTestNamespace()));
+    Map<String, String> tableInfo = getTableInfo(getTestNamespace() + ".partby_foo1");
     Assertions.assertTrue(
         tableInfo.get("Table Properties").contains("write.distribution-mode=hash"));
   }
@@ -476,14 +587,18 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   void testAlterIdentifier() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.identifier_foo1"
+        String.format("CREATE TABLE %s.identifier_foo1", getTestNamespace())
             + "( id bigint NOT NULL, data string, ts timestamp) USING iceberg");
-    sql("ALTER TABLE iceberg_rest_table_test.identifier_foo1 SET IDENTIFIER FIELDS id");
-    Map<String, String> tableInfo = getTableInfo("iceberg_rest_table_test.identifier_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.identifier_foo1 SET IDENTIFIER FIELDS id", getTestNamespace()));
+    Map<String, String> tableInfo = getTableInfo(getTestNamespace() + ".identifier_foo1");
     Assertions.assertTrue(tableInfo.get("Table Properties").contains("identifier-fields=[id]"));
 
-    sql("ALTER TABLE iceberg_rest_table_test.identifier_foo1 DROP IDENTIFIER FIELDS id");
-    tableInfo = getTableInfo("iceberg_rest_table_test.identifier_foo1");
+    sql(
+        String.format(
+            "ALTER TABLE %s.identifier_foo1 DROP IDENTIFIER FIELDS id", getTestNamespace()));
+    tableInfo = getTableInfo(getTestNamespace() + ".identifier_foo1");
     Assertions.assertFalse(tableInfo.get("Table Properties").contains("identifier-fields"));
 
     // java.lang.IllegalArgumentException: Cannot add field id as an identifier field: not a
@@ -491,7 +606,10 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () ->
-            sql("ALTER TABLE iceberg_rest_table_test.identifier_foo1 SET IDENTIFIER FIELDS data"));
+            sql(
+                String.format(
+                    "ALTER TABLE %s.identifier_foo1 SET IDENTIFIER FIELDS data",
+                    getTestNamespace())));
   }
 
   @Test
@@ -502,22 +620,27 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @EnabledIf("catalogTypeNotMemory")
   void testSnapshot() {
     sql(
-        "CREATE TABLE iceberg_rest_table_test.snapshot_foo1 "
+        String.format("CREATE TABLE %s.snapshot_foo1 ", getTestNamespace())
             + "(id bigint COMMENT 'unique id',data string) using iceberg");
-    sql(" INSERT INTO iceberg_rest_table_test.snapshot_foo1 VALUES (1, 'a'), (2, 'b');");
-    sql(" INSERT INTO iceberg_rest_table_test.snapshot_foo1 VALUES (3, 'c'), (4, 'd');");
+    sql(
+        String.format(
+            " INSERT INTO %s.snapshot_foo1 VALUES (1, 'a'), (2, 'b');", getTestNamespace()));
+    sql(
+        String.format(
+            " INSERT INTO %s.snapshot_foo1 VALUES (3, 'c'), (4, 'd');", getTestNamespace()));
     List<String> snapshots =
         convertToStringList(
-            sql("SELECT * FROM iceberg_rest_table_test.snapshot_foo1.snapshots"), 1);
+            sql(String.format("SELECT * FROM %s.snapshot_foo1.snapshots", getTestNamespace())), 1);
 
     Assertions.assertEquals(2, snapshots.size());
     String oldSnapshotId = snapshots.get(0);
     sql(
         String.format(
-            "CALL rest.system.rollback_to_snapshot('iceberg_rest_table_test.snapshot_foo1', %s)",
-            oldSnapshotId));
+            "CALL rest.system.rollback_to_snapshot('%s.snapshot_foo1', %s)",
+            getTestNamespace(), oldSnapshotId));
     Map<String, String> result =
-        convertToStringMap(sql("select * from iceberg_rest_table_test.snapshot_foo1"));
+        convertToStringMap(
+            sql(String.format("select * from %s.snapshot_foo1", getTestNamespace())));
     Assertions.assertEquals(ImmutableMap.of("1", "a", "2", "b"), result);
   }
 
@@ -545,25 +668,28 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     // register table
     String register =
         String.format(
-            "CALL rest.system.register_table(table => 'iceberg_rest_table_test.register_foo2', metadata_file=> '%s')",
-            metadataLocation);
+            "CALL rest.system.register_table(table => '%s.register_foo2', metadata_file=> '%s')",
+            getTestNamespace(), metadataLocation);
     sql(register);
 
     Map<String, String> result =
-        convertToStringMap(sql("SELECT * FROM iceberg_rest_table_test.register_foo2"));
+        convertToStringMap(
+            sql(String.format("SELECT * FROM %s.register_foo2", getTestNamespace())));
     Assertions.assertEquals(ImmutableMap.of("1", "a"), result);
 
     // insert other data
-    sql("INSERT INTO iceberg_rest_table_test.register_foo2 VALUES (2, 'b')");
-    result = convertToStringMap(sql("SELECT * FROM iceberg_rest_table_test.register_foo2"));
+    sql(String.format("INSERT INTO %s.register_foo2 VALUES (2, 'b')", getTestNamespace()));
+    result =
+        convertToStringMap(
+            sql(String.format("SELECT * FROM %s.register_foo2", getTestNamespace())));
     Assertions.assertEquals(ImmutableMap.of("1", "a", "2", "b"), result);
   }
 
   @Test
   @EnabledIf("isSupportsViewCatalog")
   void testCreateViewAndDisplayView() {
-    String originTableName = "iceberg_rest_table_test.create_table_for_view_1";
-    String viewName = "iceberg_rest_table_test.test_create_view";
+    String originTableName = getTestNamespace() + ".create_table_for_view_1";
+    String viewName = getTestNamespace() + ".test_create_view";
 
     sql(
         String.format(
@@ -584,8 +710,8 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   @EnabledIf("isSupportsViewCatalog")
   void testViewProperties() {
-    String originTableName = "iceberg_rest_table_test.create_table_for_view_2";
-    String viewName = "iceberg_rest_table_test.test_create_view_with_properties";
+    String originTableName = getTestNamespace() + ".create_table_for_view_2";
+    String viewName = getTestNamespace() + ".test_create_view_with_properties";
     sql(
         String.format(
             "CREATE TABLE %s ( id bigint, data string, ts timestamp) USING iceberg",
@@ -624,8 +750,8 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   @EnabledIf("isSupportsViewCatalog")
   void testDropView() {
-    String originTableName = "iceberg_rest_table_test.create_table_for_view_3";
-    String viewName = "iceberg_rest_table_test.test_drop_view";
+    String originTableName = getTestNamespace() + ".create_table_for_view_3";
+    String viewName = getTestNamespace() + ".test_drop_view";
 
     sql(
         String.format(
@@ -642,8 +768,8 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   @EnabledIf("isSupportsViewCatalog")
   void testReplaceView() {
-    String originTableName = "iceberg_rest_table_test.create_table_for_view_4";
-    String viewName = "iceberg_rest_table_test.test_replace_view";
+    String originTableName = getTestNamespace() + ".create_table_for_view_4";
+    String viewName = getTestNamespace() + ".test_replace_view";
 
     sql(
         String.format(
@@ -664,9 +790,9 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   @Test
   @EnabledIf("isSupportsViewCatalog")
   void testShowAvailableViews() {
-    String originTableName = "iceberg_rest_table_test.create_table_for_view_5";
-    String viewName1 = "iceberg_rest_table_test.show_available_views_1";
-    String viewName2 = "iceberg_rest_table_test.show_available_views_2";
+    String originTableName = getTestNamespace() + ".create_table_for_view_5";
+    String viewName1 = getTestNamespace() + ".show_available_views_1";
+    String viewName2 = getTestNamespace() + ".show_available_views_2";
 
     sql(
         String.format(
@@ -675,15 +801,15 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName1, originTableName));
     sql(String.format("CREATE VIEW %s AS SELECT * FROM %s", viewName2, originTableName));
 
-    List<Object[]> views = sql("SHOW VIEWS IN iceberg_rest_table_test");
+    List<Object[]> views = sql("SHOW VIEWS IN " + getTestNamespace());
     Assertions.assertEquals(2, views.size());
   }
 
   @Test
   @EnabledIf("isSupportsViewCatalog")
   void testShowCreateStatementView() {
-    String originTableName = "iceberg_rest_table_test.create_table_for_view_6";
-    String viewName = "iceberg_rest_table_test.show_create_statement_view";
+    String originTableName = getTestNamespace() + ".create_table_for_view_6";
+    String viewName = getTestNamespace() + ".show_create_statement_view";
 
     sql(
         String.format(

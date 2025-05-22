@@ -111,7 +111,6 @@ class TestCommonAuth:
         os.environ["GRAVITINO_USER"] = ""
 
     def init_test_env(self):
-
         catalog = self.gravitino_client.create_catalog(
             name=self.catalog_name,
             catalog_type=Catalog.Type.FILESET,

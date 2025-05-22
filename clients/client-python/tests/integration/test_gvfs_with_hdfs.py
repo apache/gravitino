@@ -43,6 +43,7 @@ from gravitino import (
 )
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.filesystem.gvfs_config import GVFSConfig
 from tests.integration.integration_test_env import IntegrationTestEnv
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.base_hadoop_env import BaseHadoopEnvironment
@@ -69,8 +70,11 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
     schema_name: str = "test_gvfs_schema"
 
     fileset_name: str = "test_gvfs_fileset"
+    multiple_locations_fileset_name: str = "test_gvfs_multiple_locations_fileset"
     fileset_comment: str = "fileset_comment"
     fileset_storage_location: str = ""
+    multiple_locations_fileset_storage_location: str = ""
+    multiple_locations_fileset_storage_location1: str = ""
     fileset_properties_key1: str = "fileset_properties_key1"
     fileset_properties_value1: str = "fileset_properties_value1"
     fileset_properties_key2: str = "fileset_properties_key2"
@@ -84,6 +88,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         metalake_name, catalog_name, schema_name
     )
     fileset_ident: NameIdentifier = NameIdentifier.of(schema_name, fileset_name)
+    multiple_locations_fileset_ident: NameIdentifier = NameIdentifier.of(
+        schema_name, multiple_locations_fileset_name
+    )
 
     gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
         uri="http://localhost:8090"
@@ -93,7 +100,6 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
-
         cls._get_gravitino_home()
 
         cls.hdfs_container = HDFSContainer()
@@ -128,6 +134,13 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             if cls.hdfs_container is not None:
                 cls.hdfs_container.close()
 
+    def tearDown(self):
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+        )
+        fs.clear_instance_cache()
+
     @classmethod
     def _init_test_entities(cls):
         cls.gravitino_admin_client.create_metalake(
@@ -147,9 +160,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             schema_name=cls.schema_name, comment="", properties={}
         )
 
-        cls.fileset_storage_location: str = (
-            f"hdfs://{cls.hdfs_container.get_ip()}:9000/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
-        )
+        cls.fileset_storage_location: str = f"hdfs://{cls.hdfs_container.get_ip()}:9000/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
         cls.fileset_gvfs_location = (
             f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
         )
@@ -160,6 +171,33 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             storage_location=cls.fileset_storage_location,
             properties=cls.fileset_properties,
         )
+
+        cls.multiple_locations_fileset_storage_location: str = (
+            f"hdfs://{cls.hdfs_container.get_ip()}:9000/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        cls.multiple_locations_fileset_storage_location1: str = (
+            f"hdfs://{cls.hdfs_container.get_ip()}:9000/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}_1"
+        )
+        cls.multiple_locations_fileset_gvfs_location = (
+            f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        catalog.as_fileset_catalog().create_multiple_location_fileset(
+            ident=cls.multiple_locations_fileset_ident,
+            fileset_type=Fileset.Type.MANAGED,
+            comment=cls.fileset_comment,
+            storage_locations={
+                "default": cls.multiple_locations_fileset_storage_location,
+                "location1": cls.multiple_locations_fileset_storage_location1,
+            },
+            properties={
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "default",
+                **cls.fileset_properties,
+            },
+        )
+
         arrow_hadoop_fs = HadoopFileSystem(host=cls.hdfs_container.get_ip(), port=9000)
         cls.fs = ArrowFSWrapper(arrow_hadoop_fs)
         cls.conf: Dict = {"fs.defaultFS": f"hdfs://{cls.hdfs_container.get_ip()}:9000/"}
@@ -221,7 +259,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             metalake_name=self.metalake_name,
             options=options,
         )
-        token = fs._client._rest_client.auth_data_provider.get_token_data()
+        token = fs._operations._client._rest_client.auth_data_provider.get_token_data()
         token_string = base64.b64decode(
             token.decode("utf-8")[len(AuthConstants.AUTHORIZATION_BASIC_HEADER) :]
         ).decode("utf-8")
@@ -279,6 +317,35 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
 
         file_info = fs.info(info_file)
         self.assertEqual(file_info["name"], info_file[len("gvfs://") :])
+
+    def test_current_location_name(self):
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:8090",
+            metalake_name=self.metalake_name,
+            options={
+                f"{GVFSConfig.GVFS_FILESYSTEM_CURRENT_LOCATION_NAME}": "location1"
+            },
+        )
+
+        exist_file = (
+            self.multiple_locations_fileset_gvfs_location + "/test_exist/test.file"
+        )
+        exist_actual_default_file = (
+            self.multiple_locations_fileset_storage_location + "/test_exist/test.file"
+        )
+        exist_actual_location1_file = (
+            self.multiple_locations_fileset_storage_location1 + "/test_exist/test.file"
+        )
+        self.fs.touch(exist_actual_default_file)
+        self.assertTrue(self.fs.exists(exist_actual_default_file))
+        self.assertFalse(self.fs.exists(exist_actual_location1_file))
+        # fs.exists will use location1
+        self.assertFalse(fs.exists(exist_file))
+
+        self.fs.touch(exist_actual_location1_file)
+        self.assertTrue(self.fs.exists(exist_actual_location1_file))
+        # fs.exists will use location1
+        self.assertTrue(fs.exists(exist_file))
 
     def test_exist(self):
         exist_dir = self.fileset_gvfs_location + "/test_exist"
@@ -516,7 +583,7 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         )
         self.check_makedirs(makedirs_dir, makedirs_actual_dir, fs)
 
-        # test mkdir dir not exist
+        # test mkdirs dir not exist
         parent_not_exist_virtual_path = makedirs_dir + "/not_exist/sub_dir"
         self.assertFalse(fs.exists(parent_not_exist_virtual_path))
         fs.makedirs(parent_not_exist_virtual_path)

@@ -1,0 +1,136 @@
+{{- /*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+  
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  */}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gravitino.fullname" . }}
+  namespace: {{ include "gravitino.namespace" . }}
+  labels:
+    {{- include "gravitino.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.annotations | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "gravitino.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "gravitino.name" . }}
+        name: {{ include "gravitino.fullname" . }}
+        release: {{ .Release.Name }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+          {{- end }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ include "gravitino.name" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
+          command:
+            - "/bin/bash"
+            - "/tmp/conf/init.sh"
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+        {{- if or .Values.env .Values.envWithTpl }}
+          env:
+          {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- range $item := .Values.envWithTpl }}
+            - name: {{ $item.name }}
+              value: {{ tpl $item.value $ | quote }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.envFrom }}
+          envFrom:
+            {{- toYaml .Values.envFrom | nindent 12 }}
+        {{- end }}            
+          ports:
+            - name: {{ .Values.service.portName }}
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+            {{- if .Values.extraExposePorts }}
+            {{- range $item := .Values.extraExposePorts }}
+            - name: {{ $item.name }}
+              containerPort: {{ $item.targetPort }}
+              protocol: {{ $item.protocol }}
+            {{- end }}
+            {{- end }}              
+          volumeMounts:
+            - name: gravitino-conf
+              mountPath: /tmp/conf
+            - name: storage
+              mountPath: {{ .Values.entity.storagePath }}
+        {{- if .Values.extraVolumeMounts }}
+              {{- toYaml .Values.extraVolumeMounts | nindent 12 }}
+            {{- end }}  
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      volumes:
+        - name: gravitino-conf
+          configMap:
+            name: {{ include "gravitino.fullname" . }}
+        {{- if not .Values.persistence.enabled }}
+        - name: storage
+          emptyDir: {}
+        {{- else if .Values.persistence.existingClaim }}
+        - name: storage
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+        {{- else }}
+        volumeClaimTemplates:
+          - metadata:
+              name: storage
+              labels:
+                {{- toYaml .Values.persistence.labels | nindent 8 }}
+              annotations:
+                {{- toYaml .Values.persistence.annotations | nindent 8 }}
+            spec:
+              accessModes:
+                {{- toYaml .Values.persistence.accessModes | nindent 8 }}
+              resources:
+                requests:
+                  storage: {{ .Values.persistence.size | quote }}
+              storageClassName: {{ .Values.persistence.storageClassName }}
+        {{- end }}
+        {{- if .Values.extraVolumes }}
+          {{- toYaml .Values.extraVolumes | nindent 8 }}
+        {{- end }}
