@@ -80,11 +80,4 @@ public interface SupportsEntityStoreCache {
    * @param <E> The class of the entity
    */
   <E extends Entity & HasIdentifier> void put(E entity);
-
-  /**
-   * Returns the current number of entries stored in the data cache.
-   *
-   * @return the estimated size of the data cache
-   */
-  long sizeOfData();
 }

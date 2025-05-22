@@ -34,6 +34,13 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
   void clear();
 
   /**
+   * Returns the number of entries in the cache.
+   *
+   * @return The number of entries in the cache
+   */
+  long size();
+
+  /**
    * Executes the given action within a cache context.
    *
    * @param action The action to cache

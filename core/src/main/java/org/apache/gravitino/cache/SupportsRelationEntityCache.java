@@ -92,11 +92,4 @@ public interface SupportsRelationEntityCache {
    */
   <E extends Entity & HasIdentifier> void put(
       E srcEntity, E destEntity, SupportsRelationOperations.Type relType);
-
-  /**
-   * Returns the current number of entries stored in the relation cache.
-   *
-   * @return the estimated size of the relation cache
-   */
-  long sizeOfRelations();
 }
