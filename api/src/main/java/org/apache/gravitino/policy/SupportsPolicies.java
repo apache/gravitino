@@ -32,7 +32,7 @@ public interface SupportsPolicies {
   String[] listPolicies();
 
   /** @return List all the policies with details for the specific object. */
-  Policy[] listPoliciesInfo();
+  Policy[] listPolicyInfos();
 
   /**
    * Get a policy by its name for the specific object.

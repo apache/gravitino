@@ -96,9 +96,9 @@ public interface Policy extends Auditable {
   /**
    * Check if the policy is inherited from a parent object or not.
    *
-   * <p>Note: The return value is optional, Only when the tag is associated with a metadata object,
-   * and called from the metadata object, the return value will be present. Otherwise, it will be
-   * empty.
+   * <p>Note: The return value is optional, Only when the policy is associated with a metadata
+   * object, and called from the metadata object, the return value will be present. Otherwise, it
+   * will be empty.
    *
    * @return True if the policy is inherited, false if it is owned by the object itself. Empty if
    *     the policy is not associated with any object.
