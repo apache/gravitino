@@ -20,6 +20,7 @@
 package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Weigher;
+import java.util.List;
 import lombok.NonNull;
 import org.apache.gravitino.Entity;
 import org.checkerframework.checker.index.qual.NonNegative;
@@ -35,7 +36,7 @@ import org.checkerframework.checker.index.qual.NonNegative;
  *   <li>Other: 15 bytes
  * </ul>
  */
-public class EntityCacheWeigher implements Weigher<StoreEntityCacheKey, Entity> {
+public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
 
   private EntityCacheWeigher() {}
@@ -69,8 +70,12 @@ public class EntityCacheWeigher implements Weigher<StoreEntityCacheKey, Entity> 
   /** {@inheritDoc} */
   @Override
   public @NonNegative int weigh(
-      @NonNull StoreEntityCacheKey storeEntityCacheKey, @NonNull Entity entity) {
-    return calculateWeight(entity.type());
+      @NonNull EntityCacheKey storeEntityCacheKey, @NonNull List<Entity> entities) {
+    int weight = 0;
+    for (Entity entity : entities) {
+      weight += calculateWeight(entity.type());
+    }
+    return weight;
   }
 
   private int calculateWeight(Entity.EntityType tp) {

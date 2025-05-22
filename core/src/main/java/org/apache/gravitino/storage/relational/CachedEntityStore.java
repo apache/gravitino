@@ -172,7 +172,7 @@ public class CachedEntityStore
     cache.withCacheLock(
         () -> {
           entityStore.close();
-          cache.clearStore();
+          cache.clear();
         });
   }
 
@@ -262,6 +262,7 @@ public class CachedEntityStore
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
+    cache.invalidate(srcIdentifier, srcType, relType);
     entityStore.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
   }
 }

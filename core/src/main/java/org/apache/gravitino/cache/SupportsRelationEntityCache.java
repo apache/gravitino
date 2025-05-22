@@ -23,15 +23,17 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 
-public interface RelationEntityCache {
+/** {@code RelationEntityCache} defines caching behavior for entity-to-entity relationships. */
+public interface SupportsRelationEntityCache {
   /**
-   * Retrieves a list of entities related to the given entity by the given relation type and
-   * identifier type. If any of the related entities are not present in the cache, they will be
-   * loaded from the backing EntityStore.
+   * Retrieves a list of entities related to the specified entity under the given relation type. If
+   * the related entities are not present in the cache, they will be loaded from the underlying
+   * {@link EntityStore}.
    *
    * @param ident The name identifier of the entity to find related entities for
    * @param type The type of the entity to find related entities for
@@ -44,8 +46,7 @@ public interface RelationEntityCache {
       throws IOException;
 
   /**
-   * Retrieves a list of entities from the cache that are related to the given entity by the given
-   * relation type and identifier type.
+   * Retrieves a list of related entities from the cache, if present.
    *
    * @param relType the relation type
    * @param nameIdentifier the name identifier of the entity to find related entities for
@@ -59,7 +60,7 @@ public interface RelationEntityCache {
       Entity.EntityType identType);
 
   /**
-   * Invalidates the cache entry for the given entity and relation type.
+   * Invalidates the cached relation for the given entity and relation type.
    *
    * @param ident the name identifier
    * @param type the entity type
@@ -91,18 +92,4 @@ public interface RelationEntityCache {
    */
   <E extends Entity & HasIdentifier> void put(
       E srcEntity, E destEntity, SupportsRelationOperations.Type relType);
-
-  /**
-   * Returns the current number of entries stored in the relation cache.
-   *
-   * @return the estimated size of the relation cache
-   */
-  long sizeOfRelations();
-
-  /**
-   * Clear the cache based on the given entity.
-   *
-   * @param entity the entity to clear the cache for
-   */
-  void clearRelations(Entity entity);
 }
