@@ -173,15 +173,7 @@ public abstract class BaseEntityCache implements EntityCache {
   /**
    * Removes an expired entity from the data cache.
    *
-   * @param entity The expired entity to remove.
+   * @param key The expired entity key to remove.
    */
-  protected abstract void invalidateExpiredDataItemByMetadata(Entity entity);
-
-  /**
-   * Removes an expired entity from the relation cache.
-   *
-   * @param relationEntityCacheKey The expired relation entity cache key to remove.
-   */
-  protected abstract void invalidateExpiredRelationItemByMetadata(
-      RelationEntityCacheKey relationEntityCacheKey);
+  protected abstract void invalidateExpiredItem(EntityCacheKey key);
 }

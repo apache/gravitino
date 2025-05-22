@@ -26,6 +26,8 @@ import java.util.Objects;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.TestUtil;
 import org.openjdk.jcstress.annotations.Actor;
 import org.openjdk.jcstress.annotations.Arbiter;
@@ -42,15 +44,15 @@ public class TestCacheIndexCoherence {
   @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Key inserted and visible")
   @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "Key not found")
   @State
-  public static class SameKeyConcurrentInsertTest {
-    private final RadixTree<StoreEntityCacheKey> indexTree =
+  public static class InsertSameKeyCoherenceTest {
+    private final RadixTree<EntityCacheKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
     private final Entity entity =
         TestUtil.getTestSchemaEntity(
             123L, "schema1", Namespace.of("metalake1", "catalog1"), "ident1");
-    private final StoreEntityCacheKey key = StoreEntityCacheKey.of(ident, entity.type());
+    private final EntityCacheKey key = EntityCacheKey.of(ident, entity.type());
     private final String keyStr = key.toString();
 
     @Actor
@@ -65,7 +67,43 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      StoreEntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
+      EntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
+      r.r1 =
+          (valueForExactKey != null
+                  && Objects.equals(valueForExactKey, key)
+                  && indexTree.size() == 1)
+              ? 1
+              : 0;
+    }
+  }
+
+  @JCStressTest
+  @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Key inserted and visible")
+  @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "Key not found")
+  @State
+  public static class InsertSameKeyWithRelationTypeCoherenceTest {
+    private final RadixTree<EntityCacheKey> indexTree =
+        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+
+    private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
+    private final EntityCacheKey key =
+        EntityCacheKey.of(
+            ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
+    private final String keyStr = key.toString();
+
+    @Actor
+    public void actor1() {
+      indexTree.put(keyStr, key);
+    }
+
+    @Actor
+    public void actor2() {
+      indexTree.put(keyStr, key);
+    }
+
+    @Arbiter
+    public void arbiter(I_Result r) {
+      EntityCacheKey valueForExactKey = indexTree.getValueForExactKey(keyStr);
       r.r1 =
           (valueForExactKey != null
                   && Objects.equals(valueForExactKey, key)
@@ -79,8 +117,8 @@ public class TestCacheIndexCoherence {
   @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "multiple Key inserted and visible")
   @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "some Key not found")
   @State
-  public static class MultipleKeyConcurrentInsertTest {
-    private final RadixTree<StoreEntityCacheKey> indexTree =
+  public static class InsertMultipleKeyCoherenceTest {
+    private final RadixTree<EntityCacheKey> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     private final NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
@@ -91,8 +129,8 @@ public class TestCacheIndexCoherence {
     private final Entity entity2 =
         TestUtil.getTestSchemaEntity(
             456L, "schema2", Namespace.of("metalake1", "catalog1"), "ident2");
-    private final StoreEntityCacheKey key1 = StoreEntityCacheKey.of(ident1, entity1.type());
-    private final StoreEntityCacheKey key2 = StoreEntityCacheKey.of(ident2, entity2.type());
+    private final EntityCacheKey key1 = EntityCacheKey.of(ident1, entity1.type());
+    private final EntityCacheKey key2 = EntityCacheKey.of(ident2, entity2.type());
     private final String key1Str = key1.toString();
     private final String key2Str = key2.toString();
 
@@ -108,8 +146,53 @@ public class TestCacheIndexCoherence {
 
     @Arbiter
     public void arbiter(I_Result r) {
-      StoreEntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
-      StoreEntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
+      EntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
+      EntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
+      r.r1 =
+          (valueForExactKey1 != null
+                  && valueForExactKey2 != null
+                  && Objects.equals(valueForExactKey1, key1)
+                  && Objects.equals(valueForExactKey2, key2)
+                  && indexTree.size() == 2)
+              ? 1
+              : 0;
+    }
+  }
+
+  @JCStressTest
+  @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "multiple Key inserted and visible")
+  @Outcome(id = "0", expect = Expect.FORBIDDEN, desc = "some Key not found")
+  @State
+  public static class InsertMultipleKeyWithRelationTypeCoherenceTest {
+    private final RadixTree<EntityCacheKey> indexTree =
+        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+
+    private final NameIdentifier ident1 = NameIdentifierUtil.ofRole("metalake", "role1");
+    private final NameIdentifier ident2 = NameIdentifierUtil.ofRole("metalake", "role1");
+
+    private final EntityCacheKey key1 =
+        EntityCacheKey.of(
+            ident1, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
+    private final EntityCacheKey key2 =
+        EntityCacheKey.of(
+            ident2, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
+    private final String key1Str = key1.toString();
+    private final String key2Str = key2.toString();
+
+    @Actor
+    public void actor1() {
+      indexTree.put(key1Str, key1);
+    }
+
+    @Actor
+    public void actor2() {
+      indexTree.put(key2Str, key2);
+    }
+
+    @Arbiter
+    public void arbiter(I_Result r) {
+      EntityCacheKey valueForExactKey1 = indexTree.getValueForExactKey(key1Str);
+      EntityCacheKey valueForExactKey2 = indexTree.getValueForExactKey(key2Str);
       r.r1 =
           (valueForExactKey1 != null
                   && valueForExactKey2 != null
@@ -128,7 +211,7 @@ public class TestCacheIndexCoherence {
       expect = Expect.ACCEPTABLE_INTERESTING,
       desc = "Key still exists due to put/remove race.")
   @State
-  public static class PutRemoveSameKeyTest {
+  public static class PutRemoveSameKeyCoherenceTest {
 
     private final RadixTree<String> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
@@ -147,6 +230,41 @@ public class TestCacheIndexCoherence {
     @Arbiter
     public void arbiter(I_Result r) {
       String value = indexTree.getValueForExactKey(key);
+      r.r1 = (value == null) ? 1 : 0;
+    }
+  }
+
+  @JCStressTest
+  @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Key does not exist after remove.")
+  @Outcome(
+      id = "0",
+      expect = Expect.ACCEPTABLE_INTERESTING,
+      desc = "Key still exists due to put/remove race.")
+  @State
+  public static class PutRemoveSameKeyWithRelationTypeCoherenceTest {
+
+    private final RadixTree<EntityCacheKey> indexTree =
+        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+
+    private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
+    private final EntityCacheKey key =
+        EntityCacheKey.of(
+            ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
+    private final String keyStr = key.toString();
+
+    @Actor
+    public void actorPut() {
+      indexTree.put(keyStr, key);
+    }
+
+    @Actor
+    public void actorRemove() {
+      indexTree.remove(keyStr);
+    }
+
+    @Arbiter
+    public void arbiter(I_Result r) {
+      EntityCacheKey value = indexTree.getValueForExactKey(keyStr);
       r.r1 = (value == null) ? 1 : 0;
     }
   }
@@ -198,13 +316,67 @@ public class TestCacheIndexCoherence {
   }
 
   @JCStressTest
+  @Outcome(
+      id = "1, 1",
+      expect = Expect.ACCEPTABLE,
+      desc = "Both values are visible — correct and expected.")
+  @Outcome(
+      id = "1, 0",
+      expect = Expect.ACCEPTABLE_INTERESTING,
+      desc = "Only v1 is visible — race condition.")
+  @Outcome(
+      id = "0, 1",
+      expect = Expect.ACCEPTABLE_INTERESTING,
+      desc = "Only v2 is visible — race condition.")
+  @Outcome(
+      id = "0, 0",
+      expect = Expect.FORBIDDEN,
+      desc = "No value visible — inconsistent cache state.")
+  @State
+  public static class PutAndPrefixScanWithRelationTypeCoherenceTest {
+
+    private final RadixTree<EntityCacheKey> indexTree =
+        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+
+    private final NameIdentifier ident1 = NameIdentifierUtil.ofRole("metalake", "role1");
+    private final NameIdentifier ident2 = NameIdentifierUtil.ofRole("metalake", "role2");
+
+    private final EntityCacheKey key1 =
+        EntityCacheKey.of(
+            ident1, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
+    private final EntityCacheKey key2 =
+        EntityCacheKey.of(
+            ident2, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
+    private final String key1Str = key1.toString();
+    private final String key2Str = key2.toString();
+
+    @Actor
+    public void actorPut1() {
+      indexTree.put(key1Str, key1);
+    }
+
+    @Actor
+    public void actorPut2() {
+      indexTree.put(key2Str, key2);
+    }
+
+    @Arbiter
+    public void arbiter(II_Result r) {
+      ImmutableList<EntityCacheKey> values =
+          ImmutableList.copyOf(indexTree.getValuesForKeysStartingWith("metalake"));
+      r.r1 = values.contains(key1) ? 1 : 0;
+      r.r2 = values.contains(key2) ? 1 : 0;
+    }
+  }
+
+  @JCStressTest
   @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Get sees the value")
   @Outcome(
       id = "0",
       expect = Expect.ACCEPTABLE_INTERESTING,
       desc = "Get sees nothing due to timing")
   @State
-  public static class PutAndGetTest {
+  public static class PutAndGetCoherenceTest {
     private final RadixTree<String> indexTree =
         new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
     private final String key = "catalog.schema.table";
@@ -217,6 +389,33 @@ public class TestCacheIndexCoherence {
     @Actor
     public void actorGet(I_Result r) {
       r.r1 = indexTree.getValueForExactKey(key) != null ? 1 : 0;
+    }
+  }
+
+  @JCStressTest
+  @Outcome(id = "1", expect = Expect.ACCEPTABLE, desc = "Get sees the value")
+  @Outcome(
+      id = "0",
+      expect = Expect.ACCEPTABLE_INTERESTING,
+      desc = "Get sees nothing due to timing")
+  @State
+  public static class PutAndGetWithRelationTypeCoherenceTest {
+    private final RadixTree<EntityCacheKey> indexTree =
+        new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    private final NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role");
+    private final EntityCacheKey key =
+        EntityCacheKey.of(
+            ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL);
+    private final String keyStr = key.toString();
+
+    @Actor
+    public void actorPut() {
+      indexTree.put(keyStr, key);
+    }
+
+    @Actor
+    public void actorGet(I_Result r) {
+      r.r1 = indexTree.getValueForExactKey(keyStr) != null ? 1 : 0;
     }
   }
 }
