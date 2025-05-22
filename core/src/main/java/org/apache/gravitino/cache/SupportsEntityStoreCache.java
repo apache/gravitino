@@ -29,7 +29,7 @@ import org.apache.gravitino.NameIdentifier;
  * {@code StoreEntityCache} defines caching operations for direct entity access. It supports
  * loading, storing, and invalidating individual metadata entities.
  */
-public interface StoreEntityCache {
+public interface SupportsEntityStoreCache {
   /**
    * Retrieves an entity by its name identifier and type. If the entity is not present in the cache,
    * it will be loaded from the backing EntityStore.
@@ -87,9 +87,4 @@ public interface StoreEntityCache {
    * @return the estimated size of the data cache
    */
   long sizeOfData();
-
-  /**
-   * Clears all entries from the cache, including data and index, resetting it to an empty state.
-   */
-  void clearStore();
 }

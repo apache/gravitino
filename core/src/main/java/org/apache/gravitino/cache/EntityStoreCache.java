@@ -27,10 +27,12 @@ import org.apache.gravitino.Entity;
  * NameIdentifier}. The cache also supports cascading removal of entries, ensuring related
  * sub-entities are cleared together.
  */
-public interface EntityCache extends StoreEntityCache, RelationEntityCache {
-
-  /** Clear all cached entities. */
+public interface EntityStoreCache extends SupportsEntityStoreCache, SupportsRelationEntityCache {
+  /**
+   * Clears all entries from the cache, including data and index, resetting it to an empty state.
+   */
   void clear();
+
   /**
    * Executes the given action within a cache context.
    *

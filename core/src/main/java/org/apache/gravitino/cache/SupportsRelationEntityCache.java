@@ -29,7 +29,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 
 /** {@code RelationEntityCache} defines caching behavior for entity-to-entity relationships. */
-public interface RelationEntityCache {
+public interface SupportsRelationEntityCache {
   /**
    * Retrieves a list of entities related to the specified entity under the given relation type. If
    * the related entities are not present in the cache, they will be loaded from the underlying
@@ -99,11 +99,4 @@ public interface RelationEntityCache {
    * @return the estimated size of the relation cache
    */
   long sizeOfRelations();
-
-  /**
-   * Clear the cache based on the given entity.
-   *
-   * @param entity the entity to clear the cache for
-   */
-  void clearRelations(Entity entity);
 }
