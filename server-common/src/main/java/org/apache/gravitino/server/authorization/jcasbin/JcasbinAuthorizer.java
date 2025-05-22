@@ -46,12 +46,12 @@ import org.casbin.jcasbin.model.Model;
 /** The Jcasbin implementation of GravitinoAuthorizer. */
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
-  /** Jcasbin enforcer is used for metadata authorize */
+  /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer enforcer;
 
   /**
    * loadedRoles is used to cache roles that have loaded permissions. When the permissions of a role
-   * are updated, they should be removed from it
+   * are updated, they should be removed from it.
    */
   private Set<Long> loadedRoles = ConcurrentHashMap.newKeySet();
 
@@ -60,10 +60,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     try (InputStream modelStream =
         JcasbinAuthorizer.class.getResourceAsStream("/jcasbin_model.conf")) {
       Preconditions.checkNotNull(modelStream, "Jcasbin model file can not found.");
-      String modelString = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
+      String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       Model model = new Model();
-      model.loadModelFromText(modelString);
-      enforcer = new Enforcer(model, new IgnoreAdapter());
+      model.loadModelFromText(modelData);
+      enforcer = new Enforcer(model, new PassThroughAdapter());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -102,7 +102,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         || loadPrivilegeAndAuthorize(userId, metadataObject, privilege);
   }
 
-  private boolean authorizeByJcasbin(long userId, MetadataObject metadataObject, String privilege) {
+  private boolean authorizeByJcasbin(Long userId, MetadataObject metadataObject, String privilege) {
     Long metadataId = MetadataIdConverter.doConvert(metadataObject);
     return enforcer.enforce(
         String.valueOf(userId),
@@ -112,12 +112,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private boolean loadPrivilegeAndAuthorize(
-      long userId, MetadataObject metadataObject, String privilege) {
+      Long userId, MetadataObject metadataObject, String privilege) {
     loadPrivilege(userId);
     return authorizeByJcasbin(userId, metadataObject, privilege);
   }
 
-  private void loadPrivilege(long userId) {
+  private void loadPrivilege(Long userId) {
     List<RolePO> roles = RoleMetaService.getInstance().listRolesByUserId(userId);
     for (RolePO role : roles) {
       Long roleId = role.getRoleId();
@@ -131,7 +131,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     // TODO load owner relationship
   }
 
-  private void loadPolicyByRoleId(long roleId) {
+  private void loadPolicyByRoleId(Long roleId) {
     try {
       List<SecurableObjectPO> securableObjects =
           RoleMetaService.listSecurableObjectsByRoleId(roleId);
