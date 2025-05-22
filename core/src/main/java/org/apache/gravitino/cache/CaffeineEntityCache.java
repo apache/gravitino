@@ -151,15 +151,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
     Preconditions.checkArgument(relType != null, "SupportsRelationOperations.Type cannot be null");
 
-    EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type, relType);
-    List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-
-    if (entitiesFromCache != null) {
-      return convertSafe(entitiesFromCache);
-    }
-
     return withLockAndThrow(
         () -> {
+          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type, relType);
+          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
+
+          if (entitiesFromCache != null) {
+            return convertSafe(entitiesFromCache);
+          }
+
           List<E> entities = entityStore.listEntitiesByRelation(relType, ident, type);
           syncEntitiesToCache(entityCacheKey, toEntityList(entities));
 
@@ -174,15 +174,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
     Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
 
-    EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
-    List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-
-    if (entitiesFromCache != null) {
-      return convertSafe(entitiesFromCache.get(0));
-    }
-
     return withLockAndThrow(
         () -> {
+          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
+          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
+
+          if (entitiesFromCache != null) {
+            return convertSafe(entitiesFromCache.get(0));
+          }
+
           E entityFromDb = entityStore.get(ident, type, getEntityClass(type));
           syncEntitiesToCache(entityCacheKey, entityFromDb);
 

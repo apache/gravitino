@@ -376,7 +376,8 @@ public class TestUtil {
    * @return The test {@link UserEntity} entity.
    */
   public static UserEntity getTestUserEntity() {
-    return getTestUserEntity(generator.nextId(), "test_user", "test_metalake");
+    return getTestUserEntity(
+        generator.nextId(), "test_user", "test_metalake", ImmutableList.of(1L));
   }
 
   /**
@@ -385,15 +386,17 @@ public class TestUtil {
    * @param id The ID of the user entity.
    * @param name The name of the user entity.
    * @param metalake The metalake of the user entity.
+   * @param roles The roles of the user entity.
    * @return The test {@link UserEntity} entity.
    */
-  public static UserEntity getTestUserEntity(long id, String name, String metalake) {
+  public static UserEntity getTestUserEntity(
+      long id, String name, String metalake, List<Long> roles) {
     return UserEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(NamespaceUtil.ofUser(metalake))
         .withAuditInfo(getTestAuditInfo())
-        .withRoleIds(ImmutableList.of(1L, 2L, 3L))
+        .withRoleIds(roles)
         .build();
   }
 

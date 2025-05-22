@@ -132,19 +132,7 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-
-    return (E)
-        cache.withCacheLock(
-            () -> {
-              if (cache.contains(ident, entityType)) {
-                return cache.getIfPresent(ident, entityType).get();
-              }
-
-              E entity = entityStore.get(ident, entityType, e);
-              cache.put(entity);
-
-              return entity;
-            });
+    return cache.getOrLoad(ident, entityType);
   }
 
   /** {@inheritDoc} */
@@ -227,7 +215,19 @@ public class CachedEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType) throws IOException {
-    return entityStore.listEntitiesByRelation(relType, nameIdentifier, identType);
+    return cache.withCacheLock(
+        () -> {
+          Optional<List<E>> cachedEntities = cache.getIfPresent(relType, nameIdentifier, identType);
+          if (cachedEntities.isPresent()) {
+            return cachedEntities.get();
+          } else {
+            List<E> entitiesFromStore =
+                entityStore.listEntitiesByRelation(relType, nameIdentifier, identType);
+            entitiesFromStore.forEach(cache::put);
+
+            return entitiesFromStore;
+          }
+        });
   }
 
   /** {@inheritDoc} */
@@ -235,7 +235,7 @@ public class CachedEntityStore
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    cache.withCacheLock(
+    return cache.withCacheLock(
         () -> {
           Optional<List<E>> cachedEntities = cache.getIfPresent(relType, nameIdentifier, identType);
           if (cachedEntities.isPresent()) {
@@ -248,8 +248,6 @@ public class CachedEntityStore
             return entitiesFromStore;
           }
         });
-
-    return entityStore.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
   }
 
   /** {@inheritDoc} */
