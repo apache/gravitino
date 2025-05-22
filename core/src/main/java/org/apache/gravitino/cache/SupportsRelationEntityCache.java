@@ -28,7 +28,10 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 
-/** {@code RelationEntityCache} defines caching behavior for entity-to-entity relationships. */
+/**
+ * {@code RelationEntityCache} defines relation-specific caching behavior for entity-to-entity
+ * relationships.
+ */
 public interface SupportsRelationEntityCache {
   /**
    * Retrieves a list of entities related to the specified entity under the given relation type. If
