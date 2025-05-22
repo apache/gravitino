@@ -29,11 +29,18 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.security.Principal;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -41,6 +48,7 @@ import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -54,19 +62,29 @@ public class TestJcasbinAuthorizer {
 
   private static final Long USER_ID = 2L;
 
-  private static final Long ROLE_ID = 3L;
+  private static final Long ALLOW_ROLE_ID = 3L;
+
+  private static final Long DENY_ROLE_ID = 5L;
 
   private static final Long CATALOG_ID = 4L;
 
+  private static final String USERNAME = "tester";
+
+  private static final String METALAKE = "testMetalake";
+
   private static UserMetaService mockUserMetaService = mock(UserMetaService.class);
 
-  private static MetalakeMetaService metalakeMetaService = mock(MetalakeMetaService.class);
-
   private static RoleMetaService roleMetaService = mock(RoleMetaService.class);
+
+  private static EntityStore entityStore = mock(EntityStore.class);
+
+  private static GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
 
   private static MockedStatic<PrincipalUtils> principalUtilsMockedStatic;
 
   private static MockedStatic<UserMetaService> userMetaServiceMockedStatic;
+
+  private static MockedStatic<GravitinoEnv> gravitinoEnvMockedStatic;
 
   private static MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic;
 
@@ -77,33 +95,45 @@ public class TestJcasbinAuthorizer {
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   @BeforeAll
-  public static void setup() {
+  public static void setup() throws IOException {
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
-    when(mockUserMetaService.getUserIdByMetalakeIdAndName(USER_METALAKE_ID, "tester"))
+    when(mockUserMetaService.getUserIdByMetalakeIdAndName(USER_METALAKE_ID, USERNAME))
         .thenReturn(USER_ID);
-    when(metalakeMetaService.getMetalakeIdByName("testMetalake")).thenReturn(USER_METALAKE_ID);
-
     principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
     userMetaServiceMockedStatic = mockStatic(UserMetaService.class);
     metalakeMetaServiceMockedStatic = mockStatic(MetalakeMetaService.class);
     roleMetaServiceMockedStatic = mockStatic(RoleMetaService.class);
     metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
+    gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
+    gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+    roleMetaServiceMockedStatic.when(RoleMetaService::getInstance).thenReturn(roleMetaService);
+    userMetaServiceMockedStatic.when(UserMetaService::getInstance).thenReturn(mockUserMetaService);
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
-        .thenReturn(new UserPrincipal("tester"));
-    metalakeMetaServiceMockedStatic
-        .when(MetalakeMetaService::getInstance)
-        .thenReturn(metalakeMetaService);
+        .thenReturn(new UserPrincipal(USERNAME));
     metadataIdConverterMockedStatic
         .when(() -> MetadataIdConverter.doConvert(any()))
         .thenReturn(CATALOG_ID);
-    SecurableObjectPO securableObjectPO = getSecurableObjectPO();
     roleMetaServiceMockedStatic
-        .when(() -> RoleMetaService.listSecurableObjectsByRoleId(eq(ROLE_ID)))
-        .thenReturn(ImmutableList.of(securableObjectPO));
-    roleMetaServiceMockedStatic.when(RoleMetaService::getInstance).thenReturn(roleMetaService);
-    userMetaServiceMockedStatic.when(UserMetaService::getInstance).thenReturn(mockUserMetaService);
+        .when(() -> RoleMetaService.listSecurableObjectsByRoleId(eq(ALLOW_ROLE_ID)))
+        .thenReturn(ImmutableList.of(getAllowSecurableObjectPO()));
+    roleMetaServiceMockedStatic
+        .when(() -> RoleMetaService.listSecurableObjectsByRoleId(eq(DENY_ROLE_ID)))
+        .thenReturn(ImmutableList.of(getDenySecurableObjectPO()));
+    when(gravitinoEnv.entityStore()).thenReturn(entityStore);
+    BaseMetalake baseMetalake =
+        BaseMetalake.builder()
+            .withId(USER_METALAKE_ID)
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withName(METALAKE)
+            .build();
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofMetalake(METALAKE)),
+            eq(Entity.EntityType.METALAKE),
+            eq(BaseMetalake.class)))
+        .thenReturn(baseMetalake);
   }
 
   @AfterAll
@@ -123,23 +153,28 @@ public class TestJcasbinAuthorizer {
   public void testAuthorize() {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorize(currentPrincipal));
-    RolePO rolePO1 = getRolePO(ROLE_ID);
+    RolePO allowRole = getRolePO(ALLOW_ROLE_ID);
     // Mock adds roles to users.
-    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(rolePO1));
+    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
     // Test role cache.
     // When permissions are changed but handleRolePrivilegeChange is not executed, the system will
     // use the cached permissions in JCasbin, so authorize can succeed.
-    long newRoleId = -1L;
-    RolePO rolePO2 = getRolePO(newRoleId);
-    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(rolePO2));
+    Long newRoleId = -1L;
+    RolePO tempNewRole = getRolePO(newRoleId);
+    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(tempNewRole));
     assertTrue(doAuthorize(currentPrincipal));
     // After clearing the cache, authorize will fail
-    jcasbinAuthorizer.handleRolePrivilegeChange(ROLE_ID);
+    jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
     assertFalse(doAuthorize(currentPrincipal));
     // When the user is re-assigned the correct role, the authorization will succeed.
-    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(rolePO1));
+    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
+    // Test deny
+    RolePO denyRole = getRolePO(DENY_ROLE_ID);
+    when(roleMetaService.listRolesByUserId(USER_ID))
+        .thenReturn(ImmutableList.of(allowRole, denyRole));
+    assertFalse(doAuthorize(currentPrincipal));
   }
 
   private boolean doAuthorize(Principal currentPrincipal) {
@@ -162,7 +197,7 @@ public class TestJcasbinAuthorizer {
         .build();
   }
 
-  private static SecurableObjectPO getSecurableObjectPO() {
+  private static SecurableObjectPO getAllowSecurableObjectPO() {
     ImmutableList<Privilege.Name> privileges = ImmutableList.of(USE_CATALOG);
     ImmutableList<String> conditions = ImmutableList.of("ALLOW");
     ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
@@ -170,7 +205,27 @@ public class TestJcasbinAuthorizer {
       return SecurableObjectPO.builder()
           .withType(String.valueOf(MetadataObject.Type.CATALOG))
           .withMetadataObjectId(CATALOG_ID)
-          .withRoleId(ROLE_ID)
+          .withRoleId(ALLOW_ROLE_ID)
+          .withPrivilegeNames(objectMapper.writeValueAsString(privileges))
+          .withPrivilegeConditions(objectMapper.writeValueAsString(conditions))
+          .withDeletedAt(0L)
+          .withCurrentVersion(1L)
+          .withLastVersion(1L)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static SecurableObjectPO getDenySecurableObjectPO() {
+    ImmutableList<Privilege.Name> privileges = ImmutableList.of(USE_CATALOG);
+    ImmutableList<String> conditions = ImmutableList.of("DENY");
+    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
+    try {
+      return SecurableObjectPO.builder()
+          .withType(String.valueOf(MetadataObject.Type.CATALOG))
+          .withMetadataObjectId(CATALOG_ID)
+          .withRoleId(DENY_ROLE_ID)
           .withPrivilegeNames(objectMapper.writeValueAsString(privileges))
           .withPrivilegeConditions(objectMapper.writeValueAsString(conditions))
           .withDeletedAt(0L)

@@ -29,7 +29,7 @@ import org.casbin.jcasbin.persist.Adapter;
  * <p>GravitinoAdapter will not perform any actions because there is no need to persist Privilege.
  * All Privileges will be temporarily loaded into the Jcasbin cache when a user requests them.
  */
-public class PassThroughAdapter implements Adapter {
+public class GravitinoAdapter implements Adapter {
 
   /** Gravitino does not require an initialization strategy when an Enforcer is instantiated */
   @Override
