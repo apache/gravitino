@@ -215,19 +215,7 @@ public class CachedEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType) throws IOException {
-    return cache.withCacheLock(
-        () -> {
-          Optional<List<E>> cachedEntities = cache.getIfPresent(relType, nameIdentifier, identType);
-          if (cachedEntities.isPresent()) {
-            return cachedEntities.get();
-          } else {
-            List<E> entitiesFromStore =
-                entityStore.listEntitiesByRelation(relType, nameIdentifier, identType);
-            entitiesFromStore.forEach(cache::put);
-
-            return entitiesFromStore;
-          }
-        });
+    return cache.getOrLoad(nameIdentifier, identType, relType);
   }
 
   /** {@inheritDoc} */
