@@ -138,11 +138,11 @@ public class EntityCacheKey {
    */
   @Override
   public String toString() {
-    String base = identifier.toString() + ":" + type.getShortName();
+    String stringExpr = identifier.toString() + ":" + type.getShortName();
     if (relationType != null) {
-      base += ":" + relationType.name();
+      stringExpr += ":" + relationType.name();
     }
 
-    return base;
+    return stringExpr;
   }
 }
