@@ -21,6 +21,7 @@ package org.apache.gravitino.rel.types;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.StringJoiner;
 
 /** The helper class for {@link Type}. */
@@ -330,14 +331,31 @@ public class Types {
 
   /** The time type in Gravitino. */
   public static class TimeType extends Type.DateTimeType {
-    private static final TimeType INSTANCE = new TimeType();
+    private static final TimeType INSTANCE = new TimeType(Optional.empty());
 
     /** @return The singleton instance of {@link TimeType}. */
     public static TimeType get() {
       return INSTANCE;
     }
 
-    private TimeType() {}
+    /**
+     * @param precision The precision of the time type.
+     * @return A {@link TimeType} with the given precision.
+     */
+    public static TimeType of(Integer precision) {
+      return new TimeType(Optional.ofNullable(precision));
+    }
+
+    private final Optional<Integer> precision;
+
+    private TimeType(Optional<Integer> precision) {
+      this.precision = precision;
+    }
+
+    /** @return The precision of the time type. */
+    public Optional<Integer> precision() {
+      return precision;
+    }
 
     @Override
     public Name name() {
@@ -346,34 +364,72 @@ public class Types {
 
     @Override
     public String simpleString() {
-      return "time";
+      return precision.filter(p -> p > 0).map(p -> String.format("time(%d)", p)).orElse("time");
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof TimeType)) return false;
+      TimeType that = (TimeType) o;
+      return Objects.equals(precision, that.precision);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(precision);
     }
   }
 
   /** The timestamp type in Gravitino. */
   public static class TimestampType extends Type.DateTimeType {
-    private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE = new TimestampType(false);
-    private static final TimestampType INSTANCE_WITH_TIME_ZONE = new TimestampType(true);
-
-    /** @return A {@link TimestampType} with time zone. */
-    public static TimestampType withTimeZone() {
-      return INSTANCE_WITH_TIME_ZONE;
-    }
+    private static final TimestampType INSTANCE_WITHOUT_TIME_ZONE =
+        new TimestampType(false, Optional.empty());
+    private static final TimestampType INSTANCE_WITH_TIME_ZONE =
+        new TimestampType(true, Optional.empty());
 
     /** @return A {@link TimestampType} without time zone. */
     public static TimestampType withoutTimeZone() {
       return INSTANCE_WITHOUT_TIME_ZONE;
     }
 
-    private final boolean withTimeZone;
+    /** @return A {@link TimestampType} with time zone. */
+    public static TimestampType withTimeZone() {
+      return INSTANCE_WITH_TIME_ZONE;
+    }
 
-    private TimestampType(boolean withTimeZone) {
+    /**
+     * @param precision The precision of the timestamp type.
+     * @return A {@link TimestampType} with the given precision and without time zone.
+     */
+    public static TimestampType withoutTimeZone(Integer precision) {
+      return new TimestampType(false, Optional.ofNullable(precision));
+    }
+
+    /**
+     * @param precision The precision of the timestamp type.
+     * @return A {@link TimestampType} with the given precision and time zone.
+     */
+    public static TimestampType withTimeZone(Integer precision) {
+      return new TimestampType(true, Optional.ofNullable(precision));
+    }
+
+    private final boolean withTimeZone;
+    private final Optional<Integer> precision;
+
+    private TimestampType(boolean withTimeZone, Optional<Integer> precision) {
       this.withTimeZone = withTimeZone;
+      this.precision = precision;
     }
 
     /** @return True if the timestamp type has time zone, false otherwise. */
     public boolean hasTimeZone() {
       return withTimeZone;
+    }
+
+    /** @return The precision of the timestamp type. */
+    public Optional<Integer> precision() {
+      return precision;
     }
 
     @Override
@@ -384,7 +440,27 @@ public class Types {
     /** @return The simple string representation of the timestamp type. */
     @Override
     public String simpleString() {
-      return withTimeZone ? "timestamp_tz" : "timestamp";
+      return precision
+          .filter(p -> p > 0)
+          .map(
+              p ->
+                  withTimeZone
+                      ? String.format("timestamp_tz(%d)", p)
+                      : String.format("timestamp(%d)", p))
+          .orElse(withTimeZone ? "timestamp_tz" : "timestamp");
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof TimestampType)) return false;
+      TimestampType that = (TimestampType) o;
+      return withTimeZone == that.withTimeZone && Objects.equals(precision, that.precision);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(withTimeZone, precision);
     }
   }
 

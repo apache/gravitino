@@ -672,4 +672,33 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
   }
+
+  /**
+   * Calculates the precision for datetime-related types based on the column size from MySQL JDBC
+   * driver. This calculation is derived from MySQL's internal representation of datetime types: -
+   * TIME: Format is 'HH:MM:SS' (8 chars) + precision - TIMESTAMP/DATETIME: Format is 'YYYY-MM-DD
+   * HH:MM:SS' (19 chars) + precision
+   *
+   * <p>The precision is calculated by subtracting the base format length plus one (for decimal
+   * point) from the total column size. For example: - TIME(6) has columnSize = 15 (8 + 1 + 6) -
+   * TIMESTAMP(6) has columnSize = 26 (19 + 1 + 6)
+   *
+   * @param typeName The data type name (TIME, TIMESTAMP, or DATETIME)
+   * @param columnSize The total column size from MySQL JDBC driver
+   * @return The precision value (number of fractional seconds digits)
+   */
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize) {
+    String upperTypeName = typeName.toUpperCase();
+    switch (upperTypeName) {
+      case "TIME":
+        // TIME format: 'HH:MM:SS' (8 chars) + decimal point + precision
+        return columnSize >= 9 ? columnSize - 9 : 0;
+      case "TIMESTAMP":
+      case "DATETIME":
+        // TIMESTAMP/DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+        return columnSize >= 20 ? columnSize - 20 : 0;
+    }
+    return 0;
+  }
 }
