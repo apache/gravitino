@@ -31,6 +31,7 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -38,7 +39,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
@@ -50,9 +50,9 @@ import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.FileInfoListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
-import org.apache.gravitino.dto.responses.FileInfoListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
@@ -195,9 +195,16 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset,
-      @QueryParam("subPath") @DefaultValue("") String subPath,
+      @QueryParam("subPath") @DefaultValue("/") String subPath,
       @QueryParam("locationName") String locationName) {
-    LOG.info("Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}", metalake, catalog, schema, fileset, subPath, locationName);
+    LOG.info(
+        "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",
+        metalake,
+        catalog,
+        schema,
+        fileset,
+        subPath,
+        locationName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -205,7 +212,14 @@ public class FilesetOperations {
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             FileInfo[] files = dispatcher.listFiles(ident, locationName, subPath);
             Response response = Utils.ok(new FileInfoListResponse(DTOConverters.toDTO(files)));
-            LOG.info("Files listed for fileset: {}.{}.{}.{}, subPath: {}, locationName:{}", metalake, catalog, schema, fileset, subPath, locationName);
+            LOG.info(
+                "Files listed for fileset: {}.{}.{}.{}, subPath: {}, locationName:{}",
+                metalake,
+                catalog,
+                schema,
+                fileset,
+                subPath,
+                locationName);
             return response;
           });
     } catch (Exception e) {

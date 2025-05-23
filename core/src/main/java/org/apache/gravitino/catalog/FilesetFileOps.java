@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog;
 
+import java.io.IOException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.file.FileInfo;
@@ -38,6 +39,9 @@ public interface FilesetFileOps {
    * @param subPath The sub path under the fileset.
    * @return An array of file information objects.
    */
-  FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
-      throws NoSuchFilesetException;
+  default FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException, IOException {
+    throw new UnsupportedOperationException(
+        "listFiles not supported by " + getClass().getSimpleName());
+  }
 }

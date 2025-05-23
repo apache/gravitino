@@ -38,6 +38,8 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -241,34 +243,38 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath) throws NoSuchFilesetException {
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException, IOException {
+    if (disableFSOps) {
+      LOG.warn("Filesystem operations disabled, rejecting listFiles for {}", ident);
+      throw new UnsupportedOperationException("Filesystem operations are disabled on this server");
+    }
+
+    String decodedSubPath = subPath;
+    if (StringUtils.isNotBlank(subPath)) {
+      decodedSubPath = URLDecoder.decode(subPath, StandardCharsets.UTF_8.name());
+    }
+    String actualPath = getFileLocation(ident, decodedSubPath, locationName);
+    Path formalizedPath = formalizePath(new Path(actualPath), conf);
+
+    FileSystem fs = getFileSystem(formalizedPath, conf);
+    if (!fs.exists(formalizedPath)) {
+      return new FileInfo[0];
+    }
+
     try {
-      if (!store.exists(ident, Entity.EntityType.FILESET)) {
-        throw new NoSuchFilesetException(FILESET_DOES_NOT_EXIST_MSG, ident);
-      }
-
-      String actualPath = getFileLocation(ident, subPath, locationName);
-
-      Path hadoopPath = new Path(actualPath);
-      Path formalizedPath = formalizePath(hadoopPath, conf);
-
-      FileSystem fs = getFileSystem(formalizedPath, conf);
-      if (!fs.exists(formalizedPath)) {
-        return new FileInfo[0];
-      }
-
       FileStatus[] fileStatuses = fs.listStatus(formalizedPath);
-
       FileInfo[] fileInfos = new FileInfo[fileStatuses.length];
       for (int i = 0; i < fileStatuses.length; i++) {
         FileStatus status = fileStatuses[i];
-        fileInfos[i] = FileInfoDTO.builder()
-          .name(status.getPath().getName())
-          .isDir(status.isDirectory())
-          .size(status.getLen())
-          .lastModified(status.getModificationTime())
-          .path(status.getPath().toString())
-          .build();
+        fileInfos[i] =
+            FileInfoDTO.builder()
+                .name(status.getPath().getName())
+                .isDir(status.isDirectory())
+                .size(status.getLen())
+                .lastModified(status.getModificationTime())
+                .path(status.getPath().toString())
+                .build();
       }
 
       return fileInfos;
@@ -1185,7 +1191,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           Path schemaPath = schemaPaths.get(locationName);
           filesetPaths.put(
               locationName,
-                  calculateFilesetPath(
+              calculateFilesetPath(
                   schemaName, filesetName, storageLocation, schemaPath, properties));
         });
     return filesetPaths.build();
