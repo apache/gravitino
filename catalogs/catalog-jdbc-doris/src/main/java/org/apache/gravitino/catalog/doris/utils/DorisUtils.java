@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Distributions.DistributionImpl;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -48,7 +49,7 @@ public final class DorisUtils {
 
   private static final Pattern DISTRIBUTION_INFO_PATTERN =
       Pattern.compile(
-          "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?\\s*(BUCKETS\\s+(\\d+))?");
+          "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?\\s*(BUCKETS\\s+(\\d+|AUTO))?");
 
   private static final String LIST_PARTITION = "LIST";
   private static final String RANGE_PARTITION = "RANGE";
@@ -202,11 +203,8 @@ public final class DorisUtils {
                   .map(f -> f.substring(1, f.length() - 1))
                   .toArray(String[]::new);
 
-      // Default bucket number is 1.
-      int bucketNum = 1;
-      if (matcher.find(5)) {
-        bucketNum = Integer.valueOf(matcher.group(5));
-      }
+      // Default bucket number is 1, auto is -1.
+      int bucketNum = extractBucketNum(matcher);
 
       return new DistributionImpl.Builder()
           .withStrategy(Strategy.getByName(distributionType))
@@ -219,5 +217,22 @@ public final class DorisUtils {
     }
 
     throw new RuntimeException("Failed to extract distribution info in sql:" + createTableSql);
+  }
+
+  private static int extractBucketNum(Matcher matcher) {
+    int bucketNum = 1;
+    if (matcher.find(5)) {
+      String bucketValue = matcher.group(5);
+      // Use -1 to indicate auto bucket.
+      bucketNum =
+          bucketValue.trim().toUpperCase().equals("AUTO")
+              ? Distributions.AUTO
+              : Integer.valueOf(bucketValue);
+    }
+    return bucketNum;
+  }
+
+  public static String toBucketNumberString(int number) {
+    return number == Distributions.AUTO ? "AUTO" : String.valueOf(number);
   }
 }
