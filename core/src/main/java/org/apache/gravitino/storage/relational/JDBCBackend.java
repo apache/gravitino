@@ -44,6 +44,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -59,6 +60,7 @@ import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
@@ -124,6 +126,8 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return (List<E>)
             ModelVersionMetaService.getInstance().listModelVersionsByNamespace(namespace);
+      case POLICY:
+        return (List<E>) PolicyMetaService.getInstance().listPoliciesByNamespace(namespace);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -172,6 +176,8 @@ public class JDBCBackend implements RelationalBackend {
                 + "inserting the new model version.");
       }
       ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
+    } else if (e instanceof PolicyEntity) {
+      PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -207,6 +213,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) ModelMetaService.getInstance().updateModel(ident, updater);
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
+      case POLICY:
+        return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -242,6 +250,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) ModelMetaService.getInstance().getModelByIdentifier(ident);
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().getModelVersionByIdentifier(ident);
+      case POLICY:
+        return (E) PolicyMetaService.getInstance().getPolicyByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -276,6 +286,8 @@ public class JDBCBackend implements RelationalBackend {
         return ModelMetaService.getInstance().deleteModel(ident);
       case MODEL_VERSION:
         return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
+      case POLICY:
+        return PolicyMetaService.getInstance().deletePolicy(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
@@ -326,6 +338,10 @@ public class JDBCBackend implements RelationalBackend {
         return TagMetaService.getInstance()
             .deleteTagMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case POLICY:
+        return PolicyMetaService.getInstance()
+            .deletePolicyAndVersionMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case COLUMN:
         return TableColumnMetaService.getInstance()
             .deleteColumnsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
@@ -370,6 +386,11 @@ public class JDBCBackend implements RelationalBackend {
       case FILESET:
         return FilesetMetaService.getInstance()
             .deleteFilesetVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      case POLICY:
+        return PolicyMetaService.getInstance()
+            .deletePolicyVersionsByRetentionCount(
                 versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       default:
