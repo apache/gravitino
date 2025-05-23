@@ -240,7 +240,7 @@ public class SecureHadoopCatalogOperations
 
   @Override
   public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
-      throws NoSuchFilesetException {
+      throws NoSuchFilesetException, IOException {
     return hadoopCatalogOperations.listFiles(ident, locationName, subPath);
   }
 
