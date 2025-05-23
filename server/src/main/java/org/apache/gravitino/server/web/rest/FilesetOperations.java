@@ -30,14 +30,7 @@ import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
+import javax.ws.rs.*;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
@@ -47,11 +40,9 @@ import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.dto.requests.FilesetCreateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
-import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.EntityListResponse;
-import org.apache.gravitino.dto.responses.FileLocationResponse;
-import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.*;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.metrics.MetricNames;
@@ -181,6 +172,38 @@ public class FilesetOperations {
       return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
     }
   }
+
+    @GET
+    @Path("{fileset}/files")
+    @Produces("application/vnd.gravitino.v1+json")
+    @Timed(name = "list-fileset-files." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+    @ResponseMetered(name = "list-fileset-files", absolute = true)
+    public Response listFiles(
+        @PathParam("metalake") String metalake,
+        @PathParam("catalog") String catalog,
+        @PathParam("schema") String schema,
+        @PathParam("fileset") String fileset,
+        @QueryParam("path") @DefaultValue("") String path,
+        @QueryParam("limit") @DefaultValue("100") int limit,
+        @QueryParam("offset") @DefaultValue("0") int offset
+    ) {
+        LOG.info("Received list files request: {}.{}.{}.{}, path: {}, limit: {}, offset: {}",
+            metalake, catalog, schema, fileset, path, limit, offset);
+        try {
+            return Utils.doAs(
+                httpRequest,
+                () -> {
+                    NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
+                    FileInfo[] files = dispatcher.listFiles(ident, path, limit, offset);
+                    Response response = Utils.ok(new FileInfoListResponse(DTOConverters.toDTO(files)));
+                    LOG.info("Files listed for fileset: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+                    return response;
+                });
+        } catch (Exception e) {
+            return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
+        }
+    }
+
 
   @PUT
   @Path("{fileset}")

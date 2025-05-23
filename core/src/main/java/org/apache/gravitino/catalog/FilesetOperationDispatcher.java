@@ -33,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
@@ -97,6 +98,21 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 fileset.properties()));
+  }
+
+  @Override
+  public FileInfo[] listFiles(NameIdentifier ident, String path, int limit, int offset) throws NoSuchFilesetException {
+    if (limit <= 0) {
+      throw new IllegalArgumentException("Limit must be positive");
+    }
+    if (offset < 0) {
+      throw new IllegalArgumentException("Offset must be non-negative");
+    }
+    if (path == null) {
+      path = "";
+    }
+
+    // TODO: actually get fileinfos from files
   }
 
   /**

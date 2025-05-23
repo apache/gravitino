@@ -49,6 +49,7 @@ import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
+import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
@@ -80,6 +81,7 @@ import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
@@ -616,6 +618,25 @@ public class DTOConverters {
         .properties(fileset.properties())
         .audit(toDTO(fileset.auditInfo()))
         .build();
+  }
+
+  /**
+   * Converts array of FileInfo to array of FileInfoDTO.
+   *
+   * @param files The FileInfo array to convert.
+   * @return The converted FileInfoDTO array.
+   */
+  public static FileInfoDTO[] toDTO(FileInfo[] files) {
+    return Arrays.stream(files)
+        .map(file -> FileInfoDTO.builder()
+            .name(file.name())
+            .isFile(file.isFile())
+            .size(file.size())
+            .lastModified(file.lastModified())
+            .blockSize(file.blockSize())
+            .path(file.path())
+            .build())
+        .toArray(FileInfoDTO[]::new);
   }
 
   /**
