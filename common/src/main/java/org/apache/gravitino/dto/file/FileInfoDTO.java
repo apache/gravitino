@@ -28,153 +28,142 @@ import org.apache.gravitino.file.FileInfo;
 @EqualsAndHashCode
 public class FileInfoDTO implements FileInfo {
 
-    @JsonProperty("name")
+  @JsonProperty("name")
+  private String name;
+
+  @JsonProperty("isDir")
+  private boolean isDir;
+
+  @JsonProperty("size")
+  private long size;
+
+  @JsonProperty("lastModified")
+  private long lastModified;
+
+  @JsonProperty("path")
+  private String path;
+
+  private FileInfoDTO() {}
+
+  private FileInfoDTO(String name, boolean isDir, long size, long lastModified, String path) {
+    this.name = name;
+    this.isDir = isDir;
+    this.size = size;
+    this.lastModified = lastModified;
+    this.path = path;
+  }
+
+  @Override
+  public String name() {
+    return name;
+  }
+
+  @Override
+  public boolean isDir() {
+    return isDir;
+  }
+
+  @Override
+  public long size() {
+    return size;
+  }
+
+  @Override
+  public long lastModified() {
+    return lastModified;
+  }
+
+  @Override
+  public String path() {
+    return path;
+  }
+
+  /**
+   * Create a new FileInfoDTO builder.
+   *
+   * @return A new FileInfoDTO builder.
+   */
+  public static FileInfoDTO.FileInfoDTOBuilder builder() {
+    return new FileInfoDTO.FileInfoDTOBuilder();
+  }
+
+  /** Builder for FileInfoDTO. */
+  public static class FileInfoDTOBuilder {
     private String name;
-
-    @JsonProperty("isDir")
     private boolean isDir;
-
-    @JsonProperty("size")
     private long size;
-
-    @JsonProperty("lastModified")
     private long lastModified;
-
-    @JsonProperty("path")
     private String path;
 
-    private FileInfoDTO() {}
+    private FileInfoDTOBuilder() {}
 
-    private FileInfoDTO(
-        String name,
-        boolean isDir,
-        long size,
-        long lastModified,
-        String path
-    ) {
-        this.name = name;
-        this.isDir = isDir;
-        this.size = size;
-        this.lastModified = lastModified;
-        this.path = path;
-    }
-
-    @Override
-    public String name() {
-        return name;
-    }
-
-    @Override
-    public boolean isDir() {
-        return isDir;
-    }
-
-    @Override
-    public long size() {
-        return size;
-    }
-
-    @Override
-    public long lastModified() {
-        return lastModified;
-    }
-
-    @Override
-    public String path() {
-        return path;
+    /**
+     * Set the name of the FileInfo.
+     *
+     * @param name The name of the file.
+     * @return The builder instance.
+     */
+    public FileInfoDTO.FileInfoDTOBuilder name(String name) {
+      this.name = name;
+      return this;
     }
 
     /**
-     * Create a new FileInfoDTO builder.
+     * Set the isDir of the FileInfo.
      *
-     * @return A new FileInfoDTO builder.
+     * @param isDir The isDir of the file.
+     * @return The builder instance.
      */
-    public static FileInfoDTO.FileInfoDTOBuilder builder() {
-        return new FileInfoDTO.FileInfoDTOBuilder();
+    public FileInfoDTO.FileInfoDTOBuilder isDir(boolean isDir) {
+      this.isDir = isDir;
+      return this;
     }
 
-    /** Builder for FileInfoDTO. */
-    public static class FileInfoDTOBuilder {
-        private String name;
-        private boolean isDir;
-        private long size;
-        private long lastModified;
-        private String path;
-
-        private FileInfoDTOBuilder() {}
-
-        /**
-         * Set the name of the FileInfo.
-         *
-         * @param name The name of the file.
-         * @return The builder instance.
-         */
-        public FileInfoDTO.FileInfoDTOBuilder name(String name) {
-            this.name = name;
-            return this;
-        }
-
-        /**
-         * Set the isDir of the FileInfo.
-         *
-         * @param isDir The isDir of the file.
-         * @return The builder instance.
-         */
-        public FileInfoDTO.FileInfoDTOBuilder isDir(boolean isDir) {
-            this.isDir = isDir;
-            return this;
-        }
-
-        /**
-         * Set the size of the FileInfo.
-         *
-         * @param size The size of the file.
-         * @return The builder instance.
-         */
-        public FileInfoDTO.FileInfoDTOBuilder size(long size) {
-            this.size = size;
-            return this;
-        }
-
-        /**
-         * Set the lastModified of the FileInfo.
-         *
-         * @param lastModified The lastModified of the file.
-         * @return The builder instance.
-         */
-        public FileInfoDTO.FileInfoDTOBuilder lastModified(long lastModified) {
-            this.lastModified = lastModified;
-            return this;
-        }
-
-        /**
-         * Set the path of the FileInfo.
-         *
-         * @param path The path of the file.
-         * @return The builder instance.
-         */
-        public FileInfoDTO.FileInfoDTOBuilder path(String path) {
-            this.path = path;
-            return this;
-        }
-
-        /**
-         * Build the FileInfoDTO.
-         *
-         * @return The built FileInfoDTO.
-         */
-        public FileInfoDTO build() {
-            Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
-            Preconditions.checkArgument(size >= 0, "size cannot be negative");
-            Preconditions.checkArgument(lastModified > 0, "lastModified must be a valid timestamp");
-            Preconditions.checkArgument(StringUtils.isNotBlank(path), "path cannot be null or empty");
-
-            return new FileInfoDTO(
-                name,
-                isDir,
-                size,
-                lastModified,
-                path);
-        }
+    /**
+     * Set the size of the FileInfo.
+     *
+     * @param size The size of the file.
+     * @return The builder instance.
+     */
+    public FileInfoDTO.FileInfoDTOBuilder size(long size) {
+      this.size = size;
+      return this;
     }
+
+    /**
+     * Set the lastModified of the FileInfo.
+     *
+     * @param lastModified The lastModified of the file.
+     * @return The builder instance.
+     */
+    public FileInfoDTO.FileInfoDTOBuilder lastModified(long lastModified) {
+      this.lastModified = lastModified;
+      return this;
+    }
+
+    /**
+     * Set the path of the FileInfo.
+     *
+     * @param path The path of the file.
+     * @return The builder instance.
+     */
+    public FileInfoDTO.FileInfoDTOBuilder path(String path) {
+      this.path = path;
+      return this;
+    }
+
+    /**
+     * Build the FileInfoDTO.
+     *
+     * @return The built FileInfoDTO.
+     */
+    public FileInfoDTO build() {
+      Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
+      Preconditions.checkArgument(size >= 0, "size cannot be negative");
+      Preconditions.checkArgument(lastModified > 0, "lastModified must be a valid timestamp");
+      Preconditions.checkArgument(StringUtils.isNotBlank(path), "path cannot be null or empty");
+
+      return new FileInfoDTO(name, isDir, size, lastModified, path);
+    }
+  }
 }

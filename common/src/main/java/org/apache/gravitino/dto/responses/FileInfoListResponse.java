@@ -31,33 +31,33 @@ import org.apache.gravitino.dto.file.FileInfoDTO;
 @EqualsAndHashCode(callSuper = true)
 public class FileInfoListResponse extends BaseResponse {
 
-    @JsonProperty("files")
-    private final FileInfoDTO[] files;
+  @JsonProperty("files")
+  private final FileInfoDTO[] files;
 
-    /** Constructor for FileInfoListResponse. */
-    public FileInfoListResponse() {
-        super(0);
-        this.files = null;
-    }
+  /** Constructor for FileInfoListResponse. */
+  public FileInfoListResponse() {
+    super(0);
+    this.files = null;
+  }
 
-    /**
-     * Constructor for FileInfoListResponse.
-     *
-     * @param files Array of FileInfo objects to be returned.
-     */
-    public FileInfoListResponse(FileInfoDTO[] files) {
-        super(0);
-        this.files = files;
-    }
+  /**
+   * Constructor for FileInfoListResponse.
+   *
+   * @param files Array of FileInfo objects to be returned.
+   */
+  public FileInfoListResponse(FileInfoDTO[] files) {
+    super(0);
+    this.files = files;
+  }
 
-    /**
-     * Validates the response.
-     *
-     * @throws IllegalArgumentException if the response is invalid.
-     */
-    @Override
-    public void validate() throws IllegalArgumentException {
-        super.validate();
-        Preconditions.checkArgument(files != null, "files must not be null");
-    }
+  /**
+   * Validates the response.
+   *
+   * @throws IllegalArgumentException if the response is invalid.
+   */
+  @Override
+  public void validate() throws IllegalArgumentException {
+    super.validate();
+    Preconditions.checkArgument(files != null, "files must not be null");
+  }
 }

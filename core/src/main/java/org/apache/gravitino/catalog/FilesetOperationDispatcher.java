@@ -101,18 +101,17 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   }
 
   @Override
-  public FileInfo[] listFiles(NameIdentifier ident, String path, int limit, int offset) throws NoSuchFilesetException {
-    if (limit <= 0) {
-      throw new IllegalArgumentException("Limit must be positive");
-    }
-    if (offset < 0) {
-      throw new IllegalArgumentException("Offset must be non-negative");
-    }
-    if (path == null) {
-      path = "";
-    }
-
-    // TODO: actually get fileinfos from files
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                catalogIdent,
+                c -> c.doWithFilesetFileOps(f -> f.listFiles(ident, locationName, subPath)),
+                NoSuchFilesetException.class));
   }
 
   /**

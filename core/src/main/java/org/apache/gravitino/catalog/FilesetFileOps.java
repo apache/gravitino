@@ -24,19 +24,20 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.file.FileInfo;
 
 /**
- * The {@code FilesetFileOps} interface defines operations for managing files within filesets.
- * This interface is designed to be used internally by the server and not exposed to public
- * client APIs to avoid confusion.
+ * The {@code FilesetFileOps} interface defines operations for managing files within filesets. This
+ * interface is designed to be used internally by the server and not exposed to public client APIs
+ * to avoid confusion.
  */
 public interface FilesetFileOps {
 
-    /**
-     * List the files in a fileset with a specific location name and sub path.
-     * @param ident A fileset identifier.
-     * @param locationName The location name. If null, the default location will be used.
-     * @param subPath The sub path under the fileset.
-     * @return An array of file information objects.
-     */
-    FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
-        throws NoSuchFilesetException;
+  /**
+   * List the files in a fileset with a specific location name and sub path.
+   *
+   * @param ident A fileset identifier.
+   * @param locationName The location name. If null, the default location will be used.
+   * @param subPath The sub path under the fileset.
+   * @return An array of file information objects.
+   */
+  FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException;
 }
