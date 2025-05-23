@@ -31,15 +31,12 @@ import org.apache.gravitino.file.FileInfo;
 public interface FilesetFileOps {
 
     /**
-     * List files and directories within a fileset.
-     *
+     * List the files in a fileset with a specific location name and sub path.
      * @param ident A fileset identifier.
-     * @param path The path within the fileset to list files from. Empty string for root.
-     * @param limit Maximum number of files to return.
-     * @param offset Starting position in the list for pagination.
-     * @return Array of FileInfo objects containing file metadata.
-     * @throws NoSuchFilesetException If the fileset does not exist.
+     * @param locationName The location name. If null, the default location will be used.
+     * @param subPath The sub path under the fileset.
+     * @return An array of file information objects.
      */
-    FileInfo[] listFiles(NameIdentifier ident, String path, int limit, int offset)
+    FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
         throws NoSuchFilesetException;
 }

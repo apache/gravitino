@@ -24,8 +24,6 @@ import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.file.FileInfo;
 
-import java.time.Instant;
-
 /** Represents a FileInfo DTO (Data Transfer Object). */
 @EqualsAndHashCode
 public class FileInfoDTO implements FileInfo {
@@ -33,17 +31,14 @@ public class FileInfoDTO implements FileInfo {
     @JsonProperty("name")
     private String name;
 
-    @JsonProperty("isFile")
-    private boolean isFile;
+    @JsonProperty("isDir")
+    private boolean isDir;
 
     @JsonProperty("size")
     private long size;
 
     @JsonProperty("lastModified")
-    private Instant lastModified;
-
-    @JsonProperty("blockSize")
-    private long blockSize;
+    private long lastModified;
 
     @JsonProperty("path")
     private String path;
@@ -52,17 +47,15 @@ public class FileInfoDTO implements FileInfo {
 
     private FileInfoDTO(
         String name,
-        boolean isFile,
+        boolean isDir,
         long size,
-        Instant lastModified,
-        long blockSize,
+        long lastModified,
         String path
     ) {
         this.name = name;
-        this.isFile = isFile;
+        this.isDir = isDir;
         this.size = size;
         this.lastModified = lastModified;
-        this.blockSize = blockSize;
         this.path = path;
     }
 
@@ -72,8 +65,8 @@ public class FileInfoDTO implements FileInfo {
     }
 
     @Override
-    public boolean isFile() {
-        return isFile;
+    public boolean isDir() {
+        return isDir;
     }
 
     @Override
@@ -82,13 +75,8 @@ public class FileInfoDTO implements FileInfo {
     }
 
     @Override
-    public Instant lastModified() {
+    public long lastModified() {
         return lastModified;
-    }
-
-    @Override
-    public long blockSize() {
-        return blockSize;
     }
 
     @Override
@@ -108,10 +96,9 @@ public class FileInfoDTO implements FileInfo {
     /** Builder for FileInfoDTO. */
     public static class FileInfoDTOBuilder {
         private String name;
-        private boolean isFile;
+        private boolean isDir;
         private long size;
-        private Instant lastModified;
-        private long blockSize;
+        private long lastModified;
         private String path;
 
         private FileInfoDTOBuilder() {}
@@ -128,13 +115,13 @@ public class FileInfoDTO implements FileInfo {
         }
 
         /**
-         * Set the isFile of the FileInfo.
+         * Set the isDir of the FileInfo.
          *
-         * @param isFile The isFile of the file.
+         * @param isDir The isDir of the file.
          * @return The builder instance.
          */
-        public FileInfoDTO.FileInfoDTOBuilder isFile(boolean isFile) {
-            this.isFile = isFile;
+        public FileInfoDTO.FileInfoDTOBuilder isDir(boolean isDir) {
+            this.isDir = isDir;
             return this;
         }
 
@@ -155,19 +142,8 @@ public class FileInfoDTO implements FileInfo {
          * @param lastModified The lastModified of the file.
          * @return The builder instance.
          */
-        public FileInfoDTO.FileInfoDTOBuilder lastModified(Instant lastModified) {
+        public FileInfoDTO.FileInfoDTOBuilder lastModified(long lastModified) {
             this.lastModified = lastModified;
-            return this;
-        }
-
-        /**
-         * Set the blockSize of the FileInfo.
-         *
-         * @param blockSize The blockSize of the file.
-         * @return The builder instance.
-         */
-        public FileInfoDTO.FileInfoDTOBuilder blockSize(long blockSize) {
-            this.blockSize = blockSize;
             return this;
         }
 
@@ -190,17 +166,15 @@ public class FileInfoDTO implements FileInfo {
         public FileInfoDTO build() {
             Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
             Preconditions.checkArgument(size >= 0, "size cannot be negative");
-            Preconditions.checkArgument(blockSize >= 0, "blockSize cannot be negative");
-            Preconditions.checkArgument(lastModified != null, "lastModified cannot be null");
+            Preconditions.checkArgument(lastModified > 0, "lastModified must be a valid timestamp");
             Preconditions.checkArgument(StringUtils.isNotBlank(path), "path cannot be null or empty");
 
             return new FileInfoDTO(
-                    name,
-                    isFile,
-                    size,
-                    lastModified,
-                    blockSize,
-                    path);
+                name,
+                isDir,
+                size,
+                lastModified,
+                path);
         }
     }
 }

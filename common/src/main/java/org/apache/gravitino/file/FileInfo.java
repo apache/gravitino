@@ -18,24 +18,19 @@
  */
 package org.apache.gravitino.file;
 
-import java.time.Instant;
-
 public interface FileInfo {
 
-    /** @return Name of the file object. */
+    /** @return The filename or directory name of file object. */
     String name();
 
-    /** @return Whether this is a file (true). */
-    boolean isFile();
+    /** @return Whether this is a directory (true). */
+    boolean isDir();
 
-    /** @return The file size in bytes. */
+    /** @return The file size in bytes (0 if directory). */
     long size();
 
     /** @return The last modification time as an Instant. */
-    Instant lastModified();
-
-    /** @return The block size in bytes, or 0 if not applicable. */
-    long blockSize();
+    long lastModified();
 
     /** @return The full path of the file or directory within the fileset. */
     String path();

@@ -630,10 +630,9 @@ public class DTOConverters {
     return Arrays.stream(files)
         .map(file -> FileInfoDTO.builder()
             .name(file.name())
-            .isFile(file.isFile())
+            .isDir(file.isDir())
             .size(file.size())
             .lastModified(file.lastModified())
-            .blockSize(file.blockSize())
             .path(file.path())
             .build())
         .toArray(FileInfoDTO[]::new);
