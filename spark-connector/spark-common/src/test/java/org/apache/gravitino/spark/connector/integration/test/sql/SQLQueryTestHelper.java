@@ -82,7 +82,7 @@ public class SQLQueryTestHelper {
       Supplier<Pair<String, List<String>>> result) {
     try {
       return result.get();
-    } catch (Throwable e) {
+    } catch (Exception e) {
       return Pair.of(emptySchema, Arrays.asList("[SPARK_EXCEPTION]"));
     }
   }

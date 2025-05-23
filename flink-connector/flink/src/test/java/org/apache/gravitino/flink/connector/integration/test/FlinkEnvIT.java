@@ -203,8 +203,8 @@ public abstract class FlinkEnvIT extends BaseIT {
       try {
         TableEnvironmentImpl env = (TableEnvironmentImpl) tableEnv;
         env.getCatalogManager().close();
-      } catch (Throwable throwable) {
-        LOG.error("Close Flink environment failed", throwable);
+      } catch (Exception e) {
+        LOG.error("Close Flink environment failed", e);
       }
     }
   }
