@@ -82,4 +82,4 @@ jobs:
 
       - name: Run chart-testing (install mysql enable)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --chart-dirs=dev/charts --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml" --target-branch ${{ github.event.pull_request.base.ref }}
+        run: ct install --charts=dev/charts/gravitino --helm-extra-set-args "--values dev/charts/gravitino/resources/scenarios/ci-values.yaml" --target-branch ${{ github.event.pull_request.base.ref }}
