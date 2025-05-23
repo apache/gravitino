@@ -135,6 +135,8 @@ public class FileSystemUtils {
    * </pre>
    *
    * @param config Gravitino configuration
+   * @param predefinedKeys Map of Gravitino keys to Hadoop config keys; entries here have the
+   *     highest priority and override others
    * @return Hadoop configuration Map
    */
   public static Map<String, String> toHadoopConfigMap(
