@@ -110,6 +110,17 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
+   * Checks if the entity is of type {@link HasIdentifier}.
+   *
+   * @param entity The entity to check.
+   */
+  protected static void validateEntityHasIdentifier(Entity entity) {
+    if (!(entity instanceof HasIdentifier)) {
+      throw new IllegalArgumentException("Unsupported EntityType: " + entity.type().getShortName());
+    }
+  }
+
+  /**
    * Converts a list of entities to a new list.
    *
    * @param entities Thr original list of entities.
@@ -118,12 +129,7 @@ public abstract class BaseEntityCache implements EntityCache {
    */
   @SuppressWarnings("unchecked")
   protected static <E extends Entity & HasIdentifier> List<E> convertEntity(List<Entity> entities) {
-    for (Entity e : entities) {
-      if (!(e instanceof HasIdentifier)) {
-        throw new IllegalStateException(
-            "Cached entity " + e + " is not of expected type: " + HasIdentifier.class.getName());
-      }
-    }
+    entities.forEach(BaseEntityCache::validateEntityHasIdentifier);
 
     return (List<E>) (List<? extends Entity>) entities;
   }
@@ -137,10 +143,7 @@ public abstract class BaseEntityCache implements EntityCache {
    */
   @SuppressWarnings("unchecked")
   protected static <E extends Entity & HasIdentifier> E convertEntity(Entity entity) {
-    if (!(entity instanceof HasIdentifier)) {
-      throw new IllegalStateException(
-          "Cached entity " + entity + " is not of expected type: " + HasIdentifier.class.getName());
-    }
+    validateEntityHasIdentifier(entity);
 
     return (E) entity;
   }
