@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -87,12 +86,12 @@ public abstract class BaseEntityCache implements EntityCache {
   public static <E extends Entity & HasIdentifier> Class<E> getEntityClass(Entity.EntityType type) {
     Preconditions.checkNotNull(type, "EntityType must not be null");
 
-    Class<?> aClass = ENTITY_CLASS_MAP.get(type);
-    if (aClass == null) {
+    Class<?> clazz = ENTITY_CLASS_MAP.get(type);
+    if (clazz == null) {
       throw new IllegalArgumentException("Unsupported EntityType: " + type.getShortName());
     }
 
-    return (Class<E>) aClass;
+    return (Class<E>) clazz;
   }
 
   /**
@@ -102,7 +101,6 @@ public abstract class BaseEntityCache implements EntityCache {
    * @return The {@link NameIdentifier} of the metadata
    */
   protected static NameIdentifier getIdentFromMetadata(Entity metadata) {
-
     if (metadata instanceof HasIdentifier) {
       HasIdentifier hasIdentifier = (HasIdentifier) metadata;
       return hasIdentifier.nameIdentifier();
@@ -119,7 +117,7 @@ public abstract class BaseEntityCache implements EntityCache {
    * @param <E> The type of the entities in the list.
    */
   @SuppressWarnings("unchecked")
-  protected static <E extends Entity & HasIdentifier> List<E> convertSafe(List<Entity> entities) {
+  protected static <E extends Entity & HasIdentifier> List<E> convertEntity(List<Entity> entities) {
     for (Entity e : entities) {
       if (!(e instanceof HasIdentifier)) {
         throw new IllegalStateException(
@@ -138,25 +136,13 @@ public abstract class BaseEntityCache implements EntityCache {
    * @param <E> The type of the entity.
    */
   @SuppressWarnings("unchecked")
-  protected static <E extends Entity & HasIdentifier> E convertSafe(Entity entity) {
+  protected static <E extends Entity & HasIdentifier> E convertEntity(Entity entity) {
     if (!(entity instanceof HasIdentifier)) {
       throw new IllegalStateException(
           "Cached entity " + entity + " is not of expected type: " + HasIdentifier.class.getName());
     }
 
     return (E) entity;
-  }
-
-  /**
-   * Converts a list of entities to a list of entities.
-   *
-   * @param sourceList The original list of entities.
-   * @return A list of entities.
-   * @param <E> The type of the elements in the list.
-   */
-  protected static <E extends Entity & HasIdentifier> List<Entity> toEntityList(
-      List<E> sourceList) {
-    return sourceList.stream().map(e -> (Entity) e).collect(Collectors.toList());
   }
 
   /**

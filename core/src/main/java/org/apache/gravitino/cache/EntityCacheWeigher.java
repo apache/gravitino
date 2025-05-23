@@ -30,10 +30,10 @@ import org.checkerframework.checker.index.qual.NonNegative;
  * weight is calculated as follows:
  *
  * <ul>
- *   <li>Metalake: 100 bytes
- *   <li>Catalog: 75 bytes
- *   <li>Schema: 50 bytes
- *   <li>Other: 15 bytes
+ *   <li>Metalake: 100
+ *   <li>Catalog: 75
+ *   <li>Schema: 50
+ *   <li>Other: 15
  * </ul>
  */
 public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
@@ -47,11 +47,31 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
   public static final int OTHER_WEIGHT = 15;
 
   /**
-   * Returns the maximum weight that can be stored in the cache. it is calculated as follows:
-   * metalake approx 100 in every gravitino, catalog approx 200 in each metalake, schema approx 1000
-   * in each catalog.
+   * Returns the maximum weight that can be stored in the cache.
    *
-   * @return The max weigh that can be stored in the cache.
+   * <p>The total weight is estimated based on the expected number of metadata entities:
+   *
+   * <ul>
+   *   <li>~10 Metalakes per Gravitino instance
+   *   <li>~200 Catalogs per Metalake
+   *   <li>~1000 Schemas per Catalog
+   * </ul>
+   *
+   * <p>The total estimated entity count is:
+   *
+   * <pre>
+   *   10 * METALAKE_WEIGHT
+   * + (10 * 200) * CATALOG_WEIGHT
+   * + (10 * 200 * 1000) * SCHEMA_WEIGHT
+   * </pre>
+   *
+   * <p>To provide headroom and avoid early eviction, the result is multiplied by 2:
+   *
+   * <pre>
+   *   total = 2 * (10 * METALAKE_WEIGHT + 2000 * CATALOG_WEIGHT + 2_000_000 * SCHEMA_WEIGHT)
+   * </pre>
+   *
+   * @return The maximum weight that can be stored in the cache.
    */
   public static long getMaxWeight() {
     return 2

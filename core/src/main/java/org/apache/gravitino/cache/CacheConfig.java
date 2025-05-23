@@ -19,25 +19,6 @@
 
 package org.apache.gravitino.cache;
 
-/*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *  http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
-
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -50,10 +31,9 @@ import org.apache.gravitino.config.ConfigEntry;
  * expiration settings.
  */
 public class CacheConfig extends Config {
-
   // Maximum number of entries in the cache
   public static final ConfigEntry<Integer> CACHE_MAX_SIZE =
-      new ConfigBuilder("gravitino.server.cache.max.size")
+      new ConfigBuilder("gravitino.server.cache.max.num")
           .doc("The max size of the cache in number of entries.")
           .version(ConfigConstants.VERSION_0_10_0)
           .intConf()
@@ -95,15 +75,6 @@ public class CacheConfig extends Config {
           .version(ConfigConstants.VERSION_0_10_0)
           .booleanConf()
           .createWithDefault(true);
-
-  // Maximum weight of cache entries
-  public static final ConfigEntry<Long> CACHE_MAX_WEIGHT =
-      new ConfigBuilder("gravitino.server.cache.max.weight")
-          .doc("The maximum weight of cache entries. default is 10000.")
-          .version(ConfigConstants.VERSION_0_10_0)
-          .longConf()
-          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(EntityCacheWeigher.getMaxWeight());
 
   // Time unit for cache expiration
   private static final TimeUnit expirationTimeUnit = TimeUnit.MINUTES;
@@ -182,6 +153,6 @@ public class CacheConfig extends Config {
    * @return the maximum weight of cache entries
    */
   public long getMaxWeight() {
-    return get(CACHE_MAX_WEIGHT);
+    return EntityCacheWeigher.getMaxWeight();
   }
 }

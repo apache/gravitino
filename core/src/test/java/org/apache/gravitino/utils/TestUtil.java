@@ -31,6 +31,7 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.file.Fileset;
@@ -287,7 +288,11 @@ public class TestUtil {
    */
   public static TopicEntity getTestTopicEntity() {
     return getTestTopicEntity(
-        generator.nextId(), "topic_test", Namespace.of("m1", "c4", "s4"), "topic entity test");
+        generator.nextId(),
+        "topic_test",
+        Namespace.of("m1", "c4", "s4"),
+        "topic entity test",
+        ImmutableMap.of());
   }
 
   /**
@@ -297,17 +302,18 @@ public class TestUtil {
    * @param name The name of the topic entity.
    * @param namespace The namespace of the topic entity.
    * @param comment The comment of the topic entity.
+   * @param properties The properties of the topic entity.
    * @return The test {@link TopicEntity} entity.
    */
   public static TopicEntity getTestTopicEntity(
-      long id, String name, Namespace namespace, String comment) {
+      long id, String name, Namespace namespace, String comment, Map<String, String> properties) {
     return TopicEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withAuditInfo(getTestAuditInfo())
         .withComment(comment)
-        .withProperties(ImmutableMap.of())
+        .withProperties(properties)
         .build();
   }
 
@@ -317,7 +323,8 @@ public class TestUtil {
    * @return The test {@link TagEntity} entity.
    */
   public static TagEntity getTestTagEntity() {
-    return getTestTagEntity(generator.nextId(), "tag_test", Namespace.of("m1"), "tag entity test");
+    return getTestTagEntity(
+        generator.nextId(), "tag_test", Namespace.of("m1"), "tag entity test", ImmutableMap.of());
   }
 
   /**
@@ -327,17 +334,18 @@ public class TestUtil {
    * @param name The name of the tag entity.
    * @param namespace The namespace of the tag entity.
    * @param comment The comment of the tag entity.
+   * @param properties The properties of the tag entity.
    * @return The test {@link TagEntity} entity.
    */
   public static TagEntity getTestTagEntity(
-      long id, String name, Namespace namespace, String comment) {
+      long id, String name, Namespace namespace, String comment, Map<String, String> properties) {
     return TagEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
         .withAuditInfo(getTestAuditInfo())
         .withComment(comment)
-        .withProperties(ImmutableMap.of())
+        .withProperties(properties)
         .build();
   }
 
@@ -347,10 +355,21 @@ public class TestUtil {
    * @return The test {@link ColumnEntity} entity.
    */
   public static ColumnEntity getMockColumnEntity() {
+    return getMockColumnEntity("filed1", false);
+  }
+
+  /**
+   * Returns a column entity with the given name and nullable.
+   *
+   * @param name The name of the column entity.
+   * @param nullable is nullable of the column entity.
+   * @return The test {@link ColumnEntity} entity.
+   */
+  public static ColumnEntity getMockColumnEntity(String name, boolean nullable) {
     ColumnEntity mockColumn = mock(ColumnEntity.class);
-    when(mockColumn.name()).thenReturn("filed1");
+    when(mockColumn.name()).thenReturn(name);
     when(mockColumn.dataType()).thenReturn(Types.StringType.get());
-    when(mockColumn.nullable()).thenReturn(false);
+    when(mockColumn.nullable()).thenReturn(nullable);
     when(mockColumn.auditInfo()).thenReturn(getTestAuditInfo());
 
     return mockColumn;
@@ -362,11 +381,25 @@ public class TestUtil {
    * @return The test {@link AuditInfo} entity.
    */
   public static AuditInfo getTestAuditInfo() {
+    return getTestAuditInfo("admin", Instant.now(), "admin", Instant.now());
+  }
+
+  /**
+   * Returns an audit with the given creator, create time, last modifier, and last modified time.
+   *
+   * @param creator The creator of the entity.
+   * @param createTime The creation time of the entity.
+   * @param lastModifier The last modifier of the entity.
+   * @param lastModifiedTime The last modified time of the entity.
+   * @return The test {@link AuditInfo} entity.
+   */
+  public static AuditInfo getTestAuditInfo(
+      String creator, Instant createTime, String lastModifier, Instant lastModifiedTime) {
     return AuditInfo.builder()
-        .withCreator("admin")
-        .withCreateTime(Instant.now())
-        .withLastModifier("admin")
-        .withLastModifiedTime(Instant.now())
+        .withCreator(creator)
+        .withCreateTime(createTime)
+        .withLastModifier(lastModifier)
+        .withLastModifiedTime(lastModifiedTime)
         .build();
   }
 
@@ -463,10 +496,19 @@ public class TestUtil {
    * @return The test {@link SecurableObject} entity.
    */
   public static SecurableObject getMockSecurableObject() {
+    return getMockSecurableObject(
+        ImmutableList.of(Privileges.CreateSchema.allow(), Privileges.CreateTable.allow()));
+  }
+
+  /**
+   * Returns a mock securable object with the given privileges.
+   *
+   * @param privileges The privileges of the securable object.
+   * @return The test {@link SecurableObject} entity.
+   */
+  public static SecurableObject getMockSecurableObject(List<Privilege> privileges) {
     SecurableObject mockObject = mock(SecurableObject.class);
-    when(mockObject.privileges())
-        .thenReturn(
-            ImmutableList.of(Privileges.CreateSchema.allow(), Privileges.CreateTable.allow()));
+    when(mockObject.privileges()).thenReturn(privileges);
 
     return mockObject;
   }

@@ -22,6 +22,7 @@ package org.apache.gravitino.cache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -32,10 +33,13 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -58,6 +62,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private RadixTree<EntityCacheKey> cacheIndex;
 
   private final ReentrantLock opLock = new ReentrantLock();
+  ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
   @VisibleForTesting
   public static void resetForTest() {
@@ -79,19 +84,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
         }
       }
     }
-    return INSTANCE;
-  }
-
-  /**
-   * Returns the instance of MetaCacheCaffeine, if it is initialized, otherwise throws an exception.
-   *
-   * @return If INSTANCE initialized, returns the instance, otherwise throws an exception.
-   */
-  public static CaffeineEntityCache getInstance() {
-    if (INSTANCE == null) {
-      throw new RuntimeException("Illegal state: instance not initialized");
-    }
-
     return INSTANCE;
   }
 
@@ -135,11 +127,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
               try {
                 invalidateExpiredItem(key);
               } catch (Throwable t) {
-                LOG.error("Async removal failed for {}", value, t);
+                LOG.error("Failed to remove entity value={} from cache asynchronously", value, t);
               }
             });
 
     this.cacheData = cacheDataBuilder.build();
+
+    if (cacheConfig.isCacheStatusEnabled()) {
+      startCacheStatsMonitor();
+    }
   }
 
   /** {@inheritDoc} */
@@ -157,13 +153,15 @@ public class CaffeineEntityCache extends BaseEntityCache {
           List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
 
           if (entitiesFromCache != null) {
-            return convertSafe(entitiesFromCache);
+            return convertEntity(entitiesFromCache);
           }
 
-          List<E> entities = entityStore.listEntitiesByRelation(relType, ident, type);
-          syncEntitiesToCache(entityCacheKey, toEntityList(entities));
+          List<E> entitiesFromStore = entityStore.listEntitiesByRelation(relType, ident, type);
+          syncEntitiesToCache(
+              entityCacheKey,
+              entitiesFromStore.stream().map(e -> (Entity) e).collect(Collectors.toList()));
 
-          return entities;
+          return entitiesFromStore;
         });
   }
 
@@ -180,13 +178,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
           List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
 
           if (entitiesFromCache != null) {
-            return convertSafe(entitiesFromCache.get(0));
+            return convertEntity(entitiesFromCache.get(0));
           }
 
-          E entityFromDb = entityStore.get(ident, type, getEntityClass(type));
-          syncEntitiesToCache(entityCacheKey, entityFromDb);
+          E entityFromStore = entityStore.get(ident, type, getEntityClass(type));
+          syncEntitiesToCache(entityCacheKey, entityFromStore);
 
-          return entityFromDb;
+          return entityFromStore;
         });
   }
 
@@ -202,7 +200,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
           List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
           if (entitiesFromCache != null) {
-            List<E> convertedEntities = convertSafe(entitiesFromCache);
+            List<E> convertedEntities = convertEntity(entitiesFromCache);
             return Optional.of(convertedEntities);
           }
 
@@ -219,7 +217,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
           EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
           List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
           if (entitiesFromCache != null) {
-            return Optional.of(convertSafe(entitiesFromCache.get(0)));
+            return Optional.of(convertEntity(entitiesFromCache.get(0)));
           }
 
           return Optional.empty();
@@ -454,5 +452,24 @@ public class CaffeineEntityCache extends BaseEntityCache {
     } finally {
       opLock.unlock();
     }
+  }
+
+  /** Starts the cache stats monitor. */
+  private void startCacheStatsMonitor() {
+    scheduler.scheduleAtFixedRate(
+        () -> {
+          CacheStats stats = cacheData.stats();
+          LOG.info(
+              "[Cache Stats] hitRate={}, hitCount={}, missCount={}, loadSuccess={}, loadFailure={}, evictions={}",
+              String.format("%.4f", stats.hitRate()),
+              stats.hitCount(),
+              stats.missCount(),
+              stats.loadSuccessCount(),
+              stats.loadFailureCount(),
+              stats.evictionCount());
+        },
+        0,
+        5,
+        TimeUnit.MINUTES);
   }
 }
