@@ -72,6 +72,7 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -245,7 +246,33 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       if (!store.exists(ident, Entity.EntityType.FILESET)) {
         throw new NoSuchFilesetException(FILESET_DOES_NOT_EXIST_MSG, ident);
       }
-      // TODO
+
+      String actualPath = getFileLocation(ident, subPath, locationName);
+
+      Path hadoopPath = new Path(actualPath);
+      Path formalizedPath = formalizePath(hadoopPath, conf);
+
+      FileSystem fs = getFileSystem(formalizedPath, conf);
+      if (!fs.exists(formalizedPath)) {
+        return new FileInfo[0];
+      }
+
+      FileStatus[] fileStatuses = fs.listStatus(formalizedPath);
+
+      FileInfo[] fileInfos = new FileInfo[fileStatuses.length];
+      for (int i = 0; i < fileStatuses.length; i++) {
+        FileStatus status = fileStatuses[i];
+        fileInfos[i] = FileInfoDTO.builder()
+          .name(status.getPath().getName())
+          .isDir(status.isDirectory())
+          .size(status.getLen())
+          .lastModified(status.getModificationTime())
+          .path(status.getPath().toString())
+          .build();
+      }
+
+      return fileInfos;
+
     } catch (IOException e) {
       throw new RuntimeException("Failed to list files in fileset" + ident, e);
     }
