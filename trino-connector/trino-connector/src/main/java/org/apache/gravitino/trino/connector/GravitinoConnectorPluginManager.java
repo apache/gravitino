@@ -219,8 +219,8 @@ public class GravitinoConnectorPluginManager {
               String key = v.substring(start, end).replace("trino-", "");
               try {
                 loadPluginByPom(artifactResolver.resolvePom(new File(v)), key);
-              } catch (Throwable t) {
-                LOG.error("Fatal error in load plugin by {}", v, t);
+              } catch (Exception e) {
+                LOG.error("Fatal error in load plugin by {}", v, e);
               }
             });
   }
