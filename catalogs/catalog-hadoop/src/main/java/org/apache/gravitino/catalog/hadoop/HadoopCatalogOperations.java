@@ -38,6 +38,8 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,12 +67,14 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.catalog.FilesetFileOps;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -81,6 +85,7 @@ import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
@@ -99,7 +104,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HadoopCatalogOperations extends ManagedSchemaOperations
-    implements CatalogOperations, FilesetCatalog {
+    implements CatalogOperations, FilesetCatalog, FilesetFileOps {
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
@@ -235,6 +240,48 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             throw new RuntimeException("Failed to load fileset %s" + ident, ioe);
           }
         });
+  }
+
+  @Override
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException, IOException {
+    if (disableFSOps) {
+      LOG.warn("Filesystem operations disabled, rejecting listFiles for {}", ident);
+      throw new UnsupportedOperationException("Filesystem operations are disabled on this server");
+    }
+
+    String decodedSubPath = subPath;
+    if (StringUtils.isNotBlank(subPath)) {
+      decodedSubPath = URLDecoder.decode(subPath, StandardCharsets.UTF_8.name());
+    }
+    String actualPath = getFileLocation(ident, decodedSubPath, locationName);
+    Path formalizedPath = formalizePath(new Path(actualPath), conf);
+
+    FileSystem fs = getFileSystem(formalizedPath, conf);
+    if (!fs.exists(formalizedPath)) {
+      return new FileInfo[0];
+    }
+
+    try {
+      FileStatus[] fileStatuses = fs.listStatus(formalizedPath);
+      FileInfo[] fileInfos = new FileInfo[fileStatuses.length];
+      for (int i = 0; i < fileStatuses.length; i++) {
+        FileStatus status = fileStatuses[i];
+        fileInfos[i] =
+            FileInfoDTO.builder()
+                .name(status.getPath().getName())
+                .isDir(status.isDirectory())
+                .size(status.getLen())
+                .lastModified(status.getModificationTime())
+                .path(status.getPath().toString())
+                .build();
+      }
+
+      return fileInfos;
+
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list files in fileset" + ident, e);
+    }
   }
 
   @Override
@@ -1144,13 +1191,13 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           Path schemaPath = schemaPaths.get(locationName);
           filesetPaths.put(
               locationName,
-              caculateFilesetPath(
+              calculateFilesetPath(
                   schemaName, filesetName, storageLocation, schemaPath, properties));
         });
     return filesetPaths.build();
   }
 
-  private Path caculateFilesetPath(
+  private Path calculateFilesetPath(
       String schemaName,
       String filesetName,
       String storageLocation,

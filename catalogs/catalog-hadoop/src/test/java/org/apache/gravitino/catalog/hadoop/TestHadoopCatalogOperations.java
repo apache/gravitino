@@ -79,6 +79,7 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.storage.IdGenerator;
@@ -896,6 +897,79 @@ public class TestHadoopCatalogOperations {
       for (String fileset : filesets) {
         Assertions.assertTrue(idents.contains(NameIdentifier.of("m1", "c1", schemaName, fileset)));
       }
+    }
+  }
+
+  @Test
+  public void testListFilesetFiles() throws IOException {
+    String schemaName = "schema30";
+    String comment = "comment30";
+    String filesetName = "fileset30";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+
+    createSchema(schemaName, comment, null, schemaPath);
+    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+
+      Path testDir = new Path(schemaPath + "/" + filesetName);
+      FileSystem fs = testDir.getFileSystem(new Configuration());
+      fs.mkdirs(testDir);
+      fs.create(new Path(testDir, "test_file1.txt")).close();
+      fs.create(new Path(testDir, "test_file2.txt")).close();
+      fs.mkdirs(new Path(testDir, "test_subdir"));
+
+      FileInfo[] files = ops.listFiles(filesetIdent, null, "/");
+
+      Assertions.assertNotNull(files);
+      Assertions.assertTrue(files.length >= 3);
+
+      Set<String> fileNames = Arrays.stream(files).map(FileInfo::name).collect(Collectors.toSet());
+
+      Assertions.assertTrue(fileNames.contains("test_file1.txt"));
+      Assertions.assertTrue(fileNames.contains("test_file2.txt"));
+      Assertions.assertTrue(fileNames.contains("test_subdir"));
+
+      for (FileInfo file : files) {
+        // verify file type related properties
+        if (file.name().equals("test_file1.txt") || file.name().equals("test_file2.txt")) {
+          Assertions.assertFalse(file.isDir(), "File should not be directory: " + file.name());
+          Assertions.assertTrue(file.size() >= 0, "File size should be non-negative");
+        } else if (file.name().equals("test_subdir")) {
+          Assertions.assertTrue(file.isDir(), "Directory should be marked as directory");
+          Assertions.assertEquals(0, file.size(), "Directory size should be 0");
+        }
+        // verify other properties
+        Assertions.assertNotNull(file.name(), "File name should not be null");
+        Assertions.assertNotNull(file.path(), "File path should not be null");
+        Assertions.assertTrue(file.lastModified() > 0, "Last modified time should be positive");
+      }
+    }
+  }
+
+  @Test
+  public void testListFilesetFilesWithFSOpsDisabled() throws Exception {
+    String schemaName = "schema31";
+    String comment = "comment31";
+    String filesetName = "fileset31";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    createSchema(schemaName, comment, null, schemaPath, true);
+    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+
+      UnsupportedOperationException ex =
+          Assertions.assertThrows(
+              UnsupportedOperationException.class,
+              () -> ops.listFiles(filesetIdent, null, "/"),
+              "Expected listFiles to throw UnsupportedOperationException when disableFSOps is true");
+      Assertions.assertTrue(
+          ex.getMessage().contains("Filesystem operations are disabled on this server"),
+          "Exception message should mention 'Filesystem operations are disabled on this server'");
     }
   }
 
