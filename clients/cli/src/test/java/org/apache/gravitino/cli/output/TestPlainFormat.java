@@ -27,20 +27,21 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
+import org.apache.gravitino.cli.TestCliUtil;
 import org.apache.gravitino.cli.outputs.PlainFormat;
+import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -188,7 +189,7 @@ public class TestPlainFormat {
   void testListColumnWithTableFormat() {
     CommandContext mockContext = getMockContext();
     org.apache.gravitino.rel.Column mockColumn1 =
-        getMockColumn(
+        TestCliUtil.getMockColumn(
             "column1",
             Types.IntegerType.get(),
             "This is a int " + "column",
@@ -206,7 +207,7 @@ public class TestPlainFormat {
               }
             });
     org.apache.gravitino.rel.Column mockColumn2 =
-        getMockColumn(
+        TestCliUtil.getMockColumn(
             "column2",
             Types.StringType.get(),
             "This is a string " + "column",
@@ -238,10 +239,10 @@ public class TestPlainFormat {
   void testListColumnWithTableFormatAndEmptyDefaultValues() {
     CommandContext mockContext = getMockContext();
     org.apache.gravitino.rel.Column mockColumn1 =
-        getMockColumn(
+        TestCliUtil.getMockColumn(
             "column1", Types.IntegerType.get(), "", false, true, Column.DEFAULT_VALUE_NOT_SET);
     org.apache.gravitino.rel.Column mockColumn2 =
-        getMockColumn(
+        TestCliUtil.getMockColumn(
             "column2",
             Types.StringType.get(),
             "",
@@ -262,7 +263,8 @@ public class TestPlainFormat {
   @Test
   void testTagDetailsWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    Tag mockTag = getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Tag mockTag =
+        TestCliUtil.getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
 
     PlainFormat.output(mockTag, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -272,7 +274,7 @@ public class TestPlainFormat {
   @Test
   void testTagDetailsWithPlainFormatWithNullValues() {
     CommandContext mockContext = getMockContext();
-    Tag mockTag = getMockTag("tag1", null);
+    Tag mockTag = TestCliUtil.getMockTag("tag1", null);
 
     PlainFormat.output(mockTag, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -283,9 +285,9 @@ public class TestPlainFormat {
   void testListAllTagsWithPlainFormat() {
     CommandContext mockContext = getMockContext();
 
-    Tag mockTag1 = getMockTag("tag1", "comment for tag1");
-    Tag mockTag2 = getMockTag("tag2", "comment for tag2");
-    Tag mockTag3 = getMockTag("tag3", "comment for tag3");
+    Tag mockTag1 = TestCliUtil.getMockTag("tag1", "comment for tag1");
+    Tag mockTag2 = TestCliUtil.getMockTag("tag2", "comment for tag2");
+    Tag mockTag3 = TestCliUtil.getMockTag("tag3", "comment for tag3");
 
     PlainFormat.output(new Tag[] {mockTag1, mockTag2, mockTag3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -296,7 +298,8 @@ public class TestPlainFormat {
   void testListTagPropertiesWithPlainFormat() {
     CommandContext mockContext = getMockContext();
 
-    Tag mockTag1 = getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Tag mockTag1 =
+        TestCliUtil.getMockTag("tag1", "comment for tag1", ImmutableMap.of("k1", "v1", "k2", "v2"));
 
     PlainFormat.output(mockTag1.properties(), mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -367,7 +370,7 @@ public class TestPlainFormat {
   private Table getMockTable(String name, String comment) {
     Table mockTable = mock(Table.class);
     org.apache.gravitino.rel.Column mockColumnInt =
-        getMockColumn(
+        TestCliUtil.getMockColumn(
             "id",
             Types.IntegerType.get(),
             "This is a int column",
@@ -375,7 +378,7 @@ public class TestPlainFormat {
             true,
             Column.DEFAULT_VALUE_NOT_SET);
     org.apache.gravitino.rel.Column mockColumnString =
-        getMockColumn(
+        TestCliUtil.getMockColumn(
             "name",
             Types.StringType.get(),
             "This is a string column",
@@ -394,7 +397,7 @@ public class TestPlainFormat {
   @Test
   void testModelDetailsWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    Model mockModel = getMockModel("demo_model", "This is a demo model", 1);
+    Model mockModel = TestCliUtil.getMockModel("demo_model", "This is a demo model", 1);
 
     PlainFormat.output(mockModel, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -404,9 +407,9 @@ public class TestPlainFormat {
   @Test
   void testListModelWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    Model model1 = getMockModel("model1", "This is a model", 1);
-    Model model2 = getMockModel("model2", "This is another model", 2);
-    Model model3 = getMockModel("model3", "This is a third model", 3);
+    Model model1 = TestCliUtil.getMockModel("model1", "This is a model", 1);
+    Model model2 = TestCliUtil.getMockModel("model2", "This is another model", 2);
+    Model model3 = TestCliUtil.getMockModel("model3", "This is a third model", 3);
 
     PlainFormat.output(new Model[] {model1, model2, model3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -416,7 +419,7 @@ public class TestPlainFormat {
   @Test
   void testUserDetailsWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    User mockUser = getMockUser("demo_user", ImmutableList.of("admin", "user"));
+    User mockUser = TestCliUtil.getMockUser("demo_user", ImmutableList.of("admin", "user"));
     PlainFormat.output(mockUser, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals("admin,user", output);
@@ -425,9 +428,9 @@ public class TestPlainFormat {
   @Test
   void testListUsersWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    User user1 = getMockUser("user1", ImmutableList.of("admin", "user"));
-    User user2 = getMockUser("user2", ImmutableList.of("admin"));
-    User user3 = getMockUser("user3", ImmutableList.of("user"));
+    User user1 = TestCliUtil.getMockUser("user1", ImmutableList.of("admin", "user"));
+    User user2 = TestCliUtil.getMockUser("user2", ImmutableList.of("admin"));
+    User user3 = TestCliUtil.getMockUser("user3", ImmutableList.of("user"));
 
     PlainFormat.output(new User[] {user1, user2, user3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
@@ -437,7 +440,8 @@ public class TestPlainFormat {
   @Test
   void testGroupDetailsWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    Group mockGroup = getMockGroup("demo_group", ImmutableList.of("admin", "scientist"));
+    Group mockGroup =
+        TestCliUtil.getMockGroup("demo_group", ImmutableList.of("admin", "scientist"));
     PlainFormat.output(mockGroup, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals("admin,scientist", output);
@@ -446,69 +450,103 @@ public class TestPlainFormat {
   @Test
   void testListGroupsWithPlainFormat() {
     CommandContext mockContext = getMockContext();
-    Group group1 = getMockGroup("group1", ImmutableList.of("admin", "user"));
-    Group group2 = getMockGroup("group2", ImmutableList.of("admin"));
-    Group group3 = getMockGroup("group3", ImmutableList.of("user"));
+    Group group1 = TestCliUtil.getMockGroup("group1", ImmutableList.of("admin", "user"));
+    Group group2 = TestCliUtil.getMockGroup("group2", ImmutableList.of("admin"));
+    Group group3 = TestCliUtil.getMockGroup("group3", ImmutableList.of("user"));
 
     PlainFormat.output(new Group[] {group1, group2, group3}, mockContext);
     String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
     Assertions.assertEquals("group1,group2,group3", output);
   }
 
-  private org.apache.gravitino.rel.Column getMockColumn(
-      String name,
-      Type dataType,
-      String comment,
-      boolean nullable,
-      boolean autoIncrement,
-      Expression defaultValue) {
+  @Test
+  void testRoleDetailsWithPlainFormat() {
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    Role admin = TestCliUtil.getMockRole("admin");
 
-    org.apache.gravitino.rel.Column mockColumn = mock(org.apache.gravitino.rel.Column.class);
-    when(mockColumn.name()).thenReturn(name);
-    when(mockColumn.dataType()).thenReturn(dataType);
-    when(mockColumn.comment()).thenReturn(comment);
-    when(mockColumn.nullable()).thenReturn(nullable);
-    when(mockColumn.autoIncrement()).thenReturn(autoIncrement);
-    when(mockColumn.defaultValue()).thenReturn(defaultValue);
-
-    return mockColumn;
+    PlainFormat.output(admin, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "demo_table,TABLE,\n"
+            + "ALLOW create table\n"
+            + "ALLOW select table\n"
+            + "demo_fileset,FILESET,\n"
+            + "ALLOW create fileset\n"
+            + "ALLOW read fileset",
+        output);
   }
 
-  private Model getMockModel(String name, String comment, int lastVersion) {
-    Model mockModel = mock(Model.class);
-    when(mockModel.name()).thenReturn(name);
-    when(mockModel.comment()).thenReturn(comment);
-    when(mockModel.latestVersion()).thenReturn(lastVersion);
+  @Test
+  void testListRolesWithPlainFormat() {
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    Role admin = TestCliUtil.getMockRole("admin");
+    Role user = TestCliUtil.getMockRole("user");
 
-    return mockModel;
+    PlainFormat.output(new Role[] {admin, user}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("admin,user", output);
   }
 
-  private User getMockUser(String name, List<String> roles) {
-    User mockUser = mock(User.class);
-    when(mockUser.name()).thenReturn(name);
-    when(mockUser.roles()).thenReturn(roles);
-
-    return mockUser;
+  @Test
+  void testTopicDetailsWithPlainFormat() {
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    Topic mockTopic = TestCliUtil.getMockTopic("demo_topic", "This is a demo topic");
+    PlainFormat.output(mockTopic, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("demo_topic,This is a demo topic", output);
   }
 
-  private Group getMockGroup(String name, List<String> roles) {
-    Group mockGroup = mock(Group.class);
-    when(mockGroup.name()).thenReturn(name);
-    when(mockGroup.roles()).thenReturn(roles);
+  @Test
+  void testListTopicsWithPlainFormat() {
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    Topic topic1 = TestCliUtil.getMockTopic("topic1", "This is a topic");
+    Topic topic2 = TestCliUtil.getMockTopic("topic2", "This is another topic");
+    Topic topic3 = TestCliUtil.getMockTopic("topic3", "This is a third topic");
 
-    return mockGroup;
+    PlainFormat.output(new Topic[] {topic1, topic2, topic3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("topic1,topic2,topic3", output);
   }
 
-  private Tag getMockTag(String name, String comment) {
-    return getMockTag(name, comment, ImmutableMap.of("k1", "v2", "k2", "v2"));
+  @Test
+  void testFilesetDetailsWithPlainFormat() {
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    Fileset mockFileset =
+        TestCliUtil.getMockFileset(
+            "demo_fileset",
+            Fileset.Type.MANAGED,
+            "This is a demo fileset",
+            "hdfs" + "://demo_location");
+    PlainFormat.output(mockFileset, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals(
+        "demo_fileset,managed,This is a demo fileset,hdfs://demo_location", output);
   }
 
-  private Tag getMockTag(String name, String comment, Map<String, String> properties) {
-    Tag mockTag = mock(Tag.class);
-    when(mockTag.name()).thenReturn(name);
-    when(mockTag.comment()).thenReturn(comment);
-    when(mockTag.properties()).thenReturn(properties);
+  @Test
+  void testListFilesetsWithPlainFormat() {
+    Fileset fileset1 =
+        TestCliUtil.getMockFileset(
+            "fileset1",
+            Fileset.Type.MANAGED,
+            "This is a demo fileset",
+            "hdfs" + "://demo_location");
+    Fileset fileset2 =
+        TestCliUtil.getMockFileset(
+            "fileset2",
+            Fileset.Type.EXTERNAL,
+            "This is another demo fileset",
+            "s3" + "://demo_location");
+    Fileset fileset3 =
+        TestCliUtil.getMockFileset(
+            "fileset3",
+            Fileset.Type.MANAGED,
+            "This is a third demo fileset",
+            "hdfs" + "://demo_location");
 
-    return mockTag;
+    CommandContext mockContext = TestCliUtil.getMockContext();
+    PlainFormat.output(new Fileset[] {fileset1, fileset2, fileset3}, mockContext);
+    String output = new String(outContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    Assertions.assertEquals("fileset1,fileset2,fileset3", output);
   }
 }
