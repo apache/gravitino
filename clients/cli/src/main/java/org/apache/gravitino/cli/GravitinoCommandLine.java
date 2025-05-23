@@ -19,26 +19,19 @@
 
 package org.apache.gravitino.cli;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 
 /* Gravitino Command line */
 public class GravitinoCommandLine extends TestableCommandLine {
 
   private final CommandLine line;
+  // TODO remove redundant code.
   private final Options options;
   private final String entity;
   private final String command;
 
-  public static final String CMD = "gcli"; // recommended name
   public static final String DEFAULT_URL = "http://localhost:8090";
-  // This joiner is used to join multiple outputs to be displayed, e.g. roles or groups
 
   /**
    * Gravitino Command line.
@@ -55,6 +48,11 @@ public class GravitinoCommandLine extends TestableCommandLine {
     this.command = command;
   }
 
+  public Options getOptions() {
+    // TODO remove redundant code.
+    return options;
+  }
+
   /** Handles the parsed command line arguments and executes the corresponding actions. */
   public void handleCommandLine() {
     CommandContext context = new CommandContext(line);
@@ -64,29 +62,13 @@ public class GravitinoCommandLine extends TestableCommandLine {
   /** Handles the parsed command line arguments and executes the corresponding actions. */
   public void handleSimpleLine() {
     /* Display command usage. */
-    if (line.hasOption(GravitinoOptions.HELP)) {
-      displayHelp(options);
-    } else {
-      CommandContext context = new CommandContext(line);
-      new SimpleCommandHandler(this, line, context).handle();
-    }
-  }
-
-  /**
-   * Displays the help message for the command line tool.
-   *
-   * @param options The command options.
-   */
-  public static void displayHelp(Options options) {
-    HelpFormatter formatter = new HelpFormatter();
-    formatter.printHelp(CMD, options);
+    CommandContext context = new CommandContext(line);
+    new SimpleCommandHandler(this, line, context).handle();
   }
 
   /** Executes the appropriate command based on the command type. */
   private void executeCommand(CommandContext context) {
-    if (CommandActions.HELP.equals(command)) {
-      handleHelpCommand();
-    } else if (line.hasOption(GravitinoOptions.OWNER)) {
+    if (line.hasOption(GravitinoOptions.OWNER)) {
       new OwnerCommandHandler(this, line, command, context, entity).handle();
     } else if (entity.equals(CommandEntities.COLUMN)) {
       new ColumnCommandHandler(this, line, command, context).handle();
@@ -112,24 +94,6 @@ public class GravitinoCommandLine extends TestableCommandLine {
       new RoleCommandHandler(this, line, command, context).handle();
     } else if (entity.equals(CommandEntities.MODEL)) {
       new ModelCommandHandler(this, line, command, context).handle();
-    }
-  }
-
-  private void handleHelpCommand() {
-    String helpFile = entity.toLowerCase() + "_help.txt";
-
-    try (InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream(helpFile);
-        BufferedReader reader =
-            new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-      StringBuilder helpMessage = new StringBuilder();
-      String helpLine;
-      while ((helpLine = reader.readLine()) != null) {
-        helpMessage.append(helpLine).append(System.lineSeparator());
-      }
-      System.out.print(helpMessage.toString());
-    } catch (IOException e) {
-      System.err.println(ErrorMessages.HELP_FAILED + e.getMessage());
-      Main.exit(-1);
     }
   }
 }

@@ -39,7 +39,7 @@ public class CommandEntities {
   public static final String ROLE = "role";
   public static final String MODEL = "model";
 
-  private static final HashSet<String> VALID_ENTITIES = new HashSet<>();
+  public static final HashSet<String> VALID_ENTITIES = new HashSet<>();
 
   static {
     VALID_ENTITIES.add(METALAKE);
