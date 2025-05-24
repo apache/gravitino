@@ -293,7 +293,7 @@ public class RoleMetaService {
     return true;
   }
 
-  private static List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
+  public static List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
     return SessionUtils.getWithoutCommit(
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }
