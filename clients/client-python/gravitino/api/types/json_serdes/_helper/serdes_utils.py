@@ -242,6 +242,8 @@ class SerdesUtils:
                 return cls.read_list_type(type_data)
             if cls.MAP == type_str:
                 return cls.read_map_type(type_data)
+            if cls.UNION == type_str:
+                return cls.read_union_type(type_data)
 
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
 
@@ -330,3 +332,18 @@ class SerdesUtils:
         value_type = cls.read_data_type(map_data[cls.MAP_VALUE_TYPE])
         nullable = map_data.get(cls.MAP_VALUE_NULLABLE, True)
         return Types.MapType.of(key_type, value_type, nullable)
+
+    @classmethod
+    def read_union_type(cls, union_data: Dict[str, Any]) -> Types.UnionType:
+        Precondition.check_argument(
+            union_data.get(cls.UNION_TYPES) is not None,
+            f"Cannot parse union type from missing types: {union_data}",
+        )
+        types = union_data.get(cls.UNION_TYPES)
+        Precondition.check_argument(
+            types is not None and isinstance(types, list),
+            f"Cannot parse union types from non-array: {types}",
+        )
+
+        union_types = [cls.read_data_type(type_data) for type_data in types]
+        return Types.UnionType.of(*union_types)
