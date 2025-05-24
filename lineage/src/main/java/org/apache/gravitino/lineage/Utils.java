@@ -33,6 +33,6 @@ public class Utils {
 
   public static String getJobName(RunEvent event) {
     Job job = event.getJob();
-    return job == null ? "Unknown" : job.getName().toString();
+    return job == null ? "Unknown" : job.getName();
   }
 }
