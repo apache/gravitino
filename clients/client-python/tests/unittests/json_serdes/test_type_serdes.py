@@ -306,3 +306,20 @@ class TestTypeSerdes(unittest.TestCase):
             TypeSerdes.deserialize,
             data=invalid_data,
         )
+
+    def test_deserialize_external_type(self):
+        external_type = Types.ExternalType.of(catalog_string="catalog_string")
+        serialized_result = TypeSerdes.serialize(external_type)
+        deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+        self.assertEqual(
+            external_type.simple_string(), deserialized_result.simple_string()
+        )
+
+    def test_deserialize_external_type_invalid_data(self):
+        invalid_data = {"type": "external"}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse external type from missing catalogString",
+            TypeSerdes.deserialize,
+            data=invalid_data,
+        )
