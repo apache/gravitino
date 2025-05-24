@@ -1519,6 +1519,58 @@ public class TestHadoopCatalogOperations {
               .contains(
                   "Default location name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
+
+      Schema emptySchema =
+          createMultiLocationSchema(
+              "emptySchema", "no-location", ImmutableMap.of(), ImmutableMap.of());
+
+      // storage location value is blank
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fs2",
+                      emptySchema.name(),
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("v1", ""),
+                      ImmutableMap.of()));
+      Assertions.assertEquals(
+          "Storage location for name 'v1' must not be null or blank", exception.getMessage());
+
+      // storage location value is blank
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fs3",
+                      emptySchema.name(),
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("v1", " "),
+                      ImmutableMap.of()));
+      Assertions.assertEquals(
+          "Storage location for name 'v1' must not be null or blank", exception.getMessage());
+
+      // two storage locations, one valid and one is blank
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fs5",
+                      emptySchema.name(),
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("v1", TEST_ROOT_PATH + "/valid", "v2", ""),
+                      ImmutableMap.of()));
+      Assertions.assertEquals(
+          "Storage location for name 'v2' must not be null or blank", exception.getMessage());
     }
   }
 

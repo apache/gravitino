@@ -296,6 +296,12 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     // Either catalog property "location", or schema property "location", or storageLocation must be
     // set for managed fileset.
+    for (Map.Entry<String, String> e : storageLocations.entrySet()) {
+      if (StringUtils.isBlank(e.getValue())) {
+        throw new IllegalArgumentException(
+            "Storage location for name '" + e.getKey() + "' must not be null or blank");
+      }
+    }
     Map<String, Path> schemaPaths =
         getAndCheckSchemaPaths(schemaIdent.name(), schemaEntity.properties());
     if (schemaPaths.isEmpty() && storageLocations.isEmpty()) {
