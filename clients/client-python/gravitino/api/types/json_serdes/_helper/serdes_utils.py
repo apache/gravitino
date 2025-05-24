@@ -54,6 +54,7 @@ class SerdesUtils:
     UNPARSED_TYPE: ClassVar[str] = "unparsedType"
     EXTERNAL: ClassVar[str] = "external"
     CATALOG_STRING: ClassVar[str] = "catalogString"
+    NULL: ClassVar[str] = "NULL"
 
     NON_PRIMITIVE_TYPES: ClassVar[Set[Name]] = {
         Name.STRUCT,
@@ -233,6 +234,11 @@ class SerdesUtils:
         if isinstance(type_data, str):
             return cls.from_primitive_type_string(type_data.lower())
 
+        if isinstance(type_data, dict) and type_data.get(cls.TYPE):
+            type_str = type_data[cls.TYPE]
+            if cls.STRUCT == type_str:
+                return cls.read_struct_type(type_data)
+
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
 
     @classmethod
@@ -261,3 +267,37 @@ class SerdesUtils:
             return Types.VarCharType.of(length=int(varchar_matched.group(1)))
 
         return Types.UnparsedType.of(type_string)
+
+    @classmethod
+    def read_struct_type(cls, struct_data: Dict[str, Any]) -> Types.StructType:
+        fields = struct_data.get(cls.FIELDS)
+        Precondition.check_argument(
+            fields is not None and isinstance(fields, list),
+            f"Cannot parse struct fields from non-array: {fields}",
+        )
+        field_list = [cls.read_struct_field(field) for field in struct_data[cls.FIELDS]]
+        return Types.StructType.of(*field_list)
+
+    @classmethod
+    def read_struct_field(cls, field_data: Dict[str, str]) -> Types.StructType.Field:
+        Precondition.check_argument(
+            field_data is not None and isinstance(field_data, dict),
+            f"Cannot parse struct field from invalid JSON: {field_data}",
+        )
+        Precondition.check_argument(
+            field_data.get(cls.STRUCT_FIELD_NAME) is not None,
+            f"Cannot parse struct field from missing name: {field_data}",
+        )
+        Precondition.check_argument(
+            field_data.get(cls.TYPE) is not None,
+            f"Cannot parse struct field from missing type: {field_data}",
+        )
+
+        name = field_data[cls.STRUCT_FIELD_NAME]
+        field_type = cls.read_data_type(field_data[cls.TYPE])
+        nullable = field_data.get(cls.STRUCT_FIELD_NULLABLE, cls.NULL) == cls.NULL
+        comment = field_data.get(cls.STRUCT_FIELD_COMMENT, "")
+
+        return Types.StructType.Field(
+            name=name, field_type=field_type, nullable=nullable, comment=comment
+        )
