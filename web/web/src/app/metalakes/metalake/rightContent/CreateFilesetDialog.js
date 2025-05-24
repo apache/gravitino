@@ -234,12 +234,10 @@ const CreateFilesetDialog = props => {
           name: data.name,
           type: data.type,
           storageLocations: data.storageLocations.reduce((acc, item) => {
-            const trimmedName = item.name?.trim()
-            const trimmedLocation = item.location?.trim()
-            if (trimmedName && trimmedLocation) {
-              acc[trimmedName] = trimmedLocation
+            if (item.name && item.location) {
+              acc[item.name] = item.location
               if (item.defaultLocation && !properties['default-location-name']) {
-                properties['default-location-name'] = trimmedName
+                properties['default-location-name'] = item.name
               }
             }
 
