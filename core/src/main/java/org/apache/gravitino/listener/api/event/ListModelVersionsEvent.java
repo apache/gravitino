@@ -29,8 +29,9 @@ public class ListModelVersionsEvent extends ModelEvent {
    * Constructs an instance of {@code ListModelVersionsEvent}, with the specified user and model
    * identifier.
    *
-   * @param user The username of the individual who initiated the model version listing.
-   * @param identifier The unique identifier of the model that it's version was listed.
+   * @param user the username of the individual who initiated the model version listing
+   * @param identifier the unique identifier of the model whose versions were listed
+   * @param versions an array of version numbers of the model
    */
   public ListModelVersionsEvent(String user, NameIdentifier identifier, int[] versions) {
     super(user, identifier);
