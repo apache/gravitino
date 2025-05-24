@@ -44,6 +44,8 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
    * Executes the given action within a cache context.
    *
    * @param action The action to cache
+   * @param <E> The type of exception that may be thrown
+   * @throws E if the action throws an exception of type E
    */
   <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E;
 
