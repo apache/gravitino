@@ -112,7 +112,7 @@ public class DynFields {
     /**
      * Returns whether the field is a static field.
      *
-     * @return {@code true} if the field is static; {@code false} otherwise.
+     * @return true if the field is static; false otherwise
      */
     public boolean isStatic() {
       return Modifier.isStatic(field.getModifiers());
@@ -121,7 +121,7 @@ public class DynFields {
     /**
      * Returns whether the field is always null.
      *
-     * @return {@code true} if this instance is the AlwaysNull sentinel; {@code false} otherwise.
+     * @return true if this instance is the AlwaysNull sentinel; false otherwise
      */
     public boolean isAlwaysNull() {
       return this == AlwaysNull.INSTANCE;
