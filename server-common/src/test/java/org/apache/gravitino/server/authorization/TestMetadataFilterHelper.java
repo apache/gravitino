@@ -15,34 +15,27 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization.expression;
+package org.apache.gravitino.server.authorization;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
-import org.apache.gravitino.server.authorization.MockGravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-/** Test for {@link AuthorizationExpressionEvaluator} */
-public class TestAuthorizationExpressionEvaluator {
+/** Test of {@link MetadataFilterHelper} */
+public class TestMetadataFilterHelper {
 
   @Test
-  public void testEvaluator() {
-    String expression =
-        "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA && (TABLE::SELECT_TABLE || TABLE::MODIFY_TABLE)";
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
+  public void testFilter() {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
             mockStatic(GravitinoAuthorizerProvider.class)) {
@@ -52,31 +45,26 @@ public class TestAuthorizationExpressionEvaluator {
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      Map<MetadataObject.Type, NameIdentifier> metadataNames = new HashMap<>();
-      metadataNames.put(
-          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("testMetalake"));
-      metadataNames.put(
-          MetadataObject.Type.CATALOG, NameIdentifierUtil.ofCatalog("testMetalake", "testCatalog"));
-      metadataNames.put(
-          MetadataObject.Type.SCHEMA,
-          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema"));
-      metadataNames.put(
-          MetadataObject.Type.TABLE,
-          NameIdentifierUtil.ofTable(
-              "testMetalake", "testCatalog", "testSchema", "testTableHasNotPermission"));
-      Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
-      metadataNames.put(
-          MetadataObject.Type.TABLE,
-          NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "testSchema", "testTable"));
-      Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
+      NameIdentifier[] nameIdentifiers = new NameIdentifier[3];
+      nameIdentifiers[0] = NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema");
+      nameIdentifiers[1] =
+          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema2");
+      nameIdentifiers[2] =
+          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog2", "testSchema");
+      NameIdentifier[] filtered =
+          MetadataFilterHelper.filter(
+              "testMetalake",
+              MetadataObject.Type.SCHEMA,
+              Privilege.Name.USE_SCHEMA.name(),
+              nameIdentifiers);
+      Assertions.assertEquals(2, filtered.length);
+      Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered[0].toString());
+      Assertions.assertEquals("testMetalake.testCatalog2.testSchema", filtered[1].toString());
     }
   }
 
   @Test
-  public void testEvaluatorWithOwner() {
-    String expression = "METALAKE::OWNER || CATALOG::CREATE_CATALOG";
-    AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-        new AuthorizationExpressionEvaluator(expression);
+  public void testFilterByExpression() {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
             mockStatic(GravitinoAuthorizerProvider.class)) {
@@ -86,16 +74,26 @@ public class TestAuthorizationExpressionEvaluator {
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      Map<MetadataObject.Type, NameIdentifier> metadataNames = new HashMap<>();
-      metadataNames.put(
-          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOutOwner"));
-      metadataNames.put(
-          MetadataObject.Type.CATALOG,
-          NameIdentifierUtil.ofCatalog("metalakeWithOwner", "testCatalog"));
-      Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
-      metadataNames.put(
-          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOwner"));
-      Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
+      NameIdentifier[] nameIdentifiers = new NameIdentifier[3];
+      nameIdentifiers[0] = NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema");
+      nameIdentifiers[1] =
+          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema2");
+      nameIdentifiers[2] =
+          NameIdentifierUtil.ofSchema("testMetalake", "testCatalog2", "testSchema");
+      NameIdentifier[] filtered =
+          MetadataFilterHelper.filterByExpression(
+              "testMetalake",
+              "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA",
+              MetadataObject.Type.SCHEMA,
+              nameIdentifiers);
+      Assertions.assertEquals(1, filtered.length);
+      Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered[0].toString());
+      NameIdentifier[] filtered2 =
+          MetadataFilterHelper.filterByExpression(
+              "testMetalake", "CATALOG::USE_CATALOG", MetadataObject.Type.SCHEMA, nameIdentifiers);
+      Assertions.assertEquals(2, filtered2.length);
+      Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
+      Assertions.assertEquals("testMetalake.testCatalog.testSchema2", filtered2[1].toString());
     }
   }
 }
