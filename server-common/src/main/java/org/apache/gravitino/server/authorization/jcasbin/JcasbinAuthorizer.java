@@ -33,13 +33,14 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
-import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
@@ -99,9 +100,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private boolean authorizeInternal(
       Principal principal, String metalake, MetadataObject metadataObject, String privilege) {
     String username = principal.getName();
-    Long metalakeId = getMetalakeId(metalake);
-    Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
-    return loadPrivilegeAndAuthorize(userId, metadataObject, privilege);
+    return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
   }
 
   private static Long getMetalakeId(String metalake) {
@@ -129,23 +128,37 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private boolean loadPrivilegeAndAuthorize(
-      Long userId, MetadataObject metadataObject, String privilege) {
-    loadPrivilege(userId);
+      String username, String metalake, MetadataObject metadataObject, String privilege) {
+    Long metalakeId = getMetalakeId(metalake);
+    Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
+    loadPrivilege(metalake, username, userId);
     return authorizeByJcasbin(userId, metadataObject, privilege);
   }
 
-  private void loadPrivilege(Long userId) {
-    List<RolePO> roles = RoleMetaService.getInstance().listRolesByUserId(userId);
-    for (RolePO role : roles) {
-      Long roleId = role.getRoleId();
-      if (loadedRoles.contains(roleId)) {
-        continue;
+  private void loadPrivilege(String metalake, String username, Long userId) {
+    try {
+      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+      List<RoleEntity> entities =
+          entityStore
+              .relationOperations()
+              .listEntitiesByRelation(
+                  SupportsRelationOperations.Type.ROLE_USER_REL,
+                  NameIdentifierUtil.ofUser(metalake, username),
+                  Entity.EntityType.ROLE);
+
+      for (RoleEntity role : entities) {
+        Long roleId = role.id();
+        if (loadedRoles.contains(roleId)) {
+          continue;
+        }
+        enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+        loadPolicyByRoleId(roleId);
+        loadedRoles.add(roleId);
       }
-      enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-      loadPolicyByRoleId(roleId);
-      loadedRoles.add(role.getRoleId());
+      // TODO load owner relationship
+    } catch (Exception e) {
+      throw new RuntimeException("Can not load privilege", e);
     }
-    // TODO load owner relationship
   }
 
   private void loadPolicyByRoleId(Long roleId) {

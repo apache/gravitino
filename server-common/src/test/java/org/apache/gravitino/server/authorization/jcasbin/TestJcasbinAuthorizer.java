@@ -36,14 +36,16 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
-import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
@@ -79,6 +81,9 @@ public class TestJcasbinAuthorizer {
   private static EntityStore entityStore = mock(EntityStore.class);
 
   private static GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
+
+  private static SupportsRelationOperations supportsRelationOperations =
+      mock(SupportsRelationOperations.class);
 
   private static MockedStatic<PrincipalUtils> principalUtilsMockedStatic;
 
@@ -122,6 +127,7 @@ public class TestJcasbinAuthorizer {
         .when(() -> RoleMetaService.listSecurableObjectsByRoleId(eq(DENY_ROLE_ID)))
         .thenReturn(ImmutableList.of(getDenySecurableObjectPO()));
     when(gravitinoEnv.entityStore()).thenReturn(entityStore);
+    when(entityStore.relationOperations()).thenReturn(supportsRelationOperations);
     BaseMetalake baseMetalake =
         BaseMetalake.builder()
             .withId(USER_METALAKE_ID)
@@ -150,29 +156,45 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testAuthorize() {
+  public void testAuthorize() throws IOException {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorize(currentPrincipal));
-    RolePO allowRole = getRolePO(ALLOW_ROLE_ID);
+    RoleEntity allowRole = getRoleEntity(ALLOW_ROLE_ID);
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
     // Mock adds roles to users.
-    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(allowRole));
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.ROLE)))
+        .thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
     // Test role cache.
     // When permissions are changed but handleRolePrivilegeChange is not executed, the system will
     // use the cached permissions in JCasbin, so authorize can succeed.
     Long newRoleId = -1L;
-    RolePO tempNewRole = getRolePO(newRoleId);
-    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(tempNewRole));
+    RoleEntity tempNewRole = getRoleEntity(newRoleId);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.ROLE)))
+        .thenReturn(ImmutableList.of(tempNewRole));
     assertTrue(doAuthorize(currentPrincipal));
     // After clearing the cache, authorize will fail
     jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
     assertFalse(doAuthorize(currentPrincipal));
     // When the user is re-assigned the correct role, the authorization will succeed.
-    when(roleMetaService.listRolesByUserId(USER_ID)).thenReturn(ImmutableList.of(allowRole));
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.ROLE)))
+        .thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
     // Test deny
-    RolePO denyRole = getRolePO(DENY_ROLE_ID);
-    when(roleMetaService.listRolesByUserId(USER_ID))
+    RoleEntity denyRole = getRoleEntity(DENY_ROLE_ID);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.ROLE)))
         .thenReturn(ImmutableList.of(allowRole, denyRole));
     assertFalse(doAuthorize(currentPrincipal));
   }
@@ -185,15 +207,11 @@ public class TestJcasbinAuthorizer {
         USE_CATALOG);
   }
 
-  private static RolePO getRolePO(Long roleId) {
-    return RolePO.builder()
-        .withRoleId(roleId)
-        .withMetalakeId(USER_METALAKE_ID)
-        .withRoleName("roleName")
-        .withAuditInfo("")
-        .withDeletedAt(0L)
-        .withCurrentVersion(1L)
-        .withLastVersion(1L)
+  private static RoleEntity getRoleEntity(Long roleId) {
+    return RoleEntity.builder()
+        .withId(roleId)
+        .withName("roleName")
+        .withAuditInfo(AuditInfo.EMPTY)
         .build();
   }
 
