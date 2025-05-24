@@ -238,6 +238,8 @@ class SerdesUtils:
             type_str = type_data[cls.TYPE]
             if cls.STRUCT == type_str:
                 return cls.read_struct_type(type_data)
+            if cls.LIST == type_str:
+                return cls.read_list_type(type_data)
 
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
 
@@ -301,3 +303,13 @@ class SerdesUtils:
         return Types.StructType.Field(
             name=name, field_type=field_type, nullable=nullable, comment=comment
         )
+
+    @classmethod
+    def read_list_type(cls, list_data: Dict[str, Any]) -> Types.ListType:
+        Precondition.check_argument(
+            list_data.get(cls.LIST_ELEMENT_TYPE) is not None,
+            f"Cannot parse list type from missing element type: {list_data}",
+        )
+        element_type = cls.read_data_type(list_data[cls.LIST_ELEMENT_TYPE])
+        nullable = list_data.get(cls.LIST_ELEMENT_NULLABLE, cls.NULL) == cls.NULL
+        return Types.ListType.of(element_type=element_type, element_nullable=nullable)
