@@ -38,6 +38,7 @@ public final class PartitionExistsFailureEvent extends PartitionFailureEvent {
    * @param identifier The identifier of the partition that was attempted to be gotten.
    * @param exception The exception that was thrown during the partition exist check operation,
    *     providing insight into what went wrong.
+   * @param partitionName The name of the partition being checked for existence.
    */
   public PartitionExistsFailureEvent(
       String user, NameIdentifier identifier, Exception exception, String partitionName) {
