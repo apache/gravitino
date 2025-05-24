@@ -240,6 +240,8 @@ class SerdesUtils:
                 return cls.read_struct_type(type_data)
             if cls.LIST == type_str:
                 return cls.read_list_type(type_data)
+            if cls.MAP == type_str:
+                return cls.read_map_type(type_data)
 
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
 
@@ -313,3 +315,18 @@ class SerdesUtils:
         element_type = cls.read_data_type(list_data[cls.LIST_ELEMENT_TYPE])
         nullable = list_data.get(cls.LIST_ELEMENT_NULLABLE, cls.NULL) == cls.NULL
         return Types.ListType.of(element_type=element_type, element_nullable=nullable)
+
+    @classmethod
+    def read_map_type(cls, map_data: Dict[str, Any]) -> Types.MapType:
+        Precondition.check_argument(
+            map_data.get(cls.MAP_KEY_TYPE) is not None,
+            f"Cannot parse map type from missing key type: {map_data}",
+        )
+        Precondition.check_argument(
+            map_data.get(cls.MAP_VALUE_TYPE) is not None,
+            f"Cannot parse map type from missing value type: {map_data}",
+        )
+        key_type = cls.read_data_type(map_data[cls.MAP_KEY_TYPE])
+        value_type = cls.read_data_type(map_data[cls.MAP_VALUE_TYPE])
+        nullable = map_data.get(cls.MAP_VALUE_NULLABLE, True)
+        return Types.MapType.of(key_type, value_type, nullable)
