@@ -237,3 +237,32 @@ class TestTypeSerdes(unittest.TestCase):
             TypeSerdes.deserialize,
             data=list_data,
         )
+
+    def test_deserialize_map_type(self):
+        types = self._primitive_and_none_types.values()
+        for key_type, value_type in product(types, types):
+            map_type = Types.MapType.of(
+                key_type=key_type, value_type=value_type, value_nullable=False
+            )
+            serialized_result = TypeSerdes.serialize(map_type)
+            deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+            self.assertEqual(
+                map_type.simple_string(), deserialized_result.simple_string()
+            )
+
+    def test_deserialize_map_type_invalid_data(self):
+        invalid_map_data = (
+            {"type": "map", "invalid_key_type": "value"},
+            {
+                "type": "map",
+                "keyType": "valid_key",
+                "invalid_value_type": "invalid_value",
+            },
+        )
+        for data in invalid_map_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "Cannot parse map type from missing (key|value) type",
+                TypeSerdes.deserialize,
+                data=data,
+            )
