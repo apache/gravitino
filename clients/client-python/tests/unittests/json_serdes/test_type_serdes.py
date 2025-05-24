@@ -176,3 +176,45 @@ class TestTypeSerdes(unittest.TestCase):
         for data in unparsed_data:
             result = TypeSerdes.deserialize(data=data)
             self.assertIsInstance(result, Types.UnparsedType)
+
+    def test_deserialize_struct_type(self):
+        types = self._primitive_and_none_types.values()
+        fields = [
+            Types.StructType.Field.not_null_field(
+                name=f"field_{field_idx}",
+                field_type=type_,
+                comment=f"comment {field_idx}" if field_idx % 2 == 0 else "",
+            )
+            for type_, field_idx in zip(types, range(len(types)))
+        ]
+
+        struct_type = Types.StructType.of(*fields)
+        serialized_result = TypeSerdes.serialize(struct_type)
+        deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+        self.assertEqual(deserialized_result, struct_type)
+
+    def test_deserialize_struct_type_invalid_fields(self):
+        message_prefix = "Cannot parse struct fields? from"
+        field_data = {"type": SerdesUtils.STRUCT}
+        invalid_data = (
+            {**field_data, **{"fields": "non-array-fields"}},
+            {**field_data, **{"fields": ["invalid_field"]}},
+            {**field_data, **{"fields": [{"invalid_name": "value"}]}},
+            {
+                **field_data,
+                **{"fields": [{"name": "valid_field_name", "invalid_type": "value"}]},
+            },
+        )
+        messages = (
+            f"{message_prefix} non-array",
+            f"{message_prefix} invalid JSON",
+            f"{message_prefix} missing name",
+            f"{message_prefix} missing type",
+        )
+        for data, message in zip(invalid_data, messages):
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                message,
+                TypeSerdes.deserialize,
+                data=data,
+            )
