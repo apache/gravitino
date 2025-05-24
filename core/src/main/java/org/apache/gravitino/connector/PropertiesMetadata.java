@@ -94,7 +94,12 @@ public interface PropertiesMetadata {
     return getPropertyPrefixEntry(propertyName).map(PropertyEntry::isHidden).orElse(false);
   }
 
-  /** @return true if the property is existed, false otherwise. */
+  /**
+   * Checks whether the specified property exists.
+   *
+   * @param propertyName the name of the property to check for existence
+   * @return true if the property exists, false otherwise
+   */
   default boolean containsProperty(String propertyName) {
     return getNonPrefixEntry(propertyName).isPresent()
         || getPropertyPrefixEntry(propertyName).isPresent();
