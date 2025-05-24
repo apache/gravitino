@@ -134,12 +134,20 @@ public class DynMethods {
       return new BoundMethod(this, receiver);
     }
 
-    /** Returns whether the method is a static method. */
+    /**
+     * Returns whether the method is a static method.
+     *
+     * @return true if the method is static; false otherwise
+     */
     public boolean isStatic() {
       return Modifier.isStatic(method.getModifiers());
     }
 
-    /** Returns whether the method is a noop. */
+    /**
+     * Returns whether the method is a noop.
+     *
+     * @return true if the method is a noop; false otherwise
+     */
     public boolean isNoop() {
       return this == NOOP;
     }
