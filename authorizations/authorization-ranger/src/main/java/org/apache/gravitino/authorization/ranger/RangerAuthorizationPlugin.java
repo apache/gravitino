@@ -151,12 +151,18 @@ public abstract class RangerAuthorizationPlugin
   /**
    * Create a new policy for metadata object
    *
+   * @param metadataObject The authorization metadata object to create the policy for.
    * @return The RangerPolicy for metadata object.
    */
   protected abstract RangerPolicy createPolicyAddResources(
       AuthorizationMetadataObject metadataObject);
 
-  /** Wildcard search the Ranger policies in the different Ranger service. */
+  /**
+   * Wildcard search the Ranger policies in the different Ranger service.
+   *
+   * @param authzMetadataObject The authorization metadata object used to perform wildcard search.
+   * @return A list of Ranger policies matching the wildcard conditions.
+   */
   protected abstract List<RangerPolicy> wildcardSearchPolies(
       AuthorizationMetadataObject authzMetadataObject);
 
@@ -179,6 +185,13 @@ public abstract class RangerAuthorizationPlugin
    * wildcard(*,?) conditions, If you use `db.table` condition to search policy, the Ranger will
    * match `db1.table1`, `db1.table2`, `db*.table*`, So we need to manually precisely filter this
    * research results.
+   *
+   * @param authzMetadataObject The authorization metadata object used as the base for searching
+   *     policies.
+   * @param preciseFilters A map of resource keys and their expected exact values for filtering the
+   *     policies.
+   * @return The matched Ranger policy if found, or {@code null} if none matches.
+   * @throws AuthorizationPluginException If multiple policies are found or a validation fails.
    */
   protected RangerPolicy preciseFindPolicy(
       AuthorizationMetadataObject authzMetadataObject, Map<String, String> preciseFilters)
@@ -988,6 +1001,9 @@ public abstract class RangerAuthorizationPlugin
    * IF rename the TABLE, Need to rename these the relevant policies, `{schema}.*`, `{schema}.*.*`
    * <br>
    * IF rename the COLUMN, Only need to rename `{schema}.*.*` <br>
+   *
+   * @param authzMetadataObject The original metadata object to be renamed.
+   * @param newAuthzMetadataObject The new metadata object after renaming.
    */
   protected abstract void renameMetadataObject(
       AuthorizationMetadataObject authzMetadataObject,
@@ -1026,7 +1042,13 @@ public abstract class RangerAuthorizationPlugin
   @Override
   public void close() throws IOException {}
 
-  /** Generate authorization securable object */
+  /**
+   * Generate authorization securable object.
+   *
+   * @param object The authorization metadata object to base the securable object on.
+   * @param privileges The set of privileges associated with the securable object.
+   * @return The generated authorization securable object.
+   */
   public abstract AuthorizationSecurableObject generateAuthorizationSecurableObject(
       AuthorizationMetadataObject object, Set<AuthorizationPrivilege> privileges);
 
