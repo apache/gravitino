@@ -60,7 +60,7 @@ public class RegisterAndLinkModelEvent extends ModelEvent {
   /**
    * Retrieves the uri of the linked model version.
    *
-   * @return
+   * @return the uri of the linked model version
    */
   public String uri() {
     return uri;
