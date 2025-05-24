@@ -1524,24 +1524,7 @@ public class TestHadoopCatalogOperations {
           createMultiLocationSchema(
               "emptySchema", "no-location", ImmutableMap.of(), ImmutableMap.of());
 
-      // only one storage location but value is null
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fs1",
-                      emptySchema.name(),
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      null,
-                      null));
-      Assertions.assertEquals(
-          "Storage location must be set for fileset m1.c1.emptySchema.fs1 when it's catalog and schema location are not set",
-          exception.getMessage());
-
-      // only one storage location but value is ""
+      // storage location value is blank
       exception =
           Assertions.assertThrows(
               IllegalArgumentException.class,
@@ -1555,10 +1538,9 @@ public class TestHadoopCatalogOperations {
                       ImmutableMap.of("v1", ""),
                       ImmutableMap.of()));
       Assertions.assertEquals(
-          "Storage location must be set for fileset m1.c1.emptySchema.fs2 when it's catalog and schema location are not set",
-          exception.getMessage());
+          "Storage location for name 'v1' must not be null or blank", exception.getMessage());
 
-      // only one storage location but value is " "
+      // storage location value is blank
       exception =
           Assertions.assertThrows(
               IllegalArgumentException.class,
@@ -1572,27 +1554,9 @@ public class TestHadoopCatalogOperations {
                       ImmutableMap.of("v1", " "),
                       ImmutableMap.of()));
       Assertions.assertEquals(
-          "Storage location must be set for fileset m1.c1.emptySchema.fs3 when it's catalog and schema location are not set",
-          exception.getMessage());
+          "Storage location for name 'v1' must not be null or blank", exception.getMessage());
 
-      // single storage location is " " and default-location-name points to it
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fs4",
-                      emptySchema.name(),
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("loc1", " "),
-                      ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "loc1")));
-      Assertions.assertEquals(
-          "default-location-name 'loc1' is invalid; please verify that the specified storageLocations are correct.",
-          exception.getMessage());
-
-      // two storage locations, one valid and one "", default-location-name points to ""
+      // two storage locations, one valid and one is blank
       exception =
           Assertions.assertThrows(
               IllegalArgumentException.class,
@@ -1604,10 +1568,9 @@ public class TestHadoopCatalogOperations {
                       Fileset.Type.MANAGED,
                       ImmutableMap.of(),
                       ImmutableMap.of("v1", TEST_ROOT_PATH + "/valid", "v2", ""),
-                      ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "v2")));
+                      ImmutableMap.of()));
       Assertions.assertEquals(
-          "default-location-name 'v2' is invalid; please verify that the specified storageLocations are correct.",
-          exception.getMessage());
+          "Storage location for name 'v2' must not be null or blank", exception.getMessage());
     }
   }
 
@@ -2136,29 +2099,7 @@ public class TestHadoopCatalogOperations {
                 "v1",
                 TEST_ROOT_PATH + "/fileset509_1",
                 "v2",
-                TEST_ROOT_PATH + "/fileset509_2")),
-        // storageLocations == null, use schemaPaths
-        Arguments.of(
-            "fileset520",
-            Fileset.Type.MANAGED,
-            ImmutableMap.of(),
-            ImmutableMap.of(
-                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "s",
-                TEST_ROOT_PATH + "/s1/{{schema}}/{{fileset}}"),
-            null,
-            null,
-            ImmutableMap.of("s", TEST_ROOT_PATH + "/s1/s1_fileset520/fileset520")),
-        // storageLocations == null, use catalogPaths
-        Arguments.of(
-            "fileset521",
-            Fileset.Type.MANAGED,
-            ImmutableMap.of(
-                PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "c",
-                TEST_ROOT_PATH + "/catalog1/{{schema}}/{{fileset}}"),
-            ImmutableMap.of(),
-            null,
-            null,
-            ImmutableMap.of("c", TEST_ROOT_PATH + "/catalog1/s1_fileset521/fileset521")));
+                TEST_ROOT_PATH + "/fileset509_2")));
   }
 
   private static Stream<Arguments> locationWithPlaceholdersArguments() {

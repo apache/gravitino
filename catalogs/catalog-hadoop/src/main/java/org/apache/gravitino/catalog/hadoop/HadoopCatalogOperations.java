@@ -245,9 +245,6 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    // remove the entries with empty value and check the default-location-names
-    storageLocations = filterAndValidateStorageLocations(storageLocations, properties);
-
     storageLocations.forEach(
         (name, path) -> {
           if (StringUtils.isBlank(name)) {
@@ -299,6 +296,12 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     // Either catalog property "location", or schema property "location", or storageLocation must be
     // set for managed fileset.
+    for (Map.Entry<String, String> e : storageLocations.entrySet()) {
+      if (StringUtils.isBlank(e.getValue())) {
+        throw new IllegalArgumentException(
+            "Storage location for name '" + e.getKey() + "' must not be null or blank");
+      }
+    }
     Map<String, Path> schemaPaths =
         getAndCheckSchemaPaths(schemaIdent.name(), schemaEntity.properties());
     if (schemaPaths.isEmpty() && storageLocations.isEmpty()) {
@@ -1129,35 +1132,6 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   private boolean containsPlaceholder(String location) {
     return StringUtils.isNotBlank(location)
         && LOCATION_PLACEHOLDER_PATTERN.matcher(location).find();
-  }
-
-  private Map<String, String> filterAndValidateStorageLocations(
-      Map<String, String> storageLocations, Map<String, String> properties) {
-    if (storageLocations == null) {
-      return new HashMap<>();
-    }
-    String defaultLocationName =
-        properties != null ? properties.get(PROPERTY_DEFAULT_LOCATION_NAME) : null;
-    Set<String> removedKeys = new HashSet<>();
-    Map<String, String> filtered = new HashMap<>();
-    // if storageLocations is null or empty, remove the entries
-    for (Map.Entry<String, String> e : storageLocations.entrySet()) {
-      String key = e.getKey();
-      String val = e.getValue();
-      if (StringUtils.isNotBlank(val)) {
-        filtered.put(key, val);
-      } else {
-        removedKeys.add(key);
-      }
-    }
-    // check the default-location-name is not in removedKeys
-    if (defaultLocationName != null && removedKeys.contains(defaultLocationName)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "default-location-name '%s' is invalid; please verify that the specified storageLocations are correct.",
-              defaultLocationName));
-    }
-    return filtered;
   }
 
   private Map<String, Path> calculateFilesetPaths(
