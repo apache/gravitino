@@ -159,6 +159,10 @@ You can use this kind of image to test the catalog of Apache Hive with kerberos 
 
 Changelog
 
+- apache/gravitino-ci:kerberos-hive-0.1.6
+  - Change username from `datastrato` to `gravitino`.
+    For more information, see [PR](https://github.com/apache/gravitino/pull/7040)
+
 - apache/gravitino-ci:kerberos-hive-0.1.5 (Switch to Apache official DockerHub repository)
   - Use Gravitino release 0.6.0 Dockerfile to build the image.
 
@@ -193,9 +197,13 @@ You can use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
+- apache/gravitino-ci:hive-0.1.20
+  - Change username from `datastrato` to `gravitino`.
+    For more information, see [PR](https://github.com/apache/gravitino/pull/7040)
+
 - apache/gravitino-ci:hive-0.1.19
   - Build ranger packages from source.
-
+ 
 - apache/gravitino-ci:hive-0.1.18
   - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. 
     For more information, please see [PR](https://github.com/apache/gravitino/pull/6625)

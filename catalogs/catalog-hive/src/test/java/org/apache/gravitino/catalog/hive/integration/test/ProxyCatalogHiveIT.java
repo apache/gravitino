@@ -71,7 +71,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
   public static final String SCHEMA_PREFIX = "ProxyCatalogHiveIT_schema";
   public static final String TABLE_PREFIX = "ProxyCatalogHiveIT_table";
   private static final String PROVIDER = "hive";
-  private static final String EXPECT_USER = "datastrato";
+  private static final String EXPECT_USER = "gravitino";
   private static final String HADOOP_USER_NAME = "HADOOP_USER_NAME";
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
@@ -94,7 +94,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
     originHadoopUser = System.getenv(HADOOP_USER_NAME);
     setEnv(HADOOP_USER_NAME, null);
 
-    System.setProperty("user.name", "datastrato");
+    System.setProperty("user.name", "gravitino");
 
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
@@ -147,7 +147,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
 
   @Test
   public void testOperateSchema() throws Exception {
-    // create schema normally using user datastrato
+    // create schema normally using user gravitino
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String anotherSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
 
@@ -202,7 +202,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
 
   @Test
   public void testOperateTable() throws Exception {
-    // create table normally using user datastrato
+    // create table normally using user gravitino
     Column[] columns = createColumns();
     String schemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX);
     String tableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
@@ -308,7 +308,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
                   Transforms.identity(columns[1].name()), Transforms.identity(columns[2].name())
                 });
 
-    // add partition "col2=2023-01-02/col3=gravitino_it_test2" by user datastrato
+    // add partition "col2=2023-01-02/col3=gravitino_it_test2" by user gravitino
     String[] field1 = new String[] {"col2"};
     String[] field2 = new String[] {"col3"};
     Literal<?> primaryPartition = Literals.dateLiteral(LocalDate.parse("2023-01-02"));

@@ -24,11 +24,10 @@ ranger_dir="$(cd "${ranger_dir}">/dev/null; pwd)"
 # Environment variables definition
 RANGER_VERSION=2.4.0
 RANGER_PACKAGE_NAME="ranger-${RANGER_VERSION}-admin.tar.gz" # Must export this variable for Dockerfile
-RANGER_DOWNLOAD_URL=https://github.com/datastrato/apache-ranger/releases/download/release-ranger-${RANGER_VERSION}/ranger-${RANGER_VERSION}-admin.tar.gz
 
 MYSQL_CONNECTOR_VERSION=8.0.28
 MYSQL_CONNECTOR_PACKAGE_NAME="mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar"
-MYSQL_CONNECTOR_DOWNLOAD_URL=https://search.maven.org/remotecontent?filepath=mysql/mysql-connector-java/${MYSQL_CONNECTOR_VERSION}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar
+MYSQL_CONNECTOR_DOWNLOAD_URL="https://search.maven.org/remotecontent?filepath=mysql/mysql-connector-java/${MYSQL_CONNECTOR_VERSION}/mysql-connector-java-${MYSQL_CONNECTOR_VERSION}.jar"
 
 # Prepare download packages
 if [[ ! -d "${ranger_dir}/packages" ]]; then
