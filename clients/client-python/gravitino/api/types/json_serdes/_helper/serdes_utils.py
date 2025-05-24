@@ -244,6 +244,8 @@ class SerdesUtils:
                 return cls.read_map_type(type_data)
             if cls.UNION == type_str:
                 return cls.read_union_type(type_data)
+            if cls.UNPARSED == type_str:
+                return cls.read_unparsed_type(type_data)
 
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
 
@@ -347,3 +349,12 @@ class SerdesUtils:
 
         union_types = [cls.read_data_type(type_data) for type_data in types]
         return Types.UnionType.of(*union_types)
+
+    @classmethod
+    def read_unparsed_type(cls, data: Dict[str, Any]) -> Types.UnparsedType:
+        Precondition.check_argument(
+            data.get(cls.UNPARSED_TYPE) is not None,
+            f"Cannot parse unparsed type from missing unparsed type: {data}",
+        )
+
+        return Types.UnparsedType.of(data[cls.UNPARSED_TYPE])
