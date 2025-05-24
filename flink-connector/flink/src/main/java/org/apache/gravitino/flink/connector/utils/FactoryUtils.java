@@ -97,6 +97,10 @@ public class FactoryUtils {
    * Creates a utility that helps to validate options for a {@link CatalogFactory}.
    *
    * <p>Note: This utility checks for left-over options in the final step.
+   *
+   * @param factory The catalog factory to create the helper for
+   * @param context The context containing the options to validate
+   * @return A new CatalogFactoryHelper instance
    */
   public static FactoryUtil.CatalogFactoryHelper createCatalogFactoryHelper(
       CatalogFactory factory, CatalogFactory.Context context) {
