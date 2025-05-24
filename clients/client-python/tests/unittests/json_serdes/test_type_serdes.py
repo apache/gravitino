@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import random
 import unittest
 from itertools import combinations, product
 
@@ -22,6 +23,7 @@ from gravitino.api.types.json_serdes import TypeSerdes
 from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.types.type import PrimitiveType
 from gravitino.api.types.types import Types
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 class MockType(PrimitiveType):
@@ -148,3 +150,29 @@ class TestTypeSerdes(unittest.TestCase):
         self.assertEqual(
             result.get(SerdesUtils.UNPARSED_TYPE), mock_type.simple_string()
         )
+
+    def test_deserialize_primitive_and_none_type(self):
+        for simple_string, type_ in self._primitive_and_none_types.items():
+            self.assertEqual(TypeSerdes.deserialize(data=simple_string), type_)
+
+    def test_deserialize_invalid_primitive_and_non_type(self):
+        invalid_data = ["", {}, None]
+        for data in invalid_data:
+            self.assertRaises(
+                IllegalArgumentException,
+                TypeSerdes.deserialize,
+                data=data,
+            )
+
+    def test_deserialize_primitive_and_non_type_unparsed(self):
+        unparsed_data = [
+            int(random.random() * 10),
+            random.random(),
+            "invalid_type",
+            {"invalid_key": "value"},
+            list(range(10)),
+            True,
+        ]
+        for data in unparsed_data:
+            result = TypeSerdes.deserialize(data=data)
+            self.assertIsInstance(result, Types.UnparsedType)
