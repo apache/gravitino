@@ -200,7 +200,7 @@ public class FileSystemUtils {
    * Create a configuration from the config map.
    *
    * @param config properties map.
-   * @return
+   * @return Configuration map.
    */
   public static Configuration createConfiguration(Map<String, String> config) {
     return createConfiguration(null, config);
@@ -211,7 +211,7 @@ public class FileSystemUtils {
    *
    * @param bypass prefix to remove from the config keys.
    * @param config properties map.
-   * @return
+   * @return Configuration map.
    */
   public static Configuration createConfiguration(String bypass, Map<String, String> config) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
