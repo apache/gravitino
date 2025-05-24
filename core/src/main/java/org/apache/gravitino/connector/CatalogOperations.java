@@ -58,6 +58,7 @@ public interface CatalogOperations extends Closeable {
    * @param provider the provider of the catalog.
    * @param comment the comment of the catalog.
    * @param properties the properties of the catalog.
+   * @throws Exception if connection fails.
    */
   void testConnection(
       NameIdentifier catalogIdent,
