@@ -266,3 +266,26 @@ class TestTypeSerdes(unittest.TestCase):
                 TypeSerdes.deserialize,
                 data=data,
             )
+
+    def test_deserialize_union_type(self):
+        types = self._primitive_and_none_types.values()
+        for types in combinations(types, 2):
+            union_type = Types.UnionType.of(*types)
+            serialized_result = TypeSerdes.serialize(union_type)
+            deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+            self.assertEqual(
+                union_type.simple_string(), deserialized_result.simple_string()
+            )
+
+    def test_deserialize_union_type_invalid_data(self):
+        invalid_union_data = (
+            {"type": "union", "invalid_types": "invalid_types"},
+            {"type": "union", "types": "invalid_types_value"},
+        )
+        for data in invalid_union_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "Cannot parse union types? from (?:non-array|missing types)",
+                TypeSerdes.deserialize,
+                data=data,
+            )
