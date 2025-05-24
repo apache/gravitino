@@ -253,6 +253,7 @@ public class RangerHelper {
    *
    * @param roleName The role name to create
    * @param isOwnerRole The role is owner role or not
+   * @return The created or existing RangerRole
    */
   protected RangerRole createRangerRoleIfNotExists(String roleName, boolean isOwnerRole) {
     roleName = generateGravitinoRoleName(roleName);

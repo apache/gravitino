@@ -37,6 +37,7 @@ public class RangerHadoopSQLSecurableObject extends RangerHadoopSQLMetadataObjec
    * @param parent The parent of the metadata object
    * @param name The name of the metadata object
    * @param type The type of the metadata object
+   * @param privileges The set of privileges assigned to this securable object
    */
   public RangerHadoopSQLSecurableObject(
       String parent,
