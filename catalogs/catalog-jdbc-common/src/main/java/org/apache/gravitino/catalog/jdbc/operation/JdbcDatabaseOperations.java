@@ -219,9 +219,17 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     return createSysDatabaseNameSet().contains(dbName.toLowerCase(Locale.ROOT));
   }
 
-  /** Check whether support setting schema comment. */
+  /**
+   * Check whether support setting schema comment.
+   *
+   * @return true if schema comments are supported; false otherwise.
+   */
   protected abstract boolean supportSchemaComment();
 
-  /** Create a set of system database names. */
+  /**
+   * Create a set of system database names.
+   *
+   * @return a set of system database names in lowercase.
+   */
   protected abstract Set<String> createSysDatabaseNameSet();
 }

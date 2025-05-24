@@ -156,7 +156,10 @@ public abstract class JdbcTableOperations implements TableOperation {
    * not found, it will throw a NoSuchTableException.
    *
    * @param tablesResult The result set of the table
+   * @param databaseName The name of the database.
+   * @param tableName The name of the table.
    * @return The builder of the table to be returned
+   * @throws SQLException if a database access error occurs.
    */
   protected JdbcTable.Builder getTableBuilder(
       ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
@@ -246,7 +249,7 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @param connection jdbc connection
    * @param tableName table name
    * @return Returns all table properties values.
-   * @throws SQLException
+   * @throws SQLException if a database access error occurs
    */
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
@@ -365,9 +368,10 @@ public abstract class JdbcTableOperations implements TableOperation {
    * from the JDBC driver, like the table comment in MySQL of the 5.7 version.
    *
    * @param connection jdbc connection
+   * @param databaseName The name of the database
    * @param tableName table name
    * @param jdbcTableBuilder The builder of the table to be returned
-   * @throws SQLException
+   * @throws SQLException if a database access error occurs
    */
   protected void correctJdbcTableFields(
       Connection connection,
@@ -468,6 +472,10 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param oldTableName The original table name
+   * @param newTableName The new table name
+   * @return The SQL statement to rename a table
    */
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
     return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
@@ -476,6 +484,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param tableName The name of the table to be dropped
+   * @return The SQL statement to drop a table
    */
   protected String generateDropTableSql(String tableName) {
     return String.format("DROP TABLE `%s`", tableName);
@@ -489,6 +500,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param databaseName The name of the database
+   * @param tableName The name of the table
+   * @param lazyLoadCreateTable The pre-loaded table object, if available
+   * @return The resulting JdbcTable object
    */
   protected JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
@@ -549,6 +565,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param fieldNames The 2D array of index field names
+   * @return A comma-separated string of index field names
    */
   protected static String getIndexFieldStr(String[][] fieldNames) {
     return Arrays.stream(fieldNames)
