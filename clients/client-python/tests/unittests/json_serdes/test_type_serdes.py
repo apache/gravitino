@@ -218,3 +218,22 @@ class TestTypeSerdes(unittest.TestCase):
                 TypeSerdes.deserialize,
                 data=data,
             )
+
+    def test_deserialize_list_type(self):
+        types = self._primitive_and_none_types.values()
+        for type_ in types:
+            list_type = Types.ListType.of(element_type=type_, element_nullable=False)
+            serialized_result = TypeSerdes.serialize(list_type)
+            deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+            self.assertEqual(
+                list_type.simple_string(), deserialized_result.simple_string()
+            )
+
+    def test_deserialize_list_type_invalid_data(self):
+        list_data = {"type": "list", "invalid_element_type": "value"}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse list type from missing element type",
+            TypeSerdes.deserialize,
+            data=list_data,
+        )
