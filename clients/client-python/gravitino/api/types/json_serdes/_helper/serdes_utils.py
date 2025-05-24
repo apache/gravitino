@@ -15,12 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import re
 from types import MappingProxyType
 from typing import Any, ClassVar, Dict, Mapping, Pattern, Set, Union, overload
 
+from dataclasses_json.core import Json
+
 from gravitino.api.types.type import Name, Type
 from gravitino.api.types.types import Types
+from gravitino.utils.precondition import Precondition
 
 
 class SerdesUtils:
@@ -209,3 +213,51 @@ class SerdesUtils:
                 else unparsed_type
             ),
         }
+
+    @classmethod
+    def read_data_type(cls, type_data: Json) -> Type:
+        """Read Gravitino Type from JSON data. Used for Gravitino Type JSON Deserialization.
+
+        Args:
+            type_data (Json): The serialized data.
+
+        Returns:
+            Type: The Gravitino Type.
+        """
+        if type_data is None or isinstance(type_data, (dict, str)):
+            Precondition.check_argument(
+                type_data is not None and len(type_data) > 0,
+                f"Cannot parse type from invalid JSON: {type_data}",
+            )
+
+        if isinstance(type_data, str):
+            return cls.from_primitive_type_string(type_data.lower())
+
+        return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
+
+    @classmethod
+    def from_primitive_type_string(cls, type_string: str) -> Type:
+        type_instance = cls.TYPES.get(type_string)
+        if type_instance is not None:
+            return type_instance
+
+        decimal_matched = cls.DECIMAL_PATTERN.match(type_string)
+        if decimal_matched:
+            return Types.DecimalType.of(
+                precision=int(decimal_matched.group(1)),
+                scale=int(decimal_matched.group(2)),
+            )
+
+        fixed_matched = cls.FIXED_PATTERN.match(type_string)
+        if fixed_matched:
+            return Types.FixedType.of(length=int(fixed_matched.group(1)))
+
+        fixedchar_matched = cls.FIXEDCHAR_PATTERN.match(type_string)
+        if fixedchar_matched:
+            return Types.FixedCharType.of(length=int(fixedchar_matched.group(1)))
+
+        varchar_matched = cls.VARCHAR_PATTERN.match(type_string)
+        if varchar_matched:
+            return Types.VarCharType.of(length=int(varchar_matched.group(1)))
+
+        return Types.UnparsedType.of(type_string)
