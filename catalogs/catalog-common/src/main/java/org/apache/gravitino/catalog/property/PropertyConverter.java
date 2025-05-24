@@ -50,8 +50,8 @@ public abstract class PropertyConverter {
   /**
    * Convert Gravitino properties to engine properties.
    *
-   * @param gravitinoProperties map of Gravitino properties.
-   * @return map of engine properties.
+   * @param gravitinoProperties map of Gravitino properties
+   * @return map of engine properties
    */
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> engineProperties = new HashMap<>();
@@ -73,8 +73,8 @@ public abstract class PropertyConverter {
    * <p>If different engine has different behavior about error handling, you can override this
    * method.
    *
-   * @param engineProperties map of engine properties.
-   * @return map of Gravitino properties.
+   * @param engineProperties map of engine properties
+   * @return map of Gravitino properties
    */
   public Map<String, Object> engineToGravitinoProperties(Map<String, Object> engineProperties) {
     Map<String, Object> gravitinoProperties = new HashMap<>();
