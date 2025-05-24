@@ -88,6 +88,7 @@ public final class Either<L, R> {
    * @param value Left value
    * @param <L> Left type
    * @param <R> Right type
+   * @return an Either instance with left value
    */
   public static <L, R> Either<L, R> left(L value) {
     Preconditions.checkArgument(value != null, "Left value cannot be null");
@@ -100,6 +101,7 @@ public final class Either<L, R> {
    * @param value Right value
    * @param <L> Left type
    * @param <R> Right type
+   * @return an Either instance with right value
    */
   public static <L, R> Either<L, R> right(R value) {
     Preconditions.checkArgument(value != null, "Right value cannot be null");
