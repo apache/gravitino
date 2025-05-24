@@ -135,6 +135,8 @@ public class FileSystemUtils {
    * </pre>
    *
    * @param config Gravitino configuration
+   * @param predefinedKeys a map of Gravitino keys to Hadoop config keys; entries here have the
+   *     highest priority and override others
    * @return Hadoop configuration Map
    */
   public static Map<String, String> toHadoopConfigMap(
@@ -197,8 +199,8 @@ public class FileSystemUtils {
   /**
    * Create a configuration from the config map.
    *
-   * @param config properties map.
-   * @return
+   * @param config properties map
+   * @return Configuration map
    */
   public static Configuration createConfiguration(Map<String, String> config) {
     return createConfiguration(null, config);
@@ -207,9 +209,9 @@ public class FileSystemUtils {
   /**
    * Create a configuration from the config map.
    *
-   * @param bypass prefix to remove from the config keys.
-   * @param config properties map.
-   * @return
+   * @param bypass prefix to remove from the config keys
+   * @param config properties map
+   * @return Configuration map
    */
   public static Configuration createConfiguration(String bypass, Map<String, String> config) {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
