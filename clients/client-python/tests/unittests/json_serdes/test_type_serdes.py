@@ -289,3 +289,20 @@ class TestTypeSerdes(unittest.TestCase):
                 TypeSerdes.deserialize,
                 data=data,
             )
+
+    def test_deserialize_unparsed_type(self):
+        unparsed_type = Types.UnparsedType.of(unparsed_type="unparsed_type")
+        serialized_result = TypeSerdes.serialize(unparsed_type)
+        deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+        self.assertEqual(
+            unparsed_type.simple_string(), deserialized_result.simple_string()
+        )
+
+    def test_deserialize_unparsed_type_invalid_data(self):
+        invalid_data = {"type": "unparsed"}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse unparsed type from missing unparsed type",
+            TypeSerdes.deserialize,
+            data=invalid_data,
+        )
