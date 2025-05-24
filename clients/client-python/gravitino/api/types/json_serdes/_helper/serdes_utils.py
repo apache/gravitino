@@ -246,6 +246,8 @@ class SerdesUtils:
                 return cls.read_union_type(type_data)
             if cls.UNPARSED == type_str:
                 return cls.read_unparsed_type(type_data)
+            if cls.EXTERNAL == type_str:
+                return cls.read_external_type(type_data)
 
         return Types.UnparsedType.of(unparsed_type=json.dumps(type_data))
 
@@ -358,3 +360,11 @@ class SerdesUtils:
         )
 
         return Types.UnparsedType.of(data[cls.UNPARSED_TYPE])
+
+    @classmethod
+    def read_external_type(cls, external_data: Dict[str, Any]) -> Types.ExternalType:
+        Precondition.check_argument(
+            external_data.get(cls.CATALOG_STRING) is not None,
+            f"Cannot parse external type from missing catalogString: {external_data}",
+        )
+        return Types.ExternalType.of(external_data[cls.CATALOG_STRING])
