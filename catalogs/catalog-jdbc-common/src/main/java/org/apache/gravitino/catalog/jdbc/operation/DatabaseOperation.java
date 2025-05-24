@@ -44,6 +44,7 @@ public interface DatabaseOperation {
    *
    * @param databaseName The name of the database.
    * @param comment The comment of the database.
+   * @param properties Additional properties for the database creation.
    */
   void create(String databaseName, String comment, Map<String, String> properties)
       throws SchemaAlreadyExistsException;

@@ -44,6 +44,7 @@ public interface TableOperation {
    * @param exceptionMapper The exception mapper to use for the operations.
    * @param jdbcTypeConverter The type converter to use for the operations.
    * @param conf The configuration to use for the operations.
+   * @param jdbcColumnDefaultValueConverter The converter used to handle default column values.
    */
   void initialize(
       DataSource dataSource,
@@ -59,6 +60,7 @@ public interface TableOperation {
    * @param comment The comment of the table.
    * @param properties The properties of the table.
    * @param partitioning The partitioning of the table.
+   * @param distribution The distribution information of the table.
    * @param indexes The indexes of the table.
    */
   void create(
@@ -89,7 +91,7 @@ public interface TableOperation {
    * @param databaseName The name of the database.
    * @param tableName The name of the table.
    * @return information object of the JDBC table.
-   * @throws NoSuchTableException
+   * @throws NoSuchTableException if the specified table does not exist
    */
   JdbcTable load(String databaseName, String tableName) throws NoSuchTableException;
 
@@ -112,6 +114,7 @@ public interface TableOperation {
   /**
    * @param databaseName The name of the database.
    * @param tableName The name of the table.
+   * @return true if the table is successfully purged; false otherwise.
    */
   boolean purge(String databaseName, String tableName);
 
