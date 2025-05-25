@@ -39,6 +39,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -142,8 +143,25 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public <E extends Entity & HasIdentifier> List<E> getOrLoad(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
       throws IOException {
-    // TODO: implement this method
-    return entityStore.listEntitiesByRelation(relType, ident, type);
+    Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
+    Preconditions.checkArgument(type != null, "EntityType cannot be null");
+    Preconditions.checkArgument(relType != null, "SupportsRelationOperations.Type cannot be null");
+
+    return withLockAndThrow(
+        () -> {
+          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type, relType);
+          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
+
+          if (entitiesFromCache != null) {
+            return convertEntity(entitiesFromCache);
+          }
+
+          List<E> entities = entityStore.listEntitiesByRelation(relType, ident, type);
+          syncEntitiesToCache(
+              entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
+
+          return entities;
+        });
   }
 
   /** {@inheritDoc} */
@@ -175,8 +193,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
       SupportsRelationOperations.Type relType,
       NameIdentifier nameIdentifier,
       Entity.EntityType identType) {
-    // TODO: implement this method
-    return Optional.empty();
+    return withLock(
+        () -> {
+          EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, identType, relType);
+
+          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
+          if (entitiesFromCache != null) {
+            List<E> convertedEntities = convertEntity(entitiesFromCache);
+            return Optional.of(convertedEntities);
+          }
+
+          return Optional.empty();
+        });
   }
 
   /** {@inheritDoc} */
@@ -199,8 +227,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public boolean invalidate(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    // todo implement this method
-    return false;
+    return withLock(
+        () -> {
+          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
+
+          boolean existed = contains(ident, type);
+          if (existed) {
+            invalidateEntities(entityCacheKey.identifier());
+          }
+
+          return existed;
+        });
   }
 
   /** {@inheritDoc} */
@@ -223,8 +260,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public boolean contains(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    // TODO implement this method
-    return false;
+    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null);
   }
 
   /** {@inheritDoc} */
@@ -252,7 +288,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public <E extends Entity & HasIdentifier> void put(
       E srcEntity, E destEntity, SupportsRelationOperations.Type relType) {
-    // TODO: implement this method
+    withLock(
+        () -> {
+          NameIdentifier identifier = getIdentFromMetadata(srcEntity);
+          EntityCacheKey entityCacheKey = EntityCacheKey.of(identifier, srcEntity.type(), relType);
+          syncEntitiesToCache(entityCacheKey, destEntity);
+        });
   }
 
   @Override
