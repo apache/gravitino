@@ -61,7 +61,8 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
   /**
    * Define gravitino catalog provider.
    *
-   * @return
+   * @return The name of the Gravitino catalog provider, which is "lakehouse-iceberg" for this
+   *     implementation.
    */
   @Override
   public String gravitinoCatalogProvider() {
@@ -71,7 +72,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
   /**
    * Define gravitino catalog type.
    *
-   * @return
+   * @return The type of the Gravitino catalog, which is RELATIONAL for this implementation.
    */
   @Override
   public org.apache.gravitino.Catalog.Type gravitinoCatalogType() {
@@ -81,7 +82,7 @@ public class GravitinoIcebergCatalogFactory implements BaseCatalogFactory {
   /**
    * Define properties converter.
    *
-   * @return
+   * @return The properties converter instance for Iceberg catalog.
    */
   @Override
   public PropertiesConverter propertiesConverter() {
