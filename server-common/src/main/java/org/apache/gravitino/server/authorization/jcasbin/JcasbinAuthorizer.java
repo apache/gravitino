@@ -47,9 +47,13 @@ import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.casbin.jcasbin.main.Enforcer;
 import org.casbin.jcasbin.model.Model;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** The Jcasbin implementation of GravitinoAuthorizer. */
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer enforcer;
@@ -157,7 +161,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       // TODO load owner relationship
     } catch (Exception e) {
-      throw new RuntimeException("Can not load privilege", e);
+      LOG.error(e.getMessage(), e);
     }
   }
 

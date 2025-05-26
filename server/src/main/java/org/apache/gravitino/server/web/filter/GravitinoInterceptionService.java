@@ -36,6 +36,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.glassfish.hk2.api.Descriptor;
@@ -93,7 +94,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             new AuthorizationExpressionEvaluator(expression);
         boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
         if (!authorizeResult) {
-          throw new RuntimeException("Can not access metadata");
+          return Utils.internalError("Can not access metadata.");
         }
       }
       return methodInvocation.proceed();
@@ -139,6 +140,10 @@ public class GravitinoInterceptionService implements InterceptionService {
                 nameIdentifierMap.put(
                     MetadataObject.Type.SCHEMA,
                     NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
+                break;
+              case METALAKE:
+                nameIdentifierMap.put(
+                    MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
                 break;
               default:
                 break;
