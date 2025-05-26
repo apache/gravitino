@@ -68,11 +68,11 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case TIME:
-        return Types.TimeType.get();
+        return Types.TimeType.of(typeBean.getDatetimePrecision());
       case TIMESTAMP:
-        return Types.TimestampType.withTimeZone();
+        return Types.TimestampType.withTimeZone(typeBean.getDatetimePrecision());
       case DATETIME:
-        return Types.TimestampType.withoutTimeZone();
+        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
       case NUMBER:
       case NUMERIC:
       case DECIMAL:
@@ -129,7 +129,13 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.TimeType) {
       return type.simpleString();
     } else if (type instanceof Types.TimestampType) {
-      return ((Types.TimestampType) type).hasTimeZone() ? TIMESTAMP : DATETIME;
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
+      return timestampType
+          .precision()
+          .filter(p -> p >= 0)
+          .map(p -> String.format("%s(%d)", baseType, p))
+          .orElse(baseType);
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {
