@@ -52,22 +52,28 @@ public class TestPostgreSqlTypeConverter {
 
   @Test
   public void testToGravitinoType() {
-    checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, null, null);
-    checkJdbcTypeToGravitinoType(Types.ShortType.get(), INT_2, null, null);
-    checkJdbcTypeToGravitinoType(Types.IntegerType.get(), INT_4, null, null);
-    checkJdbcTypeToGravitinoType(Types.LongType.get(), INT_8, null, null);
-    checkJdbcTypeToGravitinoType(Types.FloatType.get(), FLOAT_4, null, null);
-    checkJdbcTypeToGravitinoType(Types.DoubleType.get(), FLOAT_8, null, null);
-    checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE, null, null);
-    checkJdbcTypeToGravitinoType(Types.TimeType.get(), TIME, null, null);
-    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), TIMESTAMP, null, null);
-    checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), NUMERIC, 10, 2);
-    checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null);
-    checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), BPCHAR, 20, null);
-    checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);
-    checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BYTEA, null, null);
+    checkJdbcTypeToGravitinoType(Types.BooleanType.get(), BOOL, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.ShortType.get(), INT_2, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.IntegerType.get(), INT_4, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.LongType.get(), INT_8, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.FloatType.get(), FLOAT_4, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.DoubleType.get(), FLOAT_8, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.DateType.get(), DATE, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.TimeType.of(0), TIME, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.TimeType.of(0), TIME, 8, null, 0);
+    checkJdbcTypeToGravitinoType(Types.TimeType.of(3), TIME, 12, null, 3);
+    checkJdbcTypeToGravitinoType(Types.TimeType.of(6), TIME, 15, null, 6);
+    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(0), TIMESTAMP, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(0), TIMESTAMP, 19, null, 0);
+    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(3), TIMESTAMP, 23, null, 3);
+    checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(6), TIMESTAMP, 26, null, 6);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), NUMERIC, 10, 2, 0);
+    checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null, 0);
+    checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), BPCHAR, 20, null, 0);
+    checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BYTEA, null, null, 0);
     checkJdbcTypeToGravitinoType(
-        Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null);
+        Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null, 0);
   }
 
   @Test
@@ -76,7 +82,7 @@ public class TestPostgreSqlTypeConverter {
     Type list1 = Types.ListType.of(elmentType, false);
 
     checkGravitinoTypeToJdbcType(INT_4 + ARRAY_TOKEN, list1);
-    checkJdbcTypeToGravitinoType(list1, JDBC_ARRAY_PREFIX + INT_4, null, null);
+    checkJdbcTypeToGravitinoType(list1, JDBC_ARRAY_PREFIX + INT_4, null, null, 0);
 
     // not support element nullable
     Assertions.assertThrowsExactly(
@@ -118,17 +124,23 @@ public class TestPostgreSqlTypeConverter {
   }
 
   protected void checkJdbcTypeToGravitinoType(
-      Type gravitinoType, String jdbcTypeName, Integer columnSize, Integer scale) {
-    JdbcTypeConverter.JdbcTypeBean typeBean = createTypeBean(jdbcTypeName, columnSize, scale);
+      Type gravitinoType,
+      String jdbcTypeName,
+      Integer columnSize,
+      Integer scale,
+      Integer datetimePrecision) {
+    JdbcTypeConverter.JdbcTypeBean typeBean =
+        createTypeBean(jdbcTypeName, columnSize, scale, datetimePrecision);
     Assertions.assertEquals(gravitinoType, POSTGRE_SQL_TYPE_CONVERTER.toGravitino(typeBean));
   }
 
   protected static JdbcTypeConverter.JdbcTypeBean createTypeBean(
-      String typeName, Integer columnSize, Integer scale) {
+      String typeName, Integer columnSize, Integer scale, Integer datetimePrecision) {
     return new JdbcTypeConverter.JdbcTypeBean(typeName) {
       {
         setColumnSize(columnSize);
         setScale(scale);
+        setDatetimePrecision(datetimePrecision);
       }
     };
   }

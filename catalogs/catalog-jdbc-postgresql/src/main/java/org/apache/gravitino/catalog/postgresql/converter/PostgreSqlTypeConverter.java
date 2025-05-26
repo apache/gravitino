@@ -63,11 +63,11 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case TIME:
-        return Types.TimeType.get();
+        return Types.TimeType.of(typeBean.getDatetimePrecision());
       case TIMESTAMP:
-        return Types.TimestampType.withoutTimeZone();
+        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
       case TIMESTAMP_TZ:
-        return Types.TimestampType.withTimeZone();
+        return Types.TimestampType.withTimeZone(typeBean.getDatetimePrecision());
       case NUMERIC:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
@@ -103,10 +103,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.TimeType) {
       return type.simpleString();
-    } else if (type instanceof Types.TimestampType && !((Types.TimestampType) type).hasTimeZone()) {
-      return TIMESTAMP;
-    } else if (type instanceof Types.TimestampType && ((Types.TimestampType) type).hasTimeZone()) {
-      return TIMESTAMP_TZ;
+    } else if (type instanceof Types.TimestampType) {
+      return type.simpleString();
     } else if (type instanceof Types.DecimalType) {
       return NUMERIC
           + "("
