@@ -330,9 +330,6 @@ public class GravitinoVirtualFileSystem extends FileSystem {
       throw new FilesetPathNotFoundException(message, e);
 
     } catch (IOException e) {
-      if (e instanceof FilesetPathNotFoundException) {
-        throw (FilesetPathNotFoundException) e;
-      }
       throw e;
     }
   }
