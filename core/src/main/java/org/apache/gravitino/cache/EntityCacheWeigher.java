@@ -39,15 +39,16 @@ import org.slf4j.LoggerFactory;
  * </ul>
  */
 public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
-  private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
-  private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
-
-  private EntityCacheWeigher() {}
-
   public static final int METALAKE_WEIGHT = 100;
   public static final int CATALOG_WEIGHT = 75;
   public static final int SCHEMA_WEIGHT = 50;
   public static final int OTHER_WEIGHT = 15;
+  private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
+  private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
+  private static final long MAX_WEIGHT =
+      2 * (METALAKE_WEIGHT * 10 + CATALOG_WEIGHT * (10 * 200) + SCHEMA_WEIGHT * (10 * 200 * 1000));
+
+  private EntityCacheWeigher() {}
 
   /**
    * Returns the maximum weight that can be stored in the cache.
@@ -77,8 +78,7 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
    * @return The maximum weight that can be stored in the cache.
    */
   public static long getMaxWeight() {
-    return 2
-        * (METALAKE_WEIGHT * 10 + CATALOG_WEIGHT * (10 * 200) + SCHEMA_WEIGHT * (10 * 200 * 1000));
+    return MAX_WEIGHT;
   }
 
   /**
