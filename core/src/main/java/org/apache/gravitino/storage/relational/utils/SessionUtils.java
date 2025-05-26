@@ -46,9 +46,9 @@ public class SessionUtils {
         T mapper = SqlSessions.getMapper(mapperClazz);
         consumer.accept(mapper);
         SqlSessions.commitAndCloseSqlSession();
-      } catch (Throwable t) {
+      } catch (Exception e) {
         SqlSessions.rollbackAndCloseSqlSession();
-        throw t;
+        throw e;
       }
     }
   }
@@ -70,9 +70,9 @@ public class SessionUtils {
         R result = func.apply(mapper);
         SqlSessions.commitAndCloseSqlSession();
         return result;
-      } catch (Throwable t) {
+      } catch (Exception e) {
         SqlSessions.rollbackAndCloseSqlSession();
-        throw t;
+        throw e;
       }
     }
   }
@@ -120,8 +120,8 @@ public class SessionUtils {
       try {
         T mapper = SqlSessions.getMapper(mapperClazz);
         return func.apply(mapper);
-      } catch (Throwable t) {
-        throw t;
+      } catch (Exception e) {
+        throw e;
       } finally {
         SqlSessions.closeSqlSession();
       }
@@ -139,9 +139,9 @@ public class SessionUtils {
       try {
         Arrays.stream(operations).forEach(Runnable::run);
         SqlSessions.commitAndCloseSqlSession();
-      } catch (Throwable t) {
+      } catch (Exception e) {
         SqlSessions.rollbackAndCloseSqlSession();
-        throw t;
+        throw e;
       }
     }
   }
