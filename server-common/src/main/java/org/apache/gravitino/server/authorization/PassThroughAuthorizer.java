@@ -46,5 +46,8 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public void handleRolePrivilegeChange(Long roleId) {}
+
+  @Override
   public void close() throws IOException {}
 }
