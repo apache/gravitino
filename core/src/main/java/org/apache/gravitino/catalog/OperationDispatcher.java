@@ -79,14 +79,14 @@ public abstract class OperationDispatcher {
       NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
       return c.doWithPartitionOps(tableIdent, fn);
-    } catch (Throwable throwable) {
-      if (ex.isInstance(throwable)) {
-        throw ex.cast(throwable);
+    } catch (Exception exception) {
+      if (ex.isInstance(exception)) {
+        throw ex.cast(exception);
       }
-      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
-        throw (RuntimeException) throwable;
+      if (RuntimeException.class.isAssignableFrom(exception.getClass())) {
+        throw (RuntimeException) exception;
       }
-      throw new RuntimeException(throwable);
+      throw new RuntimeException(exception);
     }
   }
 
@@ -98,14 +98,14 @@ public abstract class OperationDispatcher {
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
-    } catch (Throwable throwable) {
-      if (ex.isInstance(throwable)) {
-        throw ex.cast(throwable);
+    } catch (Exception exception) {
+      if (ex.isInstance(exception)) {
+        throw ex.cast(exception);
       }
-      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
-        throw (RuntimeException) throwable;
+      if (RuntimeException.class.isAssignableFrom(exception.getClass())) {
+        throw (RuntimeException) exception;
       }
-      throw new RuntimeException(throwable);
+      throw new RuntimeException(exception);
     }
   }
 
@@ -120,17 +120,17 @@ public abstract class OperationDispatcher {
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
-    } catch (Throwable throwable) {
-      if (ex1.isInstance(throwable)) {
-        throw ex1.cast(throwable);
-      } else if (ex2.isInstance(throwable)) {
-        throw ex2.cast(throwable);
+    } catch (Exception exception) {
+      if (ex1.isInstance(exception)) {
+        throw ex1.cast(exception);
+      } else if (ex2.isInstance(exception)) {
+        throw ex2.cast(exception);
       }
-      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
-        throw (RuntimeException) throwable;
+      if (RuntimeException.class.isAssignableFrom(exception.getClass())) {
+        throw (RuntimeException) exception;
       }
 
-      throw new RuntimeException(throwable);
+      throw new RuntimeException(exception);
     }
   }
 
