@@ -47,6 +47,8 @@ dependencies {
 
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
+  testImplementation(libs.jcstress)
+  testAnnotationProcessor(libs.jcstress)
 
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server-common"))
@@ -59,8 +61,6 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.jcstress)
-  testAnnotationProcessor(libs.jcstress)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -30,6 +30,7 @@ import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -121,13 +122,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
         .executor(cleanupExec)
         .removalListener(
             (key, value, cause) -> {
-              if (cause != RemovalCause.EXPIRED) {
+              if (cause == RemovalCause.EXPLICIT || cause == RemovalCause.REPLACED) {
                 return;
               }
               try {
                 invalidateExpiredItem(key);
               } catch (Throwable t) {
-                LOG.error("Failed to remove entity value={} from cache asynchronously", value, t);
+                LOG.error(
+                    "Failed to remove entity key={} value={} from cache asynchronously, cause={}",
+                    key,
+                    value,
+                    cause,
+                    t);
               }
             });
 
@@ -323,15 +329,28 @@ public class CaffeineEntityCache extends BaseEntityCache {
         });
   }
 
-  private void syncEntitiesToCache(EntityCacheKey key, List<Entity> entities) {
-    List<Entity> entitiesFromCache = cacheData.getIfPresent(key);
-    if (entitiesFromCache != null && key.relationType() != null) {
-      entitiesFromCache.addAll(entities);
-      return;
+  /**
+   * Syncs the entities to the cache, if cache is too big and can not put it to the cache, then it
+   * will remove and cacheIndex will not be updated.
+   *
+   * @param key The key of the entities
+   * @param newEntities The new entities to sync to the cache
+   */
+  private void syncEntitiesToCache(EntityCacheKey key, List<Entity> newEntities) {
+    List<Entity> existingEntities = cacheData.getIfPresent(key);
+
+    if (existingEntities != null && key.relationType() != null) {
+      List<Entity> merged = new ArrayList<>(existingEntities);
+      merged.addAll(newEntities);
+
+      cacheData.put(key, merged);
+    } else {
+      cacheData.put(key, newEntities);
     }
 
-    cacheData.put(key, entities);
-    cacheIndex.put(key.toString(), key);
+    if (cacheData.policy().getIfPresentQuietly(key) != null) {
+      cacheIndex.put(key.toString(), key);
+    }
   }
 
   /**

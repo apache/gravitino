@@ -24,6 +24,8 @@ import java.util.List;
 import lombok.NonNull;
 import org.apache.gravitino.Entity;
 import org.checkerframework.checker.index.qual.NonNegative;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A {@link Weigher} implementation that calculates the weight of an entity based on its type. The
@@ -37,6 +39,7 @@ import org.checkerframework.checker.index.qual.NonNegative;
  * </ul>
  */
 public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>> {
+  private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
 
   private EntityCacheWeigher() {}
@@ -95,12 +98,17 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
     for (Entity entity : entities) {
       weight += calculateWeight(entity.type());
     }
+
+    if (weight > getMaxWeight()) {
+      LOG.warn("Entity group exceeds max weight: {}", weight);
+    }
+
     return weight;
   }
 
-  private int calculateWeight(Entity.EntityType tp) {
+  private int calculateWeight(Entity.EntityType entityType) {
     int weight;
-    switch (tp) {
+    switch (entityType) {
       case METALAKE:
         weight = METALAKE_WEIGHT;
         break;

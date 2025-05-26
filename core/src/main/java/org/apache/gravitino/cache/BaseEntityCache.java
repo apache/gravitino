@@ -101,12 +101,10 @@ public abstract class BaseEntityCache implements EntityCache {
    * @return The {@link NameIdentifier} of the metadata
    */
   protected static NameIdentifier getIdentFromMetadata(Entity metadata) {
-    if (metadata instanceof HasIdentifier) {
-      HasIdentifier hasIdentifier = (HasIdentifier) metadata;
-      return hasIdentifier.nameIdentifier();
-    }
+    validateEntityHasIdentifier(metadata);
+    HasIdentifier hasIdentifier = (HasIdentifier) metadata;
 
-    throw new IllegalArgumentException("Unsupported EntityType: " + metadata.type().getShortName());
+    return hasIdentifier.nameIdentifier();
   }
 
   /**

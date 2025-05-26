@@ -50,7 +50,7 @@ public class CacheConfig extends Config {
 
   // Cache entry expiration time
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
-      new ConfigBuilder("gravitino.server.cache.expiration.time")
+      new ConfigBuilder("gravitino.server.cache.expirationTimeMin")
           .doc("The time after which cache entries expire. default is 60 minutes.")
           .version(ConfigConstants.VERSION_0_10_0)
           .longConf()
