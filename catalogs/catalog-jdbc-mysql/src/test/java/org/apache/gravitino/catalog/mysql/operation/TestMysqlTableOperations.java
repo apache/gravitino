@@ -478,7 +478,7 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             // MySQL 5.7 doesn't support nullable timestamp
             .withNullable(false)
             .withComment("timestamp")
@@ -563,7 +563,7 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             // MySQL 5.7 doesn't support nullable timestamp
             .withNullable(false)
             .withComment("timestamp")
@@ -645,13 +645,13 @@ public class TestMysqlTableOperations extends TestMysql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_8")
-            .withType(Types.TimeType.get())
+            .withType(Types.TimeType.of(0))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .build());
     columns.add(
@@ -1054,5 +1054,38 @@ public class TestMysqlTableOperations extends TestMysql {
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", false);
     sql = MysqlTableOperations.deleteIndexDefinition(null, deleteIndex);
     Assertions.assertEquals("DROP INDEX `uk_1`", sql);
+  }
+
+  @Test
+  public void testCalculateDatetimePrecision() {
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATE", 10),
+        "DATE type should return 0 precision");
+
+    Assertions.assertEquals(
+        1,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIME", 10),
+        "TIME type should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIMESTAMP", 23),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 26),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("timestamp", 19),
+        "Lower case type name should work");
+
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50),
+        "Non-datetime type should return 0 precision");
   }
 }

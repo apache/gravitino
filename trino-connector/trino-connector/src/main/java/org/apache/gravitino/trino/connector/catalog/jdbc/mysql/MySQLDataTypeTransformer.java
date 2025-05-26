@@ -38,6 +38,9 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   // column should be less than 16383. For more details, please refer to
   // https://dev.mysql.com/doc/refman/8.0/en/char.html
   private static final int MYSQL_VARCHAR_LENGTH_LIMIT = 16383;
+  private static final int TIMESTAMP_PRECISION_SECONDS = 0;
+  private static final int TIMESTAMP_PRECISION_MILLIS = 3;
+  private static final int TIMESTAMP_PRECISION_MICROS = 6;
 
   @Override
   public io.trino.spi.type.Type getTrinoType(Type type) {
@@ -45,16 +48,62 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return io.trino.spi.type.VarcharType.createUnboundedVarcharType();
     } else if (Name.TIMESTAMP == type.name()) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
-      if (timestampType.hasTimeZone()) {
-        return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
-      } else {
-        return TimestampType.TIMESTAMP_SECONDS;
-      }
+      return timestampType.hasTimeZone()
+          ? getTimestampWithTimeZoneType(timestampType)
+          : getTimestampType(timestampType);
     } else if (Name.TIME == type.name()) {
-      return TimeType.TIME_SECONDS;
+      return getTimeType(((Types.TimeType) type));
     }
-
     return super.getTrinoType(type);
+  }
+
+  private static TimestampWithTimeZoneType getTimestampWithTimeZoneType(
+      Types.TimestampType timestampType) {
+    int precision = timestampType.precision().orElse(TIMESTAMP_PRECISION_SECONDS);
+    switch (precision) {
+      case TIMESTAMP_PRECISION_SECONDS:
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
+      case TIMESTAMP_PRECISION_MILLIS:
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
+      case TIMESTAMP_PRECISION_MICROS:
+        return TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
+      default:
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Invalid MySQL timestamp precision: " + precision + ". Valid values are 0, 3, 6");
+    }
+  }
+
+  private static TimestampType getTimestampType(Types.TimestampType timestampType) {
+    int precision = timestampType.precision().orElse(TIMESTAMP_PRECISION_SECONDS);
+    switch (precision) {
+      case TIMESTAMP_PRECISION_SECONDS:
+        return TimestampType.TIMESTAMP_SECONDS;
+      case TIMESTAMP_PRECISION_MILLIS:
+        return TimestampType.TIMESTAMP_MILLIS;
+      case TIMESTAMP_PRECISION_MICROS:
+        return TimestampType.TIMESTAMP_MICROS;
+      default:
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Invalid MySQL datetime precision: " + precision + ". Valid values are 0, 3, 6");
+    }
+  }
+
+  private static TimeType getTimeType(Types.TimeType timeType) {
+    int precision = timeType.precision().orElse(TIMESTAMP_PRECISION_SECONDS);
+    switch (precision) {
+      case TIMESTAMP_PRECISION_SECONDS:
+        return TimeType.TIME_SECONDS;
+      case TIMESTAMP_PRECISION_MILLIS:
+        return TimeType.TIME_MILLIS;
+      case TIMESTAMP_PRECISION_MICROS:
+        return TimeType.TIME_MICROS;
+      default:
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Invalid MySQL time precision: " + precision + ". Valid values are 0, 3, 6");
+    }
   }
 
   @Override
