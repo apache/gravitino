@@ -333,8 +333,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * Syncs the entities to the cache, if cache is too big and can not put it to the cache, then it
    * will remove and cacheIndex will not be updated.
    *
-   * @param key The key of the entities
-   * @param newEntities The new entities to sync to the cache
+   * @param key The key of the entities.
+   * @param newEntities The new entities to sync to the cache.
    */
   private void syncEntitiesToCache(EntityCacheKey key, List<Entity> newEntities) {
     List<Entity> existingEntities = cacheData.getIfPresent(key);
