@@ -145,6 +145,9 @@ public class HiveGravitinoOperationOperator {
   private @NotNull String getHivePartitionName(
       String[] names, InternalRow ident, StructType partitionSchema) {
     StringBuilder partitionName = new StringBuilder();
+    if (names == null) {
+      throw new IllegalArgumentException("Partition column names must not be null");
+    }
     for (int i = 0; i < names.length; i++) {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
