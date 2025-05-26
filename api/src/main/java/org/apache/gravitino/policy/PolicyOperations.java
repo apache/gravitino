@@ -47,7 +47,7 @@ public interface PolicyOperations {
    * @return The list of policies.
    * @throws NoSuchMetalakeException If the metalake does not exist.
    */
-  Policy[] listPoliciesInfo() throws NoSuchMetalakeException;
+  Policy[] listPolicyInfos() throws NoSuchMetalakeException;
 
   /**
    * Get a policy by its name under a metalake.
