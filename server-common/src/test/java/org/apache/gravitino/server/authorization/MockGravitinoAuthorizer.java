@@ -64,9 +64,7 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public void handleRolePrivilegeChange(Long roleId) {
-
-  }
+  public void handleRolePrivilegeChange(Long roleId) {}
 
   @Override
   public void close() {}
