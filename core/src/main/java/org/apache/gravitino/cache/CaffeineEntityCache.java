@@ -99,7 +99,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     /**
      * Executor for async cache cleanup, when a cache expires then use this executor to sync other
-     * cache and index trees
+     * cache and index trees.
      */
     ThreadPoolExecutor cleanupExec =
         new ThreadPoolExecutor(
