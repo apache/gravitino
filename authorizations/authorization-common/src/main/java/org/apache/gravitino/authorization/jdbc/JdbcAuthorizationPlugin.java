@@ -146,7 +146,7 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
     for (String sql : sqls) {
       executeUpdateSQL(sql);
     }
-    return null;
+    return true;
   }
 
   @Override
