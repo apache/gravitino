@@ -29,6 +29,7 @@ public abstract class JdbcTypeConverter
   public static final String TIMESTAMP = "timestamp";
   public static final String VARCHAR = "varchar";
   public static final String TEXT = "text";
+  public static final int PRECISION_SECOND = 0;
 
   public static class JdbcTypeBean {
     /** Data type name. */

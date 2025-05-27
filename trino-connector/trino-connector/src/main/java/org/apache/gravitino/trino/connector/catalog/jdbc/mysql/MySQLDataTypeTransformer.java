@@ -59,7 +59,9 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
 
   private static TimestampWithTimeZoneType getTimestampWithTimeZoneType(
       Types.TimestampType timestampType) {
-    int precision = timestampType.precision().orElse(TIMESTAMP_PRECISION_SECONDS);
+
+    int precision =
+        timestampType.hasPrecisionSet() ? timestampType.precision() : TIMESTAMP_PRECISION_SECONDS;
     switch (precision) {
       case TIMESTAMP_PRECISION_SECONDS:
         return TimestampWithTimeZoneType.TIMESTAMP_TZ_SECONDS;
@@ -75,7 +77,8 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   }
 
   private static TimestampType getTimestampType(Types.TimestampType timestampType) {
-    int precision = timestampType.precision().orElse(TIMESTAMP_PRECISION_SECONDS);
+    int precision =
+        timestampType.hasPrecisionSet() ? timestampType.precision() : TIMESTAMP_PRECISION_SECONDS;
     switch (precision) {
       case TIMESTAMP_PRECISION_SECONDS:
         return TimestampType.TIMESTAMP_SECONDS;
@@ -91,7 +94,7 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   }
 
   private static TimeType getTimeType(Types.TimeType timeType) {
-    int precision = timeType.precision().orElse(TIMESTAMP_PRECISION_SECONDS);
+    int precision = timeType.hasPrecisionSet() ? timeType.precision() : TIMESTAMP_PRECISION_SECONDS;
     switch (precision) {
       case TIMESTAMP_PRECISION_SECONDS:
         return TimeType.TIME_SECONDS;

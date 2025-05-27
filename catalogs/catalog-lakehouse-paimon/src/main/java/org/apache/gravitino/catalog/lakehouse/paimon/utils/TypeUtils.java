@@ -233,14 +233,17 @@ public class TypeUtils {
           return DataTypes.DATE();
         case TIME:
           Types.TimeType timeType = (Types.TimeType) type;
-          return DataTypes.TIME(timeType.precision().orElse(PRECISION_SECOND));
+          int timeTypePrecision =
+              timeType.hasPrecisionSet() ? timeType.precision() : PRECISION_SECOND;
+          return DataTypes.TIME(timeTypePrecision);
         case TIMESTAMP:
           Types.TimestampType timestampType = (Types.TimestampType) type;
+          int timestampTypePrecision =
+              timestampType.hasPrecisionSet() ? timestampType.precision() : PRECISION_MICROSECOND;
           if (timestampType.hasTimeZone()) {
-            return DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(
-                timestampType.precision().orElse(PRECISION_MICROSECOND));
+            return DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(timestampTypePrecision);
           } else {
-            return DataTypes.TIMESTAMP(timestampType.precision().orElse(PRECISION_MICROSECOND));
+            return DataTypes.TIMESTAMP(timestampTypePrecision);
           }
         case STRING:
           return DataTypes.STRING();

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.oceanbase.converter;
 
+import java.util.Optional;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -68,11 +69,17 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case TIME:
-        return Types.TimeType.of(typeBean.getDatetimePrecision());
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimeType::of)
+            .orElseGet(Types.TimeType::get);
       case TIMESTAMP:
-        return Types.TimestampType.withTimeZone(typeBean.getDatetimePrecision());
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimestampType::withTimeZone)
+            .orElseGet(Types.TimestampType::withTimeZone);
       case DATETIME:
-        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimestampType::withoutTimeZone)
+            .orElseGet(Types.TimestampType::withoutTimeZone);
       case NUMBER:
       case NUMERIC:
       case DECIMAL:
@@ -131,11 +138,9 @@ public class OceanBaseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.TimestampType) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
       String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
-      return timestampType
-          .precision()
-          .filter(p -> p >= 0)
-          .map(p -> String.format("%s(%d)", baseType, p))
-          .orElse(baseType);
+      return timestampType.hasPrecisionSet()
+          ? String.format("%s(%d)", baseType, timestampType.precision())
+          : baseType;
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {

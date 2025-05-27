@@ -436,7 +436,7 @@ public class TestDorisTableOperations extends TestDoris {
     columns.add(
         JdbcColumn.builder()
             .withName("col_14")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .build());
 
     Distribution distribution =
