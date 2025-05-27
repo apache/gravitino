@@ -143,7 +143,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
    *
    * @param context the command context.
    */
-  public TableFormat(CommandContext context) {
+  protected TableFormat(CommandContext context) {
     super(context);
     // TODO: add other options for TableFormat
   }
