@@ -23,6 +23,8 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,6 +43,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
@@ -205,12 +208,18 @@ public class FilesetOperations {
         fileset,
         subPath,
         locationName);
+
+    final String decodedSubPath =
+        StringUtils.isNotBlank(subPath)
+            ? URLDecoder.decode(subPath, StandardCharsets.UTF_8)
+            : subPath;
+
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
-            FileInfo[] files = dispatcher.listFiles(ident, locationName, subPath);
+            FileInfo[] files = dispatcher.listFiles(ident, locationName, decodedSubPath);
             Response response = Utils.ok(new FileInfoListResponse(DTOConverters.toDTO(files)));
             LOG.info(
                 "Files listed for fileset: {}.{}.{}.{}, subPath: {}, locationName:{}",

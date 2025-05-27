@@ -38,8 +38,6 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -250,11 +248,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       throw new UnsupportedOperationException("Filesystem operations are disabled on this server");
     }
 
-    String decodedSubPath = subPath;
-    if (StringUtils.isNotBlank(subPath)) {
-      decodedSubPath = URLDecoder.decode(subPath, StandardCharsets.UTF_8.name());
-    }
-    String actualPath = getFileLocation(ident, decodedSubPath, locationName);
+    String actualPath = getFileLocation(ident, subPath, locationName);
     Path formalizedPath = formalizePath(new Path(actualPath), conf);
 
     FileSystem fs = getFileSystem(formalizedPath, conf);
