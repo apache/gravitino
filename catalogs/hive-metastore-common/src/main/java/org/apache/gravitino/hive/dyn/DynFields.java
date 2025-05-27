@@ -121,7 +121,7 @@ public class DynFields {
     /**
      * Returns whether the field is always null.
      *
-     * @return true if this instance is the AlwaysNull sentinel; false otherwise
+     * @return true if this instance is {@link AlwaysNull#INSTANCE}; false otherwise
      */
     public boolean isAlwaysNull() {
       return this == AlwaysNull.INSTANCE;
