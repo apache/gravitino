@@ -52,7 +52,7 @@ public class TestMetadataFilterHelper {
       nameIdentifiers[2] =
           NameIdentifierUtil.ofSchema("testMetalake", "testCatalog2", "testSchema");
       NameIdentifier[] filtered =
-          MetadataFilterHelper.filter(
+          MetadataFilterHelper.filterByPrivilege(
               "testMetalake",
               MetadataObject.Type.SCHEMA,
               Privilege.Name.USE_SCHEMA.name(),
