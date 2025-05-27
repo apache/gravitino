@@ -23,6 +23,7 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -199,7 +200,8 @@ public class FilesetOperations {
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset,
       @QueryParam("subPath") @DefaultValue("/") String subPath,
-      @QueryParam("locationName") String locationName) {
+      @QueryParam("locationName") String locationName)
+      throws UnsupportedEncodingException {
     LOG.info(
         "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",
         metalake,
@@ -211,7 +213,7 @@ public class FilesetOperations {
 
     final String decodedSubPath =
         StringUtils.isNotBlank(subPath)
-            ? URLDecoder.decode(subPath, StandardCharsets.UTF_8)
+            ? URLDecoder.decode(subPath, StandardCharsets.UTF_8.name())
             : subPath;
 
     try {

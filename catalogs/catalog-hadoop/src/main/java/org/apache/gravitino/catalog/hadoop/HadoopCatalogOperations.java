@@ -241,14 +241,14 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+  public FileInfo[] listFiles(NameIdentifier filesetIdent, String locationName, String subPath)
       throws NoSuchFilesetException, IOException {
     if (disableFSOps) {
-      LOG.warn("Filesystem operations disabled, rejecting listFiles for {}", ident);
+      LOG.warn("Filesystem operations disabled, rejecting listFiles for {}", filesetIdent);
       throw new UnsupportedOperationException("Filesystem operations are disabled on this server");
     }
 
-    String actualPath = getFileLocation(ident, subPath, locationName);
+    String actualPath = getFileLocation(filesetIdent, subPath, locationName);
     Path formalizedPath = formalizePath(new Path(actualPath), conf);
 
     FileSystem fs = getFileSystem(formalizedPath, conf);
@@ -274,7 +274,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       return fileInfos;
 
     } catch (IOException e) {
-      throw new RuntimeException("Failed to list files in fileset" + ident, e);
+      throw new RuntimeException("Failed to list files in fileset" + filesetIdent, e);
     }
   }
 
