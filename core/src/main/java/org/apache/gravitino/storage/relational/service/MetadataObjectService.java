@@ -249,7 +249,6 @@ public class MetadataObjectService {
       return new HashMap<>();
     }
 
-    tablePOs.stream().map(TablePO::getCatalogId).collect(Collectors.toList());
     List<Long> schemaIds = tablePOs.stream().map(TablePO::getSchemaId).collect(Collectors.toList());
 
     Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
