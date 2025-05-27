@@ -113,7 +113,7 @@ public abstract class PlainFormat<T> extends BaseOutputFormat<T> {
    *
    * @param context The command context.
    */
-  public PlainFormat(CommandContext context) {
+  protected PlainFormat(CommandContext context) {
     super(context);
   }
 

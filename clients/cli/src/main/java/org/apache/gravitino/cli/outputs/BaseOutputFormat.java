@@ -39,7 +39,7 @@ public abstract class BaseOutputFormat<T> implements OutputFormat<T> {
    *
    * @param context the command context, must not be null;
    */
-  public BaseOutputFormat(CommandContext context) {
+  protected BaseOutputFormat(CommandContext context) {
     this.context = context;
   }
 

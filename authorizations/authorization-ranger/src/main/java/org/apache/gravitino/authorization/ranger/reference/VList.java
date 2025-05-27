@@ -41,7 +41,7 @@ public abstract class VList implements java.io.Serializable {
   protected long queryTimeMS = System.currentTimeMillis();
 
   /** Default constructor. This will set all the attributes to default value. */
-  public VList() {}
+  protected VList() {}
 
   public abstract int getListSize();
 
