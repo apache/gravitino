@@ -149,7 +149,7 @@ public class CatalogRegister {
         config.toCatalogConfig());
   }
 
-  private String generateDropCatalogCommand(String name) throws Exception {
+  private String generateDropCatalogCommand(String name) {
     return String.format("DROP CATALOG %s", name);
   }
 

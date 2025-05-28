@@ -16,7 +16,6 @@ package org.apache.gravitino.server.authentication;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -49,15 +48,8 @@ public class KerberosServerUtils {
    * Return the default realm for this JVM.
    *
    * @return The default realm
-   * @throws IllegalArgumentException If the default realm does not exist.
-   * @throws ClassNotFoundException Not thrown. Exists for compatibility.
-   * @throws NoSuchMethodException Not thrown. Exists for compatibility.
-   * @throws IllegalAccessException Not thrown. Exists for compatibility.
-   * @throws InvocationTargetException Not thrown. Exists for compatibility.
    */
-  public static String getDefaultRealm()
-      throws ClassNotFoundException, NoSuchMethodException, IllegalArgumentException,
-          IllegalAccessException, InvocationTargetException {
+  public static String getDefaultRealm() {
     // Any name is okay.
     return new KerberosPrincipal("tmp", 1).getRealm();
   }
