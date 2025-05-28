@@ -47,6 +47,8 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   archiveFileName.set("$baseName-$version.jar")
   archiveClassifier.set("")
 
+  exclude("org/slf4j/**")
+
   // Relocate dependencies to avoid conflicts
   relocate("com.google", "org.apache.gravitino.shaded.com.google")
   relocate("google", "org.apache.gravitino.shaded.google")
