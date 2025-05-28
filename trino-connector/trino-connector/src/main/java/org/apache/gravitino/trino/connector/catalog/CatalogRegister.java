@@ -77,7 +77,7 @@ public class CatalogRegister {
 
   private void checkSupportCatalogNameWithMetalake(
       ConnectorContext context, GravitinoConfig config) {
-    if (!config.simplifyCatalogNames()) {
+    if (!config.simplifyCatalogMode()) {
       int version = Integer.parseInt(context.getSpiVersion());
       if (version < MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION) {
         LOG.warn(
