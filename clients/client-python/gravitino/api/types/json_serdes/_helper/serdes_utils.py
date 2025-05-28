@@ -54,7 +54,6 @@ class SerdesUtils:
     UNPARSED_TYPE: ClassVar[str] = "unparsedType"
     EXTERNAL: ClassVar[str] = "external"
     CATALOG_STRING: ClassVar[str] = "catalogString"
-    NULL: ClassVar[str] = "NULL"
 
     NON_PRIMITIVE_TYPES: ClassVar[Set[Name]] = {
         Name.STRUCT,
@@ -289,7 +288,7 @@ class SerdesUtils:
         return Types.StructType.of(*field_list)
 
     @classmethod
-    def read_struct_field(cls, field_data: Dict[str, str]) -> Types.StructType.Field:
+    def read_struct_field(cls, field_data: Dict[str, Any]) -> Types.StructType.Field:
         Precondition.check_argument(
             field_data is not None and isinstance(field_data, dict),
             f"Cannot parse struct field from invalid JSON: {field_data}",
@@ -305,7 +304,7 @@ class SerdesUtils:
 
         name = field_data[cls.STRUCT_FIELD_NAME]
         field_type = cls.read_data_type(field_data[cls.TYPE])
-        nullable = field_data.get(cls.STRUCT_FIELD_NULLABLE, cls.NULL) == cls.NULL
+        nullable = field_data.get(cls.STRUCT_FIELD_NULLABLE, True)
         comment = field_data.get(cls.STRUCT_FIELD_COMMENT, "")
 
         return Types.StructType.Field(
@@ -319,7 +318,7 @@ class SerdesUtils:
             f"Cannot parse list type from missing element type: {list_data}",
         )
         element_type = cls.read_data_type(list_data[cls.LIST_ELEMENT_TYPE])
-        nullable = list_data.get(cls.LIST_ELEMENT_NULLABLE, cls.NULL) == cls.NULL
+        nullable = list_data.get(cls.LIST_ELEMENT_NULLABLE, True)
         return Types.ListType.of(element_type=element_type, element_nullable=nullable)
 
     @classmethod
