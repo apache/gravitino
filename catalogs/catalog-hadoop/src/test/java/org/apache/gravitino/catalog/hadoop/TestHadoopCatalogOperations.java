@@ -955,11 +955,15 @@ public class TestHadoopCatalogOperations {
     String comment = "comment31";
     String filesetName = "fileset31";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    createSchema(schemaName, comment, null, schemaPath, true);
-    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null, true);
+
+    createSchema(schemaName, comment, null, schemaPath);
+    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    Map<String, String> catalogProps = Maps.newHashMap();
+    catalogProps.put(DISABLE_FILESYSTEM_OPS, "true");
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
-      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      ops.initialize(catalogProps, randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
       UnsupportedOperationException ex =
