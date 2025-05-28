@@ -261,13 +261,26 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       FileInfo[] fileInfos = new FileInfo[fileStatuses.length];
       for (int i = 0; i < fileStatuses.length; i++) {
         FileStatus status = fileStatuses[i];
+
+        String catalogName = filesetIdent.namespace().level(1);
+        String schemaName = filesetIdent.namespace().level(2);
+        String filesetName = filesetIdent.name();
+
         fileInfos[i] =
             FileInfoDTO.builder()
                 .name(status.getPath().getName())
                 .isDir(status.isDirectory())
                 .size(status.isDirectory() ? 0L : status.getLen())
                 .lastModified(status.getModificationTime())
-                .path(status.getPath().toString())
+                .path(
+                    "/fileset/"
+                        + catalogName
+                        + "/"
+                        + schemaName
+                        + "/"
+                        + filesetName
+                        + "/subPath/"
+                        + status.getPath().getName())
                 .build();
       }
 
