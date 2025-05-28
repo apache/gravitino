@@ -265,7 +265,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
             FileInfoDTO.builder()
                 .name(status.getPath().getName())
                 .isDir(status.isDirectory())
-                .size(status.getLen())
+                .size(status.isDirectory() ? 0L : status.getLen())
                 .lastModified(status.getModificationTime())
                 .path(status.getPath().toString())
                 .build();

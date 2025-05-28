@@ -242,7 +242,7 @@ public class TestHadoopCatalogOperations {
         .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
             Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema11"));
 
-    for (int i = 10; i < 30; i++) {
+    for (int i = 10; i < 32; i++) {
       doReturn(new SchemaIds(1L, 1L, (long) i))
           .when(spySchemaMetaService)
           .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
@@ -956,7 +956,7 @@ public class TestHadoopCatalogOperations {
     String filesetName = "fileset31";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
     createSchema(schemaName, comment, null, schemaPath, true);
-    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
+    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null, true);
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
