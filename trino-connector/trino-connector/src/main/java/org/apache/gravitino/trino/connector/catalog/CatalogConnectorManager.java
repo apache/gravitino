@@ -127,7 +127,7 @@ public class CatalogConnectorManager {
       }
 
       Set<String> usedMetalakes = new HashSet<>();
-      if (config.simplifyCatalogMode()) {
+      if (config.singleMetalakeMode()) {
         usedMetalakes.add(targetMetalake);
         metalakes.computeIfAbsent(targetMetalake, this::retrieveMetalake);
       } else {
@@ -180,7 +180,7 @@ public class CatalogConnectorManager {
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
         Arrays.stream(catalogNames)
-            .map(id -> config.simplifyCatalogMode() ? id : getTrinoCatalogName(metalake.name(), id))
+            .map(id -> config.singleMetalakeMode() ? id : getTrinoCatalogName(metalake.name(), id))
             .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
@@ -277,7 +277,7 @@ public class CatalogConnectorManager {
   }
 
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.simplifyCatalogMode() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
+    return config.singleMetalakeMode() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
   }
 
   public String getTrinoCatalogName(GravitinoCatalog catalog) {

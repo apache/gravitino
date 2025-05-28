@@ -122,7 +122,7 @@ public class GravitinoConfig {
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
   }
 
-  public boolean simplifyCatalogMode() {
+  public boolean singleMetalakeMode() {
     return Boolean.parseBoolean(
         config.getOrDefault(
             GRAVITINO_SINGLE_METALAKE_MODE.key, GRAVITINO_SINGLE_METALAKE_MODE.defaultValue));
