@@ -21,8 +21,8 @@ import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -54,13 +54,14 @@ public class MetadataFilterHelper {
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    Entity.EntityType entityType = Entity.EntityType.valueOf(metadataType.name());
     return Arrays.stream(metadataList)
         .filter(
             metaDataName ->
                 gravitinoAuthorizer.authorize(
                     currentPrincipal,
                     metalake,
-                    MetadataObjects.of(metadataType, metaDataName),
+                    NameIdentifierUtil.toMetadataObject(metaDataName, entityType),
                     Privilege.Name.valueOf(privilege)))
         .toArray(NameIdentifier[]::new);
   }
@@ -109,19 +110,16 @@ public class MetadataFilterHelper {
         nameIdentifierMap.put(MetadataObject.Type.CATALOG, nameIdentifier);
         break;
       case SCHEMA:
-        String[] schemaParents = nameIdentifier.namespace().levels();
         nameIdentifierMap.put(MetadataObject.Type.SCHEMA, nameIdentifier);
         nameIdentifierMap.put(
-            MetadataObject.Type.CATALOG, NameIdentifierUtil.ofCatalog(metalake, schemaParents[1]));
+            MetadataObject.Type.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       case TABLE:
-        String[] tableParents = nameIdentifier.namespace().levels();
         nameIdentifierMap.put(MetadataObject.Type.TABLE, nameIdentifier);
         nameIdentifierMap.put(
-            MetadataObject.Type.SCHEMA,
-            NameIdentifierUtil.ofSchema(metalake, tableParents[0], tableParents[2]));
+            MetadataObject.Type.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
         nameIdentifierMap.put(
-            MetadataObject.Type.CATALOG, NameIdentifierUtil.ofCatalog(metalake, tableParents[1]));
+            MetadataObject.Type.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       default:
         break;

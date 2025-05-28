@@ -22,11 +22,12 @@ import java.util.Map;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Evaluate the runtime result of the AuthorizationExpression. */
@@ -61,7 +62,9 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put("authorizer", gravitinoAuthorizer);
     metadataNames.forEach(
         (metadataType, metadataName) -> {
-          MetadataObject metadataObject = MetadataObjects.of(metadataType, metadataName);
+          MetadataObject metadataObject =
+              NameIdentifierUtil.toMetadataObject(
+                  metadataName, Entity.EntityType.valueOf(metadataType.name()));
           ognlContext.put(metadataType.name(), metadataObject);
         });
     NameIdentifier nameIdentifier = metadataNames.get(MetadataObject.Type.METALAKE);
