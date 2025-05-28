@@ -106,7 +106,7 @@ public class MetadataObjectCredentialOperations {
               CallerContext.CallerContextHolder.set(context);
               LOG.info(
                   "Set the caller context for getting credential: {}",
-                  context.context().toString());
+                  context.context());
             }
             List<Credential> credentials = credentialOperationDispatcher.getCredentials(identifier);
             if (credentials == null) {
