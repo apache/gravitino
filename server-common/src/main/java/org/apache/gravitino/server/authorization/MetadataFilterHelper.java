@@ -46,7 +46,7 @@ public class MetadataFilterHelper {
    * @param metadataList metadata list.
    * @return metadata List that the user has permission to access.
    */
-  public static NameIdentifier[] filter(
+  public static NameIdentifier[] filterByPrivilege(
       String metalake,
       MetadataObject.Type metadataType,
       String privilege,
