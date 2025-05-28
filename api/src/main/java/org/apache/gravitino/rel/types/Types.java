@@ -366,6 +366,7 @@ public class Types {
       return precision;
     }
 
+    /** @return True if the time type has precision set, false otherwise. */
     public boolean hasPrecisionSet() {
       return precision != DATE_TIME_PRECISION_NOT_SET;
     }
@@ -459,6 +460,7 @@ public class Types {
       return precision;
     }
 
+    /** @return True if the timestamp type has precision set, false otherwise. */
     public boolean hasPrecisionSet() {
       return precision != DATE_TIME_PRECISION_NOT_SET;
     }
