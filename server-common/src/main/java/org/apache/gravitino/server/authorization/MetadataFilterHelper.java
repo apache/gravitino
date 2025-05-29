@@ -93,13 +93,14 @@ public class MetadataFilterHelper {
   }
 
   /**
-   * Extract the parent metadata from NameIdentify, for example, extract Schema and Catalog from
-   * Table.
+   * Extract the parent metadata from NameIdentifier.
+   * For example, when given a Table NameIdentifier, it returns a map containing the Table itself
+   * along with its parent Schema and Catalog.
    *
    * @param metalake metalake
    * @param metadataType metadata type
    * @param nameIdentifier metadata name
-   * @return metadata name
+   * @return A map containing the metadata object and all its parent objects, keyed by their types
    */
   private static Map<MetadataObject.Type, NameIdentifier> spiltMetadataNames(
       String metalake, MetadataObject.Type metadataType, NameIdentifier nameIdentifier) {
