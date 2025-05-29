@@ -20,7 +20,6 @@ package org.apache.gravitino.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.HashSet;
 import java.util.Properties;
 import javax.servlet.Servlet;
