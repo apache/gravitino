@@ -50,4 +50,6 @@ class TypeSerdes(JsonSerializable[Type]):
             Type: The deserialized Gravitino Type.
         """
 
-        return SerdesUtils.read_data_type(data)
+        # TODO: We shall implement the deserialization logic here.
+        # For now, it's just a placeholder.
+        pass
