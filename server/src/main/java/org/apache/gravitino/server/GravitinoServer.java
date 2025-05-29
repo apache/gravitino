@@ -20,6 +20,7 @@ package org.apache.gravitino.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.HashSet;
 import java.util.Properties;
 import javax.servlet.Servlet;
@@ -98,9 +99,10 @@ public class GravitinoServer extends ResourceConfig {
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
+    GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
+
     lineageService.initialize(
         new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
-    GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
 
     // initialize Jersey REST API resources.
     initializeRestApi();
