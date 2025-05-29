@@ -41,11 +41,23 @@ tasks.withType(ShadowJar::class.java) {
   }
 
   // Relocate dependencies to avoid conflicts
-  relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
-  relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
+  relocate("com.azure", "org.apache.gravitino.azure.shaded.com.azure")
+  relocate("com.ctc.wstx", "org.apache.gravitino.azure.shaded.com.ctc.wstx")
   relocate("com.fasterxml", "org.apache.gravitino.azure.shaded.com.fasterxml")
-  relocate("com.google.common", "org.apache.gravitino.azure.shaded.com.google.common")
-  relocate("org.eclipse.jetty", "org.apache.gravitino.azure.shaded.org.eclipse.jetty")
+  relocate("com.google", "org.apache.gravitino.azure.shaded.com.google")
+  relocate("com.microsoft.aad", "org.apache.gravitino.azure.shaded.com.microsoft.aad")
+  relocate("com.nimbusds", "org.apache.gravitino.azure.shaded.com.nimbusds")
+  relocate("com.sun", "org.apache.gravitino.azure.shaded.com.sun")
+  relocate("io.netty", "org.apache.gravitino.azure.shaded.io.netty")
+  relocate("net.minidev", "org.apache.gravitino.azure.shaded.net.minidev")
+  relocate("net.jcip.annotations", "org.apache.gravitino.azure.shaded.net.jcip.annotations")
+  relocate("org.apache.commons", "org.apache.gravitino.azure.shaded.org.apache.commons")
+  relocate("org.apache.httpcomponents", "org.apache.gravitino.azure.shaded.org.apache.httpcomponents")
+  relocate("org.checkerframework", "org.apache.gravitino.azure.shaded.org.checkerframework")
+  relocate("org.codehaus.stax2", "org.apache.gravitino.azure.shaded.org.codehaus.stax2")
+  relocate("org.objectweb.asm", "org.apache.gravitino.azure.shaded.org.objectweb.asm")
+  relocate("org.reactivestreams", "org.apache.gravitino.azure.shaded.org.reactivestreams")
+  relocate("reactor", "org.apache.gravitino.azure.shaded.reactor")
   mergeServiceFiles()
 }
 
