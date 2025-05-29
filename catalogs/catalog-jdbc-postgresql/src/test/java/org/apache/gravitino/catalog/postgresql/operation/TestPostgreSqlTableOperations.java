@@ -312,19 +312,19 @@ public class TestPostgreSqlTableOperations extends TestPostgreSql {
     columns.add(
         JdbcColumn.builder()
             .withName("col_8")
-            .withType(Types.TimeType.get())
+            .withType(Types.TimeType.of(6))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(6))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_10")
-            .withType(Types.TimestampType.withTimeZone())
+            .withType(Types.TimestampType.withTimeZone(6))
             .withNullable(false)
             .build());
     columns.add(
