@@ -414,7 +414,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      LOG.warn("Thread was interrupted while waiting for lock", e);
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
     }
   }
 
@@ -435,7 +435,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      LOG.warn("Thread was interrupted while waiting for lock", e);
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
     }
   }
 
