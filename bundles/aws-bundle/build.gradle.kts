@@ -41,7 +41,6 @@ tasks.withType(ShadowJar::class.java) {
     exclude(dependency("org.slf4j:slf4j-api"))
   }
 
-  relocate("com.amazonaws", "org.apache.gravitino.aws.shaded.com.amazonaws")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")
   relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
   relocate("com.google.errorprone", "org.apache.gravitino.aws.shaded.com.google.errorprone")
