@@ -21,7 +21,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.Privilege;
@@ -54,7 +54,7 @@ public class TestMetadataFilterHelper {
       NameIdentifier[] filtered =
           MetadataFilterHelper.filterByPrivilege(
               "testMetalake",
-              MetadataObject.Type.SCHEMA,
+              Entity.EntityType.SCHEMA,
               Privilege.Name.USE_SCHEMA.name(),
               nameIdentifiers);
       Assertions.assertEquals(2, filtered.length);
@@ -84,13 +84,13 @@ public class TestMetadataFilterHelper {
           MetadataFilterHelper.filterByExpression(
               "testMetalake",
               "CATALOG::USE_CATALOG && SCHEMA::USE_SCHEMA",
-              MetadataObject.Type.SCHEMA,
+              Entity.EntityType.SCHEMA,
               nameIdentifiers);
       Assertions.assertEquals(1, filtered.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered[0].toString());
       NameIdentifier[] filtered2 =
           MetadataFilterHelper.filterByExpression(
-              "testMetalake", "CATALOG::USE_CATALOG", MetadataObject.Type.SCHEMA, nameIdentifiers);
+              "testMetalake", "CATALOG::USE_CATALOG", Entity.EntityType.SCHEMA, nameIdentifiers);
       Assertions.assertEquals(2, filtered2.length);
       Assertions.assertEquals("testMetalake.testCatalog.testSchema", filtered2[0].toString());
       Assertions.assertEquals("testMetalake.testCatalog.testSchema2", filtered2[1].toString());

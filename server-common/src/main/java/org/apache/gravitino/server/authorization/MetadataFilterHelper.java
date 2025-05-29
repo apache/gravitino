@@ -41,20 +41,19 @@ public class MetadataFilterHelper {
   /**
    * Call {@link GravitinoAuthorizer} to filter the metadata list
    *
-   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param entityType for example, CATALOG, SCHEMA,TABLE, etc.
    * @param privilege for example, CREATE_CATALOG, CREATE_TABLE, etc.
    * @param metadataList metadata list.
    * @return metadata List that the user has permission to access.
    */
   public static NameIdentifier[] filterByPrivilege(
       String metalake,
-      MetadataObject.Type metadataType,
+      Entity.EntityType entityType,
       String privilege,
       NameIdentifier[] metadataList) {
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    Entity.EntityType entityType = Entity.EntityType.valueOf(metadataType.name());
     return Arrays.stream(metadataList)
         .filter(
             metaDataName ->
@@ -71,14 +70,14 @@ public class MetadataFilterHelper {
    *
    * @param metalake metalake
    * @param expression authorization expression
-   * @param metadataType for example, CATALOG, SCHEMA,TABLE, etc.
+   * @param entityType for example, CATALOG, SCHEMA,TABLE, etc.
    * @param nameIdentifiers metaData list.
    * @return metadata List that the user has permission to access.
    */
   public static NameIdentifier[] filterByExpression(
       String metalake,
       String expression,
-      MetadataObject.Type metadataType,
+      Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
@@ -86,27 +85,27 @@ public class MetadataFilterHelper {
         .filter(
             metaDataName -> {
               Map<MetadataObject.Type, NameIdentifier> nameIdentifierMap =
-                  spiltMetadataNames(metalake, metadataType, metaDataName);
+                  spiltMetadataNames(metalake, entityType, metaDataName);
               return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
             })
         .toArray(NameIdentifier[]::new);
   }
 
   /**
-   * Extract the parent metadata from NameIdentifier.
-   * For example, when given a Table NameIdentifier, it returns a map containing the Table itself
-   * along with its parent Schema and Catalog.
+   * Extract the parent metadata from NameIdentifier. For example, when given a Table
+   * NameIdentifier, it returns a map containing the Table itself along with its parent Schema and
+   * Catalog.
    *
    * @param metalake metalake
-   * @param metadataType metadata type
+   * @param entityType metadata type
    * @param nameIdentifier metadata name
    * @return A map containing the metadata object and all its parent objects, keyed by their types
    */
   private static Map<MetadataObject.Type, NameIdentifier> spiltMetadataNames(
-      String metalake, MetadataObject.Type metadataType, NameIdentifier nameIdentifier) {
+      String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
     Map<MetadataObject.Type, NameIdentifier> nameIdentifierMap = new HashMap<>();
     nameIdentifierMap.put(MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-    switch (metadataType) {
+    switch (entityType) {
       case CATALOG:
         nameIdentifierMap.put(MetadataObject.Type.CATALOG, nameIdentifier);
         break;
