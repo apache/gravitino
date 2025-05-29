@@ -62,6 +62,14 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_METALAKE =
       new ConfigEntry("gravitino.metalake", "The metalake name for used", "", true);
 
+  @Deprecated
+  private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
+      new ConfigEntry(
+          "gravitino.simplify-catalog-names",
+          "Omit metalake prefix for catalog names, is deprecated, use gravitino.use-single-metalake instead",
+          "true",
+          false);
+
   private static final ConfigEntry GRAVITINO_SINGLE_METALAKE_MODE =
       new ConfigEntry(
           "gravitino.use-single-metalake",
@@ -92,7 +100,7 @@ public class GravitinoConfig {
 
   private static final ConfigEntry GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND =
       new ConfigEntry(
-          "gravitino.metadata.refresh-interval seconds",
+          "gravitino.metadata.refresh-interval-seconds",
           "The interval in seconds to refresh the metadata from Gravitino server",
           "10",
           false);
