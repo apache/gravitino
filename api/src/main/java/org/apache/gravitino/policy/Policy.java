@@ -63,8 +63,8 @@ public interface Policy extends Auditable {
 
   /**
    * Whether the policy is exclusive or not. If the policy is exclusive, only one of the same type
-   * policy can be associated with the same object. If the policy is not exclusive, multiple policies of
-   * the same type can be associated with the same object.
+   * policy can be associated with the same object. If the policy is not exclusive, multiple
+   * policies of the same type can be associated with the same object.
    *
    * @return True if the policy is exclusive, false otherwise.
    */
@@ -72,8 +72,8 @@ public interface Policy extends Auditable {
 
   /**
    * Whether the policy is inheritable or not. If the policy is inheritable, it can be inherited by
-   * child objects. If the policy is not inheritable, it can only be associated with the metadata object
-   * itself.
+   * child objects. If the policy is not inheritable, it can only be associated with the metadata
+   * object itself.
    *
    * @return True if the policy is inheritable, false otherwise.
    */

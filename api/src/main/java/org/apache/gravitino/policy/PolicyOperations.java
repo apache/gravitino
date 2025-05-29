@@ -82,13 +82,15 @@ public interface PolicyOperations {
    * @param comment The comment of the policy.
    * @param enabled Whether the policy is enabled or not.
    * @param exclusive Whether the policy is exclusive or not. If the policy is exclusive, only one
-   *     of the same type policy can be associated with the same object, and the same type of policy on a
-   *     metadata object will override the one inherited from the parent object. If the policy is
-   *     not exclusive, multiple policies of the same type can be associated with the same object.
+   *     of the same type policy can be associated with the same object, and the same type of policy
+   *     on a metadata object will override the one inherited from the parent object. If the policy
+   *     is not exclusive, multiple policies of the same type can be associated with the same
+   *     object.
    * @param inheritable Whether the policy is inheritable or not. If the policy is inheritable, it
    *     will be inherited automatically by child objects. If the policy is not inheritable, it can
    *     only be associated with the metadata object itself.
-   * @param supportedObjectTypes The set of the metadata object types that the policy can be associated with
+   * @param supportedObjectTypes The set of the metadata object types that the policy can be
+   *     associated with
    * @param content The content of the policy.
    * @return The created policy.
    * @throws PolicyAlreadyExistsException If the policy already exists.

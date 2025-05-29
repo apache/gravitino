@@ -20,7 +20,9 @@ package org.apache.gravitino.exceptions;
 
 import com.google.errorprone.annotations.FormatMethod;
 
-/** Exception thrown when a policy with specified name is already associated with a metadata object. */
+/**
+ * Exception thrown when a policy with specified name is already associated with a metadata object.
+ */
 public class PolicyAlreadyAssociatedException extends AlreadyExistsException {
 
   /**

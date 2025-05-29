@@ -23,8 +23,8 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 
 /**
- * The interface for supporting getting or associating policies with a metadata object. This interface
- * will be mixed with metadata objects to provide policy operations.
+ * The interface for supporting getting or associating policies with a metadata object. This
+ * interface will be mixed with metadata objects to provide policy operations.
  */
 @Evolving
 public interface SupportsPolicies {
