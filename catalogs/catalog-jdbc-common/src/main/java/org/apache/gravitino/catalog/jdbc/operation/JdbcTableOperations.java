@@ -257,7 +257,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected Transform[] getTablePartitioning(
-      Connection connection, String databaseName, String tableName) {
+      Connection connection, String databaseName, String tableName) throws SQLException {
     return Transforms.EMPTY_TRANSFORM;
   }
 
