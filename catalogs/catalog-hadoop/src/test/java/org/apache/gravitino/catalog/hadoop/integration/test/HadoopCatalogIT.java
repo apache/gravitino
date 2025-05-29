@@ -40,7 +40,7 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
-import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.*;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -62,6 +62,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.JsonNode;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
+import org.testcontainers.shaded.com.github.dockerjava.core.MediaType;
 
 @Tag("gravitino-docker-test")
 public class HadoopCatalogIT extends BaseIT {
@@ -149,6 +152,16 @@ public class HadoopCatalogIT extends BaseIT {
   private void dropSchema() {
     catalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
+  }
+
+  protected void uploadFileIntoFileset(String filesetName, String subPath, String content) {
+    String targetUrl = String.format("/fileset/%s/%s/%s/%s", catalogName, schemaName, filesetName, subPath);
+    HTTPClient client = HTTPClient.builder(Collections.emptyMap())
+            .uri(getBaseUrl())
+            .withAuthDataProvider(authDataProvider)
+            .withObjectMapper(ObjectMapperProvider.objectMapper())
+            .build();
+    client.post(targetUrl);
   }
 
   @Test
@@ -654,6 +667,50 @@ public class HadoopCatalogIT extends BaseIT {
     Assertions.assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
     Assertions.assertEquals(fileset1.name(), nameIdentifiers1[0].name());
     Assertions.assertEquals(fileset2.name(), nameIdentifiers1[1].name());
+  }
+
+  @Test
+  public void testListFilesetFiles() throws IOException {
+    // clear schema
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_fileset_files";
+    String storageLocation = storageLocation(filesetName);
+    createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    String fileName = "test1.txt";
+    String content = "hello";
+    uploadFileIntoFileset(filesetName, "/" + fileName, content);
+
+    HTTPClient client = HTTPClient.builder()
+            .uri(getBaseUrl())
+            .withAuthDataProvider(authDataProvider)
+            .withObjectMapper(ObjectMapperProvider.objectMapper())
+            .build();
+    String url = String.format(
+            "%s/fileset/%s/%s/%s/subPath/test1.txt", getBaseUrl(), catalogName, schemaName, filesetName
+    );
+    String actualJson = client.target(url)
+            .request(MediaType.APPLICATION_JSON)
+            .get(String.class);
+
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode array = mapper.readTree(actualJson);
+    Assertions.assertEquals(1, array.size(), "Should return exactly one file metadata");
+    JsonNode fileMetadata = array.get(0);
+
+    Assertions.assertEquals(fileName, fileMetadata.get("name").asText(), "Name should match");
+    Assertions.assertFalse(fileMetadata.get("isDir").asBoolean(), "isDir should be false");
+    Assertions.assertTrue(
+            fileMetadata.get("lastModified").asLong() > 0,
+            "lastModified should be a positive timestamp"
+    );
+    Assertions.assertTrue(
+            fileMetadata.get("path").asText().endsWith("/" + fileName),
+            "Path should end with the file name"
+    );
   }
 
   @Test
