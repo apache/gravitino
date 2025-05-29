@@ -492,11 +492,6 @@ public class Types {
     public int hashCode() {
       return Objects.hash(withTimeZone, precision);
     }
-
-    @Override
-    public String toString() {
-      return "TimestampType{" + "withTimeZone=" + withTimeZone + ", precision=" + precision + '}';
-    }
   }
 
   /** The interval year type in Gravitino. */

@@ -609,10 +609,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected JdbcColumn.Builder getBasicJdbcColumnInfo(ResultSet column) throws SQLException {
     String typeName = column.getString("TYPE_NAME");
     int columnSize = column.getInt("COLUMN_SIZE");
+    int scale = column.getInt("DECIMAL_DIGITS");
     JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
     typeBean.setColumnSize(columnSize);
-    typeBean.setScale(column.getInt("DECIMAL_DIGITS"));
-    Integer datetimePrecision = calculateDatetimePrecision(typeName, columnSize);
+    typeBean.setScale(scale);
+    Integer datetimePrecision = calculateDatetimePrecision(typeName, columnSize, scale);
     typeBean.setDatetimePrecision(datetimePrecision);
 
     String comment = column.getString("REMARKS");
@@ -636,9 +637,10 @@ public abstract class JdbcTableOperations implements TableOperation {
    *
    * @param typeName the type name from database
    * @param columnSize the column size from database
+   * @param scale
    * @return the precision of the time/datetime/timestamp type
    */
-  public Integer calculateDatetimePrecision(String typeName, int columnSize) {
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     return null;
   }
 }

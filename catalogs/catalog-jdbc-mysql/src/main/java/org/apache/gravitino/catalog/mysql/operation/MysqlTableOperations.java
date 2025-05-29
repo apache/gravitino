@@ -674,7 +674,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   @Override
-  public Integer calculateDatetimePrecision(String typeName, int columnSize) {
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     String upperTypeName = typeName.toUpperCase();
     switch (upperTypeName) {
       case "TIME":
