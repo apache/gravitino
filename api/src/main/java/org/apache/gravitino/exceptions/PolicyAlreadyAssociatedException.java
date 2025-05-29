@@ -20,8 +20,8 @@ package org.apache.gravitino.exceptions;
 
 import com.google.errorprone.annotations.FormatMethod;
 
-/** Exception thrown when a policy with specified name is already applied to a metadata object. */
-public class PolicyAlreadyAppliedException extends AlreadyExistsException {
+/** Exception thrown when a policy with specified name is already associated with a metadata object. */
+public class PolicyAlreadyAssociatedException extends AlreadyExistsException {
 
   /**
    * Constructs a new exception with the specified detail message.
@@ -30,7 +30,7 @@ public class PolicyAlreadyAppliedException extends AlreadyExistsException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public PolicyAlreadyAppliedException(String message, Object... args) {
+  public PolicyAlreadyAssociatedException(String message, Object... args) {
     super(message, args);
   }
 
@@ -42,7 +42,7 @@ public class PolicyAlreadyAppliedException extends AlreadyExistsException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public PolicyAlreadyAppliedException(Throwable cause, String message, Object... args) {
+  public PolicyAlreadyAssociatedException(Throwable cause, String message, Object... args) {
     super(cause, message, args);
   }
 }

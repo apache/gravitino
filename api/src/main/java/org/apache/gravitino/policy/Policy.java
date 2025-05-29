@@ -27,7 +27,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.IllegalPolicyException;
 
 /**
- * The interface of the policy. The policy is a set of rules that can be applied to a metadata
+ * The interface of the policy. The policy is a set of rules that can be associated with a metadata
  * object. The policy can be used for data governance and so on.
  */
 @Evolving
@@ -63,8 +63,8 @@ public interface Policy extends Auditable {
 
   /**
    * Whether the policy is exclusive or not. If the policy is exclusive, only one of the same type
-   * policy can be applied to the same object. If the policy is not exclusive, multiple policies of
-   * the same type can be applied to the same object.
+   * policy can be associated with the same object. If the policy is not exclusive, multiple policies of
+   * the same type can be associated with the same object.
    *
    * @return True if the policy is exclusive, false otherwise.
    */
@@ -72,7 +72,7 @@ public interface Policy extends Auditable {
 
   /**
    * Whether the policy is inheritable or not. If the policy is inheritable, it can be inherited by
-   * child objects. If the policy is not inheritable, it can only be applied to the metadata object
+   * child objects. If the policy is not inheritable, it can only be associated with the metadata object
    * itself.
    *
    * @return True if the policy is inheritable, false otherwise.
@@ -80,9 +80,9 @@ public interface Policy extends Auditable {
   boolean inheritable();
 
   /**
-   * Get the set of the metadata object types that the policy can be applied to.
+   * Get the set of the metadata object types that the policy can be associated with.
    *
-   * @return The set of the metadata object types that the policy can be applied to.
+   * @return The set of the metadata object types that the policy can be associated with.
    */
   Set<MetadataObject.Type> supportedObjectTypes();
 

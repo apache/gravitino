@@ -20,10 +20,10 @@ package org.apache.gravitino.policy;
 
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAppliedException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 
 /**
- * The interface for supporting getting or applying policies to a metadata object. This interface
+ * The interface for supporting getting or associating policies with a metadata object. This interface
  * will be mixed with metadata objects to provide policy operations.
  */
 @Evolving
@@ -44,22 +44,22 @@ public interface SupportsPolicies {
   Policy getPolicy(String name) throws NoSuchPolicyException;
 
   /**
-   * Apply policies to the specific object. The policiesToApply will be applied to the object and
+   * Associate policies to the specific object. The policiesToAdd will be applied to the object and
    * the policiesToRemove will be removed from the object. Note that:
    *
    * <ol>
-   *   <li>Applying or removing policies that are not existed will be ignored.
-   *   <li>If the same name policy is in both policiesToApply and policiesToRemove, it will be
+   *   <li>Adding or removing policies that are not existed will be ignored.
+   *   <li>If the same name policy is in both policiesToAdd and policiesToRemove, it will be
    *       ignored.
    *   <li>If the policy is already applied to the object, it will throw {@link
-   *       PolicyAlreadyAppliedException}
+   *       PolicyAlreadyAssociatedException}
    * </ol>
    *
-   * @param policiesToApply The policies to apply.
+   * @param policiesToAdd The policies to be added to the object.
    * @param policiesToRemove The policies to remove.
    * @return The list of applied policies.
-   * @throws PolicyAlreadyAppliedException If the policy is already applied to the object.
+   * @throws PolicyAlreadyAssociatedException If the policy is already applied to the object.
    */
-  String[] applyPolicies(String[] policiesToApply, String[] policiesToRemove)
-      throws PolicyAlreadyAppliedException;
+  String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
+      throws PolicyAlreadyAssociatedException;
 }
