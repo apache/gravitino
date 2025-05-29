@@ -76,6 +76,8 @@ public class TopicDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    printResults(gTopic.name() + "," + gTopic.comment());
+    if (gTopic != null) {
+      printResults(gTopic);
+    }
   }
 }

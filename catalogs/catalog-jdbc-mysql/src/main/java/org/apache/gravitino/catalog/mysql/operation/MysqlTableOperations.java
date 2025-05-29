@@ -311,7 +311,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     // Return the generated SQL statement
     String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
-    LOG.info("Generated alter table:{} sql: {}", databaseName + "." + tableName, result);
+    LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
   }
 

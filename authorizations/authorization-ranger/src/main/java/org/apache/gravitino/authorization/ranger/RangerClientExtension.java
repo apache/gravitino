@@ -119,7 +119,7 @@ public class RangerClientExtension extends RangerClient {
     try {
       callAPIMethodClassResponseType.invoke(this, CREATE_EXTERNAL_USER, null, user, VXUser.class);
     } catch (UniformInterfaceException e) {
-      LOG.error("Failed to create user: " + e.getResponse().getEntity(String.class));
+      LOG.error("Failed to create user: {}", e.getResponse().getEntity(String.class), e);
       return Boolean.FALSE;
     } catch (InvocationTargetException | IllegalAccessException e) {
       Throwable cause = e.getCause();
@@ -169,7 +169,7 @@ public class RangerClientExtension extends RangerClient {
     try {
       callAPIMethodClassResponseType.invoke(this, CREATE_GROUP, null, group, VXGroup.class);
     } catch (UniformInterfaceException e) {
-      LOG.error("Failed to create user: " + e.getResponse().getEntity(String.class));
+      LOG.error("Failed to create group: {}", e.getResponse().getEntity(String.class), e);
       return Boolean.FALSE;
     } catch (InvocationTargetException | IllegalAccessException e) {
       throw new RuntimeException(e);
