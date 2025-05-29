@@ -48,7 +48,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google.thirdparty", "org.apache.gravitino.aws.shaded.com.google.thirdparty")
   relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
   relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
-  relocate("org.apache.hadoop.fs.s3a", "org.apache.gravitino.aws.shaded.org.apache.hadoop.fs.s3a")
   relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
   relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
   relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
