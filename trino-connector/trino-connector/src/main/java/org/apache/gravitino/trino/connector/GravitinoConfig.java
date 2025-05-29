@@ -63,6 +63,7 @@ public class GravitinoConfig {
       new ConfigEntry("gravitino.metalake", "The metalake name for used", "", true);
 
   @Deprecated
+  @SuppressWarnings("UnusedVariable")
   private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
       new ConfigEntry(
           "gravitino.simplify-catalog-names",
