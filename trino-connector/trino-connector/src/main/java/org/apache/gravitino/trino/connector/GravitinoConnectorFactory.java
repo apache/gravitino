@@ -108,12 +108,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
-      if (config.simplifyCatalogNames() && !catalogConnectorManager.getUsedMetalakes().isEmpty()) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
-            "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
-      }
-      catalogConnectorManager.addMetalake(metalake);
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
       return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);
