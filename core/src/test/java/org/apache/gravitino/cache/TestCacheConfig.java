@@ -19,21 +19,19 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestCacheConfig {
   @Test
   void testDefaultCacheConfig() {
-    CacheConfig cacheConfig = new CacheConfig();
-
-    Assertions.assertEquals(10_000, cacheConfig.getMaxSize());
-    Assertions.assertTrue(cacheConfig.isExpirationEnabled());
-    Assertions.assertEquals(60, cacheConfig.getExpirationTime());
-    Assertions.assertEquals(TimeUnit.MINUTES, cacheConfig.getExpirationTimeUnit());
-    Assertions.assertFalse(cacheConfig.isCacheStatusEnabled());
-    Assertions.assertTrue(cacheConfig.isWeigherEnabled());
-    Assertions.assertEquals(200_302_000, cacheConfig.getMaxWeight());
+    Config config = new Config(false) {};
+    Assertions.assertEquals(10_000, config.get(Configs.CACHE_MAX_ENTRIES));
+    Assertions.assertEquals(3_600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
+    Assertions.assertFalse(config.get(Configs.CACHE_STATUS_ENABLED));
+    Assertions.assertTrue(config.get(Configs.CACHE_WEIGHER_ENABLED));
+    Assertions.assertEquals(200_302_000L, EntityCacheWeigher.getMaxWeight());
   }
 }

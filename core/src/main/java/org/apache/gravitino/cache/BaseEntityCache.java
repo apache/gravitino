@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -55,7 +56,7 @@ public abstract class BaseEntityCache implements EntityCache {
   private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAP;
   // The entity store used by the cache, initialized through the constructor.
   protected final RelationalEntityStore entityStore;
-  protected final CacheConfig cacheConfig;
+  protected final Config cacheConfig;
 
   static {
     Map<Entity.EntityType, Class<?>> map = new EnumMap<>(Entity.EntityType.class);
@@ -76,6 +77,17 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
+   * Constructs a new {@link BaseEntityCache} instance. If the provided entityStore is null, it will
+   * use the entity store configured in the Gravitino environment.
+   *
+   * @param entityStore The entity store to be used by the cache, can be null.
+   */
+  public BaseEntityCache(Config config, EntityStore entityStore) {
+    this.cacheConfig = config;
+    this.entityStore = (RelationalEntityStore) entityStore;
+  }
+
+  /**
    * Returns the class of the entity based on its type.
    *
    * @param type The entity type
@@ -84,7 +96,7 @@ public abstract class BaseEntityCache implements EntityCache {
    */
   @SuppressWarnings("unchecked")
   public static <E extends Entity & HasIdentifier> Class<E> getEntityClass(Entity.EntityType type) {
-    Preconditions.checkNotNull(type, "EntityType must not be null");
+    Preconditions.checkArgument(type != null, "EntityType must not be null");
 
     Class<?> clazz = ENTITY_CLASS_MAP.get(type);
     if (clazz == null) {
@@ -95,14 +107,14 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Returns the {@link NameIdentifier} of the metadata based on its type.
+   * Returns the {@link NameIdentifier} of the entity based on its type.
    *
-   * @param metadata The entity
-   * @return The {@link NameIdentifier} of the metadata
+   * @param entity The entity
+   * @return The {@link NameIdentifier} of the entity
    */
-  protected static NameIdentifier getIdentFromMetadata(Entity metadata) {
-    validateEntityHasIdentifier(metadata);
-    HasIdentifier hasIdentifier = (HasIdentifier) metadata;
+  protected static NameIdentifier getIdentFromEntity(Entity entity) {
+    validateEntityHasIdentifier(entity);
+    HasIdentifier hasIdentifier = (HasIdentifier) entity;
 
     return hasIdentifier.nameIdentifier();
   }
@@ -113,9 +125,8 @@ public abstract class BaseEntityCache implements EntityCache {
    * @param entity The entity to check.
    */
   protected static void validateEntityHasIdentifier(Entity entity) {
-    if (!(entity instanceof HasIdentifier)) {
-      throw new IllegalArgumentException("Unsupported EntityType: " + entity.type().getShortName());
-    }
+    Preconditions.checkArgument(
+        entity instanceof HasIdentifier, "Unsupported EntityType: " + entity.type());
   }
 
   /**
@@ -144,17 +155,6 @@ public abstract class BaseEntityCache implements EntityCache {
     validateEntityHasIdentifier(entity);
 
     return (E) entity;
-  }
-
-  /**
-   * Constructs a new {@link BaseEntityCache} instance. If the provided entityStore is null, it will
-   * use the entity store configured in the Gravitino environment.
-   *
-   * @param entityStore The entity store to be used by the cache, can be null.
-   */
-  public BaseEntityCache(CacheConfig cacheConfig, EntityStore entityStore) {
-    this.cacheConfig = cacheConfig;
-    this.entityStore = (RelationalEntityStore) entityStore;
   }
 
   /**

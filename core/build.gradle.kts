@@ -47,8 +47,6 @@ dependencies {
 
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
-  testImplementation(libs.jcstress)
-  testAnnotationProcessor(libs.jcstress)
 
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server-common"))

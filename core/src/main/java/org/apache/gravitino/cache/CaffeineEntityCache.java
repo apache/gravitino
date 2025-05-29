@@ -41,6 +41,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -66,7 +68,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
   @VisibleForTesting
-  public static void resetForTest() {
+  static void resetForTest() {
     INSTANCE = null;
   }
 
@@ -77,7 +79,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param entityStore The entity store to load entities from the database
    * @return The instance of {@link CaffeineEntityCache}
    */
-  public static CaffeineEntityCache getInstance(CacheConfig cacheConfig, EntityStore entityStore) {
+  public static CaffeineEntityCache getInstance(Config cacheConfig, EntityStore entityStore) {
     if (INSTANCE == null) {
       synchronized (CaffeineEntityCache.class) {
         if (INSTANCE == null) {
@@ -94,7 +96,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param cacheConfig the cache configuration
    * @param entityStore The entity store to load entities from the database
    */
-  private CaffeineEntityCache(CacheConfig cacheConfig, EntityStore entityStore) {
+  private CaffeineEntityCache(Config cacheConfig, EntityStore entityStore) {
     super(cacheConfig, entityStore);
     cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
@@ -139,7 +141,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     this.cacheData = cacheDataBuilder.build();
 
-    if (cacheConfig.isCacheStatusEnabled()) {
+    if (cacheConfig.get(Configs.CACHE_STATUS_ENABLED)) {
       startCacheStatsMonitor();
     }
   }
@@ -297,7 +299,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public <E extends Entity & HasIdentifier> void put(E entity) {
     withLock(
         () -> {
-          NameIdentifier identifier = getIdentFromMetadata(entity);
+          NameIdentifier identifier = getIdentFromEntity(entity);
           EntityCacheKey entityCacheKey = EntityCacheKey.of(identifier, entity.type());
           syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entity));
         });
@@ -316,10 +318,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Removes the expired metadata from the cache. This method is a hook method for the Cache, when
-   * an entry expires, it will call this method.
+   * Removes the expired entity from the cache. This method is a hook method for the Cache, when an
+   * entry expires, it will call this method.
    *
-   * @param key The key of the expired metadata
+   * @param key The key of the expired entity
    */
   @Override
   protected void invalidateExpiredItem(EntityCacheKey key) {
@@ -362,22 +364,22 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @return The new instance of Caffeine cache builder
    */
   @SuppressWarnings("unchecked")
-  private <KEY, VALUE> Caffeine<KEY, VALUE> newBaseBuilder(CacheConfig cacheConfig) {
+  private <KEY, VALUE> Caffeine<KEY, VALUE> newBaseBuilder(Config cacheConfig) {
     Caffeine<Object, Object> builder = Caffeine.newBuilder();
 
-    if (cacheConfig.isWeigherEnabled()) {
-      builder.maximumWeight(cacheConfig.getMaxWeight());
+    if (cacheConfig.get(Configs.CACHE_WEIGHER_ENABLED)) {
+      builder.maximumWeight(EntityCacheWeigher.getMaxWeight());
       builder.weigher(EntityCacheWeigher.getInstance());
     } else {
-      builder.maximumSize(cacheConfig.getMaxSize());
+      builder.maximumSize(cacheConfig.get(Configs.CACHE_MAX_ENTRIES));
     }
 
-    if (cacheConfig.isExpirationEnabled()) {
+    if (cacheConfig.get(Configs.CACHE_EXPIRATION_ENABLED)) {
       builder.expireAfterWrite(
-          cacheConfig.getExpirationTime(), cacheConfig.getExpirationTimeUnit());
+          cacheConfig.get(Configs.CACHE_EXPIRATION_TIME), TimeUnit.MILLISECONDS);
     }
 
-    if (cacheConfig.isCacheStatusEnabled()) {
+    if (cacheConfig.get(Configs.CACHE_STATUS_ENABLED)) {
       builder.recordStats();
     }
 
@@ -385,7 +387,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Invalidates the entities by the given metadata key.
+   * Invalidates the entities by the given cache key.
    *
    * @param identifier The identifier of the entities to invalidate
    */
@@ -403,8 +405,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param action The action to run with the lock
    */
   private void withLock(Runnable action) {
-    opLock.lock();
+
     try {
+      opLock.lock();
       action.run();
     } finally {
       opLock.unlock();

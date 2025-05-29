@@ -343,4 +343,48 @@ public class Configs {
           .stringConf()
           .toSequence()
           .createWithDefault(Collections.emptyList());
+
+  // Maximum number of entries in the cache
+  public static final ConfigEntry<Integer> CACHE_MAX_ENTRIES =
+      new ConfigBuilder("gravitino.cache.maxEntries")
+          .doc("Maximum number of entries allowed in the cache.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(10_000);
+
+  // Whether to enable cache expiration
+  public static final ConfigEntry<Boolean> CACHE_EXPIRATION_ENABLED =
+      new ConfigBuilder("gravitino.cache.expiration.enabled")
+          .doc("Whether to enable cache entry expiration based on time.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .booleanConf()
+          .createWithDefault(true);
+
+  // Cache entry expiration time
+  public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
+      new ConfigBuilder("gravitino.cache.expireTimeInMs")
+          .doc(
+              "Time in milliseconds after which a cache entry expires. Default is 3,600,000 ms (1 hour).")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(3_600_000L);
+
+  // Whether to enable cache status logging
+  public static final ConfigEntry<Boolean> CACHE_STATUS_ENABLED =
+      new ConfigBuilder("gravitino.cache.status.enabled")
+          .doc("Whether to collect and log cache statistics such as hit/miss count and size.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  // Whether to enable weighted cache
+  public static final ConfigEntry<Boolean> CACHE_WEIGHER_ENABLED =
+      new ConfigBuilder("gravitino.cache.weigher.enabled")
+          .doc(
+              "Whether to enable weighted cache eviction. Entries are evicted based on weight instead of count.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .booleanConf()
+          .createWithDefault(true);
 }
