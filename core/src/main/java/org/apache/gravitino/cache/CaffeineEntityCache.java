@@ -405,12 +405,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param action The action to run with the lock
    */
   private void withLock(Runnable action) {
-
     try {
-      opLock.lock();
-      action.run();
-    } finally {
-      opLock.unlock();
+      opLock.lockInterruptibly();
+      try {
+        action.run();
+      } finally {
+        opLock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.warn("Thread was interrupted while waiting for lock", e);
     }
   }
 
@@ -422,11 +426,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @param <T> The type of the result
    */
   private <T> T withLock(Supplier<T> action) {
-    opLock.lock();
     try {
-      return action.get();
-    } finally {
-      opLock.unlock();
+      opLock.lockInterruptibly();
+      try {
+        return action.get();
+      } finally {
+        opLock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      LOG.warn("Thread was interrupted while waiting for lock", e);
     }
   }
 
