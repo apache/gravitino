@@ -461,7 +461,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -545,7 +545,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -626,13 +626,13 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_8")
-            .withType(Types.TimeType.get())
+            .withType(Types.TimeType.of(0))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .build());
     columns.add(

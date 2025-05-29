@@ -640,13 +640,13 @@ public class CatalogOceanBaseIT extends BaseIT {
           Assertions.assertEquals(Types.DateType.get(), column.dataType());
           break;
         case "time_col":
-          Assertions.assertEquals(Types.TimeType.get(), column.dataType());
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
           break;
         case "timestamp_col":
-          Assertions.assertEquals(Types.TimestampType.withTimeZone(), column.dataType());
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
           break;
         case "datetime_col":
-          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
           break;
         case "decimal_6_2_col":
           Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
