@@ -26,6 +26,7 @@ import static org.apache.gravitino.file.Fileset.Type.MANAGED;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -40,7 +41,11 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
-import org.apache.gravitino.client.*;
+import org.apache.gravitino.client.ErrorHandlers;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.HTTPClient;
+import org.apache.gravitino.client.ObjectMapperProvider;
+import org.apache.gravitino.dto.responses.FileInfoListResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -52,6 +57,7 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
@@ -64,7 +70,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.JsonNode;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
-import org.testcontainers.shaded.com.github.dockerjava.core.MediaType;
 
 @Tag("gravitino-docker-test")
 public class HadoopCatalogIT extends BaseIT {
@@ -81,6 +86,8 @@ public class HadoopCatalogIT extends BaseIT {
   protected FileSystem fileSystem;
   protected String defaultBaseLocation;
 
+  protected HTTPClient httpClient;
+
   protected void startNecessaryContainer() {
     containerSuite.startHiveContainer();
   }
@@ -96,6 +103,8 @@ public class HadoopCatalogIT extends BaseIT {
     createMetalake();
     createCatalog();
     createSchema();
+
+    httpClient = HTTPClient.builder(Collections.emptyMap()).uri(serverUri).build();
   }
 
   @AfterAll
@@ -106,6 +115,12 @@ public class HadoopCatalogIT extends BaseIT {
     client.dropMetalake(metalakeName, true);
     if (fileSystem != null) {
       fileSystem.close();
+    }
+    if (httpClient != null) {
+      try {
+        httpClient.close();
+      } catch (Exception ignored) {
+      }
     }
 
     try {
@@ -154,14 +169,22 @@ public class HadoopCatalogIT extends BaseIT {
     Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
   }
 
-  protected void uploadFileIntoFileset(String filesetName, String subPath, String content) {
-    String targetUrl = String.format("/fileset/%s/%s/%s/%s", catalogName, schemaName, filesetName, subPath);
-    HTTPClient client = HTTPClient.builder(Collections.emptyMap())
-            .uri(getBaseUrl())
-            .withAuthDataProvider(authDataProvider)
-            .withObjectMapper(ObjectMapperProvider.objectMapper())
-            .build();
-    client.post(targetUrl);
+  private String getFileInfos(NameIdentifier filesetIdent, String subPath, String locationName)
+      throws IOException {
+    Map<String, String> query = new HashMap<>();
+    query.put("subPath", subPath);
+    query.put("locationName", locationName);
+
+    FileInfoListResponse resp =
+        httpClient.get(
+            String.format("fileset/%s/%s/%s/files", catalogName, schemaName, filesetIdent.name()),
+            query,
+            FileInfoListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.restErrorHandler());
+
+    // Serialize the list of FileInfoDTO back to JSON
+    return ObjectMapperProvider.objectMapper().writeValueAsString(resp.getFiles());
   }
 
   @Test
@@ -680,21 +703,17 @@ public class HadoopCatalogIT extends BaseIT {
     createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
 
-    String fileName = "test1.txt";
-    String content = "hello";
-    uploadFileIntoFileset(filesetName, "/" + fileName, content);
+    Path basePath = new Path(storageLocation);
+    fileSystem.mkdirs(basePath);
 
-    HTTPClient client = HTTPClient.builder()
-            .uri(getBaseUrl())
-            .withAuthDataProvider(authDataProvider)
-            .withObjectMapper(ObjectMapperProvider.objectMapper())
-            .build();
-    String url = String.format(
-            "%s/fileset/%s/%s/%s/subPath/test1.txt", getBaseUrl(), catalogName, schemaName, filesetName
-    );
-    String actualJson = client.target(url)
-            .request(MediaType.APPLICATION_JSON)
-            .get(String.class);
+    String fileName = "test1.txt";
+    Path file1 = new Path(basePath, fileName);
+    try (FSDataOutputStream out = fileSystem.create(file1, true)) {
+      out.write("hello".getBytes(StandardCharsets.UTF_8));
+    }
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    String actualJson = getFileInfos(filesetIdent, "/" + fileName, null);
 
     ObjectMapper mapper = new ObjectMapper();
     JsonNode array = mapper.readTree(actualJson);
@@ -703,14 +722,16 @@ public class HadoopCatalogIT extends BaseIT {
 
     Assertions.assertEquals(fileName, fileMetadata.get("name").asText(), "Name should match");
     Assertions.assertFalse(fileMetadata.get("isDir").asBoolean(), "isDir should be false");
+    Assertions.assertEquals(
+        "hello".getBytes(StandardCharsets.UTF_8).length,
+        fileMetadata.get("size").asInt(),
+        "Size should equal content length");
     Assertions.assertTrue(
-            fileMetadata.get("lastModified").asLong() > 0,
-            "lastModified should be a positive timestamp"
-    );
+        fileMetadata.get("lastModified").asLong() > 0,
+        "lastModified should be a positive timestamp");
     Assertions.assertTrue(
-            fileMetadata.get("path").asText().endsWith("/" + fileName),
-            "Path should end with the file name"
-    );
+        fileMetadata.get("path").asText().endsWith("/" + fileName),
+        "Path should end with the file name");
   }
 
   @Test
