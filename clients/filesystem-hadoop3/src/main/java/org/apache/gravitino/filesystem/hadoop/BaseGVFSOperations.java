@@ -138,7 +138,7 @@ public abstract class BaseGVFSOperations implements Closeable {
    *
    * @param configuration the configuration
    */
-  public BaseGVFSOperations(Configuration configuration) {
+  protected BaseGVFSOperations(Configuration configuration) {
     this.metalakeName =
         configuration.get(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY);
     Preconditions.checkArgument(

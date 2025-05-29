@@ -20,7 +20,6 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.List;
-import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -62,12 +61,10 @@ public class RoleDetails extends Command {
       exitWithError(exp.getMessage());
     }
 
-    for (SecurableObject object : objects) {
-      printInformation(object.name() + "," + object.type() + ",");
-      for (Privilege privilege : object.privileges()) {
-        printInformation(privilege.simpleString() + " ");
-      }
+    if (objects == null || objects.isEmpty()) {
+      printInformation("No securable objects found for role: " + role);
+    } else {
+      printResults(objects);
     }
-    printInformation("");
   }
 }

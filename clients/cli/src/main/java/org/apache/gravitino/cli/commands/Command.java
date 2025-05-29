@@ -63,7 +63,7 @@ public abstract class Command {
    *
    * @param context The command context.
    */
-  public Command(CommandContext context) {
+  protected Command(CommandContext context) {
     this.context = context;
     this.url = context.url();
     this.ignoreVersions = context.ignoreVersions();
