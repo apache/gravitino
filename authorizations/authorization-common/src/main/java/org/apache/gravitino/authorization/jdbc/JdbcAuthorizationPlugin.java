@@ -119,11 +119,11 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
     List<String> sqls = getCreateRoleSQL(role.name());
     boolean createdNewly = false;
     for (String sql : sqls) {
-      createdNewly = executeUpdateSQL(sql, "already exists");
+      createdNewly |= executeUpdateSQL(sql, "already exists");
     }
 
     if (!createdNewly) {
-      return true;
+      return false;
     }
 
     if (role.securableObjects() != null) {
@@ -131,7 +131,6 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
         onRoleUpdated(role, RoleChange.addSecurableObject(role.name(), object));
       }
     }
-
     return true;
   }
 
