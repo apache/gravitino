@@ -253,7 +253,9 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     FileSystem fs = getFileSystem(formalizedPath, conf);
     if (!fs.exists(formalizedPath)) {
-      return new FileInfo[0];
+      throw new IllegalArgumentException(
+          String.format(
+              "Path %s does not exist in fileset %s", formalizedPath.toString(), filesetIdent));
     }
 
     String catalogName = filesetIdent.namespace().level(1);

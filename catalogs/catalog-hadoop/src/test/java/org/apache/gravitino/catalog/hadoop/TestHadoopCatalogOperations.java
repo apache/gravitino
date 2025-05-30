@@ -242,7 +242,7 @@ public class TestHadoopCatalogOperations {
         .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
             Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema11"));
 
-    for (int i = 10; i < 32; i++) {
+    for (int i = 10; i < 33; i++) {
       doReturn(new SchemaIds(1L, 1L, (long) i))
           .when(spySchemaMetaService)
           .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
@@ -974,6 +974,33 @@ public class TestHadoopCatalogOperations {
       Assertions.assertTrue(
           ex.getMessage().contains("Filesystem operations are disabled on this server"),
           "Exception message should mention 'Filesystem operations are disabled on this server'");
+    }
+  }
+
+  @Test
+  public void testListFilesetFilesWithNonExistentPath() throws IOException {
+    String schemaName = "schema32";
+    String comment = "comment32";
+    String filesetName = "fileset32";
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+
+    createSchema(schemaName, comment, null, schemaPath);
+    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+
+      String nonExistentSubPath = "/non_existent_file.txt";
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> ops.listFiles(filesetIdent, null, nonExistentSubPath),
+              "Listing a non-existent fileset directory should throw IllegalArgumentException");
+
+      Assertions.assertTrue(
+          ex.getMessage().contains("does not exist"),
+          "Exception message should mention that the path does not exist");
     }
   }
 
