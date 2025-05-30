@@ -70,7 +70,9 @@ public abstract class PartitionInfo {
   /**
    * Returns the instance of the PartitionInfo.
    *
-   * @return A instance of the PartitionInfo
+   * @param partition the source {@link Partition} to convert into a {@link PartitionInfo}
+   * @return A instance of the {@code PartitionInfo}
+   * @throws GravitinoRuntimeException if the partition type is unrecognized
    */
   public static PartitionInfo of(Partition partition) {
     if (partition instanceof IdentityPartition) {

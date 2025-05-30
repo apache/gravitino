@@ -37,7 +37,7 @@ public abstract class GroupFailureEvent extends FailureEvent {
    * @param identifier the unique identifier for the group operation
    * @param exception the exception encountered during the operation, detailing the cause of failure
    */
-  public GroupFailureEvent(String initiator, NameIdentifier identifier, Exception exception) {
+  protected GroupFailureEvent(String initiator, NameIdentifier identifier, Exception exception) {
     super(initiator, identifier, exception);
   }
 }
