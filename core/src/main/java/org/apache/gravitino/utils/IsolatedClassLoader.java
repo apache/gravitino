@@ -206,7 +206,7 @@ public class IsolatedClassLoader implements Closeable {
     }
   }
 
-  private synchronized URLClassLoader classLoader() throws Exception {
+  private synchronized URLClassLoader classLoader() {
     if (classLoader != null) {
       return classLoader;
     }
