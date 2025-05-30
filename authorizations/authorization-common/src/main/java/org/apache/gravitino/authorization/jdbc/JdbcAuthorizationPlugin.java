@@ -125,7 +125,7 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
     }
 
     if (!createdNewly) {
-      return false;
+      return true;
     }
 
     if (role.securableObjects() != null) {
