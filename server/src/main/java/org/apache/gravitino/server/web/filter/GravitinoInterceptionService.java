@@ -31,6 +31,7 @@ import java.util.Set;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -88,7 +89,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       if (expressionAnnotation != null) {
         String expression = expressionAnnotation.expression();
         Object[] args = methodInvocation.getArguments();
-        Map<MetadataObject.Type, NameIdentifier> metadataContext =
+        Map<Entity.EntityType, NameIdentifier> metadataContext =
             getMetadataContext(parameters, args);
         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
             new AuthorizationExpressionEvaluator(expression);
@@ -100,10 +101,10 @@ public class GravitinoInterceptionService implements InterceptionService {
       return methodInvocation.proceed();
     }
 
-    private Map<MetadataObject.Type, NameIdentifier> getMetadataContext(
+    private Map<Entity.EntityType, NameIdentifier> getMetadataContext(
         Parameter[] parameters, Object[] args) {
-      Map<MetadataObject.Type, String> metadatas = new HashMap<>();
-      Map<MetadataObject.Type, NameIdentifier> nameIdentifierMap = new HashMap<>();
+      Map<Entity.EntityType, String> metadatas = new HashMap<>();
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
       for (int i = 0; i < parameters.length; i++) {
         Parameter parameter = parameters[i];
         AuthorizationMetadata authorizeResource =
@@ -112,7 +113,7 @@ public class GravitinoInterceptionService implements InterceptionService {
           continue;
         }
         MetadataObject.Type type = authorizeResource.type();
-        metadatas.put(type, String.valueOf(args[i]));
+        metadatas.put(Entity.EntityType.valueOf(type.name()), String.valueOf(args[i]));
       }
       String metalake = metadatas.get(MetadataObject.Type.METALAKE);
       String catalog = metadatas.get(MetadataObject.Type.CATALOG);
@@ -124,26 +125,26 @@ public class GravitinoInterceptionService implements InterceptionService {
             switch (type) {
               case CATALOG:
                 nameIdentifierMap.put(
-                    MetadataObject.Type.CATALOG, NameIdentifierUtil.ofCatalog(metalake, catalog));
+                    Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalake, catalog));
                 break;
               case SCHEMA:
                 nameIdentifierMap.put(
-                    MetadataObject.Type.SCHEMA,
+                    Entity.EntityType.SCHEMA,
                     NameIdentifierUtil.ofSchema(metalake, catalog, schema));
                 break;
               case TABLE:
                 nameIdentifierMap.put(
-                    MetadataObject.Type.SCHEMA,
+                    Entity.EntityType.SCHEMA,
                     NameIdentifierUtil.ofTable(metalake, catalog, schema, table));
                 break;
               case TOPIC:
                 nameIdentifierMap.put(
-                    MetadataObject.Type.SCHEMA,
+                    Entity.EntityType.SCHEMA,
                     NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
                 break;
               case METALAKE:
                 nameIdentifierMap.put(
-                    MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
+                    Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
                 break;
               default:
                 break;
