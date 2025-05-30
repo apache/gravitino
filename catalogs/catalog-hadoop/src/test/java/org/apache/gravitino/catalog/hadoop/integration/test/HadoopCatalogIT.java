@@ -171,13 +171,19 @@ public class HadoopCatalogIT extends BaseIT {
 
   private String getFileInfos(NameIdentifier filesetIdent, String subPath, String locationName)
       throws IOException {
+    String targetUrl =
+        "fileset/" + catalogName + "/" + schemaName + "/" + filesetIdent.name() + "/files";
     Map<String, String> query = new HashMap<>();
-    query.put("subPath", subPath);
-    query.put("locationName", locationName);
+    if (subPath != null && !subPath.isEmpty()) {
+      query.put("subPath", subPath);
+    }
+    if (locationName != null && !locationName.isEmpty()) {
+      query.put("locationName", locationName);
+    }
 
     FileInfoListResponse resp =
         httpClient.get(
-            String.format("fileset/%s/%s/%s/files", catalogName, schemaName, filesetIdent.name()),
+            targetUrl,
             query,
             FileInfoListResponse.class,
             Collections.emptyMap(),
@@ -713,7 +719,7 @@ public class HadoopCatalogIT extends BaseIT {
     }
 
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
-    String actualJson = getFileInfos(filesetIdent, "/" + fileName, null);
+    String actualJson = getFileInfos(filesetIdent, null, null);
 
     ObjectMapper mapper = new ObjectMapper();
     JsonNode array = mapper.readTree(actualJson);
