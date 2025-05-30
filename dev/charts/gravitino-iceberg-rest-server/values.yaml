@@ -1,0 +1,272 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+replicas: 1
+
+image:
+  repository: apache/gravitino-iceberg-rest
+  tag: latest
+  pullPolicy: IfNotPresent
+  ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
+  ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+  ## Example:
+  ## pullSecrets:
+  ##   - myRegistryKeySecretName
+  ##
+  pullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+icebergRest:
+  # THE CONFIGURATION FOR Iceberg REST SERVER
+  shutdownTimeout: 3000
+  # THE CONFIGURATION FOR Iceberg REST WEB SERVER
+  # The host name of the built-in web server
+  host: 0.0.0.0
+  # The http port number of the built-in web server
+  httpPort: 9001
+  # The min thread size of the built-in web server
+  minThreads: 24
+  # The max thread size of the built-in web server
+  maxThreads: 200
+  # The stop timeout of the built-in web server
+  stopTimeout: 30000
+  # The timeout of idle connections
+  idleTimeout: 30000
+  # The executor thread pool work queue size of the built-in web server
+  threadPoolWorkQueueSize: 100
+  # The request header size of the built-in web server
+  requestHeaderSize: 131072
+  # The response header size of the built-in web server
+  responseHeaderSize: 131072
+  ## The backend Iceberg catalog for Iceberg REST service, it's recommended to change to hive or jdbc
+  catalogBackend: memory
+  ## The warehouse directory of Iceberg catalog for Iceberg REST service
+  warehouse: /tmp/
+
+# Rest backend configs.
+additionalConfigItems: {}
+  ## THE CONFIGURATION EXAMPLE FOR JDBC CATALOG BACKEND WITH S3 SUPPORT
+  # gravitino.iceberg-rest.jdbc-driver: org.postgresql.Driver
+  # gravitino.iceberg-rest.uri: jdbc:postgresql://127.0.0.1:5432/postgres
+  # gravitino.iceberg-rest.jdbc-user: postgres
+  # gravitino.iceberg-rest.jdbc-password: abc123
+  # gravitino.iceberg-rest.jdbc-initialize: true
+  # change to s3a://test/my/key/prefix for Hive catalog backend
+  # gravitino.iceberg-rest.warehouse: s3://test/my/key/prefix
+  # gravitino.iceberg-rest.io-impl: org.apache.iceberg.aws.s3.S3FileIO
+  # gravitino.iceberg-rest.s3-access-key-id: xxx
+  # gravitino.iceberg-rest.s3-secret-access-key: xxx
+  # gravitino.iceberg-rest.s3-endpoint: http://192.168.215.4:9010
+  # gravitino.iceberg-rest.s3-region: xxx
+
+## Gravitino iceberg catalog server log4j2 configuration items in log4j2.properties can be customized
+##
+log4j2Properties: {}
+  # status: warn
+
+  ## Log files location
+  # basePath: "${sys:gravitino.log.path}"
+  # serverName: "${sys:gravitino.server.name}"
+
+  ## RollingFileAppender name, pattern, path and rollover policy
+  # rollingAppenderType: RollingFile
+  # rollingAppenderName: fileLogger
+  # rollingAppenderFileName: "${basePath}/${serverName}.log"
+  # rollingAppenderFilePattern: "${basePath}/${serverName}_%d{yyyyMMdd}.log.gz"
+  # rollingAppenderLayoutType: PatternLayout
+  # rollingAppenderLayoutPattern: "%d{yyyy-MM-dd HH:mm:ss.SSS} %level [%t] [%l] - %msg%n"
+  # rollingAppenderPoliciesType: Policies
+
+  ## RollingFileAppender rotation policy
+  # rollingAppenderPoliciesSizeType: SizeBasedTriggeringPolicy
+  # rollingAppenderPoliciesSizeSize: 10MB
+  # rollingAppenderPoliciesTimeType: TimeBasedTriggeringPolicy
+  # rollingAppenderPoliciesTimeInterval: 1
+  # rollingAppenderPoliciesTimeModulate: true
+  # rollingAppenderStrategyType: DefaultRolloverStrategy
+  # rollingAppenderStrategyDeleteType: Delete
+  # rollingAppenderStrategyDeleteBasePath: "${basePath}"
+  # rollingAppenderStrategyDeleteMaxDepth: 10
+  # rollingAppenderStrategyDeleteIfLastModifiedType: IfLastModified
+
+  ## Delete all files older than 30 days
+  # rollingAppenderStrategyDeleteIfLastModifiedAge: 30d
+
+  ## Lineage log appender configurations
+  # lineageFileType: RollingFile
+  # lineageFileName: lineage_file
+  # lineageFileFileName: "${basePath}/gravitino_lineage.log"
+  # lineageFilePattern: "${basePath}/gravitino_lineage_%d{yyyyMMdd}.log.gz"
+  # lineageFileLayoutType: PatternLayout
+  # lineageFileLayoutPattern: "[%d{yyyy-MM-dd HH:mm:ss}] %m%n"
+
+  ## Rollover strategy configurations
+  # lineageFilePoliciesType: Policies
+  # lineageFilePoliciesTimeType: TimeBasedTriggeringPolicy
+  # lineageFilePoliciesTimeInterval: 1
+  # lineageFilePoliciesTimeModulate: true
+  # lineageFileStrategyType: DefaultRolloverStrategy
+  # lineageFileStrategyDeleteType: Delete
+  # lineageFileStrategyDeleteBasePath: "${basePath}"
+  # lineageFileStrategyDeleteMaxDepth: 10      # Consider reducing to 1 for security (per previous optimization)
+  # lineageFileStrategyDeleteIfLastModifiedType: IfLastModified
+  # lineageFileStrategyDeleteIfLastModifiedAge: 30d
+
+  ## Lineage logger configurations
+  # lineageName: org.apache.gravitino.lineage.sink.LineageLogSink$LineageLogger
+  # lineageLevel: info
+  # lineageAppenderRefLineageFileRef: lineage_file
+  # lineageAdditivity: false
+
+  ## Configure root logger
+  # rootLoggerLevel: info
+  # rootLoggerAppenderRefRollingRef: fileLogger
+
+## Additional log4j2 configuration items in log4j2.properties can be added
+##
+additionalLog4j2Properties: {}
+  # appender.console.type: Console
+  # appender.console.name: console
+  # appender.console.layout.type: PatternLayout
+  # appender.console.layout.pattern: "%d{HH:mm:ss.SSS} %level %msg%n"
+  # rootLogger.appenderRef.console.ref: console
+
+## Hadoop configuration items in hdfs-site.xml and core-site.xml can be customized
+coreSiteProperties: {}
+hdfsSiteProperties: {}
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+annotations: {}
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+## Container-specific security context configuration
+## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
+##
+securityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+## Container Environment
+##
+env:
+  - name: GRAVITINO_HOME
+    value: /root/gravitino-iceberg-rest-server
+  - name: GRAVITINO_MEM
+    value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
+
+# foo2: bar2
+envFrom: []
+
+service:
+  name: gravitino-iceberg-rest-server
+  type: ClusterIP
+  port: 9001
+  targetPort: 9001
+  annotations: {}
+  labels: {}
+  portName: http
+  nodePort: ""
+
+## Readiness probe for the Gravitino deployment
+##
+readinessProbe:
+  httpGet:
+    path: /iceberg/v1/config
+    port: http
+  initialDelaySeconds: 20
+  timeoutSeconds: 5
+
+## Liveness probe for the Gravitino deployment
+##
+livenessProbe:
+  httpGet:
+    path: /iceberg/v1/config
+    port: http
+  initialDelaySeconds: 20
+  timeoutSeconds: 5
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+## Additional volumes
+##
+extraVolumes:
+  - name: gravitino-rest-catalog-server-log
+    emptyDir: {}
+
+## Additional volume mounts
+##
+extraVolumeMounts:
+  - name: gravitino-rest-catalog-server-log
+    mountPath: /root/gravitino-iceberg-rest-server/logs
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    # nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    # nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  hosts:
+    - host: gravitino-rest-catalog-server.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-gravitino-tls
+  #    hosts:
+  #      - chart-gravitino.local
+
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

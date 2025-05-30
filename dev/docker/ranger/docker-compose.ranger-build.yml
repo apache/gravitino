@@ -1,0 +1,61 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# This file is copied from apache/ranger at commit [RANGER-5146: 500 API Error When Deleting TagDef with a Linked Tag](https://github.com/apache/ranger/blob/ff36aabe36169b94862c51a5b403f59c9d728b94/dev-support/ranger-docker/docker-compose.ranger-build.yml)
+# with some modification to make build successful in GitHub Action:
+# - Add :Z option to volume mount.
+# - Use docker volume instead of bind mount.
+version: "3"
+services:
+  ranger-build:
+    build:
+      context: .
+      dockerfile: Dockerfile.ranger-build
+      args:
+        - RANGER_BUILD_JAVA_VERSION=${RANGER_BUILD_JAVA_VERSION}
+    image: ranger-build
+    container_name: ranger-build
+    hostname: ranger-build.example.com
+    networks:
+      - ranger
+    volumes:
+      # SELinux
+      # https://github.com/moby/moby/issues/41202#issuecomment-657422171
+      - m2:/home/ranger/.m2:Z
+      - ./scripts:/home/ranger/scripts
+      - ./patches:/home/ranger/patches
+      - dist:/home/ranger/dist:Z
+      # mount from host project root to container's project root
+      - ${RANGER_HOME:-./../../}:/home/ranger/src:Z
+    depends_on:
+      - ranger-base
+    environment:
+      - BRANCH
+      - BUILD_HOST_SRC
+      - BUILD_OPTS
+      - PROFILE
+      - GIT_URL
+      - RANGER_VERSION
+      - SKIPTESTS
+
+networks:
+  ranger:
+    name: rangernw
+
+volumes:
+  m2:
+  dist:

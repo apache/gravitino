@@ -129,6 +129,57 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     checkPartitionDirExists(tableInfo);
   }
 
+  @Test
+  void testManagePartitionTable() {
+    String tableName = "hive_partition_ops_table";
+
+    dropTableIfExists(tableName);
+    String createTableSQL = getCreateSimpleTableString(tableName);
+    createTableSQL = createTableSQL + "PARTITIONED BY (age_p1 INT, age_p2 STRING)";
+    sql(createTableSQL);
+
+    List<Object[]> partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(0, partitionInfo.size());
+
+    sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=20, age_p2='twenty')");
+    sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, partitionInfo.size());
+    Assertions.assertEquals("age_p1=20/age_p2=twenty", partitionInfo.get(0)[0]);
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(1)[0]);
+
+    sql("ALTER TABLE  " + tableName + " DROP PARTITION (age_p1=20, age_p2='twenty')");
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+
+    sql(
+        "ALTER TABLE  "
+            + tableName
+            + " ADD PARTITION (age_p1=22, age_p2='twenty two') "
+            + "LOCATION '/user/hive/warehouse/hive_partition_ops_table/age_p1=22/age_p2=twentytwo' ");
+    partitionInfo = getTablePartitions(tableName);
+    Assertions.assertEquals(2, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+    Assertions.assertEquals("age_p1=22/age_p2=twenty two", partitionInfo.get(1)[0]);
+
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=21)");
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=21/age_p2=twenty one", partitionInfo.get(0)[0]);
+
+    // test exactly match
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=2)");
+    Assertions.assertEquals(0, partitionInfo.size());
+
+    Exception exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () -> {
+              sql("ALTER TABLE  " + tableName + " ADD PARTITION (age_p1=21, age_p2='twenty one')");
+            });
+    Assertions.assertTrue(exception.getMessage().contains("Partition already exists"));
+  }
+
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   void testWriteHiveDynamicPartition(boolean isInsertOverWrite) {

@@ -58,9 +58,10 @@ import org.slf4j.LoggerFactory;
 public class CatalogConnectorManager {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
 
-  private static final int CATALOG_LOAD_FREQUENCY_SECOND = 10;
   private static final int NUMBER_EXECUTOR_THREAD = 1;
   private static final int LOAD_METALAKE_TIMEOUT = 60;
+
+  private int metadataUpdateIntervalSecond = 10;
 
   private final ScheduledExecutorService executorService;
   private final CatalogRegister catalogRegister;
@@ -69,7 +70,7 @@ public class CatalogConnectorManager {
   private final ConcurrentHashMap<String, CatalogConnectorContext> catalogConnectors =
       new ConcurrentHashMap<>();
 
-  private final Set<String> usedMetalakes = new HashSet<>();
+  private String targetMetalake;
   private final Map<String, GravitinoMetalake> metalakes = new ConcurrentHashMap<>();
 
   private GravitinoAdminClient gravitinoClient;
@@ -101,6 +102,8 @@ public class CatalogConnectorManager {
     } else {
       this.gravitinoClient = client;
     }
+    this.metadataUpdateIntervalSecond = Integer.parseInt(config.getMetadataRefreshIntervalSecond());
+    this.targetMetalake = config.getMetalake();
   }
 
   public void start(ConnectorContext context) throws Exception {
@@ -108,8 +111,8 @@ public class CatalogConnectorManager {
     if (catalogRegister.isCoordinator()) {
       executorService.scheduleWithFixedDelay(
           this::loadMetalake,
-          CATALOG_LOAD_FREQUENCY_SECOND,
-          CATALOG_LOAD_FREQUENCY_SECOND,
+          metadataUpdateIntervalSecond,
+          metadataUpdateIntervalSecond,
           TimeUnit.SECONDS);
     }
 
@@ -123,10 +126,21 @@ public class CatalogConnectorManager {
         return;
       }
 
+      Set<String> usedMetalakes = new HashSet<>();
+      if (config.singleMetalakeMode()) {
+        usedMetalakes.add(targetMetalake);
+        metalakes.computeIfAbsent(targetMetalake, this::retrieveMetalake);
+      } else {
+        GravitinoMetalake[] allMetalakes = gravitinoClient.listMetalakes();
+        for (GravitinoMetalake metalake : allMetalakes) {
+          usedMetalakes.add(metalake.name());
+          metalakes.put(metalake.name(), metalake);
+        }
+      }
+
       for (String usedMetalake : usedMetalakes) {
         try {
-          GravitinoMetalake metalake =
-              metalakes.computeIfAbsent(usedMetalake, this::retrieveMetalake);
+          GravitinoMetalake metalake = metalakes.get(usedMetalake);
           LOG.debug("Load metalake: {}", usedMetalake);
           loadCatalogs(metalake);
         } catch (Exception e) {
@@ -139,7 +153,7 @@ public class CatalogConnectorManager {
     }
   }
 
-  private GravitinoMetalake retrieveMetalake(String metalakeName) {
+  public GravitinoMetalake retrieveMetalake(String metalakeName) {
     try {
       return gravitinoClient.loadMetalake(metalakeName);
     } catch (NoSuchMetalakeException e) {
@@ -166,8 +180,7 @@ public class CatalogConnectorManager {
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
         Arrays.stream(catalogNames)
-            .map(
-                id -> config.simplifyCatalogNames() ? id : getTrinoCatalogName(metalake.name(), id))
+            .map(id -> config.singleMetalakeMode() ? id : getTrinoCatalogName(metalake.name(), id))
             .collect(Collectors.toSet());
 
     for (Map.Entry<String, CatalogConnectorContext> entry : catalogConnectors.entrySet()) {
@@ -264,23 +277,15 @@ public class CatalogConnectorManager {
   }
 
   public String getTrinoCatalogName(String metalake, String catalog) {
-    return config.simplifyCatalogNames() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
+    return config.singleMetalakeMode() ? catalog : String.format("\"%s.%s\"", metalake, catalog);
   }
 
   public String getTrinoCatalogName(GravitinoCatalog catalog) {
     return getTrinoCatalogName(catalog.getMetalake(), catalog.getName());
   }
 
-  public void addMetalake(String metalake) {
-    if (config.simplifyCatalogNames() && usedMetalakes.size() > 1)
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
-          "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
-    usedMetalakes.add(metalake);
-  }
-
   public Set<String> getUsedMetalakes() {
-    return usedMetalakes;
+    return metalakes.keySet();
   }
 
   public Connector createConnector(
@@ -314,11 +319,6 @@ public class CatalogConnectorManager {
   }
 
   public GravitinoMetalake getMetalake(String metalake) {
-    if (!usedMetalakes.contains(metalake)) {
-      throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
-          "This connector does not allowed to access metalake " + metalake);
-    }
     return metalakes.computeIfAbsent(metalake, this::retrieveMetalake);
   }
 }
