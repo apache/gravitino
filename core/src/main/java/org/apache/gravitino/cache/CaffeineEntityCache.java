@@ -56,6 +56,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private final int CACHE_CLEANUP_CORE_THREADS = 1;
   private final int CACHE_CLEANUP_MAX_THREADS = 1;
   private final int CACHE_CLEANUP_QUEUE_CAPACITY = 100;
+  private final int CACHE_MONITOR_PERIOD_MINUTES = 5;
+  private final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
   private final ReentrantLock opLock = new ReentrantLock();
 
@@ -496,8 +498,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
               stats.loadFailureCount(),
               stats.evictionCount());
         },
-        0,
-        5,
+        CACHE_MONITOR_INITIAL_DELAY_MINUTES,
+        CACHE_MONITOR_PERIOD_MINUTES,
         TimeUnit.MINUTES);
   }
 }
