@@ -39,6 +39,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -263,22 +264,17 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     String filesetName = filesetIdent.name();
 
     try {
-      FileStatus[] fileStatuses = fs.listStatus(formalizedPath);
-      FileInfo[] fileInfos = new FileInfo[fileStatuses.length];
-      for (int i = 0; i < fileStatuses.length; i++) {
-        FileStatus status = fileStatuses[i];
-
-        fileInfos[i] =
-            FileInfoDTO.builder()
-                .name(status.getPath().getName())
-                .isDir(status.isDirectory())
-                .size(status.isDirectory() ? 0L : status.getLen())
-                .lastModified(status.getModificationTime())
-                .path(buildGVFSFilePath(catalogName, schemaName, filesetName, subPath))
-                .build();
-      }
-
-      return fileInfos;
+      return Arrays.stream(fs.listStatus(formalizedPath))
+          .map(
+              status ->
+                  FileInfoDTO.builder()
+                      .name(status.getPath().getName())
+                      .isDir(status.isDirectory())
+                      .size(status.isDirectory() ? 0L : status.getLen())
+                      .lastModified(status.getModificationTime())
+                      .path(buildGVFSFilePath(catalogName, schemaName, filesetName, subPath))
+                      .build())
+          .toArray(FileInfo[]::new);
 
     } catch (IOException e) {
       throw new RuntimeException("Failed to list files in fileset" + filesetIdent, e);
