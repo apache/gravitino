@@ -250,6 +250,24 @@ public class TestEventListenerManager {
     eventListenerManager.stop();
   }
 
+  @Test
+  void testTransformPreEvent() {
+    String sync1 = "sync1";
+    String sync2 = "sync2";
+    Map<String, String> properties = createSyncEventListenerConfig(sync1, sync2);
+
+    EventListenerManager eventListenerManager = new EventListenerManager();
+    eventListenerManager.init(properties);
+    eventListenerManager.start();
+
+    EventBus eventBus = eventListenerManager.createEventBus();
+    PreEvent transformedEvent =
+        eventBus.dispatchAndTransformPreEvent(
+            new CountingPreEvent("user1", NameIdentifier.of("ns", "name"), 0));
+    Assertions.assertTrue(transformedEvent instanceof CountingPreEvent);
+    Assertions.assertEquals(2, ((CountingPreEvent) transformedEvent).count());
+  }
+
   private Map<String, String> createIsolatedAsyncEventListenerConfig(String async1, String async2) {
     Map<String, String> config = new HashMap<>();
 
