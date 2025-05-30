@@ -77,11 +77,14 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Constructs a new {@link BaseEntityCache} instance. If the provided entityStore is null.
+   * Constructs a new {@link BaseEntityCache} instance.
    *
    * @param entityStore The entity store to be used by the cache, can be null.
    */
   public BaseEntityCache(Config config, EntityStore entityStore) {
+    Preconditions.checkArgument(config != null, "Config must not be null");
+    Preconditions.checkArgument(entityStore != null, "EntityStore must not be null");
+
     this.cacheConfig = config;
     this.entityStore = (RelationalEntityStore) entityStore;
   }
@@ -106,7 +109,7 @@ public abstract class BaseEntityCache implements EntityCache {
   /**
    * Returns the {@link NameIdentifier} of the entity based on its type.
    *
-   * @param entity The entity
+   * @param entity The {@link Entity} instance.
    * @return The {@link NameIdentifier} of the entity
    */
   protected static NameIdentifier getIdentFromEntity(Entity entity) {
@@ -119,7 +122,7 @@ public abstract class BaseEntityCache implements EntityCache {
   /**
    * Checks if the entity is of type {@link HasIdentifier}.
    *
-   * @param entity The entity to check.
+   * @param entity The {@link Entity} instance to check.
    */
   protected static void validateEntityHasIdentifier(Entity entity) {
     Preconditions.checkArgument(
@@ -131,7 +134,7 @@ public abstract class BaseEntityCache implements EntityCache {
    *
    * @param entities Thr original list of entities.
    * @return A list of converted entities.
-   * @param <E> The type of the entities in the list.
+   * @param <E> The type of the entities in the new list.
    */
   @SuppressWarnings("unchecked")
   protected static <E extends Entity & HasIdentifier> List<E> convertEntity(List<Entity> entities) {
@@ -141,7 +144,7 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Converts an entity to a new entity.
+   * Converts an entity to a new one.
    *
    * @param entity The original entity.
    * @return A new entity.

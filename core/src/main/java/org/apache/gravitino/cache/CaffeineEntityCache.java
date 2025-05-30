@@ -51,7 +51,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** This class implements a Entity cache using Caffeine cache. */
+/** This class implements the {@link EntityCache} using Caffeine. */
 public class CaffeineEntityCache extends BaseEntityCache {
   private final int CACHE_CLEANUP_CORE_THREADS = 1;
   private final int CACHE_CLEANUP_MAX_THREADS = 1;
@@ -59,7 +59,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
   private final ReentrantLock opLock = new ReentrantLock();
 
-  /** Singleton instance */
   private static volatile CaffeineEntityCache INSTANCE;
 
   /** Cache part */
@@ -103,6 +102,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private CaffeineEntityCache(Config cacheConfig, EntityStore entityStore) {
     super(cacheConfig, entityStore);
     cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+
     ThreadPoolExecutor cleanupExec = buildCleanupExecutor();
     Caffeine<EntityCacheKey, List<Entity>> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
@@ -273,6 +273,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
         entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
   }
 
+  /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void put(E entity) {
     withLock(
@@ -310,8 +311,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Syncs the entities to the cache, if cache is too big and can not put it to the cache, then it
-   * will remove and cacheIndex will not be updated.
+   * Syncs the entities to the cache, if entities is too big and can not put to the cache, then it
+   * will be removed from the cache and cacheIndex will not be updated.
    *
    * @param key The key of the entities.
    * @param newEntities The new entities to sync to the cache.
@@ -367,7 +368,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /**
    * Invalidates the entities by the given cache key.
    *
-   * @param identifier The identifier of the entities to invalidate
+   * @param identifier The identifier of the entity to invalidate
    */
   private void invalidateEntities(NameIdentifier identifier) {
     Iterable<EntityCacheKey> entityKeysToRemove =
