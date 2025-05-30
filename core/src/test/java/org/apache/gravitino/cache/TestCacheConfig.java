@@ -28,13 +28,11 @@ public class TestCacheConfig {
   @Test
   void testDefaultCacheConfig() {
     Config config = new Config(false) {};
+    Assertions.assertFalse(config.get(Configs.CACHE_STATS_ENABLED));
+    Assertions.assertTrue(config.get(Configs.CACHE_ENABLED));
+    Assertions.assertTrue(config.get(Configs.CACHE_WEIGHER_ENABLED));
     Assertions.assertEquals(10_000, config.get(Configs.CACHE_MAX_ENTRIES));
     Assertions.assertEquals(3_600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
-    Assertions.assertFalse(config.get(Configs.CACHE_STATS_ENABLED));
-    Assertions.assertTrue(config.get(Configs.CACHE_WEIGHER_ENABLED));
     Assertions.assertEquals(200_302_000L, EntityCacheWeigher.getMaxWeight());
-    Assertions.assertEquals(1, config.get(Configs.CACHE_CLEANUP_CORE_THREADS));
-    Assertions.assertEquals(1, config.get(Configs.CACHE_CLEANUP_MAX_THREADS));
-    Assertions.assertEquals(100, config.get(Configs.CACHE_CLEANUP_QUEUE_CAPACITY));
   }
 }

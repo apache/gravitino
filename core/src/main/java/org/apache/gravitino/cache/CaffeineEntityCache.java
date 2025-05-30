@@ -53,10 +53,14 @@ import org.slf4j.LoggerFactory;
 
 /** This class implements a Entity cache using Caffeine cache. */
 public class CaffeineEntityCache extends BaseEntityCache {
+  private final int CACHE_CLEANUP_CORE_THREADS = 1;
+  private final int CACHE_CLEANUP_MAX_THREADS = 1;
+  private final int CACHE_CLEANUP_QUEUE_CAPACITY = 100;
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
+  private final ReentrantLock opLock = new ReentrantLock();
 
   /** Singleton instance */
-  private static volatile CaffeineEntityCache INSTANCE = null;
+  private static volatile CaffeineEntityCache INSTANCE;
 
   /** Cache part */
   private final Cache<EntityCacheKey, List<Entity>> cacheData;
@@ -64,7 +68,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** Index part */
   private RadixTree<EntityCacheKey> cacheIndex;
 
-  private final ReentrantLock opLock = new ReentrantLock();
   private ScheduledExecutorService scheduler;
 
   @VisibleForTesting
@@ -463,16 +466,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @return The cleanup executor
    */
   private ThreadPoolExecutor buildCleanupExecutor() {
-    int corePoolSize = cacheConfig.get(Configs.CACHE_CLEANUP_CORE_THREADS);
-    int maxPoolSize = cacheConfig.get(Configs.CACHE_CLEANUP_MAX_THREADS);
-    int queueCapacity = cacheConfig.get(Configs.CACHE_CLEANUP_QUEUE_CAPACITY);
-
     return new ThreadPoolExecutor(
-        corePoolSize,
-        maxPoolSize,
+        CACHE_CLEANUP_CORE_THREADS,
+        CACHE_CLEANUP_MAX_THREADS,
         0L,
         TimeUnit.MILLISECONDS,
-        new ArrayBlockingQueue<>(queueCapacity),
+        new ArrayBlockingQueue<>(CACHE_CLEANUP_QUEUE_CAPACITY),
         r -> {
           Thread t = new Thread(r, "CaffeineEntityCache-Cleanup");
           t.setDaemon(true);

@@ -44,9 +44,9 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 
 /**
- * An abstract class that provides a basic implementation for the {@link EntityCache} interface. This class
- * is abstract and cannot be instantiated directly, it is designed to be a base class for other
- * entity cache implementations.
+ * An abstract class that provides a basic implementation for the {@link EntityCache} interface.
+ * This class is abstract and cannot be instantiated directly, it is designed to be a base class for
+ * other entity cache implementations.
  *
  * <p>The purpose of the {@link BaseEntityCache} is to provide a unified way of accessing entity
  * stores, allowing subclasses to focus on caching logic without having to deal with entity store

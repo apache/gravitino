@@ -344,6 +344,14 @@ public class Configs {
           .toSequence()
           .createWithDefault(Collections.emptyList());
 
+  // Whether to enable cache store
+  public static final ConfigEntry<Boolean> CACHE_ENABLED =
+      new ConfigBuilder("gravitino.cache.enabled")
+          .doc("Whether to enable cache store.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   // Maximum number of entries in the cache
   public static final ConfigEntry<Integer> CACHE_MAX_ENTRIES =
       new ConfigBuilder("gravitino.cache.maxEntries")
@@ -376,35 +384,9 @@ public class Configs {
   public static final ConfigEntry<Boolean> CACHE_WEIGHER_ENABLED =
       new ConfigBuilder("gravitino.cache.enableWeigher")
           .doc(
-              "Whether to enable weighted cache eviction. Entries are evicted based on weight instead of count.")
+              "Whether to enable weighted cache eviction. "
+                  + "Entries are evicted based on weight instead of count.")
           .version(ConfigConstants.VERSION_0_10_0)
           .booleanConf()
           .createWithDefault(true);
-
-  // Number of core threads for cache cleanup executor
-  public static final ConfigEntry<Integer> CACHE_CLEANUP_CORE_THREADS =
-      new ConfigBuilder("gravitino.cache.cleanup.coreThreads")
-          .doc("Core thread count for the cache cleanup executor.")
-          .version(ConfigConstants.VERSION_0_10_0)
-          .intConf()
-          .checkValue(v -> v > 0, "Must be > 0")
-          .createWithDefault(1);
-
-  // Number of max threads for cache cleanup executor
-  public static final ConfigEntry<Integer> CACHE_CLEANUP_MAX_THREADS =
-      new ConfigBuilder("gravitino.cache.cleanup.maxThreads")
-          .doc("Maximum thread count for the cache cleanup executor.")
-          .version(ConfigConstants.VERSION_0_10_0)
-          .intConf()
-          .checkValue(v -> v >= 1, "Must be >= 1")
-          .createWithDefault(1);
-
-  // Capacity of the task queue for cache cleanup executor
-  public static final ConfigEntry<Integer> CACHE_CLEANUP_QUEUE_CAPACITY =
-      new ConfigBuilder("gravitino.cache.cleanup.queueCapacity")
-          .doc("Task queue capacity for the cache cleanup executor.")
-          .version(ConfigConstants.VERSION_0_10_0)
-          .intConf()
-          .checkValue(v -> v >= 0, "Must be >= 0")
-          .createWithDefault(100);
 }
