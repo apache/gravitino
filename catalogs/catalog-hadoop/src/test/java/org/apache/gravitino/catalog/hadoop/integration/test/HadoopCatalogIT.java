@@ -32,6 +32,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -182,10 +184,10 @@ public class HadoopCatalogIT extends BaseIT {
             + filesetIdent.name()
             + "/files";
     Map<String, String> query = new HashMap<>();
-    if (subPath != null && !subPath.isEmpty()) {
+    if (!StringUtils.isBlank(subPath)) {
       query.put("subPath", subPath);
     }
-    if (locationName != null && !locationName.isEmpty()) {
+    if (!StringUtils.isBlank(locationName)) {
       query.put("locationName", locationName);
     }
 
