@@ -204,7 +204,7 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
-## Apache Gravitino catalog properties configuration
+## Gravitino catalog properties configuration
 
 There are three types of catalog properties:
 

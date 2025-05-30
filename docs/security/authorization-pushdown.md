@@ -13,7 +13,7 @@ Gravitino offers a set of authorization frameworks that integrate with various u
 Gravitino manages different data sources through Catalogs, and when a user performs an authorization operation on data within a Catalog, Gravitino invokes the Authorization Plugin module for that Catalog.
 This module translates Gravitino's authorization model into the permission rules of the underlying data source. The permissions are then enforced by the underlying permission system via the respective client, such as JDBC or the Apache Ranger client.
 
-### Ranger Hadoop SQL Plugin
+### Authorization Hive with Ranger Properties
 
 In order to use the Ranger Hadoop SQL Plugin, you need to configure the following properties:
 
