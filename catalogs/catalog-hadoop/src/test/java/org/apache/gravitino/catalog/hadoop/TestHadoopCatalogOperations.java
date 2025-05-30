@@ -383,15 +383,15 @@ public class TestHadoopCatalogOperations {
     String name = "schema28";
     String comment = "comment28";
     String catalogPath = "";
-    Schema schema = createSchema(name, comment, catalogPath, null);
-    Assertions.assertEquals(name, schema.name());
-    Assertions.assertEquals(comment, schema.comment());
 
     Throwable exception =
         Assertions.assertThrows(
-            SchemaAlreadyExistsException.class,
-            () -> createSchema(name, comment, catalogPath, null));
-    Assertions.assertEquals("Schema m1.c1.schema28 already exists", exception.getMessage());
+            IllegalArgumentException.class, () -> createSchema(name, comment, catalogPath, null));
+    Assertions.assertEquals(
+        "The value of the catalog property "
+            + HadoopCatalogPropertiesMetadata.LOCATION
+            + " must not be blank",
+        exception.getMessage());
   }
 
   @Test
