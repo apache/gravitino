@@ -44,12 +44,12 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 
 /**
- * An abstract class that provides a basic implementation for the MetaCache interface. This class is
- * abstract and cannot be instantiated directly, it is designed to be a base class for other meta
- * cache implementations.
+ * An abstract class that provides a basic implementation for the {@link EntityCache} interface. This class
+ * is abstract and cannot be instantiated directly, it is designed to be a base class for other
+ * entity cache implementations.
  *
- * <p>The purpose of the BaseMetaCache is to provide a unified way of accessing entity stores,
- * allowing subclasses to focus on caching logic without having to deal with entity store
+ * <p>The purpose of the {@link BaseEntityCache} is to provide a unified way of accessing entity
+ * stores, allowing subclasses to focus on caching logic without having to deal with entity store
  * management.
  */
 public abstract class BaseEntityCache implements EntityCache {
@@ -77,8 +77,7 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Constructs a new {@link BaseEntityCache} instance. If the provided entityStore is null, it will
-   * use the entity store configured in the Gravitino environment.
+   * Constructs a new {@link BaseEntityCache} instance. If the provided entityStore is null.
    *
    * @param entityStore The entity store to be used by the cache, can be null.
    */
@@ -99,9 +98,7 @@ public abstract class BaseEntityCache implements EntityCache {
     Preconditions.checkArgument(type != null, "EntityType must not be null");
 
     Class<?> clazz = ENTITY_CLASS_MAP.get(type);
-    if (clazz == null) {
-      throw new IllegalArgumentException("Unsupported EntityType: " + type.getShortName());
-    }
+    Preconditions.checkArgument(clazz != null, "Unsupported EntityType: " + type);
 
     return (Class<E>) clazz;
   }

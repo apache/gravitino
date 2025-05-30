@@ -53,7 +53,7 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
   /**
    * Returns the maximum weight that can be stored in the cache.
    *
-   * <p>The total weight is estimated based on the expected number of metadata entities:
+   * <p>The total weight is estimated based on the expected number of entities:
    *
    * <ul>
    *   <li>~10 Metalakes per Gravitino instance

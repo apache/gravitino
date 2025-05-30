@@ -51,7 +51,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** This class implements a meta cache using Caffeine cache. */
+/** This class implements a Entity cache using Caffeine cache. */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
 
@@ -65,7 +65,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private RadixTree<EntityCacheKey> cacheIndex;
 
   private final ReentrantLock opLock = new ReentrantLock();
-  ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+  private ScheduledExecutorService scheduler;
 
   @VisibleForTesting
   static void resetForTest() {
@@ -73,7 +73,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Returns the instance of MetaCacheCaffeine based on the cache configuration and entity store.
+   * Returns the instance of {@link CaffeineEntityCache} based on the cache configuration and entity
+   * store.
    *
    * @param cacheConfig The cache configuration
    * @param entityStore The entity store to load entities from the database
@@ -91,7 +92,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-   * Constructs a new MetaCacheCaffeine.
+   * Constructs a new {@link CaffeineEntityCache}.
    *
    * @param cacheConfig the cache configuration
    * @param entityStore The entity store to load entities from the database
@@ -99,25 +100,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private CaffeineEntityCache(Config cacheConfig, EntityStore entityStore) {
     super(cacheConfig, entityStore);
     cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
-
-    /**
-     * Executor for async cache cleanup, when a cache expires then use this executor to sync other
-     * cache and index trees.
-     */
-    ThreadPoolExecutor cleanupExec =
-        new ThreadPoolExecutor(
-            1,
-            1,
-            0L,
-            TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(100),
-            r -> {
-              Thread t = new Thread(r, "CaffeineMetaCache-Cleanup");
-              t.setDaemon(true);
-              return t;
-            },
-            new ThreadPoolExecutor.CallerRunsPolicy());
-
+    ThreadPoolExecutor cleanupExec = buildCleanupExecutor();
     Caffeine<EntityCacheKey, List<Entity>> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
     cacheDataBuilder
@@ -141,7 +124,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     this.cacheData = cacheDataBuilder.build();
 
-    if (cacheConfig.get(Configs.CACHE_STATUS_ENABLED)) {
+    if (cacheConfig.get(Configs.CACHE_STATS_ENABLED)) {
+      scheduler = Executors.newSingleThreadScheduledExecutor();
       startCacheStatsMonitor();
     }
   }
@@ -203,15 +187,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Entity.EntityType identType) {
     return withLock(
         () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(nameIdentifier, identType, relType);
-
-          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-          if (entitiesFromCache != null) {
-            List<E> convertedEntities = convertEntity(entitiesFromCache);
-            return Optional.of(convertedEntities);
-          }
-
-          return Optional.empty();
+          List<Entity> entitiesFromCache =
+              cacheData.getIfPresent(EntityCacheKey.of(nameIdentifier, identType, relType));
+          return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntity);
         });
   }
 
@@ -221,13 +199,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type) {
     return withLock(
         () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
-          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-          if (entitiesFromCache != null) {
-            return Optional.of(convertEntity(entitiesFromCache.get(0)));
-          }
+          List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
 
-          return Optional.empty();
+          return Optional.ofNullable(entitiesFromCache)
+              .map(entities -> convertEntity(entities.get(0)));
         });
   }
 
@@ -374,12 +349,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
       builder.maximumSize(cacheConfig.get(Configs.CACHE_MAX_ENTRIES));
     }
 
-    if (cacheConfig.get(Configs.CACHE_EXPIRATION_ENABLED)) {
+    if (cacheConfig.get(Configs.CACHE_EXPIRATION_TIME) > 0) {
       builder.expireAfterWrite(
           cacheConfig.get(Configs.CACHE_EXPIRATION_TIME), TimeUnit.MILLISECONDS);
     }
 
-    if (cacheConfig.get(Configs.CACHE_STATUS_ENABLED)) {
+    if (cacheConfig.get(Configs.CACHE_STATS_ENABLED)) {
       builder.recordStats();
     }
 
@@ -448,11 +423,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @throws IOException If an exception occurs during the action
    */
   private <T, E extends Exception> T withLockAndThrow(ThrowingSupplier<T, E> action) throws E {
-    opLock.lock();
     try {
-      return action.get();
-    } finally {
-      opLock.unlock();
+      opLock.lockInterruptibly();
+      try {
+        return action.get();
+      } finally {
+        opLock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
     }
   }
 
@@ -464,12 +444,41 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * @throws E If an exception occurs during the action
    */
   private <E extends Exception> void withLockAndThrow(ThrowingRunnable<E> action) throws E {
-    opLock.lock();
     try {
-      action.run();
-    } finally {
-      opLock.unlock();
+      opLock.lockInterruptibly();
+      try {
+        action.run();
+      } finally {
+        opLock.unlock();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
     }
+  }
+
+  /**
+   * Builds the cleanup executor.
+   *
+   * @return The cleanup executor
+   */
+  private ThreadPoolExecutor buildCleanupExecutor() {
+    int corePoolSize = cacheConfig.get(Configs.CACHE_CLEANUP_CORE_THREADS);
+    int maxPoolSize = cacheConfig.get(Configs.CACHE_CLEANUP_MAX_THREADS);
+    int queueCapacity = cacheConfig.get(Configs.CACHE_CLEANUP_QUEUE_CAPACITY);
+
+    return new ThreadPoolExecutor(
+        corePoolSize,
+        maxPoolSize,
+        0L,
+        TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(queueCapacity),
+        r -> {
+          Thread t = new Thread(r, "CaffeineEntityCache-Cleanup");
+          t.setDaemon(true);
+          return t;
+        },
+        new ThreadPoolExecutor.CallerRunsPolicy());
   }
 
   /** Starts the cache stats monitor. */

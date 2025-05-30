@@ -353,14 +353,6 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10_000);
 
-  // Whether to enable cache expiration
-  public static final ConfigEntry<Boolean> CACHE_EXPIRATION_ENABLED =
-      new ConfigBuilder("gravitino.cache.expiration.enabled")
-          .doc("Whether to enable cache entry expiration based on time.")
-          .version(ConfigConstants.VERSION_0_10_0)
-          .booleanConf()
-          .createWithDefault(true);
-
   // Cache entry expiration time
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
@@ -371,20 +363,48 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(3_600_000L);
 
-  // Whether to enable cache status logging
-  public static final ConfigEntry<Boolean> CACHE_STATUS_ENABLED =
-      new ConfigBuilder("gravitino.cache.status.enabled")
-          .doc("Whether to collect and log cache statistics such as hit/miss count and size.")
+  // Whether to enable cache statistics logging
+  public static final ConfigEntry<Boolean> CACHE_STATS_ENABLED =
+      new ConfigBuilder("gravitino.cache.enableStats")
+          .doc(
+              "Whether to enable cache statistics logging such as hit/miss count, load failures, and size.")
           .version(ConfigConstants.VERSION_0_10_0)
           .booleanConf()
           .createWithDefault(false);
 
   // Whether to enable weighted cache
   public static final ConfigEntry<Boolean> CACHE_WEIGHER_ENABLED =
-      new ConfigBuilder("gravitino.cache.weigher.enabled")
+      new ConfigBuilder("gravitino.cache.enableWeigher")
           .doc(
               "Whether to enable weighted cache eviction. Entries are evicted based on weight instead of count.")
           .version(ConfigConstants.VERSION_0_10_0)
           .booleanConf()
           .createWithDefault(true);
+
+  // Number of core threads for cache cleanup executor
+  public static final ConfigEntry<Integer> CACHE_CLEANUP_CORE_THREADS =
+      new ConfigBuilder("gravitino.cache.cleanup.coreThreads")
+          .doc("Core thread count for the cache cleanup executor.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .intConf()
+          .checkValue(v -> v > 0, "Must be > 0")
+          .createWithDefault(1);
+
+  // Number of max threads for cache cleanup executor
+  public static final ConfigEntry<Integer> CACHE_CLEANUP_MAX_THREADS =
+      new ConfigBuilder("gravitino.cache.cleanup.maxThreads")
+          .doc("Maximum thread count for the cache cleanup executor.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .intConf()
+          .checkValue(v -> v >= 1, "Must be >= 1")
+          .createWithDefault(1);
+
+  // Capacity of the task queue for cache cleanup executor
+  public static final ConfigEntry<Integer> CACHE_CLEANUP_QUEUE_CAPACITY =
+      new ConfigBuilder("gravitino.cache.cleanup.queueCapacity")
+          .doc("Task queue capacity for the cache cleanup executor.")
+          .version(ConfigConstants.VERSION_0_10_0)
+          .intConf()
+          .checkValue(v -> v >= 0, "Must be >= 0")
+          .createWithDefault(100);
 }
