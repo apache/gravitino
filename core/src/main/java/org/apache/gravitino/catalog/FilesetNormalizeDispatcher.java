@@ -57,7 +57,7 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   @Override
   public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
       throws NoSuchFilesetException, IOException {
-    return dispatcher.listFiles(ident, locationName, subPath);
+    return dispatcher.listFiles(normalizeCaseSensitive(ident), locationName, subPath);
   }
 
   @Override
