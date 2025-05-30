@@ -107,6 +107,22 @@ public interface PolicyOperations {
       throws PolicyAlreadyExistsException;
 
   /**
+   * Enable a policy under a metalake. If the policy is already enabled, this method does nothing.
+   *
+   * @param name The name of the policy to enable.
+   * @throws NoSuchPolicyException If the policy does not exist.
+   */
+  void enablePolicy(String name) throws NoSuchPolicyException;
+
+  /**
+   * Disable a policy under a metalake. If the policy is already disabled, this method does nothing.
+   *
+   * @param name The name of the policy to disable.
+   * @throws NoSuchPolicyException If the policy does not exist.
+   */
+  void disablePolicy(String name) throws NoSuchPolicyException;
+
+  /**
    * Alter a policy under a metalake.
    *
    * @param name The name of the policy.

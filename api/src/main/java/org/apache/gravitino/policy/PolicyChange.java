@@ -49,16 +49,6 @@ public interface PolicyChange {
   }
 
   /**
-   * Creates a new policy change to set the enabled or disabled state of the policy.
-   *
-   * @param enabled The enabled state to set.
-   * @return The policy change.
-   */
-  static PolicyChange setEnabled(boolean enabled) {
-    return new SetEnabled(enabled);
-  }
-
-  /**
    * Creates a new policy change to update the content of the policy.
    *
    * @param content The new content for the policy.
@@ -165,41 +155,6 @@ public interface PolicyChange {
     @Override
     public String toString() {
       return "UPDATE POLICY COMMENT " + newComment;
-    }
-  }
-
-  /** A policy change to set the policy enabled or disabled. */
-  final class SetEnabled implements PolicyChange {
-    private final boolean enabled;
-
-    private SetEnabled(boolean enabled) {
-      this.enabled = enabled;
-    }
-
-    /**
-     * Get the enabled state of the policy change.
-     *
-     * @return The enabled state of the policy change.
-     */
-    public boolean getEnabled() {
-      return enabled;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (o == null || getClass() != o.getClass()) return false;
-      SetEnabled that = (SetEnabled) o;
-      return enabled == that.enabled;
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(enabled);
-    }
-
-    @Override
-    public String toString() {
-      return "SET ENABLED " + enabled;
     }
   }
 
