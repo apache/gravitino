@@ -368,7 +368,7 @@ public class Configs {
               "Time in milliseconds after which a cache entry expires. Default is 3,600,000 ms (1 hour).")
           .version(ConfigConstants.VERSION_0_10_0)
           .longConf()
-          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(3_600_000L);
 
   // Whether to enable cache statistics logging
