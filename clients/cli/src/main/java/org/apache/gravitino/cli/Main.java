@@ -19,12 +19,14 @@
 
 package org.apache.gravitino.cli;
 
+import java.util.Arrays;
 import java.util.Locale;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.gravitino.cli.utils.CliUtils;
 
 /* Entry point for the Gravitino command line. */
 public class Main {
@@ -35,7 +37,7 @@ public class Main {
     CommandLineParser parser = new DefaultParser();
     Options options = new GravitinoOptions().options();
     if (args.length == 0) {
-      GravitinoCommandLine.displayHelp(options);
+      CliUtils.printHelp();
       return;
     }
 
@@ -50,14 +52,25 @@ public class Main {
       String command = resolveCommand(line);
       GravitinoCommandLine commandLine = new GravitinoCommandLine(line, options, entity, command);
 
-      if (entity != null && command != null) {
-        commandLine.handleCommandLine();
-      } else {
-        commandLine.handleSimpleLine();
+      if (entity == null && command == null) {
+        CliUtils.printHelp();
+        return;
       }
+
+      if (line.hasOption(GravitinoOptions.HELP)) {
+        if (command == null) {
+          boolean verbose = line.hasOption(GravitinoOptions.VERBOSE);
+          CliUtils.printEntityHelp(entity, verbose);
+        } else {
+          CliUtils.printSubCommandHelp(entity, command);
+        }
+      } else {
+        commandLine.handleCommandLine();
+      }
+
     } catch (ParseException exp) {
       System.err.println(ErrorMessages.PARSE_ERROR + exp.getMessage());
-      GravitinoCommandLine.displayHelp(options);
+      CliUtils.printHelp();
       exit(-1);
     }
   }
@@ -90,16 +103,19 @@ public class Main {
     /* As the bare second argument. */
     String[] args = line.getArgs();
 
-    if (args.length == 2) {
+    if (args.length == 0) {
+      return null;
+    } else if (args.length == 1) {
+      if (line.hasOption(GravitinoOptions.HELP)) {
+        return null;
+      }
+      throw new IllegalArgumentException(
+          "Invalid command line arguments: " + Arrays.toString(line.getArgs()));
+    } else if (args.length >= 2) {
       String action = args[1].toLowerCase(Locale.ENGLISH);
       if (CommandActions.isValidCommand(action)) {
         return action;
       }
-    } else if (args.length == 1) {
-      /* Default to 'details' command. */
-      return line.hasOption(GravitinoOptions.HELP) ? CommandActions.HELP : CommandActions.DETAILS;
-    } else if (args.length == 0) {
-      return null;
     }
 
     System.err.println(ErrorMessages.UNSUPPORTED_COMMAND);
