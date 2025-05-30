@@ -90,7 +90,7 @@ public class GravitinoInterceptionService implements InterceptionService {
         String expression = expressionAnnotation.expression();
         Object[] args = methodInvocation.getArguments();
         Map<Entity.EntityType, NameIdentifier> metadataContext =
-            getMetadataContext(parameters, args);
+            extractNameIdentifierFromParameters(parameters, args);
         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
             new AuthorizationExpressionEvaluator(expression);
         boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
@@ -101,7 +101,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       return methodInvocation.proceed();
     }
 
-    private Map<Entity.EntityType, NameIdentifier> getMetadataContext(
+    private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
         Parameter[] parameters, Object[] args) {
       Map<Entity.EntityType, String> metadatas = new HashMap<>();
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
@@ -115,11 +115,11 @@ public class GravitinoInterceptionService implements InterceptionService {
         MetadataObject.Type type = authorizeResource.type();
         metadatas.put(Entity.EntityType.valueOf(type.name()), String.valueOf(args[i]));
       }
-      String metalake = metadatas.get(MetadataObject.Type.METALAKE);
-      String catalog = metadatas.get(MetadataObject.Type.CATALOG);
-      String schema = metadatas.get(MetadataObject.Type.SCHEMA);
-      String table = metadatas.get(MetadataObject.Type.TABLE);
-      String topic = metadatas.get(MetadataObject.Type.TOPIC);
+      String metalake = metadatas.get(Entity.EntityType.METALAKE);
+      String catalog = metadatas.get(Entity.EntityType.CATALOG);
+      String schema = metadatas.get(Entity.EntityType.SCHEMA);
+      String table = metadatas.get(Entity.EntityType.TABLE);
+      String topic = metadatas.get(Entity.EntityType.TOPIC);
       metadatas.forEach(
           (type, metadata) -> {
             switch (type) {
