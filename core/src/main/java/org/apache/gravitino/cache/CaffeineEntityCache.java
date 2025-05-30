@@ -205,6 +205,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
           List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
 
           return Optional.ofNullable(entitiesFromCache)
+              .filter(l -> !l.isEmpty())
               .map(entities -> convertEntity(entities.get(0)));
         });
   }

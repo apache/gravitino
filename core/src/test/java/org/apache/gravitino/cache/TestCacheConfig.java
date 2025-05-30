@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.cache;
 
+import com.google.common.collect.Lists;
+import java.util.ArrayList;
+import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.junit.jupiter.api.Assertions;
@@ -34,5 +37,13 @@ public class TestCacheConfig {
     Assertions.assertEquals(10_000, config.get(Configs.CACHE_MAX_ENTRIES));
     Assertions.assertEquals(3_600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
     Assertions.assertEquals(200_302_000L, EntityCacheWeigher.getMaxWeight());
+  }
+
+  @Test
+  void test() {
+    ArrayList<Integer> list = Lists.newArrayList();
+    Optional<Integer> i =
+        Optional.ofNullable(list).filter(entities -> !entities.isEmpty()).map(l -> l.get(0));
+    Assertions.assertFalse(i.isPresent());
   }
 }
