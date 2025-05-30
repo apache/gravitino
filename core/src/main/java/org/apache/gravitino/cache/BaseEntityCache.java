@@ -47,10 +47,6 @@ import org.apache.gravitino.storage.relational.RelationalEntityStore;
  * An abstract class that provides a basic implementation for the {@link EntityCache} interface.
  * This class is abstract and cannot be instantiated directly, it is designed to be a base class for
  * other entity cache implementations.
- *
- * <p>The purpose of the {@link BaseEntityCache} is to provide a unified way of accessing entity
- * stores, allowing subclasses to focus on caching logic without having to deal with entity store
- * management.
  */
 public abstract class BaseEntityCache implements EntityCache {
   private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAP;
@@ -79,7 +75,7 @@ public abstract class BaseEntityCache implements EntityCache {
   /**
    * Constructs a new {@link BaseEntityCache} instance.
    *
-   * @param entityStore The entity store to be used by the cache, can be null.
+   * @param entityStore The entity store to be used by the cache.
    */
   public BaseEntityCache(Config config, EntityStore entityStore) {
     Preconditions.checkArgument(config != null, "Config must not be null");
@@ -130,7 +126,7 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Converts a list of entities to a new list.
+   * Converts a list of entities to a new list with the target entity type.
    *
    * @param entities Thr original list of entities.
    * @return A list of converted entities.
@@ -148,7 +144,7 @@ public abstract class BaseEntityCache implements EntityCache {
    *
    * @param entity The original entity.
    * @return A new entity.
-   * @param <E> The type of the entity.
+   * @param <E> The type of the new entity.
    */
   @SuppressWarnings("unchecked")
   protected static <E extends Entity & HasIdentifier> E convertEntity(Entity entity) {
