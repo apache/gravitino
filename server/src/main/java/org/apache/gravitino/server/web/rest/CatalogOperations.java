@@ -53,7 +53,6 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -115,7 +114,6 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-catalog", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNERSHIP")
   public Response createCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalake,
