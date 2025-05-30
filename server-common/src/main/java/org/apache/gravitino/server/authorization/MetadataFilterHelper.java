@@ -110,7 +110,8 @@ public class MetadataFilterHelper {
         break;
       case SCHEMA:
         nameIdentifierMap.put(Entity.EntityType.SCHEMA, nameIdentifier);
-        nameIdentifierMap.put(entityType, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       case TABLE:
         nameIdentifierMap.put(Entity.EntityType.TABLE, nameIdentifier);
