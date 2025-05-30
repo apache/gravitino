@@ -152,13 +152,10 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
         if (catalogFactory instanceof BaseCatalogFactory && predicate.test(catalogFactory)) {
           factories.add(catalogFactory);
         }
-      } catch (Throwable t) {
-        if (t instanceof NoClassDefFoundError) {
-          LOG.debug(
-              "NoClassDefFoundError when loading a " + Factory.class.getCanonicalName() + ".", t);
-        } else {
-          throw new RuntimeException("Unexpected error when trying to load service provider.", t);
-        }
+      } catch (NoClassDefFoundError e) {
+        LOG.debug("NoClassDefFoundError when loading a {}.", Factory.class.getCanonicalName(), e);
+      } catch (Exception e) {
+        throw new RuntimeException("Unexpected error when trying to load service provider.", e);
       }
     }
 

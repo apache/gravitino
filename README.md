@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Apache Gravitino™ (incubating)
+# Apache Gravitino™
 
 [![GitHub Actions Build](https://github.com/apache/gravitino/actions/workflows/build.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/build.yml)
 [![GitHub Actions Integration Test](https://github.com/apache/gravitino/actions/workflows/integration-test.yml/badge.svg)](https://github.com/apache/gravitino/actions/workflows/integration-test.yml)
@@ -129,10 +129,6 @@ Gravitino provides a Trino connector for accessing metadata within Gravitino. To
 ## License
 
 Gravitino is licensed under the Apache License Version 2.0. For details, see the [LICENSE](LICENSE).
-
-## ASF Incubator disclaimer
-
-Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. Incubation is required for all newly accepted projects until a further review indicates that the infrastructure, communications, and decision making process have stabilized in a manner consistent with other successful ASF projects. While incubation status is not necessarily a reflection of the completeness or stability of the code, it does indicate that the project has yet to be fully endorsed by the ASF.
 
 <sub>Apache®, Apache Gravitino&trade;, Apache Hadoop&reg;, Apache Hive&trade;, Apache Iceberg&trade;, Apache Kafka&reg;, Apache Spark&trade;, Apache Submarine&trade;, Apache Thrift&trade; and Apache Zeppelin&trade; are either registered trademarks or trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
 

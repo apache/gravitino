@@ -172,11 +172,11 @@ allprojects {
       param.environment("PROJECT_VERSION", project.version)
 
       // Gravitino CI Docker image
-      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.18")
-      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.6")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
-      param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
+      param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.2")
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
 
@@ -540,8 +540,6 @@ tasks.rat {
     "**/LICENSE.*",
     "**/NOTICE.*",
     "**/trino-ci-testset",
-    "DISCLAIMER.txt",
-    "DISCLAIMER_WIP.txt",
     "ROADMAP.md",
     "clients/cli/src/main/resources/*.txt",
     "clients/client-python/.pytest_cache/*",
@@ -641,7 +639,6 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("package") }
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
@@ -694,7 +691,6 @@ tasks {
         from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".rest", "")
@@ -713,7 +709,6 @@ tasks {
         from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".trino", "")
