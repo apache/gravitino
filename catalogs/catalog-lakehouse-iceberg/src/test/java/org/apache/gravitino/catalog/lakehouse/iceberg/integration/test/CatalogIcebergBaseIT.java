@@ -574,12 +574,12 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals("iceberg_column_1", loadTable.columns()[0].name());
-    Assertions.assertEquals(Types.TimestampType.withTimeZone(), loadTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(6), loadTable.columns()[0].dataType());
     Assertions.assertEquals("col_1_comment", loadTable.columns()[0].comment());
 
     Assertions.assertEquals("iceberg_column_2", loadTable.columns()[1].name());
     Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(), loadTable.columns()[1].dataType());
+        Types.TimestampType.withoutTimeZone(6), loadTable.columns()[1].dataType());
     Assertions.assertEquals("col_2_comment", loadTable.columns()[1].comment());
 
     org.apache.iceberg.Table table =
