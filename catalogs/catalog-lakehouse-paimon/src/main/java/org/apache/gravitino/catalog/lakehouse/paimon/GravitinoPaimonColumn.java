@@ -38,6 +38,8 @@ public class GravitinoPaimonColumn extends BaseColumn {
    * Converts {@link GravitinoPaimonColumn} instance to inner column.
    *
    * @param id The id of inner column.
+   * @param gravitinoColumn The Gravitino column to convert (contains name, type, nullability, and
+   *     comment).
    * @return The converted inner column.
    */
   public static DataField toPaimonColumn(int id, Column gravitinoColumn) {

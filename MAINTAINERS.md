@@ -21,7 +21,7 @@ Note: This maintainer and contributor tables at the end of this document list th
 
 # Committers
 
-The current Apache Gravitino project committers can be [viewed here](https://projects.apache.org/project.html?incubator-gravitino).
+The current Apache Gravitino project committers can be [viewed here](https://projects.apache.org/project.html?gravitino).
 
 ## Review process
 

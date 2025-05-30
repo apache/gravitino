@@ -706,9 +706,9 @@ storage_handlers: Dict[StorageType, StorageHandler] = {
     StorageType.LOCAL: LOCA_HANDLER,
     StorageType.HDFS: HDFS_HANDLER,
     StorageType.GCS: GCS_HANDLER,
-    StorageType.S3A: S3StorageHandler,
-    StorageType.OSS: OSSSecretKeyCredential,
-    StorageType.ABS: AzureAccountKeyCredential,
+    StorageType.S3A: S3_HANDLER,
+    StorageType.OSS: OSS_HANDLER,
+    StorageType.ABS: ABS_HANDLER,
 }
 
 

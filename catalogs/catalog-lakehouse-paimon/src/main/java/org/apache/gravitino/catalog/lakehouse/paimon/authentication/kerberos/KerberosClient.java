@@ -51,7 +51,7 @@ public class KerberosClient implements Closeable {
    * performing kerberos authentication based on the keytab file.
    *
    * @param keytabFilePath local keytab file path
-   * @throws IOException
+   * @throws IOException if Kerberos authentication fails
    */
   public void login(String keytabFilePath) throws IOException {
     KerberosConfig kerberosConfig = new KerberosConfig(conf);

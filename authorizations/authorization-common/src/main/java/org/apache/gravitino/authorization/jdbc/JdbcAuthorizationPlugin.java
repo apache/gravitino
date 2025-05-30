@@ -62,7 +62,7 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
   protected BasicDataSource dataSource;
   protected JdbcSecurableObjectMappingProvider mappingProvider;
 
-  public JdbcAuthorizationPlugin(Map<String, String> config) {
+  protected JdbcAuthorizationPlugin(Map<String, String> config) {
     // Initialize the data source
     dataSource = new BasicDataSource();
     JdbcAuthorizationProperties jdbcAuthProperties = new JdbcAuthorizationProperties(config);
@@ -148,7 +148,7 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
     for (String sql : sqls) {
       executeUpdateSQL(sql);
     }
-    return null;
+    return true;
   }
 
   @Override

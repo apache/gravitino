@@ -77,15 +77,7 @@ public class FilesetDetails extends Command {
     }
 
     if (result != null) {
-      String filesetType = (result.type() == Fileset.Type.MANAGED) ? "managed" : "external";
-      printResults(
-          result.name()
-              + ","
-              + filesetType
-              + ","
-              + result.comment()
-              + ","
-              + result.storageLocation());
+      printResults(result);
     }
   }
 }

@@ -25,7 +25,7 @@ import org.apache.gravitino.cli.CommandContext;
 public abstract class AuditCommand extends Command {
 
   /** @param context The command context. */
-  public AuditCommand(CommandContext context) {
+  protected AuditCommand(CommandContext context) {
     super(context);
   }
 

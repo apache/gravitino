@@ -35,21 +35,22 @@ public interface AuditLogWriter extends Closeable {
   /**
    * Initialize the writer with the given configuration.
    *
-   * @param properties
+   * @param formatter formatter of type {@link Formatter} used to format the output
+   * @param properties map of configuration properties
    */
   void init(Formatter formatter, Map<String, String> properties);
 
   /**
    * Write the audit event to storage.
    *
-   * @param auditLog
+   * @param auditLog the {@link AuditLog} instance representing the event to be written
    */
   void doWrite(AuditLog auditLog);
 
   /**
    * Write the audit event to storage.
    *
-   * @param event
+   * @param event the audit {@link Event} to be written
    */
   default void write(Event event) {
     doWrite(getFormatter().format(event));
@@ -59,7 +60,7 @@ public interface AuditLogWriter extends Closeable {
    * Define the name of the writer, which related to audit writer configuration. Audit log writer
    * configuration start with: gravitino.audit.log.writer.${name}.*
    *
-   * @return
+   * @return the name of the writer
    */
   String name();
 }
