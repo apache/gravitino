@@ -38,7 +38,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 
 /** This class is used to convert expression of bucket, sort_by, partition object to string */
 public class ExpressionUtil {
-  private static final String IDENTIFIER = "[a-zA-Z_][a-zA-Z0-9_]*";
+  private static final String IDENTIFIER = "[a-zA-Z_]\\w*";
   private static final String FUNCTION_ARG_INT = "(\\d+)";
   private static final String FUNCTION_ARG_IDENTIFIER = "(" + IDENTIFIER + ")";
   private static final Pattern YEAR_FUNCTION_PATTERN =
