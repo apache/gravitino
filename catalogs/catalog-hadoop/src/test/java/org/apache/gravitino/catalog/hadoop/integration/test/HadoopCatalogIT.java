@@ -172,7 +172,15 @@ public class HadoopCatalogIT extends BaseIT {
   private String getFileInfos(NameIdentifier filesetIdent, String subPath, String locationName)
       throws IOException {
     String targetUrl =
-        "fileset/" + catalogName + "/" + schemaName + "/" + filesetIdent.name() + "/files";
+        "fileset/"
+            + metalakeName
+            + "/"
+            + catalogName
+            + "/"
+            + schemaName
+            + "/"
+            + filesetIdent.name()
+            + "/files";
     Map<String, String> query = new HashMap<>();
     if (subPath != null && !subPath.isEmpty()) {
       query.put("subPath", subPath);
