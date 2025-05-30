@@ -273,7 +273,7 @@ public class ExpressionUtil {
                 (m) -> {
                   NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
                   SortDirection sortDirection =
-                      m.group(1).toUpperCase().equals(SORT_DIRECTION_ASC)
+                      m.group(1).equalsIgnoreCase(SORT_DIRECTION_ASC)
                           ? SortDirection.ASCENDING
                           : SortDirection.DESCENDING;
                   NullOrdering nullOrdering =
@@ -288,11 +288,11 @@ public class ExpressionUtil {
                 (m) -> {
                   NamedReference.FieldReference sortField = NamedReference.field(m.group(1));
                   SortDirection sortDirection =
-                      m.group(2).toUpperCase().equals(SORT_DIRECTION_ASC)
+                      m.group(2).equalsIgnoreCase(SORT_DIRECTION_ASC)
                           ? SortDirection.ASCENDING
                           : SortDirection.DESCENDING;
                   NullOrdering nullOrdering =
-                      m.group(3).toUpperCase().equals(NULL_ORDERING_FIRST)
+                      m.group(3).equalsIgnoreCase(NULL_ORDERING_FIRST)
                           ? NullOrdering.NULLS_FIRST
                           : NullOrdering.NULLS_LAST;
                   sortOrders.add(SortOrders.of(sortField, sortDirection, nullOrdering));
