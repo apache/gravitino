@@ -172,13 +172,13 @@ public class HadoopCatalogIT extends BaseIT {
   private String getFileInfos(NameIdentifier filesetIdent, String subPath, String locationName)
       throws IOException {
     String targetUrl =
-        "fileset/"
+        "api/metalakes/"
             + metalakeName
-            + "/"
+            + "/catalogs/"
             + catalogName
-            + "/"
+            + "/schemas/"
             + schemaName
-            + "/"
+            + "/filesets/"
             + filesetIdent.name()
             + "/files";
     Map<String, String> query = new HashMap<>();
@@ -744,8 +744,8 @@ public class HadoopCatalogIT extends BaseIT {
         fileMetadata.get("lastModified").asLong() > 0,
         "lastModified should be a positive timestamp");
     Assertions.assertTrue(
-        fileMetadata.get("path").asText().endsWith("/" + fileName),
-        "Path should end with the file name");
+        fileMetadata.get("path").asText().endsWith("/" + filesetName),
+        "Path should end with the fileset name");
   }
 
   @Test

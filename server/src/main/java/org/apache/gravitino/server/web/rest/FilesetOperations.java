@@ -220,8 +220,9 @@ public class FilesetOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
-            FileInfo[] files = dispatcher.listFiles(ident, locationName, decodedSubPath);
+            NameIdentifier filesetIdent =
+                NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
+            FileInfo[] files = dispatcher.listFiles(filesetIdent, locationName, decodedSubPath);
             Response response = Utils.ok(new FileInfoListResponse(DTOConverters.toDTO(files)));
             LOG.info(
                 "Files listed for fileset: {}.{}.{}.{}, subPath: {}, locationName:{}",

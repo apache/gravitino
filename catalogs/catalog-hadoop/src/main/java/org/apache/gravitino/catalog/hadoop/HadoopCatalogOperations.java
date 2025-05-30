@@ -256,15 +256,15 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
       return new FileInfo[0];
     }
 
+    String catalogName = filesetIdent.namespace().level(1);
+    String schemaName = filesetIdent.namespace().level(2);
+    String filesetName = filesetIdent.name();
+
     try {
       FileStatus[] fileStatuses = fs.listStatus(formalizedPath);
       FileInfo[] fileInfos = new FileInfo[fileStatuses.length];
       for (int i = 0; i < fileStatuses.length; i++) {
         FileStatus status = fileStatuses[i];
-
-        String catalogName = filesetIdent.namespace().level(1);
-        String schemaName = filesetIdent.namespace().level(2);
-        String filesetName = filesetIdent.name();
 
         fileInfos[i] =
             FileInfoDTO.builder()
@@ -272,15 +272,7 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
                 .isDir(status.isDirectory())
                 .size(status.isDirectory() ? 0L : status.getLen())
                 .lastModified(status.getModificationTime())
-                .path(
-                    "/fileset/"
-                        + catalogName
-                        + "/"
-                        + schemaName
-                        + "/"
-                        + filesetName
-                        + "/subPath/"
-                        + status.getPath().getName())
+                .path(buildGVFSFilePath(catalogName, schemaName, filesetName, subPath))
                 .build();
       }
 
@@ -1299,6 +1291,30 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
               + "mounts a single file with location name: %s",
           fileset.name(),
           locationName);
+    }
+  }
+
+  private String buildGVFSFilePath(
+      String catalogName, String schemaName, String filesetName, String subPath) {
+    if (subPath == null || subPath.isEmpty() || "/".equals(subPath)) {
+      return "/fileset/" + catalogName + "/" + schemaName + "/" + filesetName;
+    } else {
+      // Normalize subPath, removing leading or tailing slashes
+      String normalizedSubPath = subPath;
+      if (normalizedSubPath.startsWith("/")) {
+        normalizedSubPath = normalizedSubPath.substring(1);
+      }
+      if (normalizedSubPath.endsWith("/")) {
+        normalizedSubPath = normalizedSubPath.substring(0, normalizedSubPath.length() - 1);
+      }
+      return "/fileset/"
+          + catalogName
+          + "/"
+          + schemaName
+          + "/"
+          + filesetName
+          + "/subPath/"
+          + normalizedSubPath;
     }
   }
 
