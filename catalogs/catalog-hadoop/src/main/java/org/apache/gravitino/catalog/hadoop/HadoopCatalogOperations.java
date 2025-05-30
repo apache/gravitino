@@ -1097,6 +1097,10 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
     return path.endsWith(SLASH) ? path.substring(0, path.length() - 1) : path;
   }
 
+  private String ensureLeadingSlash(String path) {
+    return path.startsWith(SLASH) ? path : SLASH + path;
+  }
+
   private FilesetEntity updateFilesetEntity(
       NameIdentifier ident, FilesetEntity filesetEntity, FilesetChange... changes) {
     Map<String, String> props =
@@ -1298,26 +1302,10 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
   private String buildGVFSFilePath(
       String catalogName, String schemaName, String filesetName, String subPath) {
-    if (subPath == null || subPath.isEmpty() || "/".equals(subPath)) {
-      return "/fileset/" + catalogName + "/" + schemaName + "/" + filesetName;
-    } else {
-      // Normalize subPath, removing leading or tailing slashes
-      String normalizedSubPath = subPath;
-      if (normalizedSubPath.startsWith("/")) {
-        normalizedSubPath = normalizedSubPath.substring(1);
-      }
-      if (normalizedSubPath.endsWith("/")) {
-        normalizedSubPath = normalizedSubPath.substring(0, normalizedSubPath.length() - 1);
-      }
-      return "/fileset/"
-          + catalogName
-          + "/"
-          + schemaName
-          + "/"
-          + filesetName
-          + "/subPath/"
-          + normalizedSubPath;
-    }
+    String prefix = String.join(SLASH, "/fileset", catalogName, schemaName, filesetName);
+    return StringUtils.isBlank(subPath)
+        ? prefix
+        : prefix + ensureLeadingSlash(removeTrailingSlash(subPath));
   }
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
