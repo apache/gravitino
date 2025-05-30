@@ -250,6 +250,10 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
           if (StringUtils.isBlank(name)) {
             throw new IllegalArgumentException("Location name must not be blank");
           }
+          if (StringUtils.isBlank(path)) {
+            throw new IllegalArgumentException(
+                "Storage location must not be blank for location name: " + name);
+          }
         });
 
     // Check if the fileset already existed in cache first. If it does, it means the fileset is
@@ -296,12 +300,6 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     // Either catalog property "location", or schema property "location", or storageLocation must be
     // set for managed fileset.
-    for (Map.Entry<String, String> e : storageLocations.entrySet()) {
-      if (StringUtils.isBlank(e.getValue())) {
-        throw new IllegalArgumentException(
-            "Storage location for name '" + e.getKey() + "' must not be null or blank");
-      }
-    }
     Map<String, Path> schemaPaths =
         getAndCheckSchemaPaths(schemaIdent.name(), schemaEntity.properties());
     if (schemaPaths.isEmpty() && storageLocations.isEmpty()) {
@@ -980,7 +978,19 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
                 }));
   }
 
+  private boolean existBlankValue(Map<String, String> properties, String key) {
+    return properties.containsKey(key) && StringUtils.isBlank(properties.get(key));
+  }
+
   private Map<String, Path> getAndCheckCatalogStorageLocations(Map<String, String> properties) {
+    if (existBlankValue(properties, HadoopCatalogPropertiesMetadata.LOCATION)) {
+      // If the properties contain the catalog property "location", it must not be blank.
+      throw new IllegalArgumentException(
+          "The value of the catalog property "
+              + HadoopCatalogPropertiesMetadata.LOCATION
+              + " must not be blank");
+    }
+
     ImmutableMap.Builder<String, Path> catalogStorageLocations = ImmutableMap.builder();
     String unnamedLocation =
         (String)
@@ -995,11 +1005,17 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
     properties.forEach(
         (k, v) -> {
-          if (k.startsWith(PROPERTY_MULTIPLE_LOCATIONS_PREFIX) && StringUtils.isNotBlank(v)) {
+          if (k.startsWith(PROPERTY_MULTIPLE_LOCATIONS_PREFIX)) {
             String locationName = k.substring(PROPERTY_MULTIPLE_LOCATIONS_PREFIX.length());
             if (StringUtils.isBlank(locationName)) {
               throw new IllegalArgumentException("Location name must not be blank");
             }
+
+            if (StringUtils.isBlank(v)) {
+              throw new IllegalArgumentException(
+                  "Location value must not be blank for " + "location name: " + locationName);
+            }
+
             checkPlaceholderValue(v);
             catalogStorageLocations.put(locationName, new Path((ensureTrailingSlash(v))));
           }
@@ -1009,6 +1025,14 @@ public class HadoopCatalogOperations extends ManagedSchemaOperations
 
   private Map<String, Path> getAndCheckSchemaPaths(
       String schemaName, Map<String, String> schemaProps) {
+    if (existBlankValue(schemaProps, HadoopSchemaPropertiesMetadata.LOCATION)) {
+      // If the properties contain the schema property "location", it must not be blank.
+      throw new IllegalArgumentException(
+          "The value of the schema property "
+              + HadoopSchemaPropertiesMetadata.LOCATION
+              + " must not be blank");
+    }
+
     Map<String, Path> schemaPaths = new HashMap<>();
     catalogStorageLocations.forEach(
         (name, path) -> {

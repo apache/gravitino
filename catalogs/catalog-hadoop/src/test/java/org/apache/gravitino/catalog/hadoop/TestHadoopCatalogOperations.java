@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -1493,6 +1494,24 @@ public class TestHadoopCatalogOperations {
                       null));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
 
+      // empty location in catalog location
+      Map<String, String> illegalLocations2 =
+          new HashMap<String, String>() {
+            {
+              put(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1", null);
+            }
+          };
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.initialize(
+                      illegalLocations2,
+                      randomCatalogInfo("m1", "c1"),
+                      HADOOP_PROPERTIES_METADATA));
+      Assertions.assertEquals(
+          "Location value must not be blank for location name: v1", exception.getMessage());
+
       // storage location is parent of schema location
       Schema multipLocationSchema =
           createMultiLocationSchema(
@@ -1519,58 +1538,6 @@ public class TestHadoopCatalogOperations {
               .contains(
                   "Default location name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
-
-      Schema emptySchema =
-          createMultiLocationSchema(
-              "emptySchema", "no-location", ImmutableMap.of(), ImmutableMap.of());
-
-      // storage location value is blank
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fs2",
-                      emptySchema.name(),
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("v1", ""),
-                      ImmutableMap.of()));
-      Assertions.assertEquals(
-          "Storage location for name 'v1' must not be null or blank", exception.getMessage());
-
-      // storage location value is blank
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fs3",
-                      emptySchema.name(),
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("v1", " "),
-                      ImmutableMap.of()));
-      Assertions.assertEquals(
-          "Storage location for name 'v1' must not be null or blank", exception.getMessage());
-
-      // two storage locations, one valid and one is blank
-      exception =
-          Assertions.assertThrows(
-              IllegalArgumentException.class,
-              () ->
-                  createMultiLocationFileset(
-                      "fs5",
-                      emptySchema.name(),
-                      null,
-                      Fileset.Type.MANAGED,
-                      ImmutableMap.of(),
-                      ImmutableMap.of("v1", TEST_ROOT_PATH + "/valid", "v2", ""),
-                      ImmutableMap.of()));
-      Assertions.assertEquals(
-          "Storage location for name 'v2' must not be null or blank", exception.getMessage());
     }
   }
 
