@@ -42,8 +42,9 @@ public interface SupportsRelationOperations {
   /**
    * List the entities according to a given entity in a specific relation.
    *
+   * @param <E> The type of entities returned.
    * @param relType The type of relation.
-   * @param nameIdentifier The given entity identifier
+   * @param nameIdentifier The given entity identifier.
    * @param identType The given entity type.
    * @return The list of entities
    * @throws IOException When occurs storage issues, it will throw IOException.
@@ -56,6 +57,7 @@ public interface SupportsRelationOperations {
   /**
    * List the entities according to a given entity in a specific relation.
    *
+   * @param <E> the type of entities returned.
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier
    * @param identType The given entity type.

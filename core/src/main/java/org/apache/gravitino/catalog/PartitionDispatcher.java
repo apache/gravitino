@@ -53,7 +53,7 @@ public interface PartitionDispatcher {
    * @param tableIdent The identifier of the table.
    * @param partitionName The name of the partition.
    * @return The partition.
-   * @throws NoSuchPartitionException
+   * @throws NoSuchPartitionException if no partition with the specified name exists in the table
    */
   Partition getPartition(NameIdentifier tableIdent, String partitionName)
       throws NoSuchPartitionException;

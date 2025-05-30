@@ -43,6 +43,8 @@ public interface SupportsRelationEntityCache {
    * @param relType The relation type to find related entities for
    * @return A list of related entities, or an empty list if none are found
    * @param <E> The class of the related entities
+   * @throws IOException if an I/O error occurs while loading related entities from the underlying
+   *     {@link EntityStore}
    */
   <E extends Entity & HasIdentifier> List<E> getOrLoad(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)

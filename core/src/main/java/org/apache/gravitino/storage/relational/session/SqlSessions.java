@@ -104,6 +104,7 @@ public final class SqlSessions {
   /**
    * Get the Mapper object from the SqlSession object.
    *
+   * @param <T> the type of the mapper interface.
    * @param className the class name of the Mapper object.
    * @return the Mapper object.
    */
