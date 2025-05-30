@@ -53,7 +53,7 @@ public class AuthorizationExpressionEvaluator {
    * @param metadataNames key-metadata type, value-metadata NameIdentifier
    * @return authorization result
    */
-  public boolean evaluate(Map<MetadataObject.Type, NameIdentifier> metadataNames) {
+  public boolean evaluate(Map<Entity.EntityType, NameIdentifier> metadataNames) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
@@ -63,11 +63,10 @@ public class AuthorizationExpressionEvaluator {
     metadataNames.forEach(
         (metadataType, metadataName) -> {
           MetadataObject metadataObject =
-              NameIdentifierUtil.toMetadataObject(
-                  metadataName, Entity.EntityType.valueOf(metadataType.name()));
+              NameIdentifierUtil.toMetadataObject(metadataName, metadataType);
           ognlContext.put(metadataType.name(), metadataObject);
         });
-    NameIdentifier nameIdentifier = metadataNames.get(MetadataObject.Type.METALAKE);
+    NameIdentifier nameIdentifier = metadataNames.get(Entity.EntityType.METALAKE);
     ognlContext.put("METALAKE_NAME", nameIdentifier.name());
     try {
       Object value = Ognl.getValue(ognlAuthorizationExpression, ognlContext);
