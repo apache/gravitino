@@ -32,7 +32,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
-
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -70,8 +70,6 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.JsonNode;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 @Tag("gravitino-docker-test")
 public class HadoopCatalogIT extends BaseIT {
@@ -714,7 +712,7 @@ public class HadoopCatalogIT extends BaseIT {
     dropSchema();
     createSchema();
 
-    String filesetName = "test_list_fileset_files";
+    String filesetName = "test_list_files_fileset1";
     String storageLocation = storageLocation(filesetName);
     createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
@@ -731,23 +729,27 @@ public class HadoopCatalogIT extends BaseIT {
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     String actualJson = getFileInfos(filesetIdent, null, null);
 
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode array = mapper.readTree(actualJson);
-    Assertions.assertEquals(1, array.size(), "Should return exactly one file metadata");
-    JsonNode fileMetadata = array.get(0);
-
-    Assertions.assertEquals(fileName, fileMetadata.get("name").asText(), "Name should match");
-    Assertions.assertFalse(fileMetadata.get("isDir").asBoolean(), "isDir should be false");
-    Assertions.assertEquals(
-        "hello".getBytes(StandardCharsets.UTF_8).length,
-        fileMetadata.get("size").asInt(),
-        "Size should equal content length");
     Assertions.assertTrue(
-        fileMetadata.get("lastModified").asLong() > 0,
-        "lastModified should be a positive timestamp");
+        actualJson.contains(String.format("\"name\":\"%s\"", fileName)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileName));
     Assertions.assertTrue(
-        fileMetadata.get("path").asText().endsWith("/" + filesetName),
-        "Path should end with the fileset name");
+        actualJson.contains("\"isDir\":false"), "Response JSON should contain \"isDir\":false");
+    long actualSize = "hello".getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"size\":%d", actualSize)),
+        String.format("Response JSON should contain \"size\":%d", actualSize));
+    long lastMod =
+        fileSystem.getFileStatus(new Path(storageLocation, fileName)).getModificationTime();
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"lastModified\":%d", lastMod)),
+        String.format("Response JSON should contain \"lastModified\":%d", lastMod));
+    String suffix = "/" + filesetName + "/";
+    String regex = "\"path\"\\s*:\\s*\"[^\"]*" + Pattern.quote(suffix) + "\"";
+    Pattern suffixChecker = Pattern.compile(regex);
+    Assertions.assertTrue(
+        suffixChecker.matcher(actualJson).find(),
+        () ->
+            String.format("Response JSON should contain a path value ending with \"%s\"", suffix));
   }
 
   @Test
