@@ -86,6 +86,7 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   @Override
   public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
       throws NoSuchFilesetException, IOException {
+    // TODO: implement the ListFilesEvent
     return dispatcher.listFiles(ident, locationName, subPath);
   }
 
