@@ -182,8 +182,10 @@ public class POConverters {
   /**
    * Initialize CatalogPO
    *
-   * @param catalogEntity CatalogEntity object
-   * @return CatalogPO object with version initialized
+   * @param catalogEntity the {@link CatalogEntity} containing source metadata for the catalog
+   * @param metalakeId the identifier of the metalake environment to which this catalog belongs
+   * @return {@link CatalogPO} object with version initialized
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static CatalogPO initializeCatalogPOWithVersion(
       CatalogEntity catalogEntity, Long metalakeId) {
@@ -210,9 +212,11 @@ public class POConverters {
   /**
    * Update CatalogPO version
    *
-   * @param oldCatalogPO the old CatalogPO object
-   * @param newCatalog the new CatalogEntity object
-   * @return CatalogPO object with updated version
+   * @param oldCatalogPO the existing {@link CatalogPO} containing the version to preserve
+   * @param newCatalog the {@link CatalogEntity} with updated catalog metadata
+   * @param metalakeId the identifier of the metalake environment for this catalog
+   * @return {@code CatalogPO} object with updated version
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static CatalogPO updateCatalogPOWithVersion(
       CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
@@ -281,8 +285,10 @@ public class POConverters {
   /**
    * Initialize SchemaPO
    *
-   * @param schemaEntity SchemaEntity object
-   * @return CatalogPO object with version initialized
+   * @param schemaEntity the {@link SchemaEntity} containing source data for the PO object
+   * @param builder the {@link SchemaPO.Builder} used to assemble the {@link SchemaPO}
+   * @return {@code CatalogPO} object with version initialized
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static SchemaPO initializeSchemaPOWithVersion(
       SchemaEntity schemaEntity, SchemaPO.Builder builder) {
@@ -370,8 +376,10 @@ public class POConverters {
   /**
    * Initialize TablePO
    *
-   * @param tableEntity TableEntity object
-   * @return TablePO object with version initialized
+   * @param tableEntity the {@link TableEntity} containing source data for the PO object
+   * @param builder the {@link TablePO.Builder} used to assemble the {@link TablePO}
+   * @return {@code TablePO} object with version initialized
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static TablePO initializeTablePOWithVersion(
       TableEntity tableEntity, TablePO.Builder builder) {
@@ -538,8 +546,10 @@ public class POConverters {
   /**
    * Initialize FilesetPO
    *
-   * @param filesetEntity FilesetEntity object
-   * @return FilesetPO object with version initialized
+   * @param filesetEntity the source {@link FilesetEntity} object
+   * @param builder the {@link FilesetPO.Builder} used to assemble the {@link FilesetPO}
+   * @return {@code FilesetPO} object with version initialized
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static FilesetPO initializeFilesetPOWithVersion(
       FilesetEntity filesetEntity, FilesetPO.Builder builder) {
@@ -580,9 +590,12 @@ public class POConverters {
   /**
    * Update FilesetPO version
    *
-   * @param oldFilesetPO the old FilesetPO object
-   * @param newFileset the new FilesetEntity object
-   * @return FilesetPO object with updated version
+   * @param oldFilesetPO the existing {@link FilesetPO} containing the current and last version data
+   * @param newFileset the {@link FilesetEntity} with updated metadata and storage locations
+   * @param needUpdateVersion true to increment and update version fields; false to keep versions
+   *     unchanged
+   * @return {@code FilesetPO} object with updated version
+   * @throws RuntimeException if JSON serialization of properties fails
    */
   public static FilesetPO updateFilesetPOWithVersion(
       FilesetPO oldFilesetPO, FilesetEntity newFileset, boolean needUpdateVersion) {
@@ -771,8 +784,10 @@ public class POConverters {
   /**
    * Initialize UserPO
    *
-   * @param userEntity UserEntity object
-   * @return UserPO object with version initialized
+   * @param userEntity the {@link UserEntity} containing source data for the PO object
+   * @param builder the {@link UserPO.Builder} used to assemble the {@link UserPO}
+   * @return {@code UserPO} object with version initialized
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static UserPO initializeUserPOWithVersion(UserEntity userEntity, UserPO.Builder builder) {
     try {
@@ -1017,8 +1032,10 @@ public class POConverters {
   /**
    * Initialize RolePO
    *
-   * @param roleEntity RoleEntity object
-   * @return RolePO object with version initialized
+   * @param roleEntity the {@link RoleEntity} containing source data for the PO object
+   * @param builder the {@link RolePO.Builder} used to assemble the {@link RolePO}
+   * @return {@code RolePO} object with version initialized
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static RolePO initializeRolePOWithVersion(RoleEntity roleEntity, RolePO.Builder builder) {
     try {
@@ -1039,8 +1056,10 @@ public class POConverters {
   /**
    * Initialize GroupPO
    *
-   * @param groupEntity GroupEntity object
-   * @return GroupPO object with version initialized
+   * @param groupEntity the {@link GroupEntity} containing source data for the PO object
+   * @param builder the {@link GroupPO.Builder} used to assemble the {@link GroupPO}
+   * @return {@code GroupPO} object with version initialized
+   * @throws RuntimeException if JSON serialization of the entity fails
    */
   public static GroupPO initializeGroupPOWithVersion(
       GroupEntity groupEntity, GroupPO.Builder builder) {

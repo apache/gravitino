@@ -31,6 +31,7 @@ public interface TagDispatcher {
   /**
    * List all the tag names for the specific object.
    *
+   * @param metalake object identifier
    * @return The list of tag names.
    */
   String[] listTags(String metalake);
@@ -38,6 +39,7 @@ public interface TagDispatcher {
   /**
    * List all the tags with details for the specific object.
    *
+   * @param metalake object identifier
    * @return The list of tags.
    */
   Tag[] listTagsInfo(String metalake);
