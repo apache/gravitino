@@ -708,11 +708,10 @@ public class HadoopCatalogIT extends BaseIT {
 
   @Test
   public void testListFilesetFiles() throws IOException {
-    // clear schema
     dropSchema();
     createSchema();
 
-    String filesetName = "test_list_files_fileset1";
+    String filesetName = "test_list_files";
     String storageLocation = storageLocation(filesetName);
     createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName);
@@ -720,9 +719,9 @@ public class HadoopCatalogIT extends BaseIT {
     Path basePath = new Path(storageLocation);
     fileSystem.mkdirs(basePath);
 
-    String fileName = "test1.txt";
-    Path file1 = new Path(basePath, fileName);
-    try (FSDataOutputStream out = fileSystem.create(file1, true)) {
+    String fileName = "test.txt";
+    Path filePath = new Path(basePath, fileName);
+    try (FSDataOutputStream out = fileSystem.create(filePath, true)) {
       out.write("hello".getBytes(StandardCharsets.UTF_8));
     }
 
@@ -738,8 +737,7 @@ public class HadoopCatalogIT extends BaseIT {
     Assertions.assertTrue(
         actualJson.contains(String.format("\"size\":%d", actualSize)),
         String.format("Response JSON should contain \"size\":%d", actualSize));
-    long lastMod =
-        fileSystem.getFileStatus(new Path(storageLocation, fileName)).getModificationTime();
+    long lastMod = fileSystem.getFileStatus(filePath).getModificationTime();
     Assertions.assertTrue(
         actualJson.contains(String.format("\"lastModified\":%d", lastMod)),
         String.format("Response JSON should contain \"lastModified\":%d", lastMod));
@@ -751,6 +749,58 @@ public class HadoopCatalogIT extends BaseIT {
         () ->
             String.format("Response JSON should contain a path value ending with \"%s\"", suffix));
   }
+
+  @Test
+  public void testListFilesetFilesWithSubPath() throws IOException {
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_files_with_subpath";
+    String storageLocation = storageLocation(filesetName);
+    createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    Path basePath = new Path(storageLocation);
+    String subDirName = "subdir";
+    Path subDir = new Path(basePath, subDirName);
+    fileSystem.mkdirs(subDir);
+
+    String fileName = "test.txt";
+    Path filePath = new Path(subDir, fileName);
+    try (FSDataOutputStream out = fileSystem.create(filePath, true)) {
+      out.write("hello".getBytes(StandardCharsets.UTF_8));
+    }
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    String actualJson = getFileInfos(filesetIdent, "subdir", null);
+
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"name\":\"%s\"", fileName)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileName));
+    Assertions.assertTrue(
+        actualJson.contains("\"isDir\":false"), "Response JSON should contain \"isDir\":false");
+    long actualSize = "hello".getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"size\":%d", actualSize)),
+        String.format("Response JSON should contain \"size\":%d", actualSize));
+    long lastMod = fileSystem.getFileStatus(filePath).getModificationTime();
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"lastModified\":%d", lastMod)),
+        String.format("Response JSON should contain \"lastModified\":%d", lastMod));
+    String suffix = "/" + filesetName + "/" + subDirName;
+    String regex = "\"path\"\\s*:\\s*\"[^\"]*" + Pattern.quote(suffix) + "\"";
+    Pattern suffixChecker = Pattern.compile(regex);
+    Assertions.assertTrue(
+        suffixChecker.matcher(actualJson).find(),
+        () ->
+            String.format("Response JSON should contain a path value ending with \"%s\"", suffix));
+  }
+
+  @Test
+  public void testListFilesetFilesWithLocationName() throws IOException {}
+
+  @Test
+  public void testListFilesetFilesWithMissingPath() throws IOException {}
 
   @Test
   public void testRenameFileset() throws IOException {
