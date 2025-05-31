@@ -37,7 +37,7 @@ You can check the relevant data source configuration in [data source properties]
 When you use the Gravitino with Trino. You can pass the Trino PostgreSQL connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino PostgreSQL catalog in Trino runtime.
 
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the PostgreSQL catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the PostgreSQL catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                                                        | Default value | Required | Since Version |
 |----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
