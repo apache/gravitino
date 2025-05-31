@@ -767,8 +767,9 @@ public class HadoopCatalogIT extends BaseIT {
 
     String fileName = "test.txt";
     Path filePath = new Path(subDir, fileName);
+    String content = "hello";
     try (FSDataOutputStream out = fileSystem.create(filePath, true)) {
-      out.write("hello".getBytes(StandardCharsets.UTF_8));
+      out.write(content.getBytes(StandardCharsets.UTF_8));
     }
 
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
@@ -779,7 +780,7 @@ public class HadoopCatalogIT extends BaseIT {
         String.format("Response JSON should contain \"name\":\"%s\"", fileName));
     Assertions.assertTrue(
         actualJson.contains("\"isDir\":false"), "Response JSON should contain \"isDir\":false");
-    long actualSize = "hello".getBytes(StandardCharsets.UTF_8).length;
+    long actualSize = content.getBytes(StandardCharsets.UTF_8).length;
     Assertions.assertTrue(
         actualJson.contains(String.format("\"size\":%d", actualSize)),
         String.format("Response JSON should contain \"size\":%d", actualSize));
@@ -797,7 +798,63 @@ public class HadoopCatalogIT extends BaseIT {
   }
 
   @Test
-  public void testListFilesetFilesWithLocationName() throws IOException {}
+  public void testListFilesetFilesWithLocationName() throws IOException {
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_files_with_location_name";
+    String locA = storageLocation(filesetName + "_locA");
+    String locB = storageLocation(filesetName + "_locB");
+    Map<String, String> storageLocations =
+        ImmutableMap.of(
+            "locA", locA,
+            "locB", locB);
+    Map<String, String> props = ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "locA");
+
+    createMultipleLocationsFileset(filesetName, "comment", MANAGED, storageLocations, props);
+    assertFilesetExists(filesetName);
+
+    Path basePathA = new Path(locA);
+    fileSystem.mkdirs(basePathA);
+    String fileNameA = "testA.txt";
+    Path filePathA = new Path(basePathA, fileNameA);
+    String contentA = "hello";
+    try (FSDataOutputStream out = fileSystem.create(filePathA, true)) {
+      out.write(contentA.getBytes(StandardCharsets.UTF_8));
+    }
+
+    Path basePathB = new Path(locB);
+    fileSystem.mkdirs(basePathB);
+    String fileNameB = "testB.txt";
+    Path filePathB = new Path(basePathB, fileNameB);
+    String contentB = "hello hello";
+    try (FSDataOutputStream out = fileSystem.create(filePathB, true)) {
+      out.write(contentB.getBytes(StandardCharsets.UTF_8));
+    }
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    // get file info from locA without locationName, and from locB with locationName
+    String actualJsonA = getFileInfos(filesetIdent, null, null);
+    String actualJsonB = getFileInfos(filesetIdent, null, "locB");
+
+    // verify locA files
+    Assertions.assertTrue(
+        actualJsonA.contains(String.format("\"name\":\"%s\"", fileNameA)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileNameA));
+    long actualSizeA = contentA.getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJsonA.contains(String.format("\"size\":%d", actualSizeA)),
+        String.format("Response JSON should contain \"size\":%d", actualSizeA));
+
+    // verify locB files
+    Assertions.assertTrue(
+        actualJsonB.contains(String.format("\"name\":\"%s\"", fileNameB)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileNameB));
+    long actualSizeB = contentA.getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJsonA.contains(String.format("\"size\":%d", actualSizeB)),
+        String.format("Response JSON should contain \"size\":%d", actualSizeB));
+  }
 
   @Test
   public void testListFilesetFilesWithMissingPath() throws IOException {}
