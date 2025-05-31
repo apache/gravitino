@@ -52,6 +52,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -857,7 +858,28 @@ public class HadoopCatalogIT extends BaseIT {
   }
 
   @Test
-  public void testListFilesetFilesWithMissingPath() throws IOException {}
+  public void testListFilesetFilesWithNonExistentPath() throws IOException {
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_files_with_non_existent_path";
+    String storageLocation = storageLocation(filesetName);
+    createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    String invalidPath = "nonexistent";
+    RESTException ex =
+        Assertions.assertThrows(
+            RESTException.class,
+            () -> getFileInfos(filesetIdent, invalidPath, null),
+            "Should throw IllegalArgumentException");
+    Assertions.assertTrue(
+        ex.getMessage().contains("does not exist in fileset"),
+        String.format(
+            "Exception message should contain 'does not exist in fileset', but was: %s",
+            ex.getMessage()));
+  }
 
   @Test
   public void testRenameFileset() throws IOException {
