@@ -26,11 +26,14 @@ import static org.apache.gravitino.file.Fileset.Type.MANAGED;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -40,11 +43,16 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
+import org.apache.gravitino.client.ErrorHandlers;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.HTTPClient;
+import org.apache.gravitino.client.ObjectMapperProvider;
+import org.apache.gravitino.dto.responses.FileInfoListResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -52,6 +60,7 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.junit.jupiter.api.AfterAll;
@@ -78,6 +87,8 @@ public class HadoopCatalogIT extends BaseIT {
   protected FileSystem fileSystem;
   protected String defaultBaseLocation;
 
+  protected HTTPClient httpClient;
+
   protected void startNecessaryContainer() {
     containerSuite.startHiveContainer();
   }
@@ -93,6 +104,8 @@ public class HadoopCatalogIT extends BaseIT {
     createMetalake();
     createCatalog();
     createSchema();
+
+    httpClient = HTTPClient.builder(Collections.emptyMap()).uri(serverUri).build();
   }
 
   @AfterAll
@@ -103,6 +116,12 @@ public class HadoopCatalogIT extends BaseIT {
     client.dropMetalake(metalakeName, true);
     if (fileSystem != null) {
       fileSystem.close();
+    }
+    if (httpClient != null) {
+      try {
+        httpClient.close();
+      } catch (Exception ignored) {
+      }
     }
 
     try {
@@ -149,6 +168,38 @@ public class HadoopCatalogIT extends BaseIT {
   private void dropSchema() {
     catalog.asSchemas().dropSchema(schemaName, true);
     Assertions.assertFalse(catalog.asSchemas().schemaExists(schemaName));
+  }
+
+  private String getFileInfos(NameIdentifier filesetIdent, String subPath, String locationName)
+      throws IOException {
+    String targetUrl =
+        "api/metalakes/"
+            + metalakeName
+            + "/catalogs/"
+            + catalogName
+            + "/schemas/"
+            + schemaName
+            + "/filesets/"
+            + filesetIdent.name()
+            + "/files";
+    Map<String, String> query = new HashMap<>();
+    if (!StringUtils.isBlank(subPath)) {
+      query.put("subPath", subPath);
+    }
+    if (!StringUtils.isBlank(locationName)) {
+      query.put("locationName", locationName);
+    }
+
+    FileInfoListResponse resp =
+        httpClient.get(
+            targetUrl,
+            query,
+            FileInfoListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.restErrorHandler());
+
+    // Serialize the list of FileInfoDTO back to JSON
+    return ObjectMapperProvider.objectMapper().writeValueAsString(resp.getFiles());
   }
 
   @Test
@@ -654,6 +705,180 @@ public class HadoopCatalogIT extends BaseIT {
     Assertions.assertEquals(2, nameIdentifiers1.length, "should have 2 filesets");
     Assertions.assertEquals(fileset1.name(), nameIdentifiers1[0].name());
     Assertions.assertEquals(fileset2.name(), nameIdentifiers1[1].name());
+  }
+
+  @Test
+  public void testListFilesetFiles() throws IOException {
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_files";
+    String storageLocation = storageLocation(filesetName);
+    createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    Path basePath = new Path(storageLocation);
+    fileSystem.mkdirs(basePath);
+
+    String fileName = "test.txt";
+    Path filePath = new Path(basePath, fileName);
+    try (FSDataOutputStream out = fileSystem.create(filePath, true)) {
+      out.write("hello".getBytes(StandardCharsets.UTF_8));
+    }
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    String actualJson = getFileInfos(filesetIdent, null, null);
+
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"name\":\"%s\"", fileName)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileName));
+    Assertions.assertTrue(
+        actualJson.contains("\"isDir\":false"), "Response JSON should contain \"isDir\":false");
+    long actualSize = "hello".getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"size\":%d", actualSize)),
+        String.format("Response JSON should contain \"size\":%d", actualSize));
+    long lastMod = fileSystem.getFileStatus(filePath).getModificationTime();
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"lastModified\":%d", lastMod)),
+        String.format("Response JSON should contain \"lastModified\":%d", lastMod));
+    String suffix = "/" + filesetName + "/";
+    String regex = "\"path\"\\s*:\\s*\"[^\"]*" + Pattern.quote(suffix) + "\"";
+    Pattern suffixChecker = Pattern.compile(regex);
+    Assertions.assertTrue(
+        suffixChecker.matcher(actualJson).find(),
+        () ->
+            String.format("Response JSON should contain a path value ending with \"%s\"", suffix));
+  }
+
+  @Test
+  public void testListFilesetFilesWithSubPath() throws IOException {
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_files_with_subpath";
+    String storageLocation = storageLocation(filesetName);
+    createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    Path basePath = new Path(storageLocation);
+    String subDirName = "subdir";
+    Path subDir = new Path(basePath, subDirName);
+    fileSystem.mkdirs(subDir);
+
+    String fileName = "test.txt";
+    Path filePath = new Path(subDir, fileName);
+    String content = "hello";
+    try (FSDataOutputStream out = fileSystem.create(filePath, true)) {
+      out.write(content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    String actualJson = getFileInfos(filesetIdent, "subdir", null);
+
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"name\":\"%s\"", fileName)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileName));
+    Assertions.assertTrue(
+        actualJson.contains("\"isDir\":false"), "Response JSON should contain \"isDir\":false");
+    long actualSize = content.getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"size\":%d", actualSize)),
+        String.format("Response JSON should contain \"size\":%d", actualSize));
+    long lastMod = fileSystem.getFileStatus(filePath).getModificationTime();
+    Assertions.assertTrue(
+        actualJson.contains(String.format("\"lastModified\":%d", lastMod)),
+        String.format("Response JSON should contain \"lastModified\":%d", lastMod));
+    String suffix = "/" + filesetName + "/" + subDirName;
+    String regex = "\"path\"\\s*:\\s*\"[^\"]*" + Pattern.quote(suffix) + "\"";
+    Pattern suffixChecker = Pattern.compile(regex);
+    Assertions.assertTrue(
+        suffixChecker.matcher(actualJson).find(),
+        () ->
+            String.format("Response JSON should contain a path value ending with \"%s\"", suffix));
+  }
+
+  @Test
+  public void testListFilesetFilesWithLocationName() throws IOException {
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_files_with_location_name";
+    String locA = storageLocation(filesetName + "_locA");
+    String locB = storageLocation(filesetName + "_locB");
+    Map<String, String> storageLocations =
+        ImmutableMap.of(
+            "locA", locA,
+            "locB", locB);
+    Map<String, String> props = ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "locA");
+
+    createMultipleLocationsFileset(filesetName, "comment", MANAGED, storageLocations, props);
+    assertFilesetExists(filesetName);
+
+    Path basePathA = new Path(locA);
+    fileSystem.mkdirs(basePathA);
+    String fileNameA = "testA.txt";
+    Path filePathA = new Path(basePathA, fileNameA);
+    String contentA = "hello";
+    try (FSDataOutputStream out = fileSystem.create(filePathA, true)) {
+      out.write(contentA.getBytes(StandardCharsets.UTF_8));
+    }
+
+    Path basePathB = new Path(locB);
+    fileSystem.mkdirs(basePathB);
+    String fileNameB = "testB.txt";
+    Path filePathB = new Path(basePathB, fileNameB);
+    String contentB = "hello hello";
+    try (FSDataOutputStream out = fileSystem.create(filePathB, true)) {
+      out.write(contentB.getBytes(StandardCharsets.UTF_8));
+    }
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    // get file info from locA without locationName, and from locB with locationName
+    String actualJsonA = getFileInfos(filesetIdent, null, null);
+    String actualJsonB = getFileInfos(filesetIdent, null, "locB");
+
+    // verify locA files
+    Assertions.assertTrue(
+        actualJsonA.contains(String.format("\"name\":\"%s\"", fileNameA)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileNameA));
+    long actualSizeA = contentA.getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJsonA.contains(String.format("\"size\":%d", actualSizeA)),
+        String.format("Response JSON should contain \"size\":%d", actualSizeA));
+
+    // verify locB files
+    Assertions.assertTrue(
+        actualJsonB.contains(String.format("\"name\":\"%s\"", fileNameB)),
+        String.format("Response JSON should contain \"name\":\"%s\"", fileNameB));
+    long actualSizeB = contentA.getBytes(StandardCharsets.UTF_8).length;
+    Assertions.assertTrue(
+        actualJsonA.contains(String.format("\"size\":%d", actualSizeB)),
+        String.format("Response JSON should contain \"size\":%d", actualSizeB));
+  }
+
+  @Test
+  public void testListFilesetFilesWithNonExistentPath() throws IOException {
+    dropSchema();
+    createSchema();
+
+    String filesetName = "test_list_files_with_non_existent_path";
+    String storageLocation = storageLocation(filesetName);
+    createFileset(filesetName, "comment", MANAGED, storageLocation, ImmutableMap.of("k1", "v1"));
+    assertFilesetExists(filesetName);
+
+    NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
+    String invalidPath = "nonexistent";
+    RESTException ex =
+        Assertions.assertThrows(
+            RESTException.class,
+            () -> getFileInfos(filesetIdent, invalidPath, null),
+            "Should throw IllegalArgumentException");
+    Assertions.assertTrue(
+        ex.getMessage().contains("does not exist in fileset"),
+        String.format(
+            "Exception message should contain 'does not exist in fileset', but was: %s",
+            ex.getMessage()));
   }
 
   @Test

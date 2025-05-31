@@ -33,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
@@ -97,6 +98,20 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 fileset.properties()));
+  }
+
+  @Override
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                catalogIdent,
+                c -> c.doWithFilesetFileOps(f -> f.listFiles(ident, locationName, subPath)),
+                NoSuchFilesetException.class));
   }
 
   /**
