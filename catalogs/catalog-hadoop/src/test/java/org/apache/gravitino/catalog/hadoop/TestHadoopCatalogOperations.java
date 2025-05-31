@@ -50,6 +50,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -382,15 +383,15 @@ public class TestHadoopCatalogOperations {
     String name = "schema28";
     String comment = "comment28";
     String catalogPath = "";
-    Schema schema = createSchema(name, comment, catalogPath, null);
-    Assertions.assertEquals(name, schema.name());
-    Assertions.assertEquals(comment, schema.comment());
 
     Throwable exception =
         Assertions.assertThrows(
-            SchemaAlreadyExistsException.class,
-            () -> createSchema(name, comment, catalogPath, null));
-    Assertions.assertEquals("Schema m1.c1.schema28 already exists", exception.getMessage());
+            IllegalArgumentException.class, () -> createSchema(name, comment, catalogPath, null));
+    Assertions.assertEquals(
+        "The value of the catalog property "
+            + HadoopCatalogPropertiesMetadata.LOCATION
+            + " must not be blank",
+        exception.getMessage());
   }
 
   @Test
@@ -1492,6 +1493,24 @@ public class TestHadoopCatalogOperations {
                       ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
                       null));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // empty location in catalog location
+      Map<String, String> illegalLocations2 =
+          new HashMap<String, String>() {
+            {
+              put(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1", null);
+            }
+          };
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.initialize(
+                      illegalLocations2,
+                      randomCatalogInfo("m1", "c1"),
+                      HADOOP_PROPERTIES_METADATA));
+      Assertions.assertEquals(
+          "Location value must not be blank for location name: v1", exception.getMessage());
 
       // storage location is parent of schema location
       Schema multipLocationSchema =
