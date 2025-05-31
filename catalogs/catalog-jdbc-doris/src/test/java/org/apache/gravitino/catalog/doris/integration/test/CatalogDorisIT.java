@@ -907,7 +907,7 @@ public class CatalogDorisIT extends BaseIT {
             .findFirst()
             .get();
 
-    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), timestampColumn.dataType());
+    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), timestampColumn.dataType());
   }
 
   @Test

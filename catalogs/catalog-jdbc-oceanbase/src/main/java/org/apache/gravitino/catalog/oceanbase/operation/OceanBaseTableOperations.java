@@ -654,4 +654,19 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
     }
     return sqlBuilder;
   }
+
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    String upperTypeName = typeName.toUpperCase();
+    switch (upperTypeName) {
+      case "TIME":
+        // TIME format: 'HH:MM:SS' (8 chars) + decimal point + precision
+        return columnSize >= 9 ? columnSize - 9 : 0;
+      case "TIMESTAMP":
+      case "DATETIME":
+        // TIMESTAMP/DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+        return columnSize >= 20 ? columnSize - 20 : 0;
+    }
+    return null;
+  }
 }
