@@ -874,7 +874,7 @@ In order to create a table, you need to provide the following information:
 - Table column auto-increment (optional)
 - Table property (optional)
 
-#### Gravitino table column type
+#### Apache Gravitino table column type
 
 The following types that Gravitino supports:
 

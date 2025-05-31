@@ -492,7 +492,7 @@ model_list = catalog.as_model_catalog().list_models(namespace=Namespace.of("mode
 </TabItem>
 </Tabs>
 
-## Model Version operations
+## ModelVersion operations
 
 :::tip
  - Users should create a metalake, a catalog, a schema, and a model before link a model version

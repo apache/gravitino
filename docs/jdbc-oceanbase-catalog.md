@@ -36,7 +36,7 @@ You can pass to a OceanBase data source any property that isn't defined by Gravi
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#gravitino-catalog-properties-configuration), the OceanBase catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the OceanBase catalog has the following properties:
 
 | Configuration item   | Description                                                                                                                           | Default value | Required | Since Version    |
 |----------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
