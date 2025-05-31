@@ -26,6 +26,12 @@ import org.apache.gravitino.rel.expressions.NamedReference;
 /** Helper methods to create distributions to pass into Apache Gravitino. */
 public class Distributions {
 
+  /**
+   * AUTO indicates that the number of buckets is automatically determined by the system (without
+   * the need for manual specification).
+   */
+  public static final int AUTO = -1;
+
   /** NONE is used to indicate that there is no distribution. */
   public static final Distribution NONE =
       new DistributionImpl(Strategy.NONE, 0, Expression.EMPTY_EXPRESSION);
@@ -72,6 +78,17 @@ public class Distributions {
    */
   public static Distribution of(Strategy strategy, int number, Expression... expressions) {
     return new DistributionImpl(strategy, number, expressions);
+  }
+
+  /**
+   * Create a distribution by the given strategy, the number of buckets is not used.
+   *
+   * @param strategy The strategy to use
+   * @param expressions The expressions to distribute by
+   * @return The created distribution
+   */
+  public static Distribution auto(Strategy strategy, Expression... expressions) {
+    return new DistributionImpl(strategy, AUTO, expressions);
   }
 
   /**

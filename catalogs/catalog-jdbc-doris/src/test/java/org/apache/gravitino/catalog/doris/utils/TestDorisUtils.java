@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -170,5 +171,18 @@ public class TestDorisUtils {
     partition = Partitions.list("p7", p7values, Collections.emptyMap());
     partitionSqlFragment = DorisUtils.generatePartitionSqlFragment(partition);
     assertEquals("PARTITION `p7` VALUES IN ((\"1\",\"2\"),(\"3\",\"4\"))", partitionSqlFragment);
+  }
+
+  @Test
+  public void testDistributedInfoPattern() {
+    String createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    Distribution distribution = DorisUtils.extractDistributionInfoFromSql(createTableSql);
+    assertEquals(distribution.number(), 2);
+
+    String createTableSqlWithAuto =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS AUTO";
+    Distribution distribution2 = DorisUtils.extractDistributionInfoFromSql(createTableSqlWithAuto);
+    assertEquals(distribution2.number(), -1);
   }
 }
