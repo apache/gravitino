@@ -74,10 +74,21 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_METALAKE =
       new ConfigEntry("gravitino.metalake", "The metalake name for used", "", true);
 
+  /** @deprecated Please use {@code gravitino.use-single-metalake} instead. */
+  @Deprecated
+  @SuppressWarnings("UnusedVariable")
   private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
       new ConfigEntry(
           "gravitino.simplify-catalog-names",
-          "Omit metalake prefix for catalog names",
+          "Omit metalake prefix for catalog names, is deprecated, use gravitino.use-single-metalake instead",
+          "true",
+          false);
+
+  private static final ConfigEntry GRAVITINO_SINGLE_METALAKE_MODE =
+      new ConfigEntry(
+          "gravitino.use-single-metalake",
+          "If true, only one metalake is supported in this connector; identify the catalog by <catalog_name>. "
+              + "If false, multiple metalakes are supported; identify the catalog by <metalake_name>.<catalog_name>.",
           "true",
           false);
 
@@ -100,6 +111,13 @@ public class GravitinoConfig {
 
   private static final ConfigEntry TRINO_JDBC_PASSWORD =
       new ConfigEntry("trino.jdbc.password", "The jdbc user password of Trino", "", false);
+
+  private static final ConfigEntry GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND =
+      new ConfigEntry(
+          "gravitino.metadata.refresh-interval-seconds",
+          "The interval in seconds to refresh the metadata from Gravitino server",
+          "10",
+          false);
 
   /**
    * Constructs a new GravitinoConfig with the specified configuration.
@@ -143,14 +161,14 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the simplify catalog names.
+   * Retrieves the single metalake mode.
    *
-   * @return the simplify catalog names
+   * @return the single metalake mode
    */
-  public boolean simplifyCatalogNames() {
+  public boolean singleMetalakeMode() {
     return Boolean.parseBoolean(
         config.getOrDefault(
-            GRAVITINO_SIMPLIFY_CATALOG_NAMES.key, GRAVITINO_SIMPLIFY_CATALOG_NAMES.defaultValue));
+            GRAVITINO_SINGLE_METALAKE_MODE.key, GRAVITINO_SINGLE_METALAKE_MODE.defaultValue));
   }
 
   boolean isDynamicConnector() {
@@ -262,6 +280,17 @@ public class GravitinoConfig {
       }
     }
     return StringUtils.join(stringList, ',');
+  }
+
+  /**
+   * Retrieves the metadata refresh interval in seconds.
+   *
+   * @return the metadata refresh interval in seconds
+   */
+  public String getMetadataRefreshIntervalSecond() {
+    return config.getOrDefault(
+        GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND.key,
+        GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND.defaultValue);
   }
 
   /** Configuration entry class that holds the definition of a configuration parameter. */

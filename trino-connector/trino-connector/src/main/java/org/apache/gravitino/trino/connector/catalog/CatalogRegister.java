@@ -77,14 +77,14 @@ public class CatalogRegister {
 
   private void checkSupportCatalogNameWithMetalake(
       ConnectorContext context, GravitinoConfig config) {
-    if (!config.simplifyCatalogNames()) {
+    if (!config.singleMetalakeMode()) {
       int version = Integer.parseInt(context.getSpiVersion());
       if (version < MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION) {
-        String errmsg =
-            String.format(
-                "Trino-%s does not support catalog name with dots, The minimal required version is Trino-%d",
-                trinoVersion, MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
-        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+        LOG.warn(
+            "Trino-{} does not support catalog name with dots, The minimal required version is Trino-{}."
+                + "Some errors may occur when using the USE <CATALOG>.<SCHEMA> statement in Trino",
+            trinoVersion,
+            MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
       }
     }
   }
@@ -157,7 +157,7 @@ public class CatalogRegister {
         config.toCatalogConfig());
   }
 
-  private String generateDropCatalogCommand(String name) throws Exception {
+  private String generateDropCatalogCommand(String name) {
     return String.format("DROP CATALOG %s", name);
   }
 

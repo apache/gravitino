@@ -285,6 +285,7 @@ public interface AccessControlDispatcher {
   /**
    * Grant privileges to a role.
    *
+   * @param metalake The name of the Metalake.
    * @param role The name of the role.
    * @param privileges The privileges to grant.
    * @param object The object is associated with privileges to grant.
@@ -300,6 +301,7 @@ public interface AccessControlDispatcher {
   /**
    * Revoke privileges from a role.
    *
+   * @param metalake The name if the Metalake.
    * @param role The name of the role.
    * @param privileges The privileges to revoke.
    * @param object The object is associated with privileges to revoke.

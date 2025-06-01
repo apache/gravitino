@@ -46,6 +46,7 @@ public interface RelationalBackend
   /**
    * Lists the entities associated with the given parent namespace and entityType
    *
+   * @param <E> The entity type.
    * @param namespace The parent namespace of these entities.
    * @param entityType The type of these entities.
    * @param allFields Some fields may have a relatively high acquisition cost, EntityStore provide
@@ -75,6 +76,7 @@ public interface RelationalBackend
   /**
    * Stores the entity, possibly overwriting an existing entity if specified.
    *
+   * @param <E> The type of the entity returned.
    * @param e The entity which need be stored.
    * @param overwritten If true, overwrites the existing value.
    * @throws EntityAlreadyExistsException If the entity already exists and overwrite is false.
@@ -86,8 +88,11 @@ public interface RelationalBackend
   /**
    * Updates the entity.
    *
+   * @param <E> The entity type.
    * @param ident The identifier of the entity which need be stored.
    * @param entityType The type of the entity.
+   * @param updater A {@link Function} that takes the current entity instance and returns and
+   *     returns the updated instance.
    * @return The entity after updating.
    * @throws NoSuchEntityException If the entity is not exist.
    * @throws IOException If the entity is failed to update.
@@ -99,6 +104,7 @@ public interface RelationalBackend
   /**
    * Retrieves the entity associated with the identifier and the entity type.
    *
+   * @param <E> The type of the entity returned.
    * @param ident The identifier of the entity.
    * @param entityType The type of the entity.
    * @return The entity associated with the identifier and the entity type, or null if the key does

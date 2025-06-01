@@ -71,7 +71,7 @@ public abstract class Config {
   }
 
   /** Constructs a Config instance and loads default configurations. */
-  public Config() {
+  protected Config() {
     this(true);
   }
 

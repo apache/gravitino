@@ -65,7 +65,7 @@ public abstract class OperationDispatcher {
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
    */
-  public OperationDispatcher(
+  protected OperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
     this.catalogManager = catalogManager;
     this.store = store;

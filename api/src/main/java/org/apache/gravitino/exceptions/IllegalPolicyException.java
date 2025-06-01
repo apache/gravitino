@@ -16,22 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.common;
+package org.apache.gravitino.exceptions;
 
-import java.util.Map;
-import java.util.stream.Collectors;
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
 
-public abstract class AuthorizationProperties {
-  protected Map<String, String> properties;
+/** An exception thrown when a policy is invalid. */
+public class IllegalPolicyException extends IllegalArgumentException {
 
-  protected AuthorizationProperties(Map<String, String> properties) {
-    this.properties =
-        properties.entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith(getPropertiesPrefix()))
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  /**
+   * Constructs a new exception with the specified detail message.
+   *
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public IllegalPolicyException(@FormatString String message, Object... args) {
+    super(String.format(message, args));
   }
-
-  public abstract String getPropertiesPrefix();
-
-  public abstract void validate();
 }

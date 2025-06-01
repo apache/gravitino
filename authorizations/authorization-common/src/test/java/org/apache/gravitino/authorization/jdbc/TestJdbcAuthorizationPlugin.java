@@ -120,7 +120,7 @@ public class TestJdbcAuthorizationPlugin {
 
     resetSQLIndex();
     expectSQLs = Lists.newArrayList("DROP ROLE tmp");
-    plugin.onRoleDeleted(role);
+    Assertions.assertTrue(plugin.onRoleDeleted(role));
   }
 
   @Test
