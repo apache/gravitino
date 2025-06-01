@@ -23,6 +23,10 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 
+/**
+ * Property converter for Iceberg schema properties. Handles the conversion of property keys between
+ * Trino and Gravitino formats for Iceberg schemas.
+ */
 public class IcebergSchemaPropertyConverter extends PropertyConverter {
   // TODO (yuqi) add more properties
   private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =

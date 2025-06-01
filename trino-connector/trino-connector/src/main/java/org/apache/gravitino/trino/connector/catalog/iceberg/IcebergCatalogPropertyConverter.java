@@ -31,6 +31,11 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 
+/**
+ * A property converter for Iceberg catalogs that handles the conversion between Trino and Gravitino
+ * property formats. This converter manages various Iceberg-specific configurations including
+ * general settings, Hive integration, and S3 storage options.
+ */
 public class IcebergCatalogPropertyConverter extends PropertyConverter {
 
   private static final TreeBidiMap<String, String> TRINO_ICEBERG_TO_GRAVITINO_ICEBERG =
