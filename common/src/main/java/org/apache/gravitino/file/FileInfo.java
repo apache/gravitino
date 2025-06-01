@@ -18,6 +18,13 @@
  */
 package org.apache.gravitino.file;
 
+/**
+ * Represents metadata about a single file or directory within a fileset.
+ *
+ * <p>Implementations of this interface provide access to the basic attributes of a fileset entry,
+ * including its name, type (file vs. directory), size, last-modified timestamp, and its logical
+ * path within the enclosing fileset.
+ */
 public interface FileInfo {
 
   /** @return The filename or directory name of file object. */
