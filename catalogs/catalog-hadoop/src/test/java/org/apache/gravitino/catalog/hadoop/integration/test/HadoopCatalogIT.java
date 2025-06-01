@@ -106,7 +106,10 @@ public class HadoopCatalogIT extends BaseIT {
     createMetalake();
     createCatalog();
     createSchema();
+  }
 
+  @BeforeAll
+  protected void setupHttpClient() {
     httpClient = HttpClients.createDefault();
   }
 
