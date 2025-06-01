@@ -26,6 +26,7 @@ import static org.apache.gravitino.file.Fileset.Type.MANAGED;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,16 +44,11 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
-import org.apache.gravitino.client.ErrorHandlers;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.client.HTTPClient;
-import org.apache.gravitino.client.ObjectMapperProvider;
-import org.apache.gravitino.dto.responses.FileInfoListResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
-import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -63,6 +59,12 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.utils.URIBuilder;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -87,7 +89,7 @@ public class HadoopCatalogIT extends BaseIT {
   protected FileSystem fileSystem;
   protected String defaultBaseLocation;
 
-  protected HTTPClient httpClient;
+  protected CloseableHttpClient httpClient;
 
   protected void startNecessaryContainer() {
     containerSuite.startHiveContainer();
@@ -105,7 +107,7 @@ public class HadoopCatalogIT extends BaseIT {
     createCatalog();
     createSchema();
 
-    httpClient = HTTPClient.builder(Collections.emptyMap()).uri(serverUri).build();
+    httpClient = HttpClients.createDefault();
   }
 
   @AfterAll
@@ -172,8 +174,8 @@ public class HadoopCatalogIT extends BaseIT {
 
   private String getFileInfos(NameIdentifier filesetIdent, String subPath, String locationName)
       throws IOException {
-    String targetUrl =
-        "api/metalakes/"
+    String targetPath =
+        "/api/metalakes/"
             + metalakeName
             + "/catalogs/"
             + catalogName
@@ -182,24 +184,30 @@ public class HadoopCatalogIT extends BaseIT {
             + "/filesets/"
             + filesetIdent.name()
             + "/files";
-    Map<String, String> query = new HashMap<>();
+
+    URIBuilder uriBuilder;
+    try {
+      uriBuilder = new URIBuilder(serverUri + targetPath);
+    } catch (URISyntaxException e) {
+      throw new IOException("Error constructing URI: " + serverUri + targetPath, e);
+    }
+
     if (!StringUtils.isBlank(subPath)) {
-      query.put("subPath", subPath);
+      uriBuilder.addParameter("subPath", subPath);
     }
     if (!StringUtils.isBlank(locationName)) {
-      query.put("locationName", locationName);
+      uriBuilder.addParameter("locationName", locationName);
     }
 
-    FileInfoListResponse resp =
-        httpClient.get(
-            targetUrl,
-            query,
-            FileInfoListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.restErrorHandler());
-
-    // Serialize the list of FileInfoDTO back to JSON
-    return ObjectMapperProvider.objectMapper().writeValueAsString(resp.getFiles());
+    HttpGet httpGet;
+    try {
+      httpGet = new HttpGet(uriBuilder.build());
+    } catch (URISyntaxException e) {
+      throw new IOException("Failed to build URI with query parameters: " + uriBuilder, e);
+    }
+    try (CloseableHttpResponse httpResponse = httpClient.execute(httpGet)) {
+      return EntityUtils.toString(httpResponse.getEntity(), StandardCharsets.UTF_8);
+    }
   }
 
   @Test
@@ -722,8 +730,9 @@ public class HadoopCatalogIT extends BaseIT {
 
     String fileName = "test.txt";
     Path filePath = new Path(basePath, fileName);
+    String content = "hello";
     try (FSDataOutputStream out = fileSystem.create(filePath, true)) {
-      out.write("hello".getBytes(StandardCharsets.UTF_8));
+      out.write(content.getBytes(StandardCharsets.UTF_8));
     }
 
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
@@ -734,7 +743,7 @@ public class HadoopCatalogIT extends BaseIT {
         String.format("Response JSON should contain \"name\":\"%s\"", fileName));
     Assertions.assertTrue(
         actualJson.contains("\"isDir\":false"), "Response JSON should contain \"isDir\":false");
-    long actualSize = "hello".getBytes(StandardCharsets.UTF_8).length;
+    long actualSize = content.getBytes(StandardCharsets.UTF_8).length;
     Assertions.assertTrue(
         actualJson.contains(String.format("\"size\":%d", actualSize)),
         String.format("Response JSON should contain \"size\":%d", actualSize));
@@ -869,16 +878,12 @@ public class HadoopCatalogIT extends BaseIT {
 
     NameIdentifier filesetIdent = NameIdentifier.of(schemaName, filesetName);
     String invalidPath = "nonexistent";
-    RESTException ex =
-        Assertions.assertThrows(
-            RESTException.class,
-            () -> getFileInfos(filesetIdent, invalidPath, null),
-            "Should throw IllegalArgumentException");
+
+    String actualJson = getFileInfos(filesetIdent, invalidPath, null);
     Assertions.assertTrue(
-        ex.getMessage().contains("does not exist in fileset"),
+        actualJson.contains("does not exist in fileset"),
         String.format(
-            "Exception message should contain 'does not exist in fileset', but was: %s",
-            ex.getMessage()));
+            "Response JSON should contain \"does not exist in fileset\", but was: %s", actualJson));
   }
 
   @Test
