@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.file;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
@@ -26,6 +27,7 @@ import org.apache.gravitino.file.FileInfo;
 
 /** Represents a FileInfo DTO (Data Transfer Object). */
 @EqualsAndHashCode
+@JsonIgnoreProperties({"dir"})
 public class FileInfoDTO implements FileInfo {
 
   @JsonProperty("name")
