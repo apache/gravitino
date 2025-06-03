@@ -50,6 +50,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
+import org.apache.gravitino.dto.responses.ModelVersionNumberListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -397,7 +398,8 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    ModelVersionListResponse versionListResp = resp.readEntity(ModelVersionListResponse.class);
+    ModelVersionNumberListResponse versionListResp =
+        resp.readEntity(ModelVersionNumberListResponse.class);
     Assertions.assertEquals(0, versionListResp.getCode());
     Assertions.assertArrayEquals(versions, versionListResp.getVersions());
 
@@ -414,7 +416,8 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
-    ModelVersionListResponse versionListResp1 = resp1.readEntity(ModelVersionListResponse.class);
+    ModelVersionNumberListResponse versionListResp1 =
+        resp1.readEntity(ModelVersionNumberListResponse.class);
     Assertions.assertEquals(0, versionListResp1.getCode());
     Assertions.assertEquals(0, versionListResp1.getVersions().length);
 
@@ -431,7 +434,8 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
 
-    ModelVersionListResponse versionListResp2 = resp2.readEntity(ModelVersionListResponse.class);
+    ModelVersionNumberListResponse versionListResp2 =
+        resp2.readEntity(ModelVersionNumberListResponse.class);
     Assertions.assertEquals(0, versionListResp2.getCode());
     Assertions.assertEquals(0, versionListResp2.getVersions().length);
 
@@ -459,6 +463,112 @@ public class TestModelOperations extends JerseyTest {
         target(modelPath())
             .path("model1")
             .path("versions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp4.getStatus());
+
+    ErrorResponse errorResp1 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @Test
+  public void testListModelVersionsInfo() {
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, "model1");
+    ModelVersion[] expected =
+        new ModelVersion[] {
+          mockModelVersion(0, "uri1", new String[] {"alias1"}, "comment1"),
+          mockModelVersion(1, "uri2", new String[] {"alias2", "alias3"}, "comment2")
+        };
+    when(modelDispatcher.listModelVersionsInfo(modelId)).thenReturn(expected);
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    ModelVersionListResponse versionListResp = resp.readEntity(ModelVersionListResponse.class);
+    Assertions.assertEquals(0, versionListResp.getCode());
+    ModelVersionDTO[] actual = versionListResp.getVersions();
+    Assertions.assertEquals(expected.length, actual.length);
+    for (int i = 0; i < expected.length; i++) {
+      compare(expected[i], actual[i]);
+    }
+
+    // Test mock return null for listModelVersionsInfo
+    when(modelDispatcher.listModelVersionsInfo(modelId)).thenReturn(null);
+    Response resp1 =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    ModelVersionListResponse versionListResp1 = resp1.readEntity(ModelVersionListResponse.class);
+    Assertions.assertEquals(0, versionListResp1.getCode());
+    Assertions.assertEquals(0, versionListResp1.getVersions().length);
+
+    // Test mock return empty array for listModelVersionsInfo
+    when(modelDispatcher.listModelVersionsInfo(modelId)).thenReturn(new ModelVersion[0]);
+    Response resp2 =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
+
+    ModelVersionListResponse versionListResp2 = resp2.readEntity(ModelVersionListResponse.class);
+    Assertions.assertEquals(0, versionListResp2.getCode());
+    Assertions.assertEquals(0, versionListResp2.getVersions().length);
+
+    // Test mock throw NoSuchModelException
+    doThrow(new NoSuchModelException("mock error"))
+        .when(modelDispatcher)
+        .listModelVersionsInfo(modelId);
+    Response resp3 =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .queryParam("details", "true")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResp = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchModelException.class.getSimpleName(), errorResp.getType());
+
+    // Test mock throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(modelDispatcher)
+        .listModelVersionsInfo(modelId);
+    Response resp4 =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .queryParam("details", "true")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();

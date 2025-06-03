@@ -23,12 +23,14 @@ import com.codahale.metrics.annotation.Timed;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
@@ -45,6 +47,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
+import org.apache.gravitino.dto.responses.ModelVersionNumberListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
@@ -203,7 +206,8 @@ public class ModelOperations {
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
-      @PathParam("model") String model) {
+      @PathParam("model") String model,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
     LOG.info("Received list model versions request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
 
@@ -211,10 +215,17 @@ public class ModelOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            int[] versions = modelDispatcher.listModelVersions(modelId);
-            versions = versions == null ? new int[0] : versions;
-            LOG.info("List {} versions of model {}", versions.length, modelId);
-            return Utils.ok(new ModelVersionListResponse(versions));
+            if (verbose) {
+              ModelVersion[] modelVersions = modelDispatcher.listModelVersionsInfo(modelId);
+              modelVersions = modelVersions == null ? new ModelVersion[0] : modelVersions;
+              LOG.info("List {} versions of model {}", modelVersions.length, modelId);
+              return Utils.ok(new ModelVersionListResponse(DTOConverters.toDTOs(modelVersions)));
+            } else {
+              int[] versions = modelDispatcher.listModelVersions(modelId);
+              versions = versions == null ? new int[0] : versions;
+              LOG.info("List {} versions of model {}", versions.length, modelId);
+              return Utils.ok(new ModelVersionNumberListResponse(versions));
+            }
           });
 
     } catch (Exception e) {

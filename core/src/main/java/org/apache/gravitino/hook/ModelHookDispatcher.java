@@ -95,6 +95,11 @@ public class ModelHookDispatcher implements ModelDispatcher {
   }
 
   @Override
+  public ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException {
+    return dispatcher.listModelVersionsInfo(ident);
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     return dispatcher.getModelVersion(ident, version);

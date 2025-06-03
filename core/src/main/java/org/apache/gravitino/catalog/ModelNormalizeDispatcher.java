@@ -88,6 +88,11 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   }
 
   @Override
+  public ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException {
+    return dispatcher.listModelVersionsInfo(normalizeCaseSensitive(ident));
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     return dispatcher.getModelVersion(normalizeCaseSensitive(ident), version);
