@@ -20,7 +20,10 @@
 package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Weigher;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import lombok.NonNull;
 import org.apache.gravitino.Entity;
 import org.checkerframework.checker.index.qual.NonNegative;
@@ -45,7 +48,12 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
   public static final int OTHER_WEIGHT = 15;
   private static final Logger LOG = LoggerFactory.getLogger(EntityCacheWeigher.class.getName());
   private static final EntityCacheWeigher INSTANCE = new EntityCacheWeigher();
-  private static final long MAX_WEIGHT =
+  private static final Map<Entity.EntityType, Integer> ENTITY_WEIGHTS =
+      ImmutableMap.of(
+          Entity.EntityType.METALAKE, METALAKE_WEIGHT,
+          Entity.EntityType.CATALOG, CATALOG_WEIGHT,
+          Entity.EntityType.SCHEMA, SCHEMA_WEIGHT);
+  public static long MAX_WEIGHT =
       2 * (METALAKE_WEIGHT * 10 + CATALOG_WEIGHT * (10 * 200) + SCHEMA_WEIGHT * (10 * 200 * 1000));
 
   private EntityCacheWeigher() {}
@@ -107,25 +115,7 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
   }
 
   private int calculateWeight(Entity.EntityType entityType) {
-    int weight;
-    switch (entityType) {
-      case METALAKE:
-        weight = METALAKE_WEIGHT;
-        break;
-
-      case CATALOG:
-        weight = CATALOG_WEIGHT;
-        break;
-
-      case SCHEMA:
-        weight = SCHEMA_WEIGHT;
-        break;
-
-      default:
-        weight = OTHER_WEIGHT;
-        break;
-    }
-
-    return weight;
+    Preconditions.checkArgument(entityType != null, "entityType cannot be null");
+    return ENTITY_WEIGHTS.getOrDefault(entityType, OTHER_WEIGHT);
   }
 }

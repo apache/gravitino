@@ -53,15 +53,14 @@ import org.slf4j.LoggerFactory;
 
 /** This class implements the {@link EntityCache} using Caffeine. */
 public class CaffeineEntityCache extends BaseEntityCache {
-  private final int CACHE_CLEANUP_CORE_THREADS = 1;
-  private final int CACHE_CLEANUP_MAX_THREADS = 1;
-  private final int CACHE_CLEANUP_QUEUE_CAPACITY = 100;
-  private final int CACHE_MONITOR_PERIOD_MINUTES = 5;
-  private final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
+  private static final int CACHE_CLEANUP_CORE_THREADS = 1;
+  private static final int CACHE_CLEANUP_MAX_THREADS = 1;
+  private static final int CACHE_CLEANUP_QUEUE_CAPACITY = 100;
+  private static final int CACHE_MONITOR_PERIOD_MINUTES = 5;
+  private static final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
-  private final ReentrantLock opLock = new ReentrantLock();
-
   private static volatile CaffeineEntityCache INSTANCE;
+  private final ReentrantLock opLock = new ReentrantLock();
 
   /** Cache part */
   private final Cache<EntityCacheKey, List<Entity>> cacheData;
@@ -103,7 +102,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   private CaffeineEntityCache(Config cacheConfig, EntityStore entityStore) {
     super(cacheConfig, entityStore);
-    cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
+    this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     ThreadPoolExecutor cleanupExec = buildCleanupExecutor();
     Caffeine<EntityCacheKey, List<Entity>> cacheDataBuilder = newBaseBuilder(cacheConfig);
@@ -130,7 +129,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     this.cacheData = cacheDataBuilder.build();
 
     if (cacheConfig.get(Configs.CACHE_STATS_ENABLED)) {
-      scheduler = Executors.newSingleThreadScheduledExecutor();
+      this.scheduler = Executors.newSingleThreadScheduledExecutor();
       startCacheStatsMonitor();
     }
   }
@@ -140,10 +139,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public <E extends Entity & HasIdentifier> List<E> getOrLoad(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
       throws IOException {
-    Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
-    Preconditions.checkArgument(type != null, "EntityType cannot be null");
-    Preconditions.checkArgument(relType != null, "SupportsRelationOperations.Type cannot be null");
+    checkArguments(ident, type, relType);
 
+    // Executes a thread-safe operation: attempts to load the entity from the cache,
+    // falls back to the underlying store if not present, and updates the cache.
+    // If an error occurs during loading, the exception will be propagated.
     return withLockAndThrow(
         () -> {
           EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type, relType);
@@ -165,9 +165,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public <E extends Entity & HasIdentifier> E getOrLoad(
       NameIdentifier ident, Entity.EntityType type) throws IOException {
-    Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
-    Preconditions.checkArgument(type != null, "EntityType cannot be null");
+    checkArguments(ident, type);
 
+    // Executes a thread-safe operation: attempts to load the entity from the cache,
+    // falls back to the underlying store if not present, and updates the cache.
+    // If an error occurs during loading, the exception will be propagated.
     return withLockAndThrow(
         () -> {
           EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
@@ -190,6 +192,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
       SupportsRelationOperations.Type relType,
       NameIdentifier nameIdentifier,
       Entity.EntityType identType) {
+    checkArguments(nameIdentifier, identType, relType);
+
     return withLock(
         () -> {
           List<Entity> entitiesFromCache =
@@ -202,6 +206,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
       NameIdentifier ident, Entity.EntityType type) {
+    checkArguments(ident, type);
+
     return withLock(
         () -> {
           List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
@@ -216,19 +222,29 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public boolean invalidate(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return invalidate(ident, type);
+    checkArguments(ident, type, relType);
+
+    return withLock(
+        () -> {
+          boolean existed = contains(ident, type, relType);
+          if (existed) {
+            invalidateEntities(ident);
+          }
+
+          return existed;
+        });
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
+    checkArguments(ident, type);
+
     return withLock(
         () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
-
           boolean existed = contains(ident, type);
           if (existed) {
-            invalidateEntities(entityCacheKey.identifier());
+            invalidateEntities(ident);
           }
 
           return existed;
@@ -239,12 +255,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
   @Override
   public boolean contains(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null);
+    checkArguments(ident, type, relType);
+
+    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null);
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
+    checkArguments(ident, type);
+
     return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null);
   }
 
@@ -271,6 +291,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Entity.EntityType type,
       SupportsRelationOperations.Type relType,
       List<E> entities) {
+    checkArguments(ident, type, relType);
+    Preconditions.checkArgument(entities != null, "Entities cannot be null");
+
     syncEntitiesToCache(
         EntityCacheKey.of(ident, type, relType),
         entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
@@ -279,6 +302,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void put(E entity) {
+    Preconditions.checkArgument(entity != null, "Entity cannot be null");
+
     withLock(
         () -> {
           NameIdentifier identifier = getIdentFromEntity(entity);
@@ -290,12 +315,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E {
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
     withLockAndThrow(action);
   }
 
   /** {@inheritDoc} */
   @Override
   public <E, T extends Exception> E withCacheLock(ThrowingSupplier<E, T> action) throws T {
+    Preconditions.checkArgument(action != null, "Action cannot be null");
+
     return withLockAndThrow(action);
   }
 
@@ -501,5 +530,29 @@ public class CaffeineEntityCache extends BaseEntityCache {
         CACHE_MONITOR_INITIAL_DELAY_MINUTES,
         CACHE_MONITOR_PERIOD_MINUTES,
         TimeUnit.MINUTES);
+  }
+
+  /**
+   * Checks the arguments for the methods. All arguments must not be null.
+   *
+   * @param ident The identifier of the entity to check
+   * @param type The type of the entity to check
+   * @param relType The relation type of the entity to check
+   */
+  private void checkArguments(
+      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    checkArguments(ident, type);
+    Preconditions.checkArgument(relType != null, "relType cannot be null");
+  }
+
+  /**
+   * Checks the arguments for the methods. All arguments must not be null.
+   *
+   * @param ident The identifier of the entity to check
+   * @param type The type of the entity to check
+   */
+  private void checkArguments(NameIdentifier ident, Entity.EntityType type) {
+    Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
+    Preconditions.checkArgument(type != null, "EntityType cannot be null");
   }
 }
