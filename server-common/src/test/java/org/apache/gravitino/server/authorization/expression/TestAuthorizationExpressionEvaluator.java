@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
@@ -52,21 +52,20 @@ public class TestAuthorizationExpressionEvaluator {
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      Map<MetadataObject.Type, NameIdentifier> metadataNames = new HashMap<>();
+      Map<Entity.EntityType, NameIdentifier> metadataNames = new HashMap<>();
+      metadataNames.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("testMetalake"));
       metadataNames.put(
-          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("testMetalake"));
+          Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog("testMetalake", "testCatalog"));
       metadataNames.put(
-          MetadataObject.Type.CATALOG, NameIdentifierUtil.ofCatalog("testMetalake", "testCatalog"));
-      metadataNames.put(
-          MetadataObject.Type.SCHEMA,
+          Entity.EntityType.SCHEMA,
           NameIdentifierUtil.ofSchema("testMetalake", "testCatalog", "testSchema"));
       metadataNames.put(
-          MetadataObject.Type.TABLE,
+          Entity.EntityType.TABLE,
           NameIdentifierUtil.ofTable(
               "testMetalake", "testCatalog", "testSchema", "testTableHasNotPermission"));
       Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
       metadataNames.put(
-          MetadataObject.Type.TABLE,
+          Entity.EntityType.TABLE,
           NameIdentifierUtil.ofTable("testMetalake", "testCatalog", "testSchema", "testTable"));
       Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
     }
@@ -86,15 +85,15 @@ public class TestAuthorizationExpressionEvaluator {
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
       when(mockedProvider.getGravitinoAuthorizer()).thenReturn(new MockGravitinoAuthorizer());
-      Map<MetadataObject.Type, NameIdentifier> metadataNames = new HashMap<>();
+      Map<Entity.EntityType, NameIdentifier> metadataNames = new HashMap<>();
       metadataNames.put(
-          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOutOwner"));
+          Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOutOwner"));
       metadataNames.put(
-          MetadataObject.Type.CATALOG,
+          Entity.EntityType.CATALOG,
           NameIdentifierUtil.ofCatalog("metalakeWithOwner", "testCatalog"));
       Assertions.assertFalse(authorizationExpressionEvaluator.evaluate(metadataNames));
       metadataNames.put(
-          MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOwner"));
+          Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake("metalakeWithOwner"));
       Assertions.assertTrue(authorizationExpressionEvaluator.evaluate(metadataNames));
     }
   }
