@@ -134,7 +134,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
 
     if (distribution.number() != 0) {
-      sqlBuilder.append(" BUCKETS ").append(distribution.number());
+      sqlBuilder.append(" BUCKETS ").append(DorisUtils.toBucketNumberString(distribution.number()));
     }
 
     properties = appendNecessaryProperties(properties);
