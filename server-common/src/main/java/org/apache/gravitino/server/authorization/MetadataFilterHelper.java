@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -84,7 +83,7 @@ public class MetadataFilterHelper {
     return Arrays.stream(nameIdentifiers)
         .filter(
             metaDataName -> {
-              Map<MetadataObject.Type, NameIdentifier> nameIdentifierMap =
+              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
                   spiltMetadataNames(metalake, entityType, metaDataName);
               return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
             })
@@ -101,25 +100,25 @@ public class MetadataFilterHelper {
    * @param nameIdentifier metadata name
    * @return A map containing the metadata object and all its parent objects, keyed by their types
    */
-  private static Map<MetadataObject.Type, NameIdentifier> spiltMetadataNames(
+  private static Map<Entity.EntityType, NameIdentifier> spiltMetadataNames(
       String metalake, Entity.EntityType entityType, NameIdentifier nameIdentifier) {
-    Map<MetadataObject.Type, NameIdentifier> nameIdentifierMap = new HashMap<>();
-    nameIdentifierMap.put(MetadataObject.Type.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
+    Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
+    nameIdentifierMap.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
     switch (entityType) {
       case CATALOG:
-        nameIdentifierMap.put(MetadataObject.Type.CATALOG, nameIdentifier);
+        nameIdentifierMap.put(Entity.EntityType.CATALOG, nameIdentifier);
         break;
       case SCHEMA:
-        nameIdentifierMap.put(MetadataObject.Type.SCHEMA, nameIdentifier);
+        nameIdentifierMap.put(Entity.EntityType.SCHEMA, nameIdentifier);
         nameIdentifierMap.put(
-            MetadataObject.Type.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       case TABLE:
-        nameIdentifierMap.put(MetadataObject.Type.TABLE, nameIdentifier);
+        nameIdentifierMap.put(Entity.EntityType.TABLE, nameIdentifier);
         nameIdentifierMap.put(
-            MetadataObject.Type.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
         nameIdentifierMap.put(
-            MetadataObject.Type.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       default:
         break;
