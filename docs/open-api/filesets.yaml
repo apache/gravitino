@@ -205,6 +205,54 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/files:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/fileset"
+
+    get:
+      tags:
+        - fileset
+      summary: List directories and files in a fileset
+      operationId: listFilesetFiles
+      description: List files and directories in the specified fileset
+      parameters:
+        - name: subPath
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "/"
+          description: The sub path within the fileset to list
+        - name: locationName
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The name of the storage location within the fileset
+      responses:
+        "200":
+          $ref: "#/components/responses/FileInfoListResponse"
+        "404":
+          description: Not Found – the target fileset or subPath or locationName does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchFilesetException:
+                  $ref: "#/components/examples/NoSuchFilesetException"
+            "5xx":
+              $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
 
   schemas:
