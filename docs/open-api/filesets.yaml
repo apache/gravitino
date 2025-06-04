@@ -217,7 +217,7 @@ paths:
         - fileset
       summary: List directories and files in a fileset
       operationId: listFilesetFiles
-      description: List files and directories in the specified fileset
+      description: List directories and files in a fileset
       parameters:
         - name: subPath
           in: query
@@ -250,8 +250,8 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
-            "5xx":
-              $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
 
