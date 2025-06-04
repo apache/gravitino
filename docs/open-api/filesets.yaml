@@ -215,9 +215,9 @@ paths:
     get:
       tags:
         - fileset
-      summary: List directories and files in a fileset
+      summary: List metadata of files and directories in a fileset
       operationId: listFilesetFiles
-      description: List directories and files in a fileset
+      description: List metadata of files and directories in a fileset
       parameters:
         - name: subPath
           in: query
@@ -225,7 +225,7 @@ paths:
           schema:
             type: string
             default: "/"
-          description: The sub path within the fileset to list directories and files from
+          description: The sub path within the fileset to list files and directories from
         - name: locationName
           in: query
           required: false
@@ -283,6 +283,33 @@ components:
           default: {}
           additionalProperties:
               type: string
+    FileInfo:
+      type: object
+      required:
+        - name
+        - isDir
+        - size
+        - lastModified
+        - path
+      properties:
+        name:
+          type: string
+          description: The name of the file/directory
+        isDir:
+          type: boolean
+          description: Whether this is a directory
+        size:
+          type: integer
+          format: int64
+          description: The file size in bytes (0 if directory)
+        lastModified:
+          type: integer
+          format: int64
+          description: The last modification time of the file/directory
+        path:
+          type: string
+          description: The full path of the file/directory
+
     FilesetCreateRequest:
       type: object
       required:
@@ -459,6 +486,26 @@ components:
             FilesetResponse:
               $ref: "#/components/examples/FilesetResponse"
 
+    FileInfoListResponse:
+      description: The response containing a list of file/directory metadata
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum: [0]
+              files:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FileInfo"
+          examples:
+            FileInfoListResponse:
+              $ref: "#/components/examples/FileInfoListResponse"
+
     FileLocationResponse:
       description: The response of the file location object
       content:
@@ -505,6 +552,27 @@ components:
             "key2": "value2"
           }
         }
+      }
+
+    FileInfoListResponse:
+      value: {
+        "code": 0,
+        "files": [
+          {
+            "name": "file.txt",
+            "isDir": false,
+            "size": 5,
+            "lastModified": 1748875070123,
+            "path": "/file.txt"
+          },
+          {
+            "name": "sub_dir",
+            "isDir": true,
+            "size": 0,
+            "lastModified": 1748875070124,
+            "path": "/sub_dir"
+          }
+        ]
       }
 
     FileLocationResponse:
