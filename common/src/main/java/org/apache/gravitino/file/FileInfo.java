@@ -16,15 +16,29 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino.catalog;
-
-import org.apache.gravitino.file.FilesetCatalog;
+package org.apache.gravitino.file;
 
 /**
- * {@code FilesetDispatcher} interface acts as a specialization of the {@link FilesetCatalog}
- * interface, and extends {@link FilesetFileOps} for file operations.This interface is designed to
- * potentially add custom behaviors or operations related to dispatching or handling fileset-related
- * events or actions that are not covered by the standard {@code FilesetCatalog} operations.
+ * Represents metadata about a single file or directory within a fileset.
+ *
+ * <p>Implementations of this interface provide access to the basic attributes of a fileset entry,
+ * including its name, type (file vs. directory), size, last-modified timestamp, and its logical
+ * path within the enclosing fileset.
  */
-public interface FilesetDispatcher extends FilesetCatalog, FilesetFileOps {}
+public interface FileInfo {
+
+  /** @return The filename or directory name of file object. */
+  String name();
+
+  /** @return Whether this is a directory (true). */
+  boolean isDir();
+
+  /** @return The file size in bytes (0 if directory). */
+  long size();
+
+  /** @return The last modification time as an Instant. */
+  long lastModified();
+
+  /** @return The full path of the file or directory within the fileset. */
+  String path();
+}

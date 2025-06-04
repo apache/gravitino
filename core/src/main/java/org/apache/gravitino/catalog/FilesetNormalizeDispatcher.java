@@ -22,6 +22,7 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
+import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -31,6 +32,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 
@@ -50,6 +52,12 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
     NameIdentifier[] identifiers = dispatcher.listFilesets(caseSensitiveNs);
     return normalizeCaseSensitive(identifiers);
+  }
+
+  @Override
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException, IOException {
+    return dispatcher.listFiles(normalizeCaseSensitive(ident), locationName, subPath);
   }
 
   @Override
