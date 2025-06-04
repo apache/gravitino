@@ -20,6 +20,7 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
@@ -29,6 +30,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -79,7 +81,6 @@ public abstract class BaseEntityCache implements EntityCache {
    */
   public BaseEntityCache(Config config, EntityStore entityStore) {
     Preconditions.checkArgument(config != null, "Config must not be null");
-    Preconditions.checkArgument(entityStore != null, "EntityStore must not be null");
 
     this.cacheConfig = config;
     this.entityStore = (RelationalEntityStore) entityStore;
@@ -151,6 +152,48 @@ public abstract class BaseEntityCache implements EntityCache {
     validateEntityHasIdentifier(entity);
 
     return (E) entity;
+  }
+
+  /**
+   * Loads an entity from the database.
+   *
+   * @param ident The name identifier of the entity to load.
+   * @param type The type of the entity to load.
+   * @return The loaded entity.
+   * @param <E> The type of the loaded entity.
+   * @throws IOException if an error occurs while loading the entity.
+   */
+  protected <E extends Entity & HasIdentifier> E loadEntity(
+      NameIdentifier ident, Entity.EntityType type) throws IOException {
+    Preconditions.checkArgument(
+        entityStore != null,
+        "EntityStore must not be null if you want to get entities from " + "db");
+
+    return entityStore.get(ident, type, getEntityClass(type));
+  }
+
+  /**
+   * Loads a list of entities related to the specified entity.
+   *
+   * @param ident The name identifier of the entity to load related entities for.
+   * @param type The type of the entity to load related entities for.
+   * @param relType The type of the relation to load.
+   * @param allFields Whether to load all fields.
+   * @return A list of related entities.
+   * @param <E> The type of the related entities.
+   * @throws IOException if an error occurs while loading the entities.
+   */
+  protected <E extends Entity & HasIdentifier> List<E> loadEntitiesByRelation(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier ident,
+      Entity.EntityType type,
+      boolean allFields)
+      throws IOException {
+    Preconditions.checkArgument(
+        entityStore != null,
+        "EntityStore must not be null if you want to get entities from " + "db");
+
+    return entityStore.listEntitiesByRelation(relType, ident, type, allFields);
   }
 
   /**

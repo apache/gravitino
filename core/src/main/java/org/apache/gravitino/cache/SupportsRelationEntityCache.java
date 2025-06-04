@@ -41,13 +41,19 @@ public interface SupportsRelationEntityCache {
    * @param ident The name identifier of the entity to find related entities for
    * @param type The type of the entity to find related entities for
    * @param relType The relation type to find related entities for
+   * @param allFields Some fields may have a relatively high acquisition cost, If true, the method
+   *     will fetch all the fields, Otherwise, the method will fetch all the fields except for
+   *     high-cost fields.
    * @return A list of related entities, or an empty list if none are found
    * @param <E> The class of the related entities
    * @throws IOException if an I/O error occurs while loading related entities from the underlying
    *     {@link EntityStore}
    */
   <E extends Entity & HasIdentifier> List<E> getOrLoad(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields)
       throws IOException;
 
   /**
