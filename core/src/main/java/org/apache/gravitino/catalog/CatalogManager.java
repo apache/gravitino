@@ -172,6 +172,17 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           });
     }
 
+    public <R> R doWithFilesetFileOps(ThrowableFunction<FilesetFileOps, R> fn) throws Exception {
+      return classLoader.withClassLoader(
+          cl -> {
+            if (asFilesetFileOps() == null) {
+              throw new UnsupportedOperationException(
+                  "Catalog does not support fileset file operations");
+            }
+            return fn.apply(asFilesetFileOps());
+          });
+    }
+
     public <R> R doWithCredentialOps(ThrowableFunction<BaseCatalog, R> fn) throws Exception {
       return classLoader.withClassLoader(cl -> fn.apply(catalog));
     }
@@ -249,6 +260,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
     private FilesetCatalog asFilesets() {
       return catalog.ops() instanceof FilesetCatalog ? (FilesetCatalog) catalog.ops() : null;
+    }
+
+    private FilesetFileOps asFilesetFileOps() {
+      return catalog.ops() instanceof FilesetFileOps ? (FilesetFileOps) catalog.ops() : null;
     }
 
     private TopicCatalog asTopics() {

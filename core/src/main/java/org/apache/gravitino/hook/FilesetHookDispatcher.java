@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hook;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -32,6 +33,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -52,6 +54,12 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   @Override
   public NameIdentifier[] listFilesets(Namespace namespace) throws NoSuchSchemaException {
     return dispatcher.listFilesets(namespace);
+  }
+
+  @Override
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException, IOException {
+    return dispatcher.listFiles(ident, locationName, subPath);
   }
 
   @Override
