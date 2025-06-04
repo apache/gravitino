@@ -166,7 +166,7 @@ public abstract class BaseEntityCache implements EntityCache {
   protected <E extends Entity & HasIdentifier> E loadEntity(
       NameIdentifier ident, Entity.EntityType type) throws IOException {
     Preconditions.checkArgument(
-        entityStore != null, "EntityStore cannot be null if you want to get entity from database");
+        entityStore != null, "EntityStore is required to load entity from the database.");
 
     return entityStore.get(ident, type, getEntityClass(type));
   }
@@ -189,7 +189,7 @@ public abstract class BaseEntityCache implements EntityCache {
       boolean allFields)
       throws IOException {
     Preconditions.checkArgument(
-        entityStore != null, "EntityStore cannot be null if you want to list entities from db.");
+        entityStore != null, "EntityStore is required to list related entities from the database.");
 
     return entityStore.listEntitiesByRelation(relType, ident, type, allFields);
   }
