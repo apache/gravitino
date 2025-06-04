@@ -225,13 +225,13 @@ paths:
           schema:
             type: string
             default: "/"
-          description: The sub path within the fileset to list
+          description: The sub path within the fileset to list directories and files from
         - name: locationName
           in: query
           required: false
           schema:
             type: string
-          description: The name of the storage location within the fileset
+          description: The name of the storage location
       responses:
         "200":
           $ref: "#/components/responses/FileInfoListResponse"
