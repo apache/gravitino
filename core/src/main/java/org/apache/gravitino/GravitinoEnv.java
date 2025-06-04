@@ -441,8 +441,7 @@ public class GravitinoEnv {
     this.entityStore = EntityStoreFactory.createEntityStore(config);
     if (config.get(Configs.CACHE_ENABLED)) {
       this.entityCache = CaffeineEntityCache.getInstance(config, entityStore);
-    } else {
-      this.entityCache = CaffeineEntityCache.getInstance(config, null);
+      // TODO constructs a CachedEntityStore instance with the entityStore and entityCache
     }
     entityStore.initialize(config);
 
