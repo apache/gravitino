@@ -156,7 +156,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             return convertEntity(entitiesFromCache);
           }
 
-          List<E> entities = loadEntitiesByRelation(relType, ident, type, allFields);
+          List<E> entities = listEntitiesByRelation(relType, ident, type, allFields);
           syncEntitiesToCache(
               entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
 

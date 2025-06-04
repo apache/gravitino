@@ -166,8 +166,7 @@ public abstract class BaseEntityCache implements EntityCache {
   protected <E extends Entity & HasIdentifier> E loadEntity(
       NameIdentifier ident, Entity.EntityType type) throws IOException {
     Preconditions.checkArgument(
-        entityStore != null,
-        "EntityStore must not be null if you want to get entities from " + "db");
+        entityStore != null, "EntityStore cannot be null if you want to get entity from database");
 
     return entityStore.get(ident, type, getEntityClass(type));
   }
@@ -183,15 +182,14 @@ public abstract class BaseEntityCache implements EntityCache {
    * @param <E> The type of the related entities.
    * @throws IOException if an error occurs while loading the entities.
    */
-  protected <E extends Entity & HasIdentifier> List<E> loadEntitiesByRelation(
+  protected <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       SupportsRelationOperations.Type relType,
       NameIdentifier ident,
       Entity.EntityType type,
       boolean allFields)
       throws IOException {
     Preconditions.checkArgument(
-        entityStore != null,
-        "EntityStore must not be null if you want to get entities from " + "db");
+        entityStore != null, "EntityStore cannot be null if you want to list entities from db.");
 
     return entityStore.listEntitiesByRelation(relType, ident, type, allFields);
   }
