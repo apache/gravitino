@@ -155,6 +155,7 @@ public class TestHadoopCatalogOperations {
   private static EntityStore store;
 
   private static IdGenerator idGenerator;
+  private static SchemaMetaService spySchemaMetaService;
 
   private static CatalogInfo randomCatalogInfo() {
     return new CatalogInfo(
@@ -191,6 +192,13 @@ public class TestHadoopCatalogOperations {
         props,
         null,
         Namespace.of(metalakeName));
+  }
+
+  private void stubSchema(long schemaId) {
+    doReturn(new SchemaIds(1L, 1L, schemaId))
+        .when(spySchemaMetaService)
+        .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+            Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema" + schemaId));
   }
 
   @BeforeAll
@@ -235,23 +243,11 @@ public class TestHadoopCatalogOperations {
         .getCatalogIdByMetalakeIdAndName(Mockito.anyLong(), Mockito.anyString());
 
     SchemaMetaService serviceMetaService = SchemaMetaService.getInstance();
-    SchemaMetaService spySchemaMetaService = Mockito.spy(serviceMetaService);
+    spySchemaMetaService = Mockito.spy(serviceMetaService);
 
     doReturn(new CatalogIds(1L, 1L))
         .when(spyCatalogMetaService)
         .getCatalogIdByMetalakeAndCatalogName(Mockito.anyString(), Mockito.anyString());
-
-    doReturn(new SchemaIds(1L, 1L, 1L))
-        .when(spySchemaMetaService)
-        .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-            Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema11"));
-
-    for (int i = 10; i < 33; i++) {
-      doReturn(new SchemaIds(1L, 1L, (long) i))
-          .when(spySchemaMetaService)
-          .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-              Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema" + i));
-    }
 
     Stream<Arguments> argumentsStream = testRenameArguments();
     argumentsStream.forEach(
@@ -1192,6 +1188,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testRemoveFilesetComment() throws IOException {
+    stubSchema(27L);
     String schemaName = "schema27";
     String comment = "comment27";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
