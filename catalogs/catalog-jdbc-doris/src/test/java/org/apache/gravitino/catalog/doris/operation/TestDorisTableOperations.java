@@ -436,7 +436,7 @@ public class TestDorisTableOperations extends TestDoris {
     columns.add(
         JdbcColumn.builder()
             .withName("col_14")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .build());
 
     Distribution distribution =
@@ -687,5 +687,36 @@ public class TestDorisTableOperations extends TestDoris {
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = DorisTableOperations.deleteIndexDefinition(load, deleteIndex3);
     Assertions.assertEquals("DROP INDEX uk_2", sql);
+  }
+
+  @Test
+  public void testCalculateDatetimePrecision() {
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATE", 10, 0),
+        "DATE type should return 0 precision");
+
+    Assertions.assertEquals(
+        0,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 20, 0),
+        "TIME type should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 23, 0),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 26, 0),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        9,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 29, 0),
+        "Lower case type name should work");
+
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
+        "Non-datetime type should return 0 precision");
   }
 }

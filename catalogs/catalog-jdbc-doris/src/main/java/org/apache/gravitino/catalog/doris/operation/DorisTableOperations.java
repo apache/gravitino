@@ -795,4 +795,16 @@ public class DorisTableOperations extends JdbcTableOperations {
       return DorisUtils.extractDistributionInfoFromSql(createTableSyntax);
     }
   }
+
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    String upperTypeName = typeName.toUpperCase();
+    if (upperTypeName.equals("DATETIME")) {
+      // DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+      return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
+          ? columnSize - DATETIME_FORMAT_WITH_DOT.length()
+          : 0;
+    }
+    return null;
+  }
 }
