@@ -606,6 +606,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testDropSchema() throws IOException {
+    stubSchema(20L);
     String name = "schema20";
     String comment = "comment20";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog20";
@@ -670,6 +671,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testDropSchemaWithFSOpsDisabled() throws IOException {
+    stubSchema(21L);
     String name = "schema21";
     String comment = "comment21";
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog20";
@@ -875,6 +877,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesets() throws IOException {
+    stubSchema(23L);
     String schemaName = "schema23";
     String comment = "comment23";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
@@ -898,6 +901,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFiles() throws IOException {
+    stubSchema(30L);
     String schemaName = "schema30";
     String comment = "comment30";
     String filesetName = "fileset30";
@@ -947,6 +951,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFilesWithFSOpsDisabled() throws Exception {
+    stubSchema(31L);
     String schemaName = "schema31";
     String comment = "comment31";
     String filesetName = "fileset31";
@@ -975,6 +980,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFilesWithNonExistentPath() throws IOException {
+    stubSchema(32L);
     String schemaName = "schema32";
     String comment = "comment32";
     String filesetName = "fileset32";
@@ -1054,6 +1060,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testAlterFilesetProperties() throws IOException {
+    stubSchema(25L);
     String schemaName = "schema25";
     String comment = "comment25";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
@@ -1161,6 +1168,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testUpdateFilesetComment() throws IOException {
+    stubSchema(26L);
     String schemaName = "schema26";
     String comment = "comment26";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
@@ -1254,6 +1262,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testGetFileLocation() throws IOException {
+    stubSchema(29L);
     String schemaName = "schema29";
     String comment = "schema29";
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
