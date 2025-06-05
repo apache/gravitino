@@ -41,7 +41,6 @@ tasks.withType(ShadowJar::class.java) {
   }
 
   // Relocate dependencies to avoid conflicts
-  relocate("com.azure", "org.apache.gravitino.azure.shaded.com.azure")
   relocate("com.ctc.wstx", "org.apache.gravitino.azure.shaded.com.ctc.wstx")
   relocate("com.fasterxml", "org.apache.gravitino.azure.shaded.com.fasterxml")
   relocate("com.google", "org.apache.gravitino.azure.shaded.com.google")

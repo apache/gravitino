@@ -44,7 +44,6 @@ tasks.withType(ShadowJar::class.java) {
   }
 
   // Relocate dependencies to avoid conflicts
-  relocate("com.aliyun", "org.apache.gravitino.aliyun.shaded.com.aliyun")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
   relocate("com.google", "org.apache.gravitino.aliyun.shaded.com.google")
   relocate("com.sun", "org.apache.gravitino.aliyun.shaded.com.sun")
