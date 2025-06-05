@@ -677,13 +677,16 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testDropSchemaWithFSOpsDisabled() throws IOException {
-    stubSchema(21L);
-    String name = "schema21";
-    String comment = "comment21";
-    String catalogPath = TEST_ROOT_PATH + "/" + "catalog20";
-    Schema schema = createSchema(name, comment, catalogPath, null);
-    Assertions.assertEquals(name, schema.name());
-    NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", name);
+    final long testId = 21L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String filesetName = "fileset" + testId;
+    final String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
+
+    stubSchema(testId);
+    Schema schema = createSchema(schemaName, comment, catalogPath, null);
+    Assertions.assertEquals(schemaName, schema.name());
+    NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(
@@ -693,12 +696,13 @@ public class TestHadoopCatalogOperations {
 
       ops.dropSchema(id, false);
 
-      Path schemaPath = new Path(new Path(catalogPath), name);
+      Path schemaPath = new Path(new Path(catalogPath), schemaName);
       FileSystem fs = schemaPath.getFileSystem(new Configuration());
       Assertions.assertTrue(fs.exists(schemaPath));
 
-      createSchema(name, comment, catalogPath, null);
-      Fileset fs1 = createFileset("fs1", name, "comment", Fileset.Type.MANAGED, catalogPath, null);
+      createSchema(schemaName, comment, catalogPath, null);
+      Fileset fs1 =
+          createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, catalogPath, null);
       Path fs1Path = new Path(fs1.storageLocation());
 
       // Test drop non-empty schema with cascade = true
