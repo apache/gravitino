@@ -1269,21 +1269,24 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testGetFileLocation() throws IOException {
-    stubSchema(29L);
-    String schemaName = "schema29";
-    String comment = "schema29";
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    createSchema(schemaName, comment, null, schemaPath);
+    final long testId = 29L;
+    final String catalogName = "catalog" + testId;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    final String filesetName = "fileset" + testId;
+    final String storageLocation =
+        TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName;
 
-    String catalogName = "c1";
-    String name = "fileset1024";
-    String storageLocation = TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + name;
+    stubSchema(testId);
+    createSchema(schemaName, comment, null, schemaPath);
     Fileset fileset =
-        createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
+        createFileset(
+            filesetName, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
-      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
       // test sub path starts with "/"
       String subPath1 = "/test/test.parquet";
       String fileLocation1 = ops.getFileLocation(filesetIdent, subPath1);
@@ -1308,8 +1311,8 @@ public class TestHadoopCatalogOperations {
     }
 
     // test mount a single file
-    String filesetName2 = "test_get_file_location_2";
-    String filesetLocation2 =
+    final String filesetName2 = "test_get_file_location_2";
+    final String filesetLocation2 =
         TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName2;
     Path filesetLocationPath2 = new Path(filesetLocation2);
     createFileset(filesetName2, schemaName, comment, Fileset.Type.MANAGED, null, filesetLocation2);
@@ -1371,7 +1374,7 @@ public class TestHadoopCatalogOperations {
     String filesetName4 = "test_get_file_location_4";
     String filesetLocation4 =
         TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName4 + "/";
-    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName4);
     Fileset mockFileset = Mockito.mock(Fileset.class);
     when(mockFileset.name()).thenReturn(filesetName4);
     when(mockFileset.storageLocation()).thenReturn(filesetLocation4);
