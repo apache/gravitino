@@ -725,7 +725,7 @@ public class TestModelEvent {
 
   @Test
   void testListModelVersionsEventWithInfo() {
-    dispatcher.listModelVersionsInfo(existingIdentA);
+    dispatcher.listModelVersionInfos(existingIdentA);
 
     // validate pre-event
     PreEvent preEvent = dummyEventListener.popPreEvent();
@@ -1005,7 +1005,7 @@ public class TestModelEvent {
     when(dispatcher.deleteModelVersion(existingIdentA, 3)).thenReturn(false);
 
     when(dispatcher.listModelVersions(existingIdentA)).thenReturn(new int[] {1, 2});
-    when(dispatcher.listModelVersionsInfo(existingIdentA))
+    when(dispatcher.listModelVersionInfos(existingIdentA))
         .thenReturn(new ModelVersion[] {firstModelVersion});
 
     when(dispatcher.alterModel(existingIdentA, new ModelChange[] {modelRenameChange}))

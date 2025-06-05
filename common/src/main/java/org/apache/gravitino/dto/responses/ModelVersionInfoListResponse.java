@@ -23,28 +23,29 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.gravitino.dto.model.ModelVersionDTO;
 
-/** Represents a response for a list of model version numbers. */
+/** Represents a response for a list of model versions. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class ModelVersionNumberListResponse extends BaseResponse {
+public class ModelVersionInfoListResponse extends BaseResponse {
 
-  @JsonProperty("versions")
-  private int[] versions;
+  @JsonProperty("infos")
+  private ModelVersionDTO[] versions;
 
   /**
    * Constructor for ModelVersionListResponse.
    *
    * @param versions The list of model versions.
    */
-  public ModelVersionNumberListResponse(int[] versions) {
+  public ModelVersionInfoListResponse(ModelVersionDTO[] versions) {
     super(0);
     this.versions = versions;
   }
 
-  /** Default constructor for ModelVersionNumberListResponse. (Used for Jackson deserialization.) */
-  public ModelVersionNumberListResponse() {
+  /** Default constructor for ModelVersionListResponse. (Used for Jackson deserialization.) */
+  public ModelVersionInfoListResponse() {
     super();
     this.versions = null;
   }

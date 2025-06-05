@@ -132,7 +132,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   }
 
   @Override
-  public ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException {
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
     return internalListModelVersion(
         ident,
         () ->
@@ -142,7 +142,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 () ->
                     doWithCatalog(
                         getCatalogIdentifier(ident),
-                        c -> c.doWithModelOps(m -> m.listModelVersionsInfo(ident)),
+                        c -> c.doWithModelOps(m -> m.listModelVersionInfos(ident)),
                         NoSuchModelException.class)));
   }
 

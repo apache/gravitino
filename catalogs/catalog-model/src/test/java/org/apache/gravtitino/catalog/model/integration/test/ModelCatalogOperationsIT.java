@@ -340,7 +340,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
         .linkModelVersion(modelIdent, "uri1", new String[] {"alias1"}, "comment1", null);
 
     ModelVersion[] modelVersions =
-        gravitinoCatalog.asModelCatalog().listModelVersionsInfo(modelIdent);
+        gravitinoCatalog.asModelCatalog().listModelVersionInfos(modelIdent);
     Assertions.assertEquals(1, modelVersions.length);
     Assertions.assertEquals(0, modelVersions[0].version());
     Assertions.assertEquals("uri1", modelVersions[0].uri());
@@ -354,18 +354,18 @@ public class ModelCatalogOperationsIT extends BaseIT {
     NameIdentifier nonExistentModelIdent = NameIdentifier.of(schemaName, "non_existent_model");
     Assertions.assertThrows(
         NoSuchModelException.class,
-        () -> gravitinoCatalog.asModelCatalog().listModelVersionsInfo(nonExistentModelIdent));
+        () -> gravitinoCatalog.asModelCatalog().listModelVersionInfos(nonExistentModelIdent));
 
     // Test list model versions info of non-existent schema
     NameIdentifier nonExistentSchemaIdent = NameIdentifier.of("non_existent_schema", modelName);
     Assertions.assertThrows(
         NoSuchModelException.class,
-        () -> gravitinoCatalog.asModelCatalog().listModelVersionsInfo(nonExistentSchemaIdent));
+        () -> gravitinoCatalog.asModelCatalog().listModelVersionInfos(nonExistentSchemaIdent));
 
     // Test delete and list model versions info
     Assertions.assertTrue(gravitinoCatalog.asModelCatalog().deleteModelVersion(modelIdent, 0));
     ModelVersion[] modelVersionsAfterDelete =
-        gravitinoCatalog.asModelCatalog().listModelVersionsInfo(modelIdent);
+        gravitinoCatalog.asModelCatalog().listModelVersionInfos(modelIdent);
     Assertions.assertEquals(0, modelVersionsAfterDelete.length);
   }
 

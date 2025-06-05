@@ -369,12 +369,12 @@ public class ModelEventDispatcher implements ModelDispatcher {
 
   /** {@inheritDoc} */
   @Override
-  public ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException {
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
     String user = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new ListModelVersionPreEvent(user, ident));
     try {
-      ModelVersion[] modelVersions = dispatcher.listModelVersionsInfo(ident);
+      ModelVersion[] modelVersions = dispatcher.listModelVersionInfos(ident);
       ModelVersionInfo[] modelVersionInfos =
           Arrays.stream(modelVersions).map(ModelVersionInfo::new).toArray(ModelVersionInfo[]::new);
       eventBus.dispatchEvent(new ListModelVersionsInfoEvent(user, ident, modelVersionInfos));

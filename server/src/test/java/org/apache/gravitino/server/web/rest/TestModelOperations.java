@@ -49,8 +49,8 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
+import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
-import org.apache.gravitino.dto.responses.ModelVersionNumberListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -398,8 +398,7 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    ModelVersionNumberListResponse versionListResp =
-        resp.readEntity(ModelVersionNumberListResponse.class);
+    ModelVersionListResponse versionListResp = resp.readEntity(ModelVersionListResponse.class);
     Assertions.assertEquals(0, versionListResp.getCode());
     Assertions.assertArrayEquals(versions, versionListResp.getVersions());
 
@@ -416,8 +415,7 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
-    ModelVersionNumberListResponse versionListResp1 =
-        resp1.readEntity(ModelVersionNumberListResponse.class);
+    ModelVersionListResponse versionListResp1 = resp1.readEntity(ModelVersionListResponse.class);
     Assertions.assertEquals(0, versionListResp1.getCode());
     Assertions.assertEquals(0, versionListResp1.getVersions().length);
 
@@ -434,8 +432,7 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
 
-    ModelVersionNumberListResponse versionListResp2 =
-        resp2.readEntity(ModelVersionNumberListResponse.class);
+    ModelVersionListResponse versionListResp2 = resp2.readEntity(ModelVersionListResponse.class);
     Assertions.assertEquals(0, versionListResp2.getCode());
     Assertions.assertEquals(0, versionListResp2.getVersions().length);
 
@@ -483,7 +480,7 @@ public class TestModelOperations extends JerseyTest {
           mockModelVersion(0, "uri1", new String[] {"alias1"}, "comment1"),
           mockModelVersion(1, "uri2", new String[] {"alias2", "alias3"}, "comment2")
         };
-    when(modelDispatcher.listModelVersionsInfo(modelId)).thenReturn(expected);
+    when(modelDispatcher.listModelVersionInfos(modelId)).thenReturn(expected);
 
     Response resp =
         target(modelPath())
@@ -497,7 +494,8 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    ModelVersionListResponse versionListResp = resp.readEntity(ModelVersionListResponse.class);
+    ModelVersionInfoListResponse versionListResp =
+        resp.readEntity(ModelVersionInfoListResponse.class);
     Assertions.assertEquals(0, versionListResp.getCode());
     ModelVersionDTO[] actual = versionListResp.getVersions();
     Assertions.assertEquals(expected.length, actual.length);
@@ -506,7 +504,7 @@ public class TestModelOperations extends JerseyTest {
     }
 
     // Test mock return null for listModelVersionsInfo
-    when(modelDispatcher.listModelVersionsInfo(modelId)).thenReturn(null);
+    when(modelDispatcher.listModelVersionInfos(modelId)).thenReturn(null);
     Response resp1 =
         target(modelPath())
             .path("model1")
@@ -519,12 +517,13 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp1.getMediaType());
 
-    ModelVersionListResponse versionListResp1 = resp1.readEntity(ModelVersionListResponse.class);
+    ModelVersionInfoListResponse versionListResp1 =
+        resp1.readEntity(ModelVersionInfoListResponse.class);
     Assertions.assertEquals(0, versionListResp1.getCode());
     Assertions.assertEquals(0, versionListResp1.getVersions().length);
 
     // Test mock return empty array for listModelVersionsInfo
-    when(modelDispatcher.listModelVersionsInfo(modelId)).thenReturn(new ModelVersion[0]);
+    when(modelDispatcher.listModelVersionInfos(modelId)).thenReturn(new ModelVersion[0]);
     Response resp2 =
         target(modelPath())
             .path("model1")
@@ -537,14 +536,15 @@ public class TestModelOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp2.getMediaType());
 
-    ModelVersionListResponse versionListResp2 = resp2.readEntity(ModelVersionListResponse.class);
+    ModelVersionInfoListResponse versionListResp2 =
+        resp2.readEntity(ModelVersionInfoListResponse.class);
     Assertions.assertEquals(0, versionListResp2.getCode());
     Assertions.assertEquals(0, versionListResp2.getVersions().length);
 
     // Test mock throw NoSuchModelException
     doThrow(new NoSuchModelException("mock error"))
         .when(modelDispatcher)
-        .listModelVersionsInfo(modelId);
+        .listModelVersionInfos(modelId);
     Response resp3 =
         target(modelPath())
             .path("model1")
@@ -563,7 +563,7 @@ public class TestModelOperations extends JerseyTest {
     // Test mock throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(modelDispatcher)
-        .listModelVersionsInfo(modelId);
+        .listModelVersionInfos(modelId);
     Response resp4 =
         target(modelPath())
             .path("model1")

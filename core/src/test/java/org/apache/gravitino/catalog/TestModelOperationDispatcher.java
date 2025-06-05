@@ -239,7 +239,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String[] aliases = new String[] {"alias1", "alias2"};
     modelOperationDispatcher.linkModelVersion(modelIdent, "path", aliases, "comment", props);
 
-    ModelVersion[] versions = modelOperationDispatcher.listModelVersionsInfo(modelIdent);
+    ModelVersion[] versions = modelOperationDispatcher.listModelVersionInfos(modelIdent);
     Assertions.assertEquals(1, versions.length);
     Assertions.assertEquals(0, versions[0].version());
     Assertions.assertEquals("path", versions[0].uri());

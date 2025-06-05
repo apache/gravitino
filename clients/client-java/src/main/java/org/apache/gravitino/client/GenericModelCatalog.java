@@ -42,8 +42,8 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
+import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
-import org.apache.gravitino.dto.responses.ModelVersionNumberListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
@@ -152,10 +152,10 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     checkModelNameIdentifier(ident);
 
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
-    ModelVersionNumberListResponse resp =
+    ModelVersionListResponse resp =
         restClient.get(
             formatModelVersionRequestPath(modelFullIdent) + "/versions",
-            ModelVersionNumberListResponse.class,
+            ModelVersionListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.modelErrorHandler());
     resp.validate();
@@ -164,15 +164,15 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
   }
 
   @Override
-  public ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException {
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
     checkModelNameIdentifier(ident);
 
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
-    ModelVersionListResponse resp =
+    ModelVersionInfoListResponse resp =
         restClient.get(
             formatModelVersionRequestPath(modelFullIdent) + "/versions",
             ImmutableMap.of("details", "true"),
-            ModelVersionListResponse.class,
+            ModelVersionInfoListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.modelErrorHandler());
     resp.validate();

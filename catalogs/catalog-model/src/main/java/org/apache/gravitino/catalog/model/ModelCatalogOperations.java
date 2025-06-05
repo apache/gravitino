@@ -188,7 +188,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException {
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
     NameIdentifierUtil.checkModel(ident);
     Namespace modelVersionNs = NamespaceUtil.toModelVersionNs(ident);
 
@@ -200,7 +200,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelException(e, "Model %s does not exist", ident);
     } catch (IOException ioe) {
-      throw new RuntimeException("Failed to list model versions for model " + ident, ioe);
+      throw new RuntimeException("Failed to list model version infos for model " + ident, ioe);
     }
   }
 

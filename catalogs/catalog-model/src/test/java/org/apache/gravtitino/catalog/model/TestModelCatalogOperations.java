@@ -585,7 +585,7 @@ public class TestModelCatalogOperations {
         modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
 
     // List linked model versions info
-    ModelVersion[] versions = ops.listModelVersionsInfo(modelIdent);
+    ModelVersion[] versions = ops.listModelVersionInfos(modelIdent);
     Assertions.assertEquals(1, versions.length);
     Assertions.assertEquals(0, versions[0].version());
     Assertions.assertEquals("version1 comment", versions[0].comment());
@@ -601,7 +601,7 @@ public class TestModelCatalogOperations {
         modelIdent, "model_version_path2", aliases2, "version2 comment", versionProperties2);
 
     // List linked model versions
-    ModelVersion[] versions2 = ops.listModelVersionsInfo(modelIdent);
+    ModelVersion[] versions2 = ops.listModelVersionInfos(modelIdent);
     Assertions.assertEquals(2, versions2.length);
     Assertions.assertEquals(0, versions2[0].version());
     Assertions.assertEquals("version1 comment", versions2[0].comment());
@@ -616,7 +616,7 @@ public class TestModelCatalogOperations {
     Assertions.assertThrows(
         NoSuchModelException.class,
         () ->
-            ops.listModelVersionsInfo(
+            ops.listModelVersionInfos(
                 NameIdentifierUtil.ofModel(
                     METALAKE_NAME, CATALOG_NAME, schemaName, "non-existent-model")));
 
@@ -624,7 +624,7 @@ public class TestModelCatalogOperations {
     Assertions.assertThrows(
         NoSuchModelException.class,
         () ->
-            ops.listModelVersionsInfo(
+            ops.listModelVersionInfos(
                 NameIdentifierUtil.ofModel(
                     METALAKE_NAME, CATALOG_NAME, "non-existent-schema", modelName)));
   }

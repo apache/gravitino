@@ -45,8 +45,8 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
+import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
-import org.apache.gravitino.dto.responses.ModelVersionNumberListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
@@ -274,7 +274,7 @@ public class TestGenericModelCatalog extends TestBase {
                 + "/versions");
 
     int[] expectedVersions = new int[] {0, 1, 2};
-    ModelVersionNumberListResponse resp = new ModelVersionNumberListResponse(expectedVersions);
+    ModelVersionListResponse resp = new ModelVersionListResponse(expectedVersions);
     buildMockResource(Method.GET, modelVersionPath, null, resp, HttpStatus.SC_OK);
 
     int[] versions = catalog.asModelCatalog().listModelVersions(modelId);
@@ -316,7 +316,7 @@ public class TestGenericModelCatalog extends TestBase {
       mockModelVersion(
           1, "uri", new String[] {"alias3", "alias4"}, "comment", Collections.emptyMap())
     };
-    ModelVersionListResponse resp = new ModelVersionListResponse(expectedVersions);
+    ModelVersionInfoListResponse resp = new ModelVersionInfoListResponse(expectedVersions);
     buildMockResource(
         Method.GET,
         modelVersionPath,
@@ -325,7 +325,7 @@ public class TestGenericModelCatalog extends TestBase {
         resp,
         HttpStatus.SC_OK);
 
-    ModelVersion[] versions = catalog.asModelCatalog().listModelVersionsInfo(modelId);
+    ModelVersion[] versions = catalog.asModelCatalog().listModelVersionInfos(modelId);
     Assertions.assertArrayEquals(expectedVersions, versions);
 
     // Throw model not found exception
@@ -341,7 +341,7 @@ public class TestGenericModelCatalog extends TestBase {
 
     Assertions.assertThrows(
         NoSuchModelException.class,
-        () -> catalog.asModelCatalog().listModelVersionsInfo(modelId),
+        () -> catalog.asModelCatalog().listModelVersionInfos(modelId),
         "model not found");
 
     // Throw RuntimeException
@@ -356,7 +356,7 @@ public class TestGenericModelCatalog extends TestBase {
 
     Assertions.assertThrows(
         RuntimeException.class,
-        () -> catalog.asModelCatalog().listModelVersionsInfo(modelId),
+        () -> catalog.asModelCatalog().listModelVersionInfos(modelId),
         "internal error");
   }
 

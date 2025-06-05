@@ -46,8 +46,8 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
+import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
-import org.apache.gravitino.dto.responses.ModelVersionNumberListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
@@ -216,15 +216,16 @@ public class ModelOperations {
           httpRequest,
           () -> {
             if (verbose) {
-              ModelVersion[] modelVersions = modelDispatcher.listModelVersionsInfo(modelId);
+              ModelVersion[] modelVersions = modelDispatcher.listModelVersionInfos(modelId);
               modelVersions = modelVersions == null ? new ModelVersion[0] : modelVersions;
               LOG.info("List {} versions of model {}", modelVersions.length, modelId);
-              return Utils.ok(new ModelVersionListResponse(DTOConverters.toDTOs(modelVersions)));
+              return Utils.ok(
+                  new ModelVersionInfoListResponse(DTOConverters.toDTOs(modelVersions)));
             } else {
               int[] versions = modelDispatcher.listModelVersions(modelId);
               versions = versions == null ? new int[0] : versions;
               LOG.info("List {} versions of model {}", versions.length, modelId);
-              return Utils.ok(new ModelVersionNumberListResponse(versions));
+              return Utils.ok(new ModelVersionListResponse(versions));
             }
           });
 

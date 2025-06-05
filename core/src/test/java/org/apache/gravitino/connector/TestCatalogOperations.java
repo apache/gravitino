@@ -797,7 +797,7 @@ public class TestCatalogOperations
   }
 
   @Override
-  public ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException {
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
     if (!models.containsKey(ident)) {
       throw new NoSuchModelException("Model %s does not exist", ident);
     }

@@ -421,33 +421,34 @@ public class TestResponses {
 
   @Test
   void testModelVersionNumberListResponse() throws JsonProcessingException {
-    ModelVersionNumberListResponse response1 = new ModelVersionNumberListResponse(new int[] {});
+    ModelVersionListResponse response1 = new ModelVersionListResponse(new int[] {});
     assertDoesNotThrow(response1::validate);
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(response1);
-    ModelVersionNumberListResponse deserResponse1 =
-        JsonUtils.objectMapper().readValue(serJson1, ModelVersionNumberListResponse.class);
+    ModelVersionListResponse deserResponse1 =
+        JsonUtils.objectMapper().readValue(serJson1, ModelVersionListResponse.class);
     assertEquals(response1, deserResponse1);
     assertArrayEquals(new int[] {}, deserResponse1.getVersions());
 
-    ModelVersionNumberListResponse response2 = new ModelVersionNumberListResponse(new int[] {1, 2});
+    ModelVersionListResponse response2 = new ModelVersionListResponse(new int[] {1, 2});
     assertDoesNotThrow(response2::validate);
 
     String serJson2 = JsonUtils.objectMapper().writeValueAsString(response2);
-    ModelVersionNumberListResponse deserResponse2 =
-        JsonUtils.objectMapper().readValue(serJson2, ModelVersionNumberListResponse.class);
+    ModelVersionListResponse deserResponse2 =
+        JsonUtils.objectMapper().readValue(serJson2, ModelVersionListResponse.class);
     assertEquals(response2, deserResponse2);
     assertArrayEquals(new int[] {1, 2}, deserResponse2.getVersions());
   }
 
   @Test
   void testModelVersionListResponse() throws JsonProcessingException {
-    ModelVersionListResponse response1 = new ModelVersionListResponse(new ModelVersionDTO[] {});
+    ModelVersionInfoListResponse response1 =
+        new ModelVersionInfoListResponse(new ModelVersionDTO[] {});
     assertDoesNotThrow(response1::validate);
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(response1);
-    ModelVersionListResponse deserResponse1 =
-        JsonUtils.objectMapper().readValue(serJson1, ModelVersionListResponse.class);
+    ModelVersionInfoListResponse deserResponse1 =
+        JsonUtils.objectMapper().readValue(serJson1, ModelVersionInfoListResponse.class);
     assertEquals(response1, deserResponse1);
     assertArrayEquals(new ModelVersionDTO[] {}, deserResponse1.getVersions());
 
@@ -472,13 +473,13 @@ public class TestResponses {
                 AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build())
             .build();
 
-    ModelVersionListResponse response2 =
-        new ModelVersionListResponse(new ModelVersionDTO[] {v1, v2});
+    ModelVersionInfoListResponse response2 =
+        new ModelVersionInfoListResponse(new ModelVersionDTO[] {v1, v2});
     assertDoesNotThrow(response2::validate);
 
     String serJson2 = JsonUtils.objectMapper().writeValueAsString(response2);
-    ModelVersionListResponse deserResponse2 =
-        JsonUtils.objectMapper().readValue(serJson2, ModelVersionListResponse.class);
+    ModelVersionInfoListResponse deserResponse2 =
+        JsonUtils.objectMapper().readValue(serJson2, ModelVersionInfoListResponse.class);
     assertEquals(response2, deserResponse2);
     assertArrayEquals(new ModelVersionDTO[] {v1, v2}, deserResponse2.getVersions());
   }

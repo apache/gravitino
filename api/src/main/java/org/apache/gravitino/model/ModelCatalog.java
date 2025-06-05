@@ -144,7 +144,7 @@ public interface ModelCatalog {
    * @return An array of version information of the model.
    * @throws NoSuchModelException If the model does not exist.
    */
-  ModelVersion[] listModelVersionsInfo(NameIdentifier ident) throws NoSuchModelException;
+  ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException;
 
   /**
    * Get a model version by the {@link NameIdentifier} and version number from the catalog.
