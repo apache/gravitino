@@ -25,7 +25,7 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
 
-/** Represents a response for a list of model versions. */
+/** Represents a response for a list of model version infos. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -35,16 +35,16 @@ public class ModelVersionInfoListResponse extends BaseResponse {
   private ModelVersionDTO[] versions;
 
   /**
-   * Constructor for ModelVersionListResponse.
+   * Constructor for ModelVersionInfoListResponse.
    *
-   * @param versions The list of model versions.
+   * @param versions The list of model version infos.
    */
   public ModelVersionInfoListResponse(ModelVersionDTO[] versions) {
     super(0);
     this.versions = versions;
   }
 
-  /** Default constructor for ModelVersionListResponse. (Used for Jackson deserialization.) */
+  /** Default constructor for ModelVersionInfoListResponse. (Used for Jackson deserialization.) */
   public ModelVersionInfoListResponse() {
     super();
     this.versions = null;
@@ -53,6 +53,6 @@ public class ModelVersionInfoListResponse extends BaseResponse {
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
-    Preconditions.checkArgument(versions != null, "versions cannot be null");
+    Preconditions.checkArgument(versions != null, "version infos cannot be null");
   }
 }

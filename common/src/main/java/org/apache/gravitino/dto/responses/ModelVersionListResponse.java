@@ -24,7 +24,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-/** Represents a response for a list of model version numbers. */
+/** Represents a response for a list of model versions. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
@@ -43,7 +43,7 @@ public class ModelVersionListResponse extends BaseResponse {
     this.versions = versions;
   }
 
-  /** Default constructor for ModelVersionNumberListResponse. (Used for Jackson deserialization.) */
+  /** Default constructor for ModelVersionListResponse. (Used for Jackson deserialization.) */
   public ModelVersionListResponse() {
     super();
     this.versions = null;
