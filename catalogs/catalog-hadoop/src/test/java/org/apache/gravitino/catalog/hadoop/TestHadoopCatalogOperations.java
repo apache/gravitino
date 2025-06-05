@@ -984,20 +984,20 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFilesWithNonExistentPath() throws IOException {
-    stubSchema(32L);
-    String schemaName = "schema32";
-    String comment = "comment32";
-    String filesetName = "fileset32";
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    final long testId = 32L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String filesetName = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+    final String nonExistentSubPath = "/non_existent_file.txt";
 
+    stubSchema(testId);
     createSchema(schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
-      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
-
-      String nonExistentSubPath = "/non_existent_file.txt";
       IllegalArgumentException ex =
           Assertions.assertThrows(
               IllegalArgumentException.class,
