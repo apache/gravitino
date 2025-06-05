@@ -219,18 +219,19 @@ paths:
       operationId: listFilesetFiles
       description: List metadata of files and directories in a fileset
       parameters:
-        - name: subPath
+        - name: sub_path
           in: query
           required: false
           schema:
             type: string
             default: "/"
           description: The sub path within the fileset to list files and directories from
-        - name: locationName
+        - name: location_name
           in: query
           required: false
           schema:
             type: string
+            default: "default"
           description: The name of the storage location
       responses:
         "200":
@@ -308,7 +309,7 @@ components:
           description: The last modification time of the file/directory
         path:
           type: string
-          description: The full path of the file/directory
+          description: The gvfs path of the file/directory
 
     FilesetCreateRequest:
       type: object
