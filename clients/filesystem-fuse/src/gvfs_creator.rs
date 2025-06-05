@@ -126,9 +126,9 @@ pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
         return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
     }
 
-    let catalog = split[1].to_string();
-    let schema = split[2].to_string();
-    let fileset = split[3].to_string();
+    let catalog = split[0].to_string();
+    let schema = split[1].to_string();
+    let fileset = split[2].to_string();
     Ok((catalog, schema, fileset))
 }
 
