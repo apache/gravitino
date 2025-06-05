@@ -1066,35 +1066,37 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testAlterFilesetProperties() throws IOException {
-    stubSchema(25L);
-    String schemaName = "schema25";
-    String comment = "comment25";
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    createSchema(schemaName, comment, null, schemaPath);
+    final long testId = 25L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String filesetName = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    String name = "fileset25";
-    Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
+    stubSchema(testId);
+    createSchema(schemaName, comment, null, schemaPath);
+    Fileset fileset =
+        createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.setProperty("k1", "v1");
     FilesetChange change2 = FilesetChange.removeProperty("k1");
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
-      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
-      Assertions.assertEquals(name, fileset1.name());
+      Assertions.assertEquals(filesetName, fileset1.name());
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
-      Assertions.assertEquals("comment25", fileset1.comment());
+      Assertions.assertEquals(comment, fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
       Map<String, String> props1 = fileset1.properties();
       Assertions.assertTrue(props1.containsKey("k1"));
       Assertions.assertEquals("v1", props1.get("k1"));
 
       Fileset fileset2 = ops.alterFileset(filesetIdent, change2);
-      Assertions.assertEquals(name, fileset2.name());
+      Assertions.assertEquals(filesetName, fileset2.name());
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset2.type());
-      Assertions.assertEquals("comment25", fileset2.comment());
+      Assertions.assertEquals(comment, fileset2.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset2.storageLocation());
       Map<String, String> props2 = fileset2.properties();
       Assertions.assertFalse(props2.containsKey("k1"));
