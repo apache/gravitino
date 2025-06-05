@@ -883,12 +883,17 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesets() throws IOException {
-    stubSchema(23L);
-    String schemaName = "schema23";
-    String comment = "comment23";
+    final long testId = 23L;
+    String schemaName = "schema" + testId;
+    String comment = "comment" + testId;
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+
+    stubSchema(testId);
     createSchema(schemaName, comment, null, schemaPath);
-    String[] filesets = new String[] {"fileset23_1", "fileset23_2", "fileset23_3"};
+
+    String[] filesets = {
+      "fileset" + testId + "_1", "fileset" + testId + "_2", "fileset" + testId + "_3"
+    };
     for (String fileset : filesets) {
       createFileset(fileset, schemaName, comment, Fileset.Type.MANAGED, null, null);
     }
