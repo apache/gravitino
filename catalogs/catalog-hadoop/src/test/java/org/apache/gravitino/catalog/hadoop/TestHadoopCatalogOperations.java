@@ -839,17 +839,20 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testCreateFilesetWithExceptions() throws IOException {
-    String schemaName = "schema22";
-    String comment = "comment22";
+    final long testId = 22L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String filesetName = "fileset" + testId;
+
     createSchema(schemaName, comment, null, null);
-    String name = "fileset22";
-    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
     // If neither catalog location, nor schema location and storageLocation is specified.
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null));
+            () ->
+                createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null));
     Assertions.assertEquals(
         "Storage location must be set for fileset "
             + filesetIdent
@@ -861,14 +864,17 @@ public class TestHadoopCatalogOperations {
       Throwable e =
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
-      Assertions.assertEquals("Fileset m1.c1.schema22.fileset22 does not exist", e.getMessage());
+      Assertions.assertEquals(
+          "Fileset m1.c1.schema" + testId + ".fileset" + testId + " does not exist",
+          e.getMessage());
     }
 
     // For external fileset, if storageLocation is not specified.
     Throwable exception1 =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> createFileset(name, schemaName, comment, Fileset.Type.EXTERNAL, null, null));
+            () ->
+                createFileset(filesetName, schemaName, comment, Fileset.Type.EXTERNAL, null, null));
     Assertions.assertEquals(
         "Storage location must be set for external fileset " + filesetIdent,
         exception1.getMessage());
