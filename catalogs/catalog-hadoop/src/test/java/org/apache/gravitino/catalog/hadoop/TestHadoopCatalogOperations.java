@@ -1198,22 +1198,24 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testRemoveFilesetComment() throws IOException {
-    stubSchema(27L);
-    String schemaName = "schema27";
-    String comment = "comment27";
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    createSchema(schemaName, comment, null, schemaPath);
+    final long testId = 27L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String filesetName = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    String name = "fileset27";
-    Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
+    stubSchema(testId);
+    createSchema(schemaName, comment, null, schemaPath);
+    Fileset fileset =
+        createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.updateComment(null);
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
-      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
-      Assertions.assertEquals(name, fileset1.name());
+      Assertions.assertEquals(filesetName, fileset1.name());
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
       Assertions.assertNull(fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
