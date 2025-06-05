@@ -53,9 +53,6 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-
-import java.util.Collections;
-
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -383,13 +380,15 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testCreateSchemaWithEmptyCatalogLocation() throws IOException {
-    String name = "schema28";
-    String comment = "comment28";
-    String catalogPath = "";
+    final long testId = 28L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String catalogPath = "";
 
     Throwable exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class, () -> createSchema(name, comment, catalogPath, null));
+            IllegalArgumentException.class,
+            () -> createSchema(schemaName, comment, catalogPath, null));
     Assertions.assertEquals(
         "The value of the catalog property "
             + HadoopCatalogPropertiesMetadata.LOCATION
