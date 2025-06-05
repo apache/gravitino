@@ -215,7 +215,7 @@ paths:
     get:
       tags:
         - fileset
-      summary: List metadata of files and directories in a fileset
+      summary: List files
       operationId: listFilesetFiles
       description: List metadata of files and directories in a fileset
       parameters:
