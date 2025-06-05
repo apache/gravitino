@@ -1174,16 +1174,17 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testUpdateFilesetComment() throws IOException {
-    stubSchema(26L);
-    String schemaName = "schema26";
-    String comment = "comment26";
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    createSchema(schemaName, comment, null, schemaPath);
+    final long testId = 26L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String name = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    String name = "fileset26";
+    stubSchema(testId);
+    createSchema(schemaName, comment, null, schemaPath);
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
-    FilesetChange change1 = FilesetChange.updateComment("comment26_new");
+    FilesetChange change1 = FilesetChange.updateComment(comment + "_new");
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
@@ -1191,7 +1192,7 @@ public class TestHadoopCatalogOperations {
       Fileset fileset1 = ops.alterFileset(filesetIdent, change1);
       Assertions.assertEquals(name, fileset1.name());
       Assertions.assertEquals(Fileset.Type.MANAGED, fileset1.type());
-      Assertions.assertEquals("comment26_new", fileset1.comment());
+      Assertions.assertEquals(comment + "_new", fileset1.comment());
       Assertions.assertEquals(fileset.storageLocation(), fileset1.storageLocation());
     }
   }
