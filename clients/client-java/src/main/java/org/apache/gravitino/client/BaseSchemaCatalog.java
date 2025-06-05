@@ -82,17 +82,21 @@ abstract class BaseSchemaCatalog extends CatalogDTO
         catalogNamespace != null && catalogNamespace.length() == 1,
         "Catalog namespace must be non-null and have 1 level, the input namespace is %s",
         catalogNamespace);
+
     this.catalogNamespace = catalogNamespace;
+    String namespaceName = catalogNamespace.level(0);
+    Namespace.check(namespaceName != null && !namespaceName.isEmpty(),
+            "Catalog namespace level 0 must not be empty");
 
     MetadataObject metadataObject =
         MetadataObjects.of(null, this.name(), MetadataObject.Type.CATALOG);
     this.objectTagOperations =
-        new MetadataObjectTagOperations(catalogNamespace.level(0), metadataObject, restClient);
+        new MetadataObjectTagOperations(namespaceName, metadataObject, restClient);
     this.objectRoleOperations =
-        new MetadataObjectRoleOperations(catalogNamespace.level(0), metadataObject, restClient);
+        new MetadataObjectRoleOperations(namespaceName, metadataObject, restClient);
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(
-            catalogNamespace.level(0), metadataObject, restClient);
+                namespaceName, metadataObject, restClient);
   }
 
   @Override
