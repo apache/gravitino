@@ -60,6 +60,7 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.apache.httpcomponents", "org.apache.gravitino.gcp.shaded.org.apache.httpcomponents")
   relocate("org.checkerframework", "org.apache.gravitino.gcp.shaded.org.checkerframework")
   relocate("org.eclipse.jetty", "org.apache.gravitino.gcp.shaded.org.eclipse.jetty")
+
   mergeServiceFiles()
 }
 

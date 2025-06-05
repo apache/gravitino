@@ -90,6 +90,8 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.checkerframework", "org.apache.gravitino.aliyun.shaded.org.checkerframework")
   relocate("org.jacoco.agent.rt", "org.apache.gravitino.aliyun.shaded.org.jacoco.agent.rt")
   relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
+
+  mergeServiceFiles()
 }
 
 tasks.jar {

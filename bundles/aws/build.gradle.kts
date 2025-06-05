@@ -76,6 +76,8 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
   relocate("org.wildfly.openssl", "org.apache.gravitino.aws.shaded.org.wildfly.openssl")
   relocate("software.amazon", "org.apache.gravitino.aws.shaded.software.amazon")
+
+  mergeServiceFiles()
 }
 
 tasks.jar {

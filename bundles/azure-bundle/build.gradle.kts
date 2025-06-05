@@ -59,6 +59,7 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.objectweb.asm", "org.apache.gravitino.azure.shaded.org.objectweb.asm")
   relocate("org.reactivestreams", "org.apache.gravitino.azure.shaded.org.reactivestreams")
   relocate("reactor", "org.apache.gravitino.azure.shaded.reactor")
+
   mergeServiceFiles()
 }
 
