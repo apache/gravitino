@@ -23,7 +23,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.info.ModelVersionInfo;
 
 /** Represents an event that is generated after a model version listing operation. */
-public class ListModelVersionsInfoEvent extends ModelEvent {
+public class ListModelVersionInfosEvent extends ModelEvent {
   private final ModelVersionInfo[] versions;
 
   /**
@@ -34,7 +34,7 @@ public class ListModelVersionsInfoEvent extends ModelEvent {
    * @param identifier The unique identifier of the model whose versions were listed.
    * @param versions The versions of the model.
    */
-  public ListModelVersionsInfoEvent(
+  public ListModelVersionInfosEvent(
       String user, NameIdentifier identifier, ModelVersionInfo[] versions) {
     super(user, identifier);
 
@@ -57,6 +57,6 @@ public class ListModelVersionsInfoEvent extends ModelEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_MODEL_VERSIONS_INFO;
+    return OperationType.LIST_MODEL_VERSION_INFOS;
   }
 }

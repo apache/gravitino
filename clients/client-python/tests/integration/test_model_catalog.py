@@ -626,7 +626,7 @@ class TestModelCatalog(IntegrationTestEnv):
                 NameIdentifier.of(self._schema_name, "non_existent_model")
             )
 
-    def test_link_list_model_versions_info(self):
+    def test_link_list_model_version_infos(self):
         model_name = "model_it_model" + str(randint(0, 1000))
         model_ident = NameIdentifier.of(self._schema_name, model_name)
         self._catalog.as_model_catalog().register_model(model_ident, "comment", {})
@@ -639,7 +639,7 @@ class TestModelCatalog(IntegrationTestEnv):
             properties={"k1": "v1", "k2": "v2"},
         )
 
-        model_versions = self._catalog.as_model_catalog().list_model_versions_info(
+        model_versions = self._catalog.as_model_catalog().list_model_version_infos(
             model_ident
         )
         self.assertEqual(1, len(model_versions))
@@ -652,13 +652,13 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertTrue(
             self._catalog.as_model_catalog().delete_model_version(model_ident, 0)
         )
-        model_versions = self._catalog.as_model_catalog().list_model_versions_info(
+        model_versions = self._catalog.as_model_catalog().list_model_version_infos(
             model_ident
         )
         self.assertEqual(0, len(model_versions))
 
         with self.assertRaises(NoSuchModelException):
-            self._catalog.as_model_catalog().list_model_versions_info(
+            self._catalog.as_model_catalog().list_model_version_infos(
                 NameIdentifier.of(self._schema_name, "non_existent_model")
             )
 

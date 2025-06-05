@@ -724,7 +724,7 @@ public class TestModelEvent {
   }
 
   @Test
-  void testListModelVersionsEventWithInfo() {
+  void testListModelVersionInfosEvent() {
     dispatcher.listModelVersionInfos(existingIdentA);
 
     // validate pre-event
@@ -738,14 +738,14 @@ public class TestModelEvent {
 
     // validate post-event
     Event postEvent = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(ListModelVersionsInfoEvent.class, postEvent.getClass());
-    Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS_INFO, postEvent.operationType());
+    Assertions.assertEquals(ListModelVersionInfosEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSION_INFOS, postEvent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
 
-    ListModelVersionsInfoEvent listModelVersionsInfoEvent = (ListModelVersionsInfoEvent) postEvent;
-    Assertions.assertEquals(existingIdentA, listModelVersionsInfoEvent.identifier());
-    Assertions.assertEquals(1, listModelVersionsInfoEvent.versions().length);
-    checkModelVersionInfo(listModelVersionsInfoEvent.versions()[0], firstModelVersion);
+    ListModelVersionInfosEvent listModelVersionInfosEvent = (ListModelVersionInfosEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, listModelVersionInfosEvent.identifier());
+    Assertions.assertEquals(1, listModelVersionInfosEvent.versions().length);
+    checkModelVersionInfo(listModelVersionInfosEvent.versions()[0], firstModelVersion);
   }
 
   @Test

@@ -473,7 +473,7 @@ public class TestModelOperations extends JerseyTest {
   }
 
   @Test
-  public void testListModelVersionsInfo() {
+  public void testListModelVersionInfos() {
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, "model1");
     ModelVersion[] expected =
         new ModelVersion[] {

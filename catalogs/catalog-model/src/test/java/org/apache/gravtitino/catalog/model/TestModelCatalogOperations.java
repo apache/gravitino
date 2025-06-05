@@ -563,7 +563,7 @@ public class TestModelCatalogOperations {
   }
 
   @Test
-  public void testLinkAndListModelVersionsInfo() {
+  public void testLinkAndListModelVersionInfos() {
     // Create schema and model
     String schemaName = randomSchemaName();
     createSchema(schemaName);

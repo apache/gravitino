@@ -420,7 +420,7 @@ public class TestResponses {
   }
 
   @Test
-  void testModelVersionNumberListResponse() throws JsonProcessingException {
+  void testModelVersionListResponse() throws JsonProcessingException {
     ModelVersionListResponse response1 = new ModelVersionListResponse(new int[] {});
     assertDoesNotThrow(response1::validate);
 
@@ -441,7 +441,7 @@ public class TestResponses {
   }
 
   @Test
-  void testModelVersionListResponse() throws JsonProcessingException {
+  void testModelVersionInfoListResponse() throws JsonProcessingException {
     ModelVersionInfoListResponse response1 =
         new ModelVersionInfoListResponse(new ModelVersionDTO[] {});
     assertDoesNotThrow(response1::validate);

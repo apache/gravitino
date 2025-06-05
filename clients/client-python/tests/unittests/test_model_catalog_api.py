@@ -263,7 +263,7 @@ class TestModelCatalogApi(unittest.TestCase):
             model_versions = catalog.as_model_catalog().list_model_versions(model_ident)
             self.assertEqual([], model_versions)
 
-    def test_list_model_versions_info(self, *mock_method):
+    def test_list_model_version_infos(self, *mock_method):
         gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=self._metalake_name
         )
@@ -291,7 +291,7 @@ class TestModelCatalogApi(unittest.TestCase):
             "gravitino.utils.http_client.HTTPClient.get",
             return_value=mock_resp,
         ):
-            model_versions = catalog.as_model_catalog().list_model_versions_info(
+            model_versions = catalog.as_model_catalog().list_model_version_infos(
                 model_ident
             )
             self.assertEqual(len(model_versions), 1)
@@ -307,7 +307,7 @@ class TestModelCatalogApi(unittest.TestCase):
             "gravitino.utils.http_client.HTTPClient.get",
             return_value=mock_resp_1,
         ):
-            model_versions = catalog.as_model_catalog().list_model_versions_info(
+            model_versions = catalog.as_model_catalog().list_model_version_infos(
                 model_ident
             )
             self.assertEqual([], model_versions)

@@ -223,7 +223,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testLinkAndListModelVersionInfo() {
+  public void testLinkAndListModelVersionInfos() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
     schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);

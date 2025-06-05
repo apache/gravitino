@@ -222,7 +222,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         return model_version_list_resp.versions()
 
-    def list_model_versions_info(
+    def list_model_version_infos(
         self, model_ident: NameIdentifier
     ) -> List[ModelVersion]:
         """List all the versions with their information of the register model by NameIdentifier in the catalog.

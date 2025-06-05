@@ -331,7 +331,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
-  public void testLinkAndListModelVersionsInfo() {
+  public void testLinkAndListModelVersionInfos() {
     String modelName = RandomNameUtils.genRandomName("model1");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
     gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);

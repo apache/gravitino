@@ -265,7 +265,7 @@ public class TestGenericModelCatalog extends TestBase {
   }
 
   @Test
-  public void testListModelVersionsNumber() throws JsonProcessingException {
+  public void testListModelVersions() throws JsonProcessingException {
     NameIdentifier modelId = NameIdentifier.of("schema1", "model1");
     String modelVersionPath =
         withSlash(
@@ -302,7 +302,7 @@ public class TestGenericModelCatalog extends TestBase {
   }
 
   @Test
-  public void testListModelVersions() throws JsonProcessingException {
+  public void testListModelVersionInfos() throws JsonProcessingException {
     NameIdentifier modelId = NameIdentifier.of("schema1", "model1");
     String modelVersionPath =
         withSlash(
