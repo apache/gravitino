@@ -1405,17 +1405,19 @@ public class TestHadoopCatalogOperations {
   @Test
   public void testLocationPlaceholdersWithException() throws IOException {
     // test empty placeholder value
-    String schemaName = "schema24";
-    createSchema(schemaName, null, null, null);
-    String name = "fileset24";
+    final long testId = 24L;
+    final String schemaName = "schema" + testId;
+    final String filesetName = "fileset" + testId;
     String storageLocation = TEST_ROOT_PATH + "/{{fileset}}/{{user}}/{{id}}";
+
+    createSchema(schemaName, null, null, null);
 
     Exception exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () ->
                 createFileset(
-                    name,
+                    filesetName,
                     schemaName,
                     "comment",
                     Fileset.Type.MANAGED,
@@ -1431,7 +1433,7 @@ public class TestHadoopCatalogOperations {
             IllegalArgumentException.class,
             () ->
                 createFileset(
-                    name,
+                    filesetName,
                     schemaName,
                     "comment",
                     Fileset.Type.MANAGED,
