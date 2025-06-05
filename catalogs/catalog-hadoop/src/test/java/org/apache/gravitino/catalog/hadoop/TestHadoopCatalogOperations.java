@@ -908,18 +908,19 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFiles() throws IOException {
-    stubSchema(30L);
-    String schemaName = "schema30";
-    String comment = "comment30";
-    String filesetName = "fileset30";
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    final long testId = 30L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String filesetName = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
+    stubSchema(testId);
     createSchema(schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
-      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
       Path testDir = new Path(schemaPath + "/" + filesetName);
       FileSystem fs = testDir.getFileSystem(new Configuration());
