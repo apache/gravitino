@@ -53,6 +53,9 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+
+import java.util.Collections;
+
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -955,22 +958,21 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFilesWithFSOpsDisabled() throws Exception {
-    stubSchema(31L);
-    String schemaName = "schema31";
-    String comment = "comment31";
-    String filesetName = "fileset31";
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    final long testId = 31L;
+    final String schemaName = "schema" + testId;
+    final String comment = "comment" + testId;
+    final String filesetName = "fileset" + testId;
+    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
+    stubSchema(testId);
     createSchema(schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
-    Map<String, String> catalogProps = Maps.newHashMap();
-    catalogProps.put(DISABLE_FILESYSTEM_OPS, "true");
+    Map<String, String> catalogProps = Collections.singletonMap(DISABLE_FILESYSTEM_OPS, "true");
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
-      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
-
       UnsupportedOperationException ex =
           Assertions.assertThrows(
               UnsupportedOperationException.class,
