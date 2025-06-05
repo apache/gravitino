@@ -111,6 +111,10 @@ pub(crate) async fn create_fs_with_fileset(
 }
 
 pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
+    let mut path = path;
+    if path.ends_with('/') {
+        path = &path[0..path.len() - 1];
+    }
     let path = parse_location(path)?;
 
     if path.scheme() != GRAVITINO_FILESET_SCHEMA {
@@ -122,7 +126,7 @@ pub fn extract_fileset(path: &str) -> GvfsResult<(String, String, String)> {
         return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
     }
     let split = split.unwrap().collect::<Vec<&str>>();
-    if split.len() != 4 {
+    if split.len() != 3 {
         return Err(InvalidConfig.to_error(format!("Invalid fileset path: {}", path)));
     }
 
