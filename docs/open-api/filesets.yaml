@@ -498,7 +498,7 @@ components:
                 type: integer
                 format: int32
                 description: Status code of the response
-                enum: [0]
+                enum: 0
               files:
                 type: array
                 items:
@@ -564,14 +564,14 @@ components:
             "isDir": false,
             "size": 5,
             "lastModified": 1748875070123,
-            "path": "/file.txt"
+            "path": "/fileset/catalog1/schema1/fileset1/file.txt"
           },
           {
             "name": "sub_dir",
             "isDir": true,
             "size": 0,
             "lastModified": 1748875070124,
-            "path": "/sub_dir"
+            "path": "/fileset/catalog1/schema1/fileset1/sub_dir"
           }
         ]
       }
