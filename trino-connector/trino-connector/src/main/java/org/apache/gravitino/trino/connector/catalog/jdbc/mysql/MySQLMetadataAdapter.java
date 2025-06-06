@@ -36,6 +36,13 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   private final PropertyConverter tableConverter;
 
+  /**
+   * Constructs a new MySQLMetadataAdapter.
+   *
+   * @param schemaProperties The list of schema property metadata
+   * @param tableProperties The list of table property metadata
+   * @param columnProperties The list of column property metadata
+   */
   public MySQLMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,

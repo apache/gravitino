@@ -23,6 +23,11 @@ import io.trino.spi.procedure.Procedure;
 /** Gravitino System stored procedure interfaces */
 public abstract class GravitinoStoredProcedure {
 
-  /** Return the definition of the stored procedure */
+  /**
+   * Return the definition of the stored procedure.
+   *
+   * @return the {@link Procedure} instance
+   * @throws Exception if creation of the procedure fails
+   */
   public abstract Procedure createStoredProcedure() throws Exception;
 }

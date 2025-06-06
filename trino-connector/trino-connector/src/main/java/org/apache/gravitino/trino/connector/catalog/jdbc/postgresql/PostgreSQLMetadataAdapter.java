@@ -25,6 +25,13 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 /** Transforming gravitino PostgreSQL metadata to Trino. */
 public class PostgreSQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
+  /**
+   * Constructs a new PostgreSQLMetadataAdapter.
+   *
+   * @param schemaProperties The list of schema property metadata
+   * @param tableProperties The list of table property metadata
+   * @param columnProperties The list of column property metadata
+   */
   public PostgreSQLMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,

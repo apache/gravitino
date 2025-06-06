@@ -38,10 +38,20 @@ import java.lang.reflect.Method;
 public final class BlockJsonSerde {
   private static final String BLOCK_SERDE_UTIL_CLASS_NAME = "io.trino.block.BlockSerdeUtil";
 
+  /**
+   * Jackson serializer for Trino {@link Block} objects. Serializes block instances using Trino's
+   * internal BlockSerdeUtil via reflection.
+   */
   public static class Serializer extends JsonSerializer<Block> {
     private final BlockEncodingSerde blockEncodingSerde;
     private final Method writeBlock;
 
+    /**
+     * Constructs a serializer for {@link Block} using the specified encoding serde.
+     *
+     * @param blockEncodingSerde the encoding serde used to serialize blocks
+     * @throws Exception if the internal writeBlock method cannot be resolved via reflection
+     */
     public Serializer(BlockEncodingSerde blockEncodingSerde) throws Exception {
       this.blockEncodingSerde = blockEncodingSerde;
       Class<?> clazz =
@@ -76,10 +86,20 @@ public final class BlockJsonSerde {
     }
   }
 
+  /**
+   * Jackson deserializer for Trino {@link Block} objects. Deserializes block data using Trino's
+   * internal BlockSerdeUtil via reflection.
+   */
   public static class Deserializer extends JsonDeserializer<Block> {
     private final BlockEncodingSerde blockEncodingSerde;
     private final Method readBlock;
 
+    /**
+     * Constructs a deserializer for {@link Block} using the specified encoding serde.
+     *
+     * @param blockEncodingSerde the encoding serde used to deserialize blocks
+     * @throws Exception if the internal readBlock method cannot be resolved via reflection
+     */
     public Deserializer(BlockEncodingSerde blockEncodingSerde) throws Exception {
       this.blockEncodingSerde = blockEncodingSerde;
       Class<?> clazz =

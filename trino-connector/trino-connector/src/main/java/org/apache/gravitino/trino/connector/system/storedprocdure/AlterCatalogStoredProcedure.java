@@ -45,12 +45,23 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Stored procedure implementation for altering an existing catalog in Gravitino.
+ *
+ * <p>This procedure allows setting and removing catalog properties dynamically.
+ */
 public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
   private static final Logger LOG = LoggerFactory.getLogger(AlterCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
 
+  /**
+   * Constructs a new AlterCatalogStoredProcedure.
+   *
+   * @param catalogConnectorManager the catalog connector manager
+   * @param metalake the metalake name
+   */
   public AlterCatalogStoredProcedure(
       CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
@@ -82,6 +93,14 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
         GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME, "alter_catalog", arguments, dropCatalog);
   }
 
+  /**
+   * Alters the specified catalog by setting or removing properties.
+   *
+   * @param catalogName the name of the catalog to alter
+   * @param setProperties the properties to set
+   * @param removeProperties the properties to remove
+   * @throws TrinoException if the catalog does not exist or the operation fails
+   */
   public void alterCatalog(
       String catalogName, Map<String, String> setProperties, List<String> removeProperties) {
     try {

@@ -108,6 +108,14 @@ public class CatalogRegister {
     }
   }
 
+  /**
+   * Initializes the catalog register with the specified Trino connector context and Gravitino
+   * configuration.
+   *
+   * @param context the Trino connector context
+   * @param config the Gravitino configuration
+   * @throws Exception if the catalog register fails to initialize
+   */
   public void init(ConnectorContext context, GravitinoConfig config) throws Exception {
     this.config = config;
     checkTrinoSpiVersion(context);
@@ -153,6 +161,12 @@ public class CatalogRegister {
     return String.format("DROP CATALOG %s", name);
   }
 
+  /**
+   * Registers a new catalog with the specified name and Gravitino catalog.
+   *
+   * @param name the name of the catalog
+   * @param catalog the Gravitino catalog
+   */
   public void registerCatalog(String name, GravitinoCatalog catalog) {
     try {
       String catalogFileName = String.format("%s/%s.properties", catalogStoreDirectory, name);
@@ -242,6 +256,11 @@ public class CatalogRegister {
     }
   }
 
+  /**
+   * Unregisters a catalog with the specified name.
+   *
+   * @param name the name of the catalog
+   */
   public void unregisterCatalog(String name) {
     try {
       if (!checkCatalogExist(name)) {
@@ -258,6 +277,7 @@ public class CatalogRegister {
     }
   }
 
+  /** Closes the catalog register. */
   public void close() {
     try {
       if (connection != null) {

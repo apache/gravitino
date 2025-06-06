@@ -26,6 +26,13 @@ import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 /** Support Trino memory connector for testing. */
 public class MemoryMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
+  /**
+   * Constructs a new MemoryMetadataAdapter.
+   *
+   * @param schemaProperties the list of schema property metadata
+   * @param tableProperties the list of table property metadata
+   * @param columnProperties the list of column property metadata
+   */
   public MemoryMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,

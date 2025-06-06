@@ -26,8 +26,13 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 
+/**
+ * Defines and manages property metadata for memory tables in the Trino connector. This class
+ * provides property definitions specific to memory-based tables.
+ */
 public class MemoryPropertyMeta implements HasPropertyMeta {
 
+  /** List of supported property metadata for memory tables. */
   public static final List<PropertyMetadata<?>> MEMORY_TABLE_PROPERTY =
       ImmutableList.of(integerProperty("max_ttl", "Max ttl days for the table.", 10, false));
 

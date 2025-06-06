@@ -48,6 +48,13 @@ public class GravitinoConnector implements Connector {
   private final NameIdentifier catalogIdentifier;
   private final CatalogConnectorContext catalogConnectorContext;
 
+  /**
+   * Constructs a new GravitinoConnector with the specified catalog identifier and catalog connector
+   * context.
+   *
+   * @param catalogIdentifier the catalog identifier
+   * @param catalogConnectorContext the catalog connector context
+   */
   public GravitinoConnector(
       NameIdentifier catalogIdentifier, CatalogConnectorContext catalogConnectorContext) {
     this.catalogIdentifier = catalogIdentifier;
