@@ -47,14 +47,14 @@ public class AuthenticationConfig extends Config {
       new ConfigBuilder(AUTH_TYPE_KEY)
           .doc(
               "The type of authentication for Hudi catalog, currently we only support simple and Kerberos")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("simple");
 
   public static final ConfigEntry<Boolean> ENABLE_IMPERSONATION_ENTRY =
       new ConfigBuilder(IMPERSONATION_ENABLE_KEY)
           .doc("Whether to enable impersonation for the Hudi catalog")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(KERBEROS_DEFAULT_IMPERSONATION_ENABLE);
 
