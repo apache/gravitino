@@ -291,7 +291,10 @@ public class RelationalEntityStore
 
           List<E> EntitiesFromDb =
               backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
-          cache.put(nameIdentifier, identType, relType, EntitiesFromDb);
+
+          if (!EntitiesFromDb.isEmpty()) {
+            cache.put(nameIdentifier, identType, relType, EntitiesFromDb);
+          }
 
           return EntitiesFromDb;
         });
