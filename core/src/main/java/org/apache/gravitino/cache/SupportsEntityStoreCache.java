@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cache;
 
-import java.io.IOException;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -30,19 +29,6 @@ import org.apache.gravitino.NameIdentifier;
  * loading, storing, and invalidating individual metadata entities.
  */
 public interface SupportsEntityStoreCache {
-  /**
-   * Retrieves an entity by its name identifier and type. If the entity is not present in the cache,
-   * it will be loaded from the backing EntityStore.
-   *
-   * @param ident The name identifier of the entity
-   * @param type The type of the entity
-   * @return The cached or newly loaded Entity instance
-   * @param <E> The class of the entity
-   * @throws IOException if the operation fails
-   */
-  <E extends Entity & HasIdentifier> E getOrLoad(NameIdentifier ident, Entity.EntityType type)
-      throws IOException;
-
   /**
    * Retrieves an entity from the cache if it exists. Will not attempt to load from the store if
    * missing.

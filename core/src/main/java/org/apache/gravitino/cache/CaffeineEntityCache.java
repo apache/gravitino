@@ -44,7 +44,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -80,14 +79,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * store.
    *
    * @param cacheConfig The cache configuration
-   * @param entityStore The entity store to load entities from the database
    * @return The instance of {@link CaffeineEntityCache}
    */
-  public static CaffeineEntityCache getInstance(Config cacheConfig, EntityStore entityStore) {
+  public static CaffeineEntityCache getInstance(Config cacheConfig) {
     if (INSTANCE == null) {
       synchronized (CaffeineEntityCache.class) {
         if (INSTANCE == null) {
-          INSTANCE = new CaffeineEntityCache(cacheConfig, entityStore);
+          INSTANCE = new CaffeineEntityCache(cacheConfig);
         }
       }
     }
@@ -98,10 +96,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * Constructs a new {@link CaffeineEntityCache}.
    *
    * @param cacheConfig the cache configuration
-   * @param entityStore The entity store to load entities from the database
    */
-  private CaffeineEntityCache(Config cacheConfig, EntityStore entityStore) {
-    super(cacheConfig, entityStore);
+  private CaffeineEntityCache(Config cacheConfig) {
+    super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     ThreadPoolExecutor cleanupExec = buildCleanupExecutor();
@@ -132,58 +129,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
       this.scheduler = Executors.newSingleThreadScheduledExecutor();
       startCacheStatsMonitor();
     }
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> getOrLoad(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
-      throws IOException {
-    checkArguments(ident, type, relType);
-
-    // Executes a thread-safe operation: attempts to load the entity from the cache,
-    // falls back to the underlying store if not present, and updates the cache.
-    // If an error occurs during loading, the exception will be propagated.
-    return withLockAndThrow(
-        () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type, relType);
-          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-
-          if (entitiesFromCache != null) {
-            return convertEntity(entitiesFromCache);
-          }
-
-          List<E> entities = entityStore.listEntitiesByRelation(relType, ident, type);
-          syncEntitiesToCache(
-              entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
-
-          return entities;
-        });
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> E getOrLoad(
-      NameIdentifier ident, Entity.EntityType type) throws IOException {
-    checkArguments(ident, type);
-
-    // Executes a thread-safe operation: attempts to load the entity from the cache,
-    // falls back to the underlying store if not present, and updates the cache.
-    // If an error occurs during loading, the exception will be propagated.
-    return withLockAndThrow(
-        () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
-          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-
-          if (entitiesFromCache != null) {
-            return convertEntity(entitiesFromCache.get(0));
-          }
-
-          E entityFromStore = entityStore.get(ident, type, getEntityClass(type));
-          syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entityFromStore));
-
-          return entityFromStore;
-        });
   }
 
   /** {@inheritDoc} */

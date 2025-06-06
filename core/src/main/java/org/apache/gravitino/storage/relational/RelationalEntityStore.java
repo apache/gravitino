@@ -23,6 +23,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -34,6 +35,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
@@ -54,12 +57,26 @@ public class RelationalEntityStore
           Configs.DEFAULT_ENTITY_RELATIONAL_STORE, JDBCBackend.class.getCanonicalName());
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
+  private EntityCache cache;
+  private boolean cacheEnabled;
+
+  /**
+   * Return whether the cache is enabled or not.
+   *
+   * @return {@code true} if cache is enable, otherwise {@code false}
+   */
+  public boolean cacheEnabled() {
+    return cacheEnabled;
+  }
 
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
+    // TODO USE SPI to load the cache
+    this.cache = CaffeineEntityCache.getInstance(config);
+    this.cacheEnabled = config.get(Configs.CACHE_ENABLED);
   }
 
   private static RelationalBackend createRelationalEntityBackend(Config config) {
@@ -83,46 +100,119 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
-    return backend.list(namespace, entityType, false);
+    if (!cacheEnabled) {
+      return backend.list(namespace, entityType, false);
+    }
+
+    return cache.withCacheLock(
+        () -> {
+          List<E> entities = backend.list(namespace, entityType, false);
+          entities.forEach(cache::put);
+
+          return entities;
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
       throws IOException {
-    return backend.list(namespace, entityType, allFields);
+    if (!cacheEnabled) {
+      return backend.list(namespace, entityType, allFields);
+    }
+
+    return cache.withCacheLock(
+        () -> {
+          List<E> entities = backend.list(namespace, entityType, allFields);
+          entities.forEach(cache::put);
+
+          return entities;
+        });
   }
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    return backend.exists(ident, entityType);
+    if (!cacheEnabled) {
+      return backend.exists(ident, entityType);
+    }
+
+    return cache.withCacheLock(
+        () -> {
+          if (cache.contains(ident, entityType)) {
+            return true;
+          }
+
+          return backend.exists(ident, entityType);
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    backend.insert(e, overwritten);
+    if (!cacheEnabled) {
+      backend.insert(e, overwritten);
+      return;
+    }
+
+    cache.withCacheLock(
+        () -> {
+          backend.insert(e, overwritten);
+          cache.put(e);
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return backend.update(ident, entityType, updater);
+    if (!cacheEnabled) {
+      return backend.update(ident, entityType, updater);
+    }
+
+    return cache.withCacheLock(
+        () -> {
+          cache.invalidate(ident, entityType);
+          E updatedEntity = backend.update(ident, entityType, updater);
+          cache.put(updatedEntity);
+
+          return updatedEntity;
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    return backend.get(ident, entityType);
+    if (!cacheEnabled) {
+      return backend.get(ident, entityType);
+    }
+
+    return cache.withCacheLock(
+        () -> {
+          Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
+          if (entityFromCache.isPresent()) {
+            return entityFromCache.get();
+          }
+
+          E entity = backend.get(ident, entityType);
+          cache.put(entity);
+          return entity;
+        });
   }
 
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
     try {
-      return backend.delete(ident, entityType, cascade);
+      if (!cacheEnabled) {
+        return backend.delete(ident, entityType, cascade);
+      }
+
+      return cache.withCacheLock(
+          () -> {
+            cache.invalidate(ident, entityType);
+            return backend.delete(ident, entityType, cascade);
+          });
     } catch (NoSuchEntityException nse) {
       return false;
     }
@@ -137,6 +227,7 @@ public class RelationalEntityStore
   public void close() throws IOException {
     garbageCollector.close();
     backend.close();
+    cache.clear();
   }
 
   @Override
@@ -184,7 +275,23 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+    if (!cacheEnabled) {
+      return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+    }
+
+    return cache.withCacheLock(
+        () -> {
+          Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
+          if (entities.isPresent()) {
+            return entities.get();
+          }
+
+          List<E> EntitiesFromDb =
+              backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+          cache.put(nameIdentifier, identType, relType, EntitiesFromDb);
+
+          return EntitiesFromDb;
+        });
   }
 
   @Override
@@ -196,6 +303,14 @@ public class RelationalEntityStore
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
-    backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, true);
+    if (!cacheEnabled) {
+      backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, true);
+      return;
+    }
+    cache.withCacheLock(
+        () -> {
+          cache.invalidate(srcIdentifier, srcType, relType);
+          backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, true);
+        });
   }
 }
