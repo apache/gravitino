@@ -157,6 +157,9 @@ public class RelationalEntityStore
     cache.withCacheLock(
         () -> {
           backend.insert(e, overwritten);
+          if (e.type() == Entity.EntityType.MODEL) {
+            return;
+          }
           cache.put(e);
         });
   }
@@ -304,13 +307,12 @@ public class RelationalEntityStore
       boolean override)
       throws IOException {
     if (!cacheEnabled) {
-      backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, true);
+      backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
       return;
     }
     cache.withCacheLock(
         () -> {
-          cache.invalidate(srcIdentifier, srcType, relType);
-          backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, true);
+          backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
         });
   }
 }
