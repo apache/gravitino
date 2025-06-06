@@ -1640,6 +1640,51 @@ public class TestHadoopCatalogOperations {
                       null));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
 
+      // empty location in catalog location
+      Map<String, String> illegalLocations2 =
+          new HashMap<String, String>() {
+            {
+              put(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "v1", null);
+            }
+          };
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.initialize(
+                      illegalLocations2,
+                      randomCatalogInfo("m1", "c1"),
+                      HADOOP_PROPERTIES_METADATA));
+      Assertions.assertEquals(
+          "Location value must not be blank for location name: v1", exception.getMessage());
+
+      // empty location in schema location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationSchema(
+                      "s1", "comment", ImmutableMap.of(), ImmutableMap.of("location", "")));
+      Assertions.assertEquals(
+          "The value of the schema property location must not be blank", exception.getMessage());
+
+      // empty fileset storage location
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of("location1", ""),
+                      null));
+      Assertions.assertEquals(
+          "Storage location must not be blank for location name: location1",
+          exception.getMessage());
+
       // storage location is parent of schema location
       Schema multipLocationSchema =
           createMultiLocationSchema(

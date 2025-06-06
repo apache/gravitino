@@ -38,7 +38,7 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final ConfigEntry<String> PRINCIPAL_ENTRY =
       new ConfigBuilder(PRINCIPAL_KEY)
           .doc("The principal of the Kerberos connection")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -46,7 +46,7 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final ConfigEntry<String> KEYTAB_ENTRY =
       new ConfigBuilder(KEY_TAB_URI_KEY)
           .doc("The keytab of the Kerberos connection")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
@@ -54,7 +54,7 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final ConfigEntry<Integer> CHECK_INTERVAL_SEC_ENTRY =
       new ConfigBuilder(CHECK_INTERVAL_SEC_KEY)
           .doc("The check interval of the Kerberos connection for Hudi catalog")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
@@ -62,7 +62,7 @@ public class KerberosConfig extends AuthenticationConfig {
   public static final ConfigEntry<Integer> FETCH_TIMEOUT_SEC_ENTRY =
       new ConfigBuilder(FETCH_TIMEOUT_SEC_KEY)
           .doc("The fetch timeout of the Kerberos connection")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);

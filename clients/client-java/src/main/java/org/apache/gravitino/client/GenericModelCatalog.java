@@ -347,7 +347,8 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
   private void checkModelNamespace(Namespace namespace) {
     Namespace.check(
         namespace != null && namespace.length() == 1,
-        "Model namespace must be non-null and only have 1 level, the input namespace is ");
+        "Model namespace must be non-null and only have 1 level, the input namespace is %s",
+        namespace);
   }
 
   private void checkModelNameIdentifier(NameIdentifier ident) {

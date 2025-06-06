@@ -348,7 +348,7 @@ public class Configs {
   public static final ConfigEntry<Boolean> CACHE_ENABLED =
       new ConfigBuilder("gravitino.cache.enabled")
           .doc("Whether to enable cache store.")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(true);
 
@@ -356,7 +356,7 @@ public class Configs {
   public static final ConfigEntry<Integer> CACHE_MAX_ENTRIES =
       new ConfigBuilder("gravitino.cache.maxEntries")
           .doc("Maximum number of entries allowed in the cache.")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10_000);
@@ -366,7 +366,7 @@ public class Configs {
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
           .doc(
               "Time in milliseconds after which a cache entry expires. Default is 3,600,000 ms (1 hour).")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .longConf()
           .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(3_600_000L);
@@ -376,7 +376,7 @@ public class Configs {
       new ConfigBuilder("gravitino.cache.enableStats")
           .doc(
               "Whether to enable cache statistics logging such as hit/miss count, load failures, and size.")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(false);
 
@@ -386,7 +386,7 @@ public class Configs {
           .doc(
               "Whether to enable weighted cache eviction. "
                   + "Entries are evicted based on weight instead of count.")
-          .version(ConfigConstants.VERSION_0_10_0)
+          .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(true);
 }
