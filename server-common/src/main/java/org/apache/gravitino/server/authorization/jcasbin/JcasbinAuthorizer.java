@@ -104,7 +104,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private boolean authorizeInternal(
       Principal principal, String metalake, MetadataObject metadataObject, String privilege) {
     String username = principal.getName();
-    return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
+    try {
+      return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
+    } catch (IOException e) {
+      LOG.error(
+          "Failed to authorize user {} on {} with privilege {}: {}",
+          username,
+          metadataObject,
+          privilege,
+          e.getMessage(),
+          e);
+      throw new RuntimeException("Authorization check failed", e);
+    }
   }
 
   private static Long getMetalakeId(String metalake) {
@@ -122,8 +133,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
-  private boolean authorizeByJcasbin(Long userId, MetadataObject metadataObject, String privilege) {
-    Long metadataId = MetadataIdConverter.doConvert(metadataObject);
+  private boolean authorizeByJcasbin(
+      Long userId, MetadataObject metadataObject, String privilege, String metalake)
+      throws IOException {
+    Long metadataId = MetadataIdConverter.doConvert(metadataObject, metalake);
     return enforcer.enforce(
         String.valueOf(userId),
         String.valueOf(metadataObject.type()),
@@ -132,11 +145,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private boolean loadPrivilegeAndAuthorize(
-      String username, String metalake, MetadataObject metadataObject, String privilege) {
+      String username, String metalake, MetadataObject metadataObject, String privilege)
+      throws IOException {
     Long metalakeId = getMetalakeId(metalake);
     Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
     loadPrivilege(metalake, username, userId);
-    return authorizeByJcasbin(userId, metadataObject, privilege);
+    return authorizeByJcasbin(userId, metadataObject, privilege, metalake);
   }
 
   private void loadPrivilege(String metalake, String username, Long userId) {
