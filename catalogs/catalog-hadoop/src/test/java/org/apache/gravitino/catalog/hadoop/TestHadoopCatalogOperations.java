@@ -1009,16 +1009,12 @@ public class TestHadoopCatalogOperations {
   @Test
   public void testListFilesetFilesWithNonExistentPath() throws IOException {
     final long testId = 32L;
-    final String schemaName = "schema" + testId;
-    final String comment = "comment" + testId;
-    final String filesetName = "fileset" + testId;
-    final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
     final String nonExistentSubPath = "/non_existent_file.txt";
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
-    createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
+    Schema schema = createSchema(testId);
+    Fileset fileset = createFileset(testId);
+    final NameIdentifier filesetIdent =
+        NameIdentifier.of("m1", "c1", schema.name(), fileset.name());
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
@@ -2764,6 +2760,18 @@ public class TestHadoopCatalogOperations {
     return createSchema(name, comment, catalogPath, schemaPath, false);
   }
 
+  private Schema createSchema(long testId) throws IOException {
+    String schemaName = "schema" + testId;
+    doReturn(new SchemaIds(1L, 1L, testId))
+        .when(spySchemaMetaService)
+        .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+            Mockito.anyString(), Mockito.anyString(), Mockito.eq(schemaName));
+    String comment = "comment" + testId;
+    String catalogPath = null;
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    return createSchema(schemaName, comment, catalogPath, schemaPath);
+  }
+
   private Schema createSchema(
       String name, String comment, String catalogPath, String schemaPath, boolean disableFsOps)
       throws IOException {
@@ -2839,6 +2847,16 @@ public class TestHadoopCatalogOperations {
       String storageLocation)
       throws IOException {
     return createFileset(name, schemaName, comment, type, catalogPath, storageLocation, false);
+  }
+
+  private Fileset createFileset(long testId) throws IOException {
+    String name = "fileset" + testId;
+    String schemaName = "schema" + testId;
+    String comment = "comment" + testId;
+    Fileset.Type type = Fileset.Type.MANAGED;
+    String catalogPath = null;
+    String storageLocation = null;
+    return createFileset(name, schemaName, comment, type, catalogPath, storageLocation);
   }
 
   private Fileset createFileset(
