@@ -34,11 +34,5 @@ echo "Finish downloading"
 cp /tmp/conf/* ${GRAVITINO_HOME}/conf
 cp /tmp/conf/log4j2.properties ${GRAVITINO_HOME}/conf
 
-{{- if .Values.log.containerStdout }}
-# Redirect log files to container stdout and stderr
-ln -sf /dev/stdout ${GRAVITINO_HOME}/logs/gravitino_audit.log
-ln -sf /dev/stdout ${GRAVITINO_HOME}/logs/gravitino-server.log
-ln -sf /dev/stderr ${GRAVITINO_HOME}/logs/gravitino-server.out
-{{- end }}
 echo "Start the Gravitino Server"
-/bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh start
+/bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh run
