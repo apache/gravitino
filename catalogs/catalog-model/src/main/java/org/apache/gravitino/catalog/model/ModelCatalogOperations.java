@@ -188,6 +188,23 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    NameIdentifierUtil.checkModel(ident);
+    Namespace modelVersionNs = NamespaceUtil.toModelVersionNs(ident);
+
+    try {
+      List<ModelVersionEntity> versions =
+          store.list(modelVersionNs, ModelVersionEntity.class, Entity.EntityType.MODEL_VERSION);
+      return versions.stream().map(this::toModelVersionImpl).toArray(ModelVersion[]::new);
+
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchModelException(e, "Model %s does not exist", ident);
+    } catch (IOException ioe) {
+      throw new RuntimeException("Failed to list model version infos for model " + ident, ioe);
+    }
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     NameIdentifierUtil.checkModel(ident);

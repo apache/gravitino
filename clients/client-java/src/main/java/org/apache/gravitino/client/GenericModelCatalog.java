@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -41,6 +42,7 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
+import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
@@ -154,6 +156,23 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
         restClient.get(
             formatModelVersionRequestPath(modelFullIdent) + "/versions",
             ModelVersionListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.modelErrorHandler());
+    resp.validate();
+
+    return resp.getVersions();
+  }
+
+  @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    checkModelNameIdentifier(ident);
+
+    NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
+    ModelVersionInfoListResponse resp =
+        restClient.get(
+            formatModelVersionRequestPath(modelFullIdent) + "/versions",
+            ImmutableMap.of("details", "true"),
+            ModelVersionInfoListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.modelErrorHandler());
     resp.validate();
