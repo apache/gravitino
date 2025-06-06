@@ -2008,7 +2008,7 @@ public class TestEntityStorage {
             .withNamespace(model1.namespace())
             .withName(model1.name())
             .withComment(model1.comment())
-            .withLatestVersion(model1.latestVersion() + 1)
+            .withLatestVersion(model1.latestVersion())
             .withProperties(model1.properties())
             .withAuditInfo(model1.auditInfo())
             .build();
@@ -2088,7 +2088,7 @@ public class TestEntityStorage {
             .withNamespace(model1.namespace())
             .withName(model1.name())
             .withComment(model1.comment())
-            .withLatestVersion(model1.latestVersion() + 1)
+            .withLatestVersion(model1.latestVersion())
             .withProperties(model1.properties())
             .withAuditInfo(model1.auditInfo())
             .build();
@@ -2106,7 +2106,7 @@ public class TestEntityStorage {
             .withNamespace(model1InSchema2.namespace())
             .withName(model1InSchema2.name())
             .withComment(model1InSchema2.comment())
-            .withLatestVersion(model1InSchema2.latestVersion() + 1)
+            .withLatestVersion(model1InSchema2.latestVersion())
             .withProperties(model1InSchema2.properties())
             .withAuditInfo(model1InSchema2.auditInfo())
             .build();

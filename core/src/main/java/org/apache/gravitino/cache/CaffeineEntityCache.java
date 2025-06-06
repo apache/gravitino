@@ -23,7 +23,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
@@ -58,7 +57,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_MONITOR_PERIOD_MINUTES = 5;
   private static final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
-  private static volatile CaffeineEntityCache INSTANCE;
   private final ReentrantLock opLock = new ReentrantLock();
 
   /** Cache part */
@@ -69,35 +67,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   private ScheduledExecutorService scheduler;
 
-  @VisibleForTesting
-  static void resetForTest() {
-    INSTANCE = null;
-  }
-
-  /**
-   * Returns the instance of {@link CaffeineEntityCache} based on the cache configuration and entity
-   * store.
-   *
-   * @param cacheConfig The cache configuration
-   * @return The instance of {@link CaffeineEntityCache}
-   */
-  public static CaffeineEntityCache getInstance(Config cacheConfig) {
-    if (INSTANCE == null) {
-      synchronized (CaffeineEntityCache.class) {
-        if (INSTANCE == null) {
-          INSTANCE = new CaffeineEntityCache(cacheConfig);
-        }
-      }
-    }
-    return INSTANCE;
-  }
-
   /**
    * Constructs a new {@link CaffeineEntityCache}.
    *
    * @param cacheConfig the cache configuration
    */
-  private CaffeineEntityCache(Config cacheConfig) {
+  public CaffeineEntityCache(Config cacheConfig) {
     super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 

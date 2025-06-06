@@ -88,7 +88,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testPutAllTypeInCache() {
-    CaffeineEntityCache.resetForTest();
+
     initCache();
 
     BaseMetalake testMetalake = TestUtil.getTestMetalake();
@@ -180,7 +180,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testGetIfPresent() {
-    CaffeineEntityCache.resetForTest();
+
     initCache();
 
     cache.put(entity1);
@@ -210,7 +210,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testContains() {
-    CaffeineEntityCache.resetForTest();
+
     initCache();
 
     cache.put(entity1);
@@ -228,7 +228,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testSize() {
-    CaffeineEntityCache.resetForTest();
+
     initCache();
 
     cache.put(entity1);
@@ -240,7 +240,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testClear() {
-    CaffeineEntityCache.resetForTest();
+
     initCache();
 
     cache.put(entity1);
@@ -287,7 +287,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testInvalidateMetalake() {
-    CaffeineEntityCache.resetForTest();
+
     initCache();
 
     cache.put(entity1);
@@ -340,7 +340,7 @@ public class TestCaffeineEntityCache {
   // TODO Add other tests for cache
 
   private void initCache(Config config) {
-    real = CaffeineEntityCache.getInstance(config);
+    real = new CaffeineEntityCache(config);
     cache = spy(real);
   }
 
