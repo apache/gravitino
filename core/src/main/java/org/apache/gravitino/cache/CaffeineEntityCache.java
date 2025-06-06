@@ -137,7 +137,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> List<E> getOrLoad(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields)
       throws IOException {
     checkArguments(ident, type, relType);
 
@@ -153,7 +156,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             return convertEntity(entitiesFromCache);
           }
 
-          List<E> entities = entityStore.listEntitiesByRelation(relType, ident, type);
+          List<E> entities = listEntitiesByRelation(relType, ident, type, allFields);
           syncEntitiesToCache(
               entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
 
@@ -179,7 +182,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             return convertEntity(entitiesFromCache.get(0));
           }
 
-          E entityFromStore = entityStore.get(ident, type, getEntityClass(type));
+          E entityFromStore = loadEntity(ident, type);
           syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entityFromStore));
 
           return entityFromStore;
@@ -257,7 +260,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
 
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null);
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null;
   }
 
   /** {@inheritDoc} */
@@ -265,7 +268,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null);
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null;
   }
 
   /** {@inheritDoc} */

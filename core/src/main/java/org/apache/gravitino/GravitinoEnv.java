@@ -25,6 +25,8 @@ import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.provider.CacheFactory;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -134,6 +136,7 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
+  private EntityCache entityCache;
 
   protected GravitinoEnv() {}
 
@@ -364,6 +367,15 @@ public class GravitinoEnv {
     return eventListenerManager;
   }
 
+  /**
+   * Return the entity cache instance.
+   *
+   * @return The {@link EntityCache} instance.
+   */
+  public EntityCache entityCache() {
+    return entityCache;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -425,8 +437,30 @@ public class GravitinoEnv {
   }
 
   private void initGravitinoServerComponents() {
-    // Initialize EntityStore
+    // Initialize the base EntityStore from configuration.
     this.entityStore = EntityStoreFactory.createEntityStore(config);
+
+    // Initialize the EntityCache.
+    // The cache can work independently without the EntityStore, allowing users to operate purely
+    // in-memory
+    // (e.g., in testing scenarios or when persistence is not needed).
+    if (config.get(Configs.CACHE_ENABLED)) {
+      this.entityCache = CacheFactory.getEntityCache(config, entityStore);
+    } else {
+      this.entityCache = CacheFactory.getEntityCache(config);
+    }
+
+    // Wrap the base EntityStore with a CachedEntityStore.
+    // If the cache is enabled, we inject the actual cache instance.
+    // If not, pass null to indicate no caching, and CachedEntityStore will delegate all operations
+    // directly to the underlying store.
+    // TODO
+    //    this.entityStore =
+    //        new CachedEntityStore(entityStore, config.get(Configs.CACHE_ENABLED) ? entityCache :
+    // null);
+
+    // Initialize the EntityStore (which may now be a CachedEntityStore).
+    // This will trigger initialization of all layers in the storage stack.
     entityStore.initialize(config);
 
     // create and initialize a random id generator
