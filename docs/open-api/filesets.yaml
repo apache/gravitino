@@ -498,7 +498,7 @@ components:
                 type: integer
                 format: int32
                 description: Status code of the response
-                enum: 0
+                enum: [0]
               files:
                 type: array
                 items:
