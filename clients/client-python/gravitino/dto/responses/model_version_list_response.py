@@ -50,7 +50,7 @@ class ModelVersionListResponse(BaseResponse):
 class ModelVersionInfoListResponse(BaseResponse):
     """Represents a response for a list of model versions with their information."""
 
-    _versions: List[ModelVersionDTO] = field(metadata=config(field_name="versions"))
+    _versions: List[ModelVersionDTO] = field(metadata=config(field_name="infos"))
 
     def versions(self) -> List[ModelVersionDTO]:
         return self._versions
