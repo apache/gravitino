@@ -317,6 +317,7 @@ public class RelationalEntityStore
     }
     cache.withCacheLock(
         () -> {
+          cache.invalidate(srcIdentifier, srcType, relType);
           backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
         });
   }

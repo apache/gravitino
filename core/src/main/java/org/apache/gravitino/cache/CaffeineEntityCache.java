@@ -144,15 +144,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
 
-    return withLock(
-        () -> {
-          boolean existed = contains(ident, type, relType);
-          if (existed) {
-            invalidateEntities(ident);
-          }
-
-          return existed;
-        });
+    return withLock(() -> invalidateEntities(ident));
   }
 
   /** {@inheritDoc} */
@@ -160,15 +152,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    return withLock(
-        () -> {
-          boolean existed = contains(ident, type);
-          if (existed) {
-            invalidateEntities(ident);
-          }
-
-          return existed;
-        });
+    return withLock(() -> invalidateEntities(ident));
   }
 
   /** {@inheritDoc} */
@@ -322,12 +306,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
    *
    * @param identifier The identifier of the entity to invalidate
    */
-  private void invalidateEntities(NameIdentifier identifier) {
-    Iterable<EntityCacheKey> entityKeysToRemove =
-        cacheIndex.getValuesForKeysStartingWith(identifier.toString());
+  private boolean invalidateEntities(NameIdentifier identifier) {
+    List<EntityCacheKey> entityKeysToRemove =
+        Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
 
     cacheData.invalidateAll(entityKeysToRemove);
     entityKeysToRemove.forEach(key -> cacheIndex.remove(key.toString()));
+
+    return !entityKeysToRemove.isEmpty();
   }
 
   /**
