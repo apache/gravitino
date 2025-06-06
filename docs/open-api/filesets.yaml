@@ -231,7 +231,7 @@ paths:
           required: false
           schema:
             type: string
-            default: "default"
+            default: null
           description: The name of the storage location
       responses:
         "200":
