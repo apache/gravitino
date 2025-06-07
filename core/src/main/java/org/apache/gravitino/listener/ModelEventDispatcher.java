@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -53,6 +54,7 @@ import org.apache.gravitino.listener.api.event.ListModelEvent;
 import org.apache.gravitino.listener.api.event.ListModelFailureEvent;
 import org.apache.gravitino.listener.api.event.ListModelPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionFailureEvent;
+import org.apache.gravitino.listener.api.event.ListModelVersionInfosEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionsEvent;
 import org.apache.gravitino.listener.api.event.RegisterAndLinkModelEvent;
@@ -359,6 +361,24 @@ public class ModelEventDispatcher implements ModelDispatcher {
       int[] versions = dispatcher.listModelVersions(ident);
       eventBus.dispatchEvent(new ListModelVersionsEvent(user, ident, versions));
       return versions;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListModelVersionFailureEvent(user, ident, e));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListModelVersionPreEvent(user, ident));
+    try {
+      ModelVersion[] modelVersions = dispatcher.listModelVersionInfos(ident);
+      ModelVersionInfo[] modelVersionInfos =
+          Arrays.stream(modelVersions).map(ModelVersionInfo::new).toArray(ModelVersionInfo[]::new);
+      eventBus.dispatchEvent(new ListModelVersionInfosEvent(user, ident, modelVersionInfos));
+      return modelVersions;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListModelVersionFailureEvent(user, ident, e));
       throw e;

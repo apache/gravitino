@@ -724,6 +724,31 @@ public class TestModelEvent {
   }
 
   @Test
+  void testListModelVersionInfosEvent() {
+    dispatcher.listModelVersionInfos(existingIdentA);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(ListModelVersionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    ListModelVersionPreEvent listModelVersionsPreEvent = (ListModelVersionPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, listModelVersionsPreEvent.identifier());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListModelVersionInfosEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSION_INFOS, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    ListModelVersionInfosEvent listModelVersionInfosEvent = (ListModelVersionInfosEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, listModelVersionInfosEvent.identifier());
+    Assertions.assertEquals(1, listModelVersionInfosEvent.versions().length);
+    checkModelVersionInfo(listModelVersionInfosEvent.versions()[0], firstModelVersion);
+  }
+
+  @Test
   void testListModelVersionsFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listModelVersions(existingIdentA));
@@ -980,6 +1005,9 @@ public class TestModelEvent {
     when(dispatcher.deleteModelVersion(existingIdentA, 3)).thenReturn(false);
 
     when(dispatcher.listModelVersions(existingIdentA)).thenReturn(new int[] {1, 2});
+    when(dispatcher.listModelVersionInfos(existingIdentA))
+        .thenReturn(new ModelVersion[] {firstModelVersion});
+
     when(dispatcher.alterModel(existingIdentA, new ModelChange[] {modelRenameChange}))
         .thenReturn(alterNameModel);
 

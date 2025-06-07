@@ -563,6 +563,73 @@ public class TestModelCatalogOperations {
   }
 
   @Test
+  public void testLinkAndListModelVersionInfos() {
+    // Create schema and model
+    String schemaName = randomSchemaName();
+    createSchema(schemaName);
+
+    String modelName = "model1";
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, modelName);
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
+
+    ops.registerModel(modelIdent, "model1 comment", properties);
+
+    // Create a model version
+    StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
+
+    String[] aliases = new String[] {"alias1", "alias2"};
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
+
+    // List linked model versions info
+    ModelVersion[] versions = ops.listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(1, versions.length);
+    Assertions.assertEquals(0, versions[0].version());
+    Assertions.assertEquals("version1 comment", versions[0].comment());
+    Assertions.assertEquals("model_version_path", versions[0].uri());
+    Assertions.assertEquals(versionProperties, versions[0].properties());
+
+    // Create another model version
+    StringIdentifier versionId2 = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> versionProperties2 = StringIdentifier.newPropertiesWithId(versionId2, null);
+
+    String[] aliases2 = new String[] {"alias3", "alias4"};
+    ops.linkModelVersion(
+        modelIdent, "model_version_path2", aliases2, "version2 comment", versionProperties2);
+
+    // List linked model versions
+    ModelVersion[] versions2 = ops.listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(2, versions2.length);
+    Assertions.assertEquals(0, versions2[0].version());
+    Assertions.assertEquals("version1 comment", versions2[0].comment());
+    Assertions.assertEquals("model_version_path", versions2[0].uri());
+    Assertions.assertEquals(versionProperties, versions2[0].properties());
+    Assertions.assertEquals(1, versions2[1].version());
+    Assertions.assertEquals("version2 comment", versions2[1].comment());
+    Assertions.assertEquals("model_version_path2", versions2[1].uri());
+    Assertions.assertEquals(versionProperties2, versions2[1].properties());
+
+    // Test list model versions in a non-existent model
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () ->
+            ops.listModelVersionInfos(
+                NameIdentifierUtil.ofModel(
+                    METALAKE_NAME, CATALOG_NAME, schemaName, "non-existent-model")));
+
+    // Test list model versions in a non-existent schema
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () ->
+            ops.listModelVersionInfos(
+                NameIdentifierUtil.ofModel(
+                    METALAKE_NAME, CATALOG_NAME, "non-existent-schema", modelName)));
+  }
+
+  @Test
   public void testDeleteModelVersion() {
     // Create schema and model
     String schemaName = randomSchemaName();

@@ -137,6 +137,16 @@ public interface ModelCatalog {
   int[] listModelVersions(NameIdentifier ident) throws NoSuchModelException;
 
   /**
+   * List all the versions with their information of the register model by {@link NameIdentifier} in
+   * the catalog.
+   *
+   * @param ident The name identifier of the model.
+   * @return An array of version information of the model.
+   * @throws NoSuchModelException If the model does not exist.
+   */
+  ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException;
+
+  /**
    * Get a model version by the {@link NameIdentifier} and version number from the catalog.
    *
    * @param ident The name identifier of the model.

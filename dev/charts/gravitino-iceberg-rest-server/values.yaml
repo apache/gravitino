@@ -142,12 +142,12 @@ log4j2Properties: {}
 
 ## Additional log4j2 configuration items in log4j2.properties can be added
 ##
-additionalLog4j2Properties: {}
-  # appender.console.type: Console
-  # appender.console.name: console
-  # appender.console.layout.type: PatternLayout
-  # appender.console.layout.pattern: "%d{HH:mm:ss.SSS} %level %msg%n"
-  # rootLogger.appenderRef.console.ref: console
+additionalLog4j2Properties:
+  appender.console.type: Console
+  appender.console.name: consoleLogger
+  appender.console.layout.type: PatternLayout
+  appender.console.layout.pattern: "%d{yyyy-MM-dd HH:mm:ss} %-5p [%t] %c{1}:%L - %m%n"
+  rootLogger.appenderRef.console.ref: consoleLogger
 
 ## Hadoop configuration items in hdfs-site.xml and core-site.xml can be customized
 coreSiteProperties: {}
