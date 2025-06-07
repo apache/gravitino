@@ -149,11 +149,13 @@ public interface PropertiesMetadata {
     if (!containsProperty(propertyName)) {
       throw new IllegalArgumentException("Property is not defined: " + propertyName);
     }
+
     return getNonPrefixEntry(propertyName).isPresent()
         ? getNonPrefixEntry(propertyName).get()
-        : getPropertyPrefixEntry(propertyName).get();
+        : (getPropertyPrefixEntry(propertyName).isPresent()
+            ? getPropertyPrefixEntry(propertyName).get()
+            : null);
   }
-
   /**
    * Get the property prefix entry of the property. If there are multiple property prefix entries
    * matching the property name, the longest prefix entry will be returned.
