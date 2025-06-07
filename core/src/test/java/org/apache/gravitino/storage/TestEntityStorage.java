@@ -55,6 +55,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -139,6 +140,13 @@ public class TestEntityStorage {
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    // Fix cache config for test
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);
+    Mockito.when(config.get(Configs.CACHE_MAX_ENTRIES)).thenReturn(10_000);
+    Mockito.when(config.get(Configs.CACHE_EXPIRATION_TIME)).thenReturn(3_600_000L);
+    Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
+    Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
+
     BaseIT baseIT = new BaseIT();
 
     try {
@@ -2000,7 +2008,7 @@ public class TestEntityStorage {
             .withNamespace(model1.namespace())
             .withName(model1.name())
             .withComment(model1.comment())
-            .withLatestVersion(model1.latestVersion() + 1)
+            .withLatestVersion(model1.latestVersion())
             .withProperties(model1.properties())
             .withAuditInfo(model1.auditInfo())
             .build();
@@ -2080,7 +2088,7 @@ public class TestEntityStorage {
             .withNamespace(model1.namespace())
             .withName(model1.name())
             .withComment(model1.comment())
-            .withLatestVersion(model1.latestVersion() + 1)
+            .withLatestVersion(model1.latestVersion())
             .withProperties(model1.properties())
             .withAuditInfo(model1.auditInfo())
             .build();
@@ -2098,7 +2106,7 @@ public class TestEntityStorage {
             .withNamespace(model1InSchema2.namespace())
             .withName(model1InSchema2.name())
             .withComment(model1InSchema2.comment())
-            .withLatestVersion(model1InSchema2.latestVersion() + 1)
+            .withLatestVersion(model1InSchema2.latestVersion())
             .withProperties(model1InSchema2.properties())
             .withAuditInfo(model1InSchema2.auditInfo())
             .build();

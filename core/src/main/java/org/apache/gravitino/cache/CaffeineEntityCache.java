@@ -23,7 +23,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
@@ -44,7 +43,6 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -59,7 +57,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_MONITOR_PERIOD_MINUTES = 5;
   private static final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
-  private static volatile CaffeineEntityCache INSTANCE;
   private final ReentrantLock opLock = new ReentrantLock();
 
   /** Cache part */
@@ -70,38 +67,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   private ScheduledExecutorService scheduler;
 
-  @VisibleForTesting
-  static void resetForTest() {
-    INSTANCE = null;
-  }
-
-  /**
-   * Returns the instance of {@link CaffeineEntityCache} based on the cache configuration and entity
-   * store.
-   *
-   * @param cacheConfig The cache configuration
-   * @param entityStore The entity store to load entities from the database
-   * @return The instance of {@link CaffeineEntityCache}
-   */
-  public static CaffeineEntityCache getInstance(Config cacheConfig, EntityStore entityStore) {
-    if (INSTANCE == null) {
-      synchronized (CaffeineEntityCache.class) {
-        if (INSTANCE == null) {
-          INSTANCE = new CaffeineEntityCache(cacheConfig, entityStore);
-        }
-      }
-    }
-    return INSTANCE;
-  }
-
   /**
    * Constructs a new {@link CaffeineEntityCache}.
    *
    * @param cacheConfig the cache configuration
-   * @param entityStore The entity store to load entities from the database
    */
-  private CaffeineEntityCache(Config cacheConfig, EntityStore entityStore) {
-    super(cacheConfig, entityStore);
+  public CaffeineEntityCache(Config cacheConfig) {
+    super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
     ThreadPoolExecutor cleanupExec = buildCleanupExecutor();
@@ -132,58 +104,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
       this.scheduler = Executors.newSingleThreadScheduledExecutor();
       startCacheStatsMonitor();
     }
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> getOrLoad(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
-      throws IOException {
-    checkArguments(ident, type, relType);
-
-    // Executes a thread-safe operation: attempts to load the entity from the cache,
-    // falls back to the underlying store if not present, and updates the cache.
-    // If an error occurs during loading, the exception will be propagated.
-    return withLockAndThrow(
-        () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type, relType);
-          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-
-          if (entitiesFromCache != null) {
-            return convertEntity(entitiesFromCache);
-          }
-
-          List<E> entities = entityStore.listEntitiesByRelation(relType, ident, type);
-          syncEntitiesToCache(
-              entityCacheKey, entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
-
-          return entities;
-        });
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public <E extends Entity & HasIdentifier> E getOrLoad(
-      NameIdentifier ident, Entity.EntityType type) throws IOException {
-    checkArguments(ident, type);
-
-    // Executes a thread-safe operation: attempts to load the entity from the cache,
-    // falls back to the underlying store if not present, and updates the cache.
-    // If an error occurs during loading, the exception will be propagated.
-    return withLockAndThrow(
-        () -> {
-          EntityCacheKey entityCacheKey = EntityCacheKey.of(ident, type);
-          List<Entity> entitiesFromCache = cacheData.getIfPresent(entityCacheKey);
-
-          if (entitiesFromCache != null) {
-            return convertEntity(entitiesFromCache.get(0));
-          }
-
-          E entityFromStore = entityStore.get(ident, type, getEntityClass(type));
-          syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entityFromStore));
-
-          return entityFromStore;
-        });
   }
 
   /** {@inheritDoc} */
@@ -224,15 +144,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
 
-    return withLock(
-        () -> {
-          boolean existed = contains(ident, type, relType);
-          if (existed) {
-            invalidateEntities(ident);
-          }
-
-          return existed;
-        });
+    return withLock(() -> invalidateEntities(ident));
   }
 
   /** {@inheritDoc} */
@@ -240,15 +152,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    return withLock(
-        () -> {
-          boolean existed = contains(ident, type);
-          if (existed) {
-            invalidateEntities(ident);
-          }
-
-          return existed;
-        });
+    return withLock(() -> invalidateEntities(ident));
   }
 
   /** {@inheritDoc} */
@@ -402,12 +306,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
    *
    * @param identifier The identifier of the entity to invalidate
    */
-  private void invalidateEntities(NameIdentifier identifier) {
-    Iterable<EntityCacheKey> entityKeysToRemove =
-        cacheIndex.getValuesForKeysStartingWith(identifier.toString());
+  private boolean invalidateEntities(NameIdentifier identifier) {
+    List<EntityCacheKey> entityKeysToRemove =
+        Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier.toString()));
 
     cacheData.invalidateAll(entityKeysToRemove);
     entityKeysToRemove.forEach(key -> cacheIndex.remove(key.toString()));
+
+    return !entityKeysToRemove.isEmpty();
   }
 
   /**
