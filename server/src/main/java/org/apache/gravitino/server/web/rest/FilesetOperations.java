@@ -199,8 +199,8 @@ public class FilesetOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       @PathParam("fileset") String fileset,
-      @QueryParam("subPath") @DefaultValue("/") String subPath,
-      @QueryParam("locationName") String locationName)
+      @QueryParam("sub_path") @DefaultValue("/") String subPath,
+      @QueryParam("location_name") String locationName)
       throws UnsupportedEncodingException {
     LOG.info(
         "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",

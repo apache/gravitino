@@ -196,10 +196,10 @@ public class HadoopCatalogIT extends BaseIT {
     }
 
     if (!StringUtils.isBlank(subPath)) {
-      uriBuilder.addParameter("subPath", subPath);
+      uriBuilder.addParameter("sub_path", subPath);
     }
     if (!StringUtils.isBlank(locationName)) {
-      uriBuilder.addParameter("locationName", locationName);
+      uriBuilder.addParameter("location_name", locationName);
     }
 
     HttpGet httpGet;

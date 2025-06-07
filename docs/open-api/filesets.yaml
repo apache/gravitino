@@ -205,6 +205,55 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/files:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+      - $ref: "./openapi.yaml#/components/parameters/fileset"
+
+    get:
+      tags:
+        - fileset
+      summary: List files
+      operationId: listFilesetFiles
+      description: List metadata of files and directories in a fileset
+      parameters:
+        - name: sub_path
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "/"
+          description: The sub path within the fileset to list files and directories from
+        - name: location_name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: null
+          description: The name of the storage location
+      responses:
+        "200":
+          $ref: "#/components/responses/FileInfoListResponse"
+        "404":
+          description: Not Found – the target fileset or subPath or locationName does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
+                NoSuchSchemaException:
+                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
+                NoSuchFilesetException:
+                  $ref: "#/components/examples/NoSuchFilesetException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
 
   schemas:
@@ -235,6 +284,33 @@ components:
           default: {}
           additionalProperties:
               type: string
+    FileInfo:
+      type: object
+      required:
+        - name
+        - isDir
+        - size
+        - lastModified
+        - path
+      properties:
+        name:
+          type: string
+          description: The name of the file/directory
+        isDir:
+          type: boolean
+          description: Whether this is a directory
+        size:
+          type: integer
+          format: int64
+          description: The file size in bytes (0 if directory)
+        lastModified:
+          type: integer
+          format: int64
+          description: The last modification time of the file/directory
+        path:
+          type: string
+          description: The gvfs path of the file/directory
+
     FilesetCreateRequest:
       type: object
       required:
@@ -411,6 +487,26 @@ components:
             FilesetResponse:
               $ref: "#/components/examples/FilesetResponse"
 
+    FileInfoListResponse:
+      description: The response containing a list of file/directory metadata
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum: [0]
+              files:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FileInfo"
+          examples:
+            FileInfoListResponse:
+              $ref: "#/components/examples/FileInfoListResponse"
+
     FileLocationResponse:
       description: The response of the file location object
       content:
@@ -457,6 +553,27 @@ components:
             "key2": "value2"
           }
         }
+      }
+
+    FileInfoListResponse:
+      value: {
+        "code": 0,
+        "files": [
+          {
+            "name": "file.txt",
+            "isDir": false,
+            "size": 5,
+            "lastModified": 1748875070123,
+            "path": "/fileset/catalog1/schema1/fileset1/file.txt"
+          },
+          {
+            "name": "sub_dir",
+            "isDir": true,
+            "size": 0,
+            "lastModified": 1748875070124,
+            "path": "/fileset/catalog1/schema1/fileset1/sub_dir"
+          }
+        ]
       }
 
     FileLocationResponse:
