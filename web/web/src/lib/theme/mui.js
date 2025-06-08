@@ -340,22 +340,28 @@ const createMuiTheme = (config = {}) => {
                 paddingLeft: theme.spacing(5),
                 paddingRight: theme.spacing(5),
                 '&.MuiButton-containedPrimary:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(primary.main, 0.4)}`
+                  boxShadow: `0 2px 4px 0 ${alpha(primary.main, 0.4)}`,
+                  backgroundColor:'yellow'
                 },
                 '&.MuiButton-containedSecondary:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(secondary.main, 0.4)}`
+                  boxShadow: `0 2px 4px 0 ${alpha(secondary.main, 0.4)}`,
+                  backgroundColor:'yellow'
                 },
                 '&.MuiButton-containedSuccess:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(success.main, 0.4)}`
+                  boxShadow: `0 2px 4px 0 ${alpha(success.main, 0.4)}`,
+                  backgroundColor:'yellow'
                 },
                 '&.MuiButton-containedError:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(error.main, 0.4)}`
+                  boxShadow: `0 2px 4px 0 ${alpha(error.main, 0.4)}`,
+                  backgroundColor:'yellow'
                 },
                 '&.MuiButton-containedWarning:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(warning.main, 0.4)}`
+                  boxShadow: `0 2px 4px 0 ${alpha(warning.main, 0.4)}`,
+                  backgroundColor:'yellow'
                 },
                 '&.MuiButton-containedInfo:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(info.main, 0.4)}`
+                  boxShadow: `0 2px 4px 0 ${alpha(info.main, 0.4)}`,
+                  backgroundColor:'yellow'
                 }
               }
             })
@@ -716,13 +722,20 @@ const createMuiTheme = (config = {}) => {
             columnSeparator: ({ theme }) => ({
               color: theme.palette.divider
             }),
-            row: {
+            row: ({ theme }) => ({
+              // Disable hover effects
+              '&:hover': {
+                backgroundColor: 'transparent !important'
+              },
+              '&.Mui-hovered': {
+                backgroundColor: 'transparent !important'
+              },
               '&:last-child': {
                 '& .MuiDataGrid-cell': {
                   borderBottom: 0
                 }
               }
-            },
+            }),
             cell: ({ theme }) => ({
               borderColor: theme.palette.divider,
               '&:not(.MuiDataGrid-cellCheckbox)': {
