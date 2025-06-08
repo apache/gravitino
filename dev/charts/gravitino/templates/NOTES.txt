@@ -16,7 +16,7 @@
   specific language governing permissions and limitations
   under the License.
   */}}
-{{ $.Chart.Name }} has been installed. Check its status by running:
+🚀 {{ $.Chart.Name }} has been installed. Check its status by running:
 
   kubectl get pods --namespace {{ include "gravitino.namespace" . }}
 

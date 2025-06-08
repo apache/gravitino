@@ -40,7 +40,10 @@ from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.model_response import ModelResponse
-from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
+from gravitino.dto.responses.model_version_list_response import (
+    ModelVersionInfoListResponse,
+    ModelVersionListResponse,
+)
 from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
 from gravitino.exceptions.handlers.model_error_handler import MODEL_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
@@ -218,6 +221,39 @@ class GenericModelCatalog(BaseSchemaCatalog):
         model_version_list_resp.validate()
 
         return model_version_list_resp.versions()
+
+    def list_model_version_infos(
+        self, model_ident: NameIdentifier
+    ) -> List[ModelVersion]:
+        """List all the versions with their information of the register model by NameIdentifier in the catalog.
+
+        Args:
+            model_ident: The identifier of the model.
+
+        Raises:
+            NoSuchModelException: If the model does not exist.
+
+        Returns:
+            A list of model versions with their information.
+        """
+        self._check_model_ident(model_ident)
+        model_full_ident = self._model_full_identifier(model_ident)
+
+        params = {"details": "true"}
+        resp = self.rest_client.get(
+            f"{self._format_model_version_request_path(model_full_ident)}/versions",
+            params=params,
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+        model_version_info_list_resp = ModelVersionInfoListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        model_version_info_list_resp.validate()
+
+        return [
+            GenericModelVersion(version)
+            for version in model_version_info_list_resp.versions()
+        ]
 
     def get_model_version(
         self, model_ident: NameIdentifier, version: int

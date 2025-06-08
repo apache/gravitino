@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.apache.gravitino.EntityStore;
@@ -128,6 +129,21 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 getCatalogIdentifier(ident),
                 c -> c.doWithModelOps(m -> m.listModelVersions(ident)),
                 NoSuchModelException.class));
+  }
+
+  @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    return internalListModelVersion(
+        ident,
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                ident,
+                LockType.READ,
+                () ->
+                    doWithCatalog(
+                        getCatalogIdentifier(ident),
+                        c -> c.doWithModelOps(m -> m.listModelVersionInfos(ident)),
+                        NoSuchModelException.class)));
   }
 
   @Override
@@ -291,6 +307,22 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 catalogIdent,
                 HasPropertyMetadata::modelPropertiesMetadata,
                 modelVersion.properties()));
+  }
+
+  private ModelVersion[] internalListModelVersion(
+      NameIdentifier ident, Supplier<ModelVersion[]> supplier) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+    return Arrays.stream(supplier.get())
+        .map(
+            v ->
+                EntityCombinedModelVersion.of(v)
+                    .withHiddenProperties(
+                        getHiddenPropertyNames(
+                            catalogIdent,
+                            HasPropertyMetadata::modelPropertiesMetadata,
+                            v.properties())))
+        .toArray(ModelVersion[]::new);
   }
 
   private Map<String, String> checkAndUpdateProperties(
