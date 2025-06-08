@@ -158,9 +158,6 @@ public class RelationalEntityStore
     cache.withCacheLock(
         () -> {
           backend.insert(e, overwritten);
-          if (overwritten) {
-            return;
-          }
 
           if (e.type() == Entity.EntityType.MODEL_VERSION) {
             NameIdentifier modelIdent = ((ModelVersionEntity) e).modelIdentifier();
