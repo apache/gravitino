@@ -344,24 +344,19 @@ const createMuiTheme = (config = {}) => {
                   backgroundColor:'yellow'
                 },
                 '&.MuiButton-containedSecondary:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(secondary.main, 0.4)}`,
-                  backgroundColor:'yellow'
+                  boxShadow: `0 2px 4px 0 ${alpha(secondary.main, 0.4)}`
                 },
                 '&.MuiButton-containedSuccess:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(success.main, 0.4)}`,
-                  backgroundColor:'yellow'
+                  boxShadow: `0 2px 4px 0 ${alpha(success.main, 0.4)}` 
                 },
                 '&.MuiButton-containedError:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(error.main, 0.4)}`,
-                  backgroundColor:'yellow'
+                  boxShadow: `0 2px 4px 0 ${alpha(error.main, 0.4)}`
                 },
                 '&.MuiButton-containedWarning:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(warning.main, 0.4)}`,
-                  backgroundColor:'yellow'
+                  boxShadow: `0 2px 4px 0 ${alpha(warning.main, 0.4)}`
                 },
                 '&.MuiButton-containedInfo:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(info.main, 0.4)}`,
-                  backgroundColor:'yellow'
+                  boxShadow: `0 2px 4px 0 ${alpha(info.main, 0.4)}`
                 }
               }
             })
