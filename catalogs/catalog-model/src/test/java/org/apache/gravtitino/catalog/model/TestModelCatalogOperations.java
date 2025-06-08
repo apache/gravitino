@@ -127,7 +127,6 @@ public class TestModelCatalogOperations {
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
 
-
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
     idGenerator = new RandomIdGenerator();
