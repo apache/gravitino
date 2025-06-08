@@ -38,6 +38,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
@@ -156,10 +157,15 @@ public class RelationalEntityStore
 
     cache.withCacheLock(
         () -> {
-          if (e.type() == Entity.EntityType.MODEL) {
+          backend.insert(e, overwritten);
+          if (overwritten) {
             return;
           }
-          backend.insert(e, overwritten);
+
+          if (e.type() == Entity.EntityType.MODEL_VERSION) {
+            NameIdentifier modelIdent = ((ModelVersionEntity) e).modelIdentifier();
+            cache.invalidate(modelIdent, Entity.EntityType.MODEL);
+          }
           cache.put(e);
         });
   }
