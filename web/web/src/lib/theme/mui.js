@@ -340,14 +340,13 @@ const createMuiTheme = (config = {}) => {
                 paddingLeft: theme.spacing(5),
                 paddingRight: theme.spacing(5),
                 '&.MuiButton-containedPrimary:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(primary.main, 0.4)}`,
-                  backgroundColor:'yellow'
+                  boxShadow: `0 2px 4px 0 ${alpha(primary.main, 0.4)}`
                 },
                 '&.MuiButton-containedSecondary:hover': {
                   boxShadow: `0 2px 4px 0 ${alpha(secondary.main, 0.4)}`
                 },
                 '&.MuiButton-containedSuccess:hover': {
-                  boxShadow: `0 2px 4px 0 ${alpha(success.main, 0.4)}` 
+                  boxShadow: `0 2px 4px 0 ${alpha(success.main, 0.4)}`
                 },
                 '&.MuiButton-containedError:hover': {
                   boxShadow: `0 2px 4px 0 ${alpha(error.main, 0.4)}`
@@ -717,7 +716,7 @@ const createMuiTheme = (config = {}) => {
             columnSeparator: ({ theme }) => ({
               color: theme.palette.divider
             }),
-            row: ({ theme }) => ({
+             row: ({ theme }) => ({
               // Disable hover effects
               '&:hover': {
                 backgroundColor: 'transparent !important'
