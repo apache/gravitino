@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `inheritable` TINYINT(1) NOT NULL COMMENT 'whether the policy is inheritable, 0 is not inheritable, 1 is inheritable',
     `exclusive` TINYINT(1) NOT NULL COMMENT 'whether the policy is exclusive, 0 is not exclusive, 1 is exclusive',
     `supported_object_types` TEXT NOT NULL COMMENT 'supported object types',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag audit info',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',

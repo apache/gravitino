@@ -611,7 +611,7 @@ COMMENT ON COLUMN policy_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN policy_meta.inheritable IS 'whether the policy is inheritable, 0 is not inheritable, 1 is inheritable';
 COMMENT ON COLUMN policy_meta.exclusive IS 'whether the policy is exclusive, 0 is not exclusive, 1 is exclusive';
 COMMENT ON COLUMN policy_meta.supported_object_types IS 'supported object types';
-COMMENT ON COLUMN policy_meta.audit_info IS 'tag audit info';
+COMMENT ON COLUMN policy_meta.audit_info IS 'policy audit info';
 COMMENT ON COLUMN policy_meta.current_version IS 'policy current version';
 COMMENT ON COLUMN policy_meta.last_version IS 'policy last version';
 COMMENT ON COLUMN policy_meta.deleted_at IS 'policy deleted at';
