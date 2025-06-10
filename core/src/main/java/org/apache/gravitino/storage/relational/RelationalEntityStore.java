@@ -21,9 +21,11 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -59,6 +61,7 @@ public class RelationalEntityStore
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
+  private Set<Namespace> namespaceSet;
   private boolean cacheEnabled;
 
   /**
@@ -79,6 +82,7 @@ public class RelationalEntityStore
     // TODO USE SPI to load the cache.
     if (cacheEnabled) {
       this.cache = new CaffeineEntityCache(config);
+      this.namespaceSet = Sets.newHashSet();
     }
   }
 
@@ -124,7 +128,9 @@ public class RelationalEntityStore
       return cache.withCacheLock(
           () -> {
             List<E> entities = backend.list(namespace, entityType, allFields);
-            entities.forEach(cache::put);
+            if (namespaceSet.add(namespace)) {
+              entities.forEach(cache::put);
+            }
 
             return entities;
           });
@@ -136,14 +142,8 @@ public class RelationalEntityStore
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
     if (cacheEnabled) {
-      return cache.withCacheLock(
-          () -> {
-            if (cache.contains(ident, entityType)) {
-              return true;
-            }
-
-            return backend.exists(ident, entityType);
-          });
+      boolean existsInCache = cache.contains(ident, entityType);
+      return existsInCache || backend.exists(ident, entityType);
     }
 
     return backend.exists(ident, entityType);
@@ -233,9 +233,9 @@ public class RelationalEntityStore
 
   @Override
   public void close() throws IOException {
+    cache.clear();
     garbageCollector.close();
     backend.close();
-    cache.clear();
   }
 
   @Override
@@ -321,6 +321,7 @@ public class RelationalEntityStore
             backend.insertRelation(
                 relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
           });
+      return;
     }
 
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);

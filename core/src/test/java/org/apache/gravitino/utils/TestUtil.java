@@ -25,7 +25,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -71,21 +70,6 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 public class TestUtil {
   // Random ID generator used to generate IDs for test entities.
   private static RandomIdGenerator generator = new RandomIdGenerator();
-
-  /**
-   * Returns a list of given iterable instance.
-   *
-   * @param iterable The iterable instance to convert to a list.
-   * @return A list of the elements in the iterable.
-   * @param <T> The type of the elements in the iterable.
-   */
-  public static <T> List<T> toList(Iterable<T> iterable) {
-    List<T> list = new ArrayList<>();
-    for (T item : iterable) {
-      list.add(item);
-    }
-    return list;
-  }
 
   /**
    * Shorthand for creating a test metalake entity with default values.
