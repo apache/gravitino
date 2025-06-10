@@ -46,15 +46,14 @@ public interface Statistic {
   Optional<Literal> value();
 
   /**
-   * Get the type of the statistic. The type can be either RESERVED or CUSTOM. RESERVED means the
-   * statistic is predefined by Gravitino, CUSTOM means the statistic is defined by users. For
-   * example, the statistic "row_count" is a reserved statistic, A custom statistic name must start
-   * with "custom." prefix to avoid name conflict with reserved statistics. Because Gravitino may
-   * add more reserved statistics in the future.
+   * The statistic is predefined by Gravitino if the value is true. The statistic is defined by
+   * users if the value if false. For example, the statistic "row_count" is a reserved statistic, A
+   * custom statistic name must start with "custom." prefix to avoid name conflict with reserved
+   * statistics. Because Gravitino may add more reserved statistics in the future.
    *
    * @return The type of the statistic.
    */
-  Type type();
+  boolean reserved();
 
   /**
    * Whether the statistic is modifiable.
@@ -62,12 +61,4 @@ public interface Statistic {
    * @return If the statistic is modifiable, return true, otherwise false.
    */
   boolean modifiable();
-
-  /** The type of the statistic. */
-  enum Type {
-    /** Gravitino predefined statistic type. */
-    RESERVED,
-    /** User custom statistic type. */
-    CUSTOM
-  };
 }
