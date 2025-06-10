@@ -441,7 +441,7 @@ SELECT * FROM test;
 
 ## Exploring the Apache Gravitino Iceberg REST catalog service with StarRocks
 
-### Creating Iceberg catalog in Starrocks
+### Creating Iceberg catalog in StarRocks
 
 ```
 CREATE EXTERNAL CATALOG 'iceberg'
