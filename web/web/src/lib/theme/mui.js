@@ -716,7 +716,7 @@ const createMuiTheme = (config = {}) => {
             columnSeparator: ({ theme }) => ({
               color: theme.palette.divider
             }),
-             row: ({ theme }) => ({
+            row: ({ theme }) => ({
               // Disable hover effects
               '&:hover': {
                 backgroundColor: 'transparent !important'
