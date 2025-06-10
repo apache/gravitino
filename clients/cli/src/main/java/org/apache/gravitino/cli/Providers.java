@@ -27,6 +27,7 @@ import org.apache.gravitino.Catalog;
  * Gravitino CLI. It also can validate if a given entity is a valid entity.
  */
 public class Providers {
+
   public static final String HIVE = "hive";
   public static final String HADOOP = "hadoop";
   public static final String ICEBERG = "iceberg";
@@ -37,6 +38,7 @@ public class Providers {
   public static final String PAIMON = "paimon";
   public static final String HUDI = "hudi";
   public static final String OCEANBASE = "oceanbase";
+  public static final String MODEL = "model"; // Add MODEL provider constant definition
 
   private static final HashSet<String> VALID_PROVIDERS = new HashSet<>();
 
@@ -51,6 +53,7 @@ public class Providers {
     VALID_PROVIDERS.add(PAIMON);
     VALID_PROVIDERS.add(HUDI);
     VALID_PROVIDERS.add(OCEANBASE);
+    VALID_PROVIDERS.add(MODEL); // Add MODEL to the valid providers set
   }
 
   /**
@@ -85,6 +88,8 @@ public class Providers {
         return "lakehouse-hudi";
       case OCEANBASE:
         return "jdbc-oceanbase";
+      case MODEL:
+        return "model"; // Handle MODEL provider and return internal provider name
       default:
         throw new IllegalArgumentException("Unsupported provider: " + provider);
     }
@@ -105,6 +110,8 @@ public class Providers {
         return Catalog.Type.RELATIONAL;
       case KAFKA:
         return Catalog.Type.MESSAGING;
+      case MODEL: // Set catalog type to MODEL for model provider
+        return Catalog.Type.MODEL;
       default:
         throw new IllegalArgumentException("Unsupported provider: " + provider);
     }
