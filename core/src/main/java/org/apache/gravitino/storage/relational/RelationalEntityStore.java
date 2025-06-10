@@ -111,7 +111,9 @@ public class RelationalEntityStore
       return cache.withCacheLock(
           () -> {
             List<E> entities = backend.list(namespace, entityType, false);
-            entities.forEach(cache::put);
+            if (namespaceSet.add(namespace)) {
+              entities.forEach(cache::put);
+            }
 
             return entities;
           });
@@ -213,11 +215,8 @@ public class RelationalEntityStore
       throws IOException {
     try {
       if (cacheEnabled) {
-        return cache.withCacheLock(
-            () -> {
-              cache.clear();
-              return backend.delete(ident, entityType, cascade);
-            });
+        cache.invalidate(ident, entityType);
+        return backend.delete(ident, entityType, cascade);
       }
 
       return backend.delete(ident, entityType, cascade);
@@ -315,12 +314,8 @@ public class RelationalEntityStore
       boolean override)
       throws IOException {
     if (cacheEnabled) {
-      cache.withCacheLock(
-          () -> {
-            cache.invalidate(srcIdentifier, srcType, relType);
-            backend.insertRelation(
-                relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
-          });
+      cache.invalidate(srcIdentifier, srcType, relType);
+      backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
       return;
     }
 
