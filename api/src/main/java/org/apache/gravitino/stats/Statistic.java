@@ -20,27 +20,12 @@ package org.apache.gravitino.stats;
 
 import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 
 /**
  * Statistic interface represents a statistic that can be associated with a metadata object. It can
  * be used to store various types of statistics, for example, table statistics, partition
  * statistics, fileset statistics, etc.
- *
- * <p>For different statistics, Gravitino will use different storage solution for them. Table
- * statistics will be stored in Gravitino metadata store, usually the Gravitino's metadata is
- * relational database, it's difficult to store millions rows of records.
- *
- * <p>But for partition statistics, there may be millions of partitions in a large table. So
- * Gravitino will use a external storage solution. Gravitino will use a file to store all
- * partitions. The partition statistics may be several megabytes. If a partition is stored as a
- * file, it will cause millions of small files in the storage system. It will cause high pressure
- * for HDFS if you choose HDFS as external storage. If the partition statistic is requested for
- * multiple times, Gravitino will use cache to improve performance.
- *
- * <p>The file format of partition statistics is Json, Iceberg isn't design for small files. It will
- * read multiple files in a single read operation. It will append many small data files if users
- * update a partition every time. The relational database will record the pointer of the partition
- * statistics file.
  */
 @Evolving
 public interface Statistic {
@@ -58,7 +43,7 @@ public interface Statistic {
    *
    * @return An optional containing the value of the statistic if it is set, otherwise empty.
    */
-  Optional<StatisticValue> value();
+  Optional<Literal> value();
 
   /**
    * Get the type of the statistic. The type can be either RESERVED or CUSTOM. RESERVED means the
