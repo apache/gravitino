@@ -260,7 +260,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to link model version " + ident, e);
     } catch (EntityAlreadyExistsException e) {
       throw new ModelVersionAliasesAlreadyExistException(
-          e, "Model version aliases %s already exist", ident);
+          e, "Model version alias already exists in %s", ident);
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelException(e, "Model %s does not exist", ident);
     }
