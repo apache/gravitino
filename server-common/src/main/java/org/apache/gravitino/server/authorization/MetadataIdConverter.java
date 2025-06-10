@@ -73,7 +73,7 @@ public class MetadataIdConverter {
           MetadataObject.Type.FILESET, Capability.Scope.FILESET,
           MetadataObject.Type.TOPIC, Capability.Scope.TOPIC,
           MetadataObject.Type.COLUMN, Capability.Scope.COLUMN);
-  // Maps entity type to entity class
+  // Maps entity type to entity class.
   private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAP;
 
   static {
