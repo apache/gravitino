@@ -18,9 +18,11 @@
  */
 package org.apache.gravitino.rel.expressions.literals;
 
+import com.google.common.base.Preconditions;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.rel.types.Decimal;
@@ -236,6 +238,8 @@ public class Literals {
    * @return a new {@link Literal} instance representing a struct value
    */
   public static LiteralImpl<Map<String, Literal>> structLiteral(Map<String, Literal> values) {
+    Preconditions.checkArgument(
+        values != null && !values.isEmpty(), "values cannot be null or empty");
     return of(
         values,
         Types.StructType.of(
@@ -245,6 +249,22 @@ public class Literals {
                         Types.StructType.Field.nullableField(
                             entry.getKey(), entry.getValue().dataType()))
                 .toArray(Types.StructType.Field[]::new)));
+  }
+
+  /**
+   * Creates a list type literal with the given values.
+   *
+   * @param values the list of literal values
+   * @return a new {@link Literal} instance representing a list value
+   */
+  public static LiteralImpl<List<Literal>> listLiteral(List<Literal> values) {
+    Preconditions.checkArgument(
+        values != null && !values.isEmpty(), "values cannot be null or empty");
+    Type type = values.get(0).dataType();
+    Preconditions.checkArgument(
+        values.stream().allMatch(value -> value.dataType().equals(type)),
+        "values must have the same data type");
+    return of(values, Types.ListType.nullable(type));
   }
 
   /**

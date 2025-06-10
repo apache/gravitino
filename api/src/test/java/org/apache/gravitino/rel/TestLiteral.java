@@ -36,11 +36,13 @@ import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedInt
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedLongLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedShortLiteral;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -136,5 +138,18 @@ public class TestLiteral {
             Types.StructType.Field.nullableField("k1", Types.StringType.get()),
             Types.StructType.Field.nullableField("k2", Types.IntegerType.get())),
         literal.dataType());
+
+    List<Literal> list = Lists.newArrayList();
+    list.add(stringLiteral("v1"));
+    list.add(stringLiteral("v2"));
+
+    literal = Literals.listLiteral(list);
+    List<Literal> literalList = (List<Literal>) literal.value();
+    Assertions.assertEquals(list.size(), literalList.size());
+    Assertions.assertIterableEquals(list, literalList);
+    Assertions.assertEquals(Types.ListType.nullable(Types.StringType.get()), literal.dataType());
+
+    list.add(integerLiteral(0));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> Literals.listLiteral(list));
   }
 }
