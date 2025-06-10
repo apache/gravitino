@@ -28,6 +28,7 @@ import static org.apache.gravitino.rel.expressions.literals.Literals.integerLite
 import static org.apache.gravitino.rel.expressions.literals.Literals.longLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.shortLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.stringLiteral;
+import static org.apache.gravitino.rel.expressions.literals.Literals.structLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.timeLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.timestampLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedByteLiteral;
@@ -35,10 +36,12 @@ import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedInt
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedLongLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedShortLiteral;
 
+import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Map;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
@@ -115,5 +118,23 @@ public class TestLiteral {
     literal = decimalLiteral(Decimal.of("0.00"));
     Assertions.assertEquals(Decimal.of(new BigDecimal("0.00")), literal.value());
     Assertions.assertEquals(Types.DecimalType.of(2, 2), literal.dataType());
+
+    Map<String, Literal> map = Maps.newHashMap();
+    map.put("k1", stringLiteral("v1"));
+    map.put("k2", integerLiteral(2));
+    literal = structLiteral(map);
+    Map<String, Literal> literalMap = (Map<String, Literal>) literal.value();
+    Assertions.assertEquals(map.size(), literalMap.size());
+    for (Map.Entry<String, Literal> entry : map.entrySet()) {
+      Assertions.assertTrue(literalMap.containsKey(entry.getKey()));
+      Assertions.assertEquals(entry.getValue().value(), literalMap.get(entry.getKey()).value());
+      Assertions.assertEquals(
+          entry.getValue().dataType(), literalMap.get(entry.getKey()).dataType());
+    }
+    Assertions.assertEquals(
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("k1", Types.StringType.get()),
+            Types.StructType.Field.nullableField("k2", Types.IntegerType.get())),
+        literal.dataType());
   }
 }

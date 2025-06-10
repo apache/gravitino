@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 
 /**
  * SupportsStatistics provides methods to list and update statistics. A table, a partition or a
@@ -49,6 +50,6 @@ public interface SupportsStatistics {
    * @param statistics a map of statistic names to their values
    * @return a list of updated statistics
    */
-  List<Statistic> updateStatistics(Map<String, StatisticValue> statistics)
+  List<Statistic> updateStatistics(Map<String, Literal> statistics)
       throws UnmodifiableStatisticException, IllegalStatisticNameException;
 }

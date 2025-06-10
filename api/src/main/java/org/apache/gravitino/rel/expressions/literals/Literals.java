@@ -21,6 +21,7 @@ package org.apache.gravitino.rel.expressions.literals;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Type;
@@ -225,6 +226,25 @@ public class Literals {
    */
   public static LiteralImpl<String> varcharLiteral(int length, String value) {
     return of(value, Types.VarCharType.of(length));
+  }
+
+  /**
+   * Creates a struct type literal with the given values.
+   *
+   * @param values the struct values, where the key is the field name and the value is the literal
+   *     value
+   * @return a new {@link Literal} instance representing a struct value
+   */
+  public static LiteralImpl<Map<String, Literal>> structLiteral(Map<String, Literal> values) {
+    return of(
+        values,
+        Types.StructType.of(
+            values.entrySet().stream()
+                .map(
+                    entry ->
+                        Types.StructType.Field.nullableField(
+                            entry.getKey(), entry.getValue().dataType()))
+                .toArray(Types.StructType.Field[]::new)));
   }
 
   /**
