@@ -79,7 +79,7 @@ public class RelationalEntityStore
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
     this.cacheEnabled = config.get(Configs.CACHE_ENABLED);
-    // TODO USE SPI to load the cache.
+    // TODO USE SPI to load the cache
     if (cacheEnabled) {
       this.cache = new CaffeineEntityCache(config);
       this.namespaceSet = Sets.newHashSet();
