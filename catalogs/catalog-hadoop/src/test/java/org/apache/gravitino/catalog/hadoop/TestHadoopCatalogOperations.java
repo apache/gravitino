@@ -194,13 +194,6 @@ public class TestHadoopCatalogOperations {
         Namespace.of(metalakeName));
   }
 
-  private void stubSchema(long schemaId) {
-    doReturn(new SchemaIds(1L, 1L, schemaId))
-        .when(spySchemaMetaService)
-        .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-            Mockito.anyString(), Mockito.anyString(), Mockito.eq("schema" + schemaId));
-  }
-
   @BeforeAll
   public static void setUp() {
     Config config = Mockito.mock(Config.class);
@@ -366,21 +359,24 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testCreateSchemaWithNoLocation() throws IOException {
-    String name = "schema11";
-    String comment = "comment11";
-    Schema schema = createSchema(name, comment, null, null);
+    final long testId = generateTestId();
+    final String name = "schema" + testId;
+    final String comment = "comment" + testId;
+    Schema schema = createSchema(testId, name, comment, null, null);
     Assertions.assertEquals(name, schema.name());
     Assertions.assertEquals(comment, schema.comment());
 
     Throwable exception =
         Assertions.assertThrows(
-            SchemaAlreadyExistsException.class, () -> createSchema(name, comment, null, null));
-    Assertions.assertEquals("Schema m1.c1.schema11 already exists", exception.getMessage());
+            SchemaAlreadyExistsException.class,
+            () -> createSchema(testId, name, comment, null, null));
+    Assertions.assertEquals(
+        "Schema m1.c1.schema" + testId + " already exists", exception.getMessage());
   }
 
   @Test
   public void testCreateSchemaWithEmptyCatalogLocation() throws IOException {
-    final long testId = 28L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String catalogPath = "";
@@ -388,7 +384,7 @@ public class TestHadoopCatalogOperations {
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> createSchema(schemaName, comment, catalogPath, null));
+            () -> createSchema(testId, schemaName, comment, catalogPath, null));
     Assertions.assertEquals(
         "The value of the catalog property "
             + HadoopCatalogPropertiesMetadata.LOCATION
@@ -398,10 +394,11 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testCreateSchemaWithCatalogLocation() throws IOException {
-    String name = "schema12";
-    String comment = "comment12";
+    final long testId = generateTestId();
+    String name = "schema" + testId;
+    final String comment = "comment" + testId;
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog12";
-    Schema schema = createSchema(name, comment, catalogPath, null);
+    Schema schema = createSchema(testId, name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
     Path schemaPath = new Path(catalogPath, name);
@@ -411,9 +408,9 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(fs.listStatus(schemaPath).length == 0);
 
     // test placeholder in catalog location
-    name = "schema12_1";
+    name = "schema" + testId + "_1";
     catalogPath = TEST_ROOT_PATH + "/" + "{{catalog}}-{{schema}}";
-    schema = createSchema(name, comment, catalogPath, null);
+    schema = createSchema(testId, name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
     schemaPath = new Path(catalogPath, name);
@@ -421,9 +418,9 @@ public class TestHadoopCatalogOperations {
     Assertions.assertFalse(fs.exists(schemaPath));
 
     // Test disable server-side FS operations.
-    name = "schema12_2";
+    name = "schema" + testId + "_2";
     catalogPath = TEST_ROOT_PATH + "/" + "catalog12_2";
-    schema = createSchema(name, comment, catalogPath, null, true);
+    schema = createSchema(testId, name, comment, catalogPath, null, true);
     Assertions.assertEquals(name, schema.name());
 
     // Schema path should not be existed if the server-side FS operations are disabled.
@@ -433,11 +430,12 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testCreateSchemaWithSchemaLocation() throws IOException {
-    String name = "schema13";
-    String comment = "comment13";
-    String catalogPath = TEST_ROOT_PATH + "/" + "catalog13";
+    final long testId = generateTestId();
+    String name = "schema" + testId;
+    final String comment = "comment" + testId;
+    String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
     String schemaPath = catalogPath + "/" + name;
-    Schema schema = createSchema(name, comment, null, schemaPath);
+    Schema schema = createSchema(testId, name, comment, null, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     Path schemaPath1 = new Path(schemaPath);
@@ -447,9 +445,9 @@ public class TestHadoopCatalogOperations {
     Assertions.assertTrue(fs.listStatus(schemaPath1).length == 0);
 
     // test placeholder in schema location
-    name = "schema13_1";
+    name = "schema" + testId + "_1";
     schemaPath = catalogPath + "/" + "{{schema}}";
-    schema = createSchema(name, comment, null, schemaPath);
+    schema = createSchema(testId, name, comment, null, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     schemaPath1 = new Path(schemaPath);
@@ -457,20 +455,20 @@ public class TestHadoopCatalogOperations {
     Assertions.assertFalse(fs.exists(schemaPath1));
 
     // test illegal placeholder in schema location
-    String schemaName1 = "schema13_2";
+    String schemaName1 = "schema" + testId + "_2";
     String schemaPath2 = catalogPath + "/" + "{{}}";
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> createSchema(schemaName1, comment, null, schemaPath2));
+            () -> createSchema(testId, schemaName1, comment, null, schemaPath2));
     Assertions.assertTrue(
         exception.getMessage().contains("Placeholder in location should not be empty"),
         exception.getMessage());
 
     // Test disable server-side FS operations.
-    name = "schema13_3";
+    name = "schema" + testId + "_3";
     schemaPath = catalogPath + "/" + name;
-    schema = createSchema(name, comment, null, schemaPath, true);
+    schema = createSchema(testId, name, comment, null, schemaPath, true);
     Assertions.assertEquals(name, schema.name());
 
     // Schema path should not be existed if the server-side FS operations are disabled.
@@ -479,11 +477,12 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testCreateSchemaWithCatalogAndSchemaLocation() throws IOException {
-    String name = "schema14";
-    String comment = "comment14";
-    String catalogPath = TEST_ROOT_PATH + "/" + "catalog14";
-    String schemaPath = TEST_ROOT_PATH + "/" + "schema14";
-    Schema schema = createSchema(name, comment, catalogPath, schemaPath);
+    final long testId = generateTestId();
+    String name = "schema" + testId;
+    String comment = "comment" + testId;
+    String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
+    String schemaPath = TEST_ROOT_PATH + "/" + "schema" + testId;
+    Schema schema = createSchema(testId, name, comment, catalogPath, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     Path schemaPath1 = new Path(schemaPath);
@@ -496,10 +495,10 @@ public class TestHadoopCatalogOperations {
     Assertions.assertFalse(fs.exists(new Path(catalogPath, name)));
 
     // test placeholder in location
-    name = "schema14_1";
+    name = "schema" + testId + "_1";
     catalogPath = TEST_ROOT_PATH + "/" + "{{catalog}}";
     schemaPath = TEST_ROOT_PATH + "/" + "{{schema}}";
-    schema = createSchema(name, comment, catalogPath, schemaPath);
+    schema = createSchema(testId, name, comment, catalogPath, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     schemaPath1 = new Path(schemaPath);
@@ -509,10 +508,10 @@ public class TestHadoopCatalogOperations {
     Assertions.assertFalse(fs.exists(new Path(catalogPath, name)));
 
     // Test disable server-side FS operations.
-    name = "schema14_2";
+    name = "schema" + testId + "_2";
     catalogPath = TEST_ROOT_PATH + "/" + "catalog14_2";
     schemaPath = TEST_ROOT_PATH + "/" + "schema14_2";
-    schema = createSchema(name, comment, catalogPath, schemaPath, true);
+    schema = createSchema(testId, name, comment, catalogPath, schemaPath, true);
     Assertions.assertEquals(name, schema.name());
 
     // Schema path should not be existed if the server-side FS operations are disabled.
@@ -522,11 +521,12 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testLoadSchema() throws IOException {
-    String name = "schema15";
-    String comment = "comment15";
-    String catalogPath = TEST_ROOT_PATH + "/" + "catalog15";
-    Schema schema = createSchema(name, comment, catalogPath, null);
-    NameIdentifier schema16 = NameIdentifierUtil.ofSchema("m1", "c1", "schema16");
+    final long testId = generateTestId();
+    String name = "schema" + testId;
+    String comment = "comment" + testId;
+    String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
+    Schema schema = createSchema(testId, name, comment, catalogPath, null);
+    NameIdentifier otherSchema = NameIdentifierUtil.ofSchema("m1", "c1", "otherSchema");
 
     Assertions.assertEquals(name, schema.name());
 
@@ -540,36 +540,39 @@ public class TestHadoopCatalogOperations {
       Assertions.assertTrue(props.containsKey(StringIdentifier.ID_KEY));
 
       Throwable exception =
-          Assertions.assertThrows(NoSuchSchemaException.class, () -> ops.loadSchema(schema16));
-      Assertions.assertEquals("Schema m1.c1.schema16 does not exist", exception.getMessage());
+          Assertions.assertThrows(NoSuchSchemaException.class, () -> ops.loadSchema(otherSchema));
+      Assertions.assertEquals("Schema m1.c1.otherSchema does not exist", exception.getMessage());
     }
   }
 
   @Test
   public void testListSchema() throws IOException {
-    String name = "schema17";
-    String comment = "comment17";
-    String name1 = "schema18";
-    String comment1 = "comment18";
-    createSchema(name, comment, null, null);
-    createSchema(name1, comment1, null, null);
+    final long testId1 = generateTestId();
+    final long testId2 = generateTestId();
+    String name1 = "schema" + testId1;
+    String comment1 = "comment" + testId1;
+    String name2 = "schema" + testId2;
+    String comment2 = "comment" + testId2;
+    createSchema(testId1, name1, comment1, null, null);
+    createSchema(testId2, name2, comment2, null, null);
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), HADOOP_PROPERTIES_METADATA);
       Set<NameIdentifier> idents =
           Arrays.stream(ops.listSchemas(Namespace.of("m1", "c1"))).collect(Collectors.toSet());
       Assertions.assertTrue(idents.size() >= 2);
-      Assertions.assertTrue(idents.contains(NameIdentifierUtil.ofSchema("m1", "c1", name)));
       Assertions.assertTrue(idents.contains(NameIdentifierUtil.ofSchema("m1", "c1", name1)));
+      Assertions.assertTrue(idents.contains(NameIdentifierUtil.ofSchema("m1", "c1", name2)));
     }
   }
 
   @Test
   public void testAlterSchema() throws IOException {
-    String name = "schema19";
-    String comment = "comment19";
-    String catalogPath = TEST_ROOT_PATH + "/" + "catalog19";
-    Schema schema = createSchema(name, comment, catalogPath, null);
+    final long testId = generateTestId();
+    String name = "schema" + testId;
+    String comment = "comment" + testId;
+    String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
+    Schema schema = createSchema(testId, name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
@@ -612,13 +615,12 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testDropSchema() throws IOException {
-    final long testId = 20L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
 
-    stubSchema(testId);
-    Schema schema = createSchema(schemaName, comment, catalogPath, null);
+    Schema schema = createSchema(testId, schemaName, comment, catalogPath, null);
     Assertions.assertEquals(schemaName, schema.name());
     NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
@@ -641,7 +643,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(schemaPath));
 
       // Test drop non-empty schema with cascade = false
-      createSchema(schemaName, comment, catalogPath, null);
+      createSchema(testId, schemaName, comment, catalogPath, null);
       Fileset fs1 =
           createFileset("fs1", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs1Path = new Path(fs1.storageLocation());
@@ -657,7 +659,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertFalse(fs.exists(fs1Path));
 
       // Test drop both managed and external filesets
-      createSchema(schemaName, comment, catalogPath, null);
+      createSchema(testId, schemaName, comment, catalogPath, null);
       Fileset fs2 =
           createFileset("fs2", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs2Path = new Path(fs2.storageLocation());
@@ -673,7 +675,7 @@ public class TestHadoopCatalogOperations {
       Assertions.assertTrue(fs.exists(fs3Path));
 
       // Test drop schema with different storage location
-      createSchema(schemaName, comment, catalogPath, null);
+      createSchema(testId, schemaName, comment, catalogPath, null);
       Path fs4Path = new Path(TEST_ROOT_PATH + "/fs4");
       createFileset(
           "fs4", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, fs4Path.toString());
@@ -684,14 +686,13 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testDropSchemaWithFSOpsDisabled() throws IOException {
-    final long testId = 21L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String filesetName = "fileset" + testId;
     final String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
 
-    stubSchema(testId);
-    Schema schema = createSchema(schemaName, comment, catalogPath, null);
+    Schema schema = createSchema(testId, schemaName, comment, catalogPath, null);
     Assertions.assertEquals(schemaName, schema.name());
     NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
@@ -707,7 +708,7 @@ public class TestHadoopCatalogOperations {
       FileSystem fs = schemaPath.getFileSystem(new Configuration());
       Assertions.assertTrue(fs.exists(schemaPath));
 
-      createSchema(schemaName, comment, catalogPath, null);
+      createSchema(testId, schemaName, comment, catalogPath, null);
       Fileset fs1 =
           createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, catalogPath, null);
       Path fs1Path = new Path(fs1.storageLocation());
@@ -740,7 +741,7 @@ public class TestHadoopCatalogOperations {
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(schemaName, comment, catalogPath, schemaPath);
+        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
       }
       Fileset fileset =
           createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
@@ -797,7 +798,7 @@ public class TestHadoopCatalogOperations {
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(schemaName, comment, catalogPath, schemaPath, true);
+        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath, true);
       }
 
       Fileset fileset;
@@ -850,12 +851,12 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testCreateFilesetWithExceptions() throws IOException {
-    final long testId = 22L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String filesetName = "fileset" + testId;
 
-    createSchema(schemaName, comment, null, null);
+    createSchema(testId, schemaName, comment, null, null);
     NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
     // If neither catalog location, nor schema location and storageLocation is specified.
@@ -900,13 +901,12 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesets() throws IOException {
-    final long testId = 23L;
+    final long testId = generateTestId();
     String schemaName = "schema" + testId;
     String comment = "comment" + testId;
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
+    createSchema(testId, schemaName, comment, null, schemaPath);
 
     String[] filesets = {
       "fileset" + testId + "_1", "fileset" + testId + "_2", "fileset" + testId + "_3"
@@ -929,15 +929,14 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFiles() throws IOException {
-    final long testId = 30L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String filesetName = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
     final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
+    createSchema(testId, schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
@@ -980,15 +979,14 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFilesWithFSOpsDisabled() throws Exception {
-    final long testId = 31L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String filesetName = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
     final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
+    createSchema(testId, schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     Map<String, String> catalogProps = Collections.singletonMap(DISABLE_FILESYSTEM_OPS, "true");
@@ -1008,11 +1006,16 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testListFilesetFilesWithNonExistentPath() throws IOException {
-    final long testId = 32L;
+    final long testId = generateTestId();
+    String schemaName = "schema" + testId;
+    String comment = "comment" + testId;
+    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+    String filesetName = "fileset" + testId;
     final String nonExistentSubPath = "/non_existent_file.txt";
 
-    Schema schema = createSchema(testId);
-    Fileset fileset = createFileset(testId);
+    Schema schema = createSchema(testId, schemaName, comment, null, schemaPath);
+    Fileset fileset =
+        createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
     final NameIdentifier filesetIdent =
         NameIdentifier.of("m1", "c1", schema.name(), fileset.name());
 
@@ -1052,7 +1055,7 @@ public class TestHadoopCatalogOperations {
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(schemaName, comment, catalogPath, schemaPath);
+        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
       }
       Fileset fileset =
           createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
@@ -1084,14 +1087,13 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testAlterFilesetProperties() throws IOException {
-    final long testId = 25L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String filesetName = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
+    createSchema(testId, schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
@@ -1194,14 +1196,13 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testUpdateFilesetComment() throws IOException {
-    final long testId = 26L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String name = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
+    createSchema(testId, schemaName, comment, null, schemaPath);
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.updateComment(comment + "_new");
@@ -1219,14 +1220,13 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testRemoveFilesetComment() throws IOException {
-    final long testId = 27L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
     final String filesetName = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
+    createSchema(testId, schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
@@ -1291,7 +1291,7 @@ public class TestHadoopCatalogOperations {
 
   @Test
   public void testGetFileLocation() throws IOException {
-    final long testId = 29L;
+    final long testId = generateTestId();
     final String catalogName = "catalog" + testId;
     final String schemaName = "schema" + testId;
     final String comment = "comment" + testId;
@@ -1300,8 +1300,7 @@ public class TestHadoopCatalogOperations {
     final String storageLocation =
         TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName;
 
-    stubSchema(testId);
-    createSchema(schemaName, comment, null, schemaPath);
+    createSchema(testId, schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(
             filesetName, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
@@ -1423,12 +1422,12 @@ public class TestHadoopCatalogOperations {
   @Test
   public void testLocationPlaceholdersWithException() throws IOException {
     // test empty placeholder value
-    final long testId = 24L;
+    final long testId = generateTestId();
     final String schemaName = "schema" + testId;
     final String filesetName = "fileset" + testId;
     String storageLocation = TEST_ROOT_PATH + "/{{fileset}}/{{user}}/{{id}}";
 
-    createSchema(schemaName, null, null, null);
+    createSchema(testId, schemaName, null, null, null);
 
     Exception exception =
         Assertions.assertThrows(
@@ -1485,7 +1484,7 @@ public class TestHadoopCatalogOperations {
     try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(schemaName, comment, catalogPath, schemaPath);
+        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
       }
       Fileset fileset =
           createFileset(
@@ -2755,26 +2754,26 @@ public class TestHadoopCatalogOperations {
             TEST_ROOT_PATH + "/fileset39"));
   }
 
-  private Schema createSchema(String name, String comment, String catalogPath, String schemaPath)
+  private Schema createSchema(
+      long testId, String name, String comment, String catalogPath, String schemaPath)
       throws IOException {
-    return createSchema(name, comment, catalogPath, schemaPath, false);
-  }
-
-  private Schema createSchema(long testId) throws IOException {
-    String schemaName = "schema" + testId;
-    doReturn(new SchemaIds(1L, 1L, testId))
-        .when(spySchemaMetaService)
-        .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-            Mockito.anyString(), Mockito.anyString(), Mockito.eq(schemaName));
-    String comment = "comment" + testId;
-    String catalogPath = null;
-    String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-    return createSchema(schemaName, comment, catalogPath, schemaPath);
+    return createSchema(testId, name, comment, catalogPath, schemaPath, false);
   }
 
   private Schema createSchema(
-      String name, String comment, String catalogPath, String schemaPath, boolean disableFsOps)
+      long testId,
+      String name,
+      String comment,
+      String catalogPath,
+      String schemaPath,
+      boolean disableFsOps)
       throws IOException {
+    // stub schema
+    doReturn(new SchemaIds(1L, 1L, testId))
+        .when(spySchemaMetaService)
+        .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
+            Mockito.anyString(), Mockito.anyString(), Mockito.eq(name));
+
     Map<String, String> props = Maps.newHashMap();
     props.put(DISABLE_FILESYSTEM_OPS, String.valueOf(disableFsOps));
     if (catalogPath != null) {
@@ -2849,16 +2848,6 @@ public class TestHadoopCatalogOperations {
     return createFileset(name, schemaName, comment, type, catalogPath, storageLocation, false);
   }
 
-  private Fileset createFileset(long testId) throws IOException {
-    String name = "fileset" + testId;
-    String schemaName = "schema" + testId;
-    String comment = "comment" + testId;
-    Fileset.Type type = Fileset.Type.MANAGED;
-    String catalogPath = null;
-    String storageLocation = null;
-    return createFileset(name, schemaName, comment, type, catalogPath, storageLocation);
-  }
-
   private Fileset createFileset(
       String name,
       String schemaName,
@@ -2910,5 +2899,9 @@ public class TestHadoopCatalogOperations {
 
       return ops.createFileset(filesetIdent, comment, type, storageLocation, filesetProps);
     }
+  }
+
+  private long generateTestId() {
+    return idGenerator.nextId();
   }
 }
