@@ -25,7 +25,6 @@ import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
-import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -131,7 +130,6 @@ public class GravitinoEnv {
   private EventListenerManager eventListenerManager;
 
   private AuditLogManager auditLogManager;
-  private EntityCache entityCache;
 
   private EventBus eventBus;
   private OwnerManager ownerManager;
@@ -364,15 +362,6 @@ public class GravitinoEnv {
    */
   public EventListenerManager eventListenerManager() {
     return eventListenerManager;
-  }
-
-  /**
-   * Return the entity cache instance.
-   *
-   * @return The {@link EntityCache} instance.
-   */
-  public EntityCache entityCache() {
-    return entityCache;
   }
 
   public void start() {

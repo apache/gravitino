@@ -31,11 +31,11 @@ import java.io.IOException;
 import java.time.Instant;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.file.Fileset;
@@ -58,7 +58,7 @@ import org.mockito.MockedStatic;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMetadataIdConverter {
-  private EntityCache mockCache;
+  private EntityStore mockStore;
   private NameIdentifier ident1;
   private NameIdentifier ident2;
   private NameIdentifier ident3;
@@ -137,47 +137,47 @@ public class TestMetadataIdConverter {
               MetadataObjects.of(ImmutableList.of("metalake"), MetadataObject.Type.METALAKE),
               "metalake",
               mockCatalogManager,
-              mockCache);
+              mockStore);
       Long catalogConvertedId =
           MetadataIdConverter.doConvert(
               MetadataObjects.of(ImmutableList.of("catalog"), MetadataObject.Type.CATALOG),
               "metalake",
               mockCatalogManager,
-              mockCache);
+              mockStore);
       Long schemaConvertedId =
           MetadataIdConverter.doConvert(
               MetadataObjects.of(ImmutableList.of("catalog", "schema"), MetadataObject.Type.SCHEMA),
               "metalake",
               mockCatalogManager,
-              mockCache);
+              mockStore);
       Long tableConvertedId =
           MetadataIdConverter.doConvert(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "table"), MetadataObject.Type.TABLE),
               "metalake",
               mockCatalogManager,
-              mockCache);
+              mockStore);
       Long modelConvertedId =
           MetadataIdConverter.doConvert(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "model"), MetadataObject.Type.MODEL),
               "metalake",
               mockCatalogManager,
-              mockCache);
+              mockStore);
       Long filesetConvertedId =
           MetadataIdConverter.doConvert(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "fileset"), MetadataObject.Type.FILESET),
               "metalake",
               mockCatalogManager,
-              mockCache);
+              mockStore);
       Long topicConvertedId =
           MetadataIdConverter.doConvert(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "topic"), MetadataObject.Type.TOPIC),
               "metalake",
               mockCatalogManager,
-              mockCache);
+              mockStore);
 
       Assertions.assertEquals(1L, metalakeConvertedId);
       Assertions.assertEquals(2L, catalogConvertedId);
@@ -219,15 +219,15 @@ public class TestMetadataIdConverter {
   }
 
   private void initMockCache() throws IOException {
-    mockCache = mock(EntityCache.class);
+    mockStore = mock(EntityStore.class);
 
-    when(mockCache.getOrLoad(ident1, Entity.EntityType.METALAKE)).thenReturn(entity1);
-    when(mockCache.getOrLoad(ident2, Entity.EntityType.CATALOG)).thenReturn(entity2);
-    when(mockCache.getOrLoad(ident3, Entity.EntityType.SCHEMA)).thenReturn(entity3);
-    when(mockCache.getOrLoad(ident4, Entity.EntityType.TABLE)).thenReturn(entity4);
-    when(mockCache.getOrLoad(ident5, Entity.EntityType.MODEL)).thenReturn(entity5);
-    when(mockCache.getOrLoad(ident6, Entity.EntityType.FILESET)).thenReturn(entity6);
-    when(mockCache.getOrLoad(ident7, Entity.EntityType.TOPIC)).thenReturn(entity7);
+    when(mockStore.get(ident1, Entity.EntityType.METALAKE, BaseMetalake.class)).thenReturn(entity1);
+    when(mockStore.get(ident2, Entity.EntityType.CATALOG, CatalogEntity.class)).thenReturn(entity2);
+    when(mockStore.get(ident3, Entity.EntityType.SCHEMA, SchemaEntity.class)).thenReturn(entity3);
+    when(mockStore.get(ident4, Entity.EntityType.TABLE, TableEntity.class)).thenReturn(entity4);
+    when(mockStore.get(ident5, Entity.EntityType.MODEL, ModelEntity.class)).thenReturn(entity5);
+    when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
+    when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);
   }
 
   private BaseMetalake getTestMetalake(long id, String name, String comment) {

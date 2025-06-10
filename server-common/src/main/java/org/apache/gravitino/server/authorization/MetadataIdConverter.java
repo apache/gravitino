@@ -24,16 +24,30 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 
 /** It is used to convert MetadataObject to MetadataId */
 public class MetadataIdConverter {
@@ -59,6 +73,26 @@ public class MetadataIdConverter {
           MetadataObject.Type.FILESET, Capability.Scope.FILESET,
           MetadataObject.Type.TOPIC, Capability.Scope.TOPIC,
           MetadataObject.Type.COLUMN, Capability.Scope.COLUMN);
+  // Maps entity type to entity class
+  private static final Map<Entity.EntityType, Class<?>> ENTITY_CLASS_MAP;
+
+  static {
+    Map<Entity.EntityType, Class<?>> map = new EnumMap<>(Entity.EntityType.class);
+    map.put(Entity.EntityType.METALAKE, BaseMetalake.class);
+    map.put(Entity.EntityType.CATALOG, CatalogEntity.class);
+    map.put(Entity.EntityType.SCHEMA, SchemaEntity.class);
+    map.put(Entity.EntityType.TABLE, TableEntity.class);
+    map.put(Entity.EntityType.FILESET, FilesetEntity.class);
+    map.put(Entity.EntityType.MODEL, ModelEntity.class);
+    map.put(Entity.EntityType.TOPIC, TopicEntity.class);
+    map.put(Entity.EntityType.TAG, TagEntity.class);
+    map.put(Entity.EntityType.MODEL_VERSION, ModelVersionEntity.class);
+    map.put(Entity.EntityType.COLUMN, ColumnEntity.class);
+    map.put(Entity.EntityType.USER, UserEntity.class);
+    map.put(Entity.EntityType.GROUP, Entity.class);
+    map.put(Entity.EntityType.ROLE, RoleEntity.class);
+    ENTITY_CLASS_MAP = Collections.unmodifiableMap(map);
+  }
 
   private MetadataIdConverter() {}
 
@@ -72,9 +106,9 @@ public class MetadataIdConverter {
    */
   public static Long doConvert(MetadataObject metadataObject, String metalake) throws IOException {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    EntityCache cache = GravitinoEnv.getInstance().entityCache();
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
 
-    return doConvert(metadataObject, metalake, catalogManager, cache);
+    return doConvert(metadataObject, metalake, catalogManager, entityStore);
   }
 
   @VisibleForTesting
@@ -82,7 +116,7 @@ public class MetadataIdConverter {
       MetadataObject metadataObject,
       String metalake,
       CatalogManager catalogManager,
-      EntityCache cache)
+      EntityStore entityStore)
       throws IOException {
     Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
 
@@ -98,7 +132,7 @@ public class MetadataIdConverter {
 
     Entity entity;
     try {
-      entity = cache.getOrLoad(normalizedIdent, entityType);
+      entity = entityStore.get(normalizedIdent, entityType, getEntityClass(entityType));
     } catch (IOException e) {
       throw new IOException("Failed to convert metadata object: " + metadataObject.fullName(), e);
     }
@@ -130,5 +164,12 @@ public class MetadataIdConverter {
 
   private static Capability.Scope getScope(MetadataObject.Type metadataType) {
     return METADATA_SCOPE_MAP.get(metadataType);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static <E extends Entity & HasIdentifier> Class<E> getEntityClass(
+      Entity.EntityType entityType) {
+    Class<?> clazz = ENTITY_CLASS_MAP.get(entityType);
+    return (Class<E>) clazz;
   }
 }
