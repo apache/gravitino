@@ -21,7 +21,6 @@ package org.apache.gravitino.cache;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.locks.ReentrantLock;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -30,8 +29,6 @@ import org.apache.gravitino.SupportsRelationOperations;
 
 /** A cache implementation that does not cache anything. */
 public class NoOpsCache extends BaseEntityCache {
-  private final ReentrantLock opLock = new ReentrantLock();
-
   /**
    * Constructs a new {@link BaseEntityCache} instance.
    *
