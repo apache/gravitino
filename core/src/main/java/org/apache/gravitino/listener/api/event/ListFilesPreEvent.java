@@ -24,21 +24,21 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 @DeveloperApi
 public class ListFilesPreEvent extends FilesetPreEvent {
-  private final String subPath;
   private final String locationName;
+  private final String subPath;
 
-  public ListFilesPreEvent(String user, NameIdentifier ident, String subPath, String locationName) {
+  public ListFilesPreEvent(String user, NameIdentifier ident, String locationName, String subPath) {
     super(user, ident);
-    this.subPath = subPath;
     this.locationName = locationName;
-  }
-
-  public String subPath() {
-    return subPath;
+    this.subPath = subPath;
   }
 
   public String locationName() {
     return locationName;
+  }
+
+  public String subPath() {
+    return subPath;
   }
 
   /**

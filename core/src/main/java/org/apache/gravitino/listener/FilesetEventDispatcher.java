@@ -87,19 +87,19 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public FileInfo[] listFiles(NameIdentifier ident, String subPath, String locationName)
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
       throws NoSuchFilesetException, IOException {
     eventBus.dispatchEvent(
-        new ListFilesPreEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, locationName));
+        new ListFilesPreEvent(PrincipalUtils.getCurrentUserName(), ident, locationName, subPath));
     try {
       FileInfo[] fileInfos = dispatcher.listFiles(ident, locationName, subPath);
       eventBus.dispatchEvent(
-          new ListFilesEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, locationName));
+          new ListFilesEvent(PrincipalUtils.getCurrentUserName(), ident, locationName, subPath));
       return fileInfos;
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new ListFilesFailureEvent(
-              PrincipalUtils.getCurrentUserName(), ident, subPath, locationName, e));
+              PrincipalUtils.getCurrentUserName(), ident, locationName, subPath, e));
       throw e;
     }
   }
