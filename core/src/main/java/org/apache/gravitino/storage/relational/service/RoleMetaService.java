@@ -85,6 +85,20 @@ public class RoleMetaService {
         RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
   }
 
+  public List<RoleEntity> listRolesByUserIdent(NameIdentifier userIdent) {
+    String metalake = NameIdentifierUtil.getMetalake(userIdent);
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    Long userId =
+        UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, userIdent.name());
+    List<RolePO> rolePOs = listRolesByUserId(userId);
+    return rolePOs.stream()
+        .map(
+            po ->
+                POConverters.fromRolePO(
+                    po, Collections.emptyList(), AuthorizationUtils.ofRoleNamespace(metalake)))
+        .collect(Collectors.toList());
+  }
+
   public List<RoleEntity> listRolesByMetadataObject(
       NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType, boolean allFields) {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
