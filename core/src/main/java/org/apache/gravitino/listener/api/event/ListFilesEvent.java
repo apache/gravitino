@@ -35,21 +35,21 @@ public final class ListFilesEvent extends FilesetEvent {
    *
    * @param user The user who initiated the listing of files/directories under the fileset.
    * @param ident The identifier of the fileset.
-   * @param subPath The subPath of the fileset
    * @param locationName The name of the location.
+   * @param subPath The subPath of the fileset
    */
-  public ListFilesEvent(String user, NameIdentifier ident, String subPath, String locationName) {
+  public ListFilesEvent(String user, NameIdentifier ident, String locationName, String subPath) {
     super(user, ident);
-    this.subPath = subPath;
     this.locationName = locationName;
-  }
-
-  public String subPath() {
-    return subPath;
+    this.subPath = subPath;
   }
 
   public String locationName() {
     return locationName;
+  }
+
+  public String subPath() {
+    return subPath;
   }
 
   /**

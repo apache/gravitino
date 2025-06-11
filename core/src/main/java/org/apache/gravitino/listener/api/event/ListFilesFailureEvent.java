@@ -24,32 +24,32 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 @DeveloperApi
 public class ListFilesFailureEvent extends FilesetFailureEvent {
-  private final String subPath;
   private final String locationName;
+  private final String subPath;
 
   /**
    * Constructs a new {@code ListFilesFailureEvent}.
    *
    * @param user The user who initiated the listing of files/directories under the fileset.
    * @param ident The identifier of the fileset.
-   * @param subPath The subPath of the fileset
    * @param locationName The name of the location.
+   * @param subPath The subPath of the fileset.
    * @param exception The exception encountered during the files listing attempt, which serves as an
    *     indicator of the issues that caused the failure.
    */
   public ListFilesFailureEvent(
-      String user, NameIdentifier ident, String subPath, String locationName, Exception exception) {
+      String user, NameIdentifier ident, String locationName, String subPath, Exception exception) {
     super(user, ident, exception);
-    this.subPath = subPath;
     this.locationName = locationName;
-  }
-
-  public String subPath() {
-    return subPath;
+    this.subPath = subPath;
   }
 
   public String locationName() {
     return locationName;
+  }
+
+  public String subPath() {
+    return subPath;
   }
 
   /**
