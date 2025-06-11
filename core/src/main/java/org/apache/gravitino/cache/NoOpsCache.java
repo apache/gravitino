@@ -62,33 +62,13 @@ public class NoOpsCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Exception> void withCacheLock(ThrowingRunnable<E> action) throws E {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        action.run();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    }
+    action.run();
   }
 
   /** {@inheritDoc} */
   @Override
   public <T, E extends Exception> T withCacheLock(ThrowingSupplier<T, E> action) throws E {
-    try {
-      opLock.lockInterruptibly();
-      try {
-        return action.get();
-      } finally {
-        opLock.unlock();
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
-    }
+    return action.get();
   }
 
   /** {@inheritDoc} */
