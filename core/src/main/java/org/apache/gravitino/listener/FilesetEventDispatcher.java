@@ -45,6 +45,9 @@ import org.apache.gravitino.listener.api.event.DropFilesetPreEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationPreEvent;
+import org.apache.gravitino.listener.api.event.ListFilesEvent;
+import org.apache.gravitino.listener.api.event.ListFilesFailureEvent;
+import org.apache.gravitino.listener.api.event.ListFilesPreEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetPreEvent;
@@ -84,10 +87,21 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+  public FileInfo[] listFiles(NameIdentifier ident, String subPath, String locationName)
       throws NoSuchFilesetException, IOException {
-    // TODO: implement the ListFilesEvent
-    return dispatcher.listFiles(ident, locationName, subPath);
+    eventBus.dispatchEvent(
+        new ListFilesPreEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, locationName));
+    try {
+      FileInfo[] fileInfos = dispatcher.listFiles(ident, locationName, subPath);
+      eventBus.dispatchEvent(
+          new ListFilesEvent(PrincipalUtils.getCurrentUserName(), ident, subPath, locationName));
+      return fileInfos;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListFilesFailureEvent(
+              PrincipalUtils.getCurrentUserName(), ident, subPath, locationName, e));
+      throw e;
+    }
   }
 
   @Override
