@@ -295,7 +295,8 @@ public class SecureHadoopCatalogOperations
         .collect(Collectors.toList());
   }
 
-  private String getTargetLocation(Fileset fileset) {
+  @VisibleForTesting
+  protected String getTargetLocation(Fileset fileset) {
     CallerContext callerContext = CallerContext.CallerContextHolder.get();
     String targetLocationName;
     String targetLocation;
@@ -330,7 +331,7 @@ public class SecureHadoopCatalogOperations
           StringUtils.isNotBlank(targetLocationName),
           "The default location name of the fileset %s should not be empty.",
           fileset.name());
-      targetLocation = fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME);
+      targetLocation = fileset.storageLocations().get(targetLocationName);
     }
 
     Preconditions.checkArgument(
