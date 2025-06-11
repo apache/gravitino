@@ -39,6 +39,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -79,11 +80,9 @@ public class RelationalEntityStore
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
     this.cacheEnabled = config.get(Configs.CACHE_ENABLED);
+    this.namespaceSet = Sets.newHashSet();
     // TODO USE SPI to load the cache
-    if (cacheEnabled) {
-      this.cache = new CaffeineEntityCache(config);
-      this.namespaceSet = Sets.newHashSet();
-    }
+    this.cache = cacheEnabled ? new CaffeineEntityCache(config) : new NoOpsCache(config);
   }
 
   private static RelationalBackend createRelationalEntityBackend(Config config) {
@@ -107,118 +106,89 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
-    if (cacheEnabled) {
-      return cache.withCacheLock(
-          () -> {
-            List<E> entities = backend.list(namespace, entityType, false);
-            if (namespaceSet.add(namespace)) {
-              entities.forEach(cache::put);
-            }
+    return cache.withCacheLock(
+        () -> {
+          List<E> entities = backend.list(namespace, entityType, false);
+          if (namespaceSet.add(namespace)) {
+            entities.forEach(cache::put);
+          }
 
-            return entities;
-          });
-    }
-
-    return backend.list(namespace, entityType, false);
+          return entities;
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
       throws IOException {
-    if (cacheEnabled) {
-      return cache.withCacheLock(
-          () -> {
-            List<E> entities = backend.list(namespace, entityType, allFields);
-            if (namespaceSet.add(namespace)) {
-              entities.forEach(cache::put);
-            }
+    return cache.withCacheLock(
+        () -> {
+          List<E> entities = backend.list(namespace, entityType, allFields);
+          if (namespaceSet.add(namespace)) {
+            entities.forEach(cache::put);
+          }
 
-            return entities;
-          });
-    }
-
-    return backend.list(namespace, entityType, allFields);
+          return entities;
+        });
   }
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    if (cacheEnabled) {
-      boolean existsInCache = cache.contains(ident, entityType);
-      return existsInCache || backend.exists(ident, entityType);
-    }
-
-    return backend.exists(ident, entityType);
+    boolean existsInCache = cache.contains(ident, entityType);
+    return existsInCache || backend.exists(ident, entityType);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    if (cacheEnabled) {
-      cache.withCacheLock(
-          () -> {
-            backend.insert(e, overwritten);
+    cache.withCacheLock(
+        () -> {
+          backend.insert(e, overwritten);
 
-            if (e.type() == Entity.EntityType.MODEL_VERSION) {
-              NameIdentifier modelIdent = ((ModelVersionEntity) e).modelIdentifier();
-              cache.invalidate(modelIdent, Entity.EntityType.MODEL);
-            }
-            cache.put(e);
-          });
-      return;
-    }
-
-    backend.insert(e, overwritten);
+          if (e.type() == Entity.EntityType.MODEL_VERSION) {
+            NameIdentifier modelIdent = ((ModelVersionEntity) e).modelIdentifier();
+            cache.invalidate(modelIdent, Entity.EntityType.MODEL);
+          }
+          cache.put(e);
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    if (cacheEnabled) {
-      return cache.withCacheLock(
-          () -> {
-            cache.invalidate(ident, entityType);
-            E updatedEntity = backend.update(ident, entityType, updater);
-            cache.put(updatedEntity);
+    return cache.withCacheLock(
+        () -> {
+          cache.invalidate(ident, entityType);
+          E updatedEntity = backend.update(ident, entityType, updater);
+          cache.put(updatedEntity);
 
-            return updatedEntity;
-          });
-    }
-
-    return backend.update(ident, entityType, updater);
+          return updatedEntity;
+        });
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    if (cacheEnabled) {
-      return cache.withCacheLock(
-          () -> {
-            Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
-            if (entityFromCache.isPresent()) {
-              return entityFromCache.get();
-            }
+    return cache.withCacheLock(
+        () -> {
+          Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
+          if (entityFromCache.isPresent()) {
+            return entityFromCache.get();
+          }
 
-            E entity = backend.get(ident, entityType);
-            cache.put(entity);
-            return entity;
-          });
-    }
-
-    return backend.get(ident, entityType);
+          E entity = backend.get(ident, entityType);
+          cache.put(entity);
+          return entity;
+        });
   }
 
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
     try {
-      if (cacheEnabled) {
-        cache.invalidate(ident, entityType);
-        return backend.delete(ident, entityType, cascade);
-      }
-
+      cache.invalidate(ident, entityType);
       return backend.delete(ident, entityType, cascade);
     } catch (NoSuchEntityException e) {
       return false;
@@ -282,26 +252,22 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    if (cacheEnabled) {
-      return cache.withCacheLock(
-          () -> {
-            Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
-            if (entities.isPresent()) {
-              return entities.get();
-            }
+    return cache.withCacheLock(
+        () -> {
+          Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
+          if (entities.isPresent()) {
+            return entities.get();
+          }
 
-            List<E> backendEntities =
-                backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+          List<E> backendEntities =
+              backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
 
-            if (!backendEntities.isEmpty()) {
-              cache.put(nameIdentifier, identType, relType, backendEntities);
-            }
+          if (!backendEntities.isEmpty()) {
+            cache.put(nameIdentifier, identType, relType, backendEntities);
+          }
 
-            return backendEntities;
-          });
-    }
-
-    return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+          return backendEntities;
+        });
   }
 
   @Override
@@ -313,12 +279,7 @@ public class RelationalEntityStore
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
-    if (cacheEnabled) {
-      cache.invalidate(srcIdentifier, srcType, relType);
-      backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
-      return;
-    }
-
+    cache.invalidate(srcIdentifier, srcType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
   }
 }
