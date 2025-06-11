@@ -59,6 +59,6 @@ public class ListFilesFailureEvent extends FilesetFailureEvent {
    */
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_FILESET;
+    return OperationType.LIST_FILESET_FILES;
   }
 }
