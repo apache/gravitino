@@ -118,6 +118,12 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
         cls.restart_server()
         # create entity
         cls._init_test_entities()
+        # 只在 IDE 环境下重启服务器
+       test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+       if test_env_mode == "IDE":
+           cls.restart_server()
+
+       cls._init_test_entities()
 
     @classmethod
     def tearDownClass(cls):
@@ -125,6 +131,10 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             cls._clean_test_data()
             # reset server conf
             cls._reset_conf(cls.config, cls.hadoop_conf_path)
+            # 只在 IDE 环境下重启服务器
+            test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+            if test_env_mode == "IDE":
+                cls.restart_server()
             # restart server
             cls.restart_server()
             # clear hadoop env

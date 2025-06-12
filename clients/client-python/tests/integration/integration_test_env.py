@@ -67,6 +67,25 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+        start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
+
+        if test_env_mode == "CI" or start_external:
+            # CI环境或外部管理模式：不启动服务器，只检查服务器状态
+            if not check_gravitino_server_status():
+                logger.error("ERROR: Can't find online Gravitino server!")
+                sys.exit(0)
+            return
+
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+                start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
+
+                if test_env_mode == "CI" or start_external:
+                    # CI环境或外部管理模式：不启动服务器，只检查服务器状态
+                    if not check_gravitino_server_status():
+                        logger.error("ERROR: Can't find online Gravitino server!")
+                        sys.exit(0)
+                    return
         if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
@@ -115,6 +134,15 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+        start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
+
+        if test_env_mode == "CI" or start_external:
+           # CI环境或外部管理模式：不启动服务器，只检查服务器状态
+           if not check_gravitino_server_status():
+               logger.error("ERROR: Can't find online Gravitino server!")
+               sys.exit(0)
+           return
         if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"

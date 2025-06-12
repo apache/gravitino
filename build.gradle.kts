@@ -201,6 +201,25 @@ allprojects {
       val jdbcDatabase = project.properties["jdbcBackend"] as? String ?: "h2"
       param.environment("jdbcBackend", jdbcDatabase)
 
+      val integrationTest by registering(VenvTask::class) {
+        doFirst {
+          gravitinoServer("start")
+        }
+
+        envMap.putAll(mapOf(
+                "PROJECT_VERSION" to project.version,
+                "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+                "START_EXTERNAL_GRAVITINO" to "true",
+                "GRAVITINO_TEST_ENV_MODE" to "CI",  // 新增环境模式变量
+                "DOCKER_TEST" to dockerTest.toString(),
+        ))
+
+        doLast {
+          gravitinoServer("stop")
+        }
+      }
+
+
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
