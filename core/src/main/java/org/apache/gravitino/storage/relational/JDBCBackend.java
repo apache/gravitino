@@ -443,6 +443,8 @@ public class JDBCBackend implements RelationalBackend {
       case ROLE_USER_REL:
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
+        } else if (identType == Entity.EntityType.USER) {
+          return (List<E>) RoleMetaService.getInstance().listRolesByUserIdent(nameIdentifier);
         } else {
           throw new IllegalArgumentException(
               String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
