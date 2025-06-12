@@ -41,6 +41,7 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -50,6 +51,7 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -75,6 +77,7 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -1670,6 +1673,59 @@ public class TestHadoopCatalogOperations {
               .contains(
                   "Default location name must be set and must be one of the fileset locations"),
           "Exception message: " + exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testGetTargetLocation() throws IOException {
+    try (SecureHadoopCatalogOperations ops = new SecureHadoopCatalogOperations(store)) {
+      ops.initialize(
+          Collections.emptyMap(), randomCatalogInfo("m1", "c1"), HADOOP_PROPERTIES_METADATA);
+
+      Fileset fileset = Mockito.mock(Fileset.class);
+      when(fileset.name()).thenReturn("fileset_single_location");
+      when(fileset.storageLocations())
+          .thenReturn(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "file://a/b/c"));
+      when(fileset.properties())
+          .thenReturn(ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, LOCATION_NAME_UNKNOWN));
+      Assertions.assertEquals("file://a/b/c", ops.getTargetLocation(fileset));
+
+      try (MockedStatic<CallerContext.CallerContextHolder> callerContextHolder =
+          mockStatic(CallerContext.CallerContextHolder.class)) {
+        CallerContext callerContext = Mockito.mock(CallerContext.class);
+        when(callerContext.context())
+            .thenReturn(
+                ImmutableMap.of(
+                    CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, LOCATION_NAME_UNKNOWN));
+        callerContextHolder.when(CallerContext.CallerContextHolder::get).thenReturn(callerContext);
+        Assertions.assertEquals("file://a/b/c", ops.getTargetLocation(fileset));
+      }
+
+      Fileset filesetWithMultipleLocation = Mockito.mock(Fileset.class);
+      when(filesetWithMultipleLocation.name()).thenReturn("fileset_multiple_location");
+      when(filesetWithMultipleLocation.storageLocations())
+          .thenReturn(
+              ImmutableMap.of(
+                  LOCATION_NAME_UNKNOWN,
+                  "file://a/b/c",
+                  "location_1",
+                  "file://a/b/d",
+                  "location_2",
+                  "file://a/b/e"));
+      when(filesetWithMultipleLocation.properties())
+          .thenReturn(ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location_1"));
+      Assertions.assertEquals("file://a/b/d", ops.getTargetLocation(filesetWithMultipleLocation));
+
+      try (MockedStatic<CallerContext.CallerContextHolder> callerContextHolder =
+          mockStatic(CallerContext.CallerContextHolder.class)) {
+        CallerContext callerContext = Mockito.mock(CallerContext.class);
+        when(callerContext.context())
+            .thenReturn(
+                ImmutableMap.of(
+                    CredentialConstants.HTTP_HEADER_CURRENT_LOCATION_NAME, "location_2"));
+        callerContextHolder.when(CallerContext.CallerContextHolder::get).thenReturn(callerContext);
+        Assertions.assertEquals("file://a/b/e", ops.getTargetLocation(filesetWithMultipleLocation));
+      }
     }
   }
 
