@@ -51,7 +51,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** This class implements the {@link org.apache.gravitino.cache.EntityCache} using Caffeine. */
+/** This class implements the {@link org.apache.gravitino.cache.EntityCache} using Caffeine */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_CORE_THREADS = 1;
   private static final int CACHE_CLEANUP_MAX_THREADS = 1;
