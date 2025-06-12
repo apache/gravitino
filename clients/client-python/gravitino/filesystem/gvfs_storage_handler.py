@@ -737,3 +737,17 @@ def get_storage_handler_by_path(actual_path: str) -> StorageHandler:
     raise GravitinoRuntimeException(
         f"Storage type doesn't support now. Path:{actual_path}"
     )
+
+def register_storage_handler_providers(options: Dict[str, str]):
+    """从配置中动态加载存储处理器提供者"""
+    providers_config = options.get(GVFSConfig.GVFS_FILESYSTEM_STORAGE_HANDLER_PROVIDERS)
+    if providers_config:
+        for provider_class_name in providers_config.split(','):
+            provider_class_name = provider_class_name.strip()
+            # 动态导入和注册
+            module_name, class_name = provider_class_name.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            provider_class = getattr(module, class_name)
+            provider = provider_class()
+            storage_handlers[provider.scheme()] = provider.get_storage_handler()
+            storage_prefixes[f"{provider.scheme()}://"] = provider.scheme()
