@@ -439,6 +439,33 @@ DELETE FROM rest.dml.test WHERE id = 2;
 SELECT * FROM test;
 ```
 
+## Exploring the Apache Gravitino Iceberg REST catalog service with Apache Doris
+
+### Creating Iceberg catalog in Apache Doris
+
+```
+CREATE CATALOG iceberg PROPERTIES (
+    "uri" = "http://localhost:9001/iceberg/",
+    "type" = "iceberg",
+    "iceberg.catalog.type" = "rest",
+    "s3.endpoint" = "http://s3.ap-southeast-2.amazonaws.com",
+    "s3.region" = "ap-southeast-2",
+    "s3.access_key" = "xxx",
+    "s3.secret_key" = "xxx"
+);
+```
+
+### Exploring Apache Iceberg with Apache Doris SQL
+
+```sql
+SWITCH iceberg;
+CREATE DATABASE db;
+USE db;
+CREATE TABLE t(a int);
+INSERT INTO t values(1);
+SELECT * FROM t;
+```
+
 ## Exploring the Apache Gravitino Iceberg REST catalog service with StarRocks
 
 ### Creating Iceberg catalog in StarRocks
