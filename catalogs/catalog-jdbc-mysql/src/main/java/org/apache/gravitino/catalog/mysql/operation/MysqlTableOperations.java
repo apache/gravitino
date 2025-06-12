@@ -672,4 +672,23 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
   }
+
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    String upperTypeName = typeName.toUpperCase();
+    switch (upperTypeName) {
+      case "TIME":
+        // TIME format: 'HH:MM:SS' (8 chars) + decimal point + precision
+        return columnSize >= TIME_FORMAT_WITH_DOT.length()
+            ? columnSize - TIME_FORMAT_WITH_DOT.length()
+            : 0;
+      case "TIMESTAMP":
+      case "DATETIME":
+        // TIMESTAMP/DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+        return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
+            ? columnSize - DATETIME_FORMAT_WITH_DOT.length()
+            : 0;
+    }
+    return null;
+  }
 }

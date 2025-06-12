@@ -461,7 +461,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -545,7 +545,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -626,13 +626,13 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_8")
-            .withType(Types.TimeType.get())
+            .withType(Types.TimeType.of(0))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .build());
     columns.add(
@@ -993,5 +993,36 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", false);
     sql = OceanBaseTableOperations.deleteIndexDefinition(null, deleteIndex);
     Assertions.assertEquals("DROP INDEX `uk_1`", sql);
+  }
+
+  @Test
+  public void testCalculateDatetimePrecision() {
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATE", 10, 0),
+        "DATE type should return 0 precision");
+
+    Assertions.assertEquals(
+        1,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIME", 10, 0),
+        "TIME type should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIMESTAMP", 23, 0),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 26, 0),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        9,
+        TABLE_OPERATIONS.calculateDatetimePrecision("timestamp", 29, 0),
+        "Lower case type name should work");
+
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
+        "Non-datetime type should return 0 precision");
   }
 }
