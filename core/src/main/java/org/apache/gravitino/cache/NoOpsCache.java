@@ -95,6 +95,12 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
+    // do nothing
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
       SupportsRelationOperations.Type relType,
       NameIdentifier nameIdentifier,

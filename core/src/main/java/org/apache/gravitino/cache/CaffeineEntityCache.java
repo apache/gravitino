@@ -31,6 +31,7 @@ import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFa
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Executors;
@@ -46,10 +47,11 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** This class implements the {@link EntityCache} using Caffeine. */
+/** This class implements the {@link org.apache.gravitino.cache.EntityCache} using Caffeine. */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_CORE_THREADS = 1;
   private static final int CACHE_CLEANUP_MAX_THREADS = 1;
@@ -114,12 +116,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Entity.EntityType identType) {
     checkArguments(nameIdentifier, identType, relType);
 
-    return withLock(
-        () -> {
-          List<Entity> entitiesFromCache =
-              cacheData.getIfPresent(EntityCacheKey.of(nameIdentifier, identType, relType));
-          return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntity);
-        });
+    List<Entity> entitiesFromCache =
+        cacheData.getIfPresent(EntityCacheKey.of(nameIdentifier, identType, relType));
+    return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntity);
   }
 
   /** {@inheritDoc} */
@@ -128,14 +127,11 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
-    return withLock(
-        () -> {
-          List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
+    List<Entity> entitiesFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
 
-          return Optional.ofNullable(entitiesFromCache)
-              .filter(l -> !l.isEmpty())
-              .map(entities -> convertEntity(entities.get(0)));
-        });
+    return Optional.ofNullable(entitiesFromCache)
+        .filter(l -> !l.isEmpty())
+        .map(entities -> convertEntity(entities.get(0)));
   }
 
   /** {@inheritDoc} */
@@ -160,16 +156,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean contains(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
-
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null);
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null;
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null);
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null;
   }
 
   /** {@inheritDoc} */
@@ -197,6 +191,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
       List<E> entities) {
     checkArguments(ident, type, relType);
     Preconditions.checkArgument(entities != null, "Entities cannot be null");
+    if (entities.isEmpty()) {
+      return;
+    }
 
     syncEntitiesToCache(
         EntityCacheKey.of(ident, type, relType),
@@ -210,10 +207,21 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     withLock(
         () -> {
+          invalidateOnKeyChange(entity);
           NameIdentifier identifier = getIdentFromEntity(entity);
           EntityCacheKey entityCacheKey = EntityCacheKey.of(identifier, entity.type());
+
           syncEntitiesToCache(entityCacheKey, Lists.newArrayList(entity));
         });
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
+    if (Objects.requireNonNull(entity.type()) == Entity.EntityType.MODEL_VERSION) {
+      NameIdentifier modelIdent = ((ModelVersionEntity) entity).modelIdentifier();
+      invalidate(modelIdent, Entity.EntityType.MODEL);
+    }
   }
 
   /** {@inheritDoc} */
@@ -339,8 +347,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
    * Runs the given action with the lock and returns the result.
    *
    * @param action The action to run with the lock
-   * @return The result of the action
    * @param <T> The type of the result
+   * @return The result of the action
    */
   private <T> T withLock(Supplier<T> action) {
     try {

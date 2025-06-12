@@ -66,4 +66,15 @@ public interface SupportsEntityStoreCache {
    * @param <E> The class of the entity
    */
   <E extends Entity & HasIdentifier> void put(E entity);
+
+  /**
+   * Invalidates related cache entries when inserting the given entity, if necessary.
+   *
+   * <p>For example, inserting a {@code ModelVersion} may require invalidating the corresponding
+   * {@code Model} entry in the cache to maintain consistency.
+   *
+   * @param entity The entity being inserted
+   * @param <E> The type of the entity
+   */
+  <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity);
 }

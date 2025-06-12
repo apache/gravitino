@@ -21,11 +21,9 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -41,7 +39,6 @@ import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
@@ -62,7 +59,6 @@ public class RelationalEntityStore
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
-  private Set<Namespace> namespaceSet;
   private boolean cacheEnabled;
 
   /**
@@ -80,7 +76,6 @@ public class RelationalEntityStore
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
     this.cacheEnabled = config.get(Configs.CACHE_ENABLED);
-    this.namespaceSet = Sets.newHashSet();
     // TODO USE SPI to load the cache
     this.cache = cacheEnabled ? new CaffeineEntityCache(config) : new NoOpsCache(config);
   }
@@ -106,30 +101,14 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
-    return cache.withCacheLock(
-        () -> {
-          List<E> entities = backend.list(namespace, entityType, false);
-          if (namespaceSet.add(namespace)) {
-            entities.forEach(cache::put);
-          }
-
-          return entities;
-        });
+    return backend.list(namespace, entityType, false);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
       throws IOException {
-    return cache.withCacheLock(
-        () -> {
-          List<E> entities = backend.list(namespace, entityType, allFields);
-          if (namespaceSet.add(namespace)) {
-            entities.forEach(cache::put);
-          }
-
-          return entities;
-        });
+    return backend.list(namespace, entityType, allFields);
   }
 
   @Override
@@ -141,30 +120,16 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    cache.withCacheLock(
-        () -> {
-          backend.insert(e, overwritten);
-
-          if (e.type() == Entity.EntityType.MODEL_VERSION) {
-            NameIdentifier modelIdent = ((ModelVersionEntity) e).modelIdentifier();
-            cache.invalidate(modelIdent, Entity.EntityType.MODEL);
-          }
-          cache.put(e);
-        });
+    backend.insert(e, overwritten);
+    cache.put(e);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return cache.withCacheLock(
-        () -> {
-          cache.invalidate(ident, entityType);
-          E updatedEntity = backend.update(ident, entityType, updater);
-          cache.put(updatedEntity);
-
-          return updatedEntity;
-        });
+    cache.invalidate(ident, entityType);
+    return backend.update(ident, entityType, updater);
   }
 
   @Override
@@ -262,9 +227,7 @@ public class RelationalEntityStore
           List<E> backendEntities =
               backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
 
-          if (!backendEntities.isEmpty()) {
-            cache.put(nameIdentifier, identType, relType, backendEntities);
-          }
+          cache.put(nameIdentifier, identType, relType, backendEntities);
 
           return backendEntities;
         });
