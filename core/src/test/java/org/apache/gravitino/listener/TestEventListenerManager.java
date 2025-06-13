@@ -264,8 +264,7 @@ public class TestEventListenerManager {
 
     EventBus eventBus = eventListenerManager.createEventBus();
     Optional<BaseEvent> transformedEvent =
-        eventBus.dispatchEvent(
-            new CountingPreEvent("user1", NameIdentifier.of("ns", "name"), 0));
+        eventBus.dispatchEvent(new CountingPreEvent("user1", NameIdentifier.of("ns", "name"), 0));
     Assertions.assertTrue(transformedEvent.isPresent());
     Assertions.assertTrue(transformedEvent.get() instanceof CountingPreEvent);
     Assertions.assertEquals(2, ((CountingPreEvent) transformedEvent.get()).count());

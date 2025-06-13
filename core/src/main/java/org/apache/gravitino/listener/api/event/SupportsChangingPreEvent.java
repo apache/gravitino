@@ -19,6 +19,5 @@
 
 package org.apache.gravitino.listener.api.event;
 
-
 // whether the pre event could be changed
 public interface SupportsChangingPreEvent {}

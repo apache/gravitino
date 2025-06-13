@@ -54,7 +54,8 @@ public class DummyEventListener implements EventListenerPlugin {
   }
 
   @Override
-  public SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent supportsChangingPreEvent) {
+  public SupportsChangingPreEvent transformPreEvent(
+      SupportsChangingPreEvent supportsChangingPreEvent) {
     if (supportsChangingPreEvent instanceof CountingPreEvent) {
       PreEvent preEvent = (PreEvent) supportsChangingPreEvent;
       return new CountingPreEvent(

@@ -101,10 +101,11 @@ public class EventBus {
     return Optional.empty();
   }
 
-  private Optional<BaseEvent> dispatchAndTransformPreEvent(PreEvent originalEvent) throws ForbiddenException {
+  private Optional<BaseEvent> dispatchAndTransformPreEvent(PreEvent originalEvent)
+      throws ForbiddenException {
     PreEvent preEvent;
     if (originalEvent instanceof SupportsChangingPreEvent) {
-      preEvent = (PreEvent) transformPreEvent((SupportsChangingPreEvent)originalEvent);
+      preEvent = (PreEvent) transformPreEvent((SupportsChangingPreEvent) originalEvent);
     } else {
       preEvent = originalEvent;
     }
