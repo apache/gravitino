@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.model;
 
+import static org.apache.gravitino.model.ModelVersion.URI_NAME_UNKNOWN;
+
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -27,6 +30,7 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchURINameException;
 
 /**
  * The ModelCatalog interface defines the public API for managing model objects in a schema. If the
@@ -219,13 +223,66 @@ public interface ModelCatalog {
    * @throws NoSuchModelException If the model does not exist.
    * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
    */
-  void linkModelVersion(
+  default void linkModelVersion(
       NameIdentifier ident,
       String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
-      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException;
+      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
+    linkModelVersion(ident, ImmutableMap.of(URI_NAME_UNKNOWN, uri), aliases, comment, properties);
+  }
+
+  /**
+   * Link a new model version to the registered model object. The new model version will be added to
+   * the model object. If the model object does not exist, it will throw an exception. If the
+   * version alias already exists in the model, it will throw an exception.
+   *
+   * @param ident The name identifier of the model.
+   * @param uris The names and URIs of the model version artifact.
+   * @param aliases The aliases of the model version. The aliases should be unique in this model,
+   *     otherwise the {@link ModelVersionAliasesAlreadyExistException} will be thrown. The aliases
+   *     are optional and can be empty. Also, be aware that the alias cannot be a number or a number
+   *     string.
+   * @param comment The comment of the model version. The comment is optional and can be null.
+   * @param properties The properties of the model version. The properties are optional and can be
+   *     null or empty.
+   * @throws NoSuchModelException If the model does not exist.
+   * @throws ModelVersionAliasesAlreadyExistException If the aliases already exist in the model.
+   */
+  default void linkModelVersion(
+      NameIdentifier ident,
+      Map<String, String> uris,
+      String[] aliases,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
+    throw new UnsupportedOperationException("Not supported yet");
+  }
+
+  /**
+   * @param ident The name identifier of the model.
+   * @param version The version number of the model.
+   * @param uriName The name of the URI. If null, the default URI will be used.
+   * @throws NoSuchModelVersionException If the model version does not exist.
+   * @return The URI of the model version.
+   */
+  default String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchURINameException {
+    throw new UnsupportedOperationException("Not supported yet");
+  }
+
+  /**
+   * @param ident The name identifier of the model.
+   * @param alias The version alias of the model.
+   * @param uriName The name of the URI. If null, the default URI will be used.
+   * @throws NoSuchModelVersionException If the model version does not exist.
+   * @return The URI of the model version.
+   */
+  default String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchURINameException {
+    throw new UnsupportedOperationException("Not supported yet");
+  }
 
   /**
    * Delete the model version by the {@link NameIdentifier} and version number. If the model version

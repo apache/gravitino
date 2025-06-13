@@ -150,6 +150,12 @@ public class TestHadoopCatalogOperations {
         public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Does not support model properties");
         }
+
+        @Override
+        public PropertiesMetadata modelVersionPropertiesMetadata()
+            throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Does not support model version properties");
+        }
       };
 
   private static EntityStore store;
@@ -1174,6 +1180,12 @@ public class TestHadoopCatalogOperations {
 
           @Override
           public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
+            return null;
+          }
+
+          @Override
+          public PropertiesMetadata modelVersionPropertiesMetadata()
+              throws UnsupportedOperationException {
             return null;
           }
         };
