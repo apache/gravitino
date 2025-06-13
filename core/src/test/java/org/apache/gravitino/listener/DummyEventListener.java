@@ -28,6 +28,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 
@@ -53,12 +54,13 @@ public class DummyEventListener implements EventListenerPlugin {
   }
 
   @Override
-  public PreEvent transformPreEvent(PreEvent preEvent) {
-    if (preEvent instanceof CountingPreEvent) {
+  public SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent supportsChangingPreEvent) {
+    if (supportsChangingPreEvent instanceof CountingPreEvent) {
+      PreEvent preEvent = (PreEvent) supportsChangingPreEvent;
       return new CountingPreEvent(
           preEvent.user(), preEvent.identifier(), ((CountingPreEvent) preEvent).count() + 1);
     }
-    return preEvent;
+    return supportsChangingPreEvent;
   }
 
   @Override

@@ -21,12 +21,14 @@ package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
 
 /**
  * The {@code EventBus} class serves as a mechanism to dispatch events to registered listeners. It
@@ -68,7 +70,7 @@ public class EventBus {
    *
    * @param baseEvent The event to be dispatched to all registered listeners.
    */
-  public void dispatchEvent(BaseEvent baseEvent) {
+  public Optional<BaseEvent> dispatchEvent(BaseEvent baseEvent) {
     if (baseEvent instanceof PreEvent) {
       dispatchAndTransformPreEvent((PreEvent) baseEvent);
     } else if (baseEvent instanceof Event) {
@@ -94,18 +96,27 @@ public class EventBus {
     return eventListeners;
   }
 
-  private void dispatchPostEvent(Event postEvent) {
+  private Optional<BaseEvent> dispatchPostEvent(Event postEvent) {
     eventListeners.forEach(eventListener -> eventListener.onPostEvent(postEvent));
+    return Optional.empty();
   }
 
-  public PreEvent dispatchAndTransformPreEvent(PreEvent originalEvent) throws ForbiddenException {
-    PreEvent transformedEvent = transformPreEvent(originalEvent);
-    eventListeners.forEach(eventListener -> eventListener.onPreEvent(transformedEvent));
-    return transformedEvent;
+  private Optional<BaseEvent> dispatchAndTransformPreEvent(PreEvent originalEvent) throws ForbiddenException {
+    PreEvent preEvent;
+    if (originalEvent instanceof SupportsChangingPreEvent) {
+      preEvent = (PreEvent) transformPreEvent((SupportsChangingPreEvent)originalEvent);
+    } else {
+      preEvent = originalEvent;
+    }
+    eventListeners.forEach(eventListener -> eventListener.onPreEvent(preEvent));
+    if (preEvent instanceof SupportsChangingPreEvent) {
+      return Optional.of(preEvent);
+    }
+    return Optional.empty();
   }
 
-  private PreEvent transformPreEvent(PreEvent preEvent) {
-    PreEvent tmpPreEvent = preEvent;
+  private SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
+    SupportsChangingPreEvent tmpPreEvent = preEvent;
     for (EventListenerPlugin eventListener : eventListeners) {
       tmpPreEvent = eventListener.transformPreEvent(tmpPreEvent);
     }

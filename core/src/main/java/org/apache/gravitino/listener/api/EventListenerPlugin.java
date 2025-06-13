@@ -24,6 +24,7 @@ import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
 
 /**
  * Defines an interface for event listeners that manage the lifecycle and state of a plugin,
@@ -130,7 +131,7 @@ public interface EventListenerPlugin {
    * @param preEvent The preEvent to be transformed.
    * @return The transformed preEvent.
    */
-  default PreEvent transformPreEvent(PreEvent preEvent) {
+  default SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
     return preEvent;
   };
 

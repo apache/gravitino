@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
@@ -79,24 +81,28 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), tableIdentifier);
-    IcebergCreateTablePreEvent transformedEvent =
-        (IcebergCreateTablePreEvent)
-            eventBus.dispatchAndTransformPreEvent(
-                new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequest));
+    Optional<BaseEvent> transformedEvent =
+        eventBus.dispatchEvent(
+            new IcebergCreateTablePreEvent(context, nameIdentifier, createTableRequest));
+    IcebergCreateTablePreEvent transformedIcebergCreateEvent =
+        (IcebergCreateTablePreEvent) transformedEvent.get();
     LoadTableResponse loadTableResponse;
     try {
       loadTableResponse =
           icebergTableOperationDispatcher.createTable(
-              context, namespace, transformedEvent.createTableRequest());
+              context, namespace, transformedIcebergCreateEvent.createTableRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergCreateTableFailureEvent(
-              context, nameIdentifier, transformedEvent.createTableRequest(), e));
+              context, nameIdentifier, transformedIcebergCreateEvent.createTableRequest(), e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergCreateTableEvent(
-            context, nameIdentifier, transformedEvent.createTableRequest(), loadTableResponse));
+            context,
+            nameIdentifier,
+            transformedIcebergCreateEvent.createTableRequest(),
+            loadTableResponse));
     return loadTableResponse;
   }
 
