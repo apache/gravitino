@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
@@ -87,7 +88,7 @@ public class GravitinoClient extends GravitinoClientBase
       boolean checkVersion,
       Map<String, String> headers) {
     super(uri, authDataProvider, checkVersion, headers);
-    this.metalake = loadMetalake(metalakeName);
+    this.metalake = StringUtils.isNotEmpty(metalakeName) ? loadMetalake(metalakeName) : null;
   }
 
   /**
@@ -97,6 +98,8 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
    */
   private GravitinoMetalake getMetalake() {
+    Preconditions.checkArgument(
+        metalake != null, "The argument 'metalakeName' must be a valid name");
     return metalake;
   }
 
@@ -595,9 +598,6 @@ public class GravitinoClient extends GravitinoClientBase
     public GravitinoClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
-      Preconditions.checkArgument(
-          metalakeName != null && !metalakeName.isEmpty(),
-          "The argument 'metalakeName' must be a valid name");
 
       return new GravitinoClient(uri, metalakeName, authDataProvider, checkVersion, headers);
     }
