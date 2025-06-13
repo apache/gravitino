@@ -19,30 +19,5 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.iceberg.rest.requests.CreateTableRequest;
-
-/** Represent a pre event before creating Iceberg table. */
-@DeveloperApi
-public class IcebergCreateTablePreEvent extends IcebergTablePreEvent
-    implements SupportsChangingPreEvent {
-  private final CreateTableRequest createTableRequest;
-
-  public IcebergCreateTablePreEvent(
-      IcebergRequestContext icebergRequestContext,
-      NameIdentifier resourceIdentifier,
-      CreateTableRequest createTableRequest) {
-    super(icebergRequestContext, resourceIdentifier);
-    this.createTableRequest = createTableRequest;
-  }
-
-  @Override
-  public OperationType operationType() {
-    return OperationType.CREATE_TABLE;
-  }
-
-  public CreateTableRequest createTableRequest() {
-    return createTableRequest;
-  }
-}
+// whether the pre event could be changed
+public interface SupportsChangingPreEvent {}
