@@ -261,25 +261,29 @@ public interface ModelCatalog {
   }
 
   /**
+   * Get the URI of the model artifact with a specified version number.
+   *
    * @param ident The name identifier of the model.
    * @param version The version number of the model.
    * @param uriName The name of the URI. If null, the default URI will be used.
    * @throws NoSuchModelVersionException If the model version does not exist.
    * @return The URI of the model version.
    */
-  default String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+  default String getModelUri(NameIdentifier ident, int version, String uriName)
       throws NoSuchModelVersionException, NoSuchURINameException {
     throw new UnsupportedOperationException("Not supported yet");
   }
 
   /**
+   * Get the URI of the model artifact with a specified version alias.
+   *
    * @param ident The name identifier of the model.
    * @param alias The version alias of the model.
    * @param uriName The name of the URI. If null, the default URI will be used.
    * @throws NoSuchModelVersionException If the model version does not exist.
    * @return The URI of the model version.
    */
-  default String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+  default String getModelUri(NameIdentifier ident, String alias, String uriName)
       throws NoSuchModelVersionException, NoSuchURINameException {
     throw new UnsupportedOperationException("Not supported yet");
   }

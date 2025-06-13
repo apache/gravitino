@@ -85,6 +85,10 @@ class NoSuchModelVersionException(NotFoundException):
     """An exception thrown when a model version is not found."""
 
 
+class NoSuchUriNameException(NotFoundException):
+    """An exception thrown when a URI name of a model version is not found."""
+
+
 class AlreadyExistsException(GravitinoRuntimeException):
     """Base exception thrown when an entity or resource already exists."""
 
