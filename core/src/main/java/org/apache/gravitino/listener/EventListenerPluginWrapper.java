@@ -26,6 +26,7 @@ import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +96,7 @@ public class EventListenerPluginWrapper implements EventListenerPlugin {
   }
 
   @Override
-  public PreEvent transformPreEvent(PreEvent preEvent) {
+  public SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
     return userEventListener.transformPreEvent(preEvent);
   }
 

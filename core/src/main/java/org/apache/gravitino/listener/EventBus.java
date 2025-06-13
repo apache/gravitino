@@ -72,9 +72,9 @@ public class EventBus {
    */
   public Optional<BaseEvent> dispatchEvent(BaseEvent baseEvent) {
     if (baseEvent instanceof PreEvent) {
-      dispatchAndTransformPreEvent((PreEvent) baseEvent);
+      return dispatchAndTransformPreEvent((PreEvent) baseEvent);
     } else if (baseEvent instanceof Event) {
-      dispatchPostEvent((Event) baseEvent);
+      return dispatchPostEvent((Event) baseEvent);
     } else {
       throw new RuntimeException("Unknown event type:" + baseEvent.getClass().getSimpleName());
     }
