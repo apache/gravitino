@@ -107,7 +107,7 @@ public class TableColumnMetaService {
 
   public int deleteColumnsByLegacyTimeline(Long legacyTimeline, int limit) {
     // deleteColumns will be done in the outside transaction, so we don't do commit here.
-    return SessionUtils.doWithoutCommitAndFetchResult(
+    return SessionUtils.getWithoutCommit(
         TableColumnMapper.class,
         mapper -> mapper.deleteColumnPOsByLegacyTimeline(legacyTimeline, limit));
   }
