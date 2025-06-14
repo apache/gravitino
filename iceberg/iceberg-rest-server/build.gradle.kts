@@ -47,6 +47,7 @@ dependencies {
   implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
+  implementation(libs.bundles.jwt)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
