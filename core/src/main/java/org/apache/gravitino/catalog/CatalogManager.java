@@ -26,6 +26,11 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.BASIC_CATALOG_PROPERTIES_METADATA;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 import static org.apache.gravitino.metalake.MetalakeManager.metalakeInUse;
+import org.apache.gravitino.catalog.ClassLoaderPool;
+import org.apache.gravitino.catalog.CatalogPropertyAnalyzer;
+import org.apache.gravitino.catalog.RateLimiter;
+import org.apache.gravitino.catalog.CatalogMetrics;
+import org.apache.gravitino.dto.util.DTOConverters;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -44,6 +49,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,7 +121,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogManager.class);
 
-  public void checkCatalogInUse(EntityStore store, NameIdentifier ident)
+    // 新增ClassLoader池
+    private ClassLoaderPool classLoaderPool;
+
+    // 新增操作频率限制器
+    private final RateLimiter catalogOperationLimiter;
+
+    public void checkCatalogInUse(EntityStore store, NameIdentifier ident)
       throws NoSuchMetalakeException, NoSuchCatalogException, CatalogNotInUseException,
           MetalakeNotInUseException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
@@ -140,6 +152,39 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     public BaseCatalog catalog() {
       return catalog;
     }
+
+      /**
+       * 热更新catalog配置，不重新创建ClassLoader
+       */
+      public void hotUpdateProperties(Map<String, String> newProperties) {
+          try {
+              classLoader.withClassLoader(cl -> {
+                  catalog.withCatalogConf(newProperties);
+                  return null;
+              });
+          } catch (Exception e) {
+              LOG.warn("Failed to hot update catalog properties", e);
+              throw new RuntimeException(e);
+          }
+      }
+
+      /**
+       * 检查是否可以进行热更新
+       */
+      public boolean canHotUpdate(CatalogChange... changes) {
+          CatalogPropertyAnalyzer.ChangeAnalysisResult result =
+                  CatalogPropertyAnalyzer.analyzeCatalogChanges(changes);
+          return !result.needsRecreation() && result.hasHotUpdatableChanges();
+      }
+
+      public String getProvider() {
+          return provider;
+      }
+
+      public Map<String, String> getOriginalConf() {
+          return Maps.newHashMap(originalConf);
+      }
+  }
 
     public <R> R doWithSchemaOps(ThrowableFunction<SupportsSchemas, R> fn) throws Exception {
       return classLoader.withClassLoader(
@@ -313,6 +358,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                             .setNameFormat("catalog-cleaner-%d")
                             .build())))
             .build();
+      // 初始化ClassLoader池
+      long poolMaxSize = config.get(Configs.CATALOG_CLASSLOADER_POOL_MAX_SIZE);
+      long poolExpireMinutes = config.get(Configs.CATALOG_CLASSLOADER_POOL_EXPIRE_MINUTES);
+      this.classLoaderPool = new ClassLoaderPool(poolMaxSize, poolExpireMinutes);
+
+      // 初始化操作频率限制器
+      double operationsPerSecond = config.get(Configs.CATALOG_OPERATIONS_PER_SECOND);
+      this.catalogOperationLimiter = RateLimiter.create(operationsPerSecond);
   }
 
   /**
@@ -636,88 +689,31 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public Catalog alterCatalog(NameIdentifier ident, CatalogChange... changes)
-      throws NoSuchCatalogException, IllegalArgumentException {
-    TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () -> {
-          checkCatalogInUse(store, ident);
+          throws NoSuchCatalogException, IllegalArgumentException {
 
-          // There could be a race issue that someone is using the catalog from cache while we are
-          // updating it.
+      // 添加频率限制
+      if (!catalogOperationLimiter.tryAcquire(1, TimeUnit.SECONDS)) {
+          throw new IllegalStateException("Catalog operation rate limit exceeded");
+      }
 
-          CatalogWrapper catalogWrapper = loadCatalogAndWrap(ident);
-          if (catalogWrapper == null) {
-            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
-          }
+      return TreeLockUtils.doWithTreeLock(
+              ident,
+              LockType.WRITE,
+              () -> {
+                  // 分析变更类型
+                  CatalogPropertyAnalyzer.ChangeAnalysisResult analysisResult =
+                          CatalogPropertyAnalyzer.analyzeCatalogChanges(changes);
 
-          try {
-            catalogWrapper.doWithPropertiesMeta(
-                f -> {
-                  Pair<Map<String, String>, Map<String, String>> alterProperty =
-                      getCatalogAlterProperty(changes);
-                  validatePropertyForAlter(
-                      f.catalogPropertiesMetadata(),
-                      alterProperty.getLeft(),
-                      alterProperty.getRight());
-                  return null;
-                });
-          } catch (IllegalArgumentException e1) {
-            throw e1;
-          } catch (Exception e) {
-            LOG.error("Failed to alter catalog {}", ident, e);
-            throw new RuntimeException(e);
-          }
-          return null;
-        });
+                  CatalogEntity oldEntity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
 
-    boolean containsRenameCatalog =
-        Arrays.stream(changes).anyMatch(c -> c instanceof CatalogChange.RenameCatalog);
-    NameIdentifier nameIdentifierForLock =
-        containsRenameCatalog ? NameIdentifier.of(ident.namespace().level(0)) : ident;
-
-    return TreeLockUtils.doWithTreeLock(
-        nameIdentifierForLock,
-        LockType.WRITE,
-        () -> {
-          catalogCache.invalidate(ident);
-          try {
-            CatalogEntity updatedCatalog =
-                store.update(
-                    ident,
-                    CatalogEntity.class,
-                    EntityType.CATALOG,
-                    catalog -> {
-                      CatalogEntity.Builder newCatalogBuilder =
-                          newCatalogBuilder(ident.namespace(), catalog);
-
-                      Map<String, String> newProps =
-                          catalog.getProperties() == null
-                              ? new HashMap<>()
-                              : new HashMap<>(catalog.getProperties());
-                      newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
-
-                      return newCatalogBuilder.build();
-                    });
-            return Objects.requireNonNull(
-                    catalogCache.get(
-                        updatedCatalog.nameIdentifier(),
-                        id -> createCatalogWrapper(updatedCatalog, null)))
-                .catalog;
-
-          } catch (NoSuchEntityException ne) {
-            LOG.warn("Catalog {} does not exist", ident, ne);
-            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
-
-          } catch (IllegalArgumentException iae) {
-            LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
-            throw iae;
-
-          } catch (IOException ioe) {
-            LOG.error("Failed to alter catalog {}", ident, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+                  if (!analysisResult.needsRecreation()) {
+                      // 只需要热更新，不重新创建catalog实例
+                      return performHotUpdate(ident, oldEntity, changes);
+                  } else {
+                      // 需要重新创建catalog实例
+                      return performFullUpdate(ident, oldEntity, changes);
+                  }
+              });
   }
 
   @Override
@@ -780,6 +776,120 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           }
         });
   }
+
+
+    // 新增热更新方法
+    private Catalog performHotUpdate(NameIdentifier ident, CatalogEntity oldEntity,
+                                     CatalogChange... changes) throws IOException {
+        LOG.info("Performing hot update for catalog: {}", ident);
+
+        // 更新实体属性但不重新创建wrapper
+        Map<String, String> newProps = Maps.newHashMap(oldEntity.getProperties());
+        CatalogEntity.Builder builder = newCatalogBuilder(ident.namespace(), oldEntity);
+        CatalogEntity updatedEntity = updateEntity(builder, newProps, changes)
+                .withProperties(newProps)
+                .build();
+
+        // 更新存储
+        store.update(ident, CatalogEntity.class, Entity.EntityType.CATALOG, updatedEntity);
+
+        // 获取现有的wrapper并更新其配置
+        CatalogWrapper existingWrapper = catalogCache.getIfPresent(ident);
+        if (existingWrapper != null) {
+            // 热更新wrapper的配置
+            existingWrapper.catalog().withCatalogConf(updatedEntity.getProperties())
+                    .withCatalogEntity(updatedEntity);
+        }
+
+        return DTOConverters.toCatalog(updatedEntity, existingWrapper.catalog().properties());
+    }
+
+    // 修改完整更新方法
+    private Catalog performFullUpdate(NameIdentifier ident, CatalogEntity oldEntity,
+                                      CatalogChange... changes) throws IOException {
+        LOG.info("Performing full update for catalog: {}", ident);
+
+        // 先释放旧的ClassLoader引用
+        classLoaderPool.release(oldEntity.getProvider(), oldEntity.getProperties());
+
+        // 使缓存失效
+        catalogCache.invalidate(ident);
+
+        // 执行原有的完整更新逻辑
+        Map<String, String> newProps = Maps.newHashMap(oldEntity.getProperties());
+        CatalogEntity.Builder builder = newCatalogBuilder(ident.namespace(), oldEntity);
+        CatalogEntity updatedEntity = updateEntity(builder, newProps, changes)
+                .withProperties(newProps)
+                .build();
+
+        store.update(ident, CatalogEntity.class, Entity.EntityType.CATALOG, updatedEntity);
+
+        return DTOConverters.toCatalog(
+                updatedEntity,
+                catalogCache.get(
+                                updatedEntity.nameIdentifier(),
+                                id -> createCatalogWrapper(updatedEntity, null))
+                        .catalog.properties());
+    }
+
+    // 修改createClassLoader方法，使用ClassLoader池
+    private IsolatedClassLoader createClassLoader(String provider, Map<String, String> conf) {
+        return classLoaderPool.getOrCreate(provider, conf, (p, c) -> {
+            // 原有的createClassLoader逻辑
+            if (config.get(Configs.CATALOG_LOAD_ISOLATED)) {
+                String catalogPkgPath = buildPkgPath(c, p);
+                String catalogConfPath = buildConfPath(c, p);
+                ArrayList<String> libAndResourcesPaths = Lists.newArrayList(catalogPkgPath, catalogConfPath);
+                BaseAuthorization.buildAuthorizationPkgPath(c).ifPresent(libAndResourcesPaths::add);
+                return IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
+            } else {
+                return new IsolatedClassLoader(
+                        Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+            }
+        });
+    }
+
+    // 修改close方法，确保资源正确释放
+    @Override
+    public void close() {
+        catalogCache.invalidateAll();
+        if (classLoaderPool != null) {
+            classLoaderPool.close();
+        }
+    }
+
+    // 新增辅助方法用于更新catalog实体
+    private CatalogEntity.Builder newCatalogBuilder(Namespace namespace, CatalogEntity oldEntity) {
+        return CatalogEntity.builder()
+                .withId(oldEntity.id())
+                .withName(oldEntity.name())
+                .withNamespace(namespace)
+                .withType(oldEntity.getType())
+                .withProvider(oldEntity.getProvider())
+                .withAuditInfo(oldEntity.auditInfo());
+    }
+
+    private CatalogEntity.Builder updateEntity(CatalogEntity.Builder builder,
+                                               Map<String, String> newProps,
+                                               CatalogChange... changes) {
+        for (CatalogChange change : changes) {
+            if (change instanceof CatalogChange.SetProperty) {
+                CatalogChange.SetProperty setProperty = (CatalogChange.SetProperty) change;
+                newProps.put(setProperty.getProperty(), setProperty.getValue());
+            } else if (change instanceof CatalogChange.RemoveProperty) {
+                CatalogChange.RemoveProperty removeProperty = (CatalogChange.RemoveProperty) change;
+                newProps.remove(removeProperty.getProperty());
+            } else if (change instanceof CatalogChange.RenameCatalog) {
+                CatalogChange.RenameCatalog renameCatalog = (CatalogChange.RenameCatalog) change;
+                builder.withName(renameCatalog.getNewName());
+            } else if (change instanceof CatalogChange.UpdateCatalogComment) {
+                CatalogChange.UpdateCatalogComment updateComment = (CatalogChange.UpdateCatalogComment) change;
+                newProps.put("comment", updateComment.getNewComment());
+            }
+        }
+        return builder;
+    }
+}
 
   /**
    * Check if the given list of schema entities contains any currently existing user-created

@@ -31,6 +31,32 @@ To run the unit tests, run the following command:
 ./gradlew test -PskipITs
 ```
 
+## 运行单元测试
+```
+./gradlew :core:unitTest
+```
+
+## 运行集成测试
+```
+./gradlew :core:integrationTest
+```
+
+## 运行性能测试
+```
+./gradlew :core:performanceTest -PrunPerformanceTests=true
+```
+## 运行压力测试
+```
+./gradlew :core:stressTest -PrunStressTests=true
+```
+## 运行所有优化相关测试
+```
+./gradlew :core:fullTest -PrunOptimizationTests=true
+```
+## CI环境测试
+```
+./gradlew ciTest -PrunIntegrationTests=true
+```
 This command runs all the unit tests and skips the integration tests.
 
 ## Run the integration tests
