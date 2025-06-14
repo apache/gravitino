@@ -74,8 +74,12 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
         cls._get_gravitino_home()
 
         cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
-        # restart the server
-        cls.restart_server()
+
+        # 只在 IDE 环境下重启服务器
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+        if test_env_mode == "IDE":
+            cls.restart_server()
+
         # create entity
         cls._init_test_entities()
 
@@ -85,8 +89,11 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
         # reset server conf in case of other ITs like HDFS has changed it and fail
         # to reset it
         cls._reset_conf(cls.config, cls.hadoop_conf_path)
-        # restart server
-        cls.restart_server()
+
+        # 只在 IDE 环境下重启服务器
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+        if test_env_mode == "IDE":
+            cls.restart_server()
 
     # clear all config in the conf_path
     @classmethod
