@@ -69,6 +69,12 @@ public class TestIcebergCatalog {
         public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Model properties are not supported");
         }
+
+        @Override
+        public PropertiesMetadata modelVersionPropertiesMetadata()
+            throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Does not support model version properties");
+        }
       };
 
   @Test

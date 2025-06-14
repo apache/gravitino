@@ -20,6 +20,7 @@ from gravitino.exceptions.base import (
     NoSuchSchemaException,
     NoSuchModelException,
     NoSuchModelVersionException,
+    NoSuchUriNameException,
     NotFoundException,
     ModelAlreadyExistsException,
     ModelVersionAliasesAlreadyExistException,
@@ -44,6 +45,8 @@ class ModelErrorHandler(RestErrorHandler):
                 raise NoSuchModelException(error_message)
             if exception_type == NoSuchModelVersionException.__name__:
                 raise NoSuchModelVersionException(error_message)
+            if exception_type == NoSuchUriNameException.__name__:
+                raise NoSuchUriNameException(error_message)
 
             raise NotFoundException(error_message)
 

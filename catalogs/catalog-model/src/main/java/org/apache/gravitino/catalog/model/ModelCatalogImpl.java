@@ -37,6 +37,9 @@ public class ModelCatalogImpl extends BaseCatalog<ModelCatalogImpl> {
   private static final ModelPropertiesMetadata MODEL_PROPERTIES_META =
       new ModelPropertiesMetadata();
 
+  private static final ModelVersionPropertiesMetadata MODEL_VERSION_PROPERTIES_META =
+      new ModelVersionPropertiesMetadata();
+
   @Override
   public String shortName() {
     return "model";
@@ -61,6 +64,11 @@ public class ModelCatalogImpl extends BaseCatalog<ModelCatalogImpl> {
   @Override
   public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
     return MODEL_PROPERTIES_META;
+  }
+
+  @Override
+  public PropertiesMetadata modelVersionPropertiesMetadata() throws UnsupportedOperationException {
+    return MODEL_VERSION_PROPERTIES_META;
   }
 
   @Override
