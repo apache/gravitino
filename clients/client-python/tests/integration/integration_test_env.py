@@ -77,24 +77,7 @@ class IntegrationTestEnv(unittest.TestCase):
                 sys.exit(0)
             return
 
-        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
-        start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
-
-        if test_env_mode == "CI" or start_external:
-            # CI环境或外部管理模式：不启动服务器，只检查服务器状态
-            if not check_gravitino_server_status():
-                logger.error("ERROR: Can't find online Gravitino server!")
-                sys.exit(0)
-            return
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
-            # Maybe Gravitino server already startup by Gradle test command or developer manual startup.
-            if not check_gravitino_server_status():
-                logger.error("ERROR: Can't find online Gravitino server!")
-            return
-
+        # IDE环境：正常启动服务器流程
         cls._get_gravitino_home()
         cls.gravitino_startup_script = os.path.join(
             cls.gravitino_home, "bin/gravitino.sh"
@@ -138,15 +121,6 @@ class IntegrationTestEnv(unittest.TestCase):
         start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
 
         if test_env_mode == "CI" or start_external:
-           # CI环境或外部管理模式：不启动服务器，只检查服务器状态
-           if not check_gravitino_server_status():
-               logger.error("ERROR: Can't find online Gravitino server!")
-               sys.exit(0)
-           return
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
             return
 
         logger.info("Stop integration test environment...")

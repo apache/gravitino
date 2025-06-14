@@ -768,6 +768,35 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
+  val downloadHadoop by registering(Download::class) {
+    src(hadoopDownloadUrl)
+    dest(layout.buildDirectory.file(hadoopPackName))
+    overwrite(false)
+  }
+
+  val verifyHadoop by registering(Verify::class) {
+    dependsOn(downloadHadoop)
+    src(layout.buildDirectory.file(hadoopPackName))
+    algorithm("SHA-512")
+    checksum("0bfc4d9b04be919be2fdf36f67fa3b4526cdbd406c512a7a1f5f1b715661f831c1b35e6d4fa7d6ce4e6b4f8b3b1c4e9b0b8b0b8b0b8b0b8b0b8b0b8b0b8b0")
+  }
+
+  val extractHadoop by registering(Copy::class) {
+    dependsOn(verifyHadoop)
+    from(tarTree(layout.buildDirectory.file(hadoopPackName)))
+    into(layout.buildDirectory)
+  }
+
+  val verifyHadoopPack by registering {
+    dependsOn(extractHadoop)
+    doLast {
+      val hadoopDir = layout.buildDirectory.dir(hadoopDirName).get().asFile
+      if (!hadoopDir.exists()) {
+        throw GradleException("Hadoop directory does not exist: ${hadoopDir.absolutePath}")
+      }
+    }
+  }
+
   val integrationTest by registering(VenvTask::class) {
     doFirst {
       gravitinoServer("start")
@@ -804,6 +833,12 @@ tasks {
     }
 
     finalizedBy(integrationCoverageReport)
+  }
+
+  val integrationCoverageReport by registering(VenvTask::class) {
+    venvExec = "coverage"
+    args = listOf("xml")
+    workingDir = projectDir.resolve("./tests/integration")
   }
 
   register("checksumIcebergRESTServerDistribution") {
@@ -932,6 +967,10 @@ tasks {
   }
 
   clean {
+    doFirst {
+      deleteCacheDir("__pycache__")
+      deleteCacheDir(".pytest_cache")
+    }
     dependsOn(cleanDistribution)
   }
 }
