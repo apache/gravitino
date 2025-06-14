@@ -67,15 +67,17 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
-            # Maybe Gravitino server already startup by Gradle test command or developer manual startup.
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+        start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
+
+        if test_env_mode == "CI" or start_external:
+            # CI environment or external management mode: Do not start the server, just check the server status
             if not check_gravitino_server_status():
                 logger.error("ERROR: Can't find online Gravitino server!")
+                sys.exit(0)
             return
 
+        # Restart the server only in the IDE environment
         cls._get_gravitino_home()
         cls.gravitino_startup_script = os.path.join(
             cls.gravitino_home, "bin/gravitino.sh"
@@ -115,10 +117,10 @@ class IntegrationTestEnv(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if (
-            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
-            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
-        ):
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+        start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
+
+        if test_env_mode == "CI" or start_external:
             return
 
         logger.info("Stop integration test environment...")

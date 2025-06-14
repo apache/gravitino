@@ -54,7 +54,6 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
 
         cls.oauth2_container = OAuth2Container()
         cls.oauth2_container_ip = cls.oauth2_container.get_ip()
-
         cls.oauth2_server_uri = f"http://{cls.oauth2_container_ip}:8177"
 
         # Get PEM from OAuth Server
@@ -72,16 +71,22 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
 
         # append the hadoop conf to server
         cls._append_conf(cls.config, cls.oauth2_conf_path)
-        # restart the server
-        cls._restart_server_with_oauth()
+
+        # Restart the server only in the IDE environment
+        test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+        if test_env_mode == "IDE":
+            cls._restart_server_with_oauth()
 
     @classmethod
     def tearDownClass(cls):
         try:
             # reset server conf
             cls._reset_conf(cls.config, cls.oauth2_conf_path)
-            # restart server
-            cls.restart_server()
+
+            # Restart the server only in the IDE environment
+            test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
+            if test_env_mode == "IDE":
+                cls.restart_server()
         finally:
             # close oauth2 container
             cls.oauth2_container.close()
