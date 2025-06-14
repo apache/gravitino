@@ -1,15 +1,38 @@
+from abc import ABC, abstractmethod
+from gravitino.filesystem.gvfs_storage_handler import StorageHandler
+
+
 class StorageHandlerProvider(ABC):
+    """
+    Abstract base class for storage handler providers.
+
+    This interface allows users to provide custom storage handlers for new file systems
+    without modifying the core GVFS code. Similar to Java's FileSystemProvider pattern.
+    """
+
     @abstractmethod
     def get_storage_handler(self) -> StorageHandler:
-        """返回存储处理器实例"""
+        """
+        Returns the storage handler instance.
+
+        :return: The storage handler instance
+        """
         pass
 
     @abstractmethod
     def scheme(self) -> str:
-        """返回支持的URI scheme，如's3a', 'custom'等"""
+        """
+        Returns the URI scheme supported by this provider.
+
+        :return: The URI scheme (e.g., 's3a', 'hdfs', 'custom')
+        """
         pass
 
     @abstractmethod
     def name(self) -> str:
-        """返回provider名称"""
+        """
+        Returns the name of this provider.
+
+        :return: The provider name
+        """
         pass
