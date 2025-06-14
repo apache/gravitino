@@ -1000,3 +1000,42 @@ model_versions: List[int] = catalog.as_model_catalog().list_model_versions(model
 
 </TabItem>
 </Tabs>
+
+### List all versions' information in a model
+
+You can list all versions' information in a model by sending a `GET` request to the `/api/metalakes/
+{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions?detail=true` endpoint
+or by using the Gravitino Java/Python client. The following is an example of listing all the
+versions' information in a model:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions?detail=true
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+ModelVersion[] versions = catalog.asModelCatalog().listModelVersionInfos(NameIdentifier.of("model_schema", "example_model"));
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+model_versions: List[ModelVersion] = catalog.as_model_catalog().list_model_version_infos(model_ident=NameIdentifier.of("model_schema", "example_model"))
+```
+
+</TabItem>
+</Tabs>

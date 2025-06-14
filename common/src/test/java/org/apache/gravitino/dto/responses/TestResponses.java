@@ -441,6 +441,50 @@ public class TestResponses {
   }
 
   @Test
+  void testModelVersionInfoListResponse() throws JsonProcessingException {
+    ModelVersionInfoListResponse response1 =
+        new ModelVersionInfoListResponse(new ModelVersionDTO[] {});
+    assertDoesNotThrow(response1::validate);
+
+    String serJson1 = JsonUtils.objectMapper().writeValueAsString(response1);
+    ModelVersionInfoListResponse deserResponse1 =
+        JsonUtils.objectMapper().readValue(serJson1, ModelVersionInfoListResponse.class);
+    assertEquals(response1, deserResponse1);
+    assertArrayEquals(new ModelVersionDTO[] {}, deserResponse1.getVersions());
+
+    ModelVersionDTO v1 =
+        ModelVersionDTO.builder()
+            .withVersion(0)
+            .withComment("model version1 comment")
+            .withAliases(new String[] {"alias1", "alias2"})
+            .withUri("uri")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withAudit(
+                AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build())
+            .build();
+    ModelVersionDTO v2 =
+        ModelVersionDTO.builder()
+            .withVersion(1)
+            .withComment("model version2 comment")
+            .withAliases(new String[] {"alias3", "alias4"})
+            .withUri("uri")
+            .withProperties(ImmutableMap.of("key", "value"))
+            .withAudit(
+                AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build())
+            .build();
+
+    ModelVersionInfoListResponse response2 =
+        new ModelVersionInfoListResponse(new ModelVersionDTO[] {v1, v2});
+    assertDoesNotThrow(response2::validate);
+
+    String serJson2 = JsonUtils.objectMapper().writeValueAsString(response2);
+    ModelVersionInfoListResponse deserResponse2 =
+        JsonUtils.objectMapper().readValue(serJson2, ModelVersionInfoListResponse.class);
+    assertEquals(response2, deserResponse2);
+    assertArrayEquals(new ModelVersionDTO[] {v1, v2}, deserResponse2.getVersions());
+  }
+
+  @Test
   void testModelVersionResponse() throws JsonProcessingException {
     Map<String, String> props = ImmutableMap.of("key", "value");
     AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
