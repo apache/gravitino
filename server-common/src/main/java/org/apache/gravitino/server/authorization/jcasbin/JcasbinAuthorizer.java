@@ -107,13 +107,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     try {
       return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
     } catch (IOException e) {
-      LOG.error(
-          "Failed to authorize user {} on {} with privilege {}: {}",
-          username,
-          metadataObject,
-          privilege,
-          e.getMessage(),
-          e);
       throw new RuntimeException("Authorization check failed", e);
     }
   }
