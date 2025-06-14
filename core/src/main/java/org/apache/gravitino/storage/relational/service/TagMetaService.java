@@ -336,7 +336,7 @@ public class TagMetaService {
 
       // Fetch all the tags associated with the metadata object after the operation.
       List<TagPO> tagPOs =
-          SessionUtils.getWithoutCommit(
+          SessionUtils.doWithoutCommitAndFetchResult(
               TagMetadataObjectRelMapper.class,
               mapper ->
                   mapper.listTagPOsByMetadataObjectIdAndType(
