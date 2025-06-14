@@ -72,7 +72,7 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
         # append the hadoop conf to server
         cls._append_conf(cls.config, cls.oauth2_conf_path)
 
-        # 只在 IDE 环境下重启服务器
+        # Restart the server only in the IDE environment
         test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
         if test_env_mode == "IDE":
             cls._restart_server_with_oauth()
@@ -83,7 +83,7 @@ class TestOAuth2(IntegrationTestEnv, TestCommonAuth):
             # reset server conf
             cls._reset_conf(cls.config, cls.oauth2_conf_path)
 
-            # 只在 IDE 环境下重启服务器
+            # Restart the server only in the IDE environment
             test_env_mode = os.environ.get("GRAVITINO_TEST_ENV_MODE", "IDE").upper()
             if test_env_mode == "IDE":
                 cls.restart_server()

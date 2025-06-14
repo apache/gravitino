@@ -71,13 +71,13 @@ class IntegrationTestEnv(unittest.TestCase):
         start_external = os.environ.get("START_EXTERNAL_GRAVITINO", "false").lower() == "true"
 
         if test_env_mode == "CI" or start_external:
-            # CI环境或外部管理模式：不启动服务器，只检查服务器状态
+            # CI environment or external management mode: Do not start the server, just check the server status
             if not check_gravitino_server_status():
                 logger.error("ERROR: Can't find online Gravitino server!")
                 sys.exit(0)
             return
 
-        # IDE环境：正常启动服务器流程
+        # Restart the server only in the IDE environment
         cls._get_gravitino_home()
         cls.gravitino_startup_script = os.path.join(
             cls.gravitino_home, "bin/gravitino.sh"
