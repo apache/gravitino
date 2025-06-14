@@ -118,7 +118,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     List<Entity> entitiesFromCache =
         cacheData.getIfPresent(EntityCacheKey.of(nameIdentifier, identType, relType));
-    return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntity);
+    return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntities);
   }
 
   /** {@inheritDoc} */
@@ -218,6 +218,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
+    // Invalidate the cache if inserting the entity may affect related cache keys.
+    // For example, inserting a model version changes the latest version of the model,
+    // so the corresponding model cache entry should be invalidated.
     if (Objects.requireNonNull(entity.type()) == Entity.EntityType.MODEL_VERSION) {
       NameIdentifier modelIdent = ((ModelVersionEntity) entity).modelIdentifier();
       invalidate(modelIdent, Entity.EntityType.MODEL);

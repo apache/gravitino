@@ -76,7 +76,7 @@ public abstract class BaseEntityCache implements EntityCache {
    * @param <E> The type of the entities in the new list.
    */
   @SuppressWarnings("unchecked")
-  public static <E extends Entity & HasIdentifier> List<E> convertEntity(List<Entity> entities) {
+  public static <E extends Entity & HasIdentifier> List<E> convertEntities(List<Entity> entities) {
     entities.forEach(BaseEntityCache::validateEntityHasIdentifier);
 
     return (List<E>) (List<? extends Entity>) entities;

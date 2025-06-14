@@ -59,25 +59,17 @@ public class RelationalEntityStore
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
-  private boolean cacheEnabled;
-
-  /**
-   * Return whether the cache is enabled or not.
-   *
-   * @return {@code true} if cache is enable, otherwise {@code false}
-   */
-  public boolean cacheEnabled() {
-    return cacheEnabled;
-  }
 
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
-    this.cacheEnabled = config.get(Configs.CACHE_ENABLED);
     // TODO USE SPI to load the cache
-    this.cache = cacheEnabled ? new CaffeineEntityCache(config) : new NoOpsCache(config);
+    this.cache =
+        config.get(Configs.CACHE_ENABLED)
+            ? new CaffeineEntityCache(config)
+            : new NoOpsCache(config);
   }
 
   private static RelationalBackend createRelationalEntityBackend(Config config) {
