@@ -30,6 +30,11 @@ import io.trino.spi.connector.DynamicFilter;
 public class GravitinoSplitManager implements ConnectorSplitManager {
   private final ConnectorSplitManager internalSplitManager;
 
+  /**
+   * Constructs a new GravitinoSplitManager with the specified split manager.
+   *
+   * @param internalSplitManager the internal connector split manager
+   */
   public GravitinoSplitManager(ConnectorSplitManager internalSplitManager) {
     this.internalSplitManager = internalSplitManager;
   }

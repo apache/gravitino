@@ -46,6 +46,10 @@ import java.lang.reflect.Field;
 import java.util.function.Function;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 
+/**
+ * Utility class for JSON serialization and deserialization in the Gravitino Trino connector.
+ * Provides functionality for handling various Trino-specific types and plugin classes.
+ */
 public class JsonCodec {
   private static ObjectMapper mapper;
 
@@ -195,6 +199,14 @@ public class JsonCodec {
     }
   }
 
+  /**
+   * Gets the singleton ObjectMapper instance for JSON processing. Creates a new mapper if one
+   * doesn't exist, configured with all necessary modules and settings for handling Trino-specific
+   * types and plugin classes.
+   *
+   * @param appClassLoader the class loader to use for loading application classes
+   * @return the configured ObjectMapper instance
+   */
   public static ObjectMapper getMapper(ClassLoader appClassLoader) {
     if (mapper != null) {
       return mapper;

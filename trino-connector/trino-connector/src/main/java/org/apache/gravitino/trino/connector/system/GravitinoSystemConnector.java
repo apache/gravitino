@@ -56,6 +56,11 @@ public class GravitinoSystemConnector implements Connector {
 
   private final GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory;
 
+  /**
+   * Constructs a new GravitinoSystemConnector.
+   *
+   * @param gravitinoStoredProcedureFactory the factory for creating stored procedures
+   */
   public GravitinoSystemConnector(GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
     this.gravitinoStoredProcedureFactory = gravitinoStoredProcedureFactory;
   }
@@ -87,10 +92,13 @@ public class GravitinoSystemConnector implements Connector {
     return new DatasourceProvider();
   }
 
+  /** The transaction handle for Gravitino system connector. */
   public enum TransactionHandle implements ConnectorTransactionHandle {
+    /** The singleton instance of the transaction handle. */
     INSTANCE
   }
 
+  /** The datasource provider. */
   public static class DatasourceProvider implements ConnectorPageSourceProvider {
 
     @Override
@@ -108,6 +116,7 @@ public class GravitinoSystemConnector implements Connector {
     }
   }
 
+  /** The split manager. */
   public static class SplitManager implements ConnectorSplitManager {
 
     @Override
@@ -124,14 +133,25 @@ public class GravitinoSystemConnector implements Connector {
     }
   }
 
+  /** The split. */
   public static class Split implements ConnectorSplit {
     private final SchemaTableName tableName;
 
+    /**
+     * Constructs a new Split with the specified table name.
+     *
+     * @param tableName the table name
+     */
     @JsonCreator
     public Split(@JsonProperty("tableName") SchemaTableName tableName) {
       this.tableName = tableName;
     }
 
+    /**
+     * Retrieves the table name.
+     *
+     * @return the table name
+     */
     @JsonProperty
     public SchemaTableName getTableName() {
       return tableName;
@@ -153,11 +173,17 @@ public class GravitinoSystemConnector implements Connector {
     }
   }
 
+  /** The system table page source. */
   public static class SystemTablePageSource implements ConnectorPageSource {
 
     private boolean isFinished = false;
     private final Page page;
 
+    /**
+     * Constructs a new SystemTablePageSource.
+     *
+     * @param page the page containing system table data
+     */
     public SystemTablePageSource(Page page) {
       this.page = page;
     }

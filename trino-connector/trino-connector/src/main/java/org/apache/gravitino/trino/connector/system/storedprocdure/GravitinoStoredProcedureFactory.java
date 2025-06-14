@@ -33,8 +33,15 @@ public class GravitinoStoredProcedureFactory {
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
 
+  /** List of all registered Gravitino stored procedures */
   public final List<GravitinoStoredProcedure> procedures = new ArrayList<>();
 
+  /**
+   * Constructs a new GravitinoStoredProcedureFactory.
+   *
+   * @param catalogConnectorManager the catalog connector manager
+   * @param metalake the metalake name
+   */
   public GravitinoStoredProcedureFactory(
       CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
@@ -50,6 +57,12 @@ public class GravitinoStoredProcedureFactory {
     procedures.add(new AlterCatalogStoredProcedure(catalogConnectorManager, metalake));
   }
 
+  /**
+   * Gets all registered stored procedures.
+   *
+   * @return a set of all stored procedures
+   * @throws TrinoException if failed to initialize any stored procedure
+   */
   public Set<Procedure> getStoredProcedures() {
     return procedures.stream()
         .map(

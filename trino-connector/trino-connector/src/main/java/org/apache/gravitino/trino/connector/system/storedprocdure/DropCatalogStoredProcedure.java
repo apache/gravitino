@@ -36,12 +36,23 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Stored procedure implementation for dropping an existing catalog in Gravitino.
+ *
+ * <p>This procedure allows dropping a catalog with optional ignoreNotExist flag.
+ */
 public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
   private static final Logger LOG = LoggerFactory.getLogger(DropCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
 
+  /**
+   * Constructs a new DropCatalogStoredProcedure.
+   *
+   * @param catalogConnectorManager the catalog connector manager
+   * @param metalake the metalake name
+   */
   public DropCatalogStoredProcedure(
       CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
@@ -65,6 +76,13 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
         GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME, "drop_catalog", arguments, dropCatalog);
   }
 
+  /**
+   * Drops the specified catalog.
+   *
+   * @param catalogName the name of the catalog to drop
+   * @param ignoreNotExist whether to ignore if the catalog does not exist
+   * @throws TrinoException if the catalog does not exist and ignoreNotExist is false
+   */
   public void dropCatalog(String catalogName, boolean ignoreNotExist) {
     try {
       CatalogConnectorContext catalogConnector =
