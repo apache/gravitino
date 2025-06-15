@@ -43,7 +43,10 @@ hadoop3-aliyun = "3.3.1"
 hadoop-minikdc = "3.3.1"
 htrace-core4 = "4.1.0-incubating"
 httpclient = "4.4.1"
-httpclient5 = "5.2.1"
+httpclient5 = "5.4.4"
+httpcore5 = "5.3.4"
+micrometer-core = "1.12.2"
+jackson-dataformat-yaml = "2.16.1"
 mockserver = "5.15.0"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
@@ -120,6 +123,7 @@ google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
 openlineage = "1.29.0"
 
+
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
 aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
@@ -134,6 +138,7 @@ jackson-databind = { group = "com.fasterxml.jackson.core", name = "jackson-datab
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations", version.ref = "jackson" }
 jackson-datatype-jdk8 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jdk8", version.ref = "jackson" }
 jackson-datatype-jsr310 = { group = "com.fasterxml.jackson.datatype", name = "jackson-datatype-jsr310", version.ref = "jackson" }
+jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml", version.ref = "jackson-dataformat-yaml" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 kerby-core = { group = "org.apache.kerby", name = "kerb-core", version.ref = "kerby"}
 kerby-simplekdc = { group = "org.apache.kerby", name = "kerb-simplekdc", version.ref = "kerby"}
@@ -188,6 +193,9 @@ airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-jso
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
+httpcore5 = { group = "org.apache.httpcomponents.core5", name = "httpcore5", version.ref = "httpcore5" }
+micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.ref = "micrometer-core" }
+
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
