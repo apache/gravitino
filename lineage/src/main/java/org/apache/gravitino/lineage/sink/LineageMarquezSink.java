@@ -1,0 +1,79 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.lineage.sink;
+
+import io.openlineage.client.OpenLineageClient;
+import io.openlineage.client.OpenLineageClientException;
+import io.openlineage.client.transports.HttpConfig;
+import io.openlineage.client.transports.HttpTransport;
+import io.openlineage.server.OpenLineage;
+import java.util.Map;
+import javax.ws.rs.BadRequestException;
+import org.apache.gravitino.lineage.Utils;
+import org.apache.gravitino.lineage.auth.AuthenticationFactory;
+import org.apache.gravitino.lineage.auth.LineageServerAuthenticationStrategy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class LineageMarquezSink implements LineageSink {
+
+  private static final Logger LOG = LoggerFactory.getLogger(LineageMarquezSink.class);
+  private OpenLineageClient client;
+
+  @Override
+  public void initialize(Map<String, String> configs) {
+
+    String marquezUrl = configs.getOrDefault("url", "http://localhost:5000/");
+    LOG.info("marquez url {}", marquezUrl);
+    String authType = configs.get("auth.type");
+    LOG.info("marquez authentication type {}", authType);
+    LineageServerAuthenticationStrategy authStrategy =
+        AuthenticationFactory.createStrategy(authType);
+
+    // Configure HttpConfig with authentication
+    HttpConfig httpConfig = authStrategy.configureHttpConfig(marquezUrl, configs);
+
+    HttpTransport transport = new HttpTransport(httpConfig);
+
+    client = OpenLineageClient.builder().transport(transport).build();
+  }
+
+  @Override
+  public void sink(OpenLineage.RunEvent runEvent) {
+
+    try {
+      client.emit(Utils.mapLineageServertoClientRunEvent(runEvent));
+      LOG.info("Sent lineage event to Marquez: {}", runEvent);
+    } catch (OpenLineageClientException e) {
+      LOG.error("Failed to send lineage event to Marquez", e);
+      throw new BadRequestException(String.format(e.getMessage()));
+    }
+  }
+
+  @Override
+  public void close() {
+    if (client != null) {
+      try {
+        client.close();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+}
