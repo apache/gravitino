@@ -26,10 +26,20 @@ import java.util.Set;
 import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 
+/**
+ * Property converter for JDBC catalog properties. Handles the conversion of property keys between
+ * Trino and Gravitino formats for JDBC catalogs, including connection, authentication, and general
+ * configuration properties.
+ */
 public class JDBCCatalogPropertyConverter extends PropertyConverter {
 
+  /** Property key for JDBC connection URL. */
   public static final String JDBC_CONNECTION_URL_KEY = "connection-url";
+
+  /** Property key for JDBC connection username. */
   public static final String JDBC_CONNECTION_USER_KEY = "connection-user";
+
+  /** Property key for JDBC connection password. */
   public static final String JDBC_CONNECTION_PASSWORD_KEY = "connection-password";
 
   private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =
@@ -104,6 +114,7 @@ public class JDBCCatalogPropertyConverter extends PropertyConverter {
               .put("join-pushdown.strategy", TRINO_PROPERTIES_PREFIX + "join-pushdown.strategy")
               .build());
 
+  /** Set of required properties for JDBC connection. */
   public static final Set<String> REQUIRED_PROPERTIES =
       Sets.newHashSet(
           JDBC_CONNECTION_PASSWORD_KEY, JDBC_CONNECTION_USER_KEY, JDBC_CONNECTION_PASSWORD_KEY);

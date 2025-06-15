@@ -34,11 +34,21 @@ public class GravitinoTransactionHandle
   private HandleWrapper<ConnectorTransactionHandle> handleWrapper =
       new HandleWrapper<>(ConnectorTransactionHandle.class);
 
+  /**
+   * Constructs a new GravitinoTransactionHandle from a handle string.
+   *
+   * @param handleString the handle string representation
+   */
   @JsonCreator
   public GravitinoTransactionHandle(@JsonProperty(HANDLE_STRING) String handleString) {
     this.handleWrapper = handleWrapper.fromJson(handleString);
   }
 
+  /**
+   * Constructs a new GravitinoTransactionHandle from an internal transaction handle.
+   *
+   * @param internalTransactionHandle the internal transaction handle
+   */
   public GravitinoTransactionHandle(ConnectorTransactionHandle internalTransactionHandle) {
     this.handleWrapper = new HandleWrapper<>(internalTransactionHandle);
   }

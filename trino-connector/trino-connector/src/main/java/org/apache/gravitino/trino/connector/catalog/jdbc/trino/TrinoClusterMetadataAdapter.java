@@ -26,6 +26,13 @@ import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 /** Support Trino cluster connector for testing. */
 public class TrinoClusterMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
+  /**
+   * Constructs a new TrinoClusterMetadataAdapter.
+   *
+   * @param schemaProperties The list of schema property metadata
+   * @param tableProperties The list of table property metadata
+   * @param columnProperties The list of column property metadata
+   */
   public TrinoClusterMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,

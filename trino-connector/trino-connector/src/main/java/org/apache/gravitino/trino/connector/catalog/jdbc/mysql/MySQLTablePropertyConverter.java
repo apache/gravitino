@@ -26,6 +26,10 @@ import org.apache.gravitino.catalog.mysql.MysqlConstants;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.shaded.com.google.common.collect.ImmutableMap;
 
+/**
+ * Property converter for MySQL table properties. Handles the conversion of property keys between
+ * Trino and Gravitino formats for MySQL tables.
+ */
 public class MySQLTablePropertyConverter extends PropertyConverter {
   // TODO (yuqi) add more properties
   @VisibleForTesting

@@ -81,6 +81,14 @@ public class GravitinoMetadata implements ConnectorMetadata {
 
   private final ConnectorMetadata internalMetadata;
 
+  /**
+   * Constructs a new GravitinoMetadata instance.
+   *
+   * @param catalogConnectorMetadata the metadata handler for operations on the Gravitino server
+   * @param metadataAdapter the adapter for transforming metadata between Trino and Gravitino
+   *     formats
+   * @param internalMetadata the internal connector metadata for data access
+   */
   public GravitinoMetadata(
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,

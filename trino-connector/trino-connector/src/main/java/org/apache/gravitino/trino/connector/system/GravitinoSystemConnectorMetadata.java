@@ -88,28 +88,50 @@ public class GravitinoSystemConnectorMetadata implements ConnectorMetadata {
         .get(((SystemColumnHandle) columnHandle).index);
   }
 
+  /** A handle for system tables in the Gravitino connector. */
   public static class SystemTableHandle implements ConnectorTableHandle {
     private final SchemaTableName name;
 
+    /**
+     * Constructs a new SystemTableHandle.
+     *
+     * @param name the schema-qualified table name
+     */
     @JsonCreator
     public SystemTableHandle(@JsonProperty("name") SchemaTableName name) {
       this.name = name;
     }
 
+    /**
+     * Gets the schema-qualified table name.
+     *
+     * @return the table name
+     */
     @JsonProperty
     public SchemaTableName getName() {
       return name;
     }
   }
 
+  /** A handle for columns in system tables. */
   public static class SystemColumnHandle implements ColumnHandle {
     private final int index;
 
+    /**
+     * Constructs a new SystemColumnHandle.
+     *
+     * @param index the index of the column in the table
+     */
     @JsonCreator
     public SystemColumnHandle(@JsonProperty("index") int index) {
       this.index = index;
     }
 
+    /**
+     * Gets the index of the column.
+     *
+     * @return the column index
+     */
     @JsonProperty
     public int getIndex() {
       return index;

@@ -32,6 +32,11 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
 
   ConnectorPageSinkProvider pageSinkProvider;
 
+  /**
+   * Constructs a new GravitinoPageSinkProvider with the specified page sink provider.
+   *
+   * @param pageSinkProvider the internal connector page sink provider
+   */
   public GravitinoPageSinkProvider(ConnectorPageSinkProvider pageSinkProvider) {
     this.pageSinkProvider = pageSinkProvider;
   }
