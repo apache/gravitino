@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from itertools import filterfalse
 from typing import TYPE_CHECKING, List
 
 from gravitino.utils.precondition import Precondition
@@ -38,20 +37,18 @@ class PartitionUtils:
             field_name (List[str]): The name of the field to validate.
 
         Raises:
-            IllegalArgumentException: If the field does not exist in the table, this exception is thrown.
+            IllegalArgumentException:
+                If the field does not exist in the table, this exception is thrown.
         """
         Precondition.check_argument(
-            columns is not None and next(iter(columns), None) is not None,
-            "columns cannot be null or empty",
+            columns is not None and len(columns) > 0, "columns cannot be null or empty"
         )
-        name = next(iter(field_name), None)
-        Precondition.check_argument(name is not None, "field name cannot be empty")
         # TODO: Need to consider the case sensitivity issues. To be optimized.
-        partition_columns = filterfalse(
-            lambda column: column.name().lower() != name.lower(), columns
-        )
+        partition_column = [
+            c for c in columns if c.name().lower() == field_name[0].lower()
+        ]
+
         Precondition.check_argument(
-            next(partition_columns, None) is not None,
-            f"Field '{field_name}' not found in table",
+            len(partition_column) == 1, f"Field '{field_name[0]}' not found in table"
         )
         # TODO: should validate nested fieldName after column type support namedStruct
