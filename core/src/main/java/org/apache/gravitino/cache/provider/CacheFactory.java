@@ -24,7 +24,6 @@ import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.cache.EntityCache;
 
 /** Factory class for creating {@link EntityCache} instances. */
@@ -48,18 +47,6 @@ public final class CacheFactory {
   public static EntityCache getEntityCache(Config config) {
     CacheProvider provider = getProvider(config.get(Configs.CACHE_TYPE_NAME));
     return provider.getCache(config);
-  }
-
-  /**
-   * Creates a new {@link EntityCache} using the specified configuration and backing store.
-   *
-   * @param config The configuration.
-   * @param entityStore The underlying entity store, used to load entries when needed.
-   * @return A cache instance provided by the selected {@link CacheProvider}.
-   */
-  public static EntityCache getEntityCache(Config config, EntityStore entityStore) {
-    CacheProvider provider = getProvider(config.get(Configs.CACHE_TYPE_NAME));
-    return provider.getCache(config, entityStore);
   }
 
   private static CacheProvider getProvider(String name) {

@@ -20,7 +20,6 @@
 package org.apache.gravitino.cache.provider;
 
 import org.apache.gravitino.Config;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.EntityCache;
 
@@ -39,12 +38,6 @@ public class CaffeineCacheProvider implements CacheProvider {
   /** {@inheritDoc} */
   @Override
   public EntityCache getCache(Config config) {
-    return CaffeineEntityCache.getInstance(config, null);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public EntityCache getCache(Config config, EntityStore entityStore) {
-    return CaffeineEntityCache.getInstance(config, entityStore);
+    return new CaffeineEntityCache(config);
   }
 }

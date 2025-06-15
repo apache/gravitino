@@ -20,7 +20,6 @@
 package org.apache.gravitino.cache.provider;
 
 import org.apache.gravitino.Config;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.cache.EntityCache;
 
 /**
@@ -43,13 +42,4 @@ public interface CacheProvider {
    * @return A cache instance initialized according to the configuration.
    */
   EntityCache getCache(Config config);
-
-  /**
-   * Gets a {@link EntityCache} instance based on the cache configuration and entity store.
-   *
-   * @param config The configuration information for the cache.
-   * @param entityStore The associated entity store.
-   * @return A cache instance initialized according to the configuration and entity store.
-   */
-  EntityCache getCache(Config config, EntityStore entityStore);
 }

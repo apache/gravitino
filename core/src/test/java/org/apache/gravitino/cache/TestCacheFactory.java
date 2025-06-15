@@ -19,26 +19,15 @@
 
 package org.apache.gravitino.cache;
 
-import static org.mockito.Mockito.mock;
-
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.cache.provider.CacheFactory;
-import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestCacheFactory {
-  private EntityStore mockStore;
-
-  @BeforeAll
-  void setUp() {
-    mockStore = mock(RelationalEntityStore.class);
-  }
 
   @Test
   void testGetCache() {
@@ -46,8 +35,7 @@ public class TestCacheFactory {
     EntityCache entityCache = CacheFactory.getEntityCache(config);
     Assertions.assertInstanceOf(CaffeineEntityCache.class, entityCache);
 
-    CaffeineEntityCache.resetForTest();
-    entityCache = CacheFactory.getEntityCache(config, mockStore);
+    entityCache = CacheFactory.getEntityCache(config);
     Assertions.assertInstanceOf(CaffeineEntityCache.class, entityCache);
   }
 
@@ -56,6 +44,6 @@ public class TestCacheFactory {
     Config config = new Config() {};
     config.set(Configs.CACHE_TYPE_NAME, "InvalidCacheName");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> CacheFactory.getEntityCache(config, mockStore));
+        IllegalArgumentException.class, () -> CacheFactory.getEntityCache(config));
   }
 }
