@@ -48,7 +48,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /**
  * {@code AccessControlHookDispatcher} is a decorator for {@link AccessControlDispatcher} that not
  * only delegates access control operations to the underlying access control dispatcher but also
- * executes some hook operations before or after the underlying operations.
+ * executes some hook operations before or after the underlying operations
  */
 public class AccessControlHookDispatcher implements AccessControlDispatcher {
   private final AccessControlDispatcher dispatcher;
