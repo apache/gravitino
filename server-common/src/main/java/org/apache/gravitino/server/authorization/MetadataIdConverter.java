@@ -108,6 +108,17 @@ public class MetadataIdConverter {
     return getID(metadataObject, metalake, catalogManager, entityStore);
   }
 
+  /**
+   * Converts the given metadata object to metadata id. This method is used for testing purposes
+   * only. mock catalogManager and entityStore can be passed as arguments.
+   *
+   * @param metadataObject The metadata object to convert.
+   * @param metalake The metalake name.
+   * @param catalogManager The mock catalogManager.
+   * @param entityStore The mock entityStore.
+   * @return The metadata id.
+   * @throws IOException if an error occurs while loading the entity.
+   */
   @VisibleForTesting
   static Long getID(
       MetadataObject metadataObject,
