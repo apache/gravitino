@@ -71,4 +71,12 @@ public interface HasPropertyMetadata {
    * @throws UnsupportedOperationException if the entity does not support model properties.
    */
   PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException;
+
+  /**
+   * Returns the model version property metadata.
+   *
+   * @return The model version property metadata.
+   * @throws UnsupportedOperationException if the entity does not support model version properties.
+   */
+  PropertiesMetadata modelVersionPropertiesMetadata() throws UnsupportedOperationException;
 }
