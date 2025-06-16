@@ -21,8 +21,8 @@ package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableList;
-import java.lang.reflect.Field;
 import java.util.List;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -81,11 +81,14 @@ public class TestCaffeineEntityCache {
 
   private static Object getCacheDataFrom(EntityCache cache) {
     try {
-      Field field = cache.getClass().getDeclaredField("cacheData");
-      field.setAccessible(true);
-      return field.get(cache);
-    } catch (NoSuchFieldException | IllegalAccessException e) {
-      throw new RuntimeException("Failed to access cacheData field from EntityCache", e);
+      Object object = FieldUtils.readDeclaredField(cache, "cacheData", true);
+      if (object instanceof Cache) {
+        return object;
+      } else {
+        throw new RuntimeException("Unexpected cache data type: " + object.getClass());
+      }
+    } catch (IllegalAccessException e) {
+      throw new RuntimeException(e);
     }
   }
 
