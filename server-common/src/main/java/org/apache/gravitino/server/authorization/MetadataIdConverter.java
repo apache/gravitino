@@ -19,8 +19,6 @@
 
 package org.apache.gravitino.server.authorization;
 
-import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -128,15 +126,16 @@ public class MetadataIdConverter {
       throws IOException {
     Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
 
-    MetadataObject.Type type = metadataObject.type();
+    MetadataObject.Type metadataType = metadataObject.type();
     NameIdentifier ident =
-        (type != MetadataObject.Type.METALAKE)
+        (metadataType != MetadataObject.Type.METALAKE)
             ? NameIdentifier.of(DOT_PATTERN.split(metalake + "." + metadataObject.fullName()))
             : NameIdentifier.of(metadataObject.fullName());
 
-    NameIdentifier normalizedIdent = normalizeCaseSensitive(ident, getScope(type), catalogManager);
+    NameIdentifier normalizedIdent =
+        normalizeCaseSensitive(ident, METADATA_SCOPE_MAPPING.get(metadataType), catalogManager);
 
-    Entity.EntityType entityType = getEntityType(type);
+    Entity.EntityType entityType = getEntityType(metadataType);
 
     Entity entity;
     try {
@@ -157,7 +156,7 @@ public class MetadataIdConverter {
     }
 
     Capability capability = CapabilityHelpers.getCapability(ident, catalogManager);
-    return applyCaseSensitive(ident, scope, capability);
+    return CapabilityHelpers.applyCaseSensitive(ident, scope, capability);
   }
 
   private static Entity.EntityType getEntityType(MetadataObject.Type metadataType) {
@@ -169,10 +168,6 @@ public class MetadataIdConverter {
         entity instanceof HasIdentifier, "Entity must implement HasIdentifier interface");
 
     return ((HasIdentifier) entity).id();
-  }
-
-  private static Capability.Scope getScope(MetadataObject.Type metadataType) {
-    return METADATA_SCOPE_MAPPING.get(metadataType);
   }
 
   @SuppressWarnings("unchecked")
