@@ -100,31 +100,9 @@ public class MetadataIdConverter {
    * @throws IOException if an error occurs while loading the entity.
    */
   public static Long getID(MetadataObject metadataObject, String metalake) throws IOException {
-    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-
-    return getID(metadataObject, metalake, catalogManager, entityStore);
-  }
-
-  /**
-   * Converts the given metadata object to metadata id. This method is used for testing purposes
-   * only. mock catalogManager and entityStore can be passed as arguments.
-   *
-   * @param metadataObject The metadata object to convert.
-   * @param metalake The metalake name.
-   * @param catalogManager The mock catalogManager.
-   * @param entityStore The mock entityStore.
-   * @return The metadata id.
-   * @throws IOException if an error occurs while loading the entity.
-   */
-  @VisibleForTesting
-  static Long getID(
-      MetadataObject metadataObject,
-      String metalake,
-      CatalogManager catalogManager,
-      EntityStore entityStore)
-      throws IOException {
     Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
 
     MetadataObject.Type metadataType = metadataObject.type();
     NameIdentifier ident =

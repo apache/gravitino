@@ -29,9 +29,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -84,8 +86,16 @@ public class TestMetadataIdConverter {
   }
 
   @Test
-  void testConvert() throws IOException {
+  void testConvert() throws IOException, IllegalAccessException {
     CatalogManager mockCatalogManager = mock(CatalogManager.class);
+    Object originalCatalogManager =
+        FieldUtils.readDeclaredField(GravitinoEnv.getInstance(), "catalogManager", true);
+    Object originalEntityStore =
+        FieldUtils.readDeclaredField(GravitinoEnv.getInstance(), "entityStore", true);
+
+    FieldUtils.writeDeclaredField(
+        GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
+    FieldUtils.writeDeclaredField(GravitinoEnv.getInstance(), "entityStore", mockStore, true);
 
     try (MockedStatic<MetadataIdConverter> mockedStatic =
         mockStatic(MetadataIdConverter.class, CALLS_REAL_METHODS)) {
@@ -135,49 +145,35 @@ public class TestMetadataIdConverter {
       Long metalakeConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(ImmutableList.of("metalake"), MetadataObject.Type.METALAKE),
-              "metalake",
-              mockCatalogManager,
-              mockStore);
+              "metalake");
       Long catalogConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(ImmutableList.of("catalog"), MetadataObject.Type.CATALOG),
-              "metalake",
-              mockCatalogManager,
-              mockStore);
+              "metalake");
       Long schemaConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(ImmutableList.of("catalog", "schema"), MetadataObject.Type.SCHEMA),
-              "metalake",
-              mockCatalogManager,
-              mockStore);
+              "metalake");
       Long tableConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "table"), MetadataObject.Type.TABLE),
-              "metalake",
-              mockCatalogManager,
-              mockStore);
+              "metalake");
       Long modelConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "model"), MetadataObject.Type.MODEL),
-              "metalake",
-              mockCatalogManager,
-              mockStore);
+              "metalake");
       Long filesetConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "fileset"), MetadataObject.Type.FILESET),
-              "metalake",
-              mockCatalogManager,
-              mockStore);
+              "metalake");
       Long topicConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "topic"), MetadataObject.Type.TOPIC),
-              "metalake",
-              mockCatalogManager,
-              mockStore);
+              "metalake");
 
       Assertions.assertEquals(1L, metalakeConvertedId);
       Assertions.assertEquals(2L, catalogConvertedId);
@@ -186,6 +182,11 @@ public class TestMetadataIdConverter {
       Assertions.assertEquals(5L, modelConvertedId);
       Assertions.assertEquals(6L, filesetConvertedId);
       Assertions.assertEquals(7L, topicConvertedId);
+    } finally {
+      FieldUtils.writeDeclaredField(
+          GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
+      FieldUtils.writeDeclaredField(
+          GravitinoEnv.getInstance(), "entityStore", originalEntityStore, true);
     }
   }
 
