@@ -271,36 +271,36 @@ This is done using a startup script that parses environment variables prefixed w
 
 These variables override the corresponding entries in `gravitino.conf` at startup.
 
-| Environment Variable                                          | Configuration Key                                        | Default Value                                              | Since Version         |
-|---------------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------|------------------------|
-| `GRAVITINO_SERVER_SHUTDOWN_TIMEOUT`                          | `gravitino.server.shutdown.timeout`                     | `3000`                                                     | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_HOST`                            | `gravitino.server.webserver.host`                       | `0.0.0.0`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_HTTP_PORT`                       | `gravitino.server.webserver.httpPort`                   | `8090`                                                     | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_MIN_THREADS`                     | `gravitino.server.webserver.minThreads`                 | `24`                                                       | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_MAX_THREADS`                     | `gravitino.server.webserver.maxThreads`                 | `200`                                                      | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_STOP_TIMEOUT`                    | `gravitino.server.webserver.stopTimeout`                | `30000`                                                    | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_IDLE_TIMEOUT`                    | `gravitino.server.webserver.idleTimeout`                | `30000`                                                    | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE`     | `gravitino.server.webserver.threadPoolWorkQueueSize`    | `100`                                                      | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`             | `gravitino.server.webserver.requestHeaderSize`          | `131072`                                                   | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`            | `gravitino.server.webserver.responseHeaderSize`         | `131072`                                                   | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE`                                     | `gravitino.entity.store`                                | `relational`                                               | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL`                          | `gravitino.entity.store.relational`                     | `JDBCBackend`                                              | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`                 | `gravitino.entity.store.relational.jdbcUrl`             | `jdbc:h2`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_DRIVER`              | `gravitino.entity.store.relational.jdbcDriver`          | `org.h2.Driver`                                            | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_USER`                | `gravitino.entity.store.relational.jdbcUser`            | `gravitino`                                                | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`            | `gravitino.entity.store.relational.jdbcPassword`        | `gravitino`                                                | 0.10.0-incubating      |
-| `GRAVITINO_CATALOG_CACHE_EVICTION_INTERVAL_MS`               | `gravitino.catalog.cache.evictionIntervalMs`            | `3600000`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_AUTHORIZATION_ENABLE`                             | `gravitino.authorization.enable`                        | `false`                                                    | 0.10.0-incubating      |
-| `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                     | `gravitino.authorization.serviceAdmins`                 | `anonymous`                                                | 0.10.0-incubating      |
-| `GRAVITINO_AUX_SERVICE_NAMES`                                | `gravitino.auxService.names`                            | `iceberg-rest`                                             | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_CLASSPATH`                           | `gravitino.iceberg-rest.classpath`                      | `iceberg-rest-server/libs, iceberg-rest-server/conf`       | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_HOST`                                | `gravitino.iceberg-rest.host`                           | `0.0.0.0`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                           | `gravitino.iceberg-rest.httpPort`                       | `9001`                                                     | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                     | `gravitino.iceberg-rest.catalog-backend`                | `memory`                                                   | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                           | `gravitino.iceberg-rest.warehouse`                      | `/tmp/`                                                    | 0.10.0-incubating      |
+| Environment Variable                                          | Configuration Key                                        | Default Value                                            | Since Version |
+|---------------------------------------------------------------|----------------------------------------------------------|----------------------------------------------------------|---------------|
+| `GRAVITINO_SERVER_SHUTDOWN_TIMEOUT`                          | `gravitino.server.shutdown.timeout`                     | `3000`                                                     | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_HOST`                            | `gravitino.server.webserver.host`                       | `0.0.0.0`                                                  | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_HTTP_PORT`                       | `gravitino.server.webserver.httpPort`                   | `8090`                                                     | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_MIN_THREADS`                     | `gravitino.server.webserver.minThreads`                 | `24`                                                       | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_MAX_THREADS`                     | `gravitino.server.webserver.maxThreads`                 | `200`                                                      | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_STOP_TIMEOUT`                    | `gravitino.server.webserver.stopTimeout`                | `30000`                                                    | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_IDLE_TIMEOUT`                    | `gravitino.server.webserver.idleTimeout`                | `30000`                                                    | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE`     | `gravitino.server.webserver.threadPoolWorkQueueSize`    | `100`                                                      | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`             | `gravitino.server.webserver.requestHeaderSize`          | `131072`                                                   | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`            | `gravitino.server.webserver.responseHeaderSize`         | `131072`                                                   | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE`                                     | `gravitino.entity.store`                                | `relational`                                               | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL`                          | `gravitino.entity.store.relational`                     | `JDBCBackend`                                              | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`                 | `gravitino.entity.store.relational.jdbcUrl`             | `jdbc:h2`                                                  | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_DRIVER`              | `gravitino.entity.store.relational.jdbcDriver`          | `org.h2.Driver`                                            | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_USER`                | `gravitino.entity.store.relational.jdbcUser`            | `gravitino`                                                | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`            | `gravitino.entity.store.relational.jdbcPassword`        | `gravitino`                                                | 1.0.0         |
+| `GRAVITINO_CATALOG_CACHE_EVICTION_INTERVAL_MS`               | `gravitino.catalog.cache.evictionIntervalMs`            | `3600000`                                                  | 1.0.0         |
+| `GRAVITINO_AUTHORIZATION_ENABLE`                             | `gravitino.authorization.enable`                        | `false`                                                    | 1.0.0         |
+| `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                     | `gravitino.authorization.serviceAdmins`                 | `anonymous`                                                | 1.0.0         |
+| `GRAVITINO_AUX_SERVICE_NAMES`                                | `gravitino.auxService.names`                            | `iceberg-rest`                                             | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_CLASSPATH`                           | `gravitino.iceberg-rest.classpath`                      | `iceberg-rest-server/libs, iceberg-rest-server/conf`       | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_HOST`                                | `gravitino.iceberg-rest.host`                           | `0.0.0.0`                                                  | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                           | `gravitino.iceberg-rest.httpPort`                       | `9001`                                                     | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                     | `gravitino.iceberg-rest.catalog-backend`                | `memory`                                                   | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                           | `gravitino.iceberg-rest.warehouse`                      | `/tmp/`                                                    | 1.0.0         |
 
 :::note
-This feature is supported in the Gravitino Docker image starting from version `0.10.0-incubating`.
+This feature is supported in the Gravitino Docker image starting from version `1.0.0`.
 :::
 
 Usage Example:
@@ -340,7 +340,7 @@ If both `gravitino.conf` and environment variable exist, the container’s start
 The Gravitino server supports configuring runtime environment variables in two ways:
 
 1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
-2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 0.10.0-incubating)*
+2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 1.0.0)*
 
 ### How to access Apache Hadoop
 

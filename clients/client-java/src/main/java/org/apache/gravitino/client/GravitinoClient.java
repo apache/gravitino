@@ -421,6 +421,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If granting roles to a role encounters storage issues.
+   * @deprecated use {@link #grantPrivilegesToRole(String, MetadataObject, Set)} instead.
    */
   @Deprecated
   public Role grantPrivilegesToRole(String role, MetadataObject object, List<Privilege> privileges)
@@ -462,6 +463,7 @@ public class GravitinoClient extends GravitinoClientBase
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws IllegalPrivilegeException If any privilege can't be bind to the metadata object.
    * @throws RuntimeException If revoking privileges from a role encounters storage issues.
+   * @deprecated use {@link #revokePrivilegesFromRole(String, MetadataObject, Set)} instead.
    */
   @Deprecated
   public Role revokePrivilegesFromRole(

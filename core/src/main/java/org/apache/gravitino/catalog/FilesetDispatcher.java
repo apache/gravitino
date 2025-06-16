@@ -23,8 +23,8 @@ import org.apache.gravitino.file.FilesetCatalog;
 
 /**
  * {@code FilesetDispatcher} interface acts as a specialization of the {@link FilesetCatalog}
- * interface. This interface is designed to potentially add custom behaviors or operations related
- * to dispatching or handling fileset-related events or actions that are not covered by the standard
- * {@code FilesetCatalog} operations.
+ * interface, and extends {@link FilesetFileOps} for file operations.This interface is designed to
+ * potentially add custom behaviors or operations related to dispatching or handling fileset-related
+ * events or actions that are not covered by the standard {@code FilesetCatalog} operations.
  */
-public interface FilesetDispatcher extends FilesetCatalog {}
+public interface FilesetDispatcher extends FilesetCatalog, FilesetFileOps {}

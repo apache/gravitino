@@ -117,9 +117,11 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
   @Override
   public Boolean onRoleCreated(Role role) throws AuthorizationPluginException {
     List<String> sqls = getCreateRoleSQL(role.name());
-    boolean createdNewly = false;
+    boolean createdNewly = true;
     for (String sql : sqls) {
-      createdNewly = executeUpdateSQL(sql, "already exists");
+      if (!executeUpdateSQL(sql, "already exists")) {
+        createdNewly = false;
+      }
     }
 
     if (!createdNewly) {
@@ -146,7 +148,7 @@ public abstract class JdbcAuthorizationPlugin implements AuthorizationPlugin, Jd
     for (String sql : sqls) {
       executeUpdateSQL(sql);
     }
-    return null;
+    return true;
   }
 
   @Override

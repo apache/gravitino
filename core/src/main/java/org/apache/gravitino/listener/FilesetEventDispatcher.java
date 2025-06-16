@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -29,6 +30,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -79,6 +81,13 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
           new ListFilesetFailureEvent(PrincipalUtils.getCurrentUserName(), namespace, e));
       throw e;
     }
+  }
+
+  @Override
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException, IOException {
+    // TODO: implement the ListFilesEvent
+    return dispatcher.listFiles(ident, locationName, subPath);
   }
 
   @Override

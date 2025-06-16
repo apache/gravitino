@@ -223,6 +223,32 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testLinkAndListModelVersionInfos() {
+    String schemaName = randomSchemaName();
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    String modelName = randomModelName();
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+
+    Model model = modelOperationDispatcher.registerModel(modelIdent, "comment", props);
+    Assertions.assertEquals(0, model.latestVersion());
+
+    String[] aliases = new String[] {"alias1", "alias2"};
+    modelOperationDispatcher.linkModelVersion(modelIdent, "path", aliases, "comment", props);
+
+    ModelVersion[] versions = modelOperationDispatcher.listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(1, versions.length);
+    Assertions.assertEquals(0, versions[0].version());
+    Assertions.assertEquals("path", versions[0].uri());
+    Assertions.assertArrayEquals(aliases, versions[0].aliases());
+    Assertions.assertEquals("comment", versions[0].comment());
+    Assertions.assertEquals(props, versions[0].properties());
+  }
+
+  @Test
   public void testLinkAndDeleteModelVersion() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);

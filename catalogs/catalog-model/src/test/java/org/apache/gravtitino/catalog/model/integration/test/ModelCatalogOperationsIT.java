@@ -331,6 +331,45 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
+  public void testLinkAndListModelVersionInfos() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri1", new String[] {"alias1"}, "comment1", null);
+
+    ModelVersion[] modelVersions =
+        gravitinoCatalog.asModelCatalog().listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(1, modelVersions.length);
+    Assertions.assertEquals(0, modelVersions[0].version());
+    Assertions.assertEquals("uri1", modelVersions[0].uri());
+    Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersions[0].aliases());
+    Assertions.assertEquals("comment1", modelVersions[0].comment());
+    Assertions.assertEquals(Collections.emptyMap(), modelVersions[0].properties());
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, "alias1"));
+
+    // Test list model versions info of non-existent model
+    NameIdentifier nonExistentModelIdent = NameIdentifier.of(schemaName, "non_existent_model");
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> gravitinoCatalog.asModelCatalog().listModelVersionInfos(nonExistentModelIdent));
+
+    // Test list model versions info of non-existent schema
+    NameIdentifier nonExistentSchemaIdent = NameIdentifier.of("non_existent_schema", modelName);
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> gravitinoCatalog.asModelCatalog().listModelVersionInfos(nonExistentSchemaIdent));
+
+    // Test delete and list model versions info
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().deleteModelVersion(modelIdent, 0));
+    ModelVersion[] modelVersionsAfterDelete =
+        gravitinoCatalog.asModelCatalog().listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(0, modelVersionsAfterDelete.length);
+  }
+
+  @Test
   void testLinkAndUpdateModelVersionComment() {
     String modelName = RandomNameUtils.genRandomName("model1");
     Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");

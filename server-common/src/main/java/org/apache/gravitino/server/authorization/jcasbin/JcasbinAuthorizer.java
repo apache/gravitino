@@ -122,8 +122,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
-  private boolean authorizeByJcasbin(Long userId, MetadataObject metadataObject, String privilege) {
-    Long metadataId = MetadataIdConverter.doConvert(metadataObject);
+  private boolean authorizeByJcasbin(
+      Long userId, MetadataObject metadataObject, String privilege, String metalake) {
+    Long metadataId = null;
+    try {
+      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
     return enforcer.enforce(
         String.valueOf(userId),
         String.valueOf(metadataObject.type()),
@@ -136,7 +142,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     Long metalakeId = getMetalakeId(metalake);
     Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
     loadPrivilege(metalake, username, userId);
-    return authorizeByJcasbin(userId, metadataObject, privilege);
+    return authorizeByJcasbin(userId, metadataObject, privilege, metalake);
   }
 
   private void loadPrivilege(String metalake, String username, Long userId) {

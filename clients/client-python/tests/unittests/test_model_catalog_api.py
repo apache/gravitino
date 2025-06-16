@@ -30,7 +30,10 @@ from gravitino.dto.model_version_dto import ModelVersionDTO
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.model_response import ModelResponse
-from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
+from gravitino.dto.responses.model_version_list_response import (
+    ModelVersionInfoListResponse,
+    ModelVersionListResponse,
+)
 from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
 from gravitino.namespace import Namespace
 from gravitino.utils import Response
@@ -258,6 +261,55 @@ class TestModelCatalogApi(unittest.TestCase):
             return_value=mock_resp_1,
         ):
             model_versions = catalog.as_model_catalog().list_model_versions(model_ident)
+            self.assertEqual([], model_versions)
+
+    def test_list_model_version_infos(self, *mock_method):
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self._metalake_name
+        )
+        catalog = gravitino_client.load_catalog(self._catalog_name)
+
+        model_ident = NameIdentifier.of("schema", "model1")
+
+        model_versions_dto = [
+            ModelVersionDTO(
+                _version=0,
+                _uri="http://localhost:8090",
+                _aliases=["alias1", "alias2"],
+                _comment="this is test",
+                _properties={"k": "v"},
+                _audit=AuditDTO(_creator="test", _create_time="2022-01-01T00:00:00Z"),
+            )
+        ]
+        model_version_info_list_resp = ModelVersionInfoListResponse(
+            _versions=model_versions_dto, _code=0
+        )
+        json_str = model_version_info_list_resp.to_json()
+        mock_resp = self._mock_http_response(json_str)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ):
+            model_versions = catalog.as_model_catalog().list_model_version_infos(
+                model_ident
+            )
+            self.assertEqual(len(model_versions), 1)
+            self._compare_model_versions(model_versions_dto[0], model_versions[0])
+
+        model_version_info_list_resp_1 = ModelVersionInfoListResponse(
+            _versions=[], _code=0
+        )
+        json_str_1 = model_version_info_list_resp_1.to_json()
+        mock_resp_1 = self._mock_http_response(json_str_1)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp_1,
+        ):
+            model_versions = catalog.as_model_catalog().list_model_version_infos(
+                model_ident
+            )
             self.assertEqual([], model_versions)
 
     def test_alter_model_version_comment(self, *mock_method):

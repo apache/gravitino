@@ -21,6 +21,7 @@ import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -118,7 +119,7 @@ public class TestJcasbinAuthorizer {
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
     metadataIdConverterMockedStatic
-        .when(() -> MetadataIdConverter.doConvert(any()))
+        .when(() -> MetadataIdConverter.getID(any(), anyString()))
         .thenReturn(CATALOG_ID);
     roleMetaServiceMockedStatic
         .when(() -> RoleMetaService.listSecurableObjectsByRoleId(eq(ALLOW_ROLE_ID)))
