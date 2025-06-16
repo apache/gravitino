@@ -49,6 +49,9 @@ import org.apache.paimon.types.VarCharType;
 /** Utilities of {@link Type} to support type conversion. */
 public class TypeUtils {
 
+  public static final int PRECISION_SECOND = 0;
+  public static final int PRECISION_MICROSECOND = 6;
+
   private TypeUtils() {}
 
   /**
@@ -122,17 +125,17 @@ public class TypeUtils {
 
     @Override
     public Type visit(TimeType timeType) {
-      return Types.TimeType.get();
+      return Types.TimeType.of(timeType.getPrecision());
     }
 
     @Override
     public Type visit(TimestampType timestampType) {
-      return Types.TimestampType.withoutTimeZone();
+      return Types.TimestampType.withoutTimeZone(timestampType.getPrecision());
     }
 
     @Override
     public Type visit(LocalZonedTimestampType localZonedTimestampType) {
-      return Types.TimestampType.withTimeZone();
+      return Types.TimestampType.withTimeZone(localZonedTimestampType.getPrecision());
     }
 
     @Override
@@ -229,11 +232,19 @@ public class TypeUtils {
         case DATE:
           return DataTypes.DATE();
         case TIME:
-          return DataTypes.TIME();
+          Types.TimeType timeType = (Types.TimeType) type;
+          int timeTypePrecision =
+              timeType.hasPrecisionSet() ? timeType.precision() : PRECISION_SECOND;
+          return DataTypes.TIME(timeTypePrecision);
         case TIMESTAMP:
-          return ((Types.TimestampType) type).hasTimeZone()
-              ? DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE()
-              : DataTypes.TIMESTAMP();
+          Types.TimestampType timestampType = (Types.TimestampType) type;
+          int timestampTypePrecision =
+              timestampType.hasPrecisionSet() ? timestampType.precision() : PRECISION_MICROSECOND;
+          if (timestampType.hasTimeZone()) {
+            return DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(timestampTypePrecision);
+          } else {
+            return DataTypes.TIMESTAMP(timestampTypePrecision);
+          }
         case STRING:
           return DataTypes.STRING();
         case VARCHAR:
