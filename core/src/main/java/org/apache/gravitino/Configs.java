@@ -391,8 +391,8 @@ public class Configs {
           .createWithDefault(true);
 
   // Provider name for cache
-  public static final ConfigEntry<String> CACHE_TYPE_NAME =
-      new ConfigBuilder("gravitino.cache.typeName")
+  public static final ConfigEntry<String> CACHE_PROVIDER =
+      new ConfigBuilder("gravitino.cache.provider")
           .doc("Name of the cache provider to use.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()

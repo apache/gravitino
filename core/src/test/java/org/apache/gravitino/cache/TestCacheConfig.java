@@ -37,7 +37,7 @@ public class TestCacheConfig {
     Assertions.assertEquals(10_000, config.get(Configs.CACHE_MAX_ENTRIES));
     Assertions.assertEquals(3_600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
     Assertions.assertEquals(200_302_000L, EntityCacheWeigher.getMaxWeight());
-    Assertions.assertEquals("Caffeine", config.get(Configs.CACHE_TYPE_NAME));
+    Assertions.assertEquals("Caffeine", config.get(Configs.CACHE_PROVIDER));
   }
 
   @Test

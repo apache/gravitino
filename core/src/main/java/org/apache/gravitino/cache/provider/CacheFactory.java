@@ -45,14 +45,15 @@ public final class CacheFactory {
    * @return A cache instance provided by the selected {@link CacheProvider}.
    */
   public static EntityCache getEntityCache(Config config) {
-    CacheProvider provider = getProvider(config.get(Configs.CACHE_TYPE_NAME));
+    CacheProvider provider = getProvider(config.get(Configs.CACHE_PROVIDER));
     return provider.getCache(config);
   }
 
   private static CacheProvider getProvider(String name) {
     CacheProvider provider = PROVIDERS.get(name);
     if (provider == null) {
-      throw new IllegalArgumentException("No such cache provider: " + name);
+      throw new IllegalArgumentException(
+          "No such cache provider: " + name + ". Available providers: " + PROVIDERS.keySet());
     }
     return provider;
   }

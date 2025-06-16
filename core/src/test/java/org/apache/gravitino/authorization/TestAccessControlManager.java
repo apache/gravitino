@@ -137,7 +137,7 @@ public class TestAccessControlManager {
     Mockito.when(config.get(Configs.CACHE_EXPIRATION_TIME)).thenReturn(3_600_000L);
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
-    Mockito.when(config.get(Configs.CACHE_TYPE_NAME)).thenReturn("Caffeine");
+    Mockito.when(config.get(Configs.CACHE_PROVIDER)).thenReturn("Caffeine");
 
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);

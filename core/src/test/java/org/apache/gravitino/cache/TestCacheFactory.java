@@ -42,7 +42,7 @@ public class TestCacheFactory {
   @Test
   void testCreateCacheWithInvalidName() {
     Config config = new Config() {};
-    config.set(Configs.CACHE_TYPE_NAME, "InvalidCacheName");
+    config.set(Configs.CACHE_PROVIDER, "InvalidCacheName");
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> CacheFactory.getEntityCache(config));
   }
