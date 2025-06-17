@@ -587,6 +587,7 @@ public abstract class BaseGVFSOperations implements Closeable {
 
               FileSystem actualFileSystem =
                   getActualFileSystemByPath(targetLocation, allProperties);
+              setClassLoader();
               createFilesetLocationIfNeed(cacheKey.getLeft(), actualFileSystem, targetLocation);
               return actualFileSystem;
             } catch (IOException ioe) {
@@ -810,5 +811,15 @@ public abstract class BaseGVFSOperations implements Closeable {
     // if both are not set, return null which means use the default location
     return Optional.ofNullable(configuration.get(FS_GRAVITINO_CURRENT_LOCATION_NAME))
         .orElse(System.getenv(currentLocationEnvVar));
+  }
+
+  private void setClassLoader() {
+    Thread currentThread = Thread.currentThread();
+    ClassLoader currentClassLoader = currentThread.getContextClassLoader();
+    if (currentClassLoader == null) {
+      ClassLoader newClassLoader = BaseGVFSOperations.class.getClassLoader();
+      currentThread.setContextClassLoader(newClassLoader);
+      LOG.info("Set Context ClassLoader to BaseGVFSOperations Class  Loader: " + newClassLoader);
+    }
   }
 }
