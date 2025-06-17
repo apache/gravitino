@@ -76,6 +76,12 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
+if (extra["jdkVersion"] == "8") {
+  extra["useModernIceberg"] = false
+} else {
+  extra["useModernIceberg"] = true
+}
+
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
 } else {
@@ -286,8 +292,8 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        // sourceCompatibility = JavaVersion.VERSION_1_8
+        // targetCompatibility = JavaVersion.VERSION_1_8
       }
     }
   }
@@ -403,6 +409,8 @@ subprojects {
       }
     }
   }
+
+  // extra["useModernIceberg"] = true
 
   if (project.name in listOf("web", "docs")) {
     plugins.apply(NodePlugin::class)
