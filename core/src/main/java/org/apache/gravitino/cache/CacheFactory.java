@@ -17,15 +17,13 @@
  * under the License.
  */
 
-package org.apache.gravitino.cache.provider;
+package org.apache.gravitino.cache;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.cache.CaffeineEntityCache;
-import org.apache.gravitino.cache.EntityCache;
 
-/** Factory class for creating {@link EntityCache} instances. */
+/** Factory class for creating {@link org.apache.gravitino.cache.EntityCache} instances. */
 public final class CacheFactory {
 
   // Register EntityCache's short name to its full qualified class name in the map. So that user
@@ -37,7 +35,8 @@ public final class CacheFactory {
   private CacheFactory() {}
 
   /**
-   * Creates a new {@link EntityCache} using the cache type specified in the configuration.
+   * Creates a new {@link org.apache.gravitino.cache.EntityCache} using the cache type specified in
+   * the configuration.
    *
    * @param config The configuration.
    * @return A cache instance
