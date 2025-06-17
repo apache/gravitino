@@ -440,8 +440,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   private void createFilesetLocationIfNeed(
-      NameIdentifier filesetIdent, FileSystem fs, Path filesetPath)
-      throws FilesetPathNotFoundException {
+      NameIdentifier filesetIdent, FileSystem fs, Path filesetPath) {
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     // If the server-side filesystem ops are disabled, the fileset directory may not exist. In such

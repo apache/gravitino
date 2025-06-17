@@ -101,6 +101,9 @@ public class GravitinoServer extends ResourceConfig {
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
+    lineageService.initialize(
+        new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
+
     GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
 
     lineageService.initialize(

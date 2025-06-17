@@ -41,13 +41,13 @@ helm install [RELEASE_NAME] [CHART] [flags]
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino Iceberg REST Catalog Server using the default settings, specify container image versions using --set image.tag=x.y.z-incubating (replace x, y, z with the expected version numbers):
+Run the following command to deploy Gravitino Iceberg REST Catalog Server using the default settings, specify container image versions using --set image.tag=x.y.z (replace x, y, z with the expected version numbers):
 
 ```console
 helm upgrade --install gravitino ./gravitino-iceberg-rest-server \
   -n gravitino \
   --create-namespace \
-  --set image.tag=<x.y.z-incubating> \
+  --set image.tag=<x.y.z> \
   --set replicas=2 \
   --set resources.requests.memory="4Gi" \
   --set resources.requests.cpu="2"

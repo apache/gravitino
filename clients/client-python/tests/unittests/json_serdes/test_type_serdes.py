@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import random
 import unittest
 from itertools import combinations, product
 
@@ -22,6 +23,7 @@ from gravitino.api.types.json_serdes import TypeSerdes
 from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.types.type import PrimitiveType
 from gravitino.api.types.types import Types
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 class MockType(PrimitiveType):
@@ -147,4 +149,177 @@ class TestTypeSerdes(unittest.TestCase):
         self.assertEqual(result.get(SerdesUtils.TYPE), SerdesUtils.UNPARSED)
         self.assertEqual(
             result.get(SerdesUtils.UNPARSED_TYPE), mock_type.simple_string()
+        )
+
+    def test_deserialize_primitive_and_none_type(self):
+        for simple_string, type_ in self._primitive_and_none_types.items():
+            self.assertEqual(TypeSerdes.deserialize(data=simple_string), type_)
+
+    def test_deserialize_invalid_primitive_and_non_type(self):
+        invalid_data = ["", {}, None]
+        for data in invalid_data:
+            self.assertRaises(
+                IllegalArgumentException,
+                TypeSerdes.deserialize,
+                data=data,
+            )
+
+    def test_deserialize_primitive_and_non_type_unparsed(self):
+        unparsed_data = [
+            int(random.random() * 10),
+            random.random(),
+            "invalid_type",
+            {"invalid_key": "value"},
+            list(range(10)),
+            True,
+        ]
+        for data in unparsed_data:
+            result = TypeSerdes.deserialize(data=data)
+            self.assertIsInstance(result, Types.UnparsedType)
+
+    def test_deserialize_struct_type(self):
+        types = self._primitive_and_none_types.values()
+        fields = [
+            Types.StructType.Field.not_null_field(
+                name=f"field_{field_idx}",
+                field_type=type_,
+                comment=f"comment {field_idx}" if field_idx % 2 == 0 else "",
+            )
+            for type_, field_idx in zip(types, range(len(types)))
+        ]
+
+        struct_type = Types.StructType.of(*fields)
+        serialized_result = TypeSerdes.serialize(struct_type)
+        deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+        self.assertEqual(deserialized_result, struct_type)
+
+    def test_deserialize_struct_type_invalid_fields(self):
+        message_prefix = "Cannot parse struct fields? from"
+        field_data = {"type": SerdesUtils.STRUCT}
+        invalid_data = (
+            {**field_data, **{"fields": "non-array-fields"}},
+            {**field_data, **{"fields": ["invalid_field"]}},
+            {**field_data, **{"fields": [{"invalid_name": "value"}]}},
+            {
+                **field_data,
+                **{"fields": [{"name": "valid_field_name", "invalid_type": "value"}]},
+            },
+        )
+        messages = (
+            f"{message_prefix} non-array",
+            f"{message_prefix} invalid JSON",
+            f"{message_prefix} missing name",
+            f"{message_prefix} missing type",
+        )
+        for data, message in zip(invalid_data, messages):
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                message,
+                TypeSerdes.deserialize,
+                data=data,
+            )
+
+    def test_deserialize_list_type(self):
+        types = self._primitive_and_none_types.values()
+        for type_ in types:
+            list_type = Types.ListType.of(element_type=type_, element_nullable=False)
+            serialized_result = TypeSerdes.serialize(list_type)
+            deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+            self.assertEqual(
+                list_type.simple_string(), deserialized_result.simple_string()
+            )
+
+    def test_deserialize_list_type_invalid_data(self):
+        list_data = {"type": "list", "invalid_element_type": "value"}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse list type from missing element type",
+            TypeSerdes.deserialize,
+            data=list_data,
+        )
+
+    def test_deserialize_map_type(self):
+        types = self._primitive_and_none_types.values()
+        for key_type, value_type in product(types, types):
+            map_type = Types.MapType.of(
+                key_type=key_type, value_type=value_type, value_nullable=False
+            )
+            serialized_result = TypeSerdes.serialize(map_type)
+            deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+            self.assertEqual(
+                map_type.simple_string(), deserialized_result.simple_string()
+            )
+
+    def test_deserialize_map_type_invalid_data(self):
+        invalid_map_data = (
+            {"type": "map", "invalid_key_type": "value"},
+            {
+                "type": "map",
+                "keyType": "valid_key",
+                "invalid_value_type": "invalid_value",
+            },
+        )
+        for data in invalid_map_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "Cannot parse map type from missing (key|value) type",
+                TypeSerdes.deserialize,
+                data=data,
+            )
+
+    def test_deserialize_union_type(self):
+        types = self._primitive_and_none_types.values()
+        for types in combinations(types, 2):
+            union_type = Types.UnionType.of(*types)
+            serialized_result = TypeSerdes.serialize(union_type)
+            deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+            self.assertEqual(
+                union_type.simple_string(), deserialized_result.simple_string()
+            )
+
+    def test_deserialize_union_type_invalid_data(self):
+        invalid_union_data = (
+            {"type": "union", "invalid_types": "invalid_types"},
+            {"type": "union", "types": "invalid_types_value"},
+        )
+        for data in invalid_union_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "Cannot parse union types? from (?:non-array|missing types)",
+                TypeSerdes.deserialize,
+                data=data,
+            )
+
+    def test_deserialize_unparsed_type(self):
+        unparsed_type = Types.UnparsedType.of(unparsed_type="unparsed_type")
+        serialized_result = TypeSerdes.serialize(unparsed_type)
+        deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+        self.assertEqual(
+            unparsed_type.simple_string(), deserialized_result.simple_string()
+        )
+
+    def test_deserialize_unparsed_type_invalid_data(self):
+        invalid_data = {"type": "unparsed"}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse unparsed type from missing unparsed type",
+            TypeSerdes.deserialize,
+            data=invalid_data,
+        )
+
+    def test_deserialize_external_type(self):
+        external_type = Types.ExternalType.of(catalog_string="catalog_string")
+        serialized_result = TypeSerdes.serialize(external_type)
+        deserialized_result = TypeSerdes.deserialize(data=serialized_result)
+        self.assertEqual(
+            external_type.simple_string(), deserialized_result.simple_string()
+        )
+
+    def test_deserialize_external_type_invalid_data(self):
+        invalid_data = {"type": "external"}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse external type from missing catalogString",
+            TypeSerdes.deserialize,
+            data=invalid_data,
         )

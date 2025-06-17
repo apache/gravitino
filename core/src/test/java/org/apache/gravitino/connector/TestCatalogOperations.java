@@ -797,6 +797,18 @@ public class TestCatalogOperations
   }
 
   @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+
+    return modelVersions.entrySet().stream()
+        .filter(e -> e.getKey().getLeft().equals(ident))
+        .map(e -> e.getValue())
+        .toArray(ModelVersion[]::new);
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     if (!models.containsKey(ident)) {

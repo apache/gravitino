@@ -50,6 +50,9 @@ public abstract class BaseAuthorization<T extends BaseAuthorization>
    * The child class should implement this method to provide a specific AuthorizationPlugin instance
    * regarding that authorization. <br>
    *
+   * @param metalake the identifier of the metalake environment
+   * @param catalogProvider the identifier of the catalog provider within the metadata lake
+   * @param config a map of configuration properties required by the plugin
    * @return A new instance of AuthorizationHook.
    */
   public abstract AuthorizationPlugin newPlugin(
