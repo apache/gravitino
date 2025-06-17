@@ -35,7 +35,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
-import org.apache.gravitino.cache.CaffeineEntityCache;
+import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -65,10 +65,9 @@ public class RelationalEntityStore
     this.backend = createRelationalEntityBackend(config);
     this.garbageCollector = new RelationalGarbageCollector(backend, config);
     this.garbageCollector.start();
-    // TODO USE SPI to load the cache
     this.cache =
         config.get(Configs.CACHE_ENABLED)
-            ? new CaffeineEntityCache(config)
+            ? CacheFactory.getEntityCache(config)
             : new NoOpsCache(config);
   }
 

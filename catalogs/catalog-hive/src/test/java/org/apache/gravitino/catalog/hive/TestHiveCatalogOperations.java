@@ -119,6 +119,26 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testEmptyBypassKey() {
+    Map<String, String> properties = Maps.newHashMap();
+    // Add a normal bypass configuration
+    properties.put(CATALOG_BYPASS_PREFIX + "mapreduce.job.reduces", "20");
+    // Add an empty bypass configuration
+    properties.put(CATALOG_BYPASS_PREFIX, "some-value");
+
+    HiveCatalogOperations hiveCatalogOperations = new HiveCatalogOperations();
+    hiveCatalogOperations.initialize(properties, null, HIVE_PROPERTIES_METADATA);
+
+    // Verify that the normal bypass configuration is correctly applied
+    String v = hiveCatalogOperations.hiveConf.get("mapreduce.job.reduces");
+    Assertions.assertEquals("20", v);
+
+    // Verify that the empty bypass configuration is not applied
+    // This will fail if the empty key is incorrectly added
+    Assertions.assertNull(hiveCatalogOperations.hiveConf.get(""));
+  }
+
+  @Test
   void testTestConnection() throws TException, InterruptedException {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.clientPool = mock(CachedClientPool.class);

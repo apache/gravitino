@@ -19,10 +19,12 @@
 
 package org.apache.gravitino.cache;
 
-import static org.mockito.Mockito.spy;
-
+import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableList;
+import java.util.List;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -48,9 +50,6 @@ import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestCaffeineEntityCache {
-  private CaffeineEntityCache real;
-  private CaffeineEntityCache cache;
-
   private NameIdentifier ident1;
   private NameIdentifier ident2;
   private NameIdentifier ident3;
@@ -80,6 +79,19 @@ public class TestCaffeineEntityCache {
   private RoleEntity entity12;
   private RoleEntity entity13;
 
+  private static Object getCacheDataFrom(EntityCache cache) {
+    try {
+      Object object = FieldUtils.readDeclaredField(cache, "cacheData", true);
+      if (object instanceof Cache) {
+        return object;
+      } else {
+        throw new RuntimeException("Unexpected cache data type: " + object.getClass());
+      }
+    } catch (IllegalAccessException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @BeforeAll
   void init() {
     initTestNameIdentifier();
@@ -88,8 +100,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testPutAllTypeInCache() {
-
-    initCache();
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
     BaseMetalake testMetalake = TestUtil.getTestMetalake();
     CatalogEntity testCatalogEntity = TestUtil.getTestCatalogEntity();
@@ -179,9 +190,74 @@ public class TestCaffeineEntityCache {
   }
 
   @Test
-  void testGetIfPresent() {
+  void testPutSameIdentifierEntities() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
-    initCache();
+    UserEntity testUserEntity = TestUtil.getTestUserEntity();
+    TableEntity testTableEntity =
+        TestUtil.getTestTableEntity(
+            12L, "test_user", Namespace.of("test_metalake", "system", "user"));
+
+    cache.put(testUserEntity);
+    cache.put(testTableEntity);
+
+    Assertions.assertEquals(2, cache.size());
+    Assertions.assertTrue(
+        cache.contains(testTableEntity.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(testUserEntity.nameIdentifier(), Entity.EntityType.USER));
+  }
+
+  @Test
+  void testPutAndGet() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+
+    cache.put(entity1);
+    cache.put(entity2);
+    cache.put(entity3);
+    cache.put(entity4);
+    cache.put(entity5);
+    cache.put(entity6);
+    cache.put(entity7);
+    cache.put(entity8);
+    cache.put(entity9);
+    cache.put(entity10);
+    cache.put(entity11);
+
+    cache.put(
+        entity12.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity13.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(entity10, entity11));
+
+    Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident3, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident4, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident5, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident6, Entity.EntityType.CATALOG));
+    Assertions.assertTrue(cache.contains(ident7, Entity.EntityType.METALAKE));
+
+    Assertions.assertTrue(cache.contains(ident8, Entity.EntityType.USER));
+    Assertions.assertTrue(cache.contains(ident9, Entity.EntityType.USER));
+    Assertions.assertTrue(cache.contains(ident10, Entity.EntityType.GROUP));
+    Assertions.assertTrue(cache.contains(ident11, Entity.EntityType.GROUP));
+
+    Assertions.assertTrue(
+        cache.contains(
+            ident12, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL));
+    Assertions.assertTrue(
+        cache.contains(
+            ident13, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL));
+  }
+
+  @Test
+  void testGetIfPresent() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
     cache.put(entity1);
     cache.put(entity2);
@@ -210,8 +286,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testContains() {
-
-    initCache();
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
     cache.put(entity1);
     cache.put(entity2);
@@ -228,8 +303,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testSize() {
-
-    initCache();
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
     cache.put(entity1);
     cache.put(entity2);
@@ -240,8 +314,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testClear() {
-
-    initCache();
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
     cache.put(entity1);
     cache.put(entity2);
@@ -287,8 +360,7 @@ public class TestCaffeineEntityCache {
 
   @Test
   void testInvalidateMetalake() {
-
-    initCache();
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
     cache.put(entity1);
     cache.put(entity2);
@@ -333,15 +405,348 @@ public class TestCaffeineEntityCache {
     Assertions.assertFalse(cache.contains(ident7, Entity.EntityType.TABLE));
   }
 
-  private void initCache() {
-    initCache(new Config() {});
+  @Test
+  void testInvalidateCatalog() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+
+    cache.put(entity1);
+    cache.put(entity2);
+    cache.put(entity3);
+    cache.put(entity4);
+    cache.put(entity5);
+    cache.put(entity6);
+    cache.put(entity7);
+
+    Assertions.assertEquals(7, cache.size());
+    Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident3, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident4, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident5, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident6, Entity.EntityType.CATALOG));
+    Assertions.assertTrue(cache.contains(ident7, Entity.EntityType.METALAKE));
+
+    cache.invalidate(ident6, Entity.EntityType.CATALOG);
+    Assertions.assertEquals(3, cache.size());
+
+    Assertions.assertTrue(cache.getIfPresent(ident7, Entity.EntityType.METALAKE).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident4, Entity.EntityType.TABLE).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
+
+    Assertions.assertFalse(cache.getIfPresent(ident1, Entity.EntityType.SCHEMA).isPresent());
+    Assertions.assertFalse(cache.getIfPresent(ident3, Entity.EntityType.TABLE).isPresent());
+    Assertions.assertFalse(cache.getIfPresent(ident5, Entity.EntityType.TABLE).isPresent());
+    Assertions.assertFalse(cache.getIfPresent(ident6, Entity.EntityType.TABLE).isPresent());
   }
 
-  // TODO Add other tests for cache
+  @Test
+  void testInvalidateSchema() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
 
-  private void initCache(Config config) {
-    real = new CaffeineEntityCache(config);
-    cache = spy(real);
+    cache.put(entity1);
+    cache.put(entity2);
+    cache.put(entity3);
+    cache.put(entity4);
+    cache.put(entity5);
+    cache.put(entity6);
+    cache.put(entity7);
+
+    Assertions.assertEquals(7, cache.size());
+    Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident3, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident4, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident5, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident6, Entity.EntityType.CATALOG));
+    Assertions.assertTrue(cache.contains(ident7, Entity.EntityType.METALAKE));
+
+    cache.invalidate(ident1, Entity.EntityType.SCHEMA);
+
+    Assertions.assertEquals(5, cache.size());
+
+    Assertions.assertTrue(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident4, Entity.EntityType.TABLE).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident5, Entity.EntityType.TABLE).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident6, Entity.EntityType.CATALOG).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident7, Entity.EntityType.METALAKE).isPresent());
+
+    Assertions.assertFalse(cache.getIfPresent(ident1, Entity.EntityType.SCHEMA).isPresent());
+    Assertions.assertFalse(cache.getIfPresent(ident3, Entity.EntityType.TABLE).isPresent());
+  }
+
+  @Test
+  void testInvalidateTable() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+
+    cache.put(entity1);
+    cache.put(entity2);
+    cache.put(entity3);
+    cache.put(entity4);
+    cache.put(entity5);
+    cache.put(entity6);
+    cache.put(entity7);
+
+    Assertions.assertEquals(7, cache.size());
+    Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident2, Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(ident3, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident4, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident5, Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(ident6, Entity.EntityType.CATALOG));
+    Assertions.assertTrue(cache.contains(ident7, Entity.EntityType.METALAKE));
+
+    cache.invalidate(ident3, Entity.EntityType.TABLE);
+
+    Assertions.assertEquals(6, cache.size());
+    Assertions.assertTrue(cache.getIfPresent(ident1, Entity.EntityType.SCHEMA).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident4, Entity.EntityType.TABLE).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident5, Entity.EntityType.TABLE).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident6, Entity.EntityType.CATALOG).isPresent());
+    Assertions.assertTrue(cache.getIfPresent(ident7, Entity.EntityType.METALAKE).isPresent());
+
+    Assertions.assertFalse(cache.contains(ident3, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testRemoveNonExistentEntity() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+
+    cache.put(entity1);
+
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(cache.contains(ident1, Entity.EntityType.SCHEMA));
+
+    Assertions.assertDoesNotThrow(() -> cache.invalidate(ident2, Entity.EntityType.SCHEMA));
+    Assertions.assertFalse(cache.invalidate(ident2, Entity.EntityType.SCHEMA));
+
+    Assertions.assertDoesNotThrow(() -> cache.invalidate(ident7, Entity.EntityType.METALAKE));
+    Assertions.assertFalse(cache.invalidate(ident7, Entity.EntityType.METALAKE));
+  }
+
+  @Test
+  void testExpireByTime() throws InterruptedException {
+    int waitTime = 3_000;
+    long expireTime = 1_000L;
+
+    Config config = new Config() {};
+    config.set(Configs.CACHE_EXPIRATION_TIME, expireTime);
+    config.set(Configs.CACHE_WEIGHER_ENABLED, false);
+    EntityCache cache = new CaffeineEntityCache(config);
+
+    cache.put(entity1);
+    Thread.sleep(waitTime);
+    cache.put(entity2);
+
+    Cache<EntityCacheKey, List<Entity>> caffeineObject =
+        (Cache<EntityCacheKey, List<Entity>>) getCacheDataFrom(cache);
+    caffeineObject.cleanUp();
+
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertFalse(cache.contains(entity1.nameIdentifier(), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(entity2.nameIdentifier(), Entity.EntityType.SCHEMA));
+  }
+
+  @Test
+  void testExpireByWeightExceedMaxWeight() {
+    Config config = new Config() {};
+    long oldMaxWeight = EntityCacheWeigher.MAX_WEIGHT;
+    EntityCacheWeigher.MAX_WEIGHT = 75;
+    config.set(Configs.CACHE_WEIGHER_ENABLED, true);
+    EntityCache cache = new CaffeineEntityCache(config);
+
+    cache.put(entity7);
+    Cache<EntityCacheKey, List<Entity>> caffeineObject =
+        (Cache<EntityCacheKey, List<Entity>>) getCacheDataFrom(cache);
+    caffeineObject.cleanUp();
+
+    Assertions.assertEquals(0, cache.size());
+    Assertions.assertFalse(cache.contains(entity7.nameIdentifier(), Entity.EntityType.METALAKE));
+
+    EntityCacheWeigher.MAX_WEIGHT = oldMaxWeight;
+  }
+
+  @Test
+  void testExpireByWeight() {
+    Config config = new Config() {};
+    long maxWeight = EntityCacheWeigher.MAX_WEIGHT;
+    EntityCacheWeigher.MAX_WEIGHT = 100;
+    config.set(Configs.CACHE_WEIGHER_ENABLED, true);
+    EntityCache cache = new CaffeineEntityCache(config);
+
+    cache.put(entity7);
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(cache.contains(entity7.nameIdentifier(), Entity.EntityType.METALAKE));
+
+    cache.put(entity1);
+    cache.put(entity2);
+    Cache<EntityCacheKey, List<Entity>> caffeineObject =
+        (Cache<EntityCacheKey, List<Entity>>) getCacheDataFrom(cache);
+    caffeineObject.cleanUp();
+
+    Assertions.assertEquals(2, cache.size());
+    Assertions.assertTrue(cache.contains(entity1.nameIdentifier(), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(cache.contains(entity2.nameIdentifier(), Entity.EntityType.SCHEMA));
+
+    EntityCacheWeigher.MAX_WEIGHT = maxWeight;
+  }
+
+  @Test
+  void testExpireBySize() {
+    Config config = new Config() {};
+    config.set(Configs.CACHE_WEIGHER_ENABLED, false);
+    config.set(Configs.CACHE_MAX_ENTRIES, 1);
+    EntityCache cache = new CaffeineEntityCache(config);
+
+    Cache<EntityCacheKey, List<Entity>> caffeineObject =
+        (Cache<EntityCacheKey, List<Entity>>) getCacheDataFrom(cache);
+
+    cache.put(entity1);
+    caffeineObject.cleanUp();
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(cache.contains(entity1.nameIdentifier(), Entity.EntityType.SCHEMA));
+
+    cache.put(entity2);
+    caffeineObject.cleanUp();
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(cache.contains(entity2.nameIdentifier(), Entity.EntityType.SCHEMA));
+
+    cache.put(entity3);
+    caffeineObject.cleanUp();
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(cache.contains(entity3.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testWeightCalculation() {
+    int metalakeWeight =
+        EntityCacheWeigher.getInstance()
+            .weigh(
+                EntityCacheKey.of(ident7, Entity.EntityType.METALAKE), ImmutableList.of(entity7));
+    Assertions.assertEquals(100, metalakeWeight);
+
+    int catalogWeight =
+        EntityCacheWeigher.getInstance()
+            .weigh(EntityCacheKey.of(ident6, Entity.EntityType.CATALOG), ImmutableList.of(entity6));
+    Assertions.assertEquals(75, catalogWeight);
+
+    int schemaWeight =
+        EntityCacheWeigher.getInstance()
+            .weigh(EntityCacheKey.of(ident1, Entity.EntityType.SCHEMA), ImmutableList.of(entity1));
+    Assertions.assertEquals(50, schemaWeight);
+
+    int tableWeight =
+        EntityCacheWeigher.getInstance()
+            .weigh(EntityCacheKey.of(ident3, Entity.EntityType.TABLE), ImmutableList.of(entity3));
+    Assertions.assertEquals(15, tableWeight);
+
+    int multiUserWeight =
+        EntityCacheWeigher.getInstance()
+            .weigh(
+                EntityCacheKey.of(
+                    ident12, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL),
+                ImmutableList.of(entity8, entity9));
+
+    Assertions.assertEquals(30, multiUserWeight);
+  }
+
+  @Test
+  void testGetIfPresentWithNull() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+    cache.put(entity1);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> cache.getIfPresent(null, Entity.EntityType.SCHEMA));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> cache.getIfPresent(ident1, null));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.getIfPresent(null, ident12, Entity.EntityType.ROLE));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            cache.getIfPresent(
+                SupportsRelationOperations.Type.ROLE_USER_REL, null, Entity.EntityType.ROLE));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.getIfPresent(SupportsRelationOperations.Type.ROLE_USER_REL, ident12, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.getIfPresent(SupportsRelationOperations.Type.ROLE_USER_REL, ident12, null));
+  }
+
+  @Test
+  void testContainsWithNull() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> cache.contains(null, Entity.EntityType.SCHEMA));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> cache.contains(ident7, null));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            cache.contains(
+                null, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.contains(ident12, null, SupportsRelationOperations.Type.ROLE_USER_REL));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.contains(ident12, Entity.EntityType.ROLE, null));
+  }
+
+  @Test
+  void testInvalidateWithNull() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> cache.invalidate(null, Entity.EntityType.CATALOG));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> cache.invalidate(ident7, null));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            cache.invalidate(
+                null, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_USER_REL));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.invalidate(ident12, null, SupportsRelationOperations.Type.ROLE_USER_REL));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.invalidate(ident12, Entity.EntityType.ROLE, null));
+  }
+
+  @Test
+  void testPutWithNull() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+
+    Assertions.assertThrows(IllegalArgumentException.class, () -> cache.put(null));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            cache.put(
+                null,
+                Entity.EntityType.ROLE,
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                ImmutableList.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            cache.put(
+                ident12, null, SupportsRelationOperations.Type.ROLE_USER_REL, ImmutableList.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> cache.put(ident12, Entity.EntityType.ROLE, null, ImmutableList.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            cache.put(
+                ident12,
+                Entity.EntityType.ROLE,
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                null));
   }
 
   private void initTestNameIdentifier() {
@@ -361,9 +766,6 @@ public class TestCaffeineEntityCache {
 
     ident12 = NameIdentifierUtil.ofRole("metalake1", "role1");
     ident13 = NameIdentifierUtil.ofRole("metalake2", "role2");
-
-    // TODO remove next PR
-    System.out.println(ident8 + " " + ident9);
   }
 
   private void initTestEntities() {
