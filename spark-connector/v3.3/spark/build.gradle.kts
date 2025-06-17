@@ -30,7 +30,12 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4spark.get()
+val useModernIceberg = rootProject.extra["useModernIceberg"] as Boolean
+val icebergVersion: String = if (useModernIceberg) {
+  libs.versions.iceberg4spark4modern.get()
+} else {
+  libs.versions.iceberg4spark.get()
+}
 val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark33.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()

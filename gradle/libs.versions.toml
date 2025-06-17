@@ -56,7 +56,9 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.6.1' # used for Gravitino Iceberg catalog and Iceberg REST service
-iceberg4spark = "1.4.1" # used for compile spark connector
+iceberg4modern = '1.9.1' # used for Gravitino Iceberg catalog and Iceberg REST service
+iceberg4spark = "1.6.1" # used for compile spark connector
+iceberg4spark4modern = "1.8.1" # used for compile spark connector
 paimon = '0.8.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
@@ -202,14 +204,21 @@ commons-collections4 = { group = "org.apache.commons", name = "commons-collectio
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
+iceberg-aliyun-modern = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg4modern" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
+iceberg-aws-modern = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg4modern" }
 iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle", version.ref = "iceberg" }
 iceberg-azure = { group = "org.apache.iceberg", name = "iceberg-azure", version.ref = "iceberg" }
+iceberg-azure-modern = { group = "org.apache.iceberg", name = "iceberg-azure", version.ref = "iceberg4modern" }
 iceberg-azure-bundle = { group = "org.apache.iceberg", name = "iceberg-azure-bundle", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
+iceberg-core-modern = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg4modern" }
+iceberg-api-modern = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg4modern" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
+iceberg-hive-metastore-modern = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg4modern" }
 iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
+iceberg-gcp-modern = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg4modern" }
 iceberg-gcp-bundle = { group = "org.apache.iceberg", name = "iceberg-gcp-bundle", version.ref = "iceberg" }
 paimon-core = { group = "org.apache.paimon", name = "paimon-core", version.ref = "paimon" }
 paimon-format = { group = "org.apache.paimon", name = "paimon-format", version.ref = "paimon" }
@@ -291,6 +300,9 @@ log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-
 jetty = ["jetty-server", "jetty-servlet", "jetty-webapp", "jetty-servlets"]
 jersey = ["jersey-server", "jersey-container-servlet-core", "jersey-container-jetty-http", "jersey-media-json-jackson", "jersey-hk2"]
 iceberg = ["iceberg-core", "iceberg-api"]
+iceberg4modern = ["iceberg-core-modern", "iceberg-api-modern"]
+iceberg4cloud = ["iceberg-aliyun", "iceberg-aws", "iceberg-azure", "iceberg-gcp"]
+iceberg4cloud4modern = ["iceberg-aliyun-modern", "iceberg-aws-modern", "iceberg-azure-modern", "iceberg-gcp-modern"]
 paimon = ["paimon-core", "paimon-format", "paimon-hive-catalog"]
 jwt = ["jwt-api", "jwt-impl", "jwt-gson"]
 metrics = ["metrics-core", "metrics-jersey2", "metrics-jvm", "metrics-jmx", "metrics-servlets"]

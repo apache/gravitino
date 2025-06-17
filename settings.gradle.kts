@@ -25,6 +25,8 @@ rootProject.name = "gravitino"
 val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
   ?: settings.extra["defaultScalaVersion"].toString()
 
+val jdkVersion: String = gradle.startParameter.projectProperties["jdkVersion"]?.toString() ?: settings.extra["jdkVersion"].toString()
+
 include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
 include("catalogs:catalog-hive")
@@ -56,7 +58,11 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
   println("Skipping filesystem-fuse module since enableFuse is set to false")
 }
 include("iceberg:iceberg-common")
+include("iceberg:iceberg-rest-common")
 include("iceberg:iceberg-rest-server")
+if (jdkVersion != "8") {
+  include("iceberg:iceberg-rest-modern")
+}
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
 include("trino-connector:trino-connector", "trino-connector:integration-test")
 include("spark-connector:spark-common")

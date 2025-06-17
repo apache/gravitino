@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
@@ -207,9 +208,12 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
                 + "(id bigint COMMENT 'unique id',data string) using iceberg",
             namespaceName));
 
-    // seems a bug in Iceberg REST client, should be NamespaceNotEmptyException
-    Assertions.assertThrowsExactly(
-        BadRequestException.class, () -> sql("DROP DATABASE " + namespaceName));
+    Exception exception =
+        Assertions.assertThrows(Exception.class, () -> sql("DROP DATABASE " + namespaceName));
+    // Will throw BadRequestException for low level Iceberg client.
+    Assertions.assertTrue(
+        exception instanceof BadRequestException
+            || exception instanceof NamespaceNotEmptyException);
     sql(String.format("DROP TABLE %s.test", namespaceName));
     sql("DROP DATABASE " + namespaceName);
 

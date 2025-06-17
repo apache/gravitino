@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.rest;
 
 import com.google.common.collect.ImmutableSet;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +31,7 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import lombok.SneakyThrows;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
@@ -76,6 +78,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private static final Schema tableSchema =
@@ -360,12 +363,30 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private Response doUpdateTable(Namespace ns, String name, TableMetadata base) {
-    TableMetadata newMetadata = base.updateSchema(newTableSchema, base.lastColumnId());
+    TableMetadata newMetadata = updateTableSchema(base, newTableSchema);
     List<MetadataUpdate> metadataUpdates = newMetadata.changes();
     List<UpdateRequirement> requirements = UpdateRequirements.forUpdateTable(base, metadataUpdates);
     UpdateTableRequest updateTableRequest = new UpdateTableRequest(requirements, metadataUpdates);
     return getTableClientBuilder(ns, Optional.of(name))
         .post(Entity.entity(updateTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  @SneakyThrows
+  private TableMetadata updateTableSchema(TableMetadata oldMetadata, Schema newSchema) {
+    Method updateSchemaMethod = null;
+    try {
+      updateSchemaMethod = oldMetadata.getClass().getMethod("updateSchema", Schema.class);
+      return (TableMetadata) updateSchemaMethod.invoke(oldMetadata, newSchema);
+    } catch (NoSuchMethodException e) {
+      try {
+        updateSchemaMethod =
+            oldMetadata.getClass().getMethod("updateSchema", Schema.class, int.class);
+        return (TableMetadata)
+            updateSchemaMethod.invoke(oldMetadata, newSchema, oldMetadata.lastColumnId());
+      } catch (NoSuchMethodException e2) {
+        throw new RuntimeException(e2);
+      }
+    }
   }
 
   private TableMetadata getTableMeta(Namespace ns, String tableName) {

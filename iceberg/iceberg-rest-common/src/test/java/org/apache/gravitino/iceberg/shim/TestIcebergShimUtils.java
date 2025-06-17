@@ -17,22 +17,17 @@
  *  under the License.
  */
 
-package org.apache.gravitino.utils;
+package org.apache.gravitino.iceberg.shim;
 
-public class ClassUtils {
-  public static <T> T loadClass(String className) {
-    try {
-      return (T) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-  public static <T> T loadClass(String className, ClassLoader cl) {
-    try {
-      return (T) Class.forName(className, true, cl).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+public class TestIcebergShimUtils {
+
+  private IcebergShimUtils shimUtils = new IcebergShimUtils();
+
+  @Test
+  void testUseModernIceberg() {
+    Assertions.assertFalse(shimUtils.useModernIceberg());
   }
 }

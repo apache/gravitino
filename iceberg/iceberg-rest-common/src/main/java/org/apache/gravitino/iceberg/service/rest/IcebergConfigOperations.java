@@ -34,6 +34,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.shim.IcebergRESTConfigProvider;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
@@ -42,6 +43,8 @@ import org.apache.iceberg.rest.responses.ConfigResponse;
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergConfigOperations {
 
+  private IcebergRESTConfigProvider configProvider;
+
   @SuppressWarnings("UnusedVariable")
   @Context
   private HttpServletRequest httpRequest;
@@ -49,8 +52,9 @@ public class IcebergConfigOperations {
   private final IcebergCatalogWrapperManager catalogWrapperManager;
 
   @Inject
-  public IcebergConfigOperations(IcebergCatalogWrapperManager catalogWrapperManager) {
+  public IcebergConfigOperations(IcebergCatalogWrapperManager catalogWrapperManager, IcebergRESTConfigProvider configProvider) {
     this.catalogWrapperManager = catalogWrapperManager;
+    this.configProvider = configProvider;
   }
 
   @GET
@@ -70,6 +74,7 @@ public class IcebergConfigOperations {
             .withDefaults(catalogWrapper.getCatalogConfigToClient())
             .withDefault("prefix", warehouse)
             .build();
+    response = configProvider.getConfig("");
     return IcebergRestUtils.ok(response);
   }
 }

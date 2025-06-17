@@ -17,8 +17,11 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.service.extension;
+package org.apache.gravitino.iceberg.modern.service.rest;
 
+import com.codahale.metrics.annotation.ResponseMetered;
+import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.ImmutableMap;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -28,14 +31,13 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.metrics.MetricNames;
+import org.apache.iceberg.rest.responses.ConfigResponse;
 
-@Path("/hello")
+@Path("/v1/{prefix:([^/]*/)?}config11")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class HelloOperations {
-  public static final String HELLO_URI_PATH = "hello";
-
-  public static final String HELLO_MSG = "hello";
+public class IcebergConfigOperations {
 
   @SuppressWarnings("UnusedVariable")
   @Context
@@ -43,7 +45,11 @@ public class HelloOperations {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  public Response hello() {
-    return IcebergRestUtils.ok(new HelloResponse(HELLO_MSG));
+  @Timed(name = "config." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "config", absolute = true)
+  public Response getConfig() {
+    ConfigResponse response =
+        ConfigResponse.builder().withDefaults(ImmutableMap.of("a", "b")).build();
+    return IcebergRestUtils.ok(response);
   }
 }

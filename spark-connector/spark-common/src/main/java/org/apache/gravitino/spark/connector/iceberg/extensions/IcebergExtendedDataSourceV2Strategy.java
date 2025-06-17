@@ -20,7 +20,9 @@ package org.apache.gravitino.spark.connector.iceberg.extensions;
 
 import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.toJavaList;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
+import lombok.SneakyThrows;
 import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.SparkSession;
@@ -212,12 +214,18 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, setWriteDistributionAndOrdering.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
-                SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec =
-                    new SetWriteDistributionAndOrderingExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        setWriteDistributionAndOrdering.distributionMode(),
-                        setWriteDistributionAndOrdering.sortOrder());
+                SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec = null;
+                Object distributionMode = getDistributionMode(setWriteDistributionAndOrdering);
+                try {
+                  setWriteDistributionAndOrderingExec =
+                      createCaseClass(
+                          catalogAndIdentifier.catalog,
+                          catalogAndIdentifier.identifier,
+                          distributionMode,
+                          setWriteDistributionAndOrdering.sortOrder());
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
                 return toSeq(setWriteDistributionAndOrderingExec);
               })
           .get();
@@ -265,5 +273,40 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
             "Unsupported catalog type: " + catalog.getClass().getName());
       }
     }
+  }
+
+  private static SetWriteDistributionAndOrderingExec createCaseClass(
+      TableCatalog catalog, Identifier identifier, Object distributionMode, Object sortOrder)
+      throws Exception {
+    // 1. 获取伴生对象
+    Class<?> companionClass =
+        Class.forName(SetWriteDistributionAndOrderingExec.class.getName() + "$");
+    Object companionInstance = companionClass.getField("MODULE$").get(null);
+
+    // 2. 获取 apply 方法（Scala case class 的工厂方法）
+    Class<?>[] paramTypes = getApplyMethodParamTypes(companionClass);
+    Method applyMethod = companionClass.getMethod("apply", paramTypes);
+
+    // 3. 调用 apply 方法创建实例
+    return (SetWriteDistributionAndOrderingExec)
+        applyMethod.invoke(companionInstance, catalog, identifier, distributionMode, sortOrder);
+  }
+
+  private static Class<?>[] getApplyMethodParamTypes(Class<?> companionClass) {
+    // Scala 会生成多个 apply 方法重载，匹配参数数量为4
+    for (Method method : companionClass.getMethods()) {
+      if ("apply".equals(method.getName()) && method.getParameterCount() == 4) {
+        return method.getParameterTypes();
+      }
+    }
+    throw new IllegalStateException("apply 方法未找到");
+  }
+
+  @SneakyThrows
+  private static Object getDistributionMode(
+      SetWriteDistributionAndOrdering setWriteDistributionAndOrdering) {
+    Method distributionModeMethod =
+        setWriteDistributionAndOrdering.getClass().getMethod("distributionMode");
+    return distributionModeMethod.invoke(setWriteDistributionAndOrdering);
   }
 }

@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.service.extension;
+package org.apache.gravitino.iceberg.integration.test.extension;
 
 import org.apache.iceberg.rest.RESTResponse;
 
