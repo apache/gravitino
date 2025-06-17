@@ -19,11 +19,9 @@
 
 package org.apache.gravitino.cache;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -33,23 +31,6 @@ import org.apache.gravitino.SupportsRelationOperations;
  * relationships.
  */
 public interface SupportsRelationEntityCache {
-  /**
-   * Retrieves a list of entities related to the specified entity under the given relation type. If
-   * the related entities are not present in the cache, they will be loaded from the underlying
-   * {@link EntityStore}.
-   *
-   * @param ident The name identifier of the entity to find related entities for
-   * @param type The type of the entity to find related entities for
-   * @param relType The relation type to find related entities for
-   * @return A list of related entities, or an empty list if none are found
-   * @param <E> The class of the related entities
-   * @throws IOException if an I/O error occurs while loading related entities from the underlying
-   *     {@link EntityStore}
-   */
-  <E extends Entity & HasIdentifier> List<E> getOrLoad(
-      NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType)
-      throws IOException;
-
   /**
    * Retrieves a list of related entities from the cache, if present.
    *
