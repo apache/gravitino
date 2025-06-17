@@ -153,7 +153,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         catalog = self.gravitino_client.create_catalog(
             name=self.catalog_name,
             catalog_type=Catalog.Type.FILESET,
-            provider=self.catalog_provider,
+            provider=None,
             comment="",
             properties={self.catalog_location_prop: "/tmp/test1"},
         )
