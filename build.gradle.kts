@@ -232,6 +232,22 @@ allprojects {
         }
       }
     }
+
+    val setOptimizationTestEnvironment: (Test) -> Unit = { param ->
+      // 继承现有的测试环境配置
+      val initTest = project.extra.get("initTestParam") as (Test) -> Unit
+      initTest(param)
+
+      // 新增优化测试特定配置
+      param.environment("CATALOG_OPTIMIZATION_TEST", "true")
+      param.environment("CATALOG_CLASSLOADER_POOL_MAX_SIZE", "10")
+      param.environment("CATALOG_CLASSLOADER_POOL_EXPIRE_MINUTES", "5")
+      param.environment("CATALOG_OPERATIONS_PER_SECOND", "50.0")
+
+      // 内存监控配置
+      param.systemProperty("gravitino.test.memory.monitoring", "true")
+      param.systemProperty("gravitino.test.gc.logging", "true")
+    }
   }
 
   extra["initTestParam"] = setTestEnvironment
@@ -502,6 +518,33 @@ subprojects {
   }
 
   tasks.register("allDeps", DependencyReportTask::class)
+
+  tasks.register("ciTest") {
+    description = "CI环境测试任务"
+    group = "verification"
+
+    dependsOn(":core:unitTest")
+
+    if (project.hasProperty("runIntegrationTests")) {
+      dependsOn(":core:integrationTest")
+    }
+
+    if (project.hasProperty("runPerformanceTests")) {
+      dependsOn(":core:performanceTest")
+    }
+  }
+
+  tasks.register("fullTest") {
+    description = "运行所有测试"
+    group = "verification"
+
+    dependsOn(
+            ":core:unitTest",
+            ":core:integrationTest",
+            ":core:performanceTest",
+            ":core:stressTest"
+    )
+  }
 
   group = "org.apache.gravitino"
   version = "$version"

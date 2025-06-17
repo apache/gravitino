@@ -389,4 +389,27 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(true);
+
+  // 新增ClassLoader池相关配置
+  public static final ConfigEntry<Long> CATALOG_CLASSLOADER_POOL_MAX_SIZE =
+          new ConfigBuilder("gravitino.catalog.classloader.pool.max-size")
+                  .doc("Maximum size of the catalog ClassLoader pool")
+                  .version("1.0.0")
+                  .longConf()
+                  .createWithDefault(50L);
+
+  public static final ConfigEntry<Long> CATALOG_CLASSLOADER_POOL_EXPIRE_MINUTES =
+          new ConfigBuilder("gravitino.catalog.classloader.pool.expire-minutes")
+                  .doc("Expiration time in minutes for cached ClassLoaders")
+                  .version("1.0.0")
+                  .longConf()
+                  .createWithDefault(30L);
+
+  // 新增操作频率限制配置
+  public static final ConfigEntry<Double> CATALOG_OPERATIONS_PER_SECOND =
+          new ConfigBuilder("gravitino.catalog.operations.rate-limit")
+                  .doc("Maximum catalog operations per second")
+                  .version("1.0.0")
+                  .doubleConf()
+                  .createWithDefault(10.0);
 }
