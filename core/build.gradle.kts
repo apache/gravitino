@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import net.ltgt.gradle.errorprone.errorprone
 plugins {
   `maven-publish`
   id("java")
@@ -69,11 +68,5 @@ tasks.test {
     environment("GRAVITINO_HOME", project.rootDir.path)
   } else {
     environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
-  }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-  if (name.contains("test", ignoreCase = true)) {
-    options.errorprone?.excludedPaths?.set(".*/generated/.*")
   }
 }
