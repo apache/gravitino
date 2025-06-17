@@ -19,42 +19,38 @@
 
 package org.apache.gravitino.cache.provider;
 
-import java.util.Map;
-import java.util.ServiceLoader;
-import java.util.concurrent.ConcurrentHashMap;
+import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.EntityCache;
 
 /** Factory class for creating {@link EntityCache} instances. */
 public final class CacheFactory {
-  // Registered cache providers, discovered via Java SPI.
-  private static final Map<String, CacheProvider> PROVIDERS = new ConcurrentHashMap<>();
 
-  static {
-    ServiceLoader<CacheProvider> loader = ServiceLoader.load(CacheProvider.class);
-    for (CacheProvider provider : loader) {
-      PROVIDERS.put(provider.name(), provider);
-    }
-  }
+  // Register EntityCache's short name to its full qualified class name in the map. So that user
+  // doesn't need to specify the full qualified class name when creating an EntityCache instance.
+  public static final ImmutableMap<String, String> ENTITY_CACHES =
+      ImmutableMap.of("caffeine", CaffeineEntityCache.class.getCanonicalName());
+
+  // Private constructor to prevent instantiation of this factory class.
+  private CacheFactory() {}
 
   /**
    * Creates a new {@link EntityCache} using the cache type specified in the configuration.
    *
    * @param config The configuration.
-   * @return A cache instance provided by the selected {@link CacheProvider}.
+   * @return A cache instance
    */
   public static EntityCache getEntityCache(Config config) {
-    CacheProvider provider = getProvider(config.get(Configs.CACHE_PROVIDER));
-    return provider.getCache(config);
-  }
+    String name = config.get(Configs.CACHE_IMPLEMENTATION);
+    String className = ENTITY_CACHES.getOrDefault(name, name);
 
-  private static CacheProvider getProvider(String name) {
-    CacheProvider provider = PROVIDERS.get(name);
-    if (provider == null) {
-      throw new IllegalArgumentException(
-          "No such cache provider: " + name + ". Available providers: " + PROVIDERS.keySet());
+    try {
+      return (EntityCache)
+          Class.forName(className).getDeclaredConstructor(Config.class).newInstance(config);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create and initialize EntityCache: " + name, e);
     }
-    return provider;
   }
 }
