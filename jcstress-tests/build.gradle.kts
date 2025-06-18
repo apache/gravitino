@@ -30,12 +30,15 @@ dependencies {
 }
 
 jcstress {
-  verbose = "true"
+  /*
+   Available modes:
+   - sanity : takes seconds
+   - quick : takes tens of seconds
+   - default : takes minutes, good number of iterations
+   - tough : takes tens of minutes, large number of iterations, most reliable
+    */
   mode = "default"
-  cpuCount = "4"
-  iterations = "1000"
-  jvmArgs = "-XX:ThreadStackSize=512"
-  forks = "1"
+  jvmArgsPrepend = "-Djdk.stdout.sync=true"
 }
 
 tasks.withType<JavaCompile>().configureEach {

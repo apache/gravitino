@@ -25,16 +25,21 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.openjdk.jcstress.annotations.Actor;
 import org.openjdk.jcstress.annotations.Arbiter;
 import org.openjdk.jcstress.annotations.Description;
@@ -46,6 +51,15 @@ import org.openjdk.jcstress.infra.results.I_Result;
 import org.openjdk.jcstress.infra.results.L_Result;
 
 public class TestCaffeineEntityCacheCoherence {
+  private static final SchemaEntity schemaEntity =
+      getTestSchemaEntity(1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
+  private static final TableEntity tableEntity =
+      getTestTableEntity(3L, "table1", Namespace.of("metalake1", "catalog1", "schema1"));
+  private static final GroupEntity groupEntity =
+      getTestGroupEntity(4L, "group1", "metalake1", ImmutableList.of("role1"));
+  private static final UserEntity userEntity =
+      getTestUserEntity(5L, "user1", "metalake1", ImmutableList.of(6L));
+  private static final RoleEntity roleEntity = getTestRoleEntity(6L, "role1", "metalake1");
 
   private static SchemaEntity getTestSchemaEntity(
       long id, String name, Namespace namespace, String comment) {
@@ -66,6 +80,38 @@ public class TestCaffeineEntityCacheCoherence {
         .withAuditInfo(getTestAuditInfo())
         .withNamespace(namespace)
         .withColumns(ImmutableList.of(getMockColumnEntity()))
+        .build();
+  }
+
+  private static RoleEntity getTestRoleEntity(long id, String name, String metalake) {
+    return RoleEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofRole(metalake))
+        .withAuditInfo(getTestAuditInfo())
+        .withSecurableObjects(ImmutableList.of())
+        .build();
+  }
+
+  private static GroupEntity getTestGroupEntity(
+      long id, String name, String metalake, List<String> roles) {
+    return GroupEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofGroup(metalake))
+        .withAuditInfo(getTestAuditInfo())
+        .withRoleNames(roles)
+        .build();
+  }
+
+  private static UserEntity getTestUserEntity(
+      long id, String name, String metalake, List<Long> roles) {
+    return UserEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(NamespaceUtil.ofUser(metalake))
+        .withAuditInfo(getTestAuditInfo())
+        .withRoleIds(roles)
         .build();
   }
 
@@ -90,42 +136,35 @@ public class TestCaffeineEntityCacheCoherence {
 
   @JCStressTest
   @Outcome.Outcomes({
-    @Outcome(id = "ENTITY", expect = Expect.ACCEPTABLE, desc = "Both threads see correct value."),
-    @Outcome(id = "NULL", expect = Expect.FORBIDDEN, desc = "Cache read failed unexpectedly")
+    @Outcome(id = "ENTITY", expect = Expect.ACCEPTABLE, desc = "getIfPresent observed the entity."),
+    @Outcome(
+        id = "NULL",
+        expect = Expect.FORBIDDEN,
+        desc = "getIfPresent did not observe entity, which violates visibility guarantees.")
   })
   @Description(
-      "Tests the race condition between put() and getOrLoad(). "
-          + "Thread 1 attempts to insert an entity into the cache using put(), "
-          + "while Thread 2 concurrently attempts to retrieve the same entity using getOrLoad(). "
-          + "The expected behavior is that getOrLoad should observe the result of put() or "
-          + "load the value from the backing store if put hasn't completed yet. "
-          + "Returning NULL would indicate both put and load failed, "
-          + "which violates the cache's expected guarantees and is therefore forbidden.")
+      "Tests visibility between put() and getIfPresent() on an existing entity. "
+          + "Entity should remain visible; NULL indicates broken visibility or invalidation.")
   @State
   public static class PutVsGetIfPresentTest {
     private final EntityCache cache;
-    private final NameIdentifier ident;
-    private final SchemaEntity entity;
 
     public PutVsGetIfPresentTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
-      this.ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
-      this.entity =
-          getTestSchemaEntity(1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
-
-      this.cache.put(entity);
+      cache.put(schemaEntity);
     }
 
     @Actor
     public void actor1() {
-      cache.put(entity);
+      cache.put(schemaEntity);
     }
 
     @Actor
     public void actor2(L_Result r) {
-      Optional<? extends Entity> entityFromCache =
-          cache.getIfPresent(ident, Entity.EntityType.SCHEMA);
-      r.r1 = entityFromCache.isPresent() ? "ENTITY" : "NULL";
+      r.r1 =
+          cache.getIfPresent(schemaEntity.nameIdentifier(), schemaEntity.type()).isPresent()
+              ? "ENTITY"
+              : "NULL";
     }
   }
 
@@ -135,38 +174,34 @@ public class TestCaffeineEntityCacheCoherence {
         id = "ENTITY",
         expect = Expect.ACCEPTABLE,
         desc =
-            "The put is visible to contains(), indicating proper visibility and synchronization."),
+            "contains() returns true, indicating the cache retains visibility after repeated put()."),
     @Outcome(
         id = "NULL",
         expect = Expect.FORBIDDEN,
         desc =
-            "Put was done but not visible to contains(), indicating a visibility or synchronization issue.")
+            "contains() returned false, indicating visibility or synchronization error during repeated put().")
   })
   @Description(
-      "Tests visibility between put() and contains(): whether a concurrent put is visible to another thread using contains().")
+      "Tests visibility with repeated put() on the same key. "
+          + "Actor1 puts again; Actor2 checks contains(). "
+          + "Entity should remain visible; NULL indicates a visibility issue.")
   @State
   public static class PutVsContainTest {
     private final EntityCache cache;
-    private final NameIdentifier ident;
-    private final SchemaEntity entity;
 
     public PutVsContainTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
-      this.ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
-      this.entity =
-          getTestSchemaEntity(1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
-
-      this.cache.put(entity);
+      cache.put(schemaEntity);
     }
 
     @Actor
     public void actor1() {
-      cache.put(entity);
+      cache.put(schemaEntity);
     }
 
     @Actor
     public void actor2(L_Result r) {
-      boolean contains = cache.contains(ident, Entity.EntityType.SCHEMA);
+      boolean contains = cache.contains(schemaEntity.nameIdentifier(), schemaEntity.type());
       r.r1 = contains ? "ENTITY" : "NULL";
     }
   }
@@ -176,47 +211,38 @@ public class TestCaffeineEntityCacheCoherence {
     @Outcome(
         id = "ENTITY",
         expect = Expect.ACCEPTABLE,
-        desc = "Put succeeded and survived invalidate."),
+        desc = "put() completed after invalidate(), so the entity remains in the cache."),
     @Outcome(
         id = "NULL",
         expect = Expect.ACCEPTABLE_INTERESTING,
-        desc = "Invalidate cleared concurrent put.")
+        desc = "invalidate() cleared the entity after put(), so it is no longer in the cache.")
   })
   @Description(
-      "Tests the race condition between put() and invalidate(). "
-          + "Thread 1 attempts to put an entity into the cache "
-          + "while Thread 2 concurrently invalidates the same key. "
-          + "If put happens after invalidate, the entity remains visible in the cache. "
-          + "If invalidate wins the race and removes the entry after put, "
-          + "the cache may not contain the entity. Missing value is considered acceptable but interesting, "
-          + "as it reflects the non-determinism of concurrent modification.")
+      "Concurrent put() and invalidate() on the same key. "
+          + "If put wins, entity remains; if invalidate wins, it's removed. "
+          + "Both outcomes are acceptable; NULL is interesting for consistency checks.")
   @State
   public static class PutVsInvalidateTest {
-
     private final EntityCache cache;
-    private final NameIdentifier ident;
-    private final SchemaEntity entity;
 
     public PutVsInvalidateTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
-      this.ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
-      this.entity =
-          getTestSchemaEntity(1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
     }
 
     @Actor
     public void actor1() {
-      cache.put(entity);
+      cache.put(schemaEntity);
     }
 
     @Actor
     public void actor2() {
-      cache.invalidate(ident, Entity.EntityType.SCHEMA);
+      cache.invalidate(schemaEntity.nameIdentifier(), schemaEntity.type());
     }
 
     @Arbiter
     public void arbiter(L_Result r) {
-      Entity result = cache.getIfPresent(ident, Entity.EntityType.SCHEMA).orElse(null);
+      Entity result =
+          cache.getIfPresent(schemaEntity.nameIdentifier(), schemaEntity.type()).orElse(null);
       r.r1 = result != null ? "ENTITY" : "NULL";
     }
   }
@@ -226,36 +252,26 @@ public class TestCaffeineEntityCacheCoherence {
     @Outcome(
         id = "ENTITY",
         expect = Expect.ACCEPTABLE,
-        desc = "Put happened after clear; value visible."),
+        desc = "put() happened after clear(), so the entity remains in the cache."),
     @Outcome(
         id = "NULL",
         expect = Expect.ACCEPTABLE_INTERESTING,
-        desc = "Clear happened after put; value not present.")
+        desc = "clear() happened after or concurrently with put(), so the cache is empty.")
   })
   @Description(
-      "Tests the race condition between clear() and put(). "
-          + "Thread 1 attempts to put an entity into the cache, "
-          + "while Thread 2 concurrently clears all entries. "
-          + "If put happens after clear, the entity should remain visible. "
-          + "If clear happens after or concurrently with put, the cache may not contain the entity. "
-          + "Missing value is considered interesting but not forbidden, "
-          + "since the outcome depends on execution timing.")
+      "Concurrent put() and clear(). If put wins, entity remains. If clear wins, entity is gone. "
+          + "NULL is acceptable but interesting due to race timing.")
   @State
   public static class PutVsClearTest {
     private final EntityCache cache;
-    private final NameIdentifier ident;
-    private final TableEntity entity;
 
     public PutVsClearTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
-      this.ident = NameIdentifier.of("metalake1", "catalog1", "schema1", "table1");
-      this.entity =
-          getTestTableEntity(3L, "table1", Namespace.of("metalake1", "catalog1", "schema1"));
     }
 
     @Actor
     public void actor1() {
-      cache.put(entity);
+      cache.put(tableEntity);
     }
 
     @Actor
@@ -265,7 +281,8 @@ public class TestCaffeineEntityCacheCoherence {
 
     @Arbiter
     public void arbiter(L_Result r) {
-      Entity result = cache.getIfPresent(ident, Entity.EntityType.TABLE).orElse(null);
+      Entity result =
+          cache.getIfPresent(tableEntity.nameIdentifier(), tableEntity.type()).orElse(null);
       r.r1 = result != null ? "ENTITY" : "NULL";
     }
   }
@@ -275,57 +292,111 @@ public class TestCaffeineEntityCacheCoherence {
     @Outcome(
         id = "2",
         expect = Expect.ACCEPTABLE,
-        desc = "Both puts succeeded; cache has 2 entries."),
-    @Outcome(id = "1", expect = Expect.FORBIDDEN, desc = "Only one put visible")
+        desc = "Both put() calls succeeded; both entries are visible in the cache."),
+    @Outcome(
+        id = "1",
+        expect = Expect.FORBIDDEN,
+        desc = "Only one entry is visible; potential visibility or atomicity issue."),
+    @Outcome(
+        id = "0",
+        expect = Expect.FORBIDDEN,
+        desc =
+            "Neither entry is visible; indicates a serious failure in write propagation or cache logic.")
   })
-  @Outcome(
-      id = "0",
-      expect = Expect.FORBIDDEN,
-      desc = "No put visible – broken write or visibility.")
   @Description(
-      "Tests concurrent put() operations on two different cache keys. "
-          + "Both threads insert different entities into the cache simultaneously. "
-          + "Expected result is that both entries should be visible afterward. "
-          + "If only one or none is visible, it indicates a write visibility or atomicity violation.")
+      "Concurrent put() on different keys. Both schema and table should be visible (result = 2). "
+          + "Lower results may indicate visibility or concurrency issues.")
   @State
   public static class ConcurrentPutDifferentKeysTest {
-
     private final EntityCache cache;
-    private final NameIdentifier ident1;
-    private final NameIdentifier ident2;
-
-    private final SchemaEntity entity1;
-    private final SchemaEntity entity2;
 
     public ConcurrentPutDifferentKeysTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
-      this.ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
-      this.ident2 = NameIdentifier.of("metalake2", "catalog2", "schema2");
-      this.entity1 =
-          getTestSchemaEntity(1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
-      this.entity2 =
-          getTestSchemaEntity(2L, "schema2", Namespace.of("metalake2", "catalog2"), "test_schema2");
     }
 
     @Actor
     public void actor1() {
-      cache.put(entity1);
+      cache.put(schemaEntity);
     }
 
     @Actor
     public void actor2() {
-      cache.put(entity2);
+      cache.put(tableEntity);
     }
 
     @Arbiter
     public void arbiter(I_Result r) {
       int count = 0;
-      if (cache.getIfPresent(ident1, Entity.EntityType.SCHEMA).isPresent()) {
+      if (cache.contains(schemaEntity.nameIdentifier(), schemaEntity.type())) {
         count++;
       }
-      if (cache.getIfPresent(ident2, Entity.EntityType.SCHEMA).isPresent()) {
+      if (cache.contains(tableEntity.nameIdentifier(), tableEntity.type())) {
         count++;
       }
+
+      r.r1 = count;
+    }
+  }
+
+  @JCStressTest
+  @Outcome.Outcomes({
+    @Outcome(
+        id = "2",
+        expect = Expect.ACCEPTABLE,
+        desc = "Both put() calls succeeded; both entries are visible in the cache."),
+    @Outcome(
+        id = "1",
+        expect = Expect.FORBIDDEN,
+        desc = "Only one entry is visible; potential visibility or atomicity issue."),
+    @Outcome(
+        id = "0",
+        expect = Expect.FORBIDDEN,
+        desc =
+            "Neither entry is visible; indicates a serious failure in write propagation or cache logic.")
+  })
+  @Description("Concurrent put() with different ROLE relation types; expect both visible (2).")
+  @State
+  public static class ConcurrentPutDifferentKeysWithRelationTest {
+    private final EntityCache cache;
+
+    public ConcurrentPutDifferentKeysWithRelationTest() {
+      this.cache = new CaffeineEntityCache(new Config() {});
+    }
+
+    @Actor
+    public void actor1() {
+      cache.put(
+          roleEntity.nameIdentifier(),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_GROUP_REL,
+          ImmutableList.of(groupEntity));
+    }
+
+    @Actor
+    public void actor2() {
+      cache.put(
+          roleEntity.nameIdentifier(),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_USER_REL,
+          ImmutableList.of(userEntity));
+    }
+
+    @Arbiter
+    public void arbiter(I_Result r) {
+      int count = 0;
+      if (cache.contains(
+          roleEntity.nameIdentifier(),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_USER_REL)) {
+        count++;
+      }
+      if (cache.contains(
+          roleEntity.nameIdentifier(),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_GROUP_REL)) {
+        count++;
+      }
+
       r.r1 = count;
     }
   }
@@ -335,43 +406,87 @@ public class TestCaffeineEntityCacheCoherence {
     @Outcome(
         id = "1",
         expect = Expect.ACCEPTABLE,
-        desc = "Both puts succeeded; cache has 2 entries."),
+        desc = "Both put() calls succeeded on the same key; value is visible."),
     @Outcome(
         id = "0",
         expect = Expect.FORBIDDEN,
-        desc = "No put visible – broken write or visibility.")
+        desc = "Neither put() was visible; indicates a visibility or atomicity issue.")
   })
   @Description(
-      "Tests concurrent put() operations on two different cache keys. "
-          + "Both threads insert different entities into the cache simultaneously. "
-          + "Expected result is that both entries should be visible afterward. "
-          + "If only one or none is visible, it indicates a write visibility or atomicity violation.")
+      "Concurrent put() on the same key; value should remain visible. Missing entry indicates a concurrency issue.")
   @State
   public static class ConcurrentPutSameKeyTest {
     private final EntityCache cache;
-    private final NameIdentifier ident;
-    private final SchemaEntity entity;
 
     public ConcurrentPutSameKeyTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
-      this.ident = NameIdentifier.of("metalake1", "catalog1", "schema1");
-      this.entity =
-          getTestSchemaEntity(1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
     }
 
     @Actor
     public void actor1() {
-      cache.put(entity);
+      cache.put(schemaEntity);
     }
 
     @Actor
     public void actor2() {
-      cache.put(entity);
+      cache.put(schemaEntity);
     }
 
     @Arbiter
     public void arbiter(I_Result r) {
-      r.r1 = cache.getIfPresent(ident, Entity.EntityType.SCHEMA).isPresent() ? 1 : 0;
+      r.r1 = cache.contains(schemaEntity.nameIdentifier(), Entity.EntityType.SCHEMA) ? 1 : 0;
+    }
+  }
+
+  @JCStressTest
+  @Outcome.Outcomes({
+    @Outcome(
+        id = "1",
+        expect = Expect.ACCEPTABLE,
+        desc = "Entry is visible; concurrent put() calls succeeded."),
+    @Outcome(
+        id = "0",
+        expect = Expect.FORBIDDEN,
+        desc = "Entry is missing; indicates visibility or atomicity issue.")
+  })
+  @Description(
+      "Tests concurrent put() on the same key with relation type. "
+          + "Entry must remain visible after concurrent writes; missing indicates a bug.")
+  @State
+  public static class ConcurrentPutSameKeyWithRelationTest {
+    private final EntityCache cache;
+
+    public ConcurrentPutSameKeyWithRelationTest() {
+      this.cache = new CaffeineEntityCache(new Config() {});
+    }
+
+    @Actor
+    public void actor1() {
+      cache.put(
+          roleEntity.nameIdentifier(),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_USER_REL,
+          ImmutableList.of(userEntity));
+    }
+
+    @Actor
+    public void actor2() {
+      cache.put(
+          roleEntity.nameIdentifier(),
+          Entity.EntityType.ROLE,
+          SupportsRelationOperations.Type.ROLE_USER_REL,
+          ImmutableList.of(userEntity));
+    }
+
+    @Arbiter
+    public void arbiter(I_Result r) {
+      r.r1 =
+          cache.contains(
+                  roleEntity.nameIdentifier(),
+                  Entity.EntityType.ROLE,
+                  SupportsRelationOperations.Type.ROLE_USER_REL)
+              ? 1
+              : 0;
     }
   }
 
@@ -380,43 +495,35 @@ public class TestCaffeineEntityCacheCoherence {
     @Outcome(
         id = "ENTITY",
         expect = Expect.ACCEPTABLE,
-        desc = "GetOrLoad reloads after invalidate."),
+        desc = "GetIfPresent sees the entity before it was invalidated."),
     @Outcome(
         id = "NULL",
         expect = Expect.ACCEPTABLE_INTERESTING,
-        desc = "Invalidate caused data loss.")
+        desc = "Invalidate removed the entity before getIfPresent.")
   })
   @Description(
-      "Tests the race condition between invalidate() and getOrLoad(). "
-          + "Thread 1 removes the entity from the cache using invalidate(), "
-          + "while Thread 2 concurrently attempts to retrieve the same entity using getOrLoad(). "
-          + "The expected behavior is that getOrLoad should fall back "
-          + "to the entity store and reload the entity, ensuring it does not return null. "
-          + "A NULL result indicates that the cache failed to reload the entity correctly, "
-          + "which violates the contract of getOrLoad and is therefore forbidden.")
+      "Tests race between invalidate() and getIfPresent(). "
+          + "Either outcome is allowed depending on timing.")
   @State
   public static class InvalidateVsGetTest {
     private final EntityCache cache;
-    private final NameIdentifier ident;
-    private final TableEntity entity;
 
     public InvalidateVsGetTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
-      this.ident = NameIdentifier.of("metalake1", "catalog1", "schema1", "table1");
-      this.entity =
-          getTestTableEntity(3L, "table1", Namespace.of("metalake1", "catalog1", "schema1"));
 
-      cache.put(entity);
+      cache.put(schemaEntity);
+      cache.put(tableEntity);
     }
 
     @Actor
     public void actor1() {
-      cache.invalidate(ident, Entity.EntityType.TABLE);
+      cache.invalidate(schemaEntity.nameIdentifier(), schemaEntity.type());
     }
 
     @Actor
     public void actor2(L_Result r) {
-      Optional<? extends Entity> result = cache.getIfPresent(ident, Entity.EntityType.TABLE);
+      Optional<? extends Entity> result =
+          cache.getIfPresent(tableEntity.nameIdentifier(), tableEntity.type());
       r.r1 = result.isPresent() ? "ENTITY" : "NULL";
     }
   }
