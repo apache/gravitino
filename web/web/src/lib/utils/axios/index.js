@@ -38,6 +38,7 @@ import { AxiosCanceler } from './axiosCancel'
 import { NextAxios } from './Axios'
 import { checkStatus } from './checkStatus'
 import { useAuth as Auth } from '../../provider/session'
+import { githubApis } from '@/lib/api/github'
 
 let isRefreshing = false
 
@@ -246,7 +247,7 @@ const transform = {
 
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
-    if (response?.status === 401 && !originConfig._retry) {
+    if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
       // Log out directly if idle for more than 30 minutes
       const isIdle = localStorage.getItem('isIdle') && JSON.parse(localStorage.getItem('isIdle'))
       if (isIdle) {
