@@ -19,7 +19,12 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -34,7 +39,9 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Lists;
@@ -546,5 +553,117 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
           Assertions.assertEquals(expectedColumn.defaultValue(), column.defaultValue());
           Assertions.assertEquals(expectedColumn.auditInfo(), column.auditInfo());
         });
+  }
+
+  @Test
+  public void testDeleteColumnsByLegacyTimeline() throws IOException {
+    String catalogName = "catalog1";
+    String schemaName = "schema1";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+
+    List<ColumnEntity> columns = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      columns.add(
+          ColumnEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("column_" + i)
+              .withPosition(i)
+              .withComment("comment_" + i)
+              .withDataType(Types.StringType.get())
+              .withNullable(true)
+              .withAutoIncrement(false)
+              .withAuditInfo(auditInfo)
+              .build());
+    }
+
+    TableEntity createdTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("legacy_table")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withColumns(columns)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableMetaService.getInstance().insertTable(createdTable, false);
+    long now = System.currentTimeMillis();
+    long legacyTimeline = now - 100000; // Past timestamp
+    Connection connection = null;
+    PreparedStatement stmt = null;
+    try {
+      connection = SqlSessions.getSqlSession().getConnection();
+      for (ColumnEntity column : columns) {
+        String sql =
+            "UPDATE "
+                + TableColumnMapper.COLUMN_TABLE_NAME
+                + " SET deleted_at = ? WHERE column_id = ?";
+        stmt = connection.prepareStatement(sql);
+        stmt.setLong(1, legacyTimeline);
+        stmt.setLong(2, column.id());
+        stmt.executeUpdate();
+        stmt.close();
+      }
+      SqlSessions.commitAndCloseSqlSession();
+    } catch (Exception e) {
+      SqlSessions.rollbackAndCloseSqlSession();
+      throw new IOException("Failed to update column deleted_at timestamp", e);
+    } finally {
+      if (stmt != null) {
+        try {
+          stmt.close();
+        } catch (SQLException e) {
+          // Ignore
+        }
+      }
+    }
+    int count = countColumnsByTableId(legacyTimeline);
+    Assertions.assertEquals(5, count, "Should have 5 columns with legacy timeline");
+    TableColumnMetaService service = TableColumnMetaService.getInstance();
+    service.deleteColumnsByLegacyTimeline(now, 3);
+    count = countColumnsByTableId(legacyTimeline);
+    Assertions.assertEquals(2, count, "Should have 2 columns remaining");
+    service.deleteColumnsByLegacyTimeline(now, 10);
+    count = countColumnsByTableId(legacyTimeline);
+    Assertions.assertEquals(0, count, "Should have no columns remaining");
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(NameIdentifier.of(METALAKE_NAME), true));
+  }
+
+  private int countColumnsByTableId(long legacyTimeline) throws IOException {
+    int count = 0;
+    Connection connection = null;
+    PreparedStatement stmt = null;
+    ResultSet rs = null;
+    try {
+      connection = SqlSessions.getSqlSession().getConnection();
+      String sql =
+          "SELECT COUNT(*) FROM " + TableColumnMapper.COLUMN_TABLE_NAME + " WHERE deleted_at = ?";
+      stmt = connection.prepareStatement(sql);
+      stmt.setLong(1, legacyTimeline);
+      rs = stmt.executeQuery();
+      if (rs.next()) {
+        count = rs.getInt(1);
+      }
+      SqlSessions.commitAndCloseSqlSession();
+    } catch (Exception e) {
+      SqlSessions.rollbackAndCloseSqlSession();
+      throw new IOException("Failed to count columns with legacy timeline", e);
+    } finally {
+      if (rs != null) {
+        try {
+          rs.close();
+        } catch (SQLException e) {
+          // Ignore
+        }
+      }
+      if (stmt != null) {
+        try {
+          stmt.close();
+        } catch (SQLException e) {
+          // Ignore
+        }
+      }
+    }
+    return count;
   }
 }
