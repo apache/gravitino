@@ -60,7 +60,7 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-common")
 include("iceberg:iceberg-rest-server")
-if (jdkVersion != "1.8") {
+if (jdkVersion != "8") {
   include("iceberg:iceberg-rest-modern")
 }
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
