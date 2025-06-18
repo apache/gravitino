@@ -65,5 +65,11 @@ public interface GravitinoAuthorizer extends Closeable {
    */
   default void handleRolePrivilegeChange(Long roleId) {};
 
+  /**
+   * This method is called to clear the owner relationship in jcasbin when the owner of the metadata
+   * changes.
+   *
+   * @param nameIdentifier The metadata name identifier;
+   */
   default void handleMetadataOwnerChange(NameIdentifier nameIdentifier) {};
 }
