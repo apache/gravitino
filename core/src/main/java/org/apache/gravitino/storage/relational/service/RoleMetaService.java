@@ -40,6 +40,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -86,11 +87,9 @@ public class RoleMetaService {
   }
 
   public List<RoleEntity> listRolesByUserIdent(NameIdentifier userIdent) {
+    UserEntity user = UserMetaService.getInstance().getUserByIdentifier(userIdent);
     String metalake = NameIdentifierUtil.getMetalake(userIdent);
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-    Long userId =
-        UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, userIdent.name());
-    List<RolePO> rolePOs = listRolesByUserId(userId);
+    List<RolePO> rolePOs = listRolesByUserId(user.id());
     return rolePOs.stream()
         .map(
             po ->
