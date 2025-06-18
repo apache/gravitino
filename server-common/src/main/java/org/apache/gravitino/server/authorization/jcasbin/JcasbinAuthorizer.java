@@ -33,6 +33,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privilege;
@@ -41,7 +42,9 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -63,6 +66,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * are updated, they should be removed from it.
    */
   private Set<Long> loadedRoles = ConcurrentHashMap.newKeySet();
+
+  private Set<Long> loadedUserOwnerRels = ConcurrentHashMap.newKeySet();
 
   @Override
   public void initialize() {
@@ -148,12 +153,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private void loadPrivilege(String metalake, String username, Long userId) {
     try {
       EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+      NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
       List<RoleEntity> entities =
           entityStore
               .relationOperations()
               .listEntitiesByRelation(
                   SupportsRelationOperations.Type.ROLE_USER_REL,
-                  NameIdentifierUtil.ofUser(metalake, username),
+                  userNameIdentifier,
                   Entity.EntityType.ROLE);
 
       for (RoleEntity role : entities) {
@@ -165,10 +171,28 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         loadPolicyByRoleId(roleId);
         loadedRoles.add(roleId);
       }
-      // TODO load owner relationship
+      loadOwner(userId);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
+  }
+
+  private void loadOwner(Long userId) {
+    List<OwnerRelPO> ownerRels = OwnerMetaService.getInstance().listOwnerByUserId(userId);
+    for (OwnerRelPO ownerRel : ownerRels) {
+      enforcer.addPolicy(
+          String.valueOf(userId),
+          ownerRel.getMetadataObjectType(),
+          String.valueOf(ownerRel.getMetadataObjectId()),
+          AuthConstants.OWNER,
+          "allow");
+    }
+  }
+
+  @Override
+  public void handleUserOwnerChange(Long userId) {
+    enforcer.removeFilteredPolicy(0, String.valueOf(userId));
+    loadedUserOwnerRels.remove(userId);
   }
 
   private void loadPolicyByRoleId(Long roleId) {

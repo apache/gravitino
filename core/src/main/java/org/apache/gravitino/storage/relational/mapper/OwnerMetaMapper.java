@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -86,4 +87,7 @@ public interface OwnerMetaMapper {
       method = "deleteOwnerMetasByLegacyTimeline")
   Integer deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "listOwnerRelByUserId")
+  List<OwnerRelPO> listOwnerRelByUserId(Long userId);
 }

@@ -62,5 +62,7 @@ public interface GravitinoAuthorizer extends Closeable {
    *
    * @param roleId The role id;
    */
-  void handleRolePrivilegeChange(Long roleId);
+  default void handleRolePrivilegeChange(Long roleId) {};
+
+  default void handleUserOwnerChange(Long userId) {};
 }
