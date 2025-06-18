@@ -32,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.Principal;
+import java.util.ArrayList;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -45,6 +46,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
@@ -200,12 +202,47 @@ public class TestJcasbinAuthorizer {
     assertFalse(doAuthorize(currentPrincipal));
   }
 
+  @Test
+  public void testAuthorizeByOwner() throws IOException {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    assertFalse(doAuthorizeOwner(currentPrincipal));
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG)))
+        .thenReturn(ImmutableList.of(getUserEntity()));
+    assertTrue(doAuthorizeOwner(currentPrincipal));
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG)))
+        .thenReturn(new ArrayList<>());
+    jcasbinAuthorizer.handleMetadataOwnerChange(catalogIdent);
+    assertFalse(doAuthorizeOwner(currentPrincipal));
+  }
+
   private boolean doAuthorize(Principal currentPrincipal) {
     return jcasbinAuthorizer.authorize(
         currentPrincipal,
         "testMetalake",
         MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
         USE_CATALOG);
+  }
+
+  private boolean doAuthorizeOwner(Principal currentPrincipal) {
+    return jcasbinAuthorizer.isOwner(
+        currentPrincipal,
+        "testMetalake",
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG));
+  }
+
+  private static UserEntity getUserEntity() {
+    return UserEntity.builder()
+        .withId(USER_ID)
+        .withName(USERNAME)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
   }
 
   private static RoleEntity getRoleEntity(Long roleId) {
