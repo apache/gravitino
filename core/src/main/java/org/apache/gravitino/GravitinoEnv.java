@@ -25,8 +25,6 @@ import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
-import org.apache.gravitino.cache.CaffeineEntityCache;
-import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -136,7 +134,6 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
-  private EntityCache entityCache;
 
   protected GravitinoEnv() {}
 
@@ -367,15 +364,6 @@ public class GravitinoEnv {
     return eventListenerManager;
   }
 
-  /**
-   * Return the entity cache instance.
-   *
-   * @return The {@link EntityCache} instance.
-   */
-  public EntityCache entityCache() {
-    return entityCache;
-  }
-
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -439,11 +427,6 @@ public class GravitinoEnv {
   private void initGravitinoServerComponents() {
     // Initialize EntityStore
     this.entityStore = EntityStoreFactory.createEntityStore(config);
-    if (config.get(Configs.CACHE_ENABLED)) {
-      this.entityCache = CaffeineEntityCache.getInstance(config, entityStore);
-    } else {
-      this.entityCache = CaffeineEntityCache.getInstance(config, null);
-    }
     entityStore.initialize(config);
 
     // create and initialize a random id generator
