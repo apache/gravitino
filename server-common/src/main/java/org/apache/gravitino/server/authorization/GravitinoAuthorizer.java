@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization;
 import java.io.Closeable;
 import java.security.Principal;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 
 /** Used for metadata authorization. */
@@ -64,5 +65,5 @@ public interface GravitinoAuthorizer extends Closeable {
    */
   default void handleRolePrivilegeChange(Long roleId) {};
 
-  default void handleUserOwnerChange(Long userId) {};
+  default void handleMetadataOwnerChange(NameIdentifier nameIdentifier) {};
 }

@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -105,11 +104,6 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
-  }
-
-  public List<OwnerRelPO> listOwnerByUserId(Long userId) {
-    return SessionUtils.getWithoutCommit(
-        OwnerMetaMapper.class, mapper -> mapper.listOwnerRelByUserId(userId));
   }
 
   private static long getEntityId(

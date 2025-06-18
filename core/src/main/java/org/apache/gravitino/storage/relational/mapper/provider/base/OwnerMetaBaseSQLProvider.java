@@ -196,20 +196,4 @@ public class OwnerMetaBaseSQLProvider {
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
-
-  public String selectOwnerByUserId(@Param("userId") Long userId) {
-    return "SELECT ut.user_id as userId,"
-        + " ut.user_name as userName,"
-        + " ut.metalake_id as metalakeId,"
-        + " ut.audit_info as auditInfo,"
-        + " ut.current_version as currentVersion,"
-        + " ut.last_version as lastVersion,"
-        + " ut.deleted_at as deletedAt"
-        + " FROM "
-        + OWNER_TABLE_NAME
-        + " ot "
-        + " WHERE ot.owner_id = #{userId} AND"
-        + " ot.owner_type = 'USER' AND"
-        + " ot.deleted_at = 0";
-  }
 }

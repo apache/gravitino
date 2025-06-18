@@ -33,7 +33,6 @@ import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.security.Principal;
 import java.util.ArrayList;
-import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -47,12 +46,11 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
-import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
-import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -87,8 +85,6 @@ public class TestJcasbinAuthorizer {
 
   private static GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
 
-  private static OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
-
   private static SupportsRelationOperations supportsRelationOperations =
       mock(SupportsRelationOperations.class);
 
@@ -104,8 +100,6 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<RoleMetaService> roleMetaServiceMockedStatic;
 
-  private static MockedStatic<OwnerMetaService> ownerMetaServiceMockedStatic;
-
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   @BeforeAll
@@ -120,14 +114,12 @@ public class TestJcasbinAuthorizer {
     roleMetaServiceMockedStatic = mockStatic(RoleMetaService.class);
     metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
-    ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
     roleMetaServiceMockedStatic.when(RoleMetaService::getInstance).thenReturn(roleMetaService);
     userMetaServiceMockedStatic.when(UserMetaService::getInstance).thenReturn(mockUserMetaService);
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
-    ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
     metadataIdConverterMockedStatic
         .when(() -> MetadataIdConverter.getID(any(), anyString()))
         .thenReturn(CATALOG_ID);
@@ -211,27 +203,22 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testAuthorizeByOwner() {
+  public void testAuthorizeByOwner() throws IOException {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorizeOwner(currentPrincipal));
-    List<OwnerRelPO> mockOwners = new ArrayList<>();
-    mockOwners.add(
-        OwnerRelPO.builder()
-            .withOwnerId(USER_ID)
-            .withOwnerType(Entity.EntityType.USER.name())
-            .withMetadataObjectId(CATALOG_ID)
-            .withMetadataObjectType(MetadataObject.Type.CATALOG.name())
-            .withMetalakeId(USER_METALAKE_ID)
-            .withAuditIfo("")
-            .withCurrentVersion(1L)
-            .withLastVersion(1L)
-            .withDeleteAt(0L)
-            .build());
-    when(ownerMetaService.listOwnerByUserId(eq(USER_ID))).thenReturn(mockOwners);
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG)))
+        .thenReturn(ImmutableList.of(getUserEntity()));
     assertTrue(doAuthorizeOwner(currentPrincipal));
-    // mock owner change
-    mockOwners.clear();
-    jcasbinAuthorizer.handleUserOwnerChange(USER_ID);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG)))
+        .thenReturn(new ArrayList<>());
+    jcasbinAuthorizer.handleMetadataOwnerChange(catalogIdent);
     assertFalse(doAuthorizeOwner(currentPrincipal));
   }
 
@@ -248,6 +235,14 @@ public class TestJcasbinAuthorizer {
         currentPrincipal,
         "testMetalake",
         MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG));
+  }
+
+  private static UserEntity getUserEntity() {
+    return UserEntity.builder()
+        .withId(USER_ID)
+        .withName(USERNAME)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
   }
 
   private static RoleEntity getRoleEntity(Long roleId) {
