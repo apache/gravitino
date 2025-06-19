@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Gravitino JCStress Concurrency Tests
+# JCStress-Based Concurrency Tests for Gravitino
 
 ## Overview
 
@@ -57,7 +57,7 @@ gradle jcstress --tests "MyFirstTest|MySecondTest"
 After execution, reports are available at:
 `core/build/reports/jcstress/index.html`
 
-> The test suite may take several minutes to complete depending on the test complexity and CPU availability.
+> The test suite may take several minutes depending on test complexity and available CPU resources.
 
 ## Understanding Test Results
 
@@ -177,7 +177,7 @@ public class DirectReportingTest {
 You may add a `@Description` annotation to briefly explain the test scenario. However, avoid writing overly long descriptions, as this can trigger a `StringIndexOutOfBoundsException` due to a known limitation in the JCStress result frame parser.
 
 Choose the style based on your test needs:
-- Use an arbiter when you need to observe the final state after all actors complete.
+- Use an arbiter when the final state needs to be observed after all actors have finished.
 - Use direct reporting when actors need to record observations during their execution.
 - Direct reporting is particularly useful for testing visibility and ordering guarantees.
 
@@ -256,7 +256,7 @@ JCStress offers several execution modes to control the intensity and duration of
 
 ## Concurrency Issues We Target
 
-Our jcstress tests help identify several types of concurrency problems:
+Our JCStress tests help identify several types of concurrency problems:
 
 1. **Race Conditions**: When multiple threads access shared data without proper synchronization
 2. **Memory Visibility**: When changes made by one thread are not visible to other threads
@@ -265,7 +265,7 @@ Our jcstress tests help identify several types of concurrency problems:
 
 ## Best Practices
 
-When working with jcstress tests:
+When working with JCStress tests:
 
 - Keep tests focused on a single concurrency aspect
 - Use meaningful names that describe the scenario being tested
