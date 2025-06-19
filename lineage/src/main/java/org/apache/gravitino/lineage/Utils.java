@@ -19,12 +19,13 @@
 
 package org.apache.gravitino.lineage;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import io.openlineage.client.OpenLineage;
 import io.openlineage.server.OpenLineage.Job;
 import io.openlineage.server.OpenLineage.Run;
 import io.openlineage.server.OpenLineage.RunEvent;
-import java.util.List;
-import java.util.stream.Collectors;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 
 public class Utils {
   private Utils() {}
@@ -39,57 +40,13 @@ public class Utils {
     return job == null ? "Unknown" : job.getName().toString();
   }
 
-  public static OpenLineage.RunEvent mapLineageServertoClientRunEvent(
-      io.openlineage.server.OpenLineage.RunEvent serverEvent) {
-    OpenLineage ol = new OpenLineage(serverEvent.getSchemaURL());
-
-    return ol.newRunEventBuilder()
-        .eventType(OpenLineage.RunEvent.EventType.valueOf(serverEvent.getEventType().name()))
-        .eventTime(serverEvent.getEventTime())
-        .run(toClientRun(serverEvent.getRun(), ol))
-        .job(toClientJob(serverEvent.getJob(), ol))
-        .inputs(toClientInputs(serverEvent.getInputs(), ol))
-        .outputs(toClientOutputs(serverEvent.getOutputs(), ol))
-        .build();
-  }
-
-  private static OpenLineage.Run toClientRun(
-      io.openlineage.server.OpenLineage.Run serverRun, OpenLineage ol) {
-    return ol.newRun(serverRun.getRunId(), ol.newRunFacetsBuilder().build());
-  }
-
-  private static OpenLineage.Job toClientJob(
-      io.openlineage.server.OpenLineage.Job serverJob, OpenLineage ol) {
-    return ol.newJobBuilder()
-        .namespace(serverJob.getNamespace())
-        .name(serverJob.getName())
-        .facets(ol.newJobFacetsBuilder().build())
-        .build();
-  }
-
-  private static List<OpenLineage.InputDataset> toClientInputs(
-      List<io.openlineage.server.OpenLineage.InputDataset> serverInputs, OpenLineage ol) {
-    return serverInputs.stream()
-        .map(
-            input ->
-                ol.newInputDatasetBuilder()
-                    .namespace(input.getNamespace())
-                    .name(input.getName())
-                    .facets(ol.newDatasetFacetsBuilder().build())
-                    .build())
-        .collect(Collectors.toList());
-  }
-
-  private static List<OpenLineage.OutputDataset> toClientOutputs(
-      List<io.openlineage.server.OpenLineage.OutputDataset> serverOutputs, OpenLineage ol) {
-    return serverOutputs.stream()
-        .map(
-            output ->
-                ol.newOutputDatasetBuilder()
-                    .namespace(output.getNamespace())
-                    .name(output.getName())
-                    .facets(ol.newDatasetFacetsBuilder().build())
-                    .build())
-        .collect(Collectors.toList());
+  public static OpenLineage.RunEvent getClientRunEvent(RunEvent event)
+      throws JsonProcessingException {
+    String value = ObjectMapperProvider.objectMapper().writeValueAsString(event);
+    OpenLineage.RunEvent clientEvent =
+        ObjectMapperProvider.objectMapper()
+            .readValue(value, new TypeReference<OpenLineage.RunEvent>() {});
+    System.out.println(value);
+    return clientEvent;
   }
 }

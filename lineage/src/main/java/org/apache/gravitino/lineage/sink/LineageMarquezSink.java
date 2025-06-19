@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lineage.sink;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.openlineage.client.OpenLineageClient;
 import io.openlineage.client.OpenLineageClientException;
 import io.openlineage.client.transports.HttpConfig;
@@ -39,14 +40,13 @@ public class LineageMarquezSink implements LineageSink {
   @Override
   public void initialize(Map<String, String> configs) {
 
-    String marquezUrl = configs.getOrDefault("url", "http://localhost:5000/");
+    String marquezUrl = configs.getOrDefault("url", "http://localhost:4999/");
     LOG.info("marquez url {}", marquezUrl);
     String authType = configs.get("auth.type");
     LOG.info("marquez authentication type {}", authType);
     LineageServerAuthenticationStrategy authStrategy =
         AuthenticationFactory.createStrategy(authType);
 
-    // Configure HttpConfig with authentication
     HttpConfig httpConfig = authStrategy.configureHttpConfig(marquezUrl, configs);
 
     HttpTransport transport = new HttpTransport(httpConfig);
@@ -58,11 +58,14 @@ public class LineageMarquezSink implements LineageSink {
   public void sink(OpenLineage.RunEvent runEvent) {
 
     try {
-      client.emit(Utils.mapLineageServertoClientRunEvent(runEvent));
+      client.emit(Utils.getClientRunEvent(runEvent));
       LOG.info("Sent lineage event to Marquez: {}", runEvent);
     } catch (OpenLineageClientException e) {
-      LOG.error("Failed to send lineage event to Marquez", e);
-      throw new BadRequestException(String.format(e.getMessage()));
+      LOG.warn("Failed to send lineage event to Marquez ", e);
+      throw new BadRequestException(String.format(e.getMessage()), e);
+    } catch (JsonProcessingException e) {
+      LOG.error("Could not parse lineage run event", e);
+      throw new RuntimeException(e);
     }
   }
 
