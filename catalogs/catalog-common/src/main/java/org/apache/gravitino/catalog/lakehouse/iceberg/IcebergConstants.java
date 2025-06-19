@@ -81,22 +81,16 @@ public class IcebergConstants {
   public static final String STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME = "static-config-provider";
   public static final String DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
       "dynamic-config-provider";
+
   private static final String GRAVITINO_PREFIX = "gravitino-";
   public static final String GRAVITINO_URI = GRAVITINO_PREFIX + "uri";
-
   public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
-  public static final String GRAVITINO_AUTH_TYPE =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;
-  public static final String GRAVITINO_SIMPLE_USERNAME =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_SIMPLE_USERNAME;
-  public static final String GRAVITINO_OAUTH2_SERVER_URI =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SERVER_URI;
-  public static final String GRAVITINO_OAUTH2_CREDENTIAL =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_CREDENTIAL;
-  public static final String GRAVITINO_OAUTH2_TOKEN_PATH =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_TOKEN_PATH;
-  public static final String GRAVITINO_OAUTH2_SCOPE =
-      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SCOPE;
+  public static final String GRAVITINO_AUTH_TYPE = GRAVITINO_PREFIX + "auth-type";
+  public static final String GRAVITINO_SIMPLE_USERNAME = GRAVITINO_PREFIX + "simple.user-name";
+  public static final String GRAVITINO_OAUTH2_SERVER_URI = GRAVITINO_PREFIX + "oauth2.server-uri";
+  public static final String GRAVITINO_OAUTH2_CREDENTIAL = GRAVITINO_PREFIX + "oauth2.credential";
+  public static final String GRAVITINO_OAUTH2_TOKEN_PATH = GRAVITINO_PREFIX + "oauth2.token-path";
+  public static final String GRAVITINO_OAUTH2_SCOPE = GRAVITINO_PREFIX + "oauth2.scope";
 
   public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
