@@ -275,8 +275,8 @@ public class GravitinoConnectorPluginManager {
    * Creates a connector.
    *
    * @param connectorName the name of the connector
-   * @param config the config of the connector
-   * @param context the context of the connector
+   * @param config the configuration
+   * @param context the context
    * @return the connector
    */
   public Connector createConnector(

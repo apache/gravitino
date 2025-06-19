@@ -293,18 +293,13 @@ public class GravitinoConfig {
         GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND.defaultValue);
   }
 
-  /** Configuration entry class that holds the definition of a configuration parameter. */
   static class ConfigEntry {
-    /** The configuration key */
     final String key;
 
-    /** The description of the configuration parameter */
     final String description;
 
-    /** The default value of the configuration parameter */
     final String defaultValue;
 
-    /** Whether this configuration parameter is required */
     final boolean isRequired;
 
     /**

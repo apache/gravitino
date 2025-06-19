@@ -27,7 +27,7 @@ import java.util.List;
 public interface HasPropertyMeta {
 
   /**
-   * Gets the property metadata for schemas.
+   * Get the property metadata for a specific schema.
    *
    * @return a list of property metadata for schemas
    */
