@@ -43,10 +43,7 @@ public class Utils {
   public static OpenLineage.RunEvent getClientRunEvent(RunEvent event)
       throws JsonProcessingException {
     String value = ObjectMapperProvider.objectMapper().writeValueAsString(event);
-    OpenLineage.RunEvent clientEvent =
-        ObjectMapperProvider.objectMapper()
-            .readValue(value, new TypeReference<OpenLineage.RunEvent>() {});
-    System.out.println(value);
-    return clientEvent;
+    return ObjectMapperProvider.objectMapper()
+        .readValue(value, new TypeReference<OpenLineage.RunEvent>() {});
   }
 }
