@@ -17,52 +17,60 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.integration.test.test;
+package org.apache.gravitino.iceberg.integration.test;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
-import org.apache.gravitino.storage.GCSProperties;
+import org.apache.gravitino.storage.AzureProperties;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-// You should export GRAVITINO_GCS_BUCKET and GOOGLE_APPLICATION_CREDENTIALS to run the test
+@SuppressWarnings("FormatStringAnnotation")
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_TEST_CLOUD_IT", matches = "true")
-public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
+public class IcebergRESTAzureAccountKeyIT extends IcebergRESTJdbcCatalogIT {
 
-  private String gcsWarehouse;
-  private String gcsCredentialPath;
+  private String storageAccountName;
+  private String storageAccountKey;
+  private String warehousePath;
 
   @Override
   void initEnv() {
-    this.gcsWarehouse =
+    this.storageAccountName =
+        System.getenv()
+            .getOrDefault("GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME", "{STORAGE_ACCOUNT_NAME}");
+    this.storageAccountKey =
+        System.getenv()
+            .getOrDefault("GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY", "{STORAGE_ACCOUNT_KEY}");
+    this.warehousePath =
         String.format(
-            "gs://%s/test", System.getenv().getOrDefault("GRAVITINO_GCS_BUCKET", "bucketName"));
-    this.gcsCredentialPath =
-        System.getenv().getOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "credential.json");
+            "abfss://%s@%s.dfs.core.windows.net/data/test",
+            System.getenv().getOrDefault("GRAVITINO_ADLS_CONTAINER", "{ADLS_CONTAINER}"),
+            storageAccountName);
+
     if (ITUtils.isEmbedded()) {
       return;
     }
-
     try {
-      downloadIcebergBundleJar();
+      downloadIcebergAzureBundleJar();
     } catch (IOException e) {
+      LOG.warn("Download Iceberg Azure bundle jar failed,", e);
       throw new RuntimeException(e);
     }
-    copyGCSBundleJar();
+    copyAzureBundleJar();
   }
 
   @Override
   public Map<String, String> getCatalogConfig() {
     HashMap m = new HashMap<String, String>();
     m.putAll(getCatalogJdbcConfig());
-    m.putAll(getGCSConfig());
+    m.putAll(getADLSConfig());
     return m;
   }
 
@@ -70,36 +78,41 @@ public class IcebergRESTGCSIT extends IcebergRESTJdbcCatalogIT {
     return true;
   }
 
-  private Map<String, String> getGCSConfig() {
+  private Map<String, String> getADLSConfig() {
     Map configMap = new HashMap<String, String>();
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + CredentialConstants.CREDENTIAL_PROVIDERS,
-        GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
+        AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
-        gcsCredentialPath);
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+        storageAccountName);
+    configMap.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+        storageAccountKey);
+
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.IO_IMPL,
-        "org.apache.iceberg.gcp.gcs.GCSFileIO");
-    configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.WAREHOUSE, gcsWarehouse);
+        "org.apache.iceberg.azure.adlsv2.ADLSFileIO");
+    configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.WAREHOUSE, warehousePath);
+
     return configMap;
   }
 
-  private void copyGCSBundleJar() {
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("gcp", targetDir);
-  }
-
-  private void downloadIcebergBundleJar() throws IOException {
+  private void downloadIcebergAzureBundleJar() throws IOException {
     String icebergBundleJarUri =
         String.format(
             "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-gcp-bundle/%s/iceberg-gcp-bundle-%s.jar",
+                + "iceberg-azure-bundle/%s/iceberg-azure-bundle-%s.jar",
             ITUtils.icebergVersion(), ITUtils.icebergVersion());
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
     DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
+  }
+
+  private void copyAzureBundleJar() {
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
+    BaseIT.copyBundleJarsToDirectory("azure", targetDir);
   }
 }

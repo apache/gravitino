@@ -16,7 +16,7 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package org.apache.gravitino.iceberg.integration.test.test;
+package org.apache.gravitino.iceberg.integration.test;
 
 import com.google.common.collect.ImmutableList;
 import com.google.errorprone.annotations.FormatMethod;
@@ -33,7 +33,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.integration.test.test.util.IcebergRESTServerManager;
+import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.spark.SparkConf;

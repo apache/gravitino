@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.integration.test.test;
+package org.apache.gravitino.iceberg.integration.test;
 
 import java.io.IOException;
 import java.util.HashMap;

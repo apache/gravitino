@@ -17,12 +17,12 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.integration.test.test;
+package org.apache.gravitino.iceberg.integration.test;
 
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.integration.test.test.util.IcebergRESTServerManager;
+import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.iceberg.service.extension.HelloOperations;
 import org.apache.gravitino.iceberg.service.extension.HelloResponse;
 import org.apache.gravitino.server.web.JettyServerConfig;

@@ -16,11 +16,12 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package org.apache.gravitino.iceberg.integration.test.test;
+package org.apache.gravitino.iceberg.integration.test;
 
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -31,44 +32,61 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 @Tag("gravitino-docker-test")
 @TestInstance(Lifecycle.PER_CLASS)
-public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
-  protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+public class IcebergRESTJdbcCatalogIT extends IcebergRESTServiceIT {
 
-  @Override
-  protected boolean supportsNestedNamespaces() {
-    return false;
-  }
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+  private boolean hiveStarted = false;
 
-  public IcebergRESTHiveCatalogIT() {
-    catalogType = IcebergCatalogBackend.HIVE;
+  public IcebergRESTJdbcCatalogIT() {
+    catalogType = IcebergCatalogBackend.JDBC;
   }
 
   @Override
   void initEnv() {
     containerSuite.startHiveContainer();
+    hiveStarted = true;
   }
 
   @Override
-  Map<String, String> getCatalogConfig() {
+  public Map<String, String> getCatalogConfig() {
+    return getCatalogJdbcConfig();
+  }
+
+  protected Map<String, String> getCatalogJdbcConfig() {
     Map<String, String> configMap = new HashMap<>();
+
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_BACKEND.getKey(),
-        IcebergCatalogBackend.HIVE.toString().toLowerCase());
+        IcebergCatalogBackend.JDBC.toString().toLowerCase());
+
+    configMap.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.JDBC_DRIVER.getKey(),
+        "org.sqlite.JDBC");
 
     configMap.put(
         IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_URI.getKey(),
-        String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT));
+        "jdbc:sqlite::memory:");
 
     configMap.put(
-        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
-        GravitinoITUtils.genRandomName(
-            String.format(
-                "hdfs://%s:%d/user/hive/warehouse-hive",
-                containerSuite.getHiveContainer().getContainerIpAddress(),
-                HiveContainer.HDFS_DEFAULTFS_PORT)));
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.ICEBERG_JDBC_USER, "iceberg");
+
+    configMap.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConstants.ICEBERG_JDBC_PASSWORD, "iceberg");
+
+    configMap.put(
+        IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.JDBC_INIT_TABLES.getKey(), "true");
+
+    configMap.put(IcebergConfig.ICEBERG_CONFIG_PREFIX + "jdbc.schema-version", "V1");
+
+    if (hiveStarted) {
+      configMap.put(
+          IcebergConfig.ICEBERG_CONFIG_PREFIX + IcebergConfig.CATALOG_WAREHOUSE.getKey(),
+          GravitinoITUtils.genRandomName(
+              String.format(
+                  "hdfs://%s:%d/user/hive/warehouse-jdbc-sqlite",
+                  containerSuite.getHiveContainer().getContainerIpAddress(),
+                  HiveContainer.HDFS_DEFAULTFS_PORT)));
+    }
     return configMap;
   }
 }

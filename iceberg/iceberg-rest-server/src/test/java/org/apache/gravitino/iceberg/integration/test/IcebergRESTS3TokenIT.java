@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package org.apache.gravitino.iceberg.integration.test.test;
+package org.apache.gravitino.iceberg.integration.test;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;

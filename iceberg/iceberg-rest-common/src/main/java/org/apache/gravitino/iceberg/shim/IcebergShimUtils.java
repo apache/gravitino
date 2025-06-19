@@ -27,9 +27,12 @@ import org.apache.gravitino.utils.ClassUtils;
 public class IcebergShimUtils {
   private static boolean useModernIceberg;
 
+  private static final String MODERN_CONFIG_PROVIDER =
+      "org.apache.gravitino.iceberg.shim.IcebergModernConfigProvider";
+
   static {
     try {
-      Class.forName("org.apache.gravitino.iceberg.shim.IcebergModernConfigProvider");
+      Class.forName(MODERN_CONFIG_PROVIDER, false, Thread.currentThread().getContextClassLoader());
       useModernIceberg = true;
     } catch (ClassNotFoundException e) {
       useModernIceberg = false;
@@ -51,7 +54,8 @@ public class IcebergShimUtils {
 
   public IcebergRESTConfigProvider getIcebergRESTConfigProvider() {
     if (useModernIceberg()) {
-      return ClassUtils.loadClass("org.apache.gravitino.iceberg.shim.IcebergModernConfigProvider");
+      return ClassUtils.loadClass(
+          MODERN_CONFIG_PROVIDER, Thread.currentThread().getContextClassLoader());
     }
 
     return new IcebergLegacyConfigProvider();

@@ -16,7 +16,7 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-package org.apache.gravitino.iceberg.integration.test.test.util;
+package org.apache.gravitino.iceberg.integration.test.util;
 
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
 

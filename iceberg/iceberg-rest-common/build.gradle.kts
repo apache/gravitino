@@ -27,7 +27,12 @@ plugins {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark34.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg.get()
+val useModernIceberg = rootProject.extra["useModernIceberg"] as Boolean
+val icebergVersion: String = if (useModernIceberg) {
+  libs.versions.iceberg4modern.get()
+} else {
+  libs.versions.iceberg.get()
+}
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
@@ -41,11 +46,11 @@ dependencies {
     exclude("*")
   }
   implementation(project(":iceberg:iceberg-common"))
-  if (rootProject.extra["useModernIceberg"] as Boolean) {
-    println("use modern iceberg for iceberg rest common")
+  if (useModernIceberg) {
+    println("use modern iceberg for iceberg rest common, $icebergVersion")
     implementation(libs.bundles.iceberg4modern)
   } else {
-    println("use old iceberg for iceberg rest common")
+    println("use old iceberg for iceberg rest common, $icebergVersion")
     implementation(libs.bundles.iceberg)
   }
   implementation(project(":server-common")) {
