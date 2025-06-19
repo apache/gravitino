@@ -21,6 +21,19 @@ package org.apache.gravitino.lineage.auth;
 import io.openlineage.client.transports.HttpConfig;
 import java.util.Map;
 
+/**
+ * Defines an authentication strategy for lineage server communication.
+ * Implementations of this interface provide HTTP configuration with
+ * appropriate authentication mechanisms for lineage event transport.
+ */
 public interface LineageServerAuthenticationStrategy {
+
+  /**
+   * Configures HTTP transport with authentication parameters for lineage event submission.
+   *
+   * @param url The target URL of the lineage server endpoint
+   * @param configs A map of configuration properties required for authentication.
+   * @return Configured {@link HttpConfig} instance with authentication parameters applied
+   */
   HttpConfig configureHttpConfig(String url, Map<String, String> configs);
 }
