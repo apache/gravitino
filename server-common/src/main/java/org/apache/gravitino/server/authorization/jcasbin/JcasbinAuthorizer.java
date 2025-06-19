@@ -148,7 +148,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               .listEntitiesByRelation(
                   SupportsRelationOperations.Type.ROLE_USER_REL,
                   NameIdentifierUtil.ofUser(metalake, username),
-                  Entity.EntityType.ROLE);
+                  Entity.EntityType.USER);
 
       for (RoleEntity role : entities) {
         Long roleId = role.id();
