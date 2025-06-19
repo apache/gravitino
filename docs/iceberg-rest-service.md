@@ -98,7 +98,7 @@ When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve
 
 Here is an example of how to enable OAuth2 for Gravitino Iceberg REST server:
 
-```agsl
+```text
 gravitino.authenticators = oauth
 gravitino.authenticator.oauth.serviceAudience = test
 gravitino.authenticator.oauth.defaultSignKey = xx
@@ -108,7 +108,7 @@ gravitino.authenticator.oauth.serverUri = http://localhost:8177
 
 You should add extra configurations if using `dynamic-config-provider`:
 
-```
+```text
 gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
 gravitino.iceberg-rest.gravitino-metalake = test
 gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
