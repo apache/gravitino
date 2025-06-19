@@ -242,7 +242,7 @@ JCStress follows a well-defined execution model to simulate concurrent interacti
 1. **State Initialization**: A fresh instance of the test class (annotated with `@State`) is created before each test iteration to ensure full isolation.
 2. **Concurrent Execution of Actors**: All methods annotated with `@Actor` are invoked concurrently, each on a separate thread. These methods simulate the real-world concurrent behavior being tested.
 3. **Synchronization Barrier**: After both (or all) actors complete, JCStress inserts a memory fence to ensure all actions are visible to the next phase.
-4. **Arbiter Execution (Optional)**: If an `@Arbiter` method is defined, it runs after all actor methods have completed. It observes the final state and writes results to the `*Result` object. 
+4. **Arbiter Execution (Optional)**: If an `@Arbiter` method is defined, it runs after all actor methods have completed. It observes the final state and writes results to the `*Result` object.
 5. **Result Collection and Classification**: The outcome of each iteration is recorded and matched against the `@Outcome` definitions. JCStress performs this process millions of times with different thread interleavings to uncover rare concurrency issues.
 
 JCStress offers several execution modes to control the intensity and duration of the tests. Available modes:
