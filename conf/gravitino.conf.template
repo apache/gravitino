@@ -105,3 +105,9 @@ gravitino.lineage.marquez.sinkClass = org.apache.gravitino.lineage.sink.LineageM
 
 # Optional: Configure additional properties for your sink
 gravitino.lineage.marquez.url = http://localhost:5000
+
+# Optional: Configure api key authentication
+gravitino.lineage.marquez.auth.type = api_key
+
+# Optional: Configure key for api key authentication
+gravitino.lineage.marquez.api.key = AIzaSyDaGmWKa4JsXZ-HjGw7ISLn_3namBGewQe
