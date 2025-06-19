@@ -29,8 +29,8 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.NoSuchURINameException;
 
 /**
  * The ModelCatalog interface defines the public API for managing model objects in a schema. If the
@@ -261,7 +261,7 @@ public interface ModelCatalog {
   }
 
   /**
-   * Get the URI of the model artifact with a specified version number.
+   * Get the URI of the model artifact with a specified version number and URI name.
    *
    * @param ident The name identifier of the model.
    * @param version The version number of the model.
@@ -269,13 +269,13 @@ public interface ModelCatalog {
    * @throws NoSuchModelVersionException If the model version does not exist.
    * @return The URI of the model version.
    */
-  default String getModelUri(NameIdentifier ident, int version, String uriName)
-      throws NoSuchModelVersionException, NoSuchURINameException {
+  default String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
     throw new UnsupportedOperationException("Not supported yet");
   }
 
   /**
-   * Get the URI of the model artifact with a specified version alias.
+   * Get the URI of the model artifact with a specified version alias and URI name.
    *
    * @param ident The name identifier of the model.
    * @param alias The version alias of the model.
@@ -283,8 +283,8 @@ public interface ModelCatalog {
    * @throws NoSuchModelVersionException If the model version does not exist.
    * @return The URI of the model version.
    */
-  default String getModelUri(NameIdentifier ident, String alias, String uriName)
-      throws NoSuchModelVersionException, NoSuchURINameException {
+  default String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
     throw new UnsupportedOperationException("Not supported yet");
   }
 

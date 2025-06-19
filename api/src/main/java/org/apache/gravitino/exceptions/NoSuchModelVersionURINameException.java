@@ -21,7 +21,7 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 
 /** Exception thrown when a URI name of model version is not found. */
-public class NoSuchURINameException extends NotFoundException {
+public class NoSuchModelVersionURINameException extends NotFoundException {
 
   /**
    * Constructs a new exception with the specified detail message.
@@ -30,7 +30,7 @@ public class NoSuchURINameException extends NotFoundException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public NoSuchURINameException(String message, Object... args) {
+  public NoSuchModelVersionURINameException(String message, Object... args) {
     super(message, args);
   }
 
@@ -42,7 +42,7 @@ public class NoSuchURINameException extends NotFoundException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public NoSuchURINameException(Throwable cause, String message, Object... args) {
+  public NoSuchModelVersionURINameException(Throwable cause, String message, Object... args) {
     super(cause, message, args);
   }
 }
