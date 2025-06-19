@@ -399,6 +399,7 @@ Changelog
 - datastrato/gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`
   - Support Apache Ranger 2.4.0
-  - Use environment variable `RANGER_PASSWORD` to set up Apache Ranger admin password, Please notice Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
+  - Use environment variable `RANGER_PASSWORD` to -set up Apache Ranger admin password, Please 
+    notice Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
   - Expose ports:
     - `6080` Apache Ranger admin port

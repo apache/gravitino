@@ -1,37 +1,37 @@
 ---
-title: "Hadoop catalog with OSS"
-slug: /hadoop-catalog-with-oss
+title: "Fileset catalog with OSS"
+slug: /fileset-catalog-with-oss
 date: 2025-01-03
-keyword: Hadoop catalog OSS
+keyword: Fileset catalog OSS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document explains how to configure a Hadoop catalog with Aliyun OSS (Object Storage Service) in Gravitino.
+This document explains how to configure a Fileset catalog with Aliyun OSS (Object Storage Service) in Gravitino.
 
 ## Prerequisites
 
-To set up a Hadoop catalog with OSS, follow these steps:
+To set up a Fileset catalog with OSS, follow these steps:
 
 1. Download the [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) file.
-2. Place the downloaded file into the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+2. Place the downloaded file into the Gravitino Fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
 3. Start the Gravitino server by running the following command:
 
 ```bash
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Hadoop catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Fileset catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
-## Configurations for creating a Hadoop catalog with OSS
+## Configurations for creating a Fileset catalog with OSS
 
-### Configuration for an OSS Hadoop catalog
+### Configuration for an OSS Fileset catalog
 
-In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with OSS:
+In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
 
 | Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Default value   | Required | Since version    |
 |--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
 | `filesystem-providers`         | The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                                                                                                                                                                                                                                                                                                                     | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider`  | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location.                                                                                                                                                                                                                                                                                       | `builtin-local` | No       | 0.7.0-incubating |
+| `default-filesystem-provider`  | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location.                                                                                                                                                                                                                                                                                      | `builtin-local` | No       | 0.7.0-incubating |
 | `oss-endpoint`                 | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | (none)          | Yes      | 0.7.0-incubating |
 | `oss-access-key-id`            | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
 | `oss-secret-access-key`        | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | (none)          | Yes      | 0.7.0-incubating |
@@ -40,19 +40,19 @@ In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-con
 
 ### Configurations for a schema
 
-To create a schema, refer to [Schema configurations](./hadoop-catalog.md#schema-properties).
+To create a schema, refer to [Schema configurations](./fileset-catalog#schema-properties).
 
 ### Configurations for a fileset
 
-For instructions on how to create a fileset, refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties) for more details.
+For instructions on how to create a fileset, refer to [Fileset configurations](./fileset-catalog#fileset-properties) for more details.
 
-## Example of creating Hadoop catalog/schema/fileset with OSS
+## Example of creating Fileset catalog/schema/fileset with OSS
 
-This section will show you how to use the Hadoop catalog with OSS in Gravitino, including detailed examples.
+This section will show you how to use the Fileset catalog with OSS in Gravitino, including detailed examples.
 
-### Step1: Create a Hadoop catalog with OSS
+### Step1: Create a Fileset catalog with OSS
 
-First, you need to create a Hadoop catalog for OSS. The following examples demonstrate how to create a Hadoop catalog with OSS:
+First, you need to create a Fileset catalog for OSS. The following examples demonstrate how to create a Fileset catalog with OSS:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -63,7 +63,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "test_catalog",
   "type": "FILESET",
   "comment": "This is a OSS fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "oss://bucket/root",
     "oss-access-key-id": "access_key",
@@ -93,7 +92,6 @@ Map<String, String> ossProperties = ImmutableMap.<String, String>builder()
 
 Catalog ossCatalog = gravitinoClient.createCatalog("test_catalog",
     Type.FILESET,
-    "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a OSS fileset catalog",
     ossProperties);
 // ...
@@ -115,7 +113,7 @@ oss_properties = {
 
 oss_catalog = gravitino_client.create_catalog(name="test_catalog",
                                               catalog_type=Catalog.Type.FILESET,
-                                              provider="hadoop",
+                                              provider=None,
                                               comment="This is a OSS fileset catalog",
                                               properties=oss_properties)
 ```
@@ -125,7 +123,7 @@ oss_catalog = gravitino_client.create_catalog(name="test_catalog",
 
 ### Step 2: Create a Schema
 
-Once the Hadoop catalog with OSS is created, you can create a schema inside that catalog. Below are examples of how to do this:
+Once the Fileset catalog with OSS is created, you can create a schema inside that catalog. Below are examples of how to do this:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -494,9 +492,11 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
 
-### How to create an OSS Hadoop catalog with credential vending
+### How to create an OSS Fileset catalog with credential vending
 
-Apart from configuration method in [create-oss-hadoop-catalog](#configuration-for-an-oss-hadoop-catalog), properties needed by [oss-credential](./security/credential-vending.md#oss-credentials) should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
+Apart from configuration method in [create-oss-fileset-catalog](#configuration-for-an-oss-fileset-catalog),
+properties needed by [oss-credential](./security/credential-vending.md#oss-credentials)
+should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -504,7 +504,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "oss-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a OSS fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "oss://bucket/root",
     "oss-access-key-id": "access_key",
