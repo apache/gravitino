@@ -146,10 +146,10 @@ public class TestCaffeineEntityCacheCoherence {
       "Tests visibility between put() and getIfPresent() on an existing entity. "
           + "Entity should remain visible; NULL indicates broken visibility or invalidation.")
   @State
-  public static class PutVsGetIfPresentTest {
+  public static class PutWithGetIfPresentCoherenceTest {
     private final EntityCache cache;
 
-    public PutVsGetIfPresentTest() {
+    public PutWithGetIfPresentCoherenceTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
       cache.put(schemaEntity);
     }
@@ -186,10 +186,10 @@ public class TestCaffeineEntityCacheCoherence {
           + "Actor1 puts again; Actor2 checks contains(). "
           + "Entity should remain visible; NULL indicates a visibility issue.")
   @State
-  public static class PutVsContainTest {
+  public static class PutWithContainCoherenceTest {
     private final EntityCache cache;
 
-    public PutVsContainTest() {
+    public PutWithContainCoherenceTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
       cache.put(schemaEntity);
     }
@@ -222,10 +222,10 @@ public class TestCaffeineEntityCacheCoherence {
           + "If put wins, entity remains; if invalidate wins, it's removed. "
           + "Both outcomes are acceptable; NULL is interesting for consistency checks.")
   @State
-  public static class PutVsInvalidateTest {
+  public static class PutWithInvalidateCoherenceTest {
     private final EntityCache cache;
 
-    public PutVsInvalidateTest() {
+    public PutWithInvalidateCoherenceTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
     }
 
@@ -262,10 +262,10 @@ public class TestCaffeineEntityCacheCoherence {
       "Concurrent put() and clear(). If put wins, entity remains. If clear wins, entity is gone. "
           + "NULL is acceptable but interesting due to race timing.")
   @State
-  public static class PutVsClearTest {
+  public static class PutWithClearCoherenceTest {
     private final EntityCache cache;
 
-    public PutVsClearTest() {
+    public PutWithClearCoherenceTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
     }
 
@@ -505,10 +505,10 @@ public class TestCaffeineEntityCacheCoherence {
       "Tests race between invalidate() and getIfPresent(). "
           + "Either outcome is allowed depending on timing.")
   @State
-  public static class InvalidateVsGetTest {
+  public static class InvalidateWithGetCoherenceTest {
     private final EntityCache cache;
 
-    public InvalidateVsGetTest() {
+    public InvalidateWithGetCoherenceTest() {
       this.cache = new CaffeineEntityCache(new Config() {});
 
       cache.put(schemaEntity);
@@ -525,6 +525,137 @@ public class TestCaffeineEntityCacheCoherence {
       Optional<? extends Entity> result =
           cache.getIfPresent(tableEntity.nameIdentifier(), tableEntity.type());
       r.r1 = result.isPresent() ? "ENTITY" : "NULL";
+    }
+  }
+
+  @JCStressTest
+  @Outcome.Outcomes({
+    @Outcome(
+        id = "SUCCESS",
+        expect = Expect.ACCEPTABLE,
+        desc = "Both invalidates executed safely."),
+    @Outcome(id = "FAILURE", expect = Expect.FORBIDDEN, desc = "One or both invalidates failed.")
+  })
+  @Description("Tests concurrent invalidate() on the same key is safe and idempotent.")
+  @State
+  public static class ConcurrentInvalidateSameKeyCoherenceTest {
+    private final EntityCache cache;
+
+    public ConcurrentInvalidateSameKeyCoherenceTest() {
+      this.cache = new CaffeineEntityCache(new Config() {});
+      cache.put(schemaEntity);
+    }
+
+    @Actor
+    public void actor1() {
+      cache.invalidate(schemaEntity.nameIdentifier(), schemaEntity.type());
+    }
+
+    @Actor
+    public void actor2() {
+      cache.invalidate(schemaEntity.nameIdentifier(), schemaEntity.type());
+    }
+
+    @Arbiter
+    public void arbiter(L_Result r) {
+      r.r1 =
+          cache.contains(schemaEntity.nameIdentifier(), schemaEntity.type())
+              ? "FAILURE"
+              : "SUCCESS";
+    }
+  }
+
+  @JCStressTest
+  @Outcome.Outcomes({
+    @Outcome(
+        id = "SUCCESS",
+        expect = Expect.ACCEPTABLE,
+        desc = "Both invalidate operations completed; neither entry remains in the cache."),
+    @Outcome(
+        id = "FAILURE",
+        expect = Expect.FORBIDDEN,
+        desc = "One or both entries remain in the cache after concurrent invalidate.")
+  })
+  @Description(
+      "Tests concurrent invalidate() on two related keys (same prefix). "
+          + "Verifies that prefix-based invalidation logic does not interfere across keys, "
+          + "and both schema and table entries are properly removed without conflict or race condition.")
+  @State
+  public static class ConcurrentInvalidateRelatedKeyCoherenceTest {
+    private final EntityCache cache;
+
+    public ConcurrentInvalidateRelatedKeyCoherenceTest() {
+      this.cache = new CaffeineEntityCache(new Config() {});
+      cache.put(schemaEntity);
+      cache.put(tableEntity);
+    }
+
+    @Actor
+    public void actor1() {
+      cache.invalidate(schemaEntity.nameIdentifier(), schemaEntity.type());
+    }
+
+    @Actor
+    public void actor2() {
+      cache.invalidate(tableEntity.nameIdentifier(), tableEntity.type());
+    }
+
+    @Arbiter
+    public void arbiter(L_Result r) {
+      if (cache.contains(schemaEntity.nameIdentifier(), schemaEntity.type())
+          || cache.contains(tableEntity.nameIdentifier(), tableEntity.type())) {
+        r.r1 = "FAILURE";
+        return;
+      }
+
+      r.r1 = "SUCCESS";
+    }
+  }
+
+  @JCStressTest
+  @Outcome.Outcomes({
+    @Outcome(
+        id = "SUCCESS",
+        expect = Expect.ACCEPTABLE,
+        desc = "Both invalidate() and clear() removed the entries as expected."),
+    @Outcome(
+        id = "FAILURE",
+        expect = Expect.FORBIDDEN,
+        desc = "One or more entries remain; indicates race condition or incomplete invalidation.")
+  })
+  @Description(
+      "Tests concurrent invalidate() and clear() operations. "
+          + "Ensures that both targeted and global removals can coexist without leaving residual entries. "
+          + "Any remaining entries indicate inconsistency in concurrent removal paths.")
+  @State
+  public static class ClearWithInvalidateCoherenceTest {
+    private final EntityCache cache;
+
+    public ClearWithInvalidateCoherenceTest() {
+      this.cache = new CaffeineEntityCache(new Config() {});
+      cache.put(schemaEntity);
+      cache.put(tableEntity);
+    }
+
+    @Actor
+    public void actor1() {
+      cache.invalidate(schemaEntity.nameIdentifier(), schemaEntity.type());
+    }
+
+    @Actor
+    public void actor2() {
+      cache.clear();
+    }
+
+    @Arbiter
+    public void arbiter(L_Result r) {
+      if (cache.contains(schemaEntity.nameIdentifier(), schemaEntity.type())
+          || cache.contains(tableEntity.nameIdentifier(), tableEntity.type())) {
+        r.r1 = "FAILURE";
+        return;
+      }
+
+      r.r1 = "SUCCESS";
     }
   }
 }
