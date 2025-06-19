@@ -22,9 +22,9 @@ import io.openlineage.client.transports.HttpConfig;
 import java.util.Map;
 
 /**
- * Defines an authentication strategy for lineage server communication.
- * Implementations of this interface provide HTTP configuration with
- * appropriate authentication mechanisms for lineage event transport.
+ * Defines an authentication strategy for lineage server communication. Implementations of this
+ * interface provide HTTP configuration with appropriate authentication mechanisms for lineage event
+ * transport.
  */
 public interface LineageServerAuthenticationStrategy {
 
