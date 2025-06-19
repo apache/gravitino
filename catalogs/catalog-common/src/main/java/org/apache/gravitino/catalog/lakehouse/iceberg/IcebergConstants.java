@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import org.apache.gravitino.auth.AuthProperties;
-
 public class IcebergConstants {
 
   // Iceberg catalog properties constants
