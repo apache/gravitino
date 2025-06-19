@@ -36,5 +36,3 @@ class NoAuthStrategy implements LineageServerAuthenticationStrategy {
     return config;
   }
 }
-
-// API Key authentication
