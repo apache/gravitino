@@ -83,8 +83,11 @@ def update_config(config, key, value):
 config_file_path = "conf/gravitino-iceberg-rest-server.conf"
 config_map = parse_config_file(config_file_path)
 
+# Set from init_config only if the key doesn't exist
 for k, v in init_config.items():
-    update_config(config_map, k, v)
+    full_key = config_prefix + k
+    if full_key not in config_map:
+        update_config(config_map, k, v)
 
 for k, v in env_map.items():
     if k in os.environ:

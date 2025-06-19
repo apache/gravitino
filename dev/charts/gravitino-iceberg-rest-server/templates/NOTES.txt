@@ -25,7 +25,7 @@
 
 2. View service:
    kubectl get svc -n {{ include "gravitino-iceberg-rest-server.namespace" . }} \
-     -l app={{ include "gravitino-iceberg-rest-server.name" . }}
+     -l app.kubernetes.io/name={{ include "gravitino-iceberg-rest-server.name" . }}
 
 3. View config:
    kubectl get cm {{ include "gravitino-iceberg-rest-server.fullname" . }} -n \

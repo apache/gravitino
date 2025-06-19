@@ -18,27 +18,9 @@
 # under the License.
 #
 
-echo "Start to download the jar package of JDBC"
-wget https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.27/mysql-connector-java-8.0.27.jar -O ${GRAVITINO_HOME}/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.27.jar
-wget https://jdbc.postgresql.org/download/postgresql-42.7.0.jar -O ${GRAVITINO_HOME}/catalogs/jdbc-postgresql/libs/postgresql-42.7.0.jar
-
-cp ${GRAVITINO_HOME}/catalogs/jdbc-postgresql/libs/postgresql-42.7.0.jar ${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/libs
-cp ${GRAVITINO_HOME}/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.27.jar ${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/libs
-
-cp ${GRAVITINO_HOME}/catalogs/jdbc-postgresql/libs/postgresql-42.7.0.jar ${GRAVITINO_HOME}/iceberg-rest-server/libs
-cp ${GRAVITINO_HOME}/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.27.jar ${GRAVITINO_HOME}/iceberg-rest-server/libs
-
-cp ${GRAVITINO_HOME}/catalogs/jdbc-mysql/libs/mysql-connector-java-8.0.27.jar ${GRAVITINO_HOME}/libs
-echo "Finish downloading"
 
 cp /tmp/conf/* ${GRAVITINO_HOME}/conf
 cp /tmp/conf/log4j2.properties ${GRAVITINO_HOME}/conf
 
-{{- if .Values.log.containerStdout }}
-# Redirect log files to container stdout and stderr
-ln -sf /dev/stdout ${GRAVITINO_HOME}/logs/gravitino_audit.log
-ln -sf /dev/stdout ${GRAVITINO_HOME}/logs/gravitino-server.log
-ln -sf /dev/stderr ${GRAVITINO_HOME}/logs/gravitino-server.out
-{{- end }}
 echo "Start the Gravitino Server"
-/bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh start
+/bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh run

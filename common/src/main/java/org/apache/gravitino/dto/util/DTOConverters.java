@@ -689,6 +689,19 @@ public class DTOConverters {
   }
 
   /**
+   * Converts an array of ModelVersions to an array of ModelVersionDTOs.
+   *
+   * @param modelVersions The modelVersions to be converted.
+   * @return The array of ModelVersionDTOs.
+   */
+  public static ModelVersionDTO[] toDTOs(ModelVersion[] modelVersions) {
+    if (ArrayUtils.isEmpty(modelVersions)) {
+      return new ModelVersionDTO[0];
+    }
+    return Arrays.stream(modelVersions).map(DTOConverters::toDTO).toArray(ModelVersionDTO[]::new);
+  }
+
+  /**
    * Converts an array of Columns to an array of ColumnDTOs.
    *
    * @param columns The columns to be converted.
