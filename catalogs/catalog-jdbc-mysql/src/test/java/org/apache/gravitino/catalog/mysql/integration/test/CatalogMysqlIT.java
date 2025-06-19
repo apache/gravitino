@@ -622,8 +622,7 @@ public class CatalogMysqlIT extends BaseIT {
               Literals.timestampLiteral("1983-09-05T00:00:00"), column.defaultValue());
           break;
         case "timestamp_col_3":
-          Assertions.assertEquals(
-              UnparsedExpression.of("CURRENT_TIMESTAMP(6)"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "decimal_6_2_col_1":
           Assertions.assertEquals(
@@ -659,8 +658,20 @@ public class CatalogMysqlIT extends BaseIT {
             + "  double_col double,\n"
             + "  date_col date,\n"
             + "  time_col time,\n"
+            + "  time_col_0 time(0),\n"
+            + "  time_col_1 time(1),\n"
+            + "  time_col_3 time(3),\n"
+            + "  time_col_6 time(6),\n"
             + "  timestamp_col timestamp,\n"
+            + "  timestamp_col_0 timestamp(0),\n"
+            + "  timestamp_col_1 timestamp(1),\n"
+            + "  timestamp_col_3 timestamp(3),\n"
+            + "  timestamp_col_6 timestamp(6),\n"
             + "  datetime_col datetime,\n"
+            + "  datetime_col_0 datetime(0),\n"
+            + "  datetime_col_1 datetime(1),\n"
+            + "  datetime_col_3 datetime(3),\n"
+            + "  datetime_col_6 datetime(6),\n"
             + "  decimal_6_2_col decimal(6, 2),\n"
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
@@ -698,13 +709,43 @@ public class CatalogMysqlIT extends BaseIT {
           Assertions.assertEquals(Types.DateType.get(), column.dataType());
           break;
         case "time_col":
-          Assertions.assertEquals(Types.TimeType.get(), column.dataType());
+        case "time_col_0":
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
+          break;
+        case "time_col_1":
+          Assertions.assertEquals(Types.TimeType.of(1), column.dataType());
+          break;
+        case "time_col_3":
+          Assertions.assertEquals(Types.TimeType.of(3), column.dataType());
+          break;
+        case "time_col_6":
+          Assertions.assertEquals(Types.TimeType.of(6), column.dataType());
           break;
         case "timestamp_col":
-          Assertions.assertEquals(Types.TimestampType.withTimeZone(), column.dataType());
+        case "timestamp_col_0":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
+          break;
+        case "timestamp_col_1":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(1), column.dataType());
+          break;
+        case "timestamp_col_3":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(3), column.dataType());
+          break;
+        case "timestamp_col_6":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(6), column.dataType());
           break;
         case "datetime_col":
-          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+        case "datetime_col_0":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_col_1":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(1), column.dataType());
+          break;
+        case "datetime_col_3":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
+          break;
+        case "datetime_col_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
           break;
         case "decimal_6_2_col":
           Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
@@ -865,7 +906,7 @@ public class CatalogMysqlIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[1].name()}, FunctionExpression.of("current_timestamp")),
+                new String[] {columns[1].name()}, DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
             TableChange.updateColumnDefaultValue(
@@ -2099,5 +2140,77 @@ public class CatalogMysqlIT extends BaseIT {
 
     loadCatalog.asSchemas().dropSchema("test", true);
     metalake.dropCatalog(testCatalogName, true);
+  }
+
+  @Test
+  void testTimeTypePrecision() {
+    // Test different time type precisions
+    String tableName = GravitinoITUtils.genRandomName("test_time_precision");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  time_no_precision time,\n"
+            + "  time_precision_0 time(0),\n"
+            + "  time_precision_3 time(3),\n"
+            + "  time_precision_6 time(6),\n"
+            + "  datetime_no_precision datetime,\n"
+            + "  datetime_precision_0 datetime(0),\n"
+            + "  datetime_precision_3 datetime(3),\n"
+            + "  datetime_precision_6 datetime(6),\n"
+            + "  timestamp_no_precision timestamp,\n"
+            + "  timestamp_precision_0 timestamp(0),\n"
+            + "  timestamp_precision_3 timestamp(3),\n"
+            + "  timestamp_precision_6 timestamp(6)\n"
+            + ");\n";
+
+    mysqlService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    // Verify time type precisions
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "time_no_precision":
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
+          break;
+        case "time_precision_0":
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
+          break;
+        case "time_precision_3":
+          Assertions.assertEquals(Types.TimeType.of(3), column.dataType());
+          break;
+        case "time_precision_6":
+          Assertions.assertEquals(Types.TimeType.of(6), column.dataType());
+          break;
+        case "datetime_no_precision":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_precision_0":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_precision_3":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
+          break;
+        case "datetime_precision_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
+          break;
+        case "timestamp_no_precision":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
+          break;
+        case "timestamp_precision_0":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
+          break;
+        case "timestamp_precision_3":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(3), column.dataType());
+          break;
+        case "timestamp_precision_6":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected column name: " + column.name());
+      }
+    }
   }
 }
