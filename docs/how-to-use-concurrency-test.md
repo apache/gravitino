@@ -39,13 +39,13 @@ In Gravitino, we use the `jcstress-gradle-plugin` to integrate JCStress testing 
 This plugin simplifies running JCStress tests by:
 
 - Automatically generating the test harness
-- Providing built-in Gradle tasks (e.g., `:jcstress-tests:jcstress`)
+- Providing built-in Gradle tasks (e.g., `:core:jcstress`)
 - Generating detailed HTML reports under `build/reports/jcstress/`
 
 To run the jcstress tests in Gravitino, use the following Gradle command:
 
 ```bash
-./gradlew :jcstress-tests:jcstress 
+./gradlew :core:jcstress 
 ```
 
 or a subset of your tests:
@@ -55,7 +55,7 @@ gradle jcstress --tests "MyFirstTest|MySecondTest"
 ```
 
 After execution, reports are available at:
-`jcstress-tests/build/reports/jcstress/index.html`
+`core/build/reports/jcstress/index.html`
 
 > The test suite may take several minutes to complete depending on the test complexity and CPU availability.
 
