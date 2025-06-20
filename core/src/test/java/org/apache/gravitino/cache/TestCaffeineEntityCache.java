@@ -66,7 +66,7 @@ public class TestCaffeineEntityCache {
   private NameIdentifier ident12;
   private NameIdentifier ident13;
 
-  // Test Entities
+  // Test Entities.
   private SchemaEntity entity1;
   private SchemaEntity entity2;
   private TableEntity entity3;
