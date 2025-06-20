@@ -131,13 +131,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private boolean authorizeByJcasbin(
-      Long userId, MetadataObject metadataObject, String privilege, String metalake) {
-    Long metadataId = null;
-    try {
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+      Long userId, MetadataObject metadataObject, Long metadataId, String privilege) {
     return enforcer.enforce(
         String.valueOf(userId),
         String.valueOf(metadataObject.type()),
@@ -167,14 +161,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Long metadataObjectId) {
     try {
       EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
       List<RoleEntity> entities =
           entityStore
               .relationOperations()
               .listEntitiesByRelation(
                   SupportsRelationOperations.Type.ROLE_USER_REL,
-                  userNameIdentifier,
-                  Entity.EntityType.ROLE);
+                  NameIdentifierUtil.ofUser(metalake, username),
+                  Entity.EntityType.USER);
 
       for (RoleEntity role : entities) {
         Long roleId = role.id();
