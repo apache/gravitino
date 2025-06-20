@@ -50,36 +50,36 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestInstance(TestInstance.Lifecycle.PER_METHOD)
 public class TestCaffeineEntityCache {
-  private NameIdentifier ident1;
-  private NameIdentifier ident2;
-  private NameIdentifier ident3;
-  private NameIdentifier ident4;
-  private NameIdentifier ident5;
-  private NameIdentifier ident6;
-  private NameIdentifier ident7;
-  private NameIdentifier ident8;
-  private NameIdentifier ident9;
-  private NameIdentifier ident10;
-  private NameIdentifier ident11;
-  private NameIdentifier ident12;
-  private NameIdentifier ident13;
+  private static NameIdentifier ident1;
+  private static NameIdentifier ident2;
+  private static NameIdentifier ident3;
+  private static NameIdentifier ident4;
+  private static NameIdentifier ident5;
+  private static NameIdentifier ident6;
+  private static NameIdentifier ident7;
+  private static NameIdentifier ident8;
+  private static NameIdentifier ident9;
+  private static NameIdentifier ident10;
+  private static NameIdentifier ident11;
+  private static NameIdentifier ident12;
+  private static NameIdentifier ident13;
 
   // Test Entities.
-  private SchemaEntity entity1;
-  private SchemaEntity entity2;
-  private TableEntity entity3;
-  private TableEntity entity4;
-  private TableEntity entity5;
-  private CatalogEntity entity6;
-  private BaseMetalake entity7;
-  private UserEntity entity8;
-  private UserEntity entity9;
-  private GroupEntity entity10;
-  private GroupEntity entity11;
-  private RoleEntity entity12;
-  private RoleEntity entity13;
+  private static SchemaEntity entity1;
+  private static SchemaEntity entity2;
+  private static TableEntity entity3;
+  private static TableEntity entity4;
+  private static TableEntity entity5;
+  private static CatalogEntity entity6;
+  private static BaseMetalake entity7;
+  private static UserEntity entity8;
+  private static UserEntity entity9;
+  private static GroupEntity entity10;
+  private static GroupEntity entity11;
+  private static RoleEntity entity12;
+  private static RoleEntity entity13;
 
   private static Object getCacheDataFrom(EntityCache cache) {
     try {
@@ -95,7 +95,7 @@ public class TestCaffeineEntityCache {
   }
 
   @BeforeAll
-  void init() {
+  static void init() {
     initTestNameIdentifier();
     initTestEntities();
   }
@@ -954,7 +954,7 @@ public class TestCaffeineEntityCache {
                 null));
   }
 
-  private void initTestNameIdentifier() {
+  private static void initTestNameIdentifier() {
     ident1 = NameIdentifier.of("metalake1", "catalog1", "schema1");
     ident2 = NameIdentifier.of("metalake2", "catalog2", "schema2");
     ident3 = NameIdentifier.of("metalake1", "catalog1", "schema1", "table1");
@@ -973,7 +973,7 @@ public class TestCaffeineEntityCache {
     ident13 = NameIdentifierUtil.ofRole("metalake2", "role2");
   }
 
-  private void initTestEntities() {
+  private static void initTestEntities() {
     entity1 =
         TestUtil.getTestSchemaEntity(
             1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
