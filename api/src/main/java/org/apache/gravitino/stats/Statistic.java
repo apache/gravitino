@@ -20,7 +20,6 @@ package org.apache.gravitino.stats;
 
 import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.rel.expressions.literals.Literal;
 
 /**
  * Statistic interface represents a statistic that can be associated with a metadata object. It can
@@ -43,7 +42,7 @@ public interface Statistic {
    *
    * @return An optional containing the value of the statistic if it is set, otherwise empty.
    */
-  Optional<Literal> value();
+  Optional<StatisticValue> value();
 
   /**
    * The statistic is predefined by Gravitino if the value is true. The statistic is defined by

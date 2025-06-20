@@ -41,15 +41,21 @@ public interface SupportsStatistics {
 
   /**
    * Updates statistics with the provided values. If the statistic exists, it will be updated with
-   * the new value. If the statistic does not exist, it will be created. If the provided statistic
-   * value is null and the statistic is custom, the statistic will be deleted. If the provided
-   * statistic value is null and the statistic is reserved, the statistic will set value null. If
+   * the new value. If the statistic does not exist, it will be created. If
    * the statistic is unmodifiable, it will throw an UnmodifiableStatisticException. If the
    * statistic name is illegal, it will throw an IllegalStatisticNameException.
    *
    * @param statistics a map of statistic names to their values
    * @return a list of updated statistics
    */
-  List<Statistic> updateStatistics(Map<String, Literal> statistics)
+  List<Statistic> updateStatistics(Map<String, StatisticValue> statistics)
       throws UnmodifiableStatisticException, IllegalStatisticNameException;
+
+  /**
+   * Drop statistics by their names. If the statistic is unmodifiable, it will throw an UnmodifiableStatisticException.
+   * @param statistics a list of statistic names to be dropped
+   * @return true if the statistics were successfully dropped, false if no statistics were dropped
+   * @throws UnmodifiableStatisticException if any of the statistics to be dropped are unmodifiable
+   */
+  boolean dropStatistics(List<String> statistics) throws UnmodifiableStatisticException;
 }
