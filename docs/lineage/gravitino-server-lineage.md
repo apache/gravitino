@@ -55,6 +55,18 @@ curl -X POST \
 
 Log sink prints the log in a separate log file `gravitino_lineage.log`, you could change the default behavior in `conf/log4j2.properties`.
 
+## Lineage HTTP sink
+
+Lineage Http sink supports sending the lineage to an Http sink supported by OpenLineage. Consider the example below to configure the HTTP sink for `Marquez`.
+
+| Config Name                         | Description                                                                                                                        |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| gravitino.lineage.sinks             | Specifies the lineage sink implementation to use (e.g., `marquez`)                                                                 |
+| gravitino.lineage.marquez.sinkClass | Fully qualified class name of the Marquez lineage sink implementation(e.g., `org.apache.gravitino.lineage.sink.LineageHttpSink`)   |
+| gravitino.lineage.marquez.url       | URL of the Marquez server endpoint for lineage collection(e.g., `http://localhost:5000`)                                           |
+| gravitino.lineage.marquez.authType  | Authentication type for Marquez API (options: `apiKey` or `none`)                                                                  |
+| gravitino.lineage.marquez.apiKey    | API key for authenticating with Marquez (required if authType=`apiKey`)                                                            |
+
 ## High watermark status
 
 When the lineage sink operates slowly, lineage events accumulate in the async queue. Once the queue size exceeds 90% of its capacity (high watermark threshold), the lineage system enters a high watermark status. In this state, the lineage source must implement retry and logging mechanisms for rejected events to prevent system overload. For the HTTP source, it returns the `429 Too Many Requests` status code to the client.
