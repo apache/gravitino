@@ -21,7 +21,11 @@ package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -315,6 +319,7 @@ public class TestCaffeineEntityCache {
   @Test
   void testClear() {
     EntityCache cache = new CaffeineEntityCache(new Config() {});
+    Assertions.assertDoesNotThrow(cache::clear);
 
     cache.put(entity1);
     cache.put(entity2);
@@ -506,6 +511,246 @@ public class TestCaffeineEntityCache {
     Assertions.assertTrue(cache.getIfPresent(ident7, Entity.EntityType.METALAKE).isPresent());
 
     Assertions.assertFalse(cache.contains(ident3, Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testPutRelationalEntitiesWithMerge() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+    RoleEntity testRoleEntity = TestUtil.getTestRoleEntity();
+    GroupEntity testGroupEntity1 =
+        TestUtil.getTestGroupEntity(
+            20L, "group1", "test_metalake", ImmutableList.of(testRoleEntity.name()));
+    GroupEntity testGroupEntity2 =
+        TestUtil.getTestGroupEntity(
+            21L, "group1", "test_metalake", ImmutableList.of(testRoleEntity.name()));
+
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(testGroupEntity1));
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(testGroupEntity2));
+
+    Assertions.assertTrue(
+        cache.contains(
+            testRoleEntity.nameIdentifier(),
+            testRoleEntity.type(),
+            SupportsRelationOperations.Type.ROLE_GROUP_REL));
+    Assertions.assertTrue(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                testRoleEntity.type())
+            .isPresent());
+    List<? extends Entity> entities =
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                testRoleEntity.type())
+            .get();
+    Assertions.assertEquals(2, entities.size());
+    Assertions.assertEquals(ImmutableList.of(testGroupEntity1, testGroupEntity2), entities);
+  }
+
+  @Test
+  void testInvalidateOnKeyChange() {
+    ModelEntity testModelEntity = TestUtil.getTestModelEntity();
+    ModelVersionEntity testModelVersionEntity =
+        TestUtil.getTestModelVersionEntity(
+            testModelEntity.nameIdentifier(),
+            1,
+            "s3://test/path",
+            ImmutableMap.of(),
+            "test model version",
+            ImmutableList.of("alias1", "alias2"));
+
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+    cache.put(testModelEntity);
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(cache.contains(testModelEntity.nameIdentifier(), testModelEntity.type()));
+
+    cache.put(testModelVersionEntity);
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertFalse(
+        cache.contains(testModelEntity.nameIdentifier(), testModelEntity.type()));
+    Assertions.assertTrue(
+        cache.contains(testModelVersionEntity.nameIdentifier(), testModelVersionEntity.type()));
+  }
+
+  @Test
+  void testPutSameRelationalEntities() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+    RoleEntity testRoleEntity = TestUtil.getTestRoleEntity();
+    GroupEntity testGroupEntity =
+        TestUtil.getTestGroupEntity(
+            20L, "group1", "test_metalake", ImmutableList.of(testRoleEntity.name()));
+
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(testGroupEntity));
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(testGroupEntity));
+
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(
+        cache.contains(
+            testRoleEntity.nameIdentifier(),
+            testRoleEntity.type(),
+            SupportsRelationOperations.Type.ROLE_GROUP_REL));
+    Assertions.assertTrue(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                testRoleEntity.type())
+            .isPresent());
+
+    List<? extends Entity> entities =
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                testRoleEntity.type())
+            .get();
+    Assertions.assertEquals(1, entities.size());
+    Assertions.assertEquals(testGroupEntity, entities.get(0));
+  }
+
+  @Test
+  void testPutRelationalEntitiesWithEmptyList() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+    RoleEntity testRoleEntity = TestUtil.getTestRoleEntity();
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            cache.put(
+                testRoleEntity.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                ImmutableList.of()));
+    Assertions.assertEquals(0, cache.size());
+  }
+
+  @Test
+  void testPutRelationalEntitiesWithDifferentOrderButDeduplicated() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+    RoleEntity testRoleEntity = TestUtil.getTestRoleEntity();
+    GroupEntity testGroupEntity1 =
+        TestUtil.getTestGroupEntity(
+            20L, "group1", "test_metalake", ImmutableList.of(testRoleEntity.name()));
+    GroupEntity testGroupEntity2 =
+        TestUtil.getTestGroupEntity(
+            21L, "group1", "test_metalake", ImmutableList.of(testRoleEntity.name()));
+
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(testGroupEntity1, testGroupEntity2));
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(testGroupEntity2, testGroupEntity1));
+
+    Assertions.assertEquals(1, cache.size());
+    Assertions.assertTrue(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                testRoleEntity.type())
+            .isPresent());
+
+    List<? extends Entity> entities =
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                testRoleEntity.type())
+            .get();
+
+    Assertions.assertEquals(
+        Sets.newHashSet(testGroupEntity1, testGroupEntity2), Sets.newHashSet(entities));
+  }
+
+  @Test
+  void testInvalidateRelationKeyAndRelatedEntities() {
+    EntityCache cache = new CaffeineEntityCache(new Config() {});
+    RoleEntity role = TestUtil.getTestRoleEntity();
+    GroupEntity group = TestUtil.getTestGroupEntity();
+    UserEntity user = TestUtil.getTestUserEntity();
+
+    cache.put(
+        role.nameIdentifier(),
+        role.type(),
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        ImmutableList.of(group));
+    cache.put(
+        role.nameIdentifier(),
+        role.type(),
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        ImmutableList.of(user));
+    cache.put(role);
+
+    cache.invalidate(role.nameIdentifier(), role.type());
+
+    Assertions.assertFalse(
+        cache.contains(
+            role.nameIdentifier(), role.type(), SupportsRelationOperations.Type.ROLE_GROUP_REL));
+    Assertions.assertFalse(
+        cache.contains(
+            role.nameIdentifier(), role.type(), SupportsRelationOperations.Type.ROLE_USER_REL));
+    Assertions.assertFalse(cache.contains(role.nameIdentifier(), role.type()));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testRemovalListenerTriggeredByEviction() throws IllegalAccessException {
+    Config config = new Config() {};
+    config.set(Configs.CACHE_WEIGHER_ENABLED, false);
+    config.set(Configs.CACHE_MAX_ENTRIES, 1);
+
+    TestableCaffeineEntityCache cache = new TestableCaffeineEntityCache(config);
+    cache.put(entity1);
+    cache.put(entity2);
+
+    Cache<EntityCacheKey, List<Entity>> caffeine =
+        (Cache<EntityCacheKey, List<Entity>>) FieldUtils.readField(cache, "cacheData", true);
+
+    caffeine.cleanUp();
+
+    Assertions.assertTrue(
+        cache.wasEvicted(EntityCacheKey.of(entity1.nameIdentifier(), entity1.type())));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testRemovalListenerNotTriggeredOnExplicitInvalidate() throws IllegalAccessException {
+    Config config = new Config() {};
+    TestableCaffeineEntityCache cache = new TestableCaffeineEntityCache(config);
+    cache.put(entity1);
+
+    cache.invalidate(entity1.nameIdentifier(), entity1.type());
+
+    Cache<EntityCacheKey, List<Entity>> caffeine =
+        (Cache<EntityCacheKey, List<Entity>>) FieldUtils.readField(cache, "cacheData", true);
+
+    caffeine.cleanUp();
+
+    Assertions.assertFalse(
+        cache.wasEvicted(EntityCacheKey.of(entity1.nameIdentifier(), entity1.type())));
   }
 
   @Test
@@ -794,5 +1039,22 @@ public class TestCaffeineEntityCache {
 
     entity12 = TestUtil.getTestRoleEntity(12L, "role1", "metalake1");
     entity13 = TestUtil.getTestRoleEntity(13L, "role2", "metalake2");
+  }
+
+  static class TestableCaffeineEntityCache extends CaffeineEntityCache {
+    private final Set<EntityCacheKey> evictedKeys = new HashSet<>();
+
+    public TestableCaffeineEntityCache(Config config) {
+      super(config);
+    }
+
+    @Override
+    protected void invalidateExpiredItem(EntityCacheKey key) {
+      evictedKeys.add(key);
+    }
+
+    public boolean wasEvicted(EntityCacheKey key) {
+      return evictedKeys.contains(key);
+    }
   }
 }
