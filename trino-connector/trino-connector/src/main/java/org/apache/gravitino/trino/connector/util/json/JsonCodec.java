@@ -39,6 +39,7 @@ import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorSplit;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
+import io.trino.spi.type.StandardTypes;
 import io.trino.spi.type.Type;
 import io.trino.spi.type.TypeManager;
 import io.trino.spi.type.TypeSignature;
@@ -48,6 +49,7 @@ import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 
 public class JsonCodec {
   private static ObjectMapper mapper;
+  private static Type jsonType;
 
   private static ObjectMapper buildMapper(ClassLoader classLoader) {
     try {
@@ -57,6 +59,17 @@ public class JsonCodec {
       return createMapper(typeManager);
     } catch (Exception e) {
       throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to build ObjectMapper", e);
+    }
+  }
+
+  private static Type buildJsonType(ClassLoader classLoader) {
+    try {
+      ClassLoader appClassLoader =
+          GravitinoConnectorPluginManager.instance(classLoader).getAppClassloader();
+      TypeManager typeManager = createTypeManager(appClassLoader);
+      return typeManager.getType(new TypeSignature(StandardTypes.JSON));
+    } catch (Exception e) {
+      throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to build JsonType", e);
     }
   }
 
@@ -206,6 +219,20 @@ public class JsonCodec {
       }
       mapper = buildMapper(appClassLoader);
       return mapper;
+    }
+  }
+
+  public static Type getJsonType(ClassLoader appClassLoader) {
+    if (jsonType != null) {
+      return jsonType;
+    }
+
+    synchronized (JsonCodec.class) {
+      if (jsonType != null) {
+        return jsonType;
+      }
+      jsonType = buildJsonType(appClassLoader);
+      return jsonType;
     }
   }
 }

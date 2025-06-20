@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.CharType;
+import io.trino.spi.type.StandardTypes;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
@@ -29,6 +30,7 @@ import org.apache.gravitino.rel.types.Type.Name;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import org.apache.gravitino.trino.connector.util.json.JsonCodec;
 
 /** Type transformer between MySQL and Trino */
 public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
@@ -38,6 +40,9 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
   // column should be less than 16383. For more details, please refer to
   // https://dev.mysql.com/doc/refman/8.0/en/char.html
   private static final int MYSQL_VARCHAR_LENGTH_LIMIT = 16383;
+
+  public static final io.trino.spi.type.Type JSON_TYPE =
+      JsonCodec.getJsonType(MySQLDataTypeTransformer.class.getClassLoader());
 
   @Override
   public io.trino.spi.type.Type getTrinoType(Type type) {
@@ -52,6 +57,11 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       }
     } else if (Name.TIME == type.name()) {
       return TimeType.TIME_SECONDS;
+    } else if (Name.EXTERNAL == type.name()) {
+      String catalogString = ((Types.ExternalType) type).catalogString();
+      if (StandardTypes.JSON.equalsIgnoreCase(catalogString)) {
+        return JSON_TYPE;
+      }
     }
 
     return super.getTrinoType(type);
@@ -94,6 +104,8 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
                 + MYSQL_VARCHAR_LENGTH_LIMIT);
       }
       return Types.VarCharType.of(length);
+    } else if (typeClass == JSON_TYPE.getClass()) {
+      return Types.ExternalType.of(StandardTypes.JSON);
     }
 
     return super.getGravitinoType(type);
