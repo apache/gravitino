@@ -18,8 +18,6 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -39,14 +37,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.server.web.ObjectMapperProvider;
-import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
-import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -176,7 +172,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           continue;
         }
         enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-        loadPolicyByRoleId(roleId);
+        loadPolicyByRoleId(role);
         loadedRoles.add(roleId);
       }
       loadOwner(metalake, metadataObject, metadataObjectId);
@@ -221,29 +217,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     ownerPolicyCache.remove(nameIdentifier);
   }
 
-  private void loadPolicyByRoleId(Long roleId) {
+  private void loadPolicyByRoleId(RoleEntity roleEntity) {
     try {
-      List<SecurableObjectPO> securableObjects =
-          RoleMetaService.listSecurableObjectsByRoleId(roleId);
-      for (SecurableObjectPO securableObject : securableObjects) {
-        String privilegeNamesString = securableObject.getPrivilegeNames();
-        String privilegeConditionsString = securableObject.getPrivilegeConditions();
-        ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
-        List<String> privileges =
-            objectMapper.readValue(privilegeNamesString, new TypeReference<List<String>>() {});
-        List<String> privilegeConditions =
-            objectMapper.readValue(privilegeConditionsString, new TypeReference<List<String>>() {});
-        for (int i = 0; i < privileges.size(); i++) {
+      String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
+      List<SecurableObject> securableObjects = roleEntity.securableObjects();
+
+      for (SecurableObject securableObject : securableObjects) {
+        for (Privilege privilege : securableObject.privileges()) {
+          Privilege.Condition condition = privilege.condition();
           enforcer.addPolicy(
-              String.valueOf(securableObject.getRoleId()),
-              securableObject.getType(),
-              String.valueOf(securableObject.getMetadataObjectId()),
-              privileges.get(i).toUpperCase(),
-              privilegeConditions.get(i).toLowerCase());
+              String.valueOf(roleEntity.id()),
+              securableObject.type().name(),
+              String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
+              privilege.name().name().toUpperCase(),
+              condition.name().toLowerCase());
         }
       }
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Can not parse privilege names", e);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 }
