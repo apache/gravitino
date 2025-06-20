@@ -17,6 +17,7 @@
 import importlib
 import sys
 import time
+import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional, Tuple, List, Dict, Any
@@ -38,6 +39,8 @@ from gravitino.api.credential.s3_secret_key_credential import S3SecretKeyCredent
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
 from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.filesystem.gvfs_config import GVFSConfig
+
+logger = logging.getLogger(__name__)
 
 TIME_WITHOUT_EXPIRATION = sys.maxsize
 SLASH = "/"
@@ -737,3 +740,103 @@ def get_storage_handler_by_path(actual_path: str) -> StorageHandler:
     raise GravitinoRuntimeException(
         f"Storage type doesn't support now. Path:{actual_path}"
     )
+
+def register_storage_handler_providers(options: Dict[str, str]):
+    """
+    Register storage handler providers from configuration.
+
+    This function dynamically loads and registers storage handler providers
+    specified in the configuration, allowing users to extend GVFS with custom
+    storage systems without modifying core code.
+
+    :param options: Configuration options dictionary
+    """
+    if not options:
+        return
+
+    providers_config = options.get("storage_handler_providers")
+    if not providers_config:
+        return
+
+    # Import here to avoid circular imports
+    from gravitino.filesystem.storage_handler_provider import StorageHandlerProvider
+
+    for provider_class_name in providers_config.split(','):
+        provider_class_name = provider_class_name.strip()
+        if not provider_class_name:
+            continue
+
+        try:
+            # Dynamic import and instantiation
+            module_name, class_name = provider_class_name.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            provider_class = getattr(module, class_name)
+
+            # Validate that it's a StorageHandlerProvider
+            if not issubclass(provider_class, StorageHandlerProvider):
+                raise GravitinoRuntimeException(
+                    f"Class {provider_class_name} must extend StorageHandlerProvider"
+                )
+
+            provider = provider_class()
+            storage_handler = provider.get_storage_handler()
+            scheme = provider.scheme()
+
+            # Check for scheme conflicts
+            scheme_enum = None
+            for storage_type in StorageType:
+                if storage_type.value == scheme:
+                    scheme_enum = storage_type
+                    break
+
+            if scheme_enum is None:
+                # Create a new storage type dynamically for custom schemes
+                # Note: This is a limitation of using Enum, but we can work around it
+                # by directly adding to the dictionaries
+                pass
+            else:
+                # Check if scheme already exists
+                if scheme_enum in storage_handlers:
+                    raise GravitinoRuntimeException(
+                        f"Storage handler for scheme '{scheme}' already exists. "
+                        f"Provider: {provider_class_name}"
+                    )
+
+            # Register the storage handler
+            if scheme_enum:
+                storage_handlers[scheme_enum] = storage_handler
+            else:
+                # For custom schemes, we need to extend our lookup mechanism
+                # Add to storage_handlers with a custom key approach
+                custom_storage_type = type('CustomStorageType', (), {'value': scheme})()
+                storage_handlers[custom_storage_type] = storage_handler
+
+            # Register the prefix
+            storage_prefixes[f"{scheme}://"] = scheme_enum or custom_storage_type
+
+            logger.info(f"Successfully registered storage handler provider: {provider_class_name} for scheme: {scheme}")
+
+        except Exception as e:
+            raise GravitinoRuntimeException(
+                f"Failed to load storage handler provider: {provider_class_name}. Error: {str(e)}"
+            )
+
+
+def get_storage_handler_by_scheme(scheme: str) -> StorageHandler:
+    """
+    Get storage handler by scheme string.
+
+    :param scheme: The storage scheme (e.g., 's3a', 'hdfs', 'custom')
+    :return: The storage handler
+    """
+    # First try to find by StorageType enum
+    for storage_type in StorageType:
+        if storage_type.value == scheme and storage_type in storage_handlers:
+            return storage_handlers[storage_type]
+
+    # Then try to find by custom storage types
+    for storage_type, handler in storage_handlers.items():
+        if hasattr(storage_type, 'value') and storage_type.value == scheme:
+            return handler
+
+    raise GravitinoRuntimeException(f"No storage handler found for scheme: {scheme}")
