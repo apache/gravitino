@@ -53,7 +53,7 @@ def oss_with_credential_is_configured():
 )
 class TestGvfsWithOSSCredential(TestGvfsWithOSS):
     # Before running this test, please set the make sure aliyun-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     oss_access_key = os.environ.get("OSS_STS_ACCESS_KEY_ID")
     oss_secret_key = os.environ.get("OSS_STS_SECRET_ACCESS_KEY")
     oss_endpoint = os.environ.get("OSS_STS_ENDPOINT")

@@ -81,8 +81,8 @@ public interface SupportsCatalogs {
    * catalog should be created. The short name:
    *
    * <p>1) should be the same as the {@link CatalogProvider} interface provided. 2) can be "null" if
-   * the created catalog is the managed catalog, like model catalog. For the details of the provider
-   * definition, see {@link CatalogProvider}.
+   * the created catalog is the managed catalog, like model, fileset catalog. For the details of the
+   * provider definition, see {@link CatalogProvider}.
    *
    * @param catalogName the name of the catalog.
    * @param type the type of the catalog.

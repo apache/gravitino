@@ -62,5 +62,5 @@ tasks.jar {
 }
 
 tasks.compileJava {
-  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+  dependsOn(":catalogs:catalog-fileset:runtimeJars")
 }

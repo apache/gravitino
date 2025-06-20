@@ -110,7 +110,9 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             "gravitino.bypass.fs.defaultFS": f"hdfs://{hdfs_container_ip}:9000"
         }
 
-        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        cls.hadoop_conf_path = (
+            f"{cls.gravitino_home}/catalogs/fileset/conf/fileset.conf"
+        )
 
         # append the hadoop conf to server
         cls._append_conf(cls.config, cls.hadoop_conf_path)

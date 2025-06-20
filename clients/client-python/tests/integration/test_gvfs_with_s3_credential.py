@@ -50,7 +50,7 @@ def s3_with_credential_is_configured():
 @unittest.skipUnless(s3_with_credential_is_configured(), "S3 is not configured.")
 class TestGvfsWithS3Credential(TestGvfsWithS3):
     # Before running this test, please set the make sure aws-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     s3_access_key = os.environ.get("S3_STS_ACCESS_KEY_ID")
     s3_secret_key = os.environ.get("S3_STS_SECRET_ACCESS_KEY")
     s3_endpoint = os.environ.get("S3_STS_ENDPOINT")

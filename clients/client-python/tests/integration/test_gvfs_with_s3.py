@@ -49,7 +49,7 @@ def s3_is_configured():
 @unittest.skipUnless(s3_is_configured(), "S3 is not configured.")
 class TestGvfsWithS3(TestGvfsWithHDFS):
     # Before running this test, please set the make sure aws-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     s3_access_key = os.environ.get("S3_ACCESS_KEY_ID")
     s3_secret_key = os.environ.get("S3_SECRET_ACCESS_KEY")
     s3_endpoint = os.environ.get("S3_ENDPOINT")
@@ -71,7 +71,9 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
     def setUpClass(cls):
         cls._get_gravitino_home()
 
-        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        cls.hadoop_conf_path = (
+            f"{cls.gravitino_home}/catalogs/fileset/conf/fileset.conf"
+        )
         # restart the server
         cls.restart_server()
         # create entity

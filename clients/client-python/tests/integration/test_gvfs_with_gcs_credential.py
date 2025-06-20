@@ -42,7 +42,7 @@ def gcs_with_credential_is_configured():
 @unittest.skipUnless(gcs_with_credential_is_configured(), "GCS is not configured.")
 class TestGvfsWithGCSCredential(TestGvfsWithGCS):
     # Before running this test, please set the make sure gcp-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     key_file = os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH_FOR_CREDENTIAL")
     bucket_name = os.environ.get("GCS_BUCKET_NAME_FOR_CREDENTIAL")
     metalake_name: str = "TestGvfsWithGCSCredential_metalake" + str(randint(1, 10000))

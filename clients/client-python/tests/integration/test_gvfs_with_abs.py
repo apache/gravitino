@@ -48,7 +48,7 @@ def azure_abs_is_prepared():
 @unittest.skipUnless(azure_abs_is_prepared(), "Azure Blob Storage is not prepared.")
 class TestGvfsWithABS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure azure-bundle-xxx.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     azure_abs_account_key = os.environ.get("ABS_ACCOUNT_KEY")
     azure_abs_account_name = os.environ.get("ABS_ACCOUNT_NAME")
     azure_abs_container_name = os.environ.get("ABS_CONTAINER_NAME")
@@ -68,7 +68,9 @@ class TestGvfsWithABS(TestGvfsWithHDFS):
     def setUpClass(cls):
         cls._get_gravitino_home()
 
-        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        cls.hadoop_conf_path = (
+            f"{cls.gravitino_home}/catalogs/fileset/conf/fileset.conf"
+        )
         # restart the server
         cls.restart_server()
         # create entity
