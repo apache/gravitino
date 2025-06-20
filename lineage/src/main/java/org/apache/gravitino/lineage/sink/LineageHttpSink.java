@@ -32,18 +32,18 @@ import org.apache.gravitino.lineage.auth.LineageServerAuthenticationStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class LineageMarquezSink implements LineageSink {
+public class LineageHttpSink implements LineageSink {
 
-  private static final Logger LOG = LoggerFactory.getLogger(LineageMarquezSink.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LineageHttpSink.class);
   private OpenLineageClient client;
 
   @Override
   public void initialize(Map<String, String> configs) {
 
-    String marquezUrl = configs.getOrDefault("url", "http://localhost:4999/");
-    LOG.info("marquez url {}", marquezUrl);
-    String authType = configs.get("auth.type");
-    LOG.info("marquez authentication type {}", authType);
+    String marquezUrl = configs.getOrDefault("url", "http://localhost:5000/");
+    LOG.info("http sink url {}", marquezUrl);
+    String authType = configs.get("authType");
+    LOG.info("http sink authentication type {}", authType);
     LineageServerAuthenticationStrategy authStrategy =
         AuthenticationFactory.createStrategy(authType);
 

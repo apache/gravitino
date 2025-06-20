@@ -31,9 +31,9 @@ class ApiKeyAuthStrategy implements LineageServerAuthenticationStrategy {
 
   @Override
   public HttpConfig configureHttpConfig(String url, Map<String, String> configs) {
-    String apiKey = configs.get("api.key");
+    String apiKey = configs.get("apiKey");
     if (apiKey == null || apiKey.trim().isEmpty()) {
-      throw new BadRequestException("API key is required when auth type is api_key");
+      throw new BadRequestException("API key is required when auth type is apiKey");
     }
 
     HttpConfig config = new HttpConfig();
