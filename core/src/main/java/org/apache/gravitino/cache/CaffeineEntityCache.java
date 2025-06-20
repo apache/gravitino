@@ -64,10 +64,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private final ReentrantLock opLock = new ReentrantLock();
 
   /** Cache part */
-  protected final Cache<EntityCacheKey, List<Entity>> cacheData;
+  private final Cache<EntityCacheKey, List<Entity>> cacheData;
 
   /** Index part */
-  protected RadixTree<EntityCacheKey> cacheIndex;
+  private RadixTree<EntityCacheKey> cacheIndex;
 
   private ScheduledExecutorService scheduler;
 
