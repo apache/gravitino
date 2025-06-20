@@ -1,0 +1,215 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.stats;
+
+import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
+
+/** A class representing a collection of statistic values. */
+public class StatisticValues {
+
+  private StatisticValues() {}
+
+  /**
+   * Creates a statistic value that holds a boolean value.
+   *
+   * @param value the boolean value to be held by this statistic value
+   * @return a BooleanValue instance containing the provided boolean value
+   */
+  public static BooleanValue booleanValue(boolean value) {
+    return new BooleanValue(value);
+  }
+
+  /**
+   * Creates a statistic value that holds a long value.
+   *
+   * @param value the long value to be held by this statistic value
+   * @return a LongValue instance containing the provided long value
+   */
+  public static LongValue longValue(long value) {
+    return new LongValue(value);
+  }
+
+  /**
+   * Creates a statistic value that holds a double value.
+   *
+   * @param value the double value to be held by this statistic value
+   * @return a DoubleValue instance containing the provided double value
+   */
+  public static DoubleValue doubleValue(double value) {
+    return new DoubleValue(value);
+  }
+
+  /**
+   * Creates a statistic value that holds a string value.
+   *
+   * @param value the string value to be held by this statistic value
+   * @return a StringValue instance containing the provided string value
+   */
+  public static StringValue stringValue(String value) {
+    return new StringValue(value);
+  }
+
+  /**
+   * Creates a statistic value that holds a list of other statistic values.
+   *
+   * @param values the list of statistic values to be held by this statistic value
+   * @return a ListValue instance containing the provided list of statistic values
+   */
+  public static ListValue listValue(List<StatisticValue> values) {
+    return new ListValue(values);
+  }
+
+  /**
+   * Creates a statistic value that holds a map of string keys to other statistic values.
+   *
+   * @param values the map of string keys to statistic values to be held by this statistic value
+   * @return an ObjectValue instance containing the provided map of statistic values
+   */
+  public static ObjectValue objectValue(Map<String, StatisticValue> values) {
+    return new ObjectValue(values);
+  }
+
+  /** A statistic value that holds a Boolean value. */
+  public static class BooleanValue implements StatisticValue<Boolean> {
+    private final Boolean value;
+
+    private BooleanValue(Boolean value) {
+      this.value = value;
+    }
+
+    @Override
+    public Boolean value() {
+      return value;
+    }
+
+    @Override
+    public Type dataType() {
+      return Types.BooleanType.get();
+    }
+  }
+
+  /** A statistic value that holds a Long value. */
+  public static class LongValue implements StatisticValue<Long> {
+    private final Long value;
+
+    private LongValue(Long value) {
+      this.value = value;
+    }
+
+    @Override
+    public Long value() {
+      return value;
+    }
+
+    @Override
+    public Type dataType() {
+      return Types.LongType.get();
+    }
+  }
+
+  /** A statistic value that holds a Double value. */
+  public static class DoubleValue implements StatisticValue<Double> {
+    private final Double value;
+
+    private DoubleValue(Double value) {
+      this.value = value;
+    }
+
+    @Override
+    public Double value() {
+      return value;
+    }
+
+    @Override
+    public Type dataType() {
+      return Types.DoubleType.get();
+    }
+  }
+
+  /** A statistic value that holds a String value. */
+  public static class StringValue implements StatisticValue<String> {
+    private final String value;
+
+    private StringValue(String value) {
+      this.value = value;
+    }
+
+    @Override
+    public String value() {
+      return value;
+    }
+
+    @Override
+    public Type dataType() {
+      return Types.StringType.get();
+    }
+  }
+
+  /** A statistic value that holds a List of other statistic values. */
+  public static class ListValue implements StatisticValue<List<StatisticValue>> {
+    private final List<StatisticValue> values;
+
+    private ListValue(List<StatisticValue> values) {
+      Preconditions.checkArgument(
+          values != null && values.isEmpty(), "Values cannot be null or empty");
+      this.values = values;
+    }
+
+    @Override
+    public List<StatisticValue> value() {
+      return values;
+    }
+
+    @Override
+    public Type dataType() {
+      return Types.ListType.notNull(values.get(0).dataType());
+    }
+  }
+
+  /** A statistic value that holds a Map of String keys to other statistic values. */
+  public static class ObjectValue implements StatisticValue<Map<String, StatisticValue>> {
+    private final Map<String, StatisticValue> values;
+
+    private ObjectValue(Map<String, StatisticValue> values) {
+      Preconditions.checkArgument(
+          values != null && !values.isEmpty(), "Values cannot be null or empty");
+      this.values = values;
+    }
+
+    @Override
+    public Map<String, StatisticValue> value() {
+      return values;
+    }
+
+    @Override
+    public Type dataType() {
+      return Types.StructType.of(
+          values.entrySet().stream()
+              .map(
+                  entry ->
+                      Types.StructType.Field.nullableField(
+                          entry.getKey(), entry.getValue().dataType()))
+              .toArray(Types.StructType.Field[]::new));
+    }
+  }
+}
