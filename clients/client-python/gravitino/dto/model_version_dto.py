@@ -49,6 +49,9 @@ class ModelVersionDTO(ModelVersion, DataClassJsonMixin):
     def uri(self) -> str:
         return self._uri
 
+    def uris(self) -> Dict[str, str]:
+        raise NotImplementedError("Not supported yet")
+
     def properties(self) -> Optional[Dict[str, str]]:
         return self._properties
 

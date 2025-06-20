@@ -31,6 +31,12 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface ModelVersion extends Auditable {
 
+  /** The property name for the default uri name of the model version. */
+  String PROPERTY_DEFAULT_URI_NAME = "default-uri-name";
+
+  /** The reserved URI name to indicate the URI name is unknown. */
+  String URI_NAME_UNKNOWN = "unknown";
+
   /**
    * The version of this model object. The version number is an integer number starts from 0. Each
    * time the model checkpoint / snapshot is linked to the registered, the version number will be
@@ -60,12 +66,27 @@ public interface ModelVersion extends Auditable {
   String[] aliases();
 
   /**
-   * The URI of the model artifact. The URI is the location of the model artifact. The URI can be a
-   * file path or a remote URI.
+   * The unnamed URI of the model artifact. The URI is the location of the model artifact. The URI
+   * can be a file path or a remote URI.
    *
    * @return The URI of the model artifact.
    */
-  String uri();
+  default String uri() {
+    return uris().get(URI_NAME_UNKNOWN);
+  }
+
+  /**
+   * The name and corresponding URI of the model artifact. The key is the name of the URI, and the
+   * value is the URI of the model artifact, which can be a file path or a remote URI.
+   *
+   * <p>The "unknown" URI name is reserved for the compatibility with single URI.
+   *
+   * @return The URIs of the model version, the key is the name of the URI and the value is the URI
+   *     of the model artifact.
+   */
+  default Map<String, String> uris() {
+    throw new UnsupportedOperationException("Not implemented yet");
+  }
 
   /**
    * The properties of the model version. The properties are key-value pairs that can be used to

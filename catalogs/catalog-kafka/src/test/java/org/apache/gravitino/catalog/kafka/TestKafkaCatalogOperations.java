@@ -121,6 +121,12 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
         public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Not supported");
         }
+
+        @Override
+        public PropertiesMetadata modelVersionPropertiesMetadata()
+            throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Does not support model version properties");
+        }
       };
   private static EntityStore store;
   private static IdGenerator idGenerator;
