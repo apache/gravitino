@@ -415,8 +415,6 @@ subprojects {
     }
   }
 
-  // extra["useModernIceberg"] = true
-
   if (project.name in listOf("web", "docs")) {
     plugins.apply(NodePlugin::class)
     configure<NodeExtension> {
