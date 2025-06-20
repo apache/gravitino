@@ -18,12 +18,18 @@
  */
 package org.apache.gravitino;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.junit.jupiter.api.Test;
 
 public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
 
@@ -50,5 +56,41 @@ public class TestBasePropertiesMetadata extends BasePropertiesMetadata {
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
     return TEST_BASE_PROPERTY;
+  }
+
+  @Test
+  public void testGetPropertyEntryWithExistingProperty() {
+    TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();
+
+    PropertyEntry<?> entry =
+        metadata.getPropertyEntry(TestBasePropertiesMetadata.TEST_REQUIRED_KEY);
+    assertNotNull(entry);
+    assertEquals(TestBasePropertiesMetadata.TEST_REQUIRED_KEY, entry.getName());
+    assertEquals("test required k1 property", entry.getDescription());
+    assertTrue(entry.isRequired());
+  }
+
+  @Test
+  public void testGetPropertyEntryWithNonExistentProperty() {
+    TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> metadata.getPropertyEntry("non-existent-property"));
+    assertTrue(exception.getMessage().contains("Property is not defined"));
+  }
+
+  @Test
+  public void testGetPropertyEntryWithInvalidInput() {
+    TestBasePropertiesMetadata metadata = new TestBasePropertiesMetadata();
+
+    IllegalArgumentException nullException =
+        assertThrows(IllegalArgumentException.class, () -> metadata.getPropertyEntry(null));
+    assertTrue(nullException.getMessage().contains("Property is not defined"));
+
+    IllegalArgumentException emptyException =
+        assertThrows(IllegalArgumentException.class, () -> metadata.getPropertyEntry(""));
+    assertTrue(emptyException.getMessage().contains("Property is not defined"));
   }
 }
