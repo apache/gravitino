@@ -26,8 +26,8 @@ public class AuthenticationFactory {
       return new NoAuthStrategy();
     }
 
-    switch (authType.toLowerCase()) {
-      case "api_key":
+    switch (authType) {
+      case "apiKey":
         return new ApiKeyAuthStrategy();
       case "none":
         return new NoAuthStrategy();
