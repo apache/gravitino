@@ -26,21 +26,38 @@ import java.util.List;
 /** Interface for adding property metadata to the catalogs */
 public interface HasPropertyMeta {
 
-  /** Property metadata for schema */
+  /**
+   * Get the property metadata for a specific schema.
+   *
+   * @return a list of property metadata for schemas
+   */
   default List<PropertyMetadata<?>> getSchemaPropertyMetadata() {
     return ImmutableList.of();
   }
 
-  /** Property metadata for table */
+  /**
+   * Gets the property metadata for tables.
+   *
+   * @return a list of property metadata for tables
+   */
   default List<PropertyMetadata<?>> getTablePropertyMetadata() {
     return ImmutableList.of();
   }
 
-  /** Property metadata for column */
+  /**
+   * Gets the property metadata for columns.
+   *
+   * @return a list of property metadata for columns
+   */
   default List<PropertyMetadata<?>> getColumnPropertyMetadata() {
     return ImmutableList.of();
   }
 
+  /**
+   * Gets the property metadata for catalogs.
+   *
+   * @return a list of property metadata for catalogs
+   */
   default List<PropertyMetadata<?>> getCatalogPropertyMeta() {
     return ImmutableList.of();
   }

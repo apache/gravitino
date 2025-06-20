@@ -20,4 +20,8 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.trino;
 
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 
+/**
+ * Property metadata for Trino cluster. This class defines and manages the property metadata for
+ * Trino cluster-specific configurations.
+ */
 public class TrinoClusterPropertyMeta implements HasPropertyMeta {}

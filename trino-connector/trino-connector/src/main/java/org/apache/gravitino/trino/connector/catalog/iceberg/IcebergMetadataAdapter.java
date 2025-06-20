@@ -49,6 +49,13 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
           IcebergPropertyMeta.ICEBERG_PARTITIONING_PROPERTY,
           IcebergPropertyMeta.ICEBERG_SORTED_BY_PROPERTY);
 
+  /**
+   * Constructs a new IcebergMetadataAdapter.
+   *
+   * @param schemaProperties the list of schema property metadata
+   * @param tableProperties the list of table property metadata
+   * @param columnProperties the list of column property metadata
+   */
   public IcebergMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,

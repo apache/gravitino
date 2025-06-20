@@ -29,24 +29,47 @@ import java.util.Objects;
 
 // This class is referred from Trino:
 // plugin/trino-gravitino/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
+/**
+ * Represents a column with sorting information. This class is used to define how a column should be
+ * sorted in Hive tables.
+ */
 @Immutable
 public class SortingColumn {
+  /** Represents the sorting order of a column. */
   public enum Order {
+    /** Ascending order with nulls first. */
     ASCENDING(ASC_NULLS_FIRST, 1),
+    /** Descending order with nulls last. */
     DESCENDING(DESC_NULLS_LAST, 0);
 
     private final SortOrder sortOrder;
     private final int hiveOrder;
 
+    /**
+     * Constructs a new Order.
+     *
+     * @param sortOrder the Trino sort order
+     * @param hiveOrder the Hive sort order value
+     */
     Order(SortOrder sortOrder, int hiveOrder) {
       this.sortOrder = requireNonNull(sortOrder, "sortOrder is null");
       this.hiveOrder = hiveOrder;
     }
 
+    /**
+     * Gets the Trino sort order.
+     *
+     * @return the sort order
+     */
     public SortOrder getSortOrder() {
       return sortOrder;
     }
 
+    /**
+     * Gets the Hive sort order value.
+     *
+     * @return the Hive order value
+     */
     public int getHiveOrder() {
       return hiveOrder;
     }
@@ -55,6 +78,12 @@ public class SortingColumn {
   private final String columnName;
   private final Order order;
 
+  /**
+   * Constructs a new SortingColumn.
+   *
+   * @param columnName the name of the column
+   * @param order the sorting order
+   */
   @JsonCreator
   public SortingColumn(
       @JsonProperty("columnName") String columnName, @JsonProperty("order") Order order) {
@@ -62,11 +91,21 @@ public class SortingColumn {
     this.order = requireNonNull(order, "order is null");
   }
 
+  /**
+   * Gets the name of the column.
+   *
+   * @return the column name
+   */
   @JsonProperty
   public String getColumnName() {
     return columnName;
   }
 
+  /**
+   * Gets the sorting order.
+   *
+   * @return the order
+   */
   @JsonProperty
   public Order getOrder() {
     return order;
@@ -95,10 +134,22 @@ public class SortingColumn {
     return Objects.hash(columnName, order);
   }
 
+  /**
+   * Converts a SortingColumn to its string representation.
+   *
+   * @param column the sorting column
+   * @return the string representation
+   */
   public static String sortingColumnToString(SortingColumn column) {
     return column.getColumnName() + ((column.getOrder() == DESCENDING) ? " DESC" : "");
   }
 
+  /**
+   * Creates a SortingColumn from its string representation.
+   *
+   * @param name the string representation
+   * @return the sorting column
+   */
   public static SortingColumn sortingColumnFromString(String name) {
     SortingColumn.Order order = ASCENDING;
     String lower = name.toUpperCase(ENGLISH);

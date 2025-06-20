@@ -33,6 +33,11 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
 
   ConnectorPageSourceProvider internalPageSourceProvider;
 
+  /**
+   * Constructs a new GravitinoDataSourceProvider with the specified page source provider.
+   *
+   * @param pageSourceProvider the internal connector page source provider
+   */
   public GravitinoDataSourceProvider(ConnectorPageSourceProvider pageSourceProvider) {
     this.internalPageSourceProvider = pageSourceProvider;
   }

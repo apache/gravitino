@@ -25,6 +25,7 @@ import org.apache.commons.collections4.bidimap.TreeBidiMap;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 
+/** Converts schema properties between Trino and Apache Gravitino for Hive catalogs. */
 public class HiveSchemaPropertyConverter extends PropertyConverter {
   // Trino property key does not allow upper case character and '-', so we need to map it to
   // Gravitino

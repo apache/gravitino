@@ -27,6 +27,10 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 
+/**
+ * Property metadata for MySQL tables and columns. This class defines and manages the property
+ * metadata for MySQL-specific configurations.
+ */
 public class MySQLPropertyMeta implements HasPropertyMeta {
 
   static final String TABLE_ENGINE = "engine";
@@ -38,7 +42,9 @@ public class MySQLPropertyMeta implements HasPropertyMeta {
           stringProperty(
               TABLE_AUTO_INCREMENT_OFFSET, "The auto increment offset for the table", null, false));
 
+  /** Property name for auto-incrementing columns. */
   public static final String AUTO_INCREMENT = "auto_increment";
+
   private static final List<PropertyMetadata<?>> COLUMN_PROPERTY_META =
       ImmutableList.of(booleanProperty(AUTO_INCREMENT, "The auto increment column", false, false));
 

@@ -34,6 +34,10 @@ public class PostgreSQLConnectorAdapter implements CatalogConnectorAdapter {
   private static final String CONNECTOR_POSTGRESQL = "postgresql";
   private final PropertyConverter catalogConverter;
 
+  /**
+   * Constructs a new PostgreSQLConnectorAdapter. Initializes the catalog property converter for
+   * PostgreSQL-specific configurations.
+   */
   public PostgreSQLConnectorAdapter() {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
   }
