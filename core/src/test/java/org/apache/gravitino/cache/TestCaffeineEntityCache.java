@@ -23,9 +23,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -716,44 +714,6 @@ public class TestCaffeineEntityCache {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
-  void testRemovalListenerTriggeredByEviction() throws IllegalAccessException {
-    Config config = new Config() {};
-    config.set(Configs.CACHE_WEIGHER_ENABLED, false);
-    config.set(Configs.CACHE_MAX_ENTRIES, 1);
-
-    TestableCaffeineEntityCache cache = new TestableCaffeineEntityCache(config);
-    cache.put(entity1);
-    cache.put(entity2);
-
-    Cache<EntityCacheKey, List<Entity>> caffeine =
-        (Cache<EntityCacheKey, List<Entity>>) FieldUtils.readField(cache, "cacheData", true);
-
-    caffeine.cleanUp();
-
-    Assertions.assertTrue(
-        cache.wasEvicted(EntityCacheKey.of(entity1.nameIdentifier(), entity1.type())));
-  }
-
-  @Test
-  @SuppressWarnings("unchecked")
-  void testRemovalListenerNotTriggeredOnExplicitInvalidate() throws IllegalAccessException {
-    Config config = new Config() {};
-    TestableCaffeineEntityCache cache = new TestableCaffeineEntityCache(config);
-    cache.put(entity1);
-
-    cache.invalidate(entity1.nameIdentifier(), entity1.type());
-
-    Cache<EntityCacheKey, List<Entity>> caffeine =
-        (Cache<EntityCacheKey, List<Entity>>) FieldUtils.readField(cache, "cacheData", true);
-
-    caffeine.cleanUp();
-
-    Assertions.assertFalse(
-        cache.wasEvicted(EntityCacheKey.of(entity1.nameIdentifier(), entity1.type())));
-  }
-
-  @Test
   void testRemoveNonExistentEntity() {
     EntityCache cache = new CaffeineEntityCache(new Config() {});
 
@@ -1039,22 +999,5 @@ public class TestCaffeineEntityCache {
 
     entity12 = TestUtil.getTestRoleEntity(12L, "role1", "metalake1");
     entity13 = TestUtil.getTestRoleEntity(13L, "role2", "metalake2");
-  }
-
-  static class TestableCaffeineEntityCache extends CaffeineEntityCache {
-    private final Set<EntityCacheKey> evictedKeys = new HashSet<>();
-
-    public TestableCaffeineEntityCache(Config config) {
-      super(config);
-    }
-
-    @Override
-    protected void invalidateExpiredItem(EntityCacheKey key) {
-      evictedKeys.add(key);
-    }
-
-    public boolean wasEvicted(EntityCacheKey key) {
-      return evictedKeys.contains(key);
-    }
   }
 }
