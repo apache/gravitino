@@ -1,5 +1,10 @@
 name: Python Client Integration Test
 
+env:
+  GRAVITINO_TEST_ENV_MODE: CI
+  run: |
+    ./gradlew compileDistribution -x test -PjdkVersion=${{ matrix.java-version }}  
+
 # Controls when the workflow will run
 on:
   push:
@@ -93,3 +98,4 @@ jobs:
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
             catalogs/**/*.tar
+        

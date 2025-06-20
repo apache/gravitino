@@ -28,6 +28,11 @@ import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.kotlin.dsl.support.serviceOf
+import de.undercouch.gradle.tasks.download.Download
+import de.undercouch.gradle.tasks.download.Verify
+import io.github.piyushroshan.python.VenvTask
+import java.net.HttpURLConnection
+import java.net.URL
 import java.io.IOException
 import java.util.Locale
 
@@ -38,6 +43,8 @@ plugins {
   id("java")
   id("idea")
   id("jacoco")
+  id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
+  id("de.undercouch.download") version "5.6.0"
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.node) apply false
 
@@ -62,6 +69,11 @@ plugins {
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
+}
+
+
+pythonPlugin {
+  pythonVersion.set(project.rootProject.extra["pythonVersion"].toString())
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -200,6 +212,7 @@ allprojects {
       param.environment("TESTCONTAINERS_PULL_PAUSE_TIMEOUT", "60")
       val jdbcDatabase = project.properties["jdbcBackend"] as? String ?: "h2"
       param.environment("jdbcBackend", jdbcDatabase)
+
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
@@ -598,6 +611,11 @@ jacoco {
   reportsDirectory.set(layout.buildDirectory.dir("JacocoReport"))
 }
 
+val hadoopVersion = "2.7.3"
+val hadoopPackName = "hadoop-${hadoopVersion}.tar.gz"
+val hadoopDirName = "hadoop-${hadoopVersion}"
+val hadoopDownloadUrl = "https://archive.apache.org/dist/hadoop/core/hadoop-${hadoopVersion}/${hadoopPackName}"
+
 tasks {
   val projectDir = layout.projectDirectory
   val outputDir = projectDir.dir("distribution")
@@ -750,6 +768,79 @@ tasks {
     destinationDirectory.set(projectDir.dir("distribution"))
   }
 
+  val downloadHadoop by registering(Download::class) {
+    src(hadoopDownloadUrl)
+    dest(layout.buildDirectory.file(hadoopPackName))
+    overwrite(false)
+  }
+
+  val verifyHadoop by registering(Verify::class) {
+    dependsOn(downloadHadoop)
+    src(layout.buildDirectory.file(hadoopPackName))
+    algorithm("SHA-512")
+    checksum("0bfc4d9b04be919be2fdf36f67fa3b4526cdbd406c512a7a1f5f1b715661f831c1b35e6d4fa7d6ce4e6b4f8b3b1c4e9b0b8b0b8b0b8b0b8b0b8b0b8b0b8b0")
+  }
+
+  val extractHadoop by registering(Copy::class) {
+    dependsOn(verifyHadoop)
+    from(tarTree(layout.buildDirectory.file(hadoopPackName)))
+    into(layout.buildDirectory)
+  }
+
+  val verifyHadoopPack by registering {
+    dependsOn(extractHadoop)
+    doLast {
+      val hadoopDir = layout.buildDirectory.dir(hadoopDirName).get().asFile
+      if (!hadoopDir.exists()) {
+        throw GradleException("Hadoop directory does not exist: ${hadoopDir.absolutePath}")
+      }
+    }
+  }
+
+  val integrationTest by registering(VenvTask::class) {
+    doFirst {
+      gravitinoServer("start")
+    }
+
+    venvExec = "coverage"
+    args = listOf("run", "--branch", "-m", "unittest")
+    workingDir = projectDir.resolve("./tests/integration")
+    val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
+    val envMap = mapOf<String, Any>().toMutableMap()
+    if (dockerTest) {
+      dependsOn("verifyHadoopPack")
+      envMap.putAll(mapOf(
+              "HADOOP_VERSION" to hadoopVersion,
+              "PYTHON_BUILD_PATH" to project.rootDir.path + "/clients/client-python/build"
+      ))
+    }
+    envMap.putAll(mapOf(
+            "PROJECT_VERSION" to project.version,
+            "GRAVITINO_HOME" to project.rootDir.path + "/distribution/package",
+            "START_EXTERNAL_GRAVITINO" to "true",
+            "GRAVITINO_TEST_ENV_MODE" to "CI",  // 新增环境模式变量
+            "DOCKER_TEST" to dockerTest.toString(),
+            "GRAVITINO_CI_HIVE_DOCKER_IMAGE" to "apache/gravitino-ci:hive-0.1.13",
+            "GRAVITINO_OAUTH2_SAMPLE_SERVER" to "datastrato/sample-authorization-server:0.3.0",
+            // Set the PYTHONPATH to the client-python directory, make sure the tests can import the
+            // modules from the client-python directory.
+            "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
+    ))
+    environment = envMap
+
+    doLast {
+      gravitinoServer("stop")
+    }
+
+    finalizedBy(integrationCoverageReport)
+  }
+
+  val integrationCoverageReport by registering(VenvTask::class) {
+    venvExec = "coverage"
+    args = listOf("xml")
+    workingDir = projectDir.resolve("./tests/integration")
+  }
+
   register("checksumIcebergRESTServerDistribution") {
     group = "gravitino distribution"
     dependsOn(assembleIcebergRESTServer)
@@ -876,6 +967,10 @@ tasks {
   }
 
   clean {
+    doFirst {
+      deleteCacheDir("__pycache__")
+      deleteCacheDir(".pytest_cache")
+    }
     dependsOn(cleanDistribution)
   }
 }
@@ -1014,6 +1109,66 @@ fun checkOrbStackStatus() {
     }
   } catch (e: IOException) {
     println("checkOrbStackStatus failed: ${e.message}")
+  }
+}
+
+fun deleteCacheDir(targetDir: String) {
+  project.fileTree(project.projectDir).matching {
+    include("**/$targetDir/**")
+  }.forEach { file ->
+    val targetDirPath = file.path.substring(0, file.path.lastIndexOf(targetDir) + targetDir.length)
+    project.file(targetDirPath).deleteRecursively()
+  }
+}
+
+fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, timeout: Long = 30000) {
+  val startTime = System.currentTimeMillis()
+  var exception: java.lang.Exception?
+  val urlString = "$host:$port/metrics"
+  val successPattern = Regex("\"version\"\\s*:")
+
+  while (true) {
+    try {
+      val url = URL(urlString)
+      val connection = url.openConnection() as HttpURLConnection
+      connection.requestMethod = "GET"
+      connection.connectTimeout = 1000
+      connection.readTimeout = 1000
+
+      val responseCode = connection.responseCode
+      if (responseCode == 200) {
+        val response = connection.inputStream.bufferedReader().use { it.readText() }
+        if (successPattern.containsMatchIn(response)) {
+          return  // If this succeeds, the API is up and running
+        } else {
+          exception = RuntimeException("API returned unexpected response: $response")
+        }
+      } else {
+        exception = RuntimeException("Received non-200 response code: $responseCode")
+      }
+    } catch (e: Exception) {
+      // API is not available yet, continue to wait
+      exception = e
+    }
+
+    if (System.currentTimeMillis() - startTime > timeout) {
+      throw RuntimeException("Timed out waiting for API to be available", exception)
+    }
+    Thread.sleep(500)  // Wait for 0.5 second before checking again
+  }
+}
+
+fun gravitinoServer(operation: String) {
+  val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
+  val exitCode = process.waitFor()
+  if (exitCode == 0) {
+    val currentContext = process.inputStream.bufferedReader().readText()
+    if (operation == "start") {
+      waitForServerIsReady()
+    }
+    println("Gravitino server status: $currentContext")
+  } else {
+    println("Gravitino server execution failed with exit code $exitCode")
   }
 }
 
