@@ -106,7 +106,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
-  private Map<String, String> getCatalogConfigToClient() {
+  public Map<String, String> getCatalogConfigToClient() {
     return catalogConfigToClients;
   }
 

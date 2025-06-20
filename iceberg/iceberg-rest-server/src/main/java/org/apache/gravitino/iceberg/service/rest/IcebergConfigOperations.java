@@ -20,14 +20,19 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.responses.ConfigResponse;
@@ -41,12 +46,30 @@ public class IcebergConfigOperations {
   @Context
   private HttpServletRequest httpRequest;
 
+  private final IcebergCatalogWrapperManager catalogWrapperManager;
+
+  @Inject
+  public IcebergConfigOperations(IcebergCatalogWrapperManager catalogWrapperManager) {
+    this.catalogWrapperManager = catalogWrapperManager;
+  }
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "config." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "config", absolute = true)
-  public Response getConfig() {
-    ConfigResponse response = ConfigResponse.builder().build();
+  public Response getConfig(@DefaultValue("") @QueryParam("warehouse") String warehouse) {
+    if (warehouse == null || warehouse.isEmpty()) {
+      ConfigResponse response = ConfigResponse.builder().build();
+      return IcebergRestUtils.ok(response);
+    }
+
+    // Get the catalog wrapper which contains the configuration
+    CatalogWrapperForREST catalogWrapper = catalogWrapperManager.getCatalogWrapper(warehouse);
+    ConfigResponse response =
+        ConfigResponse.builder()
+            .withDefaults(catalogWrapper.getCatalogConfigToClient())
+            .withDefault("prefix", warehouse)
+            .build();
     return IcebergRestUtils.ok(response);
   }
 }
