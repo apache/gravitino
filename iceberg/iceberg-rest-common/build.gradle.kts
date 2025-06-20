@@ -27,7 +27,12 @@ plugins {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark34.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg.get()
+val useModernIceberg = rootProject.extra["useModernIceberg"] as Boolean
+val icebergVersion: String = if (useModernIceberg) {
+  libs.versions.iceberg4modern.get()
+} else {
+  libs.versions.iceberg.get()
+}
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
@@ -41,11 +46,11 @@ dependencies {
     exclude("*")
   }
   implementation(project(":iceberg:iceberg-common"))
-  implementation(project(":iceberg:iceberg-rest-common"))
-  if (rootProject.extra["useModernIceberg"] as Boolean) {
-    implementation(project(":iceberg:iceberg-rest-modern"))
+  if (useModernIceberg) {
+    println("use modern iceberg for iceberg rest common, $icebergVersion")
     implementation(libs.bundles.iceberg4modern)
   } else {
+    println("use old iceberg for iceberg rest common, $icebergVersion")
     implementation(libs.bundles.iceberg)
   }
   implementation(project(":server-common")) {
@@ -111,72 +116,6 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
-tasks {
-  val copyDepends by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-  jar {
-    finalizedBy(copyDepends)
-  }
-
-  register("copyLibs", Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs")
-    into("$rootDir/distribution/package/iceberg-rest-server/libs")
-  }
-
-  register("copyLibsToStandalonePackage", Copy::class) {
-    dependsOn(copyDepends, "build")
-    from("build/libs")
-    into("$rootDir/distribution/gravitino-iceberg-rest-server/libs")
-  }
-
-  register("copyConfigs", Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/package/iceberg-rest-server/conf")
-
-    include("core-site.xml.template")
-    include("hdfs-site.xml.template")
-
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-
-    fileMode = 0b111101101
-  }
-
-  register("copyConfigsToStandalonePackage", Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/gravitino-iceberg-rest-server/conf")
-
-    include("core-site.xml.template")
-    include("hdfs-site.xml.template")
-
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-
-    fileMode = 0b111101101
-  }
-
-  register("copyLibAndConfigs", Copy::class) {
-    dependsOn("copyLibs", "copyConfigs")
-  }
-
-  register("copyLibAndConfigsToStandalonePackage", Copy::class) {
-    dependsOn("copyLibsToStandalonePackage", "copyConfigsToStandalonePackage")
-  }
-}
-
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
@@ -189,8 +128,4 @@ tasks.test {
 
 tasks.clean {
   delete("spark-warehouse")
-}
-
-tasks.getByName("generateMetadataFileForMavenJavaPublication") {
-  dependsOn("copyDepends")
 }

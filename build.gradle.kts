@@ -64,10 +64,11 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
-if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
+val jdkVersion: String = project.properties["jdkVersion"] as? String ?: extra["jdkVersion"].toString()
+if (jdkVersion !in listOf("8", "11", "17")) {
   throw GradleException(
     "The Gravitino Gradle toolchain currently does not support building with " +
-      "Java version ${extra["jdkVersion"]}. Please use JDK versions 8, 11 or 17."
+      "Java version $jdkVersion. Please use JDK versions 8, 11 or 17."
   )
 }
 
@@ -76,7 +77,13 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
-project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
+if (jdkVersion == "8") {
+  extra["useModernIceberg"] = false
+} else {
+  extra["useModernIceberg"] = true
+}
+
+project.extra["extraJvmArgs"] = if (jdkVersion in listOf("8", "11")) {
   listOf()
 } else {
   listOf(
@@ -284,10 +291,14 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
-      } else {
-        languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
+      } else if (jdkVersion == "8") {
+        languageVersion.set(JavaLanguageVersion.of(jdkVersion.toInt()))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+      } else {
+        languageVersion.set(JavaLanguageVersion.of(jdkVersion.toInt()))
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
       }
     }
   }

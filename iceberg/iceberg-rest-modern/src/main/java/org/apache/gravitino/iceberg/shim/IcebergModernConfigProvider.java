@@ -17,22 +17,23 @@
  *  under the License.
  */
 
-package org.apache.gravitino.utils;
+package org.apache.gravitino.iceberg.shim;
 
-public class ClassUtils {
-  public static <T> T loadClass(String className) {
-    try {
-      return (T) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+import java.util.Arrays;
+import java.util.List;
+import org.apache.iceberg.rest.Endpoint;
+import org.apache.iceberg.rest.responses.ConfigResponse;
+
+public class IcebergModernConfigProvider implements IcebergRESTConfigProvider {
+
+  @Override
+  public ConfigResponse getConfig(String warehouse) {
+    return ConfigResponse.builder().withEndpoints(getEndpoints(warehouse)).build();
   }
 
-  public static <T> T loadClass(String className, ClassLoader cl) {
-    try {
-      return (T) Class.forName(className, true, cl).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  private List<Endpoint> getEndpoints(String warehouse) {
+    System.out.println("warehouse: " + warehouse);
+    return Arrays.asList(
+        Endpoint.V1_CREATE_TABLE, Endpoint.V1_LIST_TABLES, Endpoint.V1_DELETE_TABLE);
   }
 }

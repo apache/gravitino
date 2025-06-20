@@ -17,22 +17,12 @@
  *  under the License.
  */
 
-package org.apache.gravitino.utils;
+package org.apache.gravitino.iceberg.shim;
 
-public class ClassUtils {
-  public static <T> T loadClass(String className) {
-    try {
-      return (T) Class.forName(className).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
+import org.apache.iceberg.rest.responses.ConfigResponse;
 
-  public static <T> T loadClass(String className, ClassLoader cl) {
-    try {
-      return (T) Class.forName(className, true, cl).getDeclaredConstructor().newInstance();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+public class IcebergLegacyConfigProvider implements IcebergRESTConfigProvider {
+  public ConfigResponse getConfig(String warehouse) {
+    return ConfigResponse.builder().build();
   }
 }
