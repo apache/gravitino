@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 public class IcebergConstants {
+
   // Iceberg catalog properties constants
   public static final String CATALOG_BACKEND = "catalog-backend";
   public static final String CATALOG_BACKEND_IMPL = "catalog-backend-impl";
@@ -79,9 +80,15 @@ public class IcebergConstants {
   public static final String DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME =
       "dynamic-config-provider";
 
-  public static final String GRAVITINO_URI = "gravitino-uri";
-
-  public static final String GRAVITINO_METALAKE = "gravitino-metalake";
+  private static final String GRAVITINO_PREFIX = "gravitino-";
+  public static final String GRAVITINO_URI = GRAVITINO_PREFIX + "uri";
+  public static final String GRAVITINO_METALAKE = GRAVITINO_PREFIX + "metalake";
+  public static final String GRAVITINO_AUTH_TYPE = GRAVITINO_PREFIX + "auth-type";
+  public static final String GRAVITINO_SIMPLE_USERNAME = GRAVITINO_PREFIX + "simple.user-name";
+  public static final String GRAVITINO_OAUTH2_SERVER_URI = GRAVITINO_PREFIX + "oauth2.server-uri";
+  public static final String GRAVITINO_OAUTH2_CREDENTIAL = GRAVITINO_PREFIX + "oauth2.credential";
+  public static final String GRAVITINO_OAUTH2_TOKEN_PATH = GRAVITINO_PREFIX + "oauth2.token-path";
+  public static final String GRAVITINO_OAUTH2_SCOPE = GRAVITINO_PREFIX + "oauth2.scope";
 
   public static final String ICEBERG_REST_DEFAULT_METALAKE = "gravitino";
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
