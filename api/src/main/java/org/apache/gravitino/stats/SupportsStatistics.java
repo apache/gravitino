@@ -23,7 +23,6 @@ import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
-import org.apache.gravitino.rel.expressions.literals.Literal;
 
 /**
  * SupportsStatistics provides methods to list and update statistics. A table, a partition or a
@@ -41,9 +40,9 @@ public interface SupportsStatistics {
 
   /**
    * Updates statistics with the provided values. If the statistic exists, it will be updated with
-   * the new value. If the statistic does not exist, it will be created. If
-   * the statistic is unmodifiable, it will throw an UnmodifiableStatisticException. If the
-   * statistic name is illegal, it will throw an IllegalStatisticNameException.
+   * the new value. If the statistic does not exist, it will be created. If the statistic is
+   * unmodifiable, it will throw an UnmodifiableStatisticException. If the statistic name is
+   * illegal, it will throw an IllegalStatisticNameException.
    *
    * @param statistics a map of statistic names to their values
    * @return a list of updated statistics
@@ -52,7 +51,9 @@ public interface SupportsStatistics {
       throws UnmodifiableStatisticException, IllegalStatisticNameException;
 
   /**
-   * Drop statistics by their names. If the statistic is unmodifiable, it will throw an UnmodifiableStatisticException.
+   * Drop statistics by their names. If the statistic is unmodifiable, it will throw an
+   * UnmodifiableStatisticException.
+   *
    * @param statistics a list of statistic names to be dropped
    * @return true if the statistics were successfully dropped, false if no statistics were dropped
    * @throws UnmodifiableStatisticException if any of the statistics to be dropped are unmodifiable
