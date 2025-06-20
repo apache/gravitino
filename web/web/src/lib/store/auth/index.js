@@ -84,9 +84,7 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   localStorage.setItem('isIdle', false)
   dispatch(setAuthToken(access_token))
   dispatch(setExpiredIn(expires_in))
-
   await dispatch(initialVersion())
-
   router.push('/metalakes')
 
   return { token: access_token, expired: expires_in }
@@ -95,22 +93,31 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
   localStorage.removeItem('accessToken')
   localStorage.removeItem('authParams')
+  dispatch(clearIntervalId())
   dispatch(setAuthToken(''))
   await router.push('/login')
 
   return { token: null }
 })
 
-export const setIntervalId = createAsyncThunk('auth/setIntervalId', async (expiredIn, { dispatch }) => {
+export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', async (expiredIn, { dispatch }) => {
   const localExpiredIn = localStorage.getItem('expiredIn')
-
-  // ** the expired time obtained from the backend is in seconds, default value is 299 seconds
   const expired = (expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000
   const defaultExpired = 299 * (2 / 3) * 1000
 
   let intervalId = setInterval(() => {
+    if (localStorage.getItem('isIdle') === 'true') {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('authParams')
+      dispatch(clearIntervalId())
+      dispatch(setAuthToken(''))
+
+      return
+    }
     dispatch(refreshToken())
   }, expired || defaultExpired)
+
+  dispatch(setIntervalId(intervalId))
 
   return {
     intervalId
@@ -129,11 +136,13 @@ export const authSlice = createSlice({
   },
   reducers: {
     setIntervalId(state, action) {
-      state.intervalId = this.setIntervalId()
+      state.intervalId = action.payload
     },
-    clearIntervalId(state, action) {
-      clearInterval(state.intervalId)
-      state.intervalId = null
+    clearIntervalId(state) {
+      if (state.intervalId) {
+        clearInterval(state.intervalId)
+        state.intervalId = null
+      }
     },
     setAuthToken(state, action) {
       state.authToken = action.payload
@@ -151,12 +160,15 @@ export const authSlice = createSlice({
       state.authType = action.payload.authType
     })
     builder.addCase(refreshToken.fulfilled, (state, action) => {
+      localStorage.setItem('accessToken', action.payload.token)
+      localStorage.setItem('expiredIn', action.payload.expiredIn)
+      localStorage.setItem('isIdle', false)
       state.authToken = action.payload.token
       state.expiredIn = action.payload.expiredIn
     })
   }
 })
 
-export const { setAuthToken, setAuthParams, setExpiredIn } = authSlice.actions
+export const { setAuthToken, setAuthParams, setExpiredIn, clearIntervalId } = authSlice.actions
 
 export default authSlice.reducer
