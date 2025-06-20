@@ -55,6 +55,7 @@ iceberg_gcp_bundle="iceberg-gcp-bundle-${iceberg_version}.jar"
 if [ ! -f "bundles/${iceberg_gcp_bundle}" ]; then
   curl -L -s -o bundles/${iceberg_gcp_bundle} https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-gcp-bundle/${iceberg_version}/${iceberg_gcp_bundle}
 fi
+wget https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.23/gcs-connector-hadoop3-2.2.23-shaded.jar -O ${iceberg_rest_server_dir}/packages/gravitino-iceberg-rest-server/libs/gcs-connector-hadoop3-2.2.23-shaded.jar
 
 iceberg_aws_bundle="iceberg-aws-bundle-${iceberg_version}.jar"
 if [ ! -f "bundles/${iceberg_aws_bundle}" ]; then
