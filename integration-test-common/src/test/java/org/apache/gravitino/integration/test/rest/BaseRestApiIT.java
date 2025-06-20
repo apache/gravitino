@@ -31,9 +31,7 @@ public class BaseRestApiIT extends BaseIT {
 
   protected static final String USER_WITH_AUTHORIZATION = "tester2";
 
-  /**
-   * Mock a user without permissions.
-   */
+  /** Mock a user without permissions. */
   protected static GravitinoAdminClient clientWithNoAuthorization;
 
   @BeforeAll
