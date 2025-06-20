@@ -65,4 +65,8 @@ tasks {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
   }
+
+  named<JavaCompile>("compileTestJava") {
+    dependsOn(":catalogs:catalog-lakehouse-paimon:runtimeJars")
+  }
 }

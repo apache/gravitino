@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization;
 import java.io.Closeable;
 import java.security.Principal;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
 
 /** Used for metadata authorization. */
@@ -62,5 +63,13 @@ public interface GravitinoAuthorizer extends Closeable {
    *
    * @param roleId The role id;
    */
-  void handleRolePrivilegeChange(Long roleId);
+  default void handleRolePrivilegeChange(Long roleId) {};
+
+  /**
+   * This method is called to clear the owner relationship in jcasbin when the owner of the metadata
+   * changes.
+   *
+   * @param nameIdentifier The metadata name identifier;
+   */
+  default void handleMetadataOwnerChange(NameIdentifier nameIdentifier) {};
 }
