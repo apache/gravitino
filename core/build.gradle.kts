@@ -39,7 +39,7 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.h2db)
   implementation(libs.mybatis)
-  implementation(libs.mysql.driver)
+
   annotationProcessor(libs.lombok)
 
   compileOnly(libs.lombok)
@@ -56,6 +56,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
