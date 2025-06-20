@@ -20,20 +20,20 @@ package org.apache.gravitino.stats;
 
 import org.apache.gravitino.rel.types.Type;
 
-/**
- * An interface representing a statistic value.
- */
+/** An interface representing a statistic value. */
 public interface StatisticValue<T> {
 
-    /**
-     * Returns the value of the statistic.
-     * @return the value of the statistic
-     */
-    T value();
+  /**
+   * Returns the value of the statistic.
+   *
+   * @return the value of the statistic
+   */
+  T value();
 
-    /**
-     * Returns the data type of the statistic value.
-     * @return the data type of the statistic value
-     */
-    Type dataType();
+  /**
+   * Returns the data type of the statistic value.
+   *
+   * @return the data type of the statistic value
+   */
+  Type dataType();
 }
