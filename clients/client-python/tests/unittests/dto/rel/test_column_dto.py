@@ -83,13 +83,22 @@ class TestColumnDTO(unittest.TestCase):
         self.assertEqual("column_1", column_dto_dict.get(column_dto_1))
         self.assertNotEqual("column_1", column_dto_dict.get(column_dto_2))
 
-    def test_column_dto_validate(self):
+    def test_column_dto_builder(self):
+        ColumnDTO.builder(
+            name="",
+            data_type=Types.StringType.get(),
+            comment="comment",
+            default_value=LiteralDTO(
+                value="default_value", data_type=Types.StringType.get()
+            ),
+        )
+
         with self.assertRaisesRegex(
             IllegalArgumentException,
-            "Column name cannot be null or empty.",
+            "Column name cannot be null",
         ):
             ColumnDTO.builder(
-                name="",
+                name=None,
                 data_type=Types.StringType.get(),
                 comment="comment",
                 default_value=LiteralDTO(
@@ -99,7 +108,7 @@ class TestColumnDTO(unittest.TestCase):
 
         with self.assertRaisesRegex(
             IllegalArgumentException,
-            "Column data type cannot be null.",
+            "Column data type cannot be null",
         ):
             ColumnDTO.builder(
                 name="column",
