@@ -117,11 +117,9 @@ class ColumnDTO(Column, DataClassJsonMixin):
         auto_increment: bool = False,
         default_value: Optional[Expression] = None,
     ) -> ColumnDTO:
-        Precondition.check_string_not_empty(
-            name, "Column name cannot be null or empty."
-        )
+        Precondition.check_argument(name is not None, "Column name cannot be null")
         Precondition.check_argument(
-            data_type is not None, "Column data type cannot be null."
+            data_type is not None, "Column data type cannot be null"
         )
         return ColumnDTO(
             _name=name,
