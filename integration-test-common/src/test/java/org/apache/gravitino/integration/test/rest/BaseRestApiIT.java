@@ -17,6 +17,8 @@
 
 package org.apache.gravitino.integration.test.rest;
 
+import static org.apache.gravitino.Configs.CATALOG_LOAD_ISOLATED;
+
 import java.util.HashMap;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -38,7 +40,13 @@ public class BaseRestApiIT extends BaseIT {
   public void startIntegrationTest() throws Exception {
     // Enable authorization
     customConfigs.putAll(
-        ImmutableMap.of("SimpleAuthUserName", USER, "gravitino.authorization.enable", "true"));
+        ImmutableMap.of(
+            "SimpleAuthUserName",
+            USER,
+            "gravitino.authorization.enable",
+            "true",
+            CATALOG_LOAD_ISOLATED.getKey(),
+            "false"));
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);
