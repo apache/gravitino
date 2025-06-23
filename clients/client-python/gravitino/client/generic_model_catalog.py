@@ -493,7 +493,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
         """
         raise NotImplementedError("Not supported yet")
 
-    def get_model_uri(
+    def get_model_version_uri(
         self, model_ident: NameIdentifier, version: int, uri_name: str = None
     ):
         """Get the URI of the model artifact with a specified version number.
@@ -505,14 +505,14 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         Raises:
             NoSuchModelVersionException: If the model version does not exist.
-            NoSuchUriNameException: If the uri name does not exist.
+            NoSuchModelVersionURINameException: If the uri name does not exist.
 
         Returns:
             The URI of the model version.
         """
         raise NotImplementedError("Not supported yet")
 
-    def get_model_uri_by_alias(
+    def get_model_version_uri_by_alias(
         self, model_ident: NameIdentifier, alias: str, uri_name: str = None
     ):
         """Get the URI of the model artifact with a specified version alias.
@@ -524,7 +524,7 @@ class GenericModelCatalog(BaseSchemaCatalog):
 
         Raises:
             NoSuchModelVersionException: If the model version does not exist.
-            NoSuchUriNameException: If the uri name does not exist.
+            NoSuchModelVersionURINameException: If the uri name does not exist.
 
         Returns:
             The URI of the model version.

@@ -85,7 +85,7 @@ class NoSuchModelVersionException(NotFoundException):
     """An exception thrown when a model version is not found."""
 
 
-class NoSuchUriNameException(NotFoundException):
+class NoSuchModelVersionURINameException(NotFoundException):
     """An exception thrown when a URI name of a model version is not found."""
 
 
