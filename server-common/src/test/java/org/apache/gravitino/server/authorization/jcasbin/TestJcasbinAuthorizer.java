@@ -51,10 +51,8 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
-import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -84,8 +82,6 @@ public class TestJcasbinAuthorizer {
 
   private static UserMetaService mockUserMetaService = mock(UserMetaService.class);
 
-  private static RoleMetaService roleMetaService = mock(RoleMetaService.class);
-
   private static EntityStore entityStore = mock(EntityStore.class);
 
   private static GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
@@ -103,9 +99,9 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic;
 
-  private static MockedStatic<RoleMetaService> roleMetaServiceMockedStatic;
-
   private static JcasbinAuthorizer jcasbinAuthorizer;
+
+  private static ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeAll
   public static void setup() throws IOException {
@@ -116,11 +112,9 @@ public class TestJcasbinAuthorizer {
     principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
     userMetaServiceMockedStatic = mockStatic(UserMetaService.class);
     metalakeMetaServiceMockedStatic = mockStatic(MetalakeMetaService.class);
-    roleMetaServiceMockedStatic = mockStatic(RoleMetaService.class);
     metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
-    roleMetaServiceMockedStatic.when(RoleMetaService::getInstance).thenReturn(roleMetaService);
     userMetaServiceMockedStatic.when(UserMetaService::getInstance).thenReturn(mockUserMetaService);
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
@@ -128,12 +122,6 @@ public class TestJcasbinAuthorizer {
     metadataIdConverterMockedStatic
         .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
         .thenReturn(CATALOG_ID);
-    roleMetaServiceMockedStatic
-        .when(() -> RoleMetaService.listSecurableObjectsByRoleId(eq(ALLOW_ROLE_ID)))
-        .thenReturn(ImmutableList.of(getAllowSecurableObjectPO()));
-    roleMetaServiceMockedStatic
-        .when(() -> RoleMetaService.listSecurableObjectsByRoleId(eq(DENY_ROLE_ID)))
-        .thenReturn(ImmutableList.of(getDenySecurableObjectPO()));
     when(gravitinoEnv.entityStore()).thenReturn(entityStore);
     when(entityStore.relationOperations()).thenReturn(supportsRelationOperations);
     BaseMetalake baseMetalake =
@@ -170,7 +158,8 @@ public class TestJcasbinAuthorizer {
   public void testAuthorize() throws IOException {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorize(currentPrincipal));
-    RoleEntity allowRole = getRoleEntity(ALLOW_ROLE_ID);
+    RoleEntity allowRole =
+        getRoleEntity(ALLOW_ROLE_ID, ImmutableList.of(getAllowSecurableObject()));
     NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
     // Mock adds roles to users.
     when(supportsRelationOperations.listEntitiesByRelation(
@@ -183,7 +172,7 @@ public class TestJcasbinAuthorizer {
     // When permissions are changed but handleRolePrivilegeChange is not executed, the system will
     // use the cached permissions in JCasbin, so authorize can succeed.
     Long newRoleId = -1L;
-    RoleEntity tempNewRole = getRoleEntity(newRoleId);
+    RoleEntity tempNewRole = getRoleEntity(newRoleId, ImmutableList.of());
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
@@ -201,7 +190,7 @@ public class TestJcasbinAuthorizer {
         .thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
     // Test deny
-    RoleEntity denyRole = getRoleEntity(DENY_ROLE_ID);
+    RoleEntity denyRole = getRoleEntity(DENY_ROLE_ID, ImmutableList.of(getDenySecurableObject()));
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
@@ -253,23 +242,22 @@ public class TestJcasbinAuthorizer {
         .build();
   }
 
-  private static RoleEntity getRoleEntity(Long roleId) {
+  private static RoleEntity getRoleEntity(Long roleId, List<SecurableObject> securableObjects) {
     Namespace namespace = NamespaceUtil.ofRole(METALAKE);
     return RoleEntity.builder()
         .withNamespace(namespace)
         .withId(roleId)
         .withName("roleName")
         .withAuditInfo(AuditInfo.EMPTY)
-        .withSecurableObjects(ImmutableList.of(getAllowSecurableObject()))
+        .withSecurableObjects(securableObjects)
         .build();
   }
 
   private static SecurableObjectPO getAllowSecurableObjectPO() {
     ImmutableList<Privilege.Name> privileges = ImmutableList.of(USE_CATALOG);
     List<String> privilegeNames = privileges.stream().map(Enum::name).collect(Collectors.toList());
-
     ImmutableList<String> conditions = ImmutableList.of("ALLOW");
-    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
+
     try {
       return SecurableObjectPO.builder()
           .withType(String.valueOf(MetadataObject.Type.CATALOG))
@@ -294,7 +282,6 @@ public class TestJcasbinAuthorizer {
   private static SecurableObjectPO getDenySecurableObjectPO() {
     ImmutableList<Privilege.Name> privileges = ImmutableList.of(USE_CATALOG);
     ImmutableList<String> conditions = ImmutableList.of("DENY");
-    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
     try {
       return SecurableObjectPO.builder()
           .withType(String.valueOf(MetadataObject.Type.CATALOG))
@@ -309,5 +296,10 @@ public class TestJcasbinAuthorizer {
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private static SecurableObject getDenySecurableObject() {
+    return POConverters.fromSecurableObjectPO(
+        "testCatalog2", getDenySecurableObjectPO(), MetadataObject.Type.CATALOG);
   }
 }
