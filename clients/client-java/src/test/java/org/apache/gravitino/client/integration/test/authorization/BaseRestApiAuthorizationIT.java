@@ -15,7 +15,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.integration.test.rest;
+package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.apache.gravitino.Configs.CATALOG_LOAD_ISOLATED;
 
@@ -25,7 +25,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
-public class BaseRestApiIT extends BaseIT {
+public class BaseRestApiAuthorizationIT extends BaseIT {
 
   protected static final String METALAKE = "testMetalake";
 

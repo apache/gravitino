@@ -15,59 +15,66 @@
  * under the License.
  */
 
-package org.apache.gravitino.integration.test.rest;
+package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
+@Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class CatalogIT extends BaseRestApiIT {
-
-  protected ContainerSuite containerSuite = ContainerSuite.getInstance();
+public class CatalogAuthorizationAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private String catalog1 = "catalog1";
 
   private String catalog2 = "catalog2";
 
+  private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
+
+  private static String hmsUri;
+
   @BeforeAll
   public void startIntegrationTest() throws Exception {
+    containerSuite.startHiveContainer();
     super.startIntegrationTest();
+    hmsUri =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
   }
 
   @Test
   @Order(1)
   public void testCreateCatalog() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("metastore.uris", hmsUri);
     assertThrows(
         "Can not access metadata.",
         RuntimeException.class,
         () -> {
           clientWithNoAuthorization
               .loadMetalake(METALAKE)
-              .createCatalog(
-                  catalog1,
-                  Catalog.Type.RELATIONAL,
-                  "test",
-                  "comment",
-                  ImmutableMap.of("key", "value"));
+              .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
         });
     client
         .loadMetalake(METALAKE)
-        .createCatalog(
-            catalog1, Catalog.Type.RELATIONAL, "test", "comment", ImmutableMap.of("key", "value"));
+        .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
     client
         .loadMetalake(METALAKE)
-        .createCatalog(
-            catalog2, Catalog.Type.RELATIONAL, "test", "comment", ImmutableMap.of("key", "value"));
+        .createCatalog(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
   }
 
   @Test
