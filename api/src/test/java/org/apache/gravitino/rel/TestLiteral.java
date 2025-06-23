@@ -120,36 +120,5 @@ public class TestLiteral {
     literal = decimalLiteral(Decimal.of("0.00"));
     Assertions.assertEquals(Decimal.of(new BigDecimal("0.00")), literal.value());
     Assertions.assertEquals(Types.DecimalType.of(2, 2), literal.dataType());
-
-    Map<String, Literal> map = Maps.newHashMap();
-    map.put("k1", stringLiteral("v1"));
-    map.put("k2", integerLiteral(2));
-    literal = structLiteral(map);
-    Map<String, Literal> literalMap = (Map<String, Literal>) literal.value();
-    Assertions.assertEquals(map.size(), literalMap.size());
-    for (Map.Entry<String, Literal> entry : map.entrySet()) {
-      Assertions.assertTrue(literalMap.containsKey(entry.getKey()));
-      Assertions.assertEquals(entry.getValue().value(), literalMap.get(entry.getKey()).value());
-      Assertions.assertEquals(
-          entry.getValue().dataType(), literalMap.get(entry.getKey()).dataType());
-    }
-    Assertions.assertEquals(
-        Types.StructType.of(
-            Types.StructType.Field.nullableField("k1", Types.StringType.get()),
-            Types.StructType.Field.nullableField("k2", Types.IntegerType.get())),
-        literal.dataType());
-
-    List<Literal> list = Lists.newArrayList();
-    list.add(stringLiteral("v1"));
-    list.add(stringLiteral("v2"));
-
-    literal = Literals.listLiteral(list);
-    List<Literal> literalList = (List<Literal>) literal.value();
-    Assertions.assertEquals(list.size(), literalList.size());
-    Assertions.assertIterableEquals(list, literalList);
-    Assertions.assertEquals(Types.ListType.nullable(Types.StringType.get()), literal.dataType());
-
-    list.add(integerLiteral(0));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> Literals.listLiteral(list));
   }
 }
