@@ -423,7 +423,7 @@ public class BaseIT {
     }
 
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "hadoop", "libs");
+    String hadoopLibDirs = ITUtils.joinPath(gravitinoHome, "catalogs", "fileset", "libs");
     copyBundleJarsToDirectory(bundleName, hadoopLibDirs);
   }
 

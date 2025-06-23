@@ -31,8 +31,8 @@ import org.apache.gravitino.annotation.Evolving;
  * <p>Managed catalog: A catalog and its subsidiary objects are all managed by Gravitino. Gravitino
  * takes care of the lifecycle of the catalog and its objects. For those catalogs, Gravitino uses
  * the type of the catalog as the provider short name. Note that for each catalog type, there is
- * only one implementation of managed catalog for that type. Currently, Gravitino only has model
- * catalog that is a managed catalog.
+ * only one implementation of managed catalog for that type. Currently, Gravitino has model and
+ * fileset catalogs that are managed catalogs.
  *
  * <p>External catalog: A catalog its subsidiary objects are stored by an external sources, such as
  * Hive catalog, the DB and tables are stored in HMS. For those catalogs, Gravitino uses a unique
