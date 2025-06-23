@@ -1915,8 +1915,6 @@ public class CatalogOceanBaseIT extends BaseIT {
     for (Column column : timeColumns) {
       switch (column.name()) {
         case "time_col":
-          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
-          break;
         case "time_col_0":
           Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
           break;
@@ -1944,8 +1942,6 @@ public class CatalogOceanBaseIT extends BaseIT {
     for (Column column : timestampColumns) {
       switch (column.name()) {
         case "timestamp_col":
-          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
-          break;
         case "timestamp_col_0":
           Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
           break;

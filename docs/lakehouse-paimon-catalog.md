@@ -172,9 +172,9 @@ Paimon Table primary key constraint should not be same with partition fields, th
 | `VarChar`         | `VarChar`                    |
 | `FixedChar`       | `Char`                       |
 | `Date`            | `Date`                       |
-| `Time[p]`         | `Time[p]`                    |
-| `Timestamp[p]`    | `LocalZonedTimestamp[p]`     |
-| `Timestamp_tz[p]` | `Timestamp[p]`               |
+| `Time(p)`         | `Time(p)`                    |
+| `Timestamp(p)`    | `LocalZonedTimestamp(p)`     |
+| `Timestamp_tz(p)` | `Timestamp(p)`               |
 | `Fixed`           | `Binary`                     |
 | `Binary`          | `VarBinary`                  |
 

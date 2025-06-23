@@ -663,10 +663,10 @@ public class CatalogMysqlIT extends BaseIT {
             + "  time_col_3 time(3),\n"
             + "  time_col_6 time(6),\n"
             + "  timestamp_col timestamp,\n"
-            + "  timestamp_col_0 timestamp(0),\n"
-            + "  timestamp_col_1 timestamp(1),\n"
-            + "  timestamp_col_3 timestamp(3),\n"
-            + "  timestamp_col_6 timestamp(6),\n"
+            + "  timestamp_col_0 timestamp(0) default current_timestamp,\n"
+            + "  timestamp_col_1 timestamp(1) default current_timestamp(1),\n"
+            + "  timestamp_col_3 timestamp(3) default '2012-12-31 11:30:45.123',\n"
+            + "  timestamp_col_6 timestamp(6) default '2012-12-31 11:30:45.123456',\n"
             + "  datetime_col datetime,\n"
             + "  datetime_col_0 datetime(0),\n"
             + "  datetime_col_1 datetime(1),\n"
@@ -2153,16 +2153,19 @@ public class CatalogMysqlIT extends BaseIT {
             + " (\n"
             + "  time_no_precision time,\n"
             + "  time_precision_0 time(0),\n"
+            + "  time_precision_1 time(1),\n"
             + "  time_precision_3 time(3),\n"
             + "  time_precision_6 time(6),\n"
             + "  datetime_no_precision datetime,\n"
             + "  datetime_precision_0 datetime(0),\n"
+            + "  datetime_precision_1 datetime(1),\n"
             + "  datetime_precision_3 datetime(3),\n"
             + "  datetime_precision_6 datetime(6),\n"
             + "  timestamp_no_precision timestamp,\n"
-            + "  timestamp_precision_0 timestamp(0),\n"
-            + "  timestamp_precision_3 timestamp(3),\n"
-            + "  timestamp_precision_6 timestamp(6)\n"
+            + "  timestamp_precision_0 timestamp(0) default current_timestamp,\n"
+            + "  timestamp_precision_1 timestamp(1) default current_timestamp(1),\n"
+            + "  timestamp_precision_3 timestamp(3) default '2012-12-31 11:30:45.123',\n"
+            + "  timestamp_precision_6 timestamp(6) default '2012-12-31 11:30:45.123456'\n"
             + ");\n";
 
     mysqlService.executeQuery(sql);
@@ -2173,10 +2176,11 @@ public class CatalogMysqlIT extends BaseIT {
     for (Column column : loadedTable.columns()) {
       switch (column.name()) {
         case "time_no_precision":
-          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
-          break;
         case "time_precision_0":
           Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
+          break;
+        case "time_precision_1":
+          Assertions.assertEquals(Types.TimeType.of(1), column.dataType());
           break;
         case "time_precision_3":
           Assertions.assertEquals(Types.TimeType.of(3), column.dataType());
@@ -2185,10 +2189,11 @@ public class CatalogMysqlIT extends BaseIT {
           Assertions.assertEquals(Types.TimeType.of(6), column.dataType());
           break;
         case "datetime_no_precision":
-          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
-          break;
         case "datetime_precision_0":
           Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_precision_1":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(1), column.dataType());
           break;
         case "datetime_precision_3":
           Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
@@ -2197,10 +2202,11 @@ public class CatalogMysqlIT extends BaseIT {
           Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
           break;
         case "timestamp_no_precision":
-          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
-          break;
         case "timestamp_precision_0":
           Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
+          break;
+        case "timestamp_precision_1":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(1), column.dataType());
           break;
         case "timestamp_precision_3":
           Assertions.assertEquals(Types.TimestampType.withTimeZone(3), column.dataType());
