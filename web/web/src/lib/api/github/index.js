@@ -19,7 +19,7 @@
 
 import { defHttp } from '@/lib/utils/axios'
 
-const githubApis = {
+export const githubApis = {
   GET: 'https://api.github.com/repos/apache/gravitino'
 }
 

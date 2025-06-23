@@ -38,23 +38,8 @@ import { AxiosCanceler } from './axiosCancel'
 import { NextAxios } from './Axios'
 import { checkStatus } from './checkStatus'
 import { useAuth as Auth } from '../../provider/session'
-
-let isRefreshing = false
-
-const refreshToken = async () => {
-  const url = localStorage.getItem('oauthUrl')
-  const params = localStorage.getItem('authParams')
-
-  const res = await defHttp.post({ url: `${url}?${qs.stringify(JSON.parse(params))}` }, { withToken: false })
-
-  return res
-}
-
-const resetToLoginState = () => {
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('authParams')
-  window.location.href = '/login'
-}
+import { githubApis } from '@/lib/api/github'
+import { isProdEnv } from '@/lib/utils'
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -246,37 +231,14 @@ const transform = {
 
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
-    if (response?.status === 401 && !originConfig._retry) {
-      // Log out directly if idle for more than 30 minutes
-      const isIdle = localStorage.getItem('isIdle') && JSON.parse(localStorage.getItem('isIdle'))
-      if (isIdle) {
-        console.error('User is idle')
-        resetToLoginState()
-      }
+    if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('authParams')
 
-      originConfig._retry = true
-
-      if (!isRefreshing) {
-        isRefreshing = true
-
-        try {
-          refreshToken()
-            .then(res => {
-              const { access_token } = res
-              localStorage.setItem('accessToken', access_token)
-
-              return defHttp.request(originConfig)
-            })
-            .catch(err => {
-              console.error('refreshToken error =>', err)
-              resetToLoginState()
-            })
-        } catch (err) {
-          console.error(err)
-        } finally {
-          isRefreshing = false
-          location.reload()
-        }
+      if (isProdEnv) {
+        window.location.href = '/ui/login'
+      } else {
+        window.location.href = '/login'
       }
     }
 
