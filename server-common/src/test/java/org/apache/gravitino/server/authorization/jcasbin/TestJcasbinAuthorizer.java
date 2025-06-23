@@ -215,7 +215,8 @@ public class TestJcasbinAuthorizer {
             eq(catalogIdent),
             eq(Entity.EntityType.CATALOG)))
         .thenReturn(new ArrayList<>());
-    jcasbinAuthorizer.handleMetadataOwnerChange(catalogIdent);
+    jcasbinAuthorizer.handleMetadataOwnerChange(
+        METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(currentPrincipal));
   }
 

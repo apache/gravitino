@@ -25,7 +25,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.IOUtils;
@@ -65,9 +64,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Set<Long> loadedRoles = ConcurrentHashMap.newKeySet();
 
-  private static final Map<NameIdentifier, List<String>> ownerPolicyCache =
-      new ConcurrentHashMap<>();
-
   @Override
   public void initialize() {
     try (InputStream modelStream =
@@ -100,6 +96,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleRolePrivilegeChange(Long roleId) {
     loadedRoles.remove(roleId);
     enforcer.deleteRole(String.valueOf(roleId));
+  }
+
+  @Override
+  public void handleMetadataOwnerChange(
+      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
+    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
+    Long metadataId = null;
+    try {
+      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+    ImmutableList<String> policy =
+        ImmutableList.of(
+            String.valueOf(oldOwnerId),
+            String.valueOf(metadataObject.type()),
+            String.valueOf(metadataId),
+            AuthConstants.OWNER,
+            "allow");
+    enforcer.removePolicy(policy);
   }
 
   @Override
@@ -203,18 +219,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   AuthConstants.OWNER,
                   "allow");
           enforcer.addPolicy(policy);
-          ownerPolicyCache.put(entityIdent, policy);
         }
       }
     } catch (Exception e) {
       LOG.warn("Can not load metadata owner", e);
     }
-  }
-
-  @Override
-  public void handleMetadataOwnerChange(NameIdentifier nameIdentifier) {
-    enforcer.removePolicy(ownerPolicyCache.get(nameIdentifier));
-    ownerPolicyCache.remove(nameIdentifier);
   }
 
   private void loadPolicyByRoleId(RoleEntity roleEntity) {
