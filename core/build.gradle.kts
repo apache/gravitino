@@ -1,3 +1,5 @@
+import net.ltgt.gradle.errorprone.errorprone
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,11 +18,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import net.ltgt.gradle.errorprone.errorprone
 plugins {
   `maven-publish`
   id("java")
   id("idea")
+  alias(libs.plugins.jcstress)
 }
 
 dependencies {
@@ -61,6 +63,8 @@ dependencies {
   testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+
+  jcstressImplementation(libs.mockito.core)
 }
 
 tasks.test {
@@ -73,7 +77,19 @@ tasks.test {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-  if (name.contains("test", ignoreCase = true)) {
+  if (name.contains("jcstress", ignoreCase = true)) {
     options.errorprone?.excludedPaths?.set(".*/generated/.*")
   }
+}
+
+jcstress {
+  /*
+   Available modes:
+   - sanity : takes seconds
+   - quick : takes tens of seconds
+   - default : takes minutes, good number of iterations
+   - tough : takes tens of minutes, large number of iterations, most reliable
+    */
+  mode = "default"
+  jvmArgsPrepend = "-Djdk.stdout.sync=true"
 }
