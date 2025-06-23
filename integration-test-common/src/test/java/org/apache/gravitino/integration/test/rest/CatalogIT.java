@@ -22,25 +22,18 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableMap;
-import java.nio.file.Path;
-import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.io.TempDir;
 
-@Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class CatalogIT extends BaseRestApiIT {
 
   protected ContainerSuite containerSuite = ContainerSuite.getInstance();
-
-  @TempDir private static Path warehouseDir;
 
   private String catalog1 = "catalog1";
 
@@ -70,19 +63,11 @@ public class CatalogIT extends BaseRestApiIT {
     client
         .loadMetalake(METALAKE)
         .createCatalog(
-            catalog1,
-            Catalog.Type.RELATIONAL,
-            "lakehouse-paimon",
-            "",
-            getCatalogProperties(catalog1));
+            catalog1, Catalog.Type.RELATIONAL, "test", "comment", ImmutableMap.of("key", "value"));
     client
         .loadMetalake(METALAKE)
         .createCatalog(
-            catalog2,
-            Catalog.Type.RELATIONAL,
-            "lakehouse-paimon",
-            "",
-            getCatalogProperties(catalog2));
+            catalog2, Catalog.Type.RELATIONAL, "test", "comment", ImmutableMap.of("key", "value"));
   }
 
   @Test
@@ -114,10 +99,5 @@ public class CatalogIT extends BaseRestApiIT {
     client.loadMetalake(METALAKE).dropCatalog(catalog2, true);
     catalogs = client.loadMetalake(METALAKE).listCatalogs();
     assertEquals(0, catalogs.length);
-  }
-
-  private static Map<String, String> getCatalogProperties(String catalog) {
-    return ImmutableMap.of(
-        "warehouse", warehouseDir + "/" + catalog, "catalog-backend", "filesystem");
   }
 }
