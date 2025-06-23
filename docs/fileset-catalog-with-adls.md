@@ -26,7 +26,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ### Configuration for a ADLS Fileset catalog
 
-Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
+Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
 
 | Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Default value   | Required | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
@@ -39,11 +39,11 @@ Apart from configurations mentioned in [fileset-catalog-catalog-configuration](.
 
 ### Configurations for a schema
 
-Refer to [Schema configurations](./fileset-catalog#schema-properties) for more details.
+Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
 ### Configurations for a fileset
 
-Refer to [Fileset configurations](./fileset-catalog#fileset-properties) for more details.
+Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
 ## Example of creating Fileset catalog with ADLS
 

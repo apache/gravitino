@@ -26,7 +26,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ### Configurations for S3 Fileset Catalog
 
-In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog#catalog-properties), the following properties are necessary to configure a Fileset catalog with S3:
+In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are necessary to configure a Fileset catalog with S3:
 
 | Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
 |--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
@@ -39,12 +39,11 @@ In addition to the basic configurations mentioned in [Fileset-catalog-catalog-co
 
 ### Configurations for a schema
 
-To learn how to create a schema, refer to [Schema configurations](./fileset-catalog#schema-properties).
+To learn how to create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
 
 ### Configurations for a fileset
 
-For more details on creating a fileset, Refer to [Fileset configurations](./fileset-catalog#fileset-properties).
-
+For more details on creating a fileset, Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties).
 
 ## Using the Fileset catalog with S3
 

@@ -16,9 +16,9 @@ filesets to manage non-tabular data like training datasets and other raw data.
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
 tabular data in Gravitino in a unified way. The following operations will use HDFS as an example, for other
-HCFS like S3, OSS, GCS, etc., please refer to the corresponding operations [fileset-with-s3](./fileset-catalog-with-s3),
-[fileset-with-oss](./fileset-catalog-with-oss), [fileset-with-gcs](./fileset-catalog-with-gcs) and 
-[fileset-with-adls](./fileset-catalog-with-adls).
+HCFS like S3, OSS, GCS, etc., please refer to the corresponding operations [fileset-with-s3](./fileset-catalog-with-s3.md),
+[fileset-with-oss](./fileset-catalog-with-oss.md), [fileset-with-gcs](./fileset-catalog-with-gcs.md) and
+[fileset-with-adls](./fileset-catalog-with-adls.md).
 
 After a fileset is created, users can easily access, manage the files/directories through
 the fileset's identifier, without needing to know the physical path of the managed dataset. Also, with
@@ -97,9 +97,9 @@ catalog = gravitino_client.create_catalog(name="catalog",
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                 |
-|---------------------|------------------------------------------------------------------|
-| `fileset` or `None` | [Fileset catalog property](./fileset-catalog#catalog-properties) |
+| Catalog provider    | Catalog property                                                    |
+|---------------------|---------------------------------------------------------------------|
+| `fileset` or `None` | [Fileset catalog property](./fileset-catalog.md#catalog-properties) |
 
 ### Load a catalog
 
@@ -202,9 +202,9 @@ catalog.as_schemas().create_schema(name="schema",
 
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider | Schema property                                                |
-|-----------|----------------------------------------------------------------|
-| `fileset` | [Fileset schema property](./fileset-catalog#schema-properties) |
+| Catalog provider | Schema property                                                   |
+|------------------|-------------------------------------------------------------------|
+| `fileset`        | [Fileset schema property](./fileset-catalog.md#schema-properties) |
 
 ### Load a schema
 

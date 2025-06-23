@@ -26,7 +26,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ### Configuration for an OSS Fileset catalog
 
-In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
+In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
 
 | Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Default value   | Required | Since version    |
 |--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
@@ -40,11 +40,11 @@ In addition to the basic configurations mentioned in [Fileset-catalog-catalog-co
 
 ### Configurations for a schema
 
-To create a schema, refer to [Schema configurations](./fileset-catalog#schema-properties).
+To create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
 
 ### Configurations for a fileset
 
-For instructions on how to create a fileset, refer to [Fileset configurations](./fileset-catalog#fileset-properties) for more details.
+For instructions on how to create a fileset, refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
 ## Example of creating Fileset catalog/schema/fileset with OSS
 

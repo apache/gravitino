@@ -17,7 +17,7 @@ The rest of this document will use HDFS or local file as an example to illustrat
 For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS, 
 please refer to the corresponding document for more details.
 
-Note that Gravitino uses Hadoop 3 dependencies to build Filesest catalog. Theoretically, it should be
+Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
 Hadoop 3. If there's any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
 

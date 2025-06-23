@@ -73,10 +73,14 @@ the path mapping and convert automatically.
 | `fs.gravitino.enableCredentialVending`                | Whether to enable credential vending for the Gravitino Virtual File System.                                                                                                                                                                                                                                          | `false`                                                        | No                                  | 0.9.0-incubating |
 
 Apart from the above properties, to access fileset like S3, GCS, OSS and custom fileset, extra properties are needed, please see 
-[S3 GVFS Java client configurations](./fileset-catalog-with-s3#using-the-gvfs-java-client-to-access-the-fileset), [GCS GVFS Java client configurations](./fileset-catalog-with-gcs#using-the-gvfs-java-client-to-access-the-fileset), [OSS GVFS Java client configurations](./fileset-catalog-with-oss#using-the-gvfs-java-client-to-access-the-fileset) and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls#using-the-gvfs-java-client-to-access-the-fileset) for more details.
+[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#using-the-gvfs-java-client-to-access-the-fileset),
+[GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#using-the-gvfs-java-client-to-access-the-fileset),
+[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#using-the-gvfs-java-client-to-access-the-fileset)
+and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#using-the-gvfs-java-client-to-access-the-fileset) for more details.
 
 #### Custom fileset 
-Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding properties, for more, please refer to [Custom Fileset](./fileset-catalog#how-to-custom-your-own-hcfs-file-system-fileset).
+Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding
+properties, for more, please refer to [Custom Fileset](./fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
 | Configuration item             | Description                                                                                             | Default value | Required | Since version    |
@@ -386,10 +390,13 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 
 #### Configurations for S3, GCS, OSS and Azure Blob storage fileset
 
-Please see the cloud-storage-specific configurations [GCS GVFS Java client configurations](./fileset-catalog-with-gcs#using-the-gvfs-python-client-to-access-a-fileset), [S3 GVFS Java client configurations](./fileset-catalog-with-s3#using-the-gvfs-python-client-to-access-a-fileset), [OSS GVFS Java client configurations](./fileset-catalog-with-oss#using-the-gvfs-python-client-to-access-a-fileset) and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls#using-the-gvfs-python-client-to-access-a-fileset) for more details.
+Please see the cloud-storage-specific configurations [GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#using-the-gvfs-python-client-to-access-a-fileset),
+[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#using-the-gvfs-python-client-to-access-a-fileset),
+[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#using-the-gvfs-python-client-to-access-a-fileset)
+and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#using-the-gvfs-python-client-to-access-a-fileset) for more details.
 
 :::note
-Gravitino python client does not support [customized file systems](fileset-catalog#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library. 
+Gravitino python client does not support [customized file systems](fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
 :::
 
 ### Usage examples
