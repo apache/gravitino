@@ -55,7 +55,6 @@ dependencies {
     exclude("org.elasticsearch.plugin")
     exclude("org.apache.hadoop", "hadoop-common")
   }
-  testImplementation(project(":catalogs:catalog-common"))
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
   testImplementation(platform("org.junit:junit-bom:5.9.1"))
