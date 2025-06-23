@@ -22,7 +22,7 @@
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Roboto } from 'next/font/google'
-
+import { useEffect } from 'react'
 import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
 
 import clsx from 'clsx'
@@ -30,8 +30,8 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
-import { useAppDispatch } from '@/lib/hooks/useStore'
-import { loginAction } from '@/lib/store/auth'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { loginAction, setIntervalIdAction, clearIntervalId } from '@/lib/store/auth'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
@@ -52,6 +52,7 @@ const schema = yup.object().shape({
 const LoginPage = () => {
   const router = useRouter()
   const dispatch = useAppDispatch()
+  const store = useAppSelector(state => state.auth)
 
   const {
     control,
@@ -64,8 +65,15 @@ const LoginPage = () => {
     resolver: yupResolver(schema)
   })
 
+  useEffect(() => {
+    if (store.intervalId) {
+      clearIntervalId()
+    }
+  }, [store.intervalId])
+
   const onSubmit = async data => {
-    dispatch(loginAction({ params: data, router }))
+    await dispatch(loginAction({ params: data, router }))
+    await dispatch(setIntervalIdAction())
 
     reset({ ...data })
   }
