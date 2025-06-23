@@ -41,8 +41,6 @@ dependencies {
   testImplementation(libs.commons.io)
   testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
-  testImplementation(libs.mysql.driver)
-  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
