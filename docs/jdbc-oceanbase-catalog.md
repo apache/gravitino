@@ -102,9 +102,9 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `Double`          | `Double`            |
 | `String`          | `Text`              |
 | `Date`            | `Date`              |
-| `Time[p]`         | `Time[p]`           |
-| `Timestamp_tz[p]` | `Timestamp[p]`      |
-| `Timestamp[p]`    | `Datetime[p]`       |
+| `Time(p)`         | `Time(p)`           |
+| `Timestamp_tz(p)` | `Timestamp(p)`      |
+| `Timestamp(p)`    | `Datetime(p)`       |
 | `Decimal`         | `Decimal`           |
 | `VarChar`         | `VarChar`           |
 | `FixedChar`       | `FixedChar`         |

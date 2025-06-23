@@ -97,7 +97,7 @@ Please refer to
 | `Double`       | `Double`      |
 | `Decimal`      | `Decimal`     |
 | `Date`         | `Date`        |
-| `Timestamp[p]` | `Datetime[p]` |
+| `Timestamp(p)` | `Datetime(p)` |
 | `VarChar`      | `VarChar`     |
 | `FixedChar`    | `Char`        |
 | `String`       | `String`      |

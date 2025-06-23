@@ -100,9 +100,9 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 | `Double`          | `Float8`         |
 | `String`          | `Text`           |
 | `Date`            | `Date`           |
-| `Time[p]`         | `Time[p]`        |
-| `Timestamp[p]`    | `Timestamp[p]`   |
-| `Timestamp_tz[p]` | `Timestamptz[p]` |
+| `Time(p)`         | `Time(p)`        |
+| `Timestamp(p)`    | `Timestamp(p)`   |
+| `Timestamp_tz(p)` | `Timestamptz(p)` |
 | `Decimal`         | `Numeric`        |
 | `VarChar`         | `Varchar`        |
 | `FixedChar`       | `Bpchar`         |
