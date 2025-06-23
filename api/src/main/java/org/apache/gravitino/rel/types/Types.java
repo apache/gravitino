@@ -393,6 +393,11 @@ public class Types {
     public int hashCode() {
       return precision;
     }
+
+    @Override
+    public String toString() {
+      return "TimeType{" + "precision=" + precision + '}';
+    }
   }
 
   /** The timestamp type in Gravitino. */
@@ -491,6 +496,11 @@ public class Types {
     @Override
     public int hashCode() {
       return Objects.hash(withTimeZone, precision);
+    }
+
+    @Override
+    public String toString() {
+      return "TimestampType{" + "withTimeZone=" + withTimeZone + ", precision=" + precision + '}';
     }
   }
 
