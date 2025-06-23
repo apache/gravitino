@@ -1214,11 +1214,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private CatalogEntity convertFilesetCatalogEntity(CatalogEntity entity) {
     if (entity.getType() != FILESET) {
       return entity;
-    } else if (!entity.getProvider().equalsIgnoreCase("hadoop")) {
-      // If the provider is not "hadoop", we can return the entity as is.
-      return entity;
-    } else {
-      // If the provider is not "fileset", we need to convert it to a fileset catalog entity.
+    }
+
+    if ("hadoop".equalsIgnoreCase(entity.getProvider())) {
+      // If the provider is "hadoop", we need to convert it to a fileset catalog entity.
       // This is a special case to maintain compatibility.
       return CatalogEntity.builder()
           .withId(entity.id())
@@ -1237,5 +1236,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   .build())
           .build();
     }
+
+    // If the provider is not "hadoop", we assume it is already a fileset catalog entity.
+    return entity;
   }
 }
