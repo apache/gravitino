@@ -176,7 +176,7 @@ public class TestJcasbinAuthorizer {
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
-            eq(Entity.EntityType.ROLE)))
+            eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
     // Test role cache.
@@ -187,7 +187,7 @@ public class TestJcasbinAuthorizer {
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
-            eq(Entity.EntityType.ROLE)))
+            eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(tempNewRole));
     assertTrue(doAuthorize(currentPrincipal));
     // After clearing the cache, authorize will fail
@@ -197,7 +197,7 @@ public class TestJcasbinAuthorizer {
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
-            eq(Entity.EntityType.ROLE)))
+            eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
     // Test deny
@@ -205,7 +205,7 @@ public class TestJcasbinAuthorizer {
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
-            eq(Entity.EntityType.ROLE)))
+            eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(allowRole, denyRole));
     assertFalse(doAuthorize(currentPrincipal));
   }
