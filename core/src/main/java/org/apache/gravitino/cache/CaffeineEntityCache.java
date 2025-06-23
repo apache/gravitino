@@ -25,6 +25,7 @@ import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
@@ -33,6 +34,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -285,13 +287,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
-      List<Entity> merged = new ArrayList<>(existingEntities);
+      Set<Entity> merged = Sets.newLinkedHashSet(existingEntities);
       merged.addAll(newEntities);
-
-      cacheData.put(key, merged);
-    } else {
-      cacheData.put(key, newEntities);
+      newEntities = new ArrayList<>(merged);
     }
+
+    cacheData.put(key, newEntities);
 
     if (cacheData.policy().getIfPresentQuietly(key) != null) {
       cacheIndex.put(key.toString(), key);
