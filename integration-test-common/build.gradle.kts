@@ -41,6 +41,7 @@ dependencies {
   testImplementation(libs.commons.io)
   testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
@@ -57,6 +58,7 @@ dependencies {
   }
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
+
   testImplementation(platform("org.junit:junit-bom:5.9.1"))
   testImplementation("org.junit.jupiter:junit-jupiter")
 }
