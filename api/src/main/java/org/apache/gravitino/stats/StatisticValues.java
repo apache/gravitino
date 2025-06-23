@@ -167,44 +167,50 @@ public class StatisticValues {
 
   /** A statistic value that holds a List of other statistic values. */
   public static class ListValue implements StatisticValue<List<StatisticValue>> {
-    private final List<StatisticValue> values;
+    private final List<StatisticValue> valueList;
 
-    private ListValue(List<StatisticValue> values) {
+    private ListValue(List<StatisticValue> valueList) {
       Preconditions.checkArgument(
-          values != null && values.isEmpty(), "Values cannot be null or empty");
-      this.values = values;
+          valueList != null && !valueList.isEmpty(), "Values cannot be null or empty");
+
+      Type dataType = valueList.get(0).dataType();
+      Preconditions.checkArgument(
+          valueList.stream().allMatch(value -> value.dataType().equals(dataType)),
+          "All values in the list must have the same data type");
+
+      this.valueList = valueList;
     }
 
     @Override
     public List<StatisticValue> value() {
-      return values;
+      return valueList;
     }
 
     @Override
     public Type dataType() {
-      return Types.ListType.notNull(values.get(0).dataType());
+      return Types.ListType.nullable(valueList.get(0).dataType());
     }
   }
 
   /** A statistic value that holds a Map of String keys to other statistic values. */
   public static class ObjectValue implements StatisticValue<Map<String, StatisticValue>> {
-    private final Map<String, StatisticValue> values;
+    private final Map<String, StatisticValue> valueMap;
 
-    private ObjectValue(Map<String, StatisticValue> values) {
+    private ObjectValue(Map<String, StatisticValue> valueMap) {
       Preconditions.checkArgument(
-          values != null && !values.isEmpty(), "Values cannot be null or empty");
-      this.values = values;
+          valueMap != null && !valueMap.isEmpty(), "Values cannot be null or empty");
+      this.valueMap = valueMap;
     }
 
     @Override
     public Map<String, StatisticValue> value() {
-      return values;
+      return valueMap;
     }
 
     @Override
     public Type dataType() {
       return Types.StructType.of(
-          values.entrySet().stream()
+          valueMap.entrySet().stream()
               .map(
                   entry ->
                       Types.StructType.Field.nullableField(

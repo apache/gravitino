@@ -28,7 +28,6 @@ import static org.apache.gravitino.rel.expressions.literals.Literals.integerLite
 import static org.apache.gravitino.rel.expressions.literals.Literals.longLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.shortLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.stringLiteral;
-import static org.apache.gravitino.rel.expressions.literals.Literals.structLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.timeLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.timestampLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedByteLiteral;
@@ -36,14 +35,10 @@ import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedInt
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedLongLiteral;
 import static org.apache.gravitino.rel.expressions.literals.Literals.unsignedShortLiteral;
 
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
