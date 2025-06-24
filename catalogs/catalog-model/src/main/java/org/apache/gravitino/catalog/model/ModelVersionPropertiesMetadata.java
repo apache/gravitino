@@ -25,14 +25,14 @@ import java.util.Map;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
-public class ModelPropertiesMetadata extends BasePropertiesMetadata {
-  private static final Map<String, PropertyEntry<?>> MODEL_PROPERTY_ENTRIES =
+public class ModelVersionPropertiesMetadata extends BasePropertiesMetadata {
+  private static final Map<String, PropertyEntry<?>> MODEL_VERSION_PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
               PROPERTY_DEFAULT_URI_NAME,
               PropertyEntry.stringOptionalPropertyEntry(
                   PROPERTY_DEFAULT_URI_NAME,
-                  "The default URI name for the versions of the model",
+                  "The default URI name for the model version",
                   false /* immutable */,
                   null,
                   false /* hidden */))
@@ -40,6 +40,6 @@ public class ModelPropertiesMetadata extends BasePropertiesMetadata {
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return MODEL_PROPERTY_ENTRIES;
+    return MODEL_VERSION_PROPERTY_ENTRIES;
   }
 }
