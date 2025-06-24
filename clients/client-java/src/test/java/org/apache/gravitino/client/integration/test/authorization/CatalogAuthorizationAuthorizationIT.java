@@ -22,12 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.Maps;
-import java.io.File;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -63,10 +61,6 @@ public class CatalogAuthorizationAuthorizationIT extends BaseRestApiAuthorizatio
   public void testCreateCatalog() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Assertions.assertNotNull(gravitinoHome);
-    String packagePath = String.join(File.separator, gravitinoHome, "catalogs", "hive");
-    properties.put("package", packagePath);
     assertThrows(
         "Can not access metadata.",
         RuntimeException.class,
