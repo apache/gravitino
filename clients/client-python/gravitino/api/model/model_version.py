@@ -77,7 +77,7 @@ class ModelVersion(Auditable):
         Returns:
             The URI of the model artifact.
         """
-        return self.uris().get()
+        return self.uris().get(self.URI_NAME_UNKNOWN)
 
     @abstractmethod
     def uris(self) -> Dict[str, str]:

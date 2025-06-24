@@ -36,7 +36,7 @@ public class ModelPropertiesMetadata extends BasePropertiesMetadata {
                   false /* immutable */,
                   null,
                   false /* hidden */))
-          .build();;
+          .build();
 
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
