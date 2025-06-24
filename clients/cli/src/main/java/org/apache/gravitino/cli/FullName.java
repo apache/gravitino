@@ -28,7 +28,7 @@ import org.apache.commons.cli.CommandLine;
 public class FullName {
   private final CommandLine line;
   private String metalakeEnv;
-  private boolean matalakeSet = false;
+  private boolean metalakeSet = false;
   private boolean hasDisplayedMissingNameInfo = true;
   private boolean hasDisplayedMalformedInfo = true;
 
@@ -70,9 +70,9 @@ public class FullName {
     }
 
     // Cache the metalake environment variable
-    if (metalakeEnv == null && !matalakeSet) {
+    if (metalakeEnv == null && !metalakeSet) {
       metalakeEnv = System.getenv("GRAVITINO_METALAKE");
-      matalakeSet = true;
+      metalakeSet = true;
     }
 
     // Check if the metalake name is set as an environment variable

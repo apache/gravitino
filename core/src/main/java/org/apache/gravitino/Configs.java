@@ -389,4 +389,13 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(true);
+
+  // Provider name for cache
+  public static final ConfigEntry<String> CACHE_IMPLEMENTATION =
+      new ConfigBuilder("gravitino.cache.implementation")
+          .doc("Which cache implementation to use")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault("caffeine");
 }

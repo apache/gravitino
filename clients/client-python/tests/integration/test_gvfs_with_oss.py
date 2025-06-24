@@ -51,7 +51,7 @@ def oss_is_configured():
 @unittest.skipUnless(oss_is_configured(), "OSS is not configured.")
 class TestGvfsWithOSS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure aliyun-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     oss_access_key = os.environ.get("OSS_ACCESS_KEY_ID")
     oss_secret_key = os.environ.get("OSS_SECRET_ACCESS_KEY")
     oss_endpoint = os.environ.get("OSS_ENDPOINT")
@@ -73,7 +73,9 @@ class TestGvfsWithOSS(TestGvfsWithHDFS):
     def setUpClass(cls):
         cls._get_gravitino_home()
 
-        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        cls.hadoop_conf_path = (
+            f"{cls.gravitino_home}/catalogs/fileset/conf/fileset.conf"
+        )
         # restart the server
         cls.restart_server()
         # create entity
