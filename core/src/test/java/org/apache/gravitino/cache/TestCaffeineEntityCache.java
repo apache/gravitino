@@ -781,6 +781,7 @@ public class TestCaffeineEntityCache {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   void testExpireByTime() {
     long expireTime = 1_000L;
 
