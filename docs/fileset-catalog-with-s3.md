@@ -1,58 +1,57 @@
 ---
-title: "Hadoop catalog with S3"
-slug: /hadoop-catalog-with-s3
+title: "Fileset catalog with S3"
+slug: /fileset-catalog-with-s3
 date: 2025-01-03
-keyword: Hadoop catalog S3
+keyword: Fileset catalog S3
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document explains how to configure a Hadoop catalog with S3 in Gravitino.
+This document explains how to configure a Fileset catalog with S3 in Gravitino.
 
 ## Prerequisites
 
-To create a Hadoop catalog with S3, follow these steps:
+To create a Fileset catalog with S3, follow these steps:
 
 1. Download the [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) file.
-2. Place this file in the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+2. Place this file in the Gravitino Fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
 3. Start the Gravitino server using the following command:
 
 ```bash
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Hadoop catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Fileset catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
-## Configurations for creating a Hadoop catalog with S3
+## Configurations for creating a Fileset catalog with S3
 
-### Configurations for S3 Hadoop Catalog
+### Configurations for S3 Fileset Catalog
 
-In addition to the basic configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are necessary to configure a Hadoop catalog with S3:
+In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are necessary to configure a Fileset catalog with S3:
 
-| Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
-|--------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`         | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                                                                                                                                                                        | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider`  | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location.                                                                                                                                                                   | `builtin-local` | No       | 0.7.0-incubating |
-| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.7.0-incubating |
-| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
-| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
+| Configuration item             | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Default value   | Required | Since version    |
+|--------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
+| `filesystem-providers`         | The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                                                                                                                                                                                                                                                                                        | (none)          | Yes      | 0.7.0-incubating |
+| `default-filesystem-provider`  | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location.                                                                                                                                                                                                                                                                                  | `builtin-local` | No       | 0.7.0-incubating |
+| `s3-endpoint`                  | The endpoint of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.7.0-incubating |
+| `s3-access-key-id`             | The access key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
+| `s3-secret-access-key`         | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | (none)          | Yes      | 0.7.0-incubating |
 | `credential-providers`         | The credential provider types, separated by comma, possible value can be `s3-token`, `s3-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access S3 by GVFS. Once it's set, more configuration items are needed to make it works, please see [s3-credential-vending](security/credential-vending.md#s3-credentials) | (none)          | No       | 0.8.0-incubating |
 
 ### Configurations for a schema
 
-To learn how to create a schema, refer to [Schema configurations](./hadoop-catalog.md#schema-properties).
+To learn how to create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
 
 ### Configurations for a fileset
 
-For more details on creating a fileset, Refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties).
+For more details on creating a fileset, Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties).
 
+## Using the Fileset catalog with S3
 
-## Using the Hadoop catalog with S3
+This section demonstrates how to use the Fileset catalog with S3 in Gravitino, with a complete example.
 
-This section demonstrates how to use the Hadoop catalog with S3 in Gravitino, with a complete example.
+### Step1: Create a Fileset Catalog with S3
 
-### Step1: Create a Hadoop Catalog with S3
-
-First of all, you need to create a Hadoop catalog with S3. The following example shows how to create a Hadoop catalog with S3:
+First of all, you need to create a Fileset catalog with S3. The following example shows how to create a Fileset catalog with S3:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -63,7 +62,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "test_catalog",
   "type": "FILESET",
   "comment": "This is a S3 fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key",
@@ -93,7 +91,6 @@ Map<String, String> s3Properties = ImmutableMap.<String, String>builder()
 
 Catalog s3Catalog = gravitinoClient.createCatalog("test_catalog",
     Type.FILESET,
-    "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a S3 fileset catalog",
     s3Properties);
 // ...
@@ -115,7 +112,7 @@ s3_properties = {
 
 s3_catalog = gravitino_client.create_catalog(name="test_catalog",
                                              catalog_type=Catalog.Type.FILESET,
-                                             provider="hadoop",
+                                             provider=None,
                                              comment="This is a S3 fileset catalog",
                                              properties=s3_properties)
 ```
@@ -124,12 +121,12 @@ s3_catalog = gravitino_client.create_catalog(name="test_catalog",
 </Tabs>
 
 :::note
-When using S3 with Hadoop, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
+When using S3, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
 :::
 
 ### Step2: Create a schema
 
-Once your Hadoop catalog with S3 is created, you can create a schema under the catalog. Here are examples of how to do that:
+Once your Fileset catalog with S3 is created, you can create a schema under the catalog. Here are examples of how to do that:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -497,9 +494,11 @@ For more use cases, please refer to the [Gravitino Virtual File System](./how-to
 
 Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access S3 fileset without providing authentication information like `s3-access-key-id` and `s3-secret-access-key` in the properties.
 
-### How to create a S3 Hadoop catalog with credential vending
+### How to create a S3 Fileset catalog with credential vending
 
-Apart from configuration method in [create-s3-hadoop-catalog](#configurations-for-s3-hadoop-catalog), properties needed by [s3-credential](./security/credential-vending.md#s3-credentials) should also be set to enable credential vending for S3 fileset. Take `s3-token` credential provider for example:
+Apart from configuration method in [create-s3-fileset-catalog](#configurations-for-s3-fileset-catalog),
+properties needed by [s3-credential](./security/credential-vending.md#s3-credentials)
+should also be set to enable credential vending for S3 fileset. Take `s3-token` credential provider for example:
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -507,7 +506,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "s3-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a S3 fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "s3a://bucket/root",
     "s3-access-key-id": "access_key",

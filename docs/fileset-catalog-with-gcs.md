@@ -1,55 +1,55 @@
 ---
-title: "Hadoop catalog with GCS"
-slug: /hadoop-catalog-with-gcs
+title: "Fileset catalog with GCS"
+slug: /fileset-catalog-with-gcs
 date: 2024-01-03
-keyword: Hadoop catalog GCS
+keyword: Fileset catalog GCS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document describes how to configure a Hadoop catalog with GCS.
+This document describes how to configure a Fileset catalog with GCS.
 
 ## Prerequisites
-To set up a Hadoop catalog with OSS, follow these steps:
+To set up a Fileset catalog with OSS, follow these steps:
 
 1. Download the [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) file.
-2. Place the downloaded file into the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+2. Place the downloaded file into the Gravitino Fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
 3. Start the Gravitino server by running the following command:
 
 ```bash
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Hadoop catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Fileset catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
-## Configurations for creating a Hadoop catalog with GCS
+## Configurations for creating a Fileset catalog with GCS
 
-### Configurations for a GCS Hadoop catalog
+### Configurations for a GCS Fileset catalog
 
-Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with GCS:
+Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with GCS:
 
 | Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Default value   | Required | Since version    |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
 | `filesystem-providers`        | The file system providers to add. Set it to `gcs` if it's a GCS fileset, a comma separated string that contains `gcs` like `gcs,s3` to support multiple kinds of fileset including `gcs`.                                                                                                                                                                                                                                                                                                                               | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                                            | `builtin-local` | No       | 0.7.0-incubating |
+| `default-filesystem-provider` | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for GCS, if we set this value, we can omit the prefix 'gs://' in the location.                                                                                                                                                                                                                                                                                           | `builtin-local` | No       | 0.7.0-incubating |
 | `gcs-service-account-file`    | The path of GCS service account JSON file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      | 0.7.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `gcs-token`. As the default authentication type is using service account as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like service account to access GCS by GVFS. Once it's set, more configuration items are needed to make it works, please see [gcs-credential-vending](security/credential-vending.md#gcs-credentials) | (none)          | No       | 0.8.0-incubating |
 
 
 ### Configurations for a schema
 
-Refer to [Schema configurations](./hadoop-catalog.md#schema-properties) for more details.
+Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
 ### Configurations for a fileset
 
-Refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties) for more details.
+Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Example of creating Hadoop catalog with GCS
+## Example of creating Fileset catalog with GCS
 
-This section will show you how to use the Hadoop catalog with GCS in Gravitino, including detailed examples.
+This section will show you how to use the Fileset catalog with GCS in Gravitino, including detailed examples.
 
-### Step1: Create a Hadoop catalog with GCS
+### Step1: Create a Fileset catalog with GCS
 
-First, you need to create a Hadoop catalog with GCS. The following example shows how to create a Hadoop catalog with GCS:
+First, you need to create a Fileset catalog with GCS. The following example shows how to create a Fileset catalog with GCS:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -60,7 +60,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "test_catalog",
   "type": "FILESET",
   "comment": "This is a GCS fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "gs://bucket/root",
     "gcs-service-account-file": "path_of_gcs_service_account_file",
@@ -86,7 +85,6 @@ Map<String, String> gcsProperties = ImmutableMap.<String, String>builder()
 
 Catalog gcsCatalog = gravitinoClient.createCatalog("test_catalog", 
     Type.FILESET,
-    "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a GCS fileset catalog",
     gcsProperties);
 // ...
@@ -106,7 +104,7 @@ gcs_properties = {
 
 gcs_properties = gravitino_client.create_catalog(name="test_catalog",
                                                  catalog_type=Catalog.Type.FILESET,
-                                                 provider="hadoop",
+                                                 provider=None,
                                                  comment="This is a GCS fileset catalog",
                                                  properties=gcs_properties)
 ```
@@ -116,7 +114,7 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 
 ### Step2: Create a schema
 
-Once you have created a Hadoop catalog with GCS, you can create a schema. The following example shows how to create a schema:
+Once you have created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -459,9 +457,11 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
 
-### How to create a GCS Hadoop catalog with credential vending
+### How to create a GCS Fileset catalog with credential vending
 
-Apart from configuration method in [create-gcs-hadoop-catalog](#configurations-for-a-gcs-hadoop-catalog), properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also be set to enable credential vending for GCS fileset. Take `gcs-token` credential provider for example:
+Apart from configuration method in [create-gcs-fileset-catalog](#configurations-for-a-gcs-fileset-catalog),
+properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also
+be set to enable credential vending for GCS fileset. Take `gcs-token` credential provider for example:
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -469,7 +469,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "gcs-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a GCS fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "gs://bucket/root",
     "gcs-service-account-file": "path_of_gcs_service_account_file",

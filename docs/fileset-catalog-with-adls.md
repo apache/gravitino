@@ -1,37 +1,37 @@
 ---
-title: "Hadoop catalog with ADLS"
-slug: /hadoop-catalog-with-adls
+title: "Fileset catalog with ADLS"
+slug: /fileset-catalog-with-adls
 date: 2025-01-03
-keyword: Hadoop catalog ADLS
+keyword: Fileset catalog ADLS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-This document describes how to configure a Hadoop catalog with ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)).
+This document describes how to configure a Fileset catalog with ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)).
 
 ## Prerequisites
 
-To set up a Hadoop catalog with ADLS, follow these steps:
+To set up a Fileset catalog with ADLS, follow these steps:
 
 1. Download the [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) file.
-2. Place the downloaded file into the Gravitino Hadoop catalog classpath at `${GRAVITINO_HOME}/catalogs/hadoop/libs/`.
+2. Place the downloaded file into the Gravitino Fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
 3. Start the Gravitino server by running the following command:
 
 ```bash
 $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Hadoop catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
+Once the server is up and running, you can proceed to configure the Fileset catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
-## Configurations for creating a Hadoop catalog with ADLS
+## Configurations for creating a Fileset catalog with ADLS
 
-### Configuration for a ADLS Hadoop catalog
+### Configuration for a ADLS Fileset catalog
 
-Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./hadoop-catalog.md#catalog-properties), the following properties are required to configure a Hadoop catalog with ADLS:
+Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
 
 | Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Default value   | Required | Since version    |
 |-------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
 | `filesystem-providers`        | The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                                        | (none)          | Yes      | 0.8.0-incubating |
-| `default-filesystem-provider` | The name default filesystem providers of this Hadoop catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                                         | `builtin-local` | No       | 0.8.0-incubating |
+| `default-filesystem-provider` | The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                                        | `builtin-local` | No       | 0.8.0-incubating |
 | `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | (none)          | Yes      | 0.8.0-incubating |
 | `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | (none)          | Yes      | 0.8.0-incubating |
 | `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, please see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
@@ -39,19 +39,19 @@ Apart from configurations mentioned in [Hadoop-catalog-catalog-configuration](./
 
 ### Configurations for a schema
 
-Refer to [Schema configurations](./hadoop-catalog.md#schema-properties) for more details.
+Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
 ### Configurations for a fileset
 
-Refer to [Fileset configurations](./hadoop-catalog.md#fileset-properties) for more details.
+Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Example of creating Hadoop catalog with ADLS
+## Example of creating Fileset catalog with ADLS
 
-This section demonstrates how to create the Hadoop catalog with ADLS in Gravitino, with a complete example.
+This section demonstrates how to create the Fileset catalog with ADLS in Gravitino, with a complete example.
 
-### Step1: Create a Hadoop catalog with ADLS
+### Step1: Create a Fileset catalog with ADLS
 
-First, you need to create a Hadoop catalog with ADLS. The following example shows how to create a Hadoop catalog with ADLS:
+First, you need to create a Fileset catalog with ADLS. The following example shows how to create a Fileset catalog with ADLS:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -62,7 +62,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "example_catalog",
   "type": "FILESET",
   "comment": "This is a ADLS fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "The account name of the Azure Blob Storage",
@@ -90,7 +89,6 @@ Map<String, String> adlsProperties = ImmutableMap.<String, String>builder()
 
 Catalog adlsCatalog = gravitinoClient.createCatalog("example_catalog",
     Type.FILESET,
-    "hadoop", // provider, Gravitino only supports "hadoop" for now.
     "This is a ADLS fileset catalog",
     adlsProperties);
 // ...
@@ -111,7 +109,7 @@ adls_properties = {
 
 adls_properties = gravitino_client.create_catalog(name="example_catalog",
                                                   catalog_type=Catalog.Type.FILESET,
-                                                  provider="hadoop",
+                                                  provider=None,
                                                   comment="This is a ADLS fileset catalog",
                                                   properties=adls_properties)
 ```
@@ -480,9 +478,11 @@ For other use cases, please refer to the [Gravitino Virtual File System](./how-t
 
 Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access ADLS fileset without providing authentication information like `azure-storage-account-name` and `azure-storage-account-key` in the properties.
 
-### How to create an ADLS Hadoop catalog with credential vending
+### How to create an ADLS Fileset catalog with credential vending
 
-Apart from configuration method in [create-adls-hadoop-catalog](#configuration-for-a-adls-hadoop-catalog), properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should also be set to enable credential vending for ADLS fileset. Take `adls-token` credential provider for example:
+Apart from configuration method in [create-adls-fileset-catalog](#configuration-for-a-adls-fileset-catalog),
+properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should
+also be set to enable credential vending for ADLS fileset. Take `adls-token` credential provider for example:
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -490,7 +490,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "adls-catalog-with-token",
   "type": "FILESET",
   "comment": "This is a ADLS fileset catalog",
-  "provider": "hadoop",
   "properties": {
     "location": "abfss://container@account-name.dfs.core.windows.net/path",
     "azure-storage-account-name": "The account name of the Azure Blob Storage",
@@ -542,4 +541,3 @@ spark = SparkSession.builder
 ```
 
 Python client and Hadoop command are similar to the above examples.
-
