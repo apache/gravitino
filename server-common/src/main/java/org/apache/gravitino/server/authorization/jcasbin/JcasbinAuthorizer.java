@@ -191,13 +191,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         loadPolicyByRoleId(role);
         loadedRoles.add(roleId);
       }
-      loadOwner(metalake, metadataObject, metadataObjectId);
+      loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
   }
 
-  private void loadOwner(String metalake, MetadataObject metadataObject, Long metadataId) {
+  private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
     try {
       NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
@@ -221,7 +221,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           enforcer.addPolicy(policy);
         }
       }
-    } catch (Exception e) {
+    } catch (IOException e) {
       LOG.warn("Can not load metadata owner", e);
     }
   }
