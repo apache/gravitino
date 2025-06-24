@@ -51,7 +51,7 @@ contains the following code snippets:
 4. Initialize Gravitino admin client and create a Gravitino metalake.
 5. Initialize Gravitino client and list metalakes.
 6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
-   [Fileset](./fileset-catalog.md)
+   [fileset](./fileset-catalog.md)
 7. Create a Gravitino `Schema` with the `location` pointed to a HDFS path, and use `hdfs client` to
    check if the schema location is successfully created in HDFS.
 8. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./manage-fileset-metadata-using-gravitino.md#fileset-operations),
