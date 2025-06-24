@@ -259,6 +259,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
               throw new MetalakeNotInUseException(
                   "Metalake %s is not in use, please enable it first", ident);
             }
+
             return store.update(
                 ident,
                 BaseMetalake.class,
