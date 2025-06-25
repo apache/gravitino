@@ -26,12 +26,15 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -44,6 +47,8 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   private static String hmsUri;
+
+  private static final Logger LOG = LoggerFactory.getLogger(CatalogAuthorizationIT.class);
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -61,6 +66,9 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testCreateCatalog() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
+    LOG.info(
+        "GravitinoAuthorizer is {}",
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer());
     assertThrows(
         "Can not access metadata.",
         RuntimeException.class,
