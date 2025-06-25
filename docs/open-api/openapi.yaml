@@ -77,6 +77,9 @@ paths:
   /metalakes/{metalake}/tags/{tag}/objects:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1objects"
 
+  /metalakes/{metalake}/tags/objects:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1objects"
+
   /metalakes/{metalake}/catalogs:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs"
 
@@ -177,9 +180,7 @@ paths:
     $ref: "./lineage.yaml#/paths/~1lineage"
 
 components:
-
   schemas:
-
     Audit:
       type: object
       description: Audit information for a Gravitino resource.
@@ -282,7 +283,6 @@ components:
             TableListResponse:
               $ref: "./tables.yaml#/components/examples/TableListResponse"
 
-
     BadRequestErrorResponse:
       description:
         Indicates a bad request error. It could be caused by an unexpected request
@@ -292,12 +292,13 @@ components:
       content:
         application/vnd.gravitino.v1+json:
           schema:
-            $ref: '#/components/schemas/ErrorModel'
-          example: {
-            "code": 1003,
-            "type": "BadRequestException",
-            "message": "Malformed request"
-          }
+            $ref: "#/components/schemas/ErrorModel"
+          example:
+            {
+              "code": 1003,
+              "type": "BadRequestException",
+              "message": "Malformed request",
+            }
 
     ServerErrorResponse:
       description:
@@ -308,14 +309,13 @@ components:
         application/vnd.gravitino.v1+json:
           schema:
             $ref: "#/components/schemas/ErrorModel"
-          example: {
-            "code": 1002,
-            "type": "RuntimeException",
-            "message": "Internal Server Error",
-            "stack": [
-              "java.lang.RuntimeException: Internal Server Error"
-            ]
-          }
+          example:
+            {
+              "code": 1002,
+              "type": "RuntimeException",
+              "message": "Internal Server Error",
+              "stack": ["java.lang.RuntimeException: Internal Server Error"],
+            }
 
     DropResponse:
       description: Represents a response for a drop operation
@@ -400,9 +400,7 @@ components:
                 description: Status code of the response
                 enum:
                   - 0
-          example: {
-            "code": 0
-          }
+          example: { "code": 0 }
 
   parameters:
     metalake:
@@ -483,7 +481,7 @@ components:
       description: The name of the group
       required: true
       schema:
-          type: string
+        type: string
     role:
       name: role
       in: path
@@ -527,7 +525,6 @@ components:
         default: false
 
   securitySchemes:
-
     OAuth2WithJWT:
       type: oauth2
       description: OAuth2 with JWT
@@ -544,4 +541,3 @@ components:
     KerberosAuth:
       type: http
       scheme: negotiate
-
