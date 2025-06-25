@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Entity;
@@ -217,6 +218,42 @@ public class TagManager implements TagDispatcher {
                 .toArray(new MetadataObject[0]);
           } catch (IOException e) {
             LOG.error("Failed to list metadata objects for tag {}", name, e);
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
+  public MetadataObject[] listMetadataObjectsForTags(String metalake, String[] names)
+      throws NoSuchTagException {
+    if (names == null || names.length == 0) {
+      return new MetadataObject[0];
+    }
+    NameIdentifier[] tagIds =
+        Arrays.stream(names)
+            .map(name -> NameIdentifierUtil.ofTag(metalake, name))
+            .toArray(NameIdentifier[]::new);
+    NameIdentifier lockId = tagIds[0];
+    return TreeLockUtils.doWithTreeLock(
+        lockId,
+        LockType.READ,
+        () -> {
+          checkMetalake(NameIdentifier.of(metalake), entityStore);
+
+          try {
+            Set<MetadataObject> allObjects = Sets.newHashSet();
+            for (NameIdentifier tagId : tagIds) {
+              if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
+                throw new NoSuchTagException(
+                    "Tag with name %s under metalake %s does not exist", tagId.name(), metalake);
+              }
+              List<MetadataObject> objects =
+                  supportsTagOperations.listAssociatedMetadataObjectsForTag(tagId);
+              allObjects.addAll(objects);
+            }
+
+            return allObjects.toArray(new MetadataObject[0]);
+          } catch (IOException e) {
+            LOG.error("Failed to list metadata objects for tags {}", Arrays.toString(names), e);
             throw new RuntimeException(e);
           }
         });
