@@ -65,6 +65,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 /**
@@ -330,7 +331,8 @@ public class BaseIT {
           .pollInterval(1, TimeUnit.SECONDS)
           .until(() -> HttpUtils.isHttpServerUp(checkServerUrl));
     }
-    LOG.info("serverConfig {}", serverConfig);
+    LOG.info("serverConfig {}", new ObjectMapper().writeValueAsString(serverConfig));
+    LOG.info("Enable authorization {}", serverConfig.get(Configs.ENABLE_AUTHORIZATION));
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
