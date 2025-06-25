@@ -55,6 +55,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     containerSuite.startHiveContainer();
     LOG.info("GravitinoConfig  {}", customConfigs);
     super.startIntegrationTest();
+    LOG.info("GravitinoConfig  {}", customConfigs);
     hmsUri =
         String.format(
             "thrift://%s:%d",

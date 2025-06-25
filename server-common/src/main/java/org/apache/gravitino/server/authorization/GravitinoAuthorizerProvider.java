@@ -17,6 +17,8 @@
 
 package org.apache.gravitino.server.authorization;
 
+import java.io.Closeable;
+import java.io.IOException;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
@@ -27,7 +29,7 @@ import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
  * in the GravitinoAuthorizerProvider. The GravitinoAuthorizer instance can then be retrieved using
  * the getGravitinoAuthorizer method.
  */
-public class GravitinoAuthorizerProvider {
+public class GravitinoAuthorizerProvider implements Closeable {
 
   private static final GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
 
@@ -68,5 +70,13 @@ public class GravitinoAuthorizerProvider {
    */
   public GravitinoAuthorizer getGravitinoAuthorizer() {
     return gravitinoAuthorizer;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.close();
+    }
+    gravitinoAuthorizer = null;
   }
 }
