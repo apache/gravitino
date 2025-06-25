@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy version info';
 
 CREATE TABLE IF NOT EXISTS `policy_relation_meta` (

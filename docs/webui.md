@@ -163,7 +163,7 @@ Creating a catalog requires these fields:
 2. **Type**(**_required_**): `relational`/`fileset`/`messaging`/`model`, the default value is `relational`
 3. **Provider**(**_required_**):
     1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`
-    2. Type `fileset` - `hadoop`
+    2. Type `fileset` has no provider
     3. Type `messaging` - `kafka`
     4. Type `model` has no provider
 4. **Comment**(_optional_): the comment of this catalog
@@ -354,8 +354,8 @@ Creating a catalog requires these fields:
 ###### 2. Type `fileset`
 
 <Tabs>
-  <TabItem value='hadoop' label='Hadoop'>
-    Follow the [Hadoop catalog](./hadoop-catalog.md) document.
+  <TabItem value='fileset' label='Fileset'>
+    Follow the [Fileset catalog](./fileset-catalog.md) document.
 
     <Image img={require('./assets/webui/create-fileset-hadoop-catalog-dialog.png')} style={{ width: 480 }} />
 

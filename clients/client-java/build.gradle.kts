@@ -71,7 +71,7 @@ tasks.test {
   if (skipITs) {
     exclude("**/integration/test/**")
   } else {
-    dependsOn(":catalogs:catalog-hadoop:jar", ":catalogs:catalog-hadoop:runtimeJars")
+    dependsOn(":catalogs:catalog-fileset:jar", ":catalogs:catalog-fileset:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
   }

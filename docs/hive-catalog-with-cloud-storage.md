@@ -135,7 +135,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-// Assuming you have just created a Hadoop catalog named `catalog`
+// Assuming you have just created a Hive catalog named `catalog`
 Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
