@@ -27,7 +27,7 @@ plugins {
 dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":catalogs:catalog-fileset"))
   compileOnly(project(":core"))
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
@@ -93,5 +93,5 @@ tasks.jar {
 }
 
 tasks.compileJava {
-  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+  dependsOn(":catalogs:catalog-fileset:runtimeJars")
 }

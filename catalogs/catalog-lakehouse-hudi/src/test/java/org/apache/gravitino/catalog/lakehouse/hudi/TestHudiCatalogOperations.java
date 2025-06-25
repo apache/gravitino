@@ -64,6 +64,12 @@ public class TestHudiCatalogOperations {
         public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException();
         }
+
+        @Override
+        public PropertiesMetadata modelVersionPropertiesMetadata()
+            throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Does not support model version properties");
+        }
       };
 
   @Test

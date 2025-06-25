@@ -16,8 +16,9 @@ filesets to manage non-tabular data like training datasets and other raw data.
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
 tabular data in Gravitino in a unified way. The following operations will use HDFS as an example, for other
-HCFS like S3, OSS, GCS, etc., please refer to the corresponding operations [hadoop-with-s3](./hadoop-catalog-with-s3.md), [hadoop-with-oss](./hadoop-catalog-with-oss.md), [hadoop-with-gcs](./hadoop-catalog-with-gcs.md) and 
-[hadoop-with-adls](./hadoop-catalog-with-adls.md).
+HCFS like S3, OSS, GCS, etc., please refer to the corresponding operations [fileset-with-s3](./fileset-catalog-with-s3.md),
+[fileset-with-oss](./fileset-catalog-with-oss.md), [fileset-with-gcs](./fileset-catalog-with-gcs.md) and
+[fileset-with-adls](./fileset-catalog-with-adls.md).
 
 After a fileset is created, users can easily access, manage the files/directories through
 the fileset's identifier, without needing to know the physical path of the managed dataset. Also, with
@@ -49,7 +50,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "catalog",
   "type": "FILESET",
   "comment": "comment",
-  "provider": "hadoop",
   "properties": {
     "location": "file:///tmp/root"
   }
@@ -74,8 +74,7 @@ Map<String, String> properties = ImmutableMap.<String, String>builder()
 
 Catalog catalog = gravitinoClient.createCatalog("catalog",
     Type.FILESET,
-    "hadoop", // provider, Gravitino only supports "hadoop" for now.
-    "This is a Hadoop fileset catalog",
+    "This is a fileset catalog",
     properties);
 // ...
 
@@ -88,8 +87,8 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
 catalog = gravitino_client.create_catalog(name="catalog",
                                           catalog_type=Catalog.Type.FILESET,
-                                          provider="hadoop", 
-                                          comment="This is a Hadoop fileset catalog",
+                                          provider=None, 
+                                          comment="This is a fileset catalog",
                                           properties={"location": "/tmp/test1"})
 ```
 
@@ -98,9 +97,9 @@ catalog = gravitino_client.create_catalog(name="catalog",
 
 Currently, Gravitino supports the following catalog providers:
 
-| Catalog provider    | Catalog property                                                        |
-|---------------------|-------------------------------------------------------------------------|
-| `hadoop`            | [Hadoop catalog property](./hadoop-catalog.md#catalog-properties)       |
+| Catalog provider    | Catalog property                                                    |
+|---------------------|---------------------------------------------------------------------|
+| `fileset` or `None` | [Fileset catalog property](./fileset-catalog.md#catalog-properties) |
 
 ### Load a catalog
 
@@ -169,7 +168,7 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-// Assuming you have just created a Hadoop catalog named `catalog`
+// Assuming you have just created a Fileset catalog named `catalog`
 Catalog catalog = gravitinoClient.loadCatalog("catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
@@ -203,9 +202,9 @@ catalog.as_schemas().create_schema(name="schema",
 
 Currently, Gravitino supports the following schema property:
 
-| Catalog provider    | Schema property                                                              |
-|---------------------|------------------------------------------------------------------------------|
-| `hadoop`            | [Hadoop schema property](./hadoop-catalog.md#schema-properties)              |
+| Catalog provider | Schema property                                                   |
+|------------------|-------------------------------------------------------------------|
+| `fileset`        | [Fileset schema property](./fileset-catalog.md#schema-properties) |
 
 ### Load a schema
 
@@ -368,7 +367,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "test_catalog",
   "type": "FILESET",
   "comment": "comment",
-  "provider": "hadoop",
   "properties": {
     "location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"
   }
@@ -409,7 +407,6 @@ GravitinoClient gravitinoClient = GravitinoClient
 Catalog catalog = gravitinoClient.createCatalog(
     "test_catalog",
     Type.FILESET,
-    "hadoop", // provider
     "comment",
     ImmutableMap.of("location", "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"));
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
@@ -438,7 +435,7 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 # create a catalog first
 catalog: Catalog = gravitino_client.create_catalog(name="test_catalog",
                                                    catalog_type=Catalog.Type.FILESET,
-                                                   provider="hadoop",
+                                                   provider=None,
                                                    comment="comment",
                                                    properties={"location": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}"})
 
@@ -473,7 +470,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "test_catalog",
   "type": "FILESET",
   "comment": "comment",
-  "provider": "hadoop",
   "properties": {
     "filesystem-providers": "builtin-local,builtin-hdfs,s3,gcs",
     "location-l1": "file:///{{catalog}}/{{schema}}/workspace_{{project}}/{{user}}",
@@ -539,7 +535,6 @@ GravitinoClient gravitinoClient = GravitinoClient
 Catalog catalog = gravitinoClient.createCatalog(
     "test_catalog",
     Type.FILESET,
-    "hadoop", // provider
     "comment",
     ImmutableMap.of(
         "filesystem-providers", "builtin-local,builtin-hdfs,s3,gcs",
@@ -595,7 +590,7 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 catalog: Catalog = gravitino_client.create_catalog(
    name="test_catalog",
    catalog_type=Catalog.Type.FILESET,
-   provider="hadoop",
+   provider=None,
    comment="comment",
    properties={
       "filesystem-providers": "builtin-local,builtin-hdfs,s3,gcs",
