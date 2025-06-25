@@ -188,7 +188,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           continue;
         }
         enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-        loadPolicyByRoleId(role);
+        loadPolicyByRoleEntity(role);
         loadedRoles.add(roleId);
       }
       loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
@@ -226,7 +226,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
-  private void loadPolicyByRoleId(RoleEntity roleEntity) {
+  private void loadPolicyByRoleEntity(RoleEntity roleEntity) {
     try {
       String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
       List<SecurableObject> securableObjects = roleEntity.securableObjects();
