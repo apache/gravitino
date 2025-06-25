@@ -94,6 +94,15 @@ public interface TagDispatcher {
   MetadataObject[] listMetadataObjectsForTag(String metalake, String name);
 
   /**
+   * List all metadata objects associated with the specified tags.
+   *
+   * @param metalake The name of the metalake.
+   * @param names The names of the tags.
+   * @return The array of metadata objects associated with the specified tags.
+   */
+  MetadataObject[] listMetadataObjectsForTags(String metalake, String[] names);
+
+  /**
    * List all tag names associated with the specified metadata object.
    *
    * @param metalake The name of the metalake
