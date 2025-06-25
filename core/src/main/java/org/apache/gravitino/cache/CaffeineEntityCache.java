@@ -172,14 +172,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
   public boolean contains(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null);
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null;
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean contains(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
-    return withLock(() -> cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null);
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type)) != null;
   }
 
   /** {@inheritDoc} */
