@@ -303,6 +303,7 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
+    LOG.info("testMode {}", testMode);
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -329,7 +330,7 @@ public class BaseIT {
           .pollInterval(1, TimeUnit.SECONDS)
           .until(() -> HttpUtils.isHttpServerUp(checkServerUrl));
     }
-
+    LOG.info("serverConfig {}", serverConfig);
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
