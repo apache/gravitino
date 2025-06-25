@@ -360,6 +360,18 @@ public class DorisTableOperations extends JdbcTableOperations {
       while (resultSet.next()) {
         createTableSqlSb.append(resultSet.getString("Create Table"));
       }
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      if (!e.getMessage().contains("materialized view")) {
+        throw e;
+      }
+      showCreateTableSQL = String.format("show create materialized view `%s`", tableName);
+      try (Statement statement = connection.createStatement();
+          ResultSet resultSet = statement.executeQuery(showCreateTableSQL)) {
+        while (resultSet.next()) {
+          createTableSqlSb.append(resultSet.getString("Create Materialized View"));
+        }
+      }
     }
 
     String createTableSql = createTableSqlSb.toString();
@@ -398,16 +410,29 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
     String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    StringBuilder createTableSql = new StringBuilder();
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
-      StringBuilder createTableSql = new StringBuilder();
       if (result.next()) {
         createTableSql.append(result.getString("Create Table"));
       }
-      Optional<Transform> transform =
-          DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
-      return transform.map(t -> new Transform[] {t}).orElse(Transforms.EMPTY_TRANSFORM);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      if (!e.getMessage().contains("materialized view")) {
+        throw e;
+      }
+      showCreateTableSql = String.format("show create materialized view `%s`", tableName);
+      try (Statement statement = connection.createStatement();
+          ResultSet resultSet = statement.executeQuery(showCreateTableSql)) {
+        while (resultSet.next()) {
+          createTableSql.append(resultSet.getString("Create Materialized View"));
+        }
+      }
     }
+
+    Optional<Transform> transform =
+        DorisUtils.extractPartitionInfoFromSql(createTableSql.toString());
+    return transform.map(t -> new Transform[] {t}).orElse(Transforms.EMPTY_TRANSFORM);
   }
 
   @Override
@@ -788,11 +813,24 @@ public class DorisTableOperations extends JdbcTableOperations {
       Connection connection, String databaseName, String tableName) throws SQLException {
 
     String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String createTableSyntax = "";
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       result.next();
-      String createTableSyntax = result.getString("Create Table");
-      return DorisUtils.extractDistributionInfoFromSql(createTableSyntax);
+      createTableSyntax = result.getString("Create Table");
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      if (!e.getMessage().contains("materialized view")) {
+        throw e;
+      }
+      showCreateTableSql = String.format("show create materialized view `%s`", tableName);
+      try (Statement statement = connection.createStatement();
+          ResultSet result = statement.executeQuery(showCreateTableSql)) {
+        result.next();
+        createTableSyntax = result.getString("Create Materialized View");
+      }
     }
+
+    return DorisUtils.extractDistributionInfoFromSql(createTableSyntax);
   }
 }
