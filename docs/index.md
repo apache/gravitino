@@ -88,7 +88,7 @@ Gravitino currently supports the following catalogs:
 
 **Fileset catalogs:**
 
-* [**Hadoop catalog**](./hadoop-catalog.md)
+* [**Fileset catalog**](./fileset-catalog.md)
 
 **Messaging catalogs:**
 
@@ -120,7 +120,7 @@ complete environment. To experience all the features, see
 Gravitino supports different catalogs to manage the metadata in different sources. Please see:
 
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
-* [Hadoop catalog](./hadoop-catalog.md): a complete guide to using Gravitino to manage fileset
+* [Fileset catalog](./fileset-catalog.md): a complete guide to using Gravitino to manage fileset
   using Hadoop Compatible File System (HCFS).
 * [Hive catalog](./apache-hive-catalog.md): a complete guide to using Gravitino to manage Apache Hive data.
 * [Hudi catalog](./lakehouse-hudi-catalog.md): a complete guide to using Gravitino to manage Apache Hudi data.

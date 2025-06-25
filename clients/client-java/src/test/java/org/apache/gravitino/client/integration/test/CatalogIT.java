@@ -281,7 +281,7 @@ public class CatalogIT extends BaseIT {
 
     Assertions.assertEquals(catalogName, catalog.name());
     Assertions.assertEquals(Catalog.Type.FILESET, catalog.type());
-    Assertions.assertEquals("hadoop", catalog.provider());
+    Assertions.assertEquals("fileset", catalog.provider());
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertEquals("true", catalog.properties().get(PROPERTY_IN_USE));
     metalake.disableCatalog(catalogName);

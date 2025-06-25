@@ -25,6 +25,7 @@ import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
@@ -33,7 +34,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -58,6 +61,20 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_QUEUE_CAPACITY = 100;
   private static final int CACHE_MONITOR_PERIOD_MINUTES = 5;
   private static final int CACHE_MONITOR_INITIAL_DELAY_MINUTES = 0;
+  private static final ExecutorService CLEANUP_EXECUTOR =
+      new ThreadPoolExecutor(
+          CACHE_CLEANUP_CORE_THREADS,
+          CACHE_CLEANUP_MAX_THREADS,
+          0L,
+          TimeUnit.MILLISECONDS,
+          new ArrayBlockingQueue<>(CACHE_CLEANUP_QUEUE_CAPACITY),
+          r -> {
+            Thread t = new Thread(r, "CaffeineEntityCache-Cleanup");
+            t.setDaemon(true);
+            return t;
+          },
+          new ThreadPoolExecutor.CallerRunsPolicy());
+
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
   private final ReentrantLock opLock = new ReentrantLock();
 
@@ -78,11 +95,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
     super(cacheConfig);
     this.cacheIndex = new ConcurrentRadixTree<>(new DefaultCharArrayNodeFactory());
 
-    ThreadPoolExecutor cleanupExec = buildCleanupExecutor();
     Caffeine<EntityCacheKey, List<Entity>> cacheDataBuilder = newBaseBuilder(cacheConfig);
 
     cacheDataBuilder
-        .executor(cleanupExec)
+        .executor(CLEANUP_EXECUTOR)
         .removalListener(
             (key, value, cause) -> {
               if (cause == RemovalCause.EXPLICIT || cause == RemovalCause.REPLACED) {
@@ -169,7 +185,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public long size() {
-    return cacheData.estimatedSize();
+    return cacheIndex.size();
   }
 
   /** {@inheritDoc} */
@@ -191,13 +207,16 @@ public class CaffeineEntityCache extends BaseEntityCache {
       List<E> entities) {
     checkArguments(ident, type, relType);
     Preconditions.checkArgument(entities != null, "Entities cannot be null");
-    if (entities.isEmpty()) {
-      return;
-    }
+    withLock(
+        () -> {
+          if (entities.isEmpty()) {
+            return;
+          }
 
-    syncEntitiesToCache(
-        EntityCacheKey.of(ident, type, relType),
-        entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
+          syncEntitiesToCache(
+              EntityCacheKey.of(ident, type, relType),
+              entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
+        });
   }
 
   /** {@inheritDoc} */
@@ -268,13 +287,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
     if (existingEntities != null && key.relationType() != null) {
-      List<Entity> merged = new ArrayList<>(existingEntities);
+      Set<Entity> merged = Sets.newLinkedHashSet(existingEntities);
       merged.addAll(newEntities);
-
-      cacheData.put(key, merged);
-    } else {
-      cacheData.put(key, newEntities);
+      newEntities = new ArrayList<>(merged);
     }
+
+    cacheData.put(key, newEntities);
 
     if (cacheData.policy().getIfPresentQuietly(key) != null) {
       cacheIndex.put(key.toString(), key);
@@ -408,26 +426,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
       Thread.currentThread().interrupt();
       throw new IllegalStateException("Thread was interrupted while waiting for lock", e);
     }
-  }
-
-  /**
-   * Builds the cleanup executor.
-   *
-   * @return The cleanup executor
-   */
-  private ThreadPoolExecutor buildCleanupExecutor() {
-    return new ThreadPoolExecutor(
-        CACHE_CLEANUP_CORE_THREADS,
-        CACHE_CLEANUP_MAX_THREADS,
-        0L,
-        TimeUnit.MILLISECONDS,
-        new ArrayBlockingQueue<>(CACHE_CLEANUP_QUEUE_CAPACITY),
-        r -> {
-          Thread t = new Thread(r, "CaffeineEntityCache-Cleanup");
-          t.setDaemon(true);
-          return t;
-        },
-        new ThreadPoolExecutor.CallerRunsPolicy());
   }
 
   /** Starts the cache stats monitor. */
