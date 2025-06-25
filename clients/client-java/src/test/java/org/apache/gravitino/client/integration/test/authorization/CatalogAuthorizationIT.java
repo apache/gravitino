@@ -35,7 +35,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class CatalogAuthorizationAuthorizationIT extends BaseRestApiAuthorizationIT {
+public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private String catalog1 = "catalog1";
 
@@ -75,6 +75,14 @@ public class CatalogAuthorizationAuthorizationIT extends BaseRestApiAuthorizatio
     client
         .loadMetalake(METALAKE)
         .createCatalog(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+    assertThrows(
+        "Can not access metadata.",
+        RuntimeException.class,
+        () -> {
+          clientWithNoAuthorization
+              .loadMetalake(METALAKE)
+              .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+        });
   }
 
   @Test

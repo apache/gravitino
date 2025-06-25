@@ -20,7 +20,10 @@ package org.apache.gravitino.client.integration.test.authorization;
 import java.util.HashMap;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class BaseRestApiAuthorizationIT extends BaseIT {
@@ -34,6 +37,8 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   /** Mock a user without permissions. */
   protected static GravitinoAdminClient clientWithNoAuthorization;
 
+  private static final Logger LOG = LoggerFactory.getLogger(BaseRestApiAuthorizationIT.class);
+
   @BeforeAll
   public void startIntegrationTest() throws Exception {
     // Enable authorization
@@ -44,5 +49,26 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
     client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);
     clientWithNoAuthorization =
         GravitinoAdminClient.builder(serverUri).withSimpleAuth(USER_WITH_AUTHORIZATION).build();
+  }
+
+  @AfterAll
+  public void stop() {
+    client.dropMetalake(METALAKE, true);
+
+    if (client != null) {
+      client.close();
+      client = null;
+    }
+
+    if (clientWithNoAuthorization != null) {
+      clientWithNoAuthorization.close();
+      clientWithNoAuthorization = null;
+    }
+
+    try {
+      closer.close();
+    } catch (Exception e) {
+      LOG.error("Exception in closing CloseableGroup", e);
+    }
   }
 }
