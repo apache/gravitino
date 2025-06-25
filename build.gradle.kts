@@ -819,11 +819,7 @@ tasks {
         it.name != "trino-connector" &&
         it.parent?.name != "bundles"
       ) {
-        from(
-          project.files(it.configurations.runtimeClasspath).filter { file ->
-            !file.name.contains("jcstress", ignoreCase = true)
-          }
-        )
+        from(it.configurations.runtimeClasspath)
         into("distribution/package/libs")
       }
     }
