@@ -185,7 +185,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public long size() {
-    return cacheData.estimatedSize();
+    return cacheIndex.size();
   }
 
   /** {@inheritDoc} */

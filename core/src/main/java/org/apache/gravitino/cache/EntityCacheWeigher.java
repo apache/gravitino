@@ -20,6 +20,7 @@
 package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Weigher;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
@@ -53,10 +54,11 @@ public class EntityCacheWeigher implements Weigher<EntityCacheKey, List<Entity>>
           Entity.EntityType.METALAKE, METALAKE_WEIGHT,
           Entity.EntityType.CATALOG, CATALOG_WEIGHT,
           Entity.EntityType.SCHEMA, SCHEMA_WEIGHT);
-  public static long MAX_WEIGHT =
+  private static long MAX_WEIGHT =
       2 * (METALAKE_WEIGHT * 10 + CATALOG_WEIGHT * (10 * 200) + SCHEMA_WEIGHT * (10 * 200 * 1000));
 
-  private EntityCacheWeigher() {}
+  @VisibleForTesting
+  protected EntityCacheWeigher() {}
 
   /**
    * Returns the maximum weight that can be stored in the cache.
