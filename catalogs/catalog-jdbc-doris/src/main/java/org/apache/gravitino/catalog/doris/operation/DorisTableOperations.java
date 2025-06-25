@@ -360,8 +360,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       while (resultSet.next()) {
         createTableSqlSb.append(resultSet.getString("Create Table"));
       }
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    } catch (SQLException e) {
       if (!e.getMessage().contains("materialized view")) {
         throw e;
       }
@@ -416,8 +415,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       if (result.next()) {
         createTableSql.append(result.getString("Create Table"));
       }
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    } catch (SQLException e) {
       if (!e.getMessage().contains("materialized view")) {
         throw e;
       }
@@ -818,8 +816,7 @@ public class DorisTableOperations extends JdbcTableOperations {
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       result.next();
       createTableSyntax = result.getString("Create Table");
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
+    } catch (SQLException e) {
       if (!e.getMessage().contains("materialized view")) {
         throw e;
       }
