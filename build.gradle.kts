@@ -819,7 +819,11 @@ tasks {
         it.name != "trino-connector" &&
         it.parent?.name != "bundles"
       ) {
-        from(it.configurations.runtimeClasspath)
+        from(
+          project.files(it.configurations.runtimeClasspath).filter { file ->
+            !file.name.contains("jcstress", ignoreCase = true)
+          }
+        )
         into("distribution/package/libs")
       }
     }
@@ -851,9 +855,11 @@ tasks {
         it.parent?.name != "bundles"
       ) {
         dependsOn("${it.name}:build")
-        from("${it.name}/build/libs")
+        from("${it.name}/build/libs") {
+          include("*.jar")
+          exclude("*-jcstress.jar")
+        }
         into("distribution/package/libs")
-        include("*.jar")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
