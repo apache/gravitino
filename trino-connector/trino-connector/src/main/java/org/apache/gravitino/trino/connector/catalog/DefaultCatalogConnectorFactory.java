@@ -47,7 +47,7 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   protected final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders =
       new HashMap<>();
 
-  /** The region code where this catalog connector factory is running */
+  /** The region code indicates the location of this Trino instance */
   protected final String region;
 
   /**
