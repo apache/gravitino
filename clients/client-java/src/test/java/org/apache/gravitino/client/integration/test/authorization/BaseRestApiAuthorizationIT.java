@@ -18,6 +18,7 @@
 package org.apache.gravitino.client.integration.test.authorization;
 
 import java.util.HashMap;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.AfterAll;
@@ -43,7 +44,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   public void startIntegrationTest() throws Exception {
     // Enable authorization
     customConfigs.putAll(
-        ImmutableMap.of("SimpleAuthUserName", USER, "gravitino.authorization.enable", "true"));
+        ImmutableMap.of("SimpleAuthUserName", USER, Configs.ENABLE_AUTHORIZATION.getKey(), "true"));
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);

@@ -53,6 +53,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
   @BeforeAll
   public void startIntegrationTest() throws Exception {
     containerSuite.startHiveContainer();
+    LOG.info("GravitinoConfig  {}", customConfigs);
     super.startIntegrationTest();
     hmsUri =
         String.format(
@@ -66,6 +67,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testCreateCatalog() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
+    LOG.info("Config is {}", customConfigs);
     LOG.info(
         "GravitinoAuthorizer is {}",
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer());
