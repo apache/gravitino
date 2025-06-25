@@ -534,7 +534,7 @@ class OSSStorageHandler(StorageHandler):
         )
 
     def _get_last_modified(self, entry: Dict):
-        return entry["LastModified"]
+        return entry["LastModified"] if "LastModified" in entry else None
 
     def _get_actual_prefix(
         self,
