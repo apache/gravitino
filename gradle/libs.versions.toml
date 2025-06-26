@@ -63,8 +63,8 @@ spark34 = "3.4.3"
 spark35 = "3.5.1"
 kyuubi4spark33 = "1.7.4"
 kyuubi4spark34 = "1.8.2"
-kyuubi4spark35 = "1.9.0"
-kyuubi4paimon = "1.10.0"
+kyuubi4spark35 = "1.10.2"
+kyuubi4paimon = "1.10.2"
 trino = '435'
 scala-collection-compat = "2.7.0"
 scala-java-compat = "1.0.2"
@@ -78,7 +78,7 @@ metrics = "4.2.25"
 prometheus = "0.16.0"
 mysql = "8.0.33"
 postgresql = "42.6.0"
-immutables-value = "2.10.0"
+immutables-value = "2.10.1"
 selenium = "3.141.59"
 rauschig = "1.2.0"
 mybatis = "3.5.6"
@@ -119,6 +119,8 @@ hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
 openlineage = "1.29.0"
+concurrent-trees = "2.6.0"
+jcstress = "0.8.15"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
@@ -282,6 +284,8 @@ aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.
 flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }
 
+concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
+
 [bundles]
 log4j = ["slf4j-api", "log4j-slf4j2-impl", "log4j-api", "log4j-core", "log4j-12-api", "log4j-layout-template-json"]
 jetty = ["jetty-server", "jetty-servlet", "jetty-webapp", "jetty-servlets"]
@@ -304,3 +308,4 @@ tasktree = {id = "com.dorongold.task-tree", version = "2.1.1"}
 dependencyLicenseReport = {id = "com.github.jk1.dependency-license-report", version = "2.9"}
 bom = {id = "org.cyclonedx.bom", version = "1.5.0"}
 errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}
+jcstress = { id = "io.github.reyerizo.gradle.jcstress", version.ref = "jcstress" }

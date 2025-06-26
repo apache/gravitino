@@ -30,8 +30,14 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 public class GravitinoSystemTableFactory {
 
   private final CatalogConnectorManager catalogConnectorManager;
+  /** Map of all registered system tables, keyed by their schema-qualified names. */
   public static final Map<SchemaTableName, GravitinoSystemTable> SYSTEM_TABLES = new HashMap<>();
 
+  /**
+   * Constructs a new GravitinoSystemTableFactory.
+   *
+   * @param catalogConnectorManager the manager for catalog connectors
+   */
   public GravitinoSystemTableFactory(CatalogConnectorManager catalogConnectorManager) {
     this.catalogConnectorManager = catalogConnectorManager;
 
@@ -45,11 +51,25 @@ public class GravitinoSystemTableFactory {
         new GravitinoSystemTableCatalog(catalogConnectorManager));
   }
 
+  /**
+   * Loads the page data for a given system table.
+   *
+   * @param tableName the schema-qualified name of the table
+   * @return the page containing the table's data
+   * @throws IllegalArgumentException if the table does not exist
+   */
   public static Page loadPageData(SchemaTableName tableName) {
     Preconditions.checkArgument(SYSTEM_TABLES.containsKey(tableName), "table does not exist");
     return SYSTEM_TABLES.get(tableName).loadPageData();
   }
 
+  /**
+   * Gets the table metadata for a given system table.
+   *
+   * @param tableName the schema-qualified name of the table
+   * @return the table metadata
+   * @throws IllegalArgumentException if the table does not exist
+   */
   public static ConnectorTableMetadata getTableMetaData(SchemaTableName tableName) {
     Preconditions.checkArgument(SYSTEM_TABLES.containsKey(tableName), "table does not exist");
     return SYSTEM_TABLES.get(tableName).getTableMetaData();

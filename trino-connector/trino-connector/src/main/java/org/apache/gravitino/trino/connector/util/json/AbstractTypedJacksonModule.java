@@ -48,6 +48,14 @@ import java.util.function.Function;
 public abstract class AbstractTypedJacksonModule<T> extends SimpleModule {
   private static final String TYPE_PROPERTY = "@gravitino-connector-type";
 
+  /**
+   * Constructs a new AbstractTypedJacksonModule with the specified base class, name resolver, and
+   * class resolver.
+   *
+   * @param baseClass the base class
+   * @param nameResolver the name resolver
+   * @param classResolver the class resolver
+   */
   protected AbstractTypedJacksonModule(
       Class<T> baseClass,
       Function<Object, String> nameResolver,

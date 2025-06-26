@@ -22,4 +22,4 @@ cp /tmp/conf/* ${GRAVITINO_HOME}/conf
 cp /tmp/conf/log4j2.properties ${GRAVITINO_HOME}/conf
 
 echo "Start the Gravitino Iceberg Rest Catalog Server"
-/bin/bash ${GRAVITINO_HOME}/bin/start-iceberg-rest-server.sh start
+/bin/bash ${GRAVITINO_HOME}/bin/gravitino-iceberg-rest-server.sh run

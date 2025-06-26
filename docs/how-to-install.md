@@ -32,7 +32,7 @@ The Gravitino binary distribution package contains the following files:
     |   ├── gravitino.sh                        # Gravitino server Launching scripts.
     |   └── gravitino-iceberg-rest-server.sh    # Gravitino Iceberg REST server Launching scripts.
     |── catalogs
-    |   └── hadoop/                             # Apache Hadoop catalog dependencies and configurations.
+    |   └── fileset/                            # Fileset catalog dependencies and configurations.
     |   └── hive/                               # Apache Hive catalog dependencies and configurations.
     |   └── jdbc-doris/                         # JDBC doris catalog dependencies and configurations.
     |   └── jdbc-mysql/                         # JDBC MySQL catalog dependencies and configurations.
@@ -40,6 +40,7 @@ The Gravitino binary distribution package contains the following files:
     |   └── kafka/                              # Apache Kafka PostgreSQL catalog dependencies and configurations.
     |   └── lakehouse-iceberg/                  # Apache Iceberg catalog dependencies and configurations.
     |   └── lakehouse-paimon/                   # Apache Paimon catalog dependencies and configurations.
+    |   └── model/                              # Model catalog dependencies and configurations.
     |── conf/                                   # All configurations for Gravitino.
     |   ├── gravitino.conf                      # Gravitino server and Gravitino Iceberg REST server configuration.
     |   ├── gravitino-iceberg-rest-server.conf  # Gravitino server configuration.

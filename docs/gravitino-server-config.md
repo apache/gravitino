@@ -75,6 +75,56 @@ We strongly recommend that you change the default value of `gravitino.entity.sto
 
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
+### Storage cache configuration
+
+To enable storage caching, please modify the following settings in the `${GRAVITINO_HOME}/conf/gravitino.conf` file:
+
+```
+# Whether to enable the cache
+gravitino.cache.enabled=true
+
+# Specify the cache implementation (no need to use the fully qualified class name)
+gravitino.cache.implementation=caffeine
+```
+
+| Configuration Key                | Description                                | Default Value          | Required | Since Version |
+|----------------------------------|--------------------------------------------|------------------------|----------|---------------|
+| `gravitino.cache.enabled`        | Whether to enable caching                  | `true`                 | Yes      | 1.0.0         |
+| `gravitino.cache.implementation` | Specifies the cache implementation         | `caffeine`             | Yes      | 1.0.0         |
+| `gravitino.cache.maxEntries`     | Maximum number of entries allowed in cache | `10000`                | No       | 1.0.0         |
+| `gravitino.cache.expireTimeInMs` | Cache expiration time (in milliseconds)    | `3600000` (about 1 hr) | No       | 1.0.0         |
+| `gravitino.cache.enableStats`    | Whether to enable cache statistics logging | `false`                | No       | 1.0.0         |
+| `gravitino.cache.enableWeigher`  | Whether to enable weight-based eviction    | `true`                 | No       | 1.0.0         |
+
+- `gravitino.cache.enableWeigher`: When enabled, eviction is based on weight and `maxEntries` will be ignored.
+- `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
+- If `gravitino.cache.enableStats` is enabled, Gravitino will log cache statistics (hit count, miss count, load failures, etc.) every 5 minutes at the Info level.
+
+#### Eviction strategies
+
+Gravitino supports multiple eviction strategies including capacity-based, weight-based, and time-based (TTL) eviction. The following describes how they work with Caffeine:
+
+##### Capacity-based eviction
+
+When `gravitino.cache.enableWeigher` is **disabled**, Gravitino limits the number of cached entries using `gravitino.cache.maxEntries` and employs Caffeine’s W-TinyLFU eviction policy to remove the least-used entries when the cache is full.
+
+##### Weight-based eviction
+
+When `gravitino.cache.enableWeigher` is **enabled**, Gravitino uses a combination of `maximumWeight` and a custom weigher to control the total weight of the cache:
+
+- Each entity type has a default weight (e.g., Metalake > Catalog > Schema);
+- Entries are evicted based on the combined weight limit (`maximumWeight`);
+- If a single cache item exceeds the total weight limit, it will not be cached;
+- When this strategy is active, `maxEntries` will be ignored.
+
+##### Time-based eviction
+
+All cache entries are subject to a TTL (Time-To-Live) expiration policy. By default, the TTL is `3600000ms` (1 hour) and can be adjusted via the `gravitino.cache.expireTimeInMs` setting:
+
+- TTL starts at the time of entry creation; once it exceeds the configured duration, the entry expires automatically;
+- TTL can work in conjunction with both capacity and weight-based eviction;
+- Expired entries will also trigger asynchronous cleanup mechanisms for resource release and logging.
+
 ### Tree lock configuration
 
 Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Currently, Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
@@ -121,7 +171,7 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | Operation type                      | Post-event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Since Version    |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
 | table operation                     | `CreateTableEvent`, `AlterTableEvent`, `DropTableEvent`, `LoadTableEvent`, `ListTableEvent`, `PurgeTableFailureEvent`, `CreateTableFailureEvent`, `AlterTableFailureEvent`, `DropTableFailureEvent`, `LoadTableFailureEvent`, `ListTableFailureEvent`, `PurgeTableFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                  | 0.5.0            |
-| fileset operation                   | `CreateFileSetEvent`, `AlterFileSetEvent`, `DropFileSetEvent`, `LoadFileSetEvent`, `ListFileSetEvent`, `CreateFileSetFailureEvent`, `AlterFileSetFailureEvent`, `DropFileSetFailureEvent`, `LoadFileSetFailureEvent`, `ListFileSetFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                  | 0.5.0            |
+| fileset operation                   | `CreateFileSetEvent`, `AlterFileSetEvent`, `DropFileSetEvent`, `LoadFileSetEvent`, `ListFileSetEvent`, `CreateFileSetFailureEvent`, `AlterFileSetFailureEvent`, `DropFileSetFailureEvent`, `LoadFileSetFailureEvent`, `ListFileSetFailureEvent`, `ListFilesFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                  | 0.5.0            |
 | topic operation                     | `CreateTopicEvent`, `AlterTopicEvent`, `DropTopicEvent`, `LoadTopicEvent`, `ListTopicEvent`, `CreateTopicFailureEvent`, `AlterTopicFailureEvent`, `DropTopicFailureEvent`, `LoadTopicFailureEvent`, `ListTopicFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                                      | 0.5.0            |
 | schema operation                    | `CreateSchemaEvent`, `AlterSchemaEvent`, `DropSchemaEvent`, `LoadSchemaEvent`, `ListSchemaEvent`, `CreateSchemaFailureEvent`, `AlterSchemaFailureEvent`, `DropSchemaFailureEvent`, `LoadSchemaFailureEvent`, `ListSchemaFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                            | 0.5.0            |
 | catalog operation                   | `CreateCatalogEvent`, `AlterCatalogEvent`, `DropCatalogEvent`, `LoadCatalogEvent`, `ListCatalogEvent`, `CreateCatalogFailureEvent`, `AlterCatalogFailureEvent`, `DropCatalogFailureEvent`, `LoadCatalogFailureEvent`, `ListCatalogFailureEvent`                                                                                                                                                                                                                                                                                                                                                                                                                  | 0.5.0            |
@@ -145,7 +195,7 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | Gravitino server catalog operation   | `CreateCatalogPreEvent`, `AlterCatalogPreEvent`, `DropCatalogPreEvent`, `LoadCatalogPreEvent`, `ListCatalogPreEvent`                                                                                                                                                                                                       | 0.8.0-incubating |
 | Gravitino server metalake operation  | `CreateMetalakePreEvent`, `AlterMetalakePreEvent`,`DropMetalakePreEvent`,`LoadMetalakePreEvent`,`ListMetalakePreEvent`                                                                                                                                                                                                     | 0.8.0-incubating |
 | Gravitino server partition operation | `AddPartitionPreEvent`, `DropPartitionPreEvent`, `GetPartitionPreEvent`, `PurgePartitionPreEvent`,`ListPartitionPreEvent`,`ListPartitionNamesPreEvent`                                                                                                                                                                     | 0.8.0-incubating |
-| Gravitino server fileset operation   | `CreateFilesetPreEvent`, `AlterFilesetPreEvent`, `DropFilesetPreEvent`, `LoadFilesetPreEvent`,`ListFilesetPreEvent`,`GetFileLocationPreEvent`                                                                                                                                                                              | 0.8.0-incubating |
+| Gravitino server fileset operation   | `CreateFilesetPreEvent`, `AlterFilesetPreEvent`, `DropFilesetPreEvent`, `LoadFilesetPreEvent`,`ListFilesetPreEvent`,`GetFileLocationPreEvent`, `ListFilesPreEvent`                                                                                                                                                                              | 0.8.0-incubating |
 | Gravitino server model operation     | `DeleteModelPreEvent`, `DeleteModelVersionPreEvent`, `RegisterAndLinkModelPreEvent`,`GetModelPreEvent`, `GetModelVersionPreEvent`,`LinkModelVersionPreEvent`,`ListModelPreEvent`,`RegisterModelPreEvent`, `AlterModelPreEvent`, `AlterModelVersionPreEvent`, `AlterModelVersionPreEvent`                                   | 0.9.0-incubating |
 | Gravitino server tag operation       | `ListTagsPreEvent`, `ListTagsInfoPreEvent`, `CreateTagPreEvent`, `GetTagPreEvent`, `AlterTagPreEvent`, `DeleteTagPreEvent`, `ListMetadataObjectsForTagPreEvent`, `ListTagsForMetadataObjectPreEvent`, `ListTagsInfoForMetadataObjectPreEvent`, `AssociateTagsForMetadataObjectPreEvent`, `GetTagForMetadataObjectPreEvent` | 0.9.0-incubating |
 | Gravitino server user operation      | `AddUserPreEvent`, `GetUserPreEvent`, `ListUserNamesPreEvent`, `ListUsersPreEvent`, `RemoveUserPreEvent`, `GrantUserRolesPreEvent`, `RevokeUserRolesPreEvent`                                                                                                                                                              | 0.9.0-incubating |
@@ -247,7 +297,8 @@ The following table lists the catalog specific properties and their default path
 | `jdbc-doris`        | [Doris catalog properties](jdbc-doris-catalog.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
 | `jdbc-oceanbase`    | [OceanBase catalog properties](jdbc-oceanbase-catalog.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
 | `kafka`             | [Kafka catalog properties](kafka-catalog.md#catalog-properties)                         | `catalogs/kafka/conf/kafka.conf`                         |
-| `hadoop`            | [Hadoop catalog properties](hadoop-catalog.md#catalog-properties)                       | `catalogs/hadoop/conf/hadoop.conf`                       |
+| `fileset`           | [Fileset catalog properties](fileset-catalog#catalog-properties)                        | `catalogs/fileset/conf/fileset.conf`                     |
+| `model`             | [Fileset catalog properties](model-catalog#catalog-properties)                          | `catalogs/model/conf/model.conf`                         |
 
 :::info
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.
@@ -271,36 +322,36 @@ This is done using a startup script that parses environment variables prefixed w
 
 These variables override the corresponding entries in `gravitino.conf` at startup.
 
-| Environment Variable                                          | Configuration Key                                        | Default Value                                              | Since Version         |
-|---------------------------------------------------------------|----------------------------------------------------------|------------------------------------------------------------|------------------------|
-| `GRAVITINO_SERVER_SHUTDOWN_TIMEOUT`                          | `gravitino.server.shutdown.timeout`                     | `3000`                                                     | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_HOST`                            | `gravitino.server.webserver.host`                       | `0.0.0.0`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_HTTP_PORT`                       | `gravitino.server.webserver.httpPort`                   | `8090`                                                     | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_MIN_THREADS`                     | `gravitino.server.webserver.minThreads`                 | `24`                                                       | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_MAX_THREADS`                     | `gravitino.server.webserver.maxThreads`                 | `200`                                                      | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_STOP_TIMEOUT`                    | `gravitino.server.webserver.stopTimeout`                | `30000`                                                    | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_IDLE_TIMEOUT`                    | `gravitino.server.webserver.idleTimeout`                | `30000`                                                    | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE`     | `gravitino.server.webserver.threadPoolWorkQueueSize`    | `100`                                                      | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`             | `gravitino.server.webserver.requestHeaderSize`          | `131072`                                                   | 0.10.0-incubating      |
-| `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`            | `gravitino.server.webserver.responseHeaderSize`         | `131072`                                                   | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE`                                     | `gravitino.entity.store`                                | `relational`                                               | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL`                          | `gravitino.entity.store.relational`                     | `JDBCBackend`                                              | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`                 | `gravitino.entity.store.relational.jdbcUrl`             | `jdbc:h2`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_DRIVER`              | `gravitino.entity.store.relational.jdbcDriver`          | `org.h2.Driver`                                            | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_USER`                | `gravitino.entity.store.relational.jdbcUser`            | `gravitino`                                                | 0.10.0-incubating      |
-| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`            | `gravitino.entity.store.relational.jdbcPassword`        | `gravitino`                                                | 0.10.0-incubating      |
-| `GRAVITINO_CATALOG_CACHE_EVICTION_INTERVAL_MS`               | `gravitino.catalog.cache.evictionIntervalMs`            | `3600000`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_AUTHORIZATION_ENABLE`                             | `gravitino.authorization.enable`                        | `false`                                                    | 0.10.0-incubating      |
-| `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                     | `gravitino.authorization.serviceAdmins`                 | `anonymous`                                                | 0.10.0-incubating      |
-| `GRAVITINO_AUX_SERVICE_NAMES`                                | `gravitino.auxService.names`                            | `iceberg-rest`                                             | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_CLASSPATH`                           | `gravitino.iceberg-rest.classpath`                      | `iceberg-rest-server/libs, iceberg-rest-server/conf`       | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_HOST`                                | `gravitino.iceberg-rest.host`                           | `0.0.0.0`                                                  | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                           | `gravitino.iceberg-rest.httpPort`                       | `9001`                                                     | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                     | `gravitino.iceberg-rest.catalog-backend`                | `memory`                                                   | 0.10.0-incubating      |
-| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                           | `gravitino.iceberg-rest.warehouse`                      | `/tmp/`                                                    | 0.10.0-incubating      |
+| Environment Variable                                     | Configuration Key                                    | Default Value                                        | Since Version |
+|----------------------------------------------------------|------------------------------------------------------|------------------------------------------------------|---------------|
+| `GRAVITINO_SERVER_SHUTDOWN_TIMEOUT`                      | `gravitino.server.shutdown.timeout`                  | `3000`                                               | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_HOST`                        | `gravitino.server.webserver.host`                    | `0.0.0.0`                                            | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_HTTP_PORT`                   | `gravitino.server.webserver.httpPort`                | `8090`                                               | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_MIN_THREADS`                 | `gravitino.server.webserver.minThreads`              | `24`                                                 | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_MAX_THREADS`                 | `gravitino.server.webserver.maxThreads`              | `200`                                                | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_STOP_TIMEOUT`                | `gravitino.server.webserver.stopTimeout`             | `30000`                                              | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_IDLE_TIMEOUT`                | `gravitino.server.webserver.idleTimeout`             | `30000`                                              | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE` | `gravitino.server.webserver.threadPoolWorkQueueSize` | `100`                                                | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`         | `gravitino.server.webserver.requestHeaderSize`       | `131072`                                             | 1.0.0         |
+| `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`        | `gravitino.server.webserver.responseHeaderSize`      | `131072`                                             | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE`                                 | `gravitino.entity.store`                             | `relational`                                         | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL`                      | `gravitino.entity.store.relational`                  | `JDBCBackend`                                        | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`             | `gravitino.entity.store.relational.jdbcUrl`          | `jdbc:h2`                                            | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_DRIVER`          | `gravitino.entity.store.relational.jdbcDriver`       | `org.h2.Driver`                                      | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_USER`            | `gravitino.entity.store.relational.jdbcUser`         | `gravitino`                                          | 1.0.0         |
+| `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_PASSWORD`        | `gravitino.entity.store.relational.jdbcPassword`     | `gravitino`                                          | 1.0.0         |
+| `GRAVITINO_CATALOG_CACHE_EVICTION_INTERVAL_MS`           | `gravitino.catalog.cache.evictionIntervalMs`         | `3600000`                                            | 1.0.0         |
+| `GRAVITINO_AUTHORIZATION_ENABLE`                         | `gravitino.authorization.enable`                     | `false`                                              | 1.0.0         |
+| `GRAVITINO_AUTHORIZATION_SERVICE_ADMINS`                 | `gravitino.authorization.serviceAdmins`              | `anonymous`                                          | 1.0.0         |
+| `GRAVITINO_AUX_SERVICE_NAMES`                            | `gravitino.auxService.names`                         | `iceberg-rest`                                       | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_CLASSPATH`                       | `gravitino.iceberg-rest.classpath`                   | `iceberg-rest-server/libs, iceberg-rest-server/conf` | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_HOST`                            | `gravitino.iceberg-rest.host`                        | `0.0.0.0`                                            | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                       | `gravitino.iceberg-rest.httpPort`                    | `9001`                                               | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                 | `gravitino.iceberg-rest.catalog-backend`             | `memory`                                             | 1.0.0         |
+| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                       | `gravitino.iceberg-rest.warehouse`                   | `/tmp/`                                              | 1.0.0         |
 
 :::note
-This feature is supported in the Gravitino Docker image starting from version `0.10.0-incubating`.
+This feature is supported in the Gravitino Docker image starting from version `1.0.0`.
 :::
 
 Usage Example:
@@ -340,7 +391,7 @@ If both `gravitino.conf` and environment variable exist, the container’s start
 The Gravitino server supports configuring runtime environment variables in two ways:
 
 1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
-2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 0.10.0-incubating)*
+2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 1.0.0)*
 
 ### How to access Apache Hadoop
 
