@@ -59,6 +59,21 @@ gravitino.entity.store.relational.jdbcPassword = gravitino
 # The interval in milliseconds to evict the catalog cache
 gravitino.catalog.cache.evictionIntervalMs = 3600000
 
+# THE CONFIGURATION FOR Gravitino Entity Cache
+# Whether to enable the cached Entity store.
+gravitino.cache.enabled = true
+# Maximum number of entries allowed in the cache (effective only when weighted eviction is disabled).
+gravitino.cache.maxEntries = 10000
+# Time-to-live (TTL) for each cache entry after it is written, in milliseconds.
+gravitino.cache.expireTimeInMs = 3600000
+# Whether to enable cache statistics logging (e.g., hit/miss count, load failures, current size).
+gravitino.cache.enableStats = false
+# Whether to enable weighted cache eviction.
+# If enabled, cache entries are evicted based on their weight rather than count.
+gravitino.cache.enableWeigher = true
+# The cache implementation to use (e.g., caffeine).
+gravitino.cache.implementation = caffeine
+
 # THE CONFIGURATION FOR authorization
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = false

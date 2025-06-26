@@ -25,6 +25,29 @@ gravitino_package_dir="${gravitino_dir}/packages/gravitino"
 gravitino_staging_dir="${gravitino_package_dir}/staging"
 gravitino_iceberg_rest_dir="${gravitino_package_dir}/iceberg-rest-server/libs/"
 
+# Function to download and distribute GCS connector
+download_gcs_connector() {
+  local gcs_connector_jar="gcs-connector-hadoop2-2.2.18-shaded.jar"
+  local gcs_connector_url="https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.18/${gcs_connector_jar}"
+  local temp_file="/tmp/${gcs_connector_jar}"
+
+  echo "INFO: Downloading GCS connector: ${gcs_connector_jar}"
+  wget -q "${gcs_connector_url}" -O "${temp_file}"
+
+  # Copy to lakehouse-iceberg catalog libs
+  mkdir -p "${gravitino_dir}/packages/gravitino/catalogs/lakehouse-iceberg/libs"
+  cp "${temp_file}" "${gravitino_dir}/packages/gravitino/catalogs/lakehouse-iceberg/libs/${gcs_connector_jar}"
+  echo "INFO: Added GCS connector to lakehouse-iceberg/libs"
+
+  # Copy to iceberg-rest-server libs
+  mkdir -p "${gravitino_dir}/packages/gravitino/iceberg-rest-server/libs"
+  cp "${temp_file}" "${gravitino_dir}/packages/gravitino/iceberg-rest-server/libs/${gcs_connector_jar}"
+  echo "INFO: Added GCS connector to iceberg-rest-server/libs"
+
+  # Clean up temporary file
+  rm "${temp_file}"
+}
+
 # Build the Gravitino project
 ${gravitino_home}/gradlew clean build -x test
 
@@ -83,6 +106,8 @@ cp ${gravitino_home}/bundles/aws/build/libs/*.jar "${gravitino_iceberg_rest_dir}
 cp ${gravitino_home}/bundles/gcp/build/libs/*.jar "${gravitino_iceberg_rest_dir}"
 cp ${gravitino_home}/bundles/azure/build/libs/*.jar "${gravitino_iceberg_rest_dir}"
 cp ${gravitino_home}/bundles/aliyun-bundle/build/libs/*.jar "${gravitino_iceberg_rest_dir}"
+
+download_gcs_connector
 
 # Keeping the container running at all times
 cat <<EOF >> "${gravitino_dir}/packages/gravitino/bin/gravitino.sh"
