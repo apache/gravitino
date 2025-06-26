@@ -46,15 +46,9 @@ public class TestStatisticValue {
     Assertions.assertEquals("test", stringValue.value());
     Assertions.assertEquals(stringValue.dataType(), Types.StringType.get());
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            StatisticValues.listValue(
-                Lists.newArrayList(booleanValue, longValue, doubleValue, stringValue)));
-
-    List<StatisticValue> list =
+    List<StatisticValue<String>> list =
         Lists.newArrayList(StatisticValues.stringValue("a"), StatisticValues.stringValue("b"));
-    StatisticValues.ListValue listValue = StatisticValues.listValue(list);
+    StatisticValues.ListValue<String> listValue = StatisticValues.listValue(list);
     Assertions.assertEquals(2, listValue.value().size());
     Assertions.assertEquals(listValue.dataType(), Types.ListType.nullable(Types.StringType.get()));
     Assertions.assertIterableEquals(list, listValue.value());

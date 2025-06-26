@@ -29,6 +29,9 @@ import org.apache.gravitino.annotation.Evolving;
 @Evolving
 public interface Statistic {
 
+  /** The prefix for custom statistics. Custom statistics are user-defined statistics. */
+  String CUSTOM_PREFIX = "custom.";
+
   /**
    * Get the name of the statistic.
    *

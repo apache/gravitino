@@ -75,8 +75,8 @@ public class StatisticValues {
    * @param values the list of statistic values to be held by this statistic value
    * @return a ListValue instance containing the provided list of statistic values
    */
-  public static ListValue listValue(List<StatisticValue> values) {
-    return new ListValue(values);
+  public static <T> ListValue<T> listValue(List<StatisticValue<T>> values) {
+    return new ListValue<T>(values);
   }
 
   /**
@@ -166,10 +166,10 @@ public class StatisticValues {
   }
 
   /** A statistic value that holds a List of other statistic values. */
-  public static class ListValue implements StatisticValue<List<StatisticValue>> {
-    private final List<StatisticValue> valueList;
+  public static class ListValue<T> implements StatisticValue<List<StatisticValue<T>>> {
+    private final List<StatisticValue<T>> valueList;
 
-    private ListValue(List<StatisticValue> valueList) {
+    private ListValue(List<StatisticValue<T>> valueList) {
       Preconditions.checkArgument(
           valueList != null && !valueList.isEmpty(), "Values cannot be null or empty");
 
@@ -182,7 +182,7 @@ public class StatisticValues {
     }
 
     @Override
-    public List<StatisticValue> value() {
+    public List<StatisticValue<T>> value() {
       return valueList;
     }
 
