@@ -72,6 +72,7 @@ public class StatisticValues {
   /**
    * Creates a statistic value that holds a list of other statistic values.
    *
+   * @param <T> the type of the values in the list
    * @param values the list of statistic values to be held by this statistic value
    * @return a ListValue instance containing the provided list of statistic values
    */
