@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.client.integration.test.authorization;
 
+import java.io.IOException;
 import java.util.HashMap;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
@@ -42,6 +43,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(BaseRestApiAuthorizationIT.class);
 
   @BeforeAll
+  @Override
   public void startIntegrationTest() throws Exception {
     System.setProperty(ITUtils.TEST_MODE, ITUtils.EMBEDDED_TEST_MODE);
     // Enable authorization
@@ -61,13 +63,9 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   }
 
   @AfterAll
-  public void stop() {
+  @Override
+  public void stopIntegrationTest() throws IOException, InterruptedException {
     client.dropMetalake(METALAKE, true);
-
-    if (client != null) {
-      client.close();
-      client = null;
-    }
 
     if (clientWithNoAuthorization != null) {
       clientWithNoAuthorization.close();
@@ -79,5 +77,6 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
     } catch (Exception e) {
       LOG.error("Exception in closing CloseableGroup", e);
     }
+    super.stopIntegrationTest();
   }
 }
