@@ -37,6 +37,7 @@ public class Providers {
   public static final String PAIMON = "paimon";
   public static final String HUDI = "hudi";
   public static final String OCEANBASE = "oceanbase";
+  public static final String MODEL = "model";
 
   private static final HashSet<String> VALID_PROVIDERS = new HashSet<>();
 
@@ -51,6 +52,7 @@ public class Providers {
     VALID_PROVIDERS.add(PAIMON);
     VALID_PROVIDERS.add(HUDI);
     VALID_PROVIDERS.add(OCEANBASE);
+    VALID_PROVIDERS.add(MODEL);
   }
 
   /**
@@ -85,6 +87,8 @@ public class Providers {
         return "lakehouse-hudi";
       case OCEANBASE:
         return "jdbc-oceanbase";
+      case MODEL:
+        return "model";
       default:
         throw new IllegalArgumentException("Unsupported provider: " + provider);
     }
@@ -105,6 +109,8 @@ public class Providers {
         return Catalog.Type.RELATIONAL;
       case KAFKA:
         return Catalog.Type.MESSAGING;
+      case MODEL:
+        return Catalog.Type.MODEL;
       default:
         throw new IllegalArgumentException("Unsupported provider: " + provider);
     }
