@@ -75,7 +75,7 @@ We strongly recommend that you change the default value of `gravitino.entity.sto
 
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
-### Storage Cache configuration
+### Storage cache configuration
 
 To enable storage caching, please modify the following settings in the `${GRAVITINO_HOME}/conf/gravitino.conf` file:
 
@@ -87,28 +87,28 @@ gravitino.cache.enabled=true
 gravitino.cache.implementation=caffeine
 ```
 
-| Configuration Key                | Description                                | Default Value          |
-|----------------------------------|--------------------------------------------|------------------------|
-| `gravitino.cache.enabled`        | Whether to enable caching                  | `true`                 |
-| `gravitino.cache.implementation` | Specifies the cache implementation         | `caffeine`             |
-| `gravitino.cache.maxEntries`     | Maximum number of entries allowed in cache | `10000`                |
-| `gravitino.cache.expireTimeInMs` | Cache expiration time (in milliseconds)    | `3600000` (about 1 hr) |
-| `gravitino.cache.enableStats`    | Whether to enable cache statistics logging | `false`                |
-| `gravitino.cache.enableWeigher`  | Whether to enable weight-based eviction    | `true`                 |
+| Configuration Key                | Description                                | Default Value          | Required | Since Version |
+|----------------------------------|--------------------------------------------|------------------------|----------|---------------|
+| `gravitino.cache.enabled`        | Whether to enable caching                  | `true`                 | Yes      | 1.0.0         |
+| `gravitino.cache.implementation` | Specifies the cache implementation         | `caffeine`             | Yes      | 1.0.0         |
+| `gravitino.cache.maxEntries`     | Maximum number of entries allowed in cache | `10000`                | No       | 1.0.0         |
+| `gravitino.cache.expireTimeInMs` | Cache expiration time (in milliseconds)    | `3600000` (about 1 hr) | No       | 1.0.0         |
+| `gravitino.cache.enableStats`    | Whether to enable cache statistics logging | `false`                | No       | 1.0.0         |
+| `gravitino.cache.enableWeigher`  | Whether to enable weight-based eviction    | `true`                 | No       | 1.0.0         |
 
 - `gravitino.cache.enableWeigher`: When enabled, eviction is based on weight and `maxEntries` will be ignored.
 - `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
 - If `gravitino.cache.enableStats` is enabled, Gravitino will log cache statistics (hit count, miss count, load failures, etc.) every 5 minutes at the Info level.
 
-#### Eviction Strategies
+#### Eviction strategies
 
 Gravitino supports multiple eviction strategies including capacity-based, weight-based, and time-based (TTL) eviction. The following describes how they work with Caffeine:
 
-##### Capacity-Based Eviction
+##### Capacity-based eviction
 
 When `gravitino.cache.enableWeigher` is **disabled**, Gravitino limits the number of cached entries using `gravitino.cache.maxEntries` and employs Caffeine’s W-TinyLFU eviction policy to remove the least-used entries when the cache is full.
 
-##### Weight-Based Eviction
+##### Weight-based eviction
 
 When `gravitino.cache.enableWeigher` is **enabled**, Gravitino uses a combination of `maximumWeight` and a custom weigher to control the total weight of the cache:
 
@@ -117,7 +117,7 @@ When `gravitino.cache.enableWeigher` is **enabled**, Gravitino uses a combinatio
 - If a single cache item exceeds the total weight limit, it will not be cached;
 - When this strategy is active, `maxEntries` will be ignored.
 
-##### Time-Based Eviction (TTL)
+##### Time-based eviction
 
 All cache entries are subject to a TTL (Time-To-Live) expiration policy. By default, the TTL is `3600000ms` (1 hour) and can be adjusted via the `gravitino.cache.expireTimeInMs` setting:
 
