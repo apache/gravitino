@@ -851,9 +851,11 @@ tasks {
         it.parent?.name != "bundles"
       ) {
         dependsOn("${it.name}:build")
-        from("${it.name}/build/libs")
+        from("${it.name}/build/libs") {
+          include("*.jar")
+          exclude("*-jcstress.jar")
+        }
         into("distribution/package/libs")
-        include("*.jar")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
