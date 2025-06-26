@@ -22,7 +22,6 @@ import java.util.HashMap;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.ITUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -45,7 +44,6 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    System.setProperty(ITUtils.TEST_MODE, ITUtils.EMBEDDED_TEST_MODE);
     // Enable authorization
     customConfigs.putAll(
         ImmutableMap.of(
