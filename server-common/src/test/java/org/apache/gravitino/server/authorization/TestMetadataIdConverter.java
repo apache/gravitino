@@ -55,31 +55,29 @@ import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
 import org.mockito.MockedStatic;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMetadataIdConverter {
-  private EntityStore mockStore;
-  private NameIdentifier ident1;
-  private NameIdentifier ident2;
-  private NameIdentifier ident3;
-  private NameIdentifier ident4;
-  private NameIdentifier ident5;
-  private NameIdentifier ident6;
-  private NameIdentifier ident7;
+  private static EntityStore mockStore;
+  private static NameIdentifier ident1;
+  private static NameIdentifier ident2;
+  private static NameIdentifier ident3;
+  private static NameIdentifier ident4;
+  private static NameIdentifier ident5;
+  private static NameIdentifier ident6;
+  private static NameIdentifier ident7;
 
   // Test Entities
-  private BaseMetalake entity1;
-  private CatalogEntity entity2;
-  private SchemaEntity entity3;
-  private TableEntity entity4;
-  private ModelEntity entity5;
-  private FilesetEntity entity6;
-  private TopicEntity entity7;
+  private static BaseMetalake entity1;
+  private static CatalogEntity entity2;
+  private static SchemaEntity entity3;
+  private static TableEntity entity4;
+  private static ModelEntity entity5;
+  private static FilesetEntity entity6;
+  private static TopicEntity entity7;
 
   @BeforeAll
-  void initTest() throws IOException {
+  static void initTest() throws IOException {
     initTestNameIdentifier();
     initTestEntities();
     initMockCache();
@@ -190,7 +188,7 @@ public class TestMetadataIdConverter {
     }
   }
 
-  private void initTestNameIdentifier() {
+  private static void initTestNameIdentifier() {
     ident1 = NameIdentifier.of("metalake");
     ident2 = NameIdentifier.of("metalake", "catalog");
     ident3 = NameIdentifier.of("metalake", "catalog", "schema");
@@ -200,7 +198,7 @@ public class TestMetadataIdConverter {
     ident7 = NameIdentifier.of("metalake", "catalog", "schema", "topic");
   }
 
-  private void initTestEntities() {
+  private static void initTestEntities() {
     entity1 = getTestMetalake(1L, "metalake", "test_metalake");
     entity2 = getTestCatalogEntity(2L, "catlaog", Namespace.of("metalake"), "hive", "test_catalog");
     entity3 = getTestSchemaEntity(3L, "schema", Namespace.of("metalake", "catalog"), "test_schema");
@@ -219,7 +217,7 @@ public class TestMetadataIdConverter {
             7L, "topic", Namespace.of("metalake", "catalog", "schema"), "test_topic");
   }
 
-  private void initMockCache() throws IOException {
+  private static void initMockCache() throws IOException {
     mockStore = mock(EntityStore.class);
 
     when(mockStore.get(ident1, Entity.EntityType.METALAKE, BaseMetalake.class)).thenReturn(entity1);
@@ -231,7 +229,7 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);
   }
 
-  private BaseMetalake getTestMetalake(long id, String name, String comment) {
+  private static BaseMetalake getTestMetalake(long id, String name, String comment) {
     return BaseMetalake.builder()
         .withId(id)
         .withName(name)
@@ -242,7 +240,7 @@ public class TestMetadataIdConverter {
         .build();
   }
 
-  public CatalogEntity getTestCatalogEntity(
+  public static CatalogEntity getTestCatalogEntity(
       long id, String name, Namespace namespace, String provider, String comment) {
     return CatalogEntity.builder()
         .withId(id)
@@ -256,7 +254,7 @@ public class TestMetadataIdConverter {
         .build();
   }
 
-  private SchemaEntity getTestSchemaEntity(
+  private static SchemaEntity getTestSchemaEntity(
       long id, String name, Namespace namespace, String comment) {
     return SchemaEntity.builder()
         .withId(id)
@@ -268,7 +266,7 @@ public class TestMetadataIdConverter {
         .build();
   }
 
-  private TableEntity getTestTableEntity(long id, String name, Namespace namespace) {
+  private static TableEntity getTestTableEntity(long id, String name, Namespace namespace) {
 
     return TableEntity.builder()
         .withId(id)
@@ -279,7 +277,7 @@ public class TestMetadataIdConverter {
         .build();
   }
 
-  private FilesetEntity getTestFileSetEntity(
+  private static FilesetEntity getTestFileSetEntity(
       long id,
       String name,
       String storageLocation,
@@ -298,7 +296,7 @@ public class TestMetadataIdConverter {
         .build();
   }
 
-  private ModelEntity getTestModelEntity(long id, String name, Namespace namespace) {
+  private static ModelEntity getTestModelEntity(long id, String name, Namespace namespace) {
     return ModelEntity.builder()
         .withId(id)
         .withName(name)
@@ -308,7 +306,7 @@ public class TestMetadataIdConverter {
         .build();
   }
 
-  private AuditInfo getTestAuditInfo() {
+  private static AuditInfo getTestAuditInfo() {
     return AuditInfo.builder()
         .withCreator("admin")
         .withCreateTime(Instant.now())
@@ -317,7 +315,7 @@ public class TestMetadataIdConverter {
         .build();
   }
 
-  private ColumnEntity getMockColumnEntity() {
+  private static ColumnEntity getMockColumnEntity() {
     ColumnEntity mockColumn = mock(ColumnEntity.class);
     when(mockColumn.name()).thenReturn("filed1");
     when(mockColumn.dataType()).thenReturn(Types.StringType.get());
@@ -327,7 +325,7 @@ public class TestMetadataIdConverter {
     return mockColumn;
   }
 
-  private TopicEntity getTestTopicEntity(
+  private static TopicEntity getTestTopicEntity(
       long id, String name, Namespace namespace, String comment) {
     return TopicEntity.builder()
         .withId(id)
