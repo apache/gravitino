@@ -102,7 +102,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    ;
     ImmutableList<String> policy =
         ImmutableList.of(
             String.valueOf(oldOwnerId),
