@@ -40,12 +40,23 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Stored procedure implementation for creating a new catalog in Gravitino.
+ *
+ * <p>This procedure allows creating a new catalog with specified properties and provider.
+ */
 public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
   private static final Logger LOG = LoggerFactory.getLogger(CreateCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
 
+  /**
+   * Constructs a new CreateCatalogStoredProcedure.
+   *
+   * @param catalogConnectorManager the catalog connector manager
+   * @param metalake the metalake name
+   */
   public CreateCatalogStoredProcedure(
       CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
@@ -74,6 +85,15 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
         GravitinoSystemTable.SYSTEM_TABLE_SCHEMA_NAME, "create_catalog", arguments, createCatalog);
   }
 
+  /**
+   * Creates a new catalog in Gravitino.
+   *
+   * @param catalogName the name of the catalog to create
+   * @param provider the provider of the catalog
+   * @param properties the properties of the catalog
+   * @param ignoreExist whether to ignore if the catalog already exists
+   * @throws TrinoException if the catalog already exists and ignoreExist is false
+   */
   public void createCatalog(
       String catalogName, String provider, Map<String, String> properties, boolean ignoreExist) {
     boolean exists =

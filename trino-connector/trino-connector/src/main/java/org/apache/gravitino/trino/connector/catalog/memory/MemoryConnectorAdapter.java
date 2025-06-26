@@ -36,6 +36,10 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   private static final String CONNECTOR_MEMORY = "memory";
   private final HasPropertyMeta propertyMetadata;
 
+  /**
+   * Constructs a new MemoryConnectorAdapter. Initializes the property metadata for handling
+   * memory-specific configurations.
+   */
   public MemoryConnectorAdapter() {
     this.propertyMetadata = new MemoryPropertyMeta();
   }

@@ -28,26 +28,53 @@ public class GravitinoSchema {
   private final Map<String, String> properties;
   private final String comment;
 
+  /**
+   * Constructs a new GravitinoSchema from a Gravitino Schema object.
+   *
+   * @param schema the Gravitino Schema object
+   */
   public GravitinoSchema(Schema schema) {
     this.schemaName = schema.name();
     this.properties = schema.properties();
     this.comment = schema.comment();
   }
 
+  /**
+   * Constructs a new GravitinoSchema with the specified name, properties, and comment.
+   *
+   * @param schemaName the name of the schema
+   * @param properties the properties of the schema
+   * @param comment the comment of the schema
+   */
   public GravitinoSchema(String schemaName, Map<String, String> properties, String comment) {
     this.schemaName = schemaName;
     this.properties = properties;
     this.comment = comment;
   }
 
+  /**
+   * Gets the properties of the schema.
+   *
+   * @return the properties map
+   */
   public Map<String, String> getProperties() {
     return properties;
   }
 
+  /**
+   * Gets the name of the schema.
+   *
+   * @return the schema name
+   */
   public String getName() {
     return schemaName;
   }
 
+  /**
+   * Gets the comment of the schema.
+   *
+   * @return the schema comment
+   */
   public String getComment() {
     return comment;
   }

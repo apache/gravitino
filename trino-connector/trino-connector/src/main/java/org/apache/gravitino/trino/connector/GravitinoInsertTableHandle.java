@@ -29,11 +29,21 @@ public class GravitinoInsertTableHandle
   private HandleWrapper<ConnectorInsertTableHandle> handleWrapper =
       new HandleWrapper<>(ConnectorInsertTableHandle.class);
 
+  /**
+   * Constructs a new GravitinoInsertTableHandle from a serialized handle string.
+   *
+   * @param handleString the serialized handle string
+   */
   @JsonCreator
   public GravitinoInsertTableHandle(@JsonProperty(HANDLE_STRING) String handleString) {
     this.handleWrapper = handleWrapper.fromJson(handleString);
   }
 
+  /**
+   * Constructs a new GravitinoInsertTableHandle from a ConnectorInsertTableHandle.
+   *
+   * @param insertTableHandle the internal connector insert table handle
+   */
   public GravitinoInsertTableHandle(ConnectorInsertTableHandle insertTableHandle) {
     this.handleWrapper = new HandleWrapper<>(insertTableHandle);
   }
