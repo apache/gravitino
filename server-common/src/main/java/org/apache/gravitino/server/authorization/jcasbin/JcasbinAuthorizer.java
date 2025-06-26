@@ -17,7 +17,6 @@
 
 package org.apache.gravitino.server.authorization.jcasbin;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
@@ -102,12 +101,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    Long metadataId = null;
-    try {
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+    ;
     ImmutableList<String> policy =
         ImmutableList.of(
             String.valueOf(oldOwnerId),
@@ -155,12 +150,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String username, String metalake, MetadataObject metadataObject, String privilege) {
     Long metalakeId = getMetalakeId(metalake);
     Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
-    Long metadataId = null;
-    try {
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     loadPrivilege(metalake, username, userId, metadataObject, metadataId);
     return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
   }
@@ -227,25 +217,19 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private void loadPolicyByRoleEntity(RoleEntity roleEntity) {
-    try {
-      String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
-      List<SecurableObject> securableObjects = roleEntity.securableObjects();
+    String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
+    List<SecurableObject> securableObjects = roleEntity.securableObjects();
 
-      for (SecurableObject securableObject : securableObjects) {
-        for (Privilege privilege : securableObject.privileges()) {
-          Privilege.Condition condition = privilege.condition();
-          enforcer.addPolicy(
-              String.valueOf(roleEntity.id()),
-              securableObject.type().name(),
-              String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-              privilege.name().name().toUpperCase(),
-              condition.name().toLowerCase());
-        }
+    for (SecurableObject securableObject : securableObjects) {
+      for (Privilege privilege : securableObject.privileges()) {
+        Privilege.Condition condition = privilege.condition();
+        enforcer.addPolicy(
+            String.valueOf(roleEntity.id()),
+            securableObject.type().name(),
+            String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
+            privilege.name().name().toUpperCase(),
+            condition.name().toLowerCase());
       }
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Can not parse privilege names", e);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 }
