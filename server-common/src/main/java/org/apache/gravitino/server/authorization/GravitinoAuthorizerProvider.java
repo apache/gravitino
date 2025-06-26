@@ -19,6 +19,7 @@ package org.apache.gravitino.server.authorization;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
@@ -48,7 +49,8 @@ public class GravitinoAuthorizerProvider implements Closeable {
       synchronized (this) {
         if (gravitinoAuthorizer == null) {
           boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
-          if (enableAuthorization) {
+          if (enableAuthorization
+              && Objects.equals("jcasbin", serverConfig.get(Configs.AUTHORIZATION_TYPE))) {
             gravitinoAuthorizer = new JcasbinAuthorizer();
           } else {
             gravitinoAuthorizer = new PassThroughAuthorizer();

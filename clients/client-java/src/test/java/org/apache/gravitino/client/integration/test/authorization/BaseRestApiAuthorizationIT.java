@@ -46,7 +46,13 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
     System.setProperty(ITUtils.TEST_MODE, ITUtils.EMBEDDED_TEST_MODE);
     // Enable authorization
     customConfigs.putAll(
-        ImmutableMap.of("SimpleAuthUserName", USER, Configs.ENABLE_AUTHORIZATION.getKey(), "true"));
+        ImmutableMap.of(
+            "SimpleAuthUserName",
+            USER,
+            Configs.ENABLE_AUTHORIZATION.getKey(),
+            "true",
+            Configs.AUTHORIZATION_TYPE.getKey(),
+            "jcasbin"));
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);

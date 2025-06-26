@@ -285,6 +285,13 @@ public class Configs {
           .booleanConf()
           .createWithDefault(false);
 
+  public static final ConfigEntry<String> AUTHORIZATION_TYPE =
+      new ConfigBuilder("gravitino.authorization.type")
+          .doc("Enable the authorization")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault("pass");
+
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
           .doc("The admins of Gravitino service")

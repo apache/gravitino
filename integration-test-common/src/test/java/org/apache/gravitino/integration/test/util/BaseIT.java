@@ -65,7 +65,6 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
 /**
@@ -228,7 +227,6 @@ public class BaseIT {
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
     String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
-    LOG.info("MySQL URL: {}", mysqlUrl);
     // Connect to the mysql docker and create a databases
     try (Connection connection =
             DriverManager.getConnection(
@@ -304,7 +302,6 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
-    LOG.info("testMode {}", testMode);
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -331,8 +328,6 @@ public class BaseIT {
           .pollInterval(1, TimeUnit.SECONDS)
           .until(() -> HttpUtils.isHttpServerUp(checkServerUrl));
     }
-    LOG.info("serverConfig {}", new ObjectMapper().writeValueAsString(serverConfig));
-    LOG.info("Enable authorization {}", serverConfig.get(Configs.ENABLE_AUTHORIZATION));
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
