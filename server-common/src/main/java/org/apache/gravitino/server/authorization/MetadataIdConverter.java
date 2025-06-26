@@ -97,7 +97,6 @@ public class MetadataIdConverter {
    * @param metadataObject The metadata object to convert.
    * @param metalake The metalake name.
    * @return The metadata id.
-   * @throws IOException if an error occurs while loading the entity.
    */
   public static Long getID(MetadataObject metadataObject, String metalake) {
     Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
