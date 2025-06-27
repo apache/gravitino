@@ -37,9 +37,10 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments.
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                           | Default value | Required | Since Version    |
-|-------------------------------------|---------------------------------------------------|-------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `aws-irsa` for AWS IRSA credential provider.     | (none)        | Yes      | 0.9.0-incubating |
+
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations  | Description                                  | Default value | Required | Since Version    |
+|-------------------------------------|-----------------------------------------------|----------------------------------------------|---------------|----------|------------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers` | `aws-irsa` for AWS IRSA credential provider. | (none)        | Yes      | 0.X.0-incubating |
 
 #### S3 secret key credential
 
