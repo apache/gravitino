@@ -80,6 +80,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     this.store = store;
     this.idGenerator = idGenerator;
 
+    // preload all metalakes and put them into cache, this is useful when user load schema/table
+    // directly without list/get metalake first.
     BaseMetalake[] baseMetalakes = listMetalakes();
     for (BaseMetalake baseMetalake : baseMetalakes) {
       loadMetalake(baseMetalake.nameIdentifier());
