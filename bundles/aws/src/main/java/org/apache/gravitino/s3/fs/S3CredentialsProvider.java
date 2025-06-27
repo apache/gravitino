@@ -26,10 +26,10 @@ import com.amazonaws.auth.BasicSessionCredentials;
 import java.net.URI;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
-import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.hadoop.conf.Configuration;
 
 public class S3CredentialsProvider implements AWSCredentialsProvider {

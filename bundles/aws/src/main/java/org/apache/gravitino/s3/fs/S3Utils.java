@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.s3.fs;
 
+import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
-import org.apache.gravitino.credential.AwsIrsaCredential;
 
 public class S3Utils {
 

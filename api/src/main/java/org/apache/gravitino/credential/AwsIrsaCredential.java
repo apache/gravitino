@@ -18,7 +18,8 @@ public class AwsIrsaCredential implements Credential {
   private String sessionToken;
   private long expireTimeInMs;
 
-  public AwsIrsaCredential(String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
+  public AwsIrsaCredential(
+      String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
     validate(accessKeyId, secretAccessKey, sessionToken);
     this.accessKeyId = accessKeyId;
     this.secretAccessKey = secretAccessKey;
@@ -72,8 +73,11 @@ public class AwsIrsaCredential implements Credential {
   }
 
   private void validate(String accessKeyId, String secretAccessKey, String sessionToken) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(accessKeyId), "Access key Id should not be empty");
-    Preconditions.checkArgument(StringUtils.isNotBlank(secretAccessKey), "Secret access key should not be empty");
-    Preconditions.checkArgument(StringUtils.isNotBlank(sessionToken), "Session token should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accessKeyId), "Access key Id should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(secretAccessKey), "Secret access key should not be empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(sessionToken), "Session token should not be empty");
   }
-} 
+}
