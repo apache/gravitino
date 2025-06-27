@@ -19,4 +19,4 @@
 # under the License.
 #
 
-java -jar ../../cli/build/libs/gravitino-cli-*-incubating-SNAPSHOT.jar "$@"
+java -jar ../../cli/build/libs/gravitino-cli-*-SNAPSHOT.jar "$@"
