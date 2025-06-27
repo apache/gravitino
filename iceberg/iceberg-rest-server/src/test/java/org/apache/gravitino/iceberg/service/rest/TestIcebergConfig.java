@@ -99,7 +99,7 @@ public class TestIcebergConfig extends IcebergTestBase {
     Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouse);
     Response resp =
         getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
-    Assertions.assertEquals(500, resp.getStatus());
+    Assertions.assertEquals(404, resp.getStatus());
   }
 
   @ParameterizedTest
