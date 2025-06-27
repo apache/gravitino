@@ -17,7 +17,7 @@
 # under the License.
 #
 apiVersion: v2
-appVersion: 0.9.1-SNAPSHOT
+appVersion: 0.9.1
 description: Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake. It manages the metadata directly in different sources, types, and regions. It also provides users with unified metadata access for data and AI assets.
 home: https://gravitino.apache.org
 annotations:
@@ -35,4 +35,4 @@ maintainers:
 name: gravitino
 sources:
   - https://github.com/apache/gravitino
-version: 0.9.8
+version: 0.9.9
