@@ -79,6 +79,11 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
   public MetalakeManager(EntityStore store, IdGenerator idGenerator) {
     this.store = store;
     this.idGenerator = idGenerator;
+
+    BaseMetalake[] baseMetalakes = listMetalakes();
+    for (BaseMetalake baseMetalake : baseMetalakes) {
+      loadMetalake(baseMetalake.nameIdentifier());
+    }
   }
 
   /**
