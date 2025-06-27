@@ -7,16 +7,16 @@ import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
 
 public class AwsIrsaCredentialProvider implements CredentialProvider {
 
-  private DefaultCredentialsProvider credentialsProvider;
+  private WebIdentityTokenFileCredentialsProvider credentialsProvider;
 
   @Override
   public void initialize(Map<String, String> properties) {
-    // DefaultCredentialsProvider will pick up IRSA environment variables automatically
-    this.credentialsProvider = DefaultCredentialsProvider.create();
+    // Use WebIdentityTokenFileCredentialsProvider for IRSA
+    this.credentialsProvider = WebIdentityTokenFileCredentialsProvider.create();
   }
 
   @Override
