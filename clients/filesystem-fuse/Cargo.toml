@@ -17,7 +17,7 @@
 
 [package]
 name = "filesystem-fuse"
-version = "0.9.1-SNAPSHOT"
+version = "0.9.1"
 rust-version = "1.75"
 edition = "2021"
 
