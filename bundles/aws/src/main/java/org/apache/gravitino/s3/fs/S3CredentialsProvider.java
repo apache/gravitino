@@ -29,6 +29,7 @@ import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProv
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.hadoop.conf.Configuration;
 
 public class S3CredentialsProvider implements AWSCredentialsProvider {
@@ -75,6 +76,13 @@ public class S3CredentialsProvider implements AWSCredentialsProvider {
               s3TokenCredential.accessKeyId(),
               s3TokenCredential.secretAccessKey(),
               s3TokenCredential.sessionToken());
+    } else if (credential instanceof AwsIrsaCredential) {
+      AwsIrsaCredential awsIrsaCredential = (AwsIrsaCredential) credential;
+      basicSessionCredentials =
+          new BasicSessionCredentials(
+              awsIrsaCredential.accessKeyId(),
+              awsIrsaCredential.secretAccessKey(),
+              awsIrsaCredential.sessionToken());
     }
 
     if (credential.expireTimeInMs() > 0) {

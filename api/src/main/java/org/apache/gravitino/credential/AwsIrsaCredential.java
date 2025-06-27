@@ -8,7 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 /** Generic AWS IRSA credential. */
 public class AwsIrsaCredential implements Credential {
 
-  public static final String AWS_IRSA_CREDENTIAL_TYPE = "aws-irsa-token";
+  public static final String AWS_IRSA_CREDENTIAL_TYPE = "aws-irsa";
   public static final String ACCESS_KEY_ID = "access-key-id";
   public static final String SECRET_ACCESS_KEY = "secret-access-key";
   public static final String SESSION_TOKEN = "session-token";
@@ -43,9 +43,7 @@ public class AwsIrsaCredential implements Credential {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
     builder.put(ACCESS_KEY_ID, accessKeyId);
     builder.put(SECRET_ACCESS_KEY, secretAccessKey);
-    if (sessionToken != null) {
-      builder.put(SESSION_TOKEN, sessionToken);
-    }
+    builder.put(SESSION_TOKEN, sessionToken);
     return builder.build();
   }
 

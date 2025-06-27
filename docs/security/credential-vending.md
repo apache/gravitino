@@ -14,7 +14,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 - Supports Gravitino Iceberg REST server.
 - Supports Gravitino server, only support Hadoop catalog.
 - Supports pluggable credentials with build-in credentials:
-  - S3: `S3TokenCredential`, `S3SecretKeyCredential`
+  - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
@@ -32,6 +32,16 @@ Gravitino credential vending is used to generate temporary or static credentials
 ## Build-in credentials configurations
 
 ### S3 credentials
+
+#### S3 IRSA credential
+
+A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments.
+
+> **Note:** You must specify the S3 region in your configuration when using IRSA. IRSA provides credentials, but not the region information.
+
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                           | Default value | Required | Since Version    |
+|-------------------------------------|---------------------------------------------------|-------------------------------------------------------|---------------|----------|------------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `aws-irsa` for AWS IRSA credential provider.     | (none)        | Yes      | 0.9.0-incubating |
 
 #### S3 secret key credential
 
