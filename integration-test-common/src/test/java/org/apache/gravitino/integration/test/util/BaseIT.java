@@ -227,6 +227,7 @@ public class BaseIT {
     MYSQL_CONTAINER = containerSuite.getMySQLContainer();
 
     String mysqlUrl = MYSQL_CONTAINER.getJdbcUrl(META_DATA);
+    LOG.info("MySQL URL: {}", mysqlUrl);
     // Connect to the mysql docker and create a databases
     try (Connection connection =
             DriverManager.getConnection(
