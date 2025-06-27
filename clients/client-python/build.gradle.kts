@@ -298,7 +298,6 @@ tasks {
 
     doLast {
       delete("README.md")
-      delete("DISCLAIMER.txt")
     }
   }
 
