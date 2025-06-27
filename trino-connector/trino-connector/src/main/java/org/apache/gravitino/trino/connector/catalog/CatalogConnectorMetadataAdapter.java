@@ -45,12 +45,28 @@ import org.slf4j.LoggerFactory;
 public class CatalogConnectorMetadataAdapter {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorMetadataAdapter.class);
+
+  /** The list of schema properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> schemaProperties;
+
+  /** The list of table properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> tableProperties;
+
+  /** The list of column properties supported by this catalog connector. */
   protected final List<PropertyMetadata<?>> columnProperties;
 
+  /** The data type transformer used to convert between Gravitino and Trino types. */
   protected final GeneralDataTypeTransformer dataTypeTransformer;
 
+  /**
+   * Constructs a new CatalogConnectorMetadataAdapter.
+   *
+   * @param schemaProperties The list of schema properties supported by this catalog connector
+   * @param tableProperties The list of table properties supported by this catalog connector
+   * @param columnProperties The list of column properties supported by this catalog connector
+   * @param dataTypeTransformer The data type transformer used to convert between Gravitino and
+   *     Trino types
+   */
   protected CatalogConnectorMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
@@ -62,15 +78,31 @@ public class CatalogConnectorMetadataAdapter {
     this.dataTypeTransformer = dataTypeTransformer;
   }
 
+  /**
+   * Retrieves the schema properties for the specified Gravitino schema.
+   *
+   * @param schema the Gravitino schema
+   * @return a map of schema properties
+   */
   public Map<String, Object> getSchemaProperties(GravitinoSchema schema) {
     return toTrinoSchemaProperties(schema.getProperties());
   }
 
+  /**
+   * Retrieves the data type transformer for the specified Gravitino schema.
+   *
+   * @return the data type transformer
+   */
   public GeneralDataTypeTransformer getDataTypeTransformer() {
     return dataTypeTransformer;
   }
 
-  /** Transform Gravitino table metadata to Trino ConnectorTableMetadata */
+  /**
+   * Transform Gravitino table metadata to Trino ConnectorTableMetadata
+   *
+   * @param gravitinoTable the Gravitino table
+   * @return the Trino ConnectorTableMetadata
+   */
   public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
     SchemaTableName schemaTableName =
         new SchemaTableName(gravitinoTable.getSchemaName(), gravitinoTable.getName());
@@ -87,7 +119,12 @@ public class CatalogConnectorMetadataAdapter {
         Optional.ofNullable(gravitinoTable.getComment()));
   }
 
-  /** Transform Trino ConnectorTableMetadata to Gravitino table metadata */
+  /**
+   * Transform Trino ConnectorTableMetadata to Gravitino table metadata
+   *
+   * @param tableMetadata the Trino ConnectorTableMetadata
+   * @return the Gravitino table metadata
+   */
   public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();
     String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
@@ -111,6 +148,13 @@ public class CatalogConnectorMetadataAdapter {
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
   }
 
+  /**
+   * Removes specified keys from a map of properties.
+   *
+   * @param properties the map of properties to remove keys from
+   * @param keyToDelete the set of keys to remove
+   * @return a new map with the specified keys removed
+   */
   protected Map<String, Object> removeKeys(
       Map<String, Object> properties, Set<String> keyToDelete) {
     return properties.entrySet().stream()
@@ -118,12 +162,23 @@ public class CatalogConnectorMetadataAdapter {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
-  /** Transform Trino schema metadata to Gravitino schema metadata */
+  /**
+   * Transform Trino schema metadata to Gravitino schema metadata
+   *
+   * @param schemaName the name of the schema
+   * @param properties the properties of the schema
+   * @return the Gravitino schema metadata
+   */
   public GravitinoSchema createSchema(String schemaName, Map<String, Object> properties) {
     return new GravitinoSchema(schemaName, toGravitinoSchemaProperties(properties), "");
   }
 
-  /** Transform Gravitino column metadata to Trino ColumnMetadata */
+  /**
+   * Transform Gravitino column metadata to Trino ColumnMetadata
+   *
+   * @param column the Gravitino column
+   * @return the Trino ColumnMetadata
+   */
   public ColumnMetadata getColumnMetadata(GravitinoColumn column) {
     return ColumnMetadata.builder()
         .setName(column.getName())
@@ -135,12 +190,23 @@ public class CatalogConnectorMetadataAdapter {
         .build();
   }
 
-  /** Transform Gravitino table properties to Trino ConnectorTableProperties */
+  /**
+   * Transform Gravitino table properties to Trino ConnectorTableProperties
+   *
+   * @param table the Gravitino table
+   * @return the Trino ConnectorTableProperties
+   */
   public ConnectorTableProperties getTableProperties(GravitinoTable table) {
     throw new NotImplementedException();
   }
 
-  /** Normalize Gravitino attributes for Trino */
+  /**
+   * Normalize Gravitino attributes for Trino
+   *
+   * @param properties the Gravitino properties
+   * @param propertyTemplate the Trino property template
+   * @return the normalized properties
+   */
   private Map<String, Object> normalizeProperties(
       Map<String, String> properties, List<PropertyMetadata<?>> propertyTemplate) {
     // TODO yuhui redo this function once Gravitino table properties are supported..
@@ -157,33 +223,64 @@ public class CatalogConnectorMetadataAdapter {
     return validProperties;
   }
 
-  /** Normalize Gravitino table attributes for Trino */
+  /**
+   * Normalize Gravitino table attributes for Trino
+   *
+   * @param properties the Gravitino properties
+   * @return the Trino properties
+   */
   public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
     return normalizeProperties(properties, tableProperties);
   }
 
-  /** Normalize Gravitino schema attributes for Trino */
+  /**
+   * Normalize Gravitino schema attributes for Trino
+   *
+   * @param properties the Gravitino properties
+   * @return the Trino properties
+   */
   public Map<String, Object> toTrinoSchemaProperties(Map<String, String> properties) {
     return normalizeProperties(properties, schemaProperties);
   }
 
-  /** Normalize Trino table attributes for Gravitino */
+  /**
+   * Normalize Trino table attributes for Gravitino
+   *
+   * @param properties the Trino properties
+   * @return the Gravitino properties
+   */
   public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
     return removeUnsetProperties(properties);
   }
 
-  /** Normalize Trino schema attributes for Gravitino */
+  /**
+   * Normalize Trino schema attributes for Gravitino
+   *
+   * @param properties the Trino properties
+   * @return the Gravitino properties
+   */
   public Map<String, String> toGravitinoSchemaProperties(Map<String, Object> properties) {
     return removeUnsetProperties(properties);
   }
 
-  /** Remove Trino unset attributes for Gravitino */
+  /**
+   * Remove Trino unset attributes for Gravitino
+   *
+   * @param properties the Trino properties
+   * @return the Gravitino properties
+   */
   private Map<String, String> removeUnsetProperties(Map<String, Object> properties) {
     return properties.entrySet().stream()
         .filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
   }
 
+  /**
+   * Creates a new Gravitino column from a Trino ColumnMetadata.
+   *
+   * @param column the Trino ColumnMetadata
+   * @return the new Gravitino column
+   */
   public GravitinoColumn createColumn(ColumnMetadata column) {
     return new GravitinoColumn(
         column.getName(),

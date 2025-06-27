@@ -42,13 +42,21 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 public class TrinoClusterConnectorAdapter implements CatalogConnectorAdapter {
 
   private static final String CONNECTOR_CLUSTER = "trino";
+  /** Configuration key for the Trino cluster connection URL. */
   public static final String TRINO_CLUSTER_URL_KEY = "cloud.trino.connection-url";
+  /** Configuration key for the Trino cluster user name. */
   public static final String TRINO_CLUSTER_USER_KEY = "cloud.trino.connection-user";
+  /** Configuration key for the Trino cluster password. */
   public static final String TRINO_CLUSTER_PASSWORD_KEY = "cloud.trino.connection-password";
+  /** Default user name for Trino cluster connection. */
   public static final String TRINO_CLUSTER_DEFAULT_USER = "admin";
 
   private final HasPropertyMeta propertyMetadata;
 
+  /**
+   * Constructs a new TrinoClusterConnectorAdapter. Initializes the property metadata for Trino
+   * cluster-specific configurations.
+   */
   public TrinoClusterConnectorAdapter() {
     this.propertyMetadata = new TrinoClusterPropertyMeta();
   }

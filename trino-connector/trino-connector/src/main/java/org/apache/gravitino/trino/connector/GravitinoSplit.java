@@ -35,11 +35,21 @@ public class GravitinoSplit implements ConnectorSplit, GravitinoHandle<Connector
 
   private HandleWrapper<ConnectorSplit> handleWrapper = new HandleWrapper<>(ConnectorSplit.class);
 
+  /**
+   * Constructs a new GravitinoSplit from a serialized handle string.
+   *
+   * @param handleString the serialized handle string
+   */
   @JsonCreator
   public GravitinoSplit(@JsonProperty(HANDLE_STRING) String handleString) {
     this.handleWrapper = handleWrapper.fromJson(handleString);
   }
 
+  /**
+   * Constructs a new GravitinoSplit from a ConnectorSplit.
+   *
+   * @param split the internal connector split
+   */
   public GravitinoSplit(ConnectorSplit split) {
     this.handleWrapper = new HandleWrapper<>(split);
   }

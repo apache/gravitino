@@ -55,6 +55,12 @@ import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 /** This class is used to transform datatype between Apache Gravitino and Trino */
 public class GeneralDataTypeTransformer {
 
+  /**
+   * Transforms a Gravitino datatype to a Trino datatype.
+   *
+   * @param type the Gravitino datatype
+   * @return the Trino datatype
+   */
   public Type getTrinoType(org.apache.gravitino.rel.types.Type type) {
     switch (type.name()) {
       case BOOLEAN:
@@ -149,6 +155,12 @@ public class GeneralDataTypeTransformer {
     return StructType.of(fields);
   }
 
+  /**
+   * Transforms a Trino datatype to a Gravitino datatype.
+   *
+   * @param type the Trino datatype
+   * @return the Gravitino datatype
+   */
   public org.apache.gravitino.rel.types.Type getGravitinoType(Type type) {
     Class<? extends Type> typeClass = type.getClass();
 
