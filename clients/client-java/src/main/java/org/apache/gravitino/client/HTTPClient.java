@@ -97,17 +97,17 @@ public class HTTPClient implements RESTClient {
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
    * @param authDataProvider The provider of authentication data.
    * @param beforeConnectHandler The function to be executed before connecting to the server.
+   * @param clientBuilder the HttpClientBuilder for the HTTP client.
    */
   private HTTPClient(
       String uri,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       AuthDataProvider authDataProvider,
-      Runnable beforeConnectHandler) {
+      Runnable beforeConnectHandler,
+      HttpClientBuilder clientBuilder) {
     this.uri = uri;
     this.mapper = objectMapper;
-
-    HttpClientBuilder clientBuilder = HttpClients.custom();
 
     if (baseHeaders != null) {
       clientBuilder.setDefaultHeaders(
@@ -714,6 +714,7 @@ public class HTTPClient implements RESTClient {
     private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
     private AuthDataProvider authDataProvider;
     private Runnable beforeConnectHandler;
+    private HttpClientBuilder httpClientBuilder = HttpClients.custom();
 
     private Builder(Map<String, String> properties) {
       this.properties = properties;
@@ -789,13 +790,27 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
+     * Sets the HttpClientBuilder for the HTTP client.
+     *
+     * @param httpClientBuilder The HttpClientBuilder for the HTTP client.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withHttpClientBuilder(HttpClientBuilder httpClientBuilder) {
+      if (httpClientBuilder != null) {
+        this.httpClientBuilder = httpClientBuilder;
+      }
+      return this;
+    }
+
+    /**
      * Builds and returns an instance of the HTTPClient with the configured options.
      *
      * @return An instance of HTTPClient with the configured options.
      */
     public HTTPClient build() {
 
-      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler);
+      return new HTTPClient(
+          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, httpClientBuilder);
     }
   }
 

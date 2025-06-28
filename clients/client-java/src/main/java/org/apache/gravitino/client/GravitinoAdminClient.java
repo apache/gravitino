@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 
 /**
  * Apache Gravitino Client for the administrator to interact with the Gravitino API, allowing the
@@ -62,8 +63,9 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
       String uri,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
-      Map<String, String> headers) {
-    super(uri, authDataProvider, checkVersion, headers);
+      Map<String, String> headers,
+      HttpClientBuilder httpClientBuilder) {
+    super(uri, authDataProvider, checkVersion, headers, httpClientBuilder);
   }
 
   /**
@@ -256,7 +258,8 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     public GravitinoAdminClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
-      return new GravitinoAdminClient(uri, authDataProvider, checkVersion, headers);
+      return new GravitinoAdminClient(
+          uri, authDataProvider, checkVersion, headers, httpClientBuilder);
     }
   }
 }
