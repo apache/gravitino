@@ -20,6 +20,7 @@
 package org.apache.gravitino.tag;
 
 import java.util.Map;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -89,4 +90,13 @@ public interface TagOperations {
    * @return True if the tag is deleted, false if the tag does not exist.
    */
   boolean deleteTag(String name);
+
+  /**
+   * List all metadata objects associated with the specified tags.
+   *
+   * @param tagNames Array of tag names to query for associated objects.
+   * @return Array of metadata objects associated with the specified tags.
+   * @throws NoSuchTagException If any of the specified tags do not exist.
+   */
+  MetadataObject[] listMetadataObjectsForTags(String[] tagNames) throws NoSuchTagException;
 }

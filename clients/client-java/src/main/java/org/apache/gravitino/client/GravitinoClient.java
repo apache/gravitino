@@ -560,6 +560,11 @@ public class GravitinoClient extends GravitinoClientBase
     return getMetalake().deleteTag(name);
   }
 
+  @Override
+  public MetadataObject[] listMetadataObjectsForTags(String[] tagNames) throws NoSuchTagException {
+    return getMetalake().listMetadataObjectsForTags(tagNames);
+  }
+
   /** Builder class for constructing a GravitinoClient. */
   public static class ClientBuilder extends GravitinoClientBase.Builder<GravitinoClient> {
 

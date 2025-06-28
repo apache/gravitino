@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
@@ -43,10 +44,12 @@ import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -701,6 +704,77 @@ public class TestGravitinoMetalake extends TestBase {
     Throwable ex1 =
         Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.deleteTag(tagName));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testListMetadataObjectsForTags() throws JsonProcessingException {
+    String[] tagNames = {"tag1", "tag2"};
+    String path = "/api/metalakes/" + metalakeName + "/tags/objects";
+    Map<String, String> queryParams = Collections.singletonMap("tags", "tag1,tag2");
+
+    MetadataObjectDTO[] mockObjects = {
+      MetadataObjectDTO.builder()
+          .withName("catalog1")
+          .withType(MetadataObject.Type.CATALOG)
+          .build(),
+      MetadataObjectDTO.builder()
+          .withName("catalog1.schema1")
+          .withType(MetadataObject.Type.SCHEMA)
+          .build(),
+    };
+
+    MetadataObjectListResponse resp = new MetadataObjectListResponse(mockObjects);
+    buildMockResource(Method.GET, path, queryParams, null, resp, HttpStatus.SC_OK);
+
+    MetadataObject[] result = gravitinoClient.listMetadataObjectsForTags(tagNames);
+    Assertions.assertEquals(2, result.length);
+    Assertions.assertEquals("catalog1", result[0].fullName());
+    Assertions.assertEquals(MetadataObject.Type.CATALOG, result[0].type());
+    Assertions.assertEquals("catalog1.schema1", result[1].fullName());
+    Assertions.assertEquals(MetadataObject.Type.SCHEMA, result[1].type());
+
+    // Test with single tag
+    String[] singleTag = {"tag1"};
+    Map<String, String> singleQueryParams = Collections.singletonMap("tags", "tag1");
+    buildMockResource(Method.GET, path, singleQueryParams, null, resp, HttpStatus.SC_OK);
+
+    MetadataObject[] singleResult = gravitinoClient.listMetadataObjectsForTags(singleTag);
+    Assertions.assertEquals(2, singleResult.length);
+
+    // Test empty result
+    MetadataObjectListResponse emptyResp = new MetadataObjectListResponse(new MetadataObjectDTO[0]);
+    buildMockResource(Method.GET, path, queryParams, null, emptyResp, HttpStatus.SC_OK);
+
+    MetadataObject[] emptyResult = gravitinoClient.listMetadataObjectsForTags(tagNames);
+    Assertions.assertEquals(0, emptyResult.length);
+
+    // Test throw NoSuchMetalakeException
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.GET, path, queryParams, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class,
+            () -> gravitinoClient.listMetadataObjectsForTags(tagNames));
+    Assertions.assertTrue(ex.getMessage().contains("mock error"));
+
+    // Test throw NoSuchTagException
+    ErrorResponse errorResponse1 =
+        ErrorResponse.notFound(NoSuchTagException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.GET, path, queryParams, null, errorResponse1, HttpStatus.SC_NOT_FOUND);
+    Throwable ex1 =
+        Assertions.assertThrows(
+            NoSuchTagException.class, () -> gravitinoClient.listMetadataObjectsForTags(tagNames));
+    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+
+    // Test throw internal error
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
+    buildMockResource(
+        Method.GET, path, queryParams, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Throwable ex2 =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> gravitinoClient.listMetadataObjectsForTags(tagNames));
+    Assertions.assertTrue(ex2.getMessage().contains("mock error"));
   }
 
   @Test
