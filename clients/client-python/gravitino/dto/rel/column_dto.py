@@ -107,30 +107,9 @@ class ColumnDTO(Column, DataClassJsonMixin):
             f"Column cannot be non-nullable with a null default value: {self._name}.",
         )
 
-    @classmethod
-    def builder(
-        cls,
-        name: str,
-        data_type: Type,
-        comment: str,
-        nullable: bool = True,
-        auto_increment: bool = False,
-        default_value: Optional[Expression] = None,
-    ) -> ColumnDTO:
-        Precondition.check_argument(name is not None, "Column name cannot be null")
-        Precondition.check_argument(
-            data_type is not None, "Column data type cannot be null"
-        )
-        return ColumnDTO(
-            _name=name,
-            _data_type=data_type,
-            _comment=comment,
-            _nullable=nullable,
-            _auto_increment=auto_increment,
-            _default_value=(
-                Column.DEFAULT_VALUE_NOT_SET if default_value is None else default_value
-            ),
-        )
+    @staticmethod
+    def builder() -> ColumnDTO.Builder:
+        return ColumnDTO.Builder()
 
     def __eq__(self, other: ColumnDTO) -> bool:
         if not isinstance(other, ColumnDTO):
