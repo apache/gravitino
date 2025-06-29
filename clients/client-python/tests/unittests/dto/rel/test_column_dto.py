@@ -84,40 +84,50 @@ class TestColumnDTO(unittest.TestCase):
         self.assertNotEqual("column_1", column_dto_dict.get(column_dto_2))
 
     def test_column_dto_builder(self):
-        ColumnDTO.builder(
-            name="",
-            data_type=Types.StringType.get(),
-            comment="comment",
-            default_value=LiteralDTO(
-                value="default_value", data_type=Types.StringType.get()
-            ),
+        instance = (
+            ColumnDTO.builder()
+            .with_name(name="")
+            .with_data_type(data_type=Types.StringType.get())
+            .with_comment(comment="comment")
+            .with_default_value(
+                default_value=LiteralDTO(
+                    value="default_value", data_type=Types.StringType.get()
+                )
+            )
+            .build()
         )
+        self.assertIsInstance(instance, ColumnDTO)
+        self.assertEqual(instance.name(), "")
+        self.assertEqual(instance.data_type(), Types.StringType.get())
+        self.assertEqual(instance.comment(), "comment")
+        self.assertFalse(instance.auto_increment())
+        self.assertTrue(instance.nullable())
+        self.assertIsInstance(instance.default_value(), LiteralDTO)
+        self.assertEqual(instance.default_value().value(), "default_value")
 
         with self.assertRaisesRegex(
             IllegalArgumentException,
             "Column name cannot be null",
         ):
-            ColumnDTO.builder(
-                name=None,
-                data_type=Types.StringType.get(),
-                comment="comment",
+            ColumnDTO.builder().with_data_type(
+                data_type=Types.StringType.get()
+            ).with_comment(comment="comment").with_default_value(
                 default_value=LiteralDTO(
                     value="default_value", data_type=Types.StringType.get()
-                ),
-            )
+                )
+            ).build()
 
         with self.assertRaisesRegex(
             IllegalArgumentException,
             "Column data type cannot be null",
         ):
-            ColumnDTO.builder(
-                name="column",
-                data_type=None,
-                comment="comment",
+            ColumnDTO.builder().with_name(name="column").with_comment(
+                comment="comment"
+            ).with_default_value(
                 default_value=LiteralDTO(
                     value="default_value", data_type=Types.StringType.get()
-                ),
-            )
+                )
+            ).build()
 
     def test_column_dto_violate_non_nullable(self):
         column_dto = ColumnDTO.builder(
