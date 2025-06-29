@@ -62,11 +62,11 @@ class TestColumnDTO(unittest.TestCase):
             Types.UnparsedType.of(unparsed_type="unparsed_type"),
         ]
         cls._string_columns = [
-            ColumnDTO.builder(
-                name=f"column_{idx}",
-                data_type=Types.StringType.get(),
-                comment=f"column_{idx} comment",
-            )
+            ColumnDTO.builder()
+            .with_name(name=f"column_{idx}")
+            .with_data_type(data_type=Types.StringType.get())
+            .with_comment(comment=f"column_{idx} comment")
+            .build()
             for idx in range(3)
         ]
 
@@ -130,12 +130,16 @@ class TestColumnDTO(unittest.TestCase):
             ).build()
 
     def test_column_dto_violate_non_nullable(self):
-        column_dto = ColumnDTO.builder(
-            name="column_name",
-            data_type=Types.StringType.get(),
-            comment="comment",
-            nullable=False,
-            default_value=LiteralDTO(value="None", data_type=Types.NullType.get()),
+        column_dto = (
+            ColumnDTO.builder()
+            .with_name(name="column_name")
+            .with_data_type(data_type=Types.StringType.get())
+            .with_comment(comment="comment")
+            .with_nullable(nullable=False)
+            .with_default_value(
+                default_value=LiteralDTO(value="None", data_type=Types.NullType.get())
+            )
+            .build()
         )
         with self.assertRaisesRegex(
             IllegalArgumentException,
@@ -144,11 +148,14 @@ class TestColumnDTO(unittest.TestCase):
             column_dto.validate()
 
     def test_column_dto_default_value_not_set(self):
-        column_dto = ColumnDTO.builder(
-            name="column_name",
-            data_type=Types.StringType.get(),
-            comment="comment",
+        column_dto = (
+            ColumnDTO.builder()
+            .with_name(name="column_name")
+            .with_data_type(data_type=Types.StringType.get())
+            .with_comment(comment="comment")
+            .build()
         )
+
         self.assertEqual(column_dto.name(), "column_name")
         self.assertEqual(column_dto.nullable(), True)
         self.assertEqual(column_dto.auto_increment(), False)
@@ -168,10 +175,12 @@ class TestColumnDTO(unittest.TestCase):
             "autoIncrement": False,
         }
         for supported_type in self._supported_types:
-            column_dto = ColumnDTO.builder(
-                name=str(supported_type.name()),
-                data_type=supported_type,
-                comment=supported_type.simple_string(),
+            column_dto = (
+                ColumnDTO.builder()
+                .with_name(name=str(supported_type.name()))
+                .with_data_type(data_type=supported_type)
+                .with_comment(comment=supported_type.simple_string())
+                .build()
             )
             expected_dict["name"] = str(supported_type.name())
             expected_dict["type"] = TypeSerdes.serialize(supported_type)
@@ -188,12 +197,14 @@ class TestColumnDTO(unittest.TestCase):
         """
 
         for supported_type in self._supported_types:
-            column_dto = ColumnDTO.builder(
-                name=str(supported_type.name()),
-                data_type=supported_type,
-                comment=supported_type.simple_string(),
-                nullable=True,
-                auto_increment=False,
+            column_dto = (
+                ColumnDTO.builder()
+                .with_name(name=str(supported_type.name()))
+                .with_data_type(data_type=supported_type)
+                .with_comment(comment=supported_type.simple_string())
+                .with_nullable(nullable=True)
+                .with_auto_increment(auto_increment=False)
+                .build()
             )
             serialized_json = column_dto.to_json()
             deserialized_column_dto = ColumnDTO.from_json(serialized_json)
