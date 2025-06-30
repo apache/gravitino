@@ -101,8 +101,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             NameIdentifier accessMetadataName =
                 metadataContext.get(Entity.EntityType.valueOf(type.name()));
             return Utils.forbidden(
-                String.format("Can not access metadata %s", accessMetadataName.name()),
-                new ForbiddenException("Can not access metadata %s", accessMetadataName));
+                String.format("Can not access metadata {%s}.", accessMetadataName.name()),
+                new ForbiddenException("Can not access metadata {%s}.", accessMetadataName));
           }
         }
         return methodInvocation.proceed();

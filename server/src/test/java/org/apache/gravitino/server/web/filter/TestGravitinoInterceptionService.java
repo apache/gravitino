@@ -81,7 +81,9 @@ public class TestGravitinoInterceptionService {
 
   public static class TestOperations {
 
-    @AuthorizationExpression(expression = "METALAKE::USE_CATALOG || METALAKE::OWNER")
+    @AuthorizationExpression(
+        expression = "METALAKE::USE_CATALOG || METALAKE::OWNER",
+        accessMetadataType = MetadataObject.Type.METALAKE)
     public Response testMethod(
         @AuthorizationMetadata(type = MetadataObject.Type.METALAKE) String metalake) {
       return Utils.ok("ok");
