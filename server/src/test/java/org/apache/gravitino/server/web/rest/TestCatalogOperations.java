@@ -90,7 +90,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
   private CatalogManager manager = mock(CatalogManager.class);
 
   @BeforeAll
-  public static void start() throws IllegalAccessException {
+  public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);

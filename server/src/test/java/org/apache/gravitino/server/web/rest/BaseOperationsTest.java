@@ -27,7 +27,7 @@ import org.junit.jupiter.api.BeforeAll;
 public abstract class BaseOperationsTest extends JerseyTest {
 
   @BeforeAll
-  public static void setup() {
+  public static void start() {
     GravitinoAuthorizerProvider.getInstance().initialize(new ServerConfig());
   }
 
