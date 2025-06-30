@@ -49,7 +49,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   private String gravitinoUri;
   private Map<String, String> properties;
 
-  private GravitinoClient client;
+  private volatile GravitinoClient client;
 
   @Override
   public void initialize(Map<String, String> properties) {
