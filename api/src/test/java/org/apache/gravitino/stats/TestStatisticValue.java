@@ -53,7 +53,7 @@ public class TestStatisticValue {
     Assertions.assertEquals(listValue.dataType(), Types.ListType.nullable(Types.StringType.get()));
     Assertions.assertIterableEquals(list, listValue.value());
 
-    Map<String, StatisticValue> map = Maps.newHashMap();
+    Map<String, StatisticValue<?>> map = Maps.newHashMap();
     map.put("a", StatisticValues.stringValue("a"));
     map.put("b", StatisticValues.longValue(2L));
     StatisticValues.ObjectValue objectValue = StatisticValues.objectValue(map);
