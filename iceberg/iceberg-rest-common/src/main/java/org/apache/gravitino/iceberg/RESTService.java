@@ -75,8 +75,6 @@ public class RESTService implements GravitinoAuxiliaryService {
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
     compatibilityUtils = new IcebergShimUtils();
-    IcebergRESTConfigProvider icebergConfigProvider =
-        compatibilityUtils.getIcebergRESTConfigProvider();
 
     ResourceConfig config = new ResourceConfig();
     config.packages(getIcebergRESTPackages(icebergConfig));
@@ -109,6 +107,9 @@ public class RESTService implements GravitinoAuxiliaryService {
     IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
         new IcebergNamespaceEventDispatcher(
             icebergNamespaceOperationExecutor, eventBus, metalakeName);
+
+    IcebergRESTConfigProvider icebergConfigProvider =
+        compatibilityUtils.getIcebergRESTConfigProvider(icebergCatalogWrapperManager);
 
     config.register(
         new AbstractBinder() {

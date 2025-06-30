@@ -21,10 +21,13 @@ package org.apache.gravitino.iceberg.shim;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
-public class IcebergModernConfigProvider implements IcebergRESTConfigProvider {
+public class IcebergModernConfigProvider extends BaseRESTConfigProvider {
 
   private static final List<Endpoint> DEFAULT_ENDPOINTS =
       ImmutableList.<Endpoint>builder()
@@ -42,7 +45,10 @@ public class IcebergModernConfigProvider implements IcebergRESTConfigProvider {
           .add(Endpoint.V1_REGISTER_TABLE)
           .add(Endpoint.V1_REPORT_METRICS)
           .add(Endpoint.V1_COMMIT_TRANSACTION)
-          // view
+          .build();
+
+  private static final List<Endpoint> DEFAULT_VIEW_ENDPOINTS =
+      ImmutableList.<Endpoint>builder()
           .add(Endpoint.V1_LIST_VIEWS)
           .add(Endpoint.V1_LOAD_VIEW)
           .add(Endpoint.V1_CREATE_VIEW)
@@ -51,13 +57,19 @@ public class IcebergModernConfigProvider implements IcebergRESTConfigProvider {
           .add(Endpoint.V1_RENAME_VIEW)
           .build();
 
-  @Override
-  public ConfigResponse getConfig(String warehouse) {
-    return ConfigResponse.builder().withEndpoints(getEndpoints(warehouse)).build();
+  public IcebergModernConfigProvider(IcebergCatalogWrapperManager catalogManager) {
+    super(catalogManager);
   }
 
-  private List<Endpoint> getEndpoints(String warehouse) {
-    System.out.println("warehouse: " + warehouse);
-    return DEFAULT_ENDPOINTS;
+  protected ConfigResponse.Builder getConfigResponseBuilder(boolean supportsViewOperations) {
+    return ConfigResponse.builder().withEndpoints(getEndpoints(supportsViewOperations));
+  }
+
+  private List<Endpoint> getEndpoints(boolean supportsViewOperations) {
+    if (!supportsViewOperations) {
+      return DEFAULT_ENDPOINTS;
+    }
+    return Stream.concat(DEFAULT_ENDPOINTS.stream(), DEFAULT_VIEW_ENDPOINTS.stream())
+        .collect(Collectors.toList());
   }
 }
