@@ -83,19 +83,8 @@ if (jdkVersion == "8") {
   extra["useModernIceberg"] = true
 }
 
-project.extra["extraJvmArgs"] = if (jdkVersion == "8") {
+project.extra["extraJvmArgs"] = if (jdkVersion in listOf("8", "11")) {
   listOf()
-} else if (jdkVersion == "11") {
-  listOf(
-    "--add-exports",
-    "java.security.jgss/sun.security.krb5=ALL-UNNAMED",
-    "--add-opens",
-    "java.base/java.security=ALL-UNNAMED",
-    "--add-opens",
-    "java.base/sun.security.util=ALL-UNNAMED",
-    "--add-opens",
-    "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
-  )
 } else {
   listOf(
     "-XX:+IgnoreUnrecognizedVMOptions",
