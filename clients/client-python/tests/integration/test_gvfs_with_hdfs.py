@@ -326,7 +326,8 @@ class TestGvfsWithHDFS(IntegrationTestEnv):
             server_uri="http://localhost:8090",
             metalake_name=self.metalake_name,
             options={
-                f"{GVFSConfig.GVFS_FILESYSTEM_CURRENT_LOCATION_NAME}": "location1"
+                f"{GVFSConfig.GVFS_FILESYSTEM_CURRENT_LOCATION_NAME}": "location1",
+                **self.options,
             },
         )
 
