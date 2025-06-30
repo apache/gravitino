@@ -169,6 +169,9 @@ public class JsonUtils {
   private static final Pattern VARCHAR = Pattern.compile("varchar\\(\\s*(\\d+)\\s*\\)");
   private static final Pattern DECIMAL =
       Pattern.compile("decimal\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
+  private static final Pattern TIME = Pattern.compile("time\\((\\d+)\\)");
+  private static final Pattern TIMESTAMP_TZ = Pattern.compile("timestamp_tz\\((\\d+)\\)");
+  private static final Pattern TIMESTAMP = Pattern.compile("timestamp\\((\\d+)\\)");
 
   /**
    * Abstract iterator class for iterating over elements of a JSON array.
@@ -850,6 +853,21 @@ public class JsonUtils {
     if (decimal.matches()) {
       return Types.DecimalType.of(
           Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
+    }
+
+    Matcher time = TIME.matcher(typeString);
+    if (time.matches()) {
+      return Types.TimeType.of(Integer.parseInt(time.group(1)));
+    }
+
+    Matcher timestampTz = TIMESTAMP_TZ.matcher(typeString);
+    if (timestampTz.matches()) {
+      return Types.TimestampType.withTimeZone(Integer.parseInt(timestampTz.group(1)));
+    }
+
+    Matcher timestamp = TIMESTAMP.matcher(typeString);
+    if (timestamp.matches()) {
+      return Types.TimestampType.withoutTimeZone(Integer.parseInt(timestamp.group(1)));
     }
 
     return Types.UnparsedType.of(typeString);
