@@ -31,16 +31,9 @@ public class BaseRESTConfigProvider implements IcebergRESTConfigProvider {
 
   private IcebergCatalogWrapperManager catalogManager;
 
+  @Override
   public void initialize(IcebergCatalogWrapperManager catalogManager) {
     this.catalogManager = catalogManager;
-  }
-
-  protected Map<String, String> getDefaultConfig(String warehouse) {
-    return getCatalogConfig(warehouse);
-  }
-
-  protected ConfigResponse.Builder getConfigResponseBuilder(boolean supportsViewOperations) {
-    return ConfigResponse.builder();
   }
 
   @Override
@@ -53,6 +46,14 @@ public class BaseRESTConfigProvider implements IcebergRESTConfigProvider {
       builder.withDefault("prefix", warehouse);
     }
     return builder.build();
+  }
+
+  protected Map<String, String> getDefaultConfig(String catalogName) {
+    return getCatalogConfig(catalogName);
+  }
+
+  protected ConfigResponse.Builder getConfigResponseBuilder(boolean supportsViewOperations) {
+    return ConfigResponse.builder();
   }
 
   private Map<String, String> getCatalogConfig(String catalogName) {

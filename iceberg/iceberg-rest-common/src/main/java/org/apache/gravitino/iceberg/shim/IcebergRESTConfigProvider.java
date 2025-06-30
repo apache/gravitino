@@ -22,8 +22,24 @@ package org.apache.gravitino.iceberg.shim;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
+/**
+ * Provides REST configuration for Iceberg REST config endpoints. Different Iceberg version may have
+ * different implementation.
+ */
 public interface IcebergRESTConfigProvider {
+
+  /**
+   * Initializes the provider with catalog manager.
+   *
+   * @param catalogManager manager instance for Iceberg catalog backend.
+   */
   void initialize(IcebergCatalogWrapperManager catalogManager);
 
+  /**
+   * Retrieves configuration settings for a specific warehouse.
+   *
+   * @param warehouse target warehouse identifier
+   * @return configuration response containing Iceberg settings for the given warehouse.
+   */
   ConfigResponse getConfig(String warehouse);
 }

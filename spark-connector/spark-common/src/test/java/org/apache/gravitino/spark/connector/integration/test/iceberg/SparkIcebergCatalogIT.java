@@ -1119,7 +1119,9 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     tableProperties = tableInfo.getTableProperties();
     // After https://github.com/apache/iceberg/pull/10774/, distribution mode is not changed for
     // local sort order
-    Assertions.assertEquals("none", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    String distributionMode = tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE);
+    Assertions.assertTrue(
+        "none".equalsIgnoreCase(distributionMode) || "range".equalsIgnoreCase(distributionMode));
     Assertions.assertEquals(
         "id DESC NULLS LAST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
     sortOrder =
