@@ -75,7 +75,8 @@ public class TestGravitinoInterceptionService {
       when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake2"});
       Response response2 = (Response) methodInterceptor.invoke(methodInvocation);
       assertEquals(
-          "Can not access metadata.", ((ErrorResponse) response2.getEntity()).getMessage());
+          "Can not access metadata {testMetalake2}.",
+          ((ErrorResponse) response2.getEntity()).getMessage());
     }
   }
 
