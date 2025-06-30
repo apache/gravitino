@@ -20,6 +20,9 @@ package org.apache.gravitino.client;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -58,6 +61,27 @@ public class TestGravitinoClientBuilder {
           new SimpleTokenProvider().getTokenData(), client.getAuthDataProvider().getTokenData());
     }
   }
+
+  @Test
+  public void testGravitinoClientHttpClientBuilder() {
+    HttpClientBuilder httpClientBuilder =
+        HttpClients.custom().setDefaultRequestConfig(RequestConfig.DEFAULT);
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1")
+            .withHttpClientBuilder(httpClientBuilder)
+            .build()) {
+      Assertions.assertEquals(httpClientBuilder, client.getHttpClientBuilder());
+    }
+
+    try (MockGravitinoClient client = MockGravitinoClient.builder("http://127.0.0.1").build()) {
+      Assertions.assertNotNull(client.getHttpClientBuilder());
+    }
+
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1").withHttpClientBuilder(null).build()) {
+      Assertions.assertNotNull(client.getHttpClientBuilder());
+    }
+  }
 }
 
 class MockGravitinoClient extends GravitinoClientBase {
@@ -66,18 +90,26 @@ class MockGravitinoClient extends GravitinoClientBase {
 
   private AuthDataProvider authDataProvider;
 
+  private HttpClientBuilder httpClientBuilder;
+
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   * Constructs a new GravitinoClient with the given URI, authenticator, AuthDataProvider and
+   * HttpClientBuilder.
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
    * @param headers The base header of the Gravitino API.
+   * @param httpClientBuilder The HTTP client builder.
    */
   private MockGravitinoClient(
-      String uri, AuthDataProvider authDataProvider, Map<String, String> headers) {
-    super(uri, authDataProvider, false, headers);
+      String uri,
+      AuthDataProvider authDataProvider,
+      Map<String, String> headers,
+      HttpClientBuilder httpClientBuilder) {
+    super(uri, authDataProvider, false, headers, httpClientBuilder);
     this.headers = headers;
     this.authDataProvider = authDataProvider;
+    this.httpClientBuilder = httpClientBuilder;
   }
 
   Map<String, String> getHeaders() {
@@ -86,6 +118,10 @@ class MockGravitinoClient extends GravitinoClientBase {
 
   AuthDataProvider getAuthDataProvider() {
     return authDataProvider;
+  }
+
+  HttpClientBuilder getHttpClientBuilder() {
+    return httpClientBuilder;
   }
 
   /**
@@ -111,7 +147,7 @@ class MockGravitinoClient extends GravitinoClientBase {
 
     @Override
     public MockGravitinoClient build() {
-      return new MockGravitinoClient(uri, authDataProvider, headers);
+      return new MockGravitinoClient(uri, authDataProvider, headers, httpClientBuilder);
     }
   }
 }

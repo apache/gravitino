@@ -38,6 +38,8 @@ import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
 
 /**
  * Base class for Gravitino Java client;
@@ -61,12 +63,14 @@ public abstract class GravitinoClientBase implements Closeable {
    * @param authDataProvider The provider of the data which is used for authentication.
    * @param checkVersion Whether to check the version of the Gravitino server.
    * @param headers The base header of the Gravitino API.
+   * @param httpClientBuilder The HttpClientBuilder for the HTTP client
    */
   protected GravitinoClientBase(
       String uri,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
-      Map<String, String> headers) {
+      Map<String, String> headers,
+      HttpClientBuilder httpClientBuilder) {
     ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
     if (checkVersion) {
@@ -77,6 +81,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .withObjectMapper(mapper)
               .withPreConnectHandler(this::checkVersion)
               .withHeaders(headers)
+              .withHttpClientBuilder(httpClientBuilder)
               .build();
 
     } else {
@@ -86,6 +91,7 @@ public abstract class GravitinoClientBase implements Closeable {
               .withAuthDataProvider(authDataProvider)
               .withObjectMapper(mapper)
               .withHeaders(headers)
+              .withHttpClientBuilder(httpClientBuilder)
               .build();
     }
   }
@@ -208,6 +214,8 @@ public abstract class GravitinoClientBase implements Closeable {
     protected boolean checkVersion = true;
     /** The request base header for the Gravitino API. */
     protected Map<String, String> headers = ImmutableMap.of();
+    /** The HTTP client builder */
+    protected HttpClientBuilder httpClientBuilder = HttpClients.custom();
 
     /**
      * The constructor for the Builder class.
@@ -302,6 +310,19 @@ public abstract class GravitinoClientBase implements Closeable {
     public Builder<T> withHeaders(Map<String, String> headers) {
       if (headers != null) {
         this.headers = ImmutableMap.copyOf(headers);
+      }
+      return this;
+    }
+
+    /**
+     * Set HTTP client builder for Gravitino Client.
+     *
+     * @param httpClientBuilder the HttpClientBuilder for the HTTP client.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder<T> withHttpClientBuilder(HttpClientBuilder httpClientBuilder) {
+      if (httpClientBuilder != null) {
+        this.httpClientBuilder = httpClientBuilder;
       }
       return this;
     }

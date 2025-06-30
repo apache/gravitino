@@ -56,6 +56,7 @@ import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 
 /**
  * Apache Gravitino Client for a user to interact with the Gravitino API, allowing the client to
@@ -85,8 +86,9 @@ public class GravitinoClient extends GravitinoClientBase
       String metalakeName,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
-      Map<String, String> headers) {
-    super(uri, authDataProvider, checkVersion, headers);
+      Map<String, String> headers,
+      HttpClientBuilder httpClientBuilder) {
+    super(uri, authDataProvider, checkVersion, headers, httpClientBuilder);
     this.metalake = loadMetalake(metalakeName);
   }
 
@@ -599,7 +601,8 @@ public class GravitinoClient extends GravitinoClientBase
           metalakeName != null && !metalakeName.isEmpty(),
           "The argument 'metalakeName' must be a valid name");
 
-      return new GravitinoClient(uri, metalakeName, authDataProvider, checkVersion, headers);
+      return new GravitinoClient(
+          uri, metalakeName, authDataProvider, checkVersion, headers, httpClientBuilder);
     }
   }
 }
