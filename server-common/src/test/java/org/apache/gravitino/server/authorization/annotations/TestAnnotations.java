@@ -52,7 +52,9 @@ public class TestAnnotations {
         metadataType = MetadataObject.Type.CATALOG)
     public void testAuthedMethodUseResourceType() {}
 
-    @AuthorizationExpression(expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE")
+    @AuthorizationExpression(
+        expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE",
+        accessMetadataType = MetadataObject.Type.METALAKE)
     public void testAuthedMethodUseExpression() {}
   }
 

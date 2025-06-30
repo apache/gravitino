@@ -75,13 +75,16 @@ public class TestGravitinoInterceptionService {
       when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake2"});
       Response response2 = (Response) methodInterceptor.invoke(methodInvocation);
       assertEquals(
-          "Can not access metadata.", ((ErrorResponse) response2.getEntity()).getMessage());
+          "Can not access metadata {testMetalake2}.",
+          ((ErrorResponse) response2.getEntity()).getMessage());
     }
   }
 
   public static class TestOperations {
 
-    @AuthorizationExpression(expression = "METALAKE::USE_CATALOG || METALAKE::OWNER")
+    @AuthorizationExpression(
+        expression = "METALAKE::USE_CATALOG || METALAKE::OWNER",
+        accessMetadataType = MetadataObject.Type.METALAKE)
     public Response testMethod(
         @AuthorizationMetadata(type = MetadataObject.Type.METALAKE) String metalake) {
       return Utils.ok("ok");
