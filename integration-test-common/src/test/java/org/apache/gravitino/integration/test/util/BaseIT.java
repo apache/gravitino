@@ -329,6 +329,7 @@ public class BaseIT {
           .pollInterval(1, TimeUnit.SECONDS)
           .until(() -> HttpUtils.isHttpServerUp(checkServerUrl));
     }
+
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
 
