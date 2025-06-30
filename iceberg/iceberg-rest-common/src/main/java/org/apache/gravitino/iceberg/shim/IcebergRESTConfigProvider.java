@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.iceberg.shim;
 
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
 public interface IcebergRESTConfigProvider {
+  void initialize(IcebergCatalogWrapperManager catalogManager);
+
   ConfigResponse getConfig(String warehouse);
 }

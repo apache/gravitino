@@ -22,8 +22,7 @@ package org.apache.gravitino.iceberg.shim;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.util.List;
-import lombok.SneakyThrows;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.utils.ClassUtils;
 
 public class IcebergShimUtils {
   private static boolean useModernIceberg;
@@ -53,26 +52,17 @@ public class IcebergShimUtils {
     return Lists.newArrayList(ICEBERG_REST_SPEC_PACKAGE);
   };
 
-  public IcebergRESTConfigProvider getIcebergRESTConfigProvider(
-      IcebergCatalogWrapperManager catalogManager) {
+  public IcebergRESTConfigProvider getIcebergRESTConfigProvider() {
     if (useModernIceberg()) {
-      return getModernConfigProvider(MODERN_CONFIG_PROVIDER, catalogManager);
+      return ClassUtils.loadClass(
+          MODERN_CONFIG_PROVIDER, Thread.currentThread().getContextClassLoader());
     }
 
-    return new BaseRESTConfigProvider(catalogManager);
+    return new BaseRESTConfigProvider();
   }
 
   @VisibleForTesting
   public boolean useModernIceberg() {
     return useModernIceberg;
-  }
-
-  @SneakyThrows
-  private IcebergRESTConfigProvider getModernConfigProvider(
-      String className, IcebergCatalogWrapperManager catalogWrapperManager) {
-    return (IcebergRESTConfigProvider)
-        Class.forName(className, true, Thread.currentThread().getContextClassLoader())
-            .getDeclaredConstructor()
-            .newInstance(catalogWrapperManager);
   }
 }

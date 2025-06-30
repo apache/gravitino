@@ -23,7 +23,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
@@ -56,10 +55,6 @@ public class IcebergModernConfigProvider extends BaseRESTConfigProvider {
           .add(Endpoint.V1_DELETE_VIEW)
           .add(Endpoint.V1_RENAME_VIEW)
           .build();
-
-  public IcebergModernConfigProvider(IcebergCatalogWrapperManager catalogManager) {
-    super(catalogManager);
-  }
 
   protected ConfigResponse.Builder getConfigResponseBuilder(boolean supportsViewOperations) {
     return ConfigResponse.builder().withEndpoints(getEndpoints(supportsViewOperations));

@@ -109,7 +109,8 @@ public class RESTService implements GravitinoAuxiliaryService {
             icebergNamespaceOperationExecutor, eventBus, metalakeName);
 
     IcebergRESTConfigProvider icebergConfigProvider =
-        compatibilityUtils.getIcebergRESTConfigProvider(icebergCatalogWrapperManager);
+        compatibilityUtils.getIcebergRESTConfigProvider();
+    icebergConfigProvider.initialize(icebergCatalogWrapperManager);
 
     config.register(
         new AbstractBinder() {

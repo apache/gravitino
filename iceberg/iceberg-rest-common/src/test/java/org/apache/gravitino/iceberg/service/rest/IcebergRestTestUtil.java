@@ -132,7 +132,8 @@ public class IcebergRestTestUtil {
 
       IcebergShimUtils compatibilityUtils = new IcebergShimUtils();
       IcebergRESTConfigProvider icebergConfigProvider =
-          compatibilityUtils.getIcebergRESTConfigProvider(icebergCatalogWrapperManager);
+          compatibilityUtils.getIcebergRESTConfigProvider();
+      icebergConfigProvider.initialize(icebergCatalogWrapperManager);
 
       EventBus eventBus = new EventBus(eventListenerPlugins);
 

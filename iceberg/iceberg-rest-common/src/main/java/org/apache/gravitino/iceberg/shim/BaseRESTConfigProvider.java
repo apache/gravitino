@@ -31,7 +31,7 @@ public class BaseRESTConfigProvider implements IcebergRESTConfigProvider {
 
   private IcebergCatalogWrapperManager catalogManager;
 
-  public BaseRESTConfigProvider(IcebergCatalogWrapperManager catalogManager) {
+  public void initialize(IcebergCatalogWrapperManager catalogManager) {
     this.catalogManager = catalogManager;
   }
 
