@@ -287,10 +287,10 @@ public class Configs {
 
   public static final ConfigEntry<String> AUTHORIZATION_IMPL =
       new ConfigBuilder("gravitino.authorization.impl")
-          .doc("Metadata authorization implement")
+          .doc("Metadata authorization implementation")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .createWithDefault("PassThrough");
+          .createWithDefault("org.apache.gravitino.server.authorization.PassThroughAuthorizer");
 
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
