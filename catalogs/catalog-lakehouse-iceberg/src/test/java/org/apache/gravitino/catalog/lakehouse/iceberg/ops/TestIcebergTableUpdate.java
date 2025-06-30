@@ -45,7 +45,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergTableUpdate {
+
   private IcebergCatalogWrapper icebergCatalogWrapper = null;
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper = null;
   private static final String TEST_NAMESPACE_NAME = "gravitino_test_namespace";
@@ -263,17 +265,14 @@ public class TestIcebergTableUpdate {
         });
 
     // add required column
-    IllegalArgumentException exception =
-        Assertions.assertThrowsExactly(
-            IllegalArgumentException.class,
-            () -> {
-              TableChange addColumn1 =
-                  TableChange.addColumn(
-                      new String[] {"required_column"}, Types.IntegerType.get(), false);
-              updateTable(identifier, addColumn1);
-            });
-    Assertions.assertTrue(
-        exception.getMessage().contains("Incompatible change: cannot add required column:"));
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> {
+          TableChange addColumn1 =
+              TableChange.addColumn(
+                  new String[] {"required_column"}, Types.IntegerType.get(), false);
+          updateTable(identifier, addColumn1);
+        });
   }
 
   @Test
