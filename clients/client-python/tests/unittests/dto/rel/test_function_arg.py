@@ -32,12 +32,12 @@ class TestFunctionArg(unittest.TestCase):
         ]
         self._column_names = [f"column{i}" for i in range(len(self._data_types))]
         self._columns = [
-            ColumnDTO.builder(
-                name=column_name,
-                data_type=data_type,
-                comment=f"{column_name} comment",
-                nullable=False,
-            )
+            ColumnDTO.builder()
+            .with_name(name=column_name)
+            .with_data_type(data_type=data_type)
+            .with_comment(comment=f"{column_name} comment")
+            .with_nullable(nullable=False)
+            .build()
             for column_name, data_type in zip(self._column_names, self._data_types)
         ]
 
