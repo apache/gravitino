@@ -50,7 +50,7 @@ public class GravitinoAuthorizerProvider implements Closeable {
         if (gravitinoAuthorizer == null) {
           boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
           if (enableAuthorization
-              && Objects.equals("jcasbin", serverConfig.get(Configs.AUTHORIZATION_TYPE))) {
+              && Objects.equals("jcasbin", serverConfig.get(Configs.AUTHORIZATION_IMPL))) {
             gravitinoAuthorizer = new JcasbinAuthorizer();
           } else {
             gravitinoAuthorizer = new PassThroughAuthorizer();

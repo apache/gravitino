@@ -144,7 +144,9 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-catalog", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNER")
+  @AuthorizationExpression(
+      expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNER",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response createCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalake,
@@ -215,7 +217,8 @@ public class CatalogOperations {
   @ResponseMetered(name = "set-catalog", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER")
+          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response setCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalake,
@@ -261,7 +264,8 @@ public class CatalogOperations {
   @ResponseMetered(name = "load-catalog", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER")
+          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response loadCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalakeName,
@@ -286,7 +290,9 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-catalog", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER || CATALOG::OWNER")
+  @AuthorizationExpression(
+      expression = "METALAKE::OWNER || CATALOG::OWNER",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response alterCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalakeName,
@@ -321,7 +327,9 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-catalog", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER || CATALOG::OWNER")
+  @AuthorizationExpression(
+      expression = "METALAKE::OWNER || CATALOG::OWNER",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response dropCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalakeName,

@@ -97,13 +97,17 @@ public class GravitinoInterceptionService implements InterceptionService {
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
           if (!authorizeResult) {
+            MetadataObject.Type type = expressionAnnotation.accessMetadataType();
+            NameIdentifier accessMetadataName =
+                metadataContext.get(Entity.EntityType.valueOf(type.name()));
             return Utils.forbidden(
-                "Can not access metadata.", new ForbiddenException("Can not access metadata."));
+                String.format("Can not access metadata %s", accessMetadataName.name()),
+                new ForbiddenException("Can not access metadata %s", accessMetadataName));
           }
         }
         return methodInvocation.proceed();
       } catch (Exception ex) {
-        return Utils.forbidden("Can not access metadata.", ex);
+        return Utils.forbidden("Can not access metadata. Cause by: " + ex.getMessage(), ex);
       }
     }
 

@@ -285,12 +285,12 @@ public class Configs {
           .booleanConf()
           .createWithDefault(false);
 
-  public static final ConfigEntry<String> AUTHORIZATION_TYPE =
-      new ConfigBuilder("gravitino.authorization.type")
-          .doc("Enable the authorization")
+  public static final ConfigEntry<String> AUTHORIZATION_IMPL =
+      new ConfigBuilder("gravitino.authorization.impl")
+          .doc("Metadata authorization implement")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .createWithDefault("pass");
+          .createWithDefault("PassThrough");
 
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")

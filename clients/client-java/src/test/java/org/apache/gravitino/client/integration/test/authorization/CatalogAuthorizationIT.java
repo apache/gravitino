@@ -62,7 +62,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("metastore.uris", hmsUri);
     assertThrows(
-        "Can not access metadata.",
+        "Can not access metadata " + catalog1,
         RuntimeException.class,
         () -> {
           clientWithNoAuthorization
@@ -76,7 +76,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         .loadMetalake(METALAKE)
         .createCatalog(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
     assertThrows(
-        "Can not access metadata.",
+        "Can not access metadata " + catalog1,
         RuntimeException.class,
         () -> {
           clientWithNoAuthorization
@@ -102,7 +102,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(2, catalogs.length);
     assertArrayEquals(new String[] {catalog1, catalog2}, catalogs);
     assertThrows(
-        "Can not access metadata.",
+        "Can not access metadata " + catalog1,
         RuntimeException.class,
         () -> {
           clientWithNoAuthorization.loadMetalake(METALAKE).dropCatalog(catalog1, true);
