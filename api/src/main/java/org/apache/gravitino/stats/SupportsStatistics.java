@@ -47,7 +47,7 @@ public interface SupportsStatistics {
    * @param statistics a map of statistic names to their values
    * @return a list of updated statistics
    */
-  List<Statistic> updateStatistics(Map<String, StatisticValue> statistics)
+  List<Statistic> updateStatistics(Map<String, StatisticValue<?>> statistics)
       throws UnmodifiableStatisticException, IllegalStatisticNameException;
 
   /**

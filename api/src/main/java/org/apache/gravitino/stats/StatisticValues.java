@@ -86,7 +86,7 @@ public class StatisticValues {
    * @param values the map of string keys to statistic values to be held by this statistic value
    * @return an ObjectValue instance containing the provided map of statistic values
    */
-  public static ObjectValue objectValue(Map<String, StatisticValue> values) {
+  public static ObjectValue objectValue(Map<String, StatisticValue<?>> values) {
     return new ObjectValue(values);
   }
 
@@ -194,17 +194,17 @@ public class StatisticValues {
   }
 
   /** A statistic value that holds a Map of String keys to other statistic values. */
-  public static class ObjectValue implements StatisticValue<Map<String, StatisticValue>> {
-    private final Map<String, StatisticValue> valueMap;
+  public static class ObjectValue implements StatisticValue<Map<String, StatisticValue<?>>> {
+    private final Map<String, StatisticValue<?>> valueMap;
 
-    private ObjectValue(Map<String, StatisticValue> valueMap) {
+    private ObjectValue(Map<String, StatisticValue<?>> valueMap) {
       Preconditions.checkArgument(
           valueMap != null && !valueMap.isEmpty(), "Values cannot be null or empty");
       this.valueMap = valueMap;
     }
 
     @Override
-    public Map<String, StatisticValue> value() {
+    public Map<String, StatisticValue<?>> value() {
       return valueMap;
     }
 
