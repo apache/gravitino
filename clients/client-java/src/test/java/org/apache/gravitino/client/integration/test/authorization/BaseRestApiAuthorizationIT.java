@@ -22,6 +22,7 @@ import java.util.HashMap;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -52,7 +53,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             Configs.ENABLE_AUTHORIZATION.getKey(),
             "true",
             Configs.AUTHORIZATION_IMPL.getKey(),
-            "jcasbin"));
+            JcasbinAuthorizer.class.getCanonicalName()));
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);
