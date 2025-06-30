@@ -20,12 +20,7 @@ package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Scheduler;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Instant;
@@ -33,8 +28,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -72,26 +65,9 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
 
   private final IdGenerator idGenerator;
 
-  // Currently, there will be only one MetalakeManager instance in the system. In this case
-  // we can clear or close the cache when the instance is destroyed.
-  @VisibleForTesting
-  static final Cache<NameIdentifier, BaseMetalake> METALAKE_CACHE =
-      Caffeine.newBuilder()
-          .expireAfterAccess(24, TimeUnit.HOURS)
-          .removalListener((k, v, c) -> LOG.info("Closing metalake {}.", k))
-          .scheduler(
-              Scheduler.forScheduledExecutorService(
-                  new ScheduledThreadPoolExecutor(
-                      1,
-                      new ThreadFactoryBuilder()
-                          .setDaemon(true)
-                          .setNameFormat("metalake-cleaner-%d")
-                          .build())))
-          .build();
-
   @Override
   public void close() {
-    METALAKE_CACHE.invalidateAll();
+    // do nothing
   }
 
   /**
@@ -104,11 +80,11 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     this.store = store;
     this.idGenerator = idGenerator;
 
-    // pre-load all metalakes and put them into cache, this is useful when user load schema/table
+    // preload all metalakes and put them into cache, this is useful when user load schema/table
     // directly without list/get metalake first.
-    BaseMetalake[] metalakes = listMetalakes();
-    for (BaseMetalake metalake : metalakes) {
-      METALAKE_CACHE.put(metalake.nameIdentifier(), metalake);
+    BaseMetalake[] baseMetalakes = listMetalakes();
+    for (BaseMetalake baseMetalake : baseMetalakes) {
+      loadMetalake(baseMetalake.nameIdentifier());
     }
   }
 
@@ -140,10 +116,7 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
   public static boolean metalakeInUse(EntityStore store, NameIdentifier ident)
       throws NoSuchMetalakeException {
     try {
-      BaseMetalake metalake = METALAKE_CACHE.getIfPresent(ident);
-      if (metalake == null) {
-        metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
-      }
+      BaseMetalake metalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
       return (boolean)
           metalake.propertiesMetadata().getOrDefault(metalake.properties(), PROPERTY_IN_USE);
     } catch (NoSuchEntityException e) {
@@ -191,22 +164,18 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     return TreeLockUtils.doWithTreeLock(
         ident,
         LockType.READ,
-        () ->
-            METALAKE_CACHE.get(
-                ident,
-                k -> {
-                  try {
-                    BaseMetalake baseMetalake =
-                        store.get(ident, EntityType.METALAKE, BaseMetalake.class);
-                    return newMetalakeWithResolvedProperties(baseMetalake);
-                  } catch (NoSuchEntityException e) {
-                    LOG.warn("Metalake {} does not exist", ident, e);
-                    throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
-                  } catch (IOException ioe) {
-                    LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
-                    throw new RuntimeException(ioe);
-                  }
-                }));
+        () -> {
+          try {
+            BaseMetalake baseMetalake = store.get(ident, EntityType.METALAKE, BaseMetalake.class);
+            return newMetalakeWithResolvedProperties(baseMetalake);
+          } catch (NoSuchEntityException e) {
+            LOG.warn("Metalake {} does not exist", ident, e);
+            throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
+          } catch (IOException ioe) {
+            LOG.error("Loading Metalake {} failed due to storage issues", ident, ioe);
+            throw new RuntimeException(ioe);
+          }
+        });
   }
 
   private BaseMetalake newMetalakeWithResolvedProperties(BaseMetalake metalakeEntity) {
@@ -266,7 +235,6 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
         () -> {
           try {
             store.put(metalake, false /* overwritten */);
-            METALAKE_CACHE.put(ident, newMetalakeWithResolvedProperties(metalake));
             return metalake;
           } catch (EntityAlreadyExistsException | AlreadyExistsException e) {
             LOG.warn("Metalake {} already exists", ident, e);
@@ -298,25 +266,21 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
               throw new MetalakeNotInUseException(
                   "Metalake %s is not in use, please enable it first", ident);
             }
-            METALAKE_CACHE.invalidate(ident);
-            BaseMetalake baseMetalake =
-                store.update(
-                    ident,
-                    BaseMetalake.class,
-                    EntityType.METALAKE,
-                    metalake -> {
-                      BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
-                      Map<String, String> newProps =
-                          metalake.properties() == null
-                              ? Maps.newHashMap()
-                              : Maps.newHashMap(metalake.properties());
-                      builder = updateEntity(builder, newProps, changes);
 
-                      return builder.build();
-                    });
-            METALAKE_CACHE.put(
-                baseMetalake.nameIdentifier(), newMetalakeWithResolvedProperties(baseMetalake));
-            return baseMetalake;
+            return store.update(
+                ident,
+                BaseMetalake.class,
+                EntityType.METALAKE,
+                metalake -> {
+                  BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+                  Map<String, String> newProps =
+                      metalake.properties() == null
+                          ? Maps.newHashMap()
+                          : Maps.newHashMap(metalake.properties());
+                  builder = updateEntity(builder, newProps, changes);
+
+                  return builder.build();
+                });
           } catch (NoSuchEntityException ne) {
             LOG.warn("Metalake {} does not exist", ident, ne);
             throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, ident);
@@ -353,8 +317,6 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                   "Metalake %s is in use, please disable it first or use force option", ident);
             }
 
-            METALAKE_CACHE.invalidate(ident);
-
             List<CatalogEntity> catalogEntities =
                 store.list(Namespace.of(ident.name()), CatalogEntity.class, EntityType.CATALOG);
             if (!catalogEntities.isEmpty() && !force) {
@@ -381,25 +343,22 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
           try {
             boolean inUse = metalakeInUse(store, ident);
             if (!inUse) {
-              METALAKE_CACHE.invalidate(ident);
-              BaseMetalake baseMetalake =
-                  store.update(
-                      ident,
-                      BaseMetalake.class,
-                      EntityType.METALAKE,
-                      metalake -> {
-                        BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+              store.update(
+                  ident,
+                  BaseMetalake.class,
+                  EntityType.METALAKE,
+                  metalake -> {
+                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
 
-                        Map<String, String> newProps =
-                            metalake.properties() == null
-                                ? Maps.newHashMap()
-                                : Maps.newHashMap(metalake.properties());
-                        newProps.put(PROPERTY_IN_USE, "true");
-                        builder.withProperties(newProps);
+                    Map<String, String> newProps =
+                        metalake.properties() == null
+                            ? Maps.newHashMap()
+                            : Maps.newHashMap(metalake.properties());
+                    newProps.put(PROPERTY_IN_USE, "true");
+                    builder.withProperties(newProps);
 
-                        return builder.build();
-                      });
-              METALAKE_CACHE.put(ident, newMetalakeWithResolvedProperties(baseMetalake));
+                    return builder.build();
+                  });
             }
 
             return null;
@@ -418,25 +377,22 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
           try {
             boolean inUse = metalakeInUse(store, ident);
             if (inUse) {
-              METALAKE_CACHE.invalidate(ident);
-              BaseMetalake baseMetalake =
-                  store.update(
-                      ident,
-                      BaseMetalake.class,
-                      EntityType.METALAKE,
-                      metalake -> {
-                        BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
+              store.update(
+                  ident,
+                  BaseMetalake.class,
+                  EntityType.METALAKE,
+                  metalake -> {
+                    BaseMetalake.Builder builder = newMetalakeBuilder(metalake);
 
-                        Map<String, String> newProps =
-                            metalake.properties() == null
-                                ? Maps.newHashMap()
-                                : Maps.newHashMap(metalake.properties());
-                        newProps.put(PROPERTY_IN_USE, "false");
-                        builder.withProperties(newProps);
+                    Map<String, String> newProps =
+                        metalake.properties() == null
+                            ? Maps.newHashMap()
+                            : Maps.newHashMap(metalake.properties());
+                    newProps.put(PROPERTY_IN_USE, "false");
+                    builder.withProperties(newProps);
 
-                        return builder.build();
-                      });
-              METALAKE_CACHE.put(ident, newMetalakeWithResolvedProperties(baseMetalake));
+                    return builder.build();
+                  });
             }
             return null;
           } catch (IOException e) {
