@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.policy;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -32,6 +33,20 @@ import org.apache.gravitino.exceptions.IllegalPolicyException;
  */
 @Evolving
 public interface Policy extends Auditable {
+
+  /** The set of metadata object types that the policy can be applied to. */
+  Set<MetadataObject.Type> SUPPORTS_ALL_OBJECT_TYPES =
+      new HashSet<MetadataObject.Type>() {
+        {
+          add(MetadataObject.Type.METALAKE);
+          add(MetadataObject.Type.CATALOG);
+          add(MetadataObject.Type.SCHEMA);
+          add(MetadataObject.Type.FILESET);
+          add(MetadataObject.Type.TABLE);
+          add(MetadataObject.Type.TOPIC);
+          add(MetadataObject.Type.MODEL);
+        }
+      };
 
   /**
    * Get the name of the policy.
