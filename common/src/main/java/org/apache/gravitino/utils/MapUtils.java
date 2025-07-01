@@ -76,4 +76,36 @@ public class MapUtils {
   public static Map<String, String> unmodifiableMap(Map<String, String> m) {
     return Collections.unmodifiableMap(m);
   }
+
+  /**
+   * Extract an integer value from the properties map with provided key. If provided key not exist
+   * in the properties map, it will return null.
+   *
+   * @param properties input map
+   * @param property provided key
+   * @return integer value from the properties map with provided key.
+   */
+  public static Integer propertyAsNullableInt(Map<String, String> properties, String property) {
+    String value = properties.get(property);
+    if (value != null) {
+      return Integer.parseInt(value);
+    }
+    return null;
+  }
+
+  /**
+   * Extract a long value from the properties map with provided key. If provided key not exist in
+   * the properties map, it will return null.
+   *
+   * @param properties input map
+   * @param property provided key
+   * @return long value from the properties map with provided key.
+   */
+  public static Long propertyAsNullableLong(Map<String, String> properties, String property) {
+    String value = properties.get(property);
+    if (value != null) {
+      return Long.parseLong(value);
+    }
+    return null;
+  }
 }
