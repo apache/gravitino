@@ -25,7 +25,7 @@ rootProject.name = "gravitino"
 val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
   ?: settings.extra["defaultScalaVersion"].toString()
 
-val useModernIceberg : Boolean = gradle.startParameter.projectProperties["useModernIceberg"]?.toBoolean()?:false
+val useModernIceberg: Boolean = gradle.startParameter.projectProperties["useModernIceberg"]?.toBoolean() ?: false
 
 include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
