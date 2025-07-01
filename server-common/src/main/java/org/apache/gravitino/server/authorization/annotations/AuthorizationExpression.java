@@ -22,6 +22,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.apache.gravitino.MetadataObject;
 
 /**
  * This annotation is used to implement unified authentication in AOP. Use Expressions to define the
@@ -36,4 +37,11 @@ public @interface AuthorizationExpression {
    * @return the expression to evaluate for authorization.
    */
   String expression() default "";
+
+  /**
+   * Used to identify the type of metadata that needs to be accessed
+   *
+   * @return accessMetadataType
+   */
+  MetadataObject.Type accessMetadataType();
 }

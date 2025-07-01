@@ -34,6 +34,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 public class AuthenticationFilter implements Filter {
 
@@ -82,8 +83,12 @@ public class AuthenticationFilter implements Filter {
       if (principal == null) {
         throw new UnauthorizedException("The provided credentials did not support");
       }
-
-      chain.doFilter(request, response);
+      PrincipalUtils.doAs(
+          principal,
+          () -> {
+            chain.doFilter(request, response);
+            return null;
+          });
     } catch (UnauthorizedException ue) {
       HttpServletResponse resp = (HttpServletResponse) response;
       if (!ue.getChallenges().isEmpty()) {
@@ -95,6 +100,9 @@ public class AuthenticationFilter implements Filter {
         }
       }
       resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, ue.getMessage());
+    } catch (Exception e) {
+      HttpServletResponse resp = (HttpServletResponse) response;
+      resp.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
     }
   }
 
