@@ -27,6 +27,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class ModelVersionMetaH2Provider extends ModelVersionMetaBaseSQLProvider {
 
+  @Override
   public String insertModelVersionMetas(
       @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
     return "<script>"

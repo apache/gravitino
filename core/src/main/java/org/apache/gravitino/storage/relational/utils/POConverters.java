@@ -1497,8 +1497,7 @@ public class POConverters {
                   ModelVersionPO.builder()
                       .withModelId(modelId)
                       // Note that version set here will not be used when inserting into database,
-                      // it will
-                      // directly use the version from the query to avoid concurrent version
+                      // it will directly use the version from the query to avoid concurrent version
                       // conflict.
                       .withModelVersion(modelVersionEntity.version())
                       .withModelVersionComment(modelVersionEntity.comment())

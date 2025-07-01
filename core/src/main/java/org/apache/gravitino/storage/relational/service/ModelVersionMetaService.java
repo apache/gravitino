@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -337,19 +338,9 @@ public class ModelVersionMetaService {
                               POConverters.updateModelVersionPO(
                                   oldModelVersionPOs.get(0), newModelVersionEntity),
                               oldModelVersionPOs.get(0)))),
-          // TODO Only modifying the unknown URI is supported currently.
           () ->
               oldModelVersionPOs.stream()
-                  .filter(
-                      v ->
-                          ModelVersion.URI_NAME_UNKNOWN.equals(v.getModelVersionUriName())
-                              && newModelVersionEntity.uris().get(ModelVersion.URI_NAME_UNKNOWN)
-                                  != null
-                              && !v.getModelVersionUri()
-                                  .equals(
-                                      newModelVersionEntity
-                                          .uris()
-                                          .get(ModelVersion.URI_NAME_UNKNOWN)))
+                  .filter(v -> isModelVersionUriUpdated(v, newModelVersionEntity.uris()))
                   .findAny()
                   .ifPresent(
                       v ->
@@ -406,5 +397,15 @@ public class ModelVersionMetaService {
     }
 
     return !oldAliases.equals(newAliases);
+  }
+
+  // TODO Only modifying the unknown URI is supported currently.
+  private boolean isModelVersionUriUpdated(
+      ModelVersionPO oldModelVersionPO, Map<String, String> newModelVersionUris) {
+    return ModelVersion.URI_NAME_UNKNOWN.equals(oldModelVersionPO.getModelVersionUriName())
+        && newModelVersionUris.containsKey(ModelVersion.URI_NAME_UNKNOWN)
+        && !oldModelVersionPO
+            .getModelVersionUri()
+            .equals(newModelVersionUris.get(ModelVersion.URI_NAME_UNKNOWN));
   }
 }

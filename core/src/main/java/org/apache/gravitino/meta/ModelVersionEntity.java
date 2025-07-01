@@ -46,7 +46,7 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
       Field.optional("comment", String.class, "The comment or description of the model entity.");
   public static final Field ALIASES =
       Field.optional("aliases", List.class, "The aliases of the model entity.");
-  public static final Field URLS =
+  public static final Field URIS =
       Field.required("uris", Map.class, "The URI and their names of the model entity.");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the model entity.");
@@ -76,7 +76,7 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
     fields.put(VERSION, version);
     fields.put(COMMENT, comment);
     fields.put(ALIASES, aliases);
-    fields.put(URLS, uris);
+    fields.put(URIS, uris);
     fields.put(PROPERTIES, properties);
     fields.put(AUDIT_INFO, auditInfo);
 
