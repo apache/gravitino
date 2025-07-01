@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
