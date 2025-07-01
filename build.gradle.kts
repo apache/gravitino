@@ -77,11 +77,7 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
-if (jdkVersion == "8") {
-  extra["useModernIceberg"] = false
-} else {
-  extra["useModernIceberg"] = true
-}
+extra["useModernIceberg"] = extra["useModernIceberg"].toString().toBoolean()
 
 project.extra["extraJvmArgs"] = if (jdkVersion in listOf("8", "11")) {
   listOf()

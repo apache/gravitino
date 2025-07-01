@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.shim;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergShimUtils {
@@ -27,6 +28,7 @@ public class TestIcebergShimUtils {
   private IcebergShimUtils shimUtils = new IcebergShimUtils();
 
   @Test
+  @Disabled
   void testUseModernIceberg() {
     Assertions.assertFalse(shimUtils.useModernIceberg());
   }

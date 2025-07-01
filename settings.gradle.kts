@@ -25,7 +25,7 @@ rootProject.name = "gravitino"
 val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion"]?.toString()
   ?: settings.extra["defaultScalaVersion"].toString()
 
-val jdkVersion: String = gradle.startParameter.projectProperties["jdkVersion"]?.toString() ?: settings.extra["jdkVersion"].toString()
+val useModernIceberg : Boolean = gradle.startParameter.projectProperties["useModernIceberg"]?.toBoolean()?:false
 
 include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
@@ -60,7 +60,7 @@ if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) 
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-common")
 include("iceberg:iceberg-rest-server")
-if (jdkVersion != "8") {
+if (useModernIceberg) {
   include("iceberg:iceberg-rest-modern")
 }
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
