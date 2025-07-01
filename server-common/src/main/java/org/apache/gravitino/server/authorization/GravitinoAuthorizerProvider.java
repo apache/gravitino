@@ -17,9 +17,10 @@
 
 package org.apache.gravitino.server.authorization;
 
+import java.io.Closeable;
+import java.io.IOException;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.ServerConfig;
-import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 
 /**
  * Used to initialize and store {@link GravitinoAuthorizer}. When Gravitino Server starts up, it
@@ -27,7 +28,7 @@ import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
  * in the GravitinoAuthorizerProvider. The GravitinoAuthorizer instance can then be retrieved using
  * the getGravitinoAuthorizer method.
  */
-public class GravitinoAuthorizerProvider {
+public class GravitinoAuthorizerProvider implements Closeable {
 
   private static final GravitinoAuthorizerProvider INSTANCE = new GravitinoAuthorizerProvider();
 
@@ -47,7 +48,14 @@ public class GravitinoAuthorizerProvider {
         if (gravitinoAuthorizer == null) {
           boolean enableAuthorization = serverConfig.get(Configs.ENABLE_AUTHORIZATION);
           if (enableAuthorization) {
-            gravitinoAuthorizer = new JcasbinAuthorizer();
+            String authorizationImpl = serverConfig.get(Configs.AUTHORIZATION_IMPL);
+            try {
+              gravitinoAuthorizer =
+                  (GravitinoAuthorizer)
+                      Class.forName(authorizationImpl).getDeclaredConstructor().newInstance();
+            } catch (Exception e) {
+              throw new IllegalArgumentException("Can not initialize GravitinoAuthorizer", e);
+            }
           } else {
             gravitinoAuthorizer = new PassThroughAuthorizer();
           }
@@ -68,5 +76,13 @@ public class GravitinoAuthorizerProvider {
    */
   public GravitinoAuthorizer getGravitinoAuthorizer() {
     return gravitinoAuthorizer;
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.close();
+    }
+    gravitinoAuthorizer = null;
   }
 }

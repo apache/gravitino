@@ -34,6 +34,7 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -82,23 +83,32 @@ public class GravitinoInterceptionService implements InterceptionService {
      */
     @Override
     public Object invoke(MethodInvocation methodInvocation) throws Throwable {
-      Method method = methodInvocation.getMethod();
-      Parameter[] parameters = method.getParameters();
-      AuthorizationExpression expressionAnnotation =
-          method.getAnnotation(AuthorizationExpression.class);
-      if (expressionAnnotation != null) {
-        String expression = expressionAnnotation.expression();
-        Object[] args = methodInvocation.getArguments();
-        Map<Entity.EntityType, NameIdentifier> metadataContext =
-            extractNameIdentifierFromParameters(parameters, args);
-        AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-            new AuthorizationExpressionEvaluator(expression);
-        boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
-        if (!authorizeResult) {
-          return Utils.internalError("Can not access metadata.");
+      try {
+        Method method = methodInvocation.getMethod();
+        Parameter[] parameters = method.getParameters();
+        AuthorizationExpression expressionAnnotation =
+            method.getAnnotation(AuthorizationExpression.class);
+        if (expressionAnnotation != null) {
+          String expression = expressionAnnotation.expression();
+          Object[] args = methodInvocation.getArguments();
+          Map<Entity.EntityType, NameIdentifier> metadataContext =
+              extractNameIdentifierFromParameters(parameters, args);
+          AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
+              new AuthorizationExpressionEvaluator(expression);
+          boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
+          if (!authorizeResult) {
+            MetadataObject.Type type = expressionAnnotation.accessMetadataType();
+            NameIdentifier accessMetadataName =
+                metadataContext.get(Entity.EntityType.valueOf(type.name()));
+            return Utils.forbidden(
+                String.format("Can not access metadata {%s}.", accessMetadataName.name()),
+                new ForbiddenException("Can not access metadata {%s}.", accessMetadataName));
+          }
         }
+        return methodInvocation.proceed();
+      } catch (Exception ex) {
+        return Utils.forbidden("Can not access metadata. Cause by: " + ex.getMessage(), ex);
       }
-      return methodInvocation.proceed();
     }
 
     private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
