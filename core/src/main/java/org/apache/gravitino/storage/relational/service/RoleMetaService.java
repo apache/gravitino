@@ -94,7 +94,7 @@ public class RoleMetaService {
         .map(
             po ->
                 POConverters.fromRolePO(
-                    po, Collections.emptyList(), AuthorizationUtils.ofRoleNamespace(metalake)))
+                    po, listSecurableObjects(po), AuthorizationUtils.ofRoleNamespace(metalake)))
         .collect(Collectors.toList());
   }
 

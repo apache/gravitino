@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
@@ -35,6 +36,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
@@ -45,6 +48,7 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -78,11 +82,15 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
-            return Utils.ok(
-                new UserResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.grantRolesToUser(
-                            metalake, request.getRoleNames(), user))));
+            User grantedUser =
+                accessControlManager.grantRolesToUser(metalake, request.getRoleNames(), user);
+            List<String> roleNames = request.getRoleNames();
+            for (String roleName : roleNames) {
+              GravitinoAuthorizerProvider.getInstance()
+                  .getGravitinoAuthorizer()
+                  .handleRolePrivilegeChange(metalake, roleName);
+            }
+            return Utils.ok(new UserResponse(DTOConverters.toDTO(grantedUser)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
@@ -130,11 +138,15 @@ public class PermissionOperations {
           httpRequest,
           () -> {
             request.validate();
-            return Utils.ok(
-                new UserResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.revokeRolesFromUser(
-                            metalake, request.getRoleNames(), user))));
+            User userAfterRevoke =
+                accessControlManager.revokeRolesFromUser(metalake, request.getRoleNames(), user);
+            List<String> roleNames = request.getRoleNames();
+            for (String roleName : roleNames) {
+              GravitinoAuthorizerProvider.getInstance()
+                  .getGravitinoAuthorizer()
+                  .handleRolePrivilegeChange(metalake, roleName);
+            }
+            return Utils.ok(new UserResponse(DTOConverters.toDTO(userAfterRevoke)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserPermissionOperationException(
@@ -194,16 +206,18 @@ public class PermissionOperations {
             }
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
-            return Utils.ok(
-                new RoleResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.grantPrivilegeToRole(
-                            metalake,
-                            role,
-                            object,
-                            privilegeGrantRequest.getPrivileges().stream()
-                                .map(DTOConverters::fromPrivilegeDTO)
-                                .collect(Collectors.toSet())))));
+            Role roleAfterGrant =
+                accessControlManager.grantPrivilegeToRole(
+                    metalake,
+                    role,
+                    object,
+                    privilegeGrantRequest.getPrivileges().stream()
+                        .map(DTOConverters::fromPrivilegeDTO)
+                        .collect(Collectors.toSet()));
+            GravitinoAuthorizerProvider.getInstance()
+                .getGravitinoAuthorizer()
+                .handleRolePrivilegeChange(metalake, role);
+            return Utils.ok(new RoleResponse(DTOConverters.toDTO(roleAfterGrant)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(
@@ -235,18 +249,22 @@ public class PermissionOperations {
             for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
-
+            GravitinoAuthorizerProvider.getInstance()
+                .getGravitinoAuthorizer()
+                .handleRolePrivilegeChange(metalake, role);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
-            return Utils.ok(
-                new RoleResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.revokePrivilegesFromRole(
-                            metalake,
-                            role,
-                            object,
-                            privilegeRevokeRequest.getPrivileges().stream()
-                                .map(DTOConverters::fromPrivilegeDTO)
-                                .collect(Collectors.toSet())))));
+            Role roleAfterRevoke =
+                accessControlManager.revokePrivilegesFromRole(
+                    metalake,
+                    role,
+                    object,
+                    privilegeRevokeRequest.getPrivileges().stream()
+                        .map(DTOConverters::fromPrivilegeDTO)
+                        .collect(Collectors.toSet()));
+            GravitinoAuthorizerProvider.getInstance()
+                .getGravitinoAuthorizer()
+                .handleRolePrivilegeChange(metalake, role);
+            return Utils.ok(new RoleResponse(DTOConverters.toDTO(roleAfterRevoke)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRolePermissionOperationException(

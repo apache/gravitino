@@ -149,7 +149,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String username, String metalake, MetadataObject metadataObject, String privilege) {
     Long metalakeId = getMetalakeId(metalake);
     Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
-    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+    Long metadataId;
+    try {
+      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+    } catch (Exception e) {
+      LOG.debug("Can not get entity id", e);
+      return false;
+    }
     loadPrivilege(metalake, username, userId, metadataObject, metadataId);
     return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
   }

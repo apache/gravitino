@@ -53,7 +53,9 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             Configs.ENABLE_AUTHORIZATION.getKey(),
             "true",
             Configs.AUTHORIZATION_IMPL.getKey(),
-            JcasbinAuthorizer.class.getCanonicalName()));
+            JcasbinAuthorizer.class.getCanonicalName(),
+            Configs.CACHE_ENABLED.getKey(),
+            "false"));
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);
