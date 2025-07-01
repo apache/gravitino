@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.gravitino.auth.AuthConstants;
@@ -39,10 +41,13 @@ import org.apache.gravitino.rest.RESTResponse;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequest;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -68,6 +73,11 @@ import org.apache.hc.core5.net.URIBuilder;
 public class HTTPClient implements RESTClient {
 
   private static final String VERSION_HEADER = "application/vnd.gravitino.v1+json";
+
+  @VisibleForTesting
+  static final String REST_CONNECTION_TIMEOUT_MS = "rest.client.connection-timeout-ms";
+
+  @VisibleForTesting static final String REST_SOCKET_TIMEOUT_MS = "rest.client.socket-timeout-ms";
 
   private final String uri;
   private final CloseableHttpClient httpClient;
@@ -97,17 +107,20 @@ public class HTTPClient implements RESTClient {
    * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
    * @param authDataProvider The provider of authentication data.
    * @param beforeConnectHandler The function to be executed before connecting to the server.
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
    */
   private HTTPClient(
       String uri,
       Map<String, String> baseHeaders,
       ObjectMapper objectMapper,
       AuthDataProvider authDataProvider,
-      Runnable beforeConnectHandler) {
+      Runnable beforeConnectHandler,
+      Map<String, String> properties) {
     this.uri = uri;
     this.mapper = objectMapper;
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
+    clientBuilder.setConnectionManager(configureConnectionManager(properties));
 
     if (baseHeaders != null) {
       clientBuilder.setDefaultHeaders(
@@ -699,6 +712,41 @@ public class HTTPClient implements RESTClient {
     return new Builder(properties);
   }
 
+  private static HttpClientConnectionManager configureConnectionManager(
+      Map<String, String> properties) {
+    PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
+        PoolingHttpClientConnectionManagerBuilder.create();
+    ConnectionConfig connectionConfig = configureConnectionConfig(properties);
+    if (connectionConfig != null) {
+      connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+    }
+    return connectionManagerBuilder.build();
+  }
+
+  @VisibleForTesting
+  static ConnectionConfig configureConnectionConfig(Map<String, String> properties) {
+    Long connectionTimeoutMillis =
+        PropertyUtil.propertyAsNullableLong(properties, REST_CONNECTION_TIMEOUT_MS);
+    Integer socketTimeoutMillis =
+        PropertyUtil.propertyAsNullableInt(properties, REST_SOCKET_TIMEOUT_MS);
+
+    if (connectionTimeoutMillis == null && socketTimeoutMillis == null) {
+      return null;
+    }
+
+    ConnectionConfig.Builder connConfigBuilder = ConnectionConfig.custom();
+
+    if (connectionTimeoutMillis != null) {
+      connConfigBuilder.setConnectTimeout(connectionTimeoutMillis, TimeUnit.MILLISECONDS);
+    }
+
+    if (socketTimeoutMillis != null) {
+      connConfigBuilder.setSocketTimeout(socketTimeoutMillis, TimeUnit.MILLISECONDS);
+    }
+
+    return connConfigBuilder.build();
+  }
+
   /**
    * Builder class for configuring and creating instances of HTTPClient.
    *
@@ -706,7 +754,6 @@ public class HTTPClient implements RESTClient {
    * URI, request headers, and ObjectMapper.
    */
   public static class Builder {
-    @SuppressWarnings("UnusedVariable")
     private final Map<String, String> properties;
 
     private final Map<String, String> baseHeaders = Maps.newHashMap();
@@ -795,7 +842,8 @@ public class HTTPClient implements RESTClient {
      */
     public HTTPClient build() {
 
-      return new HTTPClient(uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler);
+      return new HTTPClient(
+          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, properties);
     }
   }
 
