@@ -21,6 +21,8 @@ package org.apache.gravitino.stats;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
@@ -107,6 +109,24 @@ public class StatisticValues {
     public Type dataType() {
       return Types.BooleanType.get();
     }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(value);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+
+      if (!(obj instanceof BooleanValue)) {
+        return false;
+      }
+
+      return Objects.equals(value, ((BooleanValue) obj).value());
+    }
   }
 
   /** A statistic value that holds a Long value. */
@@ -125,6 +145,24 @@ public class StatisticValues {
     @Override
     public Type dataType() {
       return Types.LongType.get();
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+
+      if (!(obj instanceof LongValue)) {
+        return false;
+      }
+
+      return Objects.equals(value, ((LongValue) obj).value());
     }
   }
 
@@ -145,6 +183,24 @@ public class StatisticValues {
     public Type dataType() {
       return Types.DoubleType.get();
     }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+
+      if (!(obj instanceof DoubleValue)) {
+        return false;
+      }
+
+      return Objects.equals(value, ((DoubleValue) obj).value());
+    }
   }
 
   /** A statistic value that holds a String value. */
@@ -163,6 +219,24 @@ public class StatisticValues {
     @Override
     public Type dataType() {
       return Types.StringType.get();
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(value);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+
+      if (!(obj instanceof StringValue)) {
+        return false;
+      }
+
+      return Objects.equals(value, ((StringValue) obj).value());
     }
   }
 
@@ -191,6 +265,24 @@ public class StatisticValues {
     public Type dataType() {
       return Types.ListType.nullable(valueList.get(0).dataType());
     }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(valueList);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+
+      if (!(obj instanceof ListValue)) {
+        return false;
+      }
+
+      return Objects.equals(valueList, ((ListValue<?>) obj).value());
+    }
   }
 
   /** A statistic value that holds a Map of String keys to other statistic values. */
@@ -217,6 +309,24 @@ public class StatisticValues {
                       Types.StructType.Field.nullableField(
                           entry.getKey(), entry.getValue().dataType()))
               .toArray(Types.StructType.Field[]::new));
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(valueMap);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (this == obj) {
+        return true;
+      }
+
+      if (!(obj instanceof ObjectValue)) {
+        return false;
+      }
+
+      return Objects.equals(valueMap, ((ObjectValue) obj).value());
     }
   }
 }
