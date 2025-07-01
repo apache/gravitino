@@ -163,7 +163,8 @@ public class DistributionDTO implements Distribution {
       strategy = strategy == null ? Strategy.HASH : strategy;
 
       Preconditions.checkState(args != null, "expressions cannot be null");
-      Preconditions.checkState(number >= 0, "bucketNum must be greater than 0");
+      // Check if the number of buckets is greater than -1, -1 is auto.
+      Preconditions.checkState(number >= -1, "bucketNum must be greater than or equal -1");
       return new DistributionDTO(strategy, number, args);
     }
   }
