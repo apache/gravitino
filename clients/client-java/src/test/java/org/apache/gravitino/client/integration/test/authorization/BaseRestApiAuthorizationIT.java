@@ -38,7 +38,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   protected static final String USER_WITH_AUTHORIZATION = "tester2";
 
   /** Mock a user without permissions. */
-  protected static GravitinoAdminClient clientWithNoAuthorization;
+  protected static GravitinoAdminClient tester2Client;
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseRestApiAuthorizationIT.class);
 
@@ -59,7 +59,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);
-    clientWithNoAuthorization =
+    tester2Client =
         GravitinoAdminClient.builder(serverUri).withSimpleAuth(USER_WITH_AUTHORIZATION).build();
   }
 
@@ -68,9 +68,9 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   public void stopIntegrationTest() throws IOException, InterruptedException {
     client.dropMetalake(METALAKE, true);
 
-    if (clientWithNoAuthorization != null) {
-      clientWithNoAuthorization.close();
-      clientWithNoAuthorization = null;
+    if (tester2Client != null) {
+      tester2Client.close();
+      tester2Client = null;
     }
 
     try {

@@ -65,7 +65,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         "Can not access metadata {" + catalog1 + "}.",
         RuntimeException.class,
         () -> {
-          clientWithNoAuthorization
+          tester2Client
               .loadMetalake(METALAKE)
               .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
         });
@@ -79,7 +79,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         "Can not access metadata {" + catalog1 + "}.",
         RuntimeException.class,
         () -> {
-          clientWithNoAuthorization
+          tester2Client
               .loadMetalake(METALAKE)
               .createCatalog(catalog1, Catalog.Type.RELATIONAL, "hive", "comment", properties);
         });
@@ -88,7 +88,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(2)
   public void testListCatalog() {
-    String[] catalogs = clientWithNoAuthorization.loadMetalake(METALAKE).listCatalogs();
+    String[] catalogs = tester2Client.loadMetalake(METALAKE).listCatalogs();
     assertEquals(0, catalogs.length);
     catalogs = client.loadMetalake(METALAKE).listCatalogs();
     assertEquals(2, catalogs.length);
@@ -105,7 +105,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         "Can not access metadata {" + catalog1 + "}.",
         RuntimeException.class,
         () -> {
-          clientWithNoAuthorization.loadMetalake(METALAKE).dropCatalog(catalog1, true);
+          tester2Client.loadMetalake(METALAKE).dropCatalog(catalog1, true);
         });
     client.loadMetalake(METALAKE).dropCatalog(catalog1, true);
     catalogs = client.loadMetalake(METALAKE).listCatalogs();
