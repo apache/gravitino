@@ -86,13 +86,13 @@ class HTTPClient:
         host,
         *,
         request_headers=None,
-        timeout=TIMEOUT,
+        timeout=None,
         is_debug=False,
         auth_data_provider: AuthDataProvider = None,
     ) -> None:
         self.host = host
         self.request_headers = request_headers or {}
-        self.timeout = timeout
+        self.timeout = timeout if timeout else TIMEOUT
         self.is_debug = is_debug
         self.auth_data_provider = auth_data_provider
 

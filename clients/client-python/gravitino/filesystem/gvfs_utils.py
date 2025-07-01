@@ -48,6 +48,7 @@ def create_client(
     server_uri: str,
     metalake_name: str,
     request_headers: dict = None,
+    timeout: int = None,
 ):
     """Create the Gravitino client.
     :param options: The options
@@ -68,6 +69,7 @@ def create_client(
             metalake_name=metalake_name,
             auth_data_provider=SimpleAuthProvider(),
             request_headers=request_headers,
+            timeout=timeout,
         )
 
     if auth_type == GVFSConfig.OAUTH2_AUTH_TYPE:
@@ -92,6 +94,7 @@ def create_client(
             metalake_name=metalake_name,
             auth_data_provider=oauth2_token_provider,
             request_headers=request_headers,
+            timeout=timeout,
         )
 
     raise GravitinoRuntimeException(

@@ -57,9 +57,13 @@ class GravitinoClientBase:
         check_version: bool = True,
         auth_data_provider: AuthDataProvider = None,
         request_headers: dict = None,
+        timeout: int = None,
     ):
         self._rest_client = HTTPClient(
-            uri, auth_data_provider=auth_data_provider, request_headers=request_headers
+            uri,
+            auth_data_provider=auth_data_provider,
+            request_headers=request_headers,
+            timeout=timeout,
         )
         if check_version:
             self.check_version()

@@ -29,17 +29,26 @@ This capability allows users to perform federation queries, accessing data from 
 1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
 2. Configure the Flink configuration to use the Gravitino flink connector.
 
-| Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
-|--------------------------------------------------|--------|-------------------|----------------------------------------------------------------------|----------|------------------|
-| table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
+| Property                                               | Type   | Default Value     | Description                                                          | Required | Since Version    |
+|--------------------------------------------------------|--------|-------------------|----------------------------------------------------------------------|----------|------------------|
+| table.catalog-store.kind                               | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
+| table.catalog-store.gravitino.gravitino.metalake       | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
+| table.catalog-store.gravitino.gravitino.uri            | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
+| table.catalog-store.gravitino.gravitino.client.config. | string | (none)            | The configuration key prefix for the Gravitino client config.        | No       | 1.0.0            |
+
+To configure the Gravitino client, use properties prefixed with `table.catalog-store.gravitino.gravitino.client.config.`. These properties undergo automatic transformation: the prefix is replaced with `gravitino.client.` and passed to the `GravitinoClient`.
+
+**Example:** Setting `table.catalog-store.gravitino.gravitino.client.config.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the `GravitinoClient`.
+
+**Note:** Invalid configuration properties will result in exceptions. Please see [Grivavitino Java client configurations](./how-to-use-java-client.md#gravitino-java-client-configuration) for more support client configuration.
 
 Set the flink configuration in flink-conf.yaml.
 ```yaml
 table.catalog-store.kind: gravitino
 table.catalog-store.gravitino.gravitino.metalake: test
 table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
+table.catalog-store.gravitino.gravitino.client.config.socketTimeoutMs: 60000
+table.catalog-store.gravitino.gravitino.client.config.connectionTimeoutMs: 60000
 ```
 Or you can set the flink configuration in the `TableEnvironment`.
 ```java
@@ -47,6 +56,8 @@ final Configuration configuration = new Configuration();
 configuration.setString("table.catalog-store.kind", "gravitino");
 configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "test");
 configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8090");
+configuration.setString("table.catalog-store.gravitino.gravitino.client.config.socketTimeoutMs", "60000");
+configuration.setString("table.catalog-store.gravitino.gravitino.client.config.connectionTimeoutMs", "60000");
 EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
 TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
 ```

@@ -19,8 +19,11 @@
 
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.client.GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_CONFIG_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -94,6 +97,8 @@ public class GravitinoVirtualFileSystemUtils {
                     e -> e.getKey().substring(FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX.length()),
                     Map.Entry::getValue));
 
+    Map<String, String> clientConfig = extractClientConfig(configuration);
+
     String authType =
         configuration.getOrDefault(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY,
@@ -103,6 +108,7 @@ public class GravitinoVirtualFileSystemUtils {
           .withMetalake(metalakeValue)
           .withSimpleAuth()
           .withHeaders(requestHeaders)
+          .withClientConfig(clientConfig)
           .build();
     } else if (authType.equalsIgnoreCase(
         GravitinoVirtualFileSystemConfiguration.OAUTH2_AUTH_TYPE)) {
@@ -150,6 +156,7 @@ public class GravitinoVirtualFileSystemUtils {
           .withMetalake(metalakeValue)
           .withOAuth(authDataProvider)
           .withHeaders(requestHeaders)
+          .withClientConfig(clientConfig)
           .build();
     } else if (authType.equalsIgnoreCase(
         GravitinoVirtualFileSystemConfiguration.KERBEROS_AUTH_TYPE)) {
@@ -181,6 +188,7 @@ public class GravitinoVirtualFileSystemUtils {
           .withMetalake(metalakeValue)
           .withKerberosAuth(authDataProvider)
           .withHeaders(requestHeaders)
+          .withClientConfig(clientConfig)
           .build();
     } else {
       throw new IllegalArgumentException(
@@ -188,6 +196,18 @@ public class GravitinoVirtualFileSystemUtils {
               "Unsupported authentication type: %s for %s.",
               authType, GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY));
     }
+  }
+
+  @VisibleForTesting
+  static Map<String, String> extractClientConfig(Map<String, String> configuration) {
+    return configuration.entrySet().stream()
+        .filter(e -> e.getKey().startsWith(FS_GRAVITINO_CLIENT_CONFIG_PREFIX))
+        .collect(
+            Collectors.toMap(
+                e ->
+                    e.getKey()
+                        .replace(FS_GRAVITINO_CLIENT_CONFIG_PREFIX, GRAVITINO_CLIENT_CONFIG_PREFIX),
+                Map.Entry::getValue));
   }
 
   /**

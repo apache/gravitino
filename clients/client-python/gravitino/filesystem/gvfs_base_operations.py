@@ -101,8 +101,16 @@ class BaseGVFSOperations(ABC):
                 )
             }
         )
+
+        timeout = (
+            None
+            if options is None
+            or GVFSConfig.GVFS_FILESYSTEM_CLIENT_REQUEST_TIMEOUT not in options
+            else options[GVFSConfig.GVFS_FILESYSTEM_CLIENT_REQUEST_TIMEOUT]
+        )
+
         self._client = create_client(
-            options, server_uri, metalake_name, request_headers
+            options, server_uri, metalake_name, request_headers, timeout
         )
 
         cache_size = (
