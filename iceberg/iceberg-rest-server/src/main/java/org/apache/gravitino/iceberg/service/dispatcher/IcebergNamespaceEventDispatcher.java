@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespacePreEvent;
@@ -82,20 +84,30 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), createRequest.namespace());
 
-    eventBus.dispatchEvent(
-        new IcebergCreateNamespacePreEvent(context, nameIdentifier, createRequest));
+    Optional<BaseEvent> transformedEvent =
+        eventBus.dispatchEvent(
+            new IcebergCreateNamespacePreEvent(context, nameIdentifier, createRequest));
+    IcebergCreateNamespacePreEvent transformedCreateEvent =
+        (IcebergCreateNamespacePreEvent) transformedEvent.get();
 
     CreateNamespaceResponse createResponse;
     try {
-      createResponse = operationDispatcher.createNamespace(context, createRequest);
+      createResponse =
+          operationDispatcher.createNamespace(
+              context, transformedCreateEvent.createNamespaceRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergCreateNamespaceFailureEvent(context, nameIdentifier, createRequest, e));
+          new IcebergCreateNamespaceFailureEvent(
+              context, nameIdentifier, transformedCreateEvent.createNamespaceRequest(), e));
       throw e;
     }
 
     eventBus.dispatchEvent(
-        new IcebergCreateNamespaceEvent(context, nameIdentifier, createRequest, createResponse));
+        new IcebergCreateNamespaceEvent(
+            context,
+            nameIdentifier,
+            transformedCreateEvent.createNamespaceRequest(),
+            createResponse));
     return createResponse;
   }
 
@@ -107,20 +119,33 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(metalakeName, context.catalogName(), namespace);
 
-    eventBus.dispatchEvent(
-        new IcebergUpdateNamespacePreEvent(context, nameIdentifier, updateRequest));
+    Optional<BaseEvent> transformedEvent =
+        eventBus.dispatchEvent(
+            new IcebergUpdateNamespacePreEvent(context, nameIdentifier, updateRequest));
+    IcebergUpdateNamespacePreEvent transformedUpdateEvent =
+        (IcebergUpdateNamespacePreEvent) transformedEvent.get();
 
     UpdateNamespacePropertiesResponse updateResponse;
     try {
-      updateResponse = operationDispatcher.updateNamespace(context, namespace, updateRequest);
+      updateResponse =
+          operationDispatcher.updateNamespace(
+              context, namespace, transformedUpdateEvent.updateNamespacePropertiesRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergUpdateNamespaceFailureEvent(context, nameIdentifier, updateRequest, e));
+          new IcebergUpdateNamespaceFailureEvent(
+              context,
+              nameIdentifier,
+              transformedUpdateEvent.updateNamespacePropertiesRequest(),
+              e));
       throw e;
     }
 
     eventBus.dispatchEvent(
-        new IcebergUpdateNamespaceEvent(context, nameIdentifier, updateRequest, updateResponse));
+        new IcebergUpdateNamespaceEvent(
+            context,
+            nameIdentifier,
+            transformedUpdateEvent.updateNamespacePropertiesRequest(),
+            updateResponse));
     return updateResponse;
   }
 

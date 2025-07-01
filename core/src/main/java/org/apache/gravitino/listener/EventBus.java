@@ -74,7 +74,8 @@ public class EventBus {
     if (baseEvent instanceof PreEvent) {
       return dispatchAndTransformPreEvent((PreEvent) baseEvent);
     } else if (baseEvent instanceof Event) {
-      return dispatchPostEvent((Event) baseEvent);
+      dispatchPostEvent((Event) baseEvent);
+      return Optional.empty();
     } else {
       throw new RuntimeException("Unknown event type:" + baseEvent.getClass().getSimpleName());
     }
@@ -96,9 +97,8 @@ public class EventBus {
     return eventListeners;
   }
 
-  private Optional<BaseEvent> dispatchPostEvent(Event postEvent) {
+  private void dispatchPostEvent(Event postEvent) {
     eventListeners.forEach(eventListener -> eventListener.onPostEvent(postEvent));
-    return Optional.empty();
   }
 
   private Optional<BaseEvent> dispatchAndTransformPreEvent(PreEvent originalEvent)
