@@ -218,9 +218,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             Preconditions.checkArgument(
                 asTables() != null, "Catalog does not support table operations");
             Table table = asTables().loadTable(tableIdent);
+            SupportsPartitions partitionOps  = table.supportPartitions();
             Preconditions.checkArgument(
-                table.supportPartitions() != null, "Table does not support partition operations");
-            return fn.apply(table.supportPartitions());
+                partitionOps != null,  "Table does not support partition operations");
+            return fn.apply(partitionOps);
           });
     }
 
