@@ -69,6 +69,8 @@ public class EventBus {
    * implementation, which could be either synchronous or asynchronous.
    *
    * @param baseEvent The event to be dispatched to all registered listeners.
+   * @return an Optional containing the transformed pre-event if it implements {@link
+   *     SupportsChangingPreEvent}, otherwise {@link Optional#empty() empty}
    */
   public Optional<BaseEvent> dispatchEvent(BaseEvent baseEvent) {
     if (baseEvent instanceof PreEvent) {
@@ -103,14 +105,15 @@ public class EventBus {
 
   private Optional<BaseEvent> dispatchAndTransformPreEvent(PreEvent originalEvent)
       throws ForbiddenException {
+    boolean supportsChangePreEvent = originalEvent instanceof SupportsChangingPreEvent;
     PreEvent preEvent;
-    if (originalEvent instanceof SupportsChangingPreEvent) {
+    if (supportsChangePreEvent) {
       preEvent = (PreEvent) transformPreEvent((SupportsChangingPreEvent) originalEvent);
     } else {
       preEvent = originalEvent;
     }
     eventListeners.forEach(eventListener -> eventListener.onPreEvent(preEvent));
-    if (preEvent instanceof SupportsChangingPreEvent) {
+    if (supportsChangePreEvent) {
       return Optional.of(preEvent);
     }
     return Optional.empty();

@@ -123,17 +123,17 @@ public interface EventListenerPlugin {
   default void onPreEvent(PreEvent preEvent) throws ForbiddenException {}
 
   /**
-   * Transform a preEvent before it is processed by the listener.
+   * Transforms a pre-event before listener processing.
    *
-   * <p>This method allows the plugin to modify the preEvent before it is processed. The sequence of
-   * the transformations is determined by the event listener configuration order.
+   * <p>Plugins can modify the pre-event through this method. Transformation order follows the event
+   * listener configuration sequence.
    *
-   * @param preEvent The preEvent to be transformed.
-   * @return The transformed preEvent.
+   * @param preEvent Pre-event to transform
+   * @return Transformed pre-event
    */
   default SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
     return preEvent;
-  };
+  }
 
   /**
    * Specifies the default operational mode for event processing by the plugin. The default

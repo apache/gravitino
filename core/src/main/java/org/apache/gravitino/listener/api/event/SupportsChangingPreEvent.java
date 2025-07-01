@@ -19,5 +19,11 @@
 
 package org.apache.gravitino.listener.api.event;
 
-// whether the pre event could be changed
+/**
+ * Marks pre-events that can be modified.
+ *
+ * <p>Pre-events implementing this interface can be transformed in {@link
+ * org.apache.gravitino.listener.api.EventListenerPlugin#transformPreEvent(SupportsChangingPreEvent)}.
+ * All subsequent operations will use the transformed event instead of the original.
+ */
 public interface SupportsChangingPreEvent {}
