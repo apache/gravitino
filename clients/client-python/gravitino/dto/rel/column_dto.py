@@ -107,30 +107,9 @@ class ColumnDTO(Column, DataClassJsonMixin):
             f"Column cannot be non-nullable with a null default value: {self._name}.",
         )
 
-    @classmethod
-    def builder(
-        cls,
-        name: str,
-        data_type: Type,
-        comment: str,
-        nullable: bool = True,
-        auto_increment: bool = False,
-        default_value: Optional[Expression] = None,
-    ) -> ColumnDTO:
-        Precondition.check_argument(name is not None, "Column name cannot be null")
-        Precondition.check_argument(
-            data_type is not None, "Column data type cannot be null"
-        )
-        return ColumnDTO(
-            _name=name,
-            _data_type=data_type,
-            _comment=comment,
-            _nullable=nullable,
-            _auto_increment=auto_increment,
-            _default_value=(
-                Column.DEFAULT_VALUE_NOT_SET if default_value is None else default_value
-            ),
-        )
+    @staticmethod
+    def builder() -> ColumnDTO.Builder:
+        return ColumnDTO.Builder()
 
     def __eq__(self, other: ColumnDTO) -> bool:
         if not isinstance(other, ColumnDTO):
@@ -159,3 +138,112 @@ class ColumnDTO(Column, DataClassJsonMixin):
                 ),
             )
         )
+
+    class Builder:
+        def __init__(self) -> None:
+            self._name = None
+            self._data_type = None
+            self._comment = None
+            self._nullable: bool = True
+            self._auto_increment: bool = False
+            self._default_value = None
+
+        def with_name(self, name: str) -> ColumnDTO.Builder:
+            """Sets the name of the column.
+
+            Args:
+                name (str): The name of the column.
+
+            Returns:
+                ColumnDTO.Builder: The builder instance.
+            """
+            self._name = name
+            return self
+
+        def with_data_type(self, data_type: Type) -> ColumnDTO.Builder:
+            """Sets the data type of the column.
+
+            Args:
+                data_type (Type): The data type of the column.
+
+            Returns:
+                ColumnDTO.Builder: The builder instance.
+            """
+            self._data_type = data_type
+            return self
+
+        def with_comment(self, comment: str) -> ColumnDTO.Builder:
+            """Sets the comment associated with the column.
+
+            Args:
+                comment (str): The comment associated with the column.
+
+            Returns:
+                ColumnDTO.Builder: The builder instance.
+            """
+            self._comment = comment
+            return self
+
+        def with_nullable(self, nullable: bool) -> ColumnDTO.Builder:
+            """Sets whether the column value can be null.
+
+            Args:
+                nullable (bool): Whether the column value can be null.
+
+            Returns:
+                ColumnDTO.Builder: The builder instance.
+            """
+            self._nullable = nullable
+            return self
+
+        def with_auto_increment(self, auto_increment: bool) -> ColumnDTO.Builder:
+            """Sets whether the column is an auto-increment column.
+
+            Args:
+                auto_increment (bool): Whether the column is an auto-increment column.
+
+            Returns:
+                ColumnDTO.Builder: The builder instance.
+            """
+            self._auto_increment = auto_increment
+            return self
+
+        def with_default_value(self, default_value: Expression) -> ColumnDTO.Builder:
+            """Sets the default value of the column.
+
+            Args:
+                default_value (Expression): The default value of the column.
+
+            Returns:
+                ColumnDTO.Builder: The builder instance.
+            """
+            self._default_value = default_value
+            return self
+
+        def build(self) -> ColumnDTO:
+            """Builds a Column DTO based on the provided builder parameters.
+
+            Returns:
+                ColumnDTO: A new ColumnDTO instance.
+
+            Raises:
+                IllegalArgumentException: If required, fields name and data type are not set.
+            """
+            Precondition.check_argument(
+                self._name is not None, "Column name cannot be null"
+            )
+            Precondition.check_argument(
+                self._data_type is not None, "Column data type cannot be null"
+            )
+            return ColumnDTO(
+                _name=self._name,
+                _data_type=self._data_type,
+                _comment=self._comment,
+                _nullable=self._nullable,
+                _auto_increment=self._auto_increment,
+                _default_value=(
+                    Column.DEFAULT_VALUE_NOT_SET
+                    if self._default_value is None
+                    else self._default_value
+                ),
+            )
