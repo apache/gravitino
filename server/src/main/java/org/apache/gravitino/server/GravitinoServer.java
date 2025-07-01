@@ -41,7 +41,6 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ConfigServlet;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -184,11 +183,7 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   public void stop() throws IOException {
-    GravitinoAuthorizer gravitinoAuthorizer =
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
-    if (gravitinoAuthorizer != null) {
-      gravitinoAuthorizer.close();
-    }
+    GravitinoAuthorizerProvider.getInstance().close();
     server.stop();
     gravitinoEnv.shutdown();
     if (lineageService != null) {
