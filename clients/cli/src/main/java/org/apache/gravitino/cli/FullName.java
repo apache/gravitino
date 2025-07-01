@@ -22,7 +22,7 @@ package org.apache.gravitino.cli;
 import org.apache.commons.cli.CommandLine;
 
 /**
- * Extracts different arts of a full name (dot seperated) from the command line input. This includes
+ * Extracts different parts of a full name (dot separated) from the command line input. This includes
  * metalake, catalog, schema, and table names.
  */
 public class FullName {
