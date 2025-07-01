@@ -81,7 +81,63 @@ You can also specify filter parameters by setting configuration entries in the s
 
 ### Security
 
-Gravitino Iceberg REST server supports OAuth2 and HTTPS, please refer to [Security](security/security.md) for more details.
+#### OAuth2
+
+Please refer to [OAuth2 Configuration](./security/how-to-authenticate#server-configuration) for how to enable OAuth2.
+
+When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve catalog information from the Gravitino server, please use the following configuration parameters to establish OAuth2 authentication for secure communication with the Gravitino server:
+
+| Configuration item                                   | Description                                                                         | Default value         | Required          | Since Version |
+|------------------------------------------------------|-------------------------------------------------------------------------------------|-----------------------|-------------------|---------------|
+| `gravitino.iceberg-rest.gravitino-auth-type`         | The auth type to communicate with Gravitino server, supports `simple` and `oauth2`. | `simple`              | No                | 1.0.0         |
+| `gravitino.iceberg-rest.gravitino-simple.user-name`  | The username when using `simple` auth type.                                         | `iceberg-rest-server` | No                | 1.0.0         |
+| `gravitino.iceberg-rest.gravitino-oauth2.server-uri` | The OAuth2 server uri address.                                                      | (none)                | Yes, for `oauth2` | 1.0.0         | 
+| `gravitino.iceberg-rest.gravitino-oauth2.credential` | The credential to request the OAuth2 token.                                         | (none)                | Yes, for `oauth2` | 1.0.0         | 
+| `gravitino.iceberg-rest.gravitino-oauth2.token-path` | The path for token of the default OAuth server.                                     | (none)                | Yes, for `oauth2` | 1.0.0         | 
+| `gravitino.iceberg-rest.gravitino-oauth2.scope`      | The scope to request the OAuth2 token.                                              | (none)                | Yes, for `oauth2` | 1.0.0         | 
+
+Here is an example of how to enable OAuth2 for Gravitino Iceberg REST server:
+
+```text
+gravitino.authenticators = oauth
+gravitino.authenticator.oauth.serviceAudience = test
+gravitino.authenticator.oauth.defaultSignKey = xx
+gravitino.authenticator.oauth.tokenPath = oauth2/token
+gravitino.authenticator.oauth.serverUri = http://localhost:8177
+```
+
+You should add extra configurations if using `dynamic-config-provider`:
+
+```text
+gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
+gravitino.iceberg-rest.gravitino-metalake = test
+gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
+gravitino.iceberg-rest.gravitino-auth-type = oauth2
+gravitino.iceberg-rest.gravitino-oauth2.server-uri = http://localhost:8177
+gravitino.iceberg-rest.gravitino-oauth2.credential = test:test
+gravitino.iceberg-rest.gravitino-oauth2.token-path = oauth2/token
+gravitino.iceberg-rest.gravitino-oauth2.scope = test
+```
+
+Please refer the following configuration If you are using Spark to access Iceberg REST catalog with OAuth2 enabled:
+
+```shell
+./bin/spark-sql -v \
+--conf spark.jars=/Users/fanng/deploy/demo/jars/iceberg-spark-runtime-3.5_2.12-1.9.0.jar \
+--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+--conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog \
+--conf spark.sql.catalog.rest.rest.auth.type=oauth2 \
+--conf spark.sql.catalog.rest.type=rest  \
+--conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.rest.prefix=${catalog_name} \
+--conf spark.sql.catalog.rest.credential=test:test \
+--conf spark.sql.catalog.rest.scope=test \
+--conf spark.sql.catalog.rest.oauth2-server-uri=http://localhost:8177/oauth2/token
+```
+
+#### HTTPS
+
+Please refer to [HTTPS Configuration](./security/how-to-use-https/#apache-iceberg-rest-services-configuration) for how to enable HTTPS for Gravitino Iceberg REST server.
 
 #### Backend authentication
 
