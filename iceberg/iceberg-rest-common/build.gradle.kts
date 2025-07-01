@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "iceberg-rest-service"
+description = "iceberg-rest-common"
 
 plugins {
   `maven-publish`

@@ -22,6 +22,7 @@ package org.apache.gravitino.iceberg.shim;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.util.List;
+import org.apache.gravitino.iceberg.common.utils.IcebergVersionUtils;
 import org.apache.gravitino.utils.ClassUtils;
 
 public class IcebergShimUtils {
@@ -31,12 +32,7 @@ public class IcebergShimUtils {
       "org.apache.gravitino.iceberg.shim.IcebergModernConfigProvider";
 
   static {
-    try {
-      Class.forName(MODERN_CONFIG_PROVIDER, false, Thread.currentThread().getContextClassLoader());
-      useModernIceberg = true;
-    } catch (ClassNotFoundException e) {
-      useModernIceberg = false;
-    }
+    useModernIceberg = IcebergVersionUtils.isNewIceberg();
   }
 
   private static final String ICEBERG_REST_SPEC_PACKAGE =

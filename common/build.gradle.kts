@@ -86,6 +86,7 @@ fun writeProjectPropertiesFile() {
   val compileDate = dateFormat.format(Date())
   val projectVersion = project.version.toString()
   val commitId = getGitCommitId()
+  val useModernIceberg = rootProject.extra["useModernIceberg"] as Boolean
 
   propertiesFile.parentFile.mkdirs()
   propertiesFile.createNewFile()
@@ -113,6 +114,7 @@ fun writeProjectPropertiesFile() {
     writer.write("project.version=$projectVersion\n")
     writer.write("compile.date=$compileDate\n")
     writer.write("git.commit.id=$commitId\n")
+    writer.write("useModernIceberg=$useModernIceberg\n")
   }
 }
 

@@ -185,9 +185,6 @@ tasks {
 }
 
 tasks.test {
-  doFirst {
-    println("Final JVM args: $jvmArgs")
-  }
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests

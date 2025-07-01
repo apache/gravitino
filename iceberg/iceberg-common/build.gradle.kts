@@ -24,8 +24,6 @@ plugins {
   id("idea")
 }
 
-println("当前 JDK 版本: ${JavaVersion.current()}")
-
 dependencies {
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
@@ -36,12 +34,10 @@ dependencies {
     exclude("*")
   }
   if (rootProject.extra["useModernIceberg"] as Boolean) {
-    println("use modern iceberg for iceberg common")
     implementation(libs.bundles.iceberg4modern)
     implementation(libs.bundles.iceberg4cloud4modern)
     implementation(libs.iceberg.hive.metastore.modern)
   } else {
-    println("use old iceberg for iceberg common")
     implementation(libs.bundles.iceberg)
     implementation(libs.bundles.iceberg4cloud)
     implementation(libs.iceberg.hive.metastore)
@@ -54,7 +50,6 @@ dependencies {
   implementation(libs.cglib)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")

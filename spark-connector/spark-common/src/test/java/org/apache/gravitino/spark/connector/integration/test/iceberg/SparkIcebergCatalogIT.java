@@ -817,10 +817,6 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertEquals(5, tableData.size());
     Assertions.assertEquals("1,1,1;2,2,2;3,3,3;4,4,4;5,5,5", String.join(";", tableData));
 
-    sql(
-        String.format(
-            "CALL %s.system.rewrite_data_files(table => '%s', options=> map('rewrite-all', 'true') )",
-            getCatalogName(), fullTableName));
     sql(String.format("DELETE FROM %s WHERE id = 1", tableName));
     sql(String.format("DELETE FROM %s WHERE id = 2", tableName));
 

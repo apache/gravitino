@@ -215,10 +215,12 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
           .map(
               catalogAndIdentifier -> {
                 SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec = null;
+                // Iceberg 1.6 return DistributionMode, while Iceberg 1.9 return
+                // Option<DistributionMode>
                 Object distributionMode = getDistributionMode(setWriteDistributionAndOrdering);
                 try {
                   setWriteDistributionAndOrderingExec =
-                      createCaseClass(
+                      createDistributionAndOrderingExec(
                           catalogAndIdentifier.catalog,
                           catalogAndIdentifier.identifier,
                           distributionMode,
@@ -275,31 +277,31 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
     }
   }
 
-  private static SetWriteDistributionAndOrderingExec createCaseClass(
+  private static SetWriteDistributionAndOrderingExec createDistributionAndOrderingExec(
       TableCatalog catalog, Identifier identifier, Object distributionMode, Object sortOrder)
       throws Exception {
-    // 1. 获取伴生对象
+    // 1. get the object associated with the scala case class
     Class<?> companionClass =
         Class.forName(SetWriteDistributionAndOrderingExec.class.getName() + "$");
     Object companionInstance = companionClass.getField("MODULE$").get(null);
 
-    // 2. 获取 apply 方法（Scala case class 的工厂方法）
+    // 2. get apply method
     Class<?>[] paramTypes = getApplyMethodParamTypes(companionClass);
     Method applyMethod = companionClass.getMethod("apply", paramTypes);
 
-    // 3. 调用 apply 方法创建实例
+    // 3. invoke apply to create object
     return (SetWriteDistributionAndOrderingExec)
         applyMethod.invoke(companionInstance, catalog, identifier, distributionMode, sortOrder);
   }
 
   private static Class<?>[] getApplyMethodParamTypes(Class<?> companionClass) {
-    // Scala 会生成多个 apply 方法重载，匹配参数数量为4
+    // Scala may generate multiple apply method，use the apply method with 4 arguments
     for (Method method : companionClass.getMethods()) {
       if ("apply".equals(method.getName()) && method.getParameterCount() == 4) {
         return method.getParameterTypes();
       }
     }
-    throw new IllegalStateException("apply 方法未找到");
+    throw new IllegalStateException("Could find apply method with 4 arguments");
   }
 
   @SneakyThrows

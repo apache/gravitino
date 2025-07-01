@@ -35,7 +35,11 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
   }
 
   GravitinoVersion(VersionDTO versionDTO) {
-    super(versionDTO.version(), versionDTO.compileDate(), versionDTO.gitCommit());
+    super(
+        versionDTO.version(),
+        versionDTO.compileDate(),
+        versionDTO.gitCommit(),
+        versionDTO.useModernIceberg());
   }
 
   @VisibleForTesting

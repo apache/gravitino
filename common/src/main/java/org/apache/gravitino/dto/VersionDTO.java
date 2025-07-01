@@ -36,11 +36,16 @@ public class VersionDTO {
   @JsonProperty("gitCommit")
   private final String gitCommit;
 
+  /** Use new Iceberg version */
+  @JsonProperty("useModernIceberg")
+  public boolean useModernIceberg;
+
   /** Default constructor for Jackson deserialization. */
   public VersionDTO() {
     this.version = "";
     this.compileDate = "";
     this.gitCommit = "";
+    this.useModernIceberg = false;
   }
 
   /**
@@ -51,9 +56,23 @@ public class VersionDTO {
    * @param gitCommit The git commit of the software.
    */
   public VersionDTO(String version, String compileDate, String gitCommit) {
+    this(version, compileDate, gitCommit, false);
+  }
+
+  /**
+   * Creates a new instance of VersionDTO.
+   *
+   * @param version The version of the software.
+   * @param compileDate The date the software was compiled.
+   * @param gitCommit The git commit of the software.
+   * @param useModernIceberg Use new Iceberg version.
+   */
+  public VersionDTO(
+      String version, String compileDate, String gitCommit, boolean useModernIceberg) {
     this.version = version;
     this.compileDate = compileDate;
     this.gitCommit = gitCommit;
+    this.useModernIceberg = useModernIceberg;
   }
 
   /** @return The version of the software. */
@@ -69,5 +88,10 @@ public class VersionDTO {
   /** @return The git commit of the software. */
   public String gitCommit() {
     return gitCommit;
+  }
+
+  /** @return Whether use new Iceberg version. */
+  public boolean useModernIceberg() {
+    return useModernIceberg;
   }
 }

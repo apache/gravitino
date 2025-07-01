@@ -48,10 +48,8 @@ dependencies {
   }
   implementation(project(":iceberg:iceberg-common"))
   if (useModernIceberg) {
-    println("use modern iceberg for iceberg catalog, $icebergVersion")
     implementation(libs.bundles.iceberg4modern)
   } else {
-    println("use old iceberg for iceberg catalog, $icebergVersion")
     implementation(libs.bundles.iceberg)
   }
 

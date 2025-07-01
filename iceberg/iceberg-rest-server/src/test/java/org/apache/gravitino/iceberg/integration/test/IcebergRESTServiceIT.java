@@ -210,7 +210,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
     Exception exception =
         Assertions.assertThrows(Exception.class, () -> sql("DROP DATABASE " + namespaceName));
-    // Will throw BadRequestException for low level Iceberg client.
+    // Will throw BadRequestException for low version Iceberg client.
     Assertions.assertTrue(
         exception instanceof BadRequestException
             || exception instanceof NamespaceNotEmptyException);
