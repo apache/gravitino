@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -43,7 +44,7 @@ public class StatisticMetaService {
     private StatisticMetaService() {}
 
 
-    public List<StatisticPO> listStatisticPOsByObject(NameIdentifier identifier, Entity.EntityType type) {
+    public List<StatisticEntity> listStatisticPOsByObject(NameIdentifier identifier, Entity.EntityType type) {
         long metalakeId =
                 MetalakeMetaService.getInstance()
                         .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
@@ -55,19 +56,26 @@ public class StatisticMetaService {
                         mapper -> mapper.listStatisticPOsByObject(objectId, type.name())
                 );
         return statisticPOs.stream()
-                .map(statisticPO -> POConverters.fromStatisticPO(statisticPO))
+                .map(POConverters::fromStatisticPO)
                 .collect(Collectors.toList());
     }
 
-    public void batchInsertStatisticPOs(List<StatisticPO> statisticPOs) {
-
+    public void batchInsertStatisticPOs(List<StatisticEntity> statisticEntities) {
+        if (statisticEntities == null || statisticEntities.isEmpty()) {
+            return;
+        }
+        SessionUtils.doWithCommitAndFetchResult(
+                StatisticMetaMapper.class,
+                mapper -> mapper.batchInsertStatisticPOs(statisticEntities));
     }
 
-    public void batchUpdateStatisticPOs(List<StatisticPO> statisticPOs) {
-
-    }
 
     public void batchDeleteStatisticPOs(List<Long> statisticIds) {
-        // Implementation for batch deleting StatisticPOs from the database
+        if (statisticIds == null || statisticIds.isEmpty()) {
+            return;
+        }
+        SessionUtils.doWithCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.batchDeleteStatisticPOs(statisticIds));
     }
 }

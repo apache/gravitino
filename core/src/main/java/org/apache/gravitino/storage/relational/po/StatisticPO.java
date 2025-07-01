@@ -18,10 +18,11 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import com.google.common.base.Preconditions;
+
 import java.util.Objects;
 
 public class StatisticPO {
-
     private Long statisticId;
 
     private String statisticName;
@@ -36,40 +37,41 @@ public class StatisticPO {
     private Long currentVersion;
     private Long lastVersion;
     private Long deletedAt;
+    private StatisticPO() {}
 
-    Long getStatisticId() {
+    public Long getStatisticId() {
         return statisticId;
     }
 
-    Long getObjectId() {
+    public Long getObjectId() {
         return objectId;
     }
 
-    String getObjectType() {
+    public String getObjectType() {
         return objectType;
     }
 
-    String getStatisticName() {
+    public String getStatisticName() {
         return statisticName;
     }
 
-    String getValue() {
+    public String getValue() {
         return value;
     }
 
-    String getAuditInfo() {
+    public String getAuditInfo() {
         return auditInfo;
     }
 
-    Long getCurrentVersion() {
+    public Long getCurrentVersion() {
         return currentVersion;
     }
 
-    Long getLastVersion() {
+    public Long getLastVersion() {
         return lastVersion;
     }
 
-    Long getDeletedAt() {
+    public Long getDeletedAt() {
         return deletedAt;
     }
 
@@ -161,6 +163,13 @@ public class StatisticPO {
         }
 
         public StatisticPO build() {
+            Preconditions.checkArgument(statisticPO.objectId != null, "`objectId is required");
+            Preconditions.checkArgument(
+                    statisticPO.objectType != null, "`objectType` is required");
+            Preconditions.checkArgument(
+                    statisticPO.statisticName != null, "`statisticName` is required");
+            Preconditions.checkArgument(statisticPO.value != null, "`value` is required");
+
             return statisticPO;
         }
     }

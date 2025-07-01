@@ -41,6 +41,7 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     private Namespace namespace;
 
 
+
     @Override
     public Audit auditInfo() {
         return null;
@@ -69,5 +70,46 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     @Override
     public Long id() {
         return id;
+    }
+
+    public static Builder builder() {
+        return null;
+    }
+
+    public static class Builder {
+        private final StatisticEntity statisticEntity;
+
+        private Builder() {
+            statisticEntity = new StatisticEntity();
+        }
+
+        public Builder withId(Long id) {
+            statisticEntity.id = id;
+            return this;
+        }
+
+        public Builder withName(String name) {
+            statisticEntity.name = name;
+            return this;
+        }
+
+        public Builder withValue(String value) {
+            statisticEntity.value = value;
+            return this;
+        }
+
+        public Builder withAuditInfo(AuditInfo auditInfo) {
+            statisticEntity.auditInfo = auditInfo;
+            return this;
+        }
+
+        public Builder withNamespace(Namespace namespace) {
+            statisticEntity.namespace = namespace;
+            return this;
+        }
+
+        public StatisticEntity build() {
+            return statisticEntity;
+        }
     }
 }

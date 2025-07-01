@@ -22,13 +22,6 @@ package org.apache.gravitino.storage.relational.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
-import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
@@ -42,22 +35,7 @@ import org.apache.gravitino.dto.rel.expressions.FunctionArg;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.ColumnEntity;
-import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.ModelVersionEntity;
-import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.meta.SchemaVersion;
-import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.*;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -79,6 +57,7 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
@@ -86,6 +65,14 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
 import org.apache.gravitino.utils.PrincipalUtils;
+
+import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
@@ -1581,5 +1568,9 @@ public class POConverters {
         .withModelId(entity.id())
         .withDeletedAt(DEFAULT_DELETED_AT)
         .build();
+  }
+
+  public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
+    return StatisticEntity.builder().withId(statisticPO.getStatisticId()).withName(statisticPO.getStatisticName()).withValue(statisticPO.getValue()).build();
   }
 }
