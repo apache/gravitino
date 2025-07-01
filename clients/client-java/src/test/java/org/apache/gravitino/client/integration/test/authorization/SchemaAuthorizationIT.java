@@ -32,6 +32,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -78,6 +79,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
         });
+    // grant tester load catalog privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     Catalog catalogEntity = gravitinoMetalake.loadCatalog(CATALOG);
@@ -86,7 +88,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     SecurableObject securableObject = SecurableObjects.ofCatalog(catalogEntity.name(), privileges);
     securableObjects.add(securableObject);
     gravitinoMetalake.createRole(role, new HashMap<>(), securableObjects);
-    gravitinoMetalake.grantRolesToUser(ImmutableList.of(role), USER_WITH_AUTHORIZATION);
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of(role), NORMAL_USER);
     Catalog catalogLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByTester2.name());
   }
@@ -94,6 +96,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(1)
   public void testCreateSchema() {
+    // test catalog owner privilege
     Catalog catalogEntityLoadByTester1 = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
     catalogEntityLoadByTester1.asSchemas().createSchema("schema1", "test", new HashMap<>());
     Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
@@ -104,6 +107,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
           catalogEntityLoadByTester2.asSchemas().createSchema("schema2", "test2", new HashMap<>());
         });
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    // test grant create schema privilege
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG),
@@ -137,6 +141,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           catalogEntityLoadByTester2.asSchemas().loadSchema("schema1");
         });
+    // test grant use schema
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         role,
@@ -149,18 +154,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(4)
   public void testAlterSchema() {
-    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
-    assertThrows(
-        String.format("Can not access metadata {%s.%s}.", CATALOG, "schema1"),
-        RuntimeException.class,
-        () -> {
-          catalogEntityLoadByTester2
-              .asSchemas()
-              .alterSchema("schema1", SchemaChange.setProperty("key", "value"));
-        });
-    catalogEntityLoadByTester2
-        .asSchemas()
-        .alterSchema("schema2", SchemaChange.setProperty("key", "value"));
+    // test catalog owner privilege
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     Catalog catalogEntityLoadByTester1 = gravitinoMetalake.loadCatalog(CATALOG);
     catalogEntityLoadByTester1
@@ -172,11 +166,37 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     catalogEntityLoadByTester1
         .asSchemas()
         .alterSchema("schema3", SchemaChange.setProperty("key3", "value3"));
+    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    assertThrows(
+        String.format("Can not access metadata {%s.%s}.", CATALOG, "schema1"),
+        RuntimeException.class,
+        () -> {
+          catalogEntityLoadByTester2
+              .asSchemas()
+              .alterSchema("schema1", SchemaChange.setProperty("key", "value"));
+        });
+    // test set owner
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG, "schema1"), MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    catalogEntityLoadByTester2
+        .asSchemas()
+        .alterSchema("schema1", SchemaChange.setProperty("key", "value"));
+    catalogEntityLoadByTester2
+        .asSchemas()
+        .alterSchema("schema2", SchemaChange.setProperty("key", "value"));
   }
 
   @Test
   @Order(5)
   public void testDropSchema() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    // reset owner
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG, "schema1"), MetadataObject.Type.SCHEMA),
+        USER,
+        Owner.Type.USER);
     Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertThrows(
         String.format("Can not access metadata {%s.%s}.", CATALOG, "schema1"),
@@ -185,13 +205,29 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
           catalogEntityLoadByTester2.asSchemas().dropSchema("schema1", true);
         });
     catalogEntityLoadByTester2.asSchemas().dropSchema("schema2", true);
-    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     Catalog catalogEntityLoadByTester1 = gravitinoMetalake.loadCatalog(CATALOG);
     catalogEntityLoadByTester1.asSchemas().dropSchema("schema1", true);
     catalogEntityLoadByTester1.asSchemas().dropSchema("schema3", true);
     String[] schemasLoadByTester1 = catalogEntityLoadByTester1.asSchemas().listSchemas();
     assertArrayEquals(new String[] {"default"}, schemasLoadByTester1);
     String[] schemasLoadByTester2 = catalogEntityLoadByTester2.asSchemas().listSchemas();
+    assertArrayEquals(new String[] {}, schemasLoadByTester2);
+    catalogEntityLoadByTester1.asSchemas().createSchema("schema1", "test", new HashMap<>());
+    // test catalog owner
+    assertThrows(
+        String.format("Can not access metadata {%s.%s}.", CATALOG, "schema1"),
+        RuntimeException.class,
+        () -> {
+          catalogEntityLoadByTester2.asSchemas().dropSchema("schema1", true);
+        });
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG, "schema1"), MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    catalogEntityLoadByTester2.asSchemas().dropSchema("schema1", true);
+    schemasLoadByTester1 = catalogEntityLoadByTester1.asSchemas().listSchemas();
+    assertArrayEquals(new String[] {"default"}, schemasLoadByTester1);
+    schemasLoadByTester2 = catalogEntityLoadByTester2.asSchemas().listSchemas();
     assertArrayEquals(new String[] {}, schemasLoadByTester2);
   }
 }

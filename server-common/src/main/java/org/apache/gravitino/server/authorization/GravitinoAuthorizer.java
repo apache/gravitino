@@ -73,7 +73,7 @@ public interface GravitinoAuthorizer extends Closeable {
    * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in
    * order to clear the cache.
    *
-   * @param metalake The metalakeName;
+   * @param metalake The metalake name;
    * @param roleName The role name;
    */
   default void handleRolePrivilegeChange(String metalake, String roleName) {

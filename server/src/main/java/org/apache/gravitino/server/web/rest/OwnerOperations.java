@@ -30,6 +30,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -39,10 +40,13 @@ import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 @NameBindings.AccessControlInterfaces
 @Path("/metalakes/{metalake}/owners")
@@ -109,6 +113,26 @@ public class OwnerOperations {
           () -> {
             request.validate();
             MetadataObjectUtil.checkMetadataObject(metalake, object);
+            Optional<Owner> owner = ownerManager.getOwner(metalake, object);
+            if (owner.isPresent()) {
+              Owner ownerEntity = owner.get();
+              if (ownerEntity.type() == Owner.Type.USER) {
+                UserEntity userEntity =
+                    GravitinoEnv.getInstance()
+                        .entityStore()
+                        .get(
+                            NameIdentifierUtil.ofUser(metalake, ownerEntity.name()),
+                            Entity.EntityType.USER,
+                            UserEntity.class);
+                GravitinoAuthorizerProvider.getInstance()
+                    .getGravitinoAuthorizer()
+                    .handleMetadataOwnerChange(
+                        metalake,
+                        userEntity.id(),
+                        MetadataObjectUtil.toEntityIdent(metalake, object),
+                        Entity.EntityType.valueOf(metadataObjectType.toUpperCase()));
+              }
+            }
             ownerManager.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));
           });

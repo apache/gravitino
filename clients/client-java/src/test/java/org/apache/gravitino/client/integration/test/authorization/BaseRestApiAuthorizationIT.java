@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.junit.jupiter.api.AfterAll;
@@ -35,7 +36,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
 
   protected static final String USER = "tester";
 
-  protected static final String USER_WITH_AUTHORIZATION = "tester2";
+  protected static final String NORMAL_USER = "tester2";
 
   /** Mock a user without permissions. */
   protected static GravitinoAdminClient tester2Client;
@@ -58,9 +59,10 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             "false"));
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
-    client.loadMetalake(METALAKE).addUser(USER_WITH_AUTHORIZATION);
-    tester2Client =
-        GravitinoAdminClient.builder(serverUri).withSimpleAuth(USER_WITH_AUTHORIZATION).build();
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.addUser(USER);
+    gravitinoMetalake.addUser(NORMAL_USER);
+    tester2Client = GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build();
   }
 
   @AfterAll
