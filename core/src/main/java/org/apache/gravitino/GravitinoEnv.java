@@ -366,14 +366,19 @@ public class GravitinoEnv {
     return eventListenerManager;
   }
 
+  /**
+   * Set GravitinoAuthorizer to GravitinoEnv
+   *
+   * @param gravitinoAuthorizer the GravitinoAuthorizer instance
+   */
   public void setGravitinoAuthorizer(GravitinoAuthorizer gravitinoAuthorizer) {
     this.gravitinoAuthorizer = gravitinoAuthorizer;
   }
 
   /**
-   * Get The GravitinoAuthorization
+   * Get The GravitinoAuthorizer
    *
-   * @return the GravitinoAuthorization instance
+   * @return the GravitinoAuthorizer instance
    */
   public GravitinoAuthorizer gravitinoAuthorizer() {
     return gravitinoAuthorizer;
