@@ -100,6 +100,10 @@ public class EventListenerPluginWrapper implements EventListenerPlugin {
     return userEventListener.transformPreEvent(preEvent);
   }
 
+  public String listenerName() {
+    return listenerName;
+  }
+
   @VisibleForTesting
   public EventListenerPlugin getUserEventListener() {
     return userEventListener;

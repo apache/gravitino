@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -113,17 +114,24 @@ public class EventBus {
       preEvent = originalEvent;
     }
     eventListeners.forEach(eventListener -> eventListener.onPreEvent(preEvent));
-    if (supportsChangePreEvent) {
-      return Optional.of(preEvent);
-    }
-    return Optional.empty();
+    return supportsChangePreEvent ? Optional.of(preEvent) : Optional.empty();
   }
 
   private SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
     SupportsChangingPreEvent tmpPreEvent = preEvent;
     for (EventListenerPlugin eventListener : eventListeners) {
       tmpPreEvent = eventListener.transformPreEvent(tmpPreEvent);
+      Preconditions.checkNotNull(
+          tmpPreEvent,
+          String.format("%s transformPreEvent return null", getListenerName(eventListener)));
     }
     return tmpPreEvent;
+  }
+
+  private String getListenerName(EventListenerPlugin eventListener) {
+    if (eventListener instanceof EventListenerPluginWrapper) {
+      return ((EventListenerPluginWrapper) eventListener).listenerName();
+    }
+    return eventListener.getClass().getSimpleName();
   }
 }

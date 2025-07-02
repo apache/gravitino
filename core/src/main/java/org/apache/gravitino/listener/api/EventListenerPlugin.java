@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api;
 
 import java.util.Map;
+import javax.validation.constraints.NotNull;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.event.Event;
@@ -131,7 +132,7 @@ public interface EventListenerPlugin {
    * @param preEvent Pre-event to transform
    * @return Transformed pre-event
    */
-  default SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
+  default @NotNull SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
     return preEvent;
   }
 
