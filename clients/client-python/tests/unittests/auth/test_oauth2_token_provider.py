@@ -45,7 +45,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         "gravitino.utils.http_client.HTTPClient._make_request",
         return_value=mock_base.mock_authentication_invalid_client_error(),
     )
-    def test_authertication_invalid_client_error(self, *mock_methods):
+    def test_authentication_invalid_client_error(self, *mock_methods):
         with self.assertRaises(UnauthorizedException):
             _ = DefaultOAuth2TokenProvider(
                 uri=f"http://127.0.0.1:{OAUTH_PORT}",
@@ -58,7 +58,7 @@ class TestOAuth2TokenProvider(unittest.TestCase):
         "gravitino.utils.http_client.HTTPClient._make_request",
         return_value=mock_base.mock_authentication_invalid_grant_error(),
     )
-    def test_authertication_invalid_grant_error(self, *mock_methods):
+    def test_authentication_invalid_grant_error(self, *mock_methods):
         with self.assertRaises(BadRequestException):
             _ = DefaultOAuth2TokenProvider(
                 uri=f"http://127.0.0.1:{OAUTH_PORT}",

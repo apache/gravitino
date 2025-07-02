@@ -671,9 +671,9 @@ public class TagIT extends BaseIT {
     Assertions.assertTrue(tagNames.contains(tag2.name()));
     Assertions.assertFalse(tagNames.contains(tag3.name()));
 
-    Tag retrivedTag = relationalCatalog.supportsTags().getTag(tag2.name());
-    Assertions.assertEquals(tag2.name(), retrivedTag.name());
-    Assertions.assertEquals(tag2.comment(), retrivedTag.comment());
+    Tag retrievedTag = relationalCatalog.supportsTags().getTag(tag2.name());
+    Assertions.assertEquals(tag2.name(), retrievedTag.name());
+    Assertions.assertEquals(tag2.comment(), retrievedTag.comment());
 
     boolean deleted = metalake.deleteTag("null");
     Assertions.assertFalse(deleted);
