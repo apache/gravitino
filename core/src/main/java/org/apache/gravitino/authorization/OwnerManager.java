@@ -151,7 +151,7 @@ public class OwnerManager {
                 MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
                 Entity.EntityType.valueOf(metadataObject.type().name()));
           } catch (IOException e) {
-            LOG.warn(e.getMessage(),e);
+            LOG.warn(e.getMessage(), e);
           }
         }
       }
