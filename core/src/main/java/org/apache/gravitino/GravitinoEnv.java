@@ -23,6 +23,7 @@ import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -134,6 +135,7 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
+  private GravitinoAuthorizer gravitinoAuthorizer;
 
   protected GravitinoEnv() {}
 
@@ -364,6 +366,18 @@ public class GravitinoEnv {
     return eventListenerManager;
   }
 
+  public void setGravitinoAuthorizer(GravitinoAuthorizer gravitinoAuthorizer){
+    this.gravitinoAuthorizer = gravitinoAuthorizer;
+  }
+
+  /**
+   * Get The GravitinoAuthorization
+   * @return the GravitinoAuthorization instance
+   */
+  public GravitinoAuthorizer gravitinoAuthorizer(){
+    return gravitinoAuthorizer;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -506,7 +520,8 @@ public class GravitinoEnv {
       AccessControlManager accessControlManager =
           new AccessControlManager(entityStore, idGenerator, config);
       AccessControlHookDispatcher accessControlHookDispatcher =
-          new AccessControlHookDispatcher(accessControlManager);
+          new AccessControlHookDispatcher(accessControlManager,(role)->{
+          });
       this.accessControlDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
       this.ownerManager = new OwnerManager(entityStore);
@@ -523,4 +538,5 @@ public class GravitinoEnv {
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
   }
+
 }
