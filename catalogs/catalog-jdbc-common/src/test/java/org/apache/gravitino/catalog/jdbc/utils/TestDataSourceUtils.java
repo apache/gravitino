@@ -24,6 +24,7 @@ import java.util.HashMap;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -41,5 +42,32 @@ public class TestDataSourceUtils {
         Assertions.assertDoesNotThrow(() -> DataSourceUtils.createDataSource(properties));
     Assertions.assertTrue(dataSource instanceof org.apache.commons.dbcp2.BasicDataSource);
     ((BasicDataSource) dataSource).close();
+  }
+
+  @Test
+  public void testRejectMysqlAllowLoadLocalInfile() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(
+        JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test?allowLoadLocalInfile=true");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+  }
+
+  @Test
+  public void testRejectPostgresSocketFactory() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        "jdbc:postgresql:///test?socketFactory=java.io.FileOutputStream&socketFactoryArg=/tmp/x");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
   }
 }

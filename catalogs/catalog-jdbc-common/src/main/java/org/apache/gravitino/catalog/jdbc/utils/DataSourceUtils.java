@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc.utils;
 import java.sql.SQLException;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
@@ -51,6 +52,7 @@ public class DataSourceUtils {
   }
 
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
+    validateJdbcConfig(jdbcConfig);
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
@@ -74,6 +76,41 @@ public class DataSourceUtils {
     Properties properties = new Properties();
     properties.putAll(jdbcConfig.getAllConfig());
     return properties;
+  }
+
+  private static void validateJdbcConfig(JdbcConfig jdbcConfig) {
+    String driver = jdbcConfig.getJdbcDriver();
+    String url = jdbcConfig.getJdbcUrl();
+    Map<String, String> all = jdbcConfig.getAllConfig();
+    String lowerUrl = url == null ? "" : url.toLowerCase();
+
+    if (driver != null && driver.toLowerCase().contains("mysql")) {
+      if (lowerUrl.contains("allowloadlocalinfile=true")
+          || containsKeyIgnoreCase(all, "allowLoadLocalInfile")) {
+        throw new GravitinoRuntimeException(
+            "Unsafe MySQL parameter 'allowLoadLocalInfile' detected in JDBC url");
+      }
+    }
+
+    if (driver != null && driver.toLowerCase().contains("postgresql")) {
+      if (lowerUrl.contains("socketfactory=")
+          || lowerUrl.contains("socketfactoryarg=")
+          || containsKeyIgnoreCase(all, "socketFactory")
+          || containsKeyIgnoreCase(all, "socketFactoryArg")) {
+        throw new GravitinoRuntimeException(
+            "Unsafe PostgreSQL parameters 'socketFactory' or 'socketFactoryArg' detected in JDBC url");
+      }
+    }
+  }
+
+  private static boolean containsKeyIgnoreCase(Map<String, String> map, String key) {
+    Set<String> keys = map.keySet();
+    for (String k : keys) {
+      if (k.equalsIgnoreCase(key)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public static void closeDataSource(DataSource dataSource) {
