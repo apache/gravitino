@@ -77,7 +77,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
         "Can not access metadata {" + CATALOG + "}.",
         RuntimeException.class,
         () -> {
-          tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+          normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
         });
     // grant tester load catalog privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
@@ -89,7 +89,7 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     securableObjects.add(securableObject);
     gravitinoMetalake.createRole(role, new HashMap<>(), securableObjects);
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(role), NORMAL_USER);
-    Catalog catalogLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    Catalog catalogLoadByTester2 = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals(CATALOG, catalogLoadByTester2.name());
   }
 
@@ -99,7 +99,8 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     // test catalog owner privilege
     Catalog catalogEntityLoadByTester1 = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
     catalogEntityLoadByTester1.asSchemas().createSchema("schema1", "test", new HashMap<>());
-    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    Catalog catalogEntityLoadByTester2 =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertThrows(
         "Can not access metadata {" + CATALOG + "}.",
         RuntimeException.class,
@@ -123,7 +124,8 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     String[] schemasLoadByTester1 = catalogEntityLoadByTester1.asSchemas().listSchemas();
     assertArrayEquals(
         new String[] {"default", "schema1", "schema2", "schema3"}, schemasLoadByTester1);
-    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    Catalog catalogEntityLoadByTester2 =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     String[] schemasLoadByTester2 = catalogEntityLoadByTester2.asSchemas().listSchemas();
     assertArrayEquals(new String[] {"schema2", "schema3"}, schemasLoadByTester2);
   }
@@ -131,7 +133,8 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Test
   @Order(3)
   public void testLoadSchema() {
-    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    Catalog catalogEntityLoadByTester2 =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     SupportsSchemas schemas = catalogEntityLoadByTester2.asSchemas();
     String[] schemasLoadByTester2 = schemas.listSchemas();
     assertArrayEquals(new String[] {"schema2", "schema3"}, schemasLoadByTester2);
@@ -166,7 +169,8 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     catalogEntityLoadByTester1
         .asSchemas()
         .alterSchema("schema3", SchemaChange.setProperty("key3", "value3"));
-    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    Catalog catalogEntityLoadByTester2 =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertThrows(
         String.format("Can not access metadata {%s.%s}.", CATALOG, "schema1"),
         RuntimeException.class,
@@ -197,7 +201,8 @@ public class SchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(ImmutableList.of(CATALOG, "schema1"), MetadataObject.Type.SCHEMA),
         USER,
         Owner.Type.USER);
-    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    Catalog catalogEntityLoadByTester2 =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertThrows(
         String.format("Can not access metadata {%s.%s}.", CATALOG, "schema1"),
         RuntimeException.class,

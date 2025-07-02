@@ -38,8 +38,8 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
 
   protected static final String NORMAL_USER = "tester2";
 
-  /** Mock a user without permissions. */
-  protected static GravitinoAdminClient tester2Client;
+  /** Mock a normal user without permissions. */
+  protected static GravitinoAdminClient normalUserClient;
 
   private static final Logger LOG = LoggerFactory.getLogger(BaseRestApiAuthorizationIT.class);
 
@@ -62,7 +62,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.addUser(USER);
     gravitinoMetalake.addUser(NORMAL_USER);
-    tester2Client = GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build();
+    normalUserClient = GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build();
   }
 
   @AfterAll
@@ -70,9 +70,9 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   public void stopIntegrationTest() throws IOException, InterruptedException {
     client.dropMetalake(METALAKE, true);
 
-    if (tester2Client != null) {
-      tester2Client.close();
-      tester2Client = null;
+    if (normalUserClient != null) {
+      normalUserClient.close();
+      normalUserClient = null;
     }
 
     try {
