@@ -111,6 +111,17 @@ public class IcebergRestTestUtil {
       catalogConf.put(String.format("%s.catalog-backend-name", catalogConfigPrefix), PREFIX);
       catalogConf.put(
           CredentialConstants.CREDENTIAL_PROVIDERS, DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE);
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.IO_IMPL),
+          "org.apache.iceberg.aws.s3.S3FileIO");
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_S3_ENDPOINT),
+          "https://s3-endpoint.example.com");
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.AWS_S3_REGION), "us-west-2");
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_OSS_ENDPOINT),
+          "https://oss-endpoint.example.com");
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface

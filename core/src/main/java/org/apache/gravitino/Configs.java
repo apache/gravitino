@@ -347,7 +347,7 @@ public class Configs {
   // Whether to enable cache store
   public static final ConfigEntry<Boolean> CACHE_ENABLED =
       new ConfigBuilder("gravitino.cache.enabled")
-          .doc("Whether to enable cache store.")
+          .doc("Whether to enable the cached Entity store.")
           .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(true);
@@ -365,7 +365,8 @@ public class Configs {
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
           .doc(
-              "Time in milliseconds after which a cache entry expires. Default is 3,600,000 ms (1 hour).")
+              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds."
+                  + "Default is 3,600,000 ms (1 hour).")
           .version(ConfigConstants.VERSION_1_0_0)
           .longConf()
           .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -389,4 +390,13 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .booleanConf()
           .createWithDefault(true);
+
+  // Provider name for cache
+  public static final ConfigEntry<String> CACHE_IMPLEMENTATION =
+      new ConfigBuilder("gravitino.cache.implementation")
+          .doc("Which cache implementation to use")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault("caffeine");
 }

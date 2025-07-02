@@ -489,7 +489,7 @@ public class AuthorizationUtils {
               break;
 
             case FILESET:
-              if ("hadoop".equals(catalogObj.provider())) {
+              if ("fileset".equals(catalogObj.provider())) {
                 if (schema.properties().containsKey(FILESET_SCHEMA_LOCATION)) {
                   String schemaLocation = schema.properties().get(FILESET_SCHEMA_LOCATION);
                   if (StringUtils.isNotBlank(schemaLocation)) {

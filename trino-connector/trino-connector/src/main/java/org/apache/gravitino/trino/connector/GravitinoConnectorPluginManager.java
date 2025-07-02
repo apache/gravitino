@@ -48,6 +48,7 @@ public class GravitinoConnectorPluginManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorPluginManager.class);
 
+  /** The app class loader name. */
   public static final String APP_CLASS_LOADER_NAME = "app";
 
   private static final String PLUGIN_NAME_PREFIX = "gravitino-";
@@ -77,6 +78,14 @@ public class GravitinoConnectorPluginManager {
     }
   }
 
+  /**
+   * Creates or returns the singleton instance of GravitinoConnectorPluginManager with the specified
+   * class loader.
+   *
+   * @param classLoader the class loader to be used for loading plugins
+   * @return the singleton instance of GravitinoConnectorPluginManager
+   * @throws TrinoException if the class loader is not an app class loader
+   */
   public static GravitinoConnectorPluginManager instance(ClassLoader classLoader) {
     if (instance != null) {
       return instance;
@@ -94,6 +103,12 @@ public class GravitinoConnectorPluginManager {
     }
   }
 
+  /**
+   * Returns the existing singleton instance of GravitinoConnectorPluginManager.
+   *
+   * @return the singleton instance of GravitinoConnectorPluginManager
+   * @throws IllegalStateException if instance(ClassLoader) has not been called first
+   */
   public static GravitinoConnectorPluginManager instance() {
     if (instance == null) {
       throw new IllegalStateException("Need to call the function instance(ClassLoader) first");
@@ -246,10 +261,24 @@ public class GravitinoConnectorPluginManager {
     }
   }
 
+  /**
+   * Installs a plugin.
+   *
+   * @param pluginName the name of the plugin
+   * @param plugin the plugin
+   */
   public void installPlugin(String pluginName, Plugin plugin) {
     connectorPlugins.put(pluginName, plugin);
   }
 
+  /**
+   * Creates a connector.
+   *
+   * @param connectorName the name of the connector
+   * @param config the configuration
+   * @param context the context
+   * @return the connector
+   */
   public Connector createConnector(
       String connectorName, Map<String, String> config, ConnectorContext context) {
     try {
@@ -274,6 +303,12 @@ public class GravitinoConnectorPluginManager {
     }
   }
 
+  /**
+   * Retrieves the class loader.
+   *
+   * @param classLoaderName the name of the class loader
+   * @return the class loader
+   */
   public ClassLoader getClassLoader(String classLoaderName) {
     if (classLoaderName.equals(APP_CLASS_LOADER_NAME)) {
       return appClassloader;
@@ -288,6 +323,11 @@ public class GravitinoConnectorPluginManager {
     return plugin.getClass().getClassLoader();
   }
 
+  /**
+   * Retrieves the app class loader.
+   *
+   * @return the app class loader
+   */
   public ClassLoader getAppClassloader() {
     return appClassloader;
   }

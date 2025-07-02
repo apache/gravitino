@@ -24,11 +24,20 @@ import io.trino.spi.connector.ConnectorTableMetadata;
 /** Gravitino System table interfaces */
 public abstract class GravitinoSystemTable {
 
+  /** The schema name for system tables */
   public static final String SYSTEM_TABLE_SCHEMA_NAME = "system";
 
-  /** Return the definition of the table * */
+  /**
+   * Gets the metadata definition of the system table.
+   *
+   * @return the connector table metadata containing the table definition
+   */
   public abstract ConnectorTableMetadata getTableMetaData();
 
-  /** Return all the data of the table * */
+  /**
+   * Loads and returns all data from the system table.
+   *
+   * @return a Page object containing all the table data
+   */
   public abstract Page loadPageData();
 }

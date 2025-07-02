@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.cache;
 
-import com.google.common.collect.Lists;
-import java.util.ArrayList;
-import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.junit.jupiter.api.Assertions;
@@ -37,13 +34,22 @@ public class TestCacheConfig {
     Assertions.assertEquals(10_000, config.get(Configs.CACHE_MAX_ENTRIES));
     Assertions.assertEquals(3_600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
     Assertions.assertEquals(200_302_000L, EntityCacheWeigher.getMaxWeight());
+    Assertions.assertEquals("caffeine", config.get(Configs.CACHE_IMPLEMENTATION));
   }
 
   @Test
-  void test() {
-    ArrayList<Integer> list = Lists.newArrayList();
-    Optional<Integer> i =
-        Optional.ofNullable(list).filter(entities -> !entities.isEmpty()).map(l -> l.get(0));
-    Assertions.assertFalse(i.isPresent());
+  void testSetConfigValues() {
+    Config config = new Config(false) {};
+    config.set(Configs.CACHE_ENABLED, false);
+    config.set(Configs.CACHE_STATS_ENABLED, true);
+    config.set(Configs.CACHE_WEIGHER_ENABLED, false);
+    config.set(Configs.CACHE_MAX_ENTRIES, 5000);
+    config.set(Configs.CACHE_EXPIRATION_TIME, 600_000L);
+
+    Assertions.assertFalse(config.get(Configs.CACHE_ENABLED));
+    Assertions.assertTrue(config.get(Configs.CACHE_STATS_ENABLED));
+    Assertions.assertFalse(config.get(Configs.CACHE_WEIGHER_ENABLED));
+    Assertions.assertEquals(5000, config.get(Configs.CACHE_MAX_ENTRIES));
+    Assertions.assertEquals(600_000L, config.get(Configs.CACHE_EXPIRATION_TIME));
   }
 }

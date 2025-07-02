@@ -34,6 +34,7 @@ env_map = {
     "GRAVITINO_S3_SECRET_KEY": "s3-secret-access-key",
     "GRAVITINO_S3_ENDPOINT": "s3-endpoint",
     "GRAVITINO_S3_REGION": "s3-region",
+    "GRAVITINO_S3_PATH_STYLE_ACCESS": "s3-path-style-access",
     "GRAVITINO_S3_ROLE_ARN": "s3-role-arn",
     "GRAVITINO_S3_EXTERNAL_ID": "s3-external-id",
     "GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME": "azure-storage-account-name",
@@ -83,8 +84,11 @@ def update_config(config, key, value):
 config_file_path = "conf/gravitino-iceberg-rest-server.conf"
 config_map = parse_config_file(config_file_path)
 
+# Set from init_config only if the key doesn't exist
 for k, v in init_config.items():
-    update_config(config_map, k, v)
+    full_key = config_prefix + k
+    if full_key not in config_map:
+        update_config(config_map, k, v)
 
 for k, v in env_map.items():
     if k in os.environ:

@@ -41,6 +41,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 /** An implementation of the catalog system table */
 public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
 
+  /** The name of the catalog system table. */
   public static final SchemaTableName TABLE_NAME =
       new SchemaTableName(SYSTEM_TABLE_SCHEMA_NAME, "catalog");
 
@@ -54,6 +55,11 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
 
   private final CatalogConnectorManager catalogConnectorManager;
 
+  /**
+   * Constructs a new GravitinoSystemTableCatalog.
+   *
+   * @param catalogConnectorManager the manager for catalog connectors
+   */
   public GravitinoSystemTableCatalog(CatalogConnectorManager catalogConnectorManager) {
     this.catalogConnectorManager = catalogConnectorManager;
   }

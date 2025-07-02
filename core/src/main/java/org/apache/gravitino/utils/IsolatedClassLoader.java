@@ -172,7 +172,7 @@ public class IsolatedClassLoader implements Closeable {
       try {
         return clazz == null ? doLoadClass(name, resolve) : clazz;
       } catch (Exception e) {
-        throw new ClassNotFoundException("Class no found " + name, e);
+        throw new ClassNotFoundException("Class not found " + name, e);
       }
     }
 
@@ -247,6 +247,8 @@ public class IsolatedClassLoader implements Closeable {
             || name.startsWith("org.apache.gravitino.catalog.postgresql.")
             || name.startsWith("org.apache.gravitino.catalog.doris.")
             || name.startsWith("org.apache.gravitino.catalog.hadoop.")
+            || name.startsWith("org.apache.gravitino.catalog.fileset.")
+            || name.startsWith("org.apache.gravitino.catalog.model.")
             || name.startsWith("org.apache.gravitino.catalog.kafka."));
   }
 

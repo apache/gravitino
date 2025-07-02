@@ -851,9 +851,11 @@ tasks {
         it.parent?.name != "bundles"
       ) {
         dependsOn("${it.name}:build")
-        from("${it.name}/build/libs")
+        from("${it.name}/build/libs") {
+          include("*.jar")
+          exclude("*-jcstress.jar")
+        }
         into("distribution/package/libs")
-        include("*.jar")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
@@ -861,7 +863,7 @@ tasks {
 
   register("copyCatalogLibAndConfigs", Copy::class) {
     dependsOn(
-      ":catalogs:catalog-hadoop:copyLibAndConfig",
+      ":catalogs:catalog-fileset:copyLibAndConfig",
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",

@@ -39,7 +39,7 @@ include(
   "catalogs:catalog-jdbc-postgresql",
   "catalogs:catalog-jdbc-oceanbase"
 )
-include("catalogs:catalog-hadoop")
+include("catalogs:catalog-fileset")
 include("catalogs:catalog-kafka")
 include("catalogs:catalog-model")
 include(

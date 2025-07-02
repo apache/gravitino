@@ -469,6 +469,20 @@ public class TestTagEvent {
   }
 
   @Test
+  void testListMetadataObjectsForTagFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.listMetadataObjectsForTag("metalake", tag.name()));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListMetadataObjectsForTagFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((ListMetadataObjectsForTagFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
   void testAssociateTagsForMetadataObjectFailureEvent() {
     MetadataObject metadataObject =
         NameIdentifierUtil.toMetadataObject(

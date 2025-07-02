@@ -48,7 +48,7 @@ def gcs_is_configured():
 @unittest.skipUnless(gcs_is_configured(), "GCS is not configured.")
 class TestGvfsWithGCS(TestGvfsWithHDFS):
     # Before running this test, please set the make sure gcp-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     key_file = os.environ.get("GCS_SERVICE_ACCOUNT_JSON_PATH")
     bucket_name = os.environ.get("GCS_BUCKET_NAME")
     metalake_name: str = "TestGvfsWithGCS_metalake" + str(randint(1, 10000))
@@ -65,7 +65,9 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
     def setUpClass(cls):
         cls._get_gravitino_home()
 
-        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        cls.hadoop_conf_path = (
+            f"{cls.gravitino_home}/catalogs/fileset/conf/fileset.conf"
+        )
         # restart the server
         cls.restart_server()
         # create entity
@@ -137,6 +139,32 @@ class TestGvfsWithGCS(TestGvfsWithHDFS):
             comment=cls.fileset_comment,
             storage_location=cls.fileset_storage_location,
             properties=cls.fileset_properties,
+        )
+
+        cls.multiple_locations_fileset_storage_location: str = (
+            f"gs://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        cls.multiple_locations_fileset_storage_location1: str = (
+            f"gs://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}_1"
+        )
+        cls.multiple_locations_fileset_gvfs_location = (
+            f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        catalog.as_fileset_catalog().create_multiple_location_fileset(
+            ident=cls.multiple_locations_fileset_ident,
+            fileset_type=Fileset.Type.MANAGED,
+            comment=cls.fileset_comment,
+            storage_locations={
+                "default": cls.multiple_locations_fileset_storage_location,
+                "location1": cls.multiple_locations_fileset_storage_location1,
+            },
+            properties={
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "default",
+                **cls.fileset_properties,
+            },
         )
 
         cls.fs = GCSFileSystem(token=cls.key_file)

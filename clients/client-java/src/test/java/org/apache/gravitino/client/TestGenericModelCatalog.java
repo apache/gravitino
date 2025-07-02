@@ -20,6 +20,7 @@ package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
@@ -44,6 +45,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.ModelResponse;
+import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
@@ -296,6 +298,65 @@ public class TestGenericModelCatalog extends TestBase {
     Assertions.assertThrows(
         RuntimeException.class,
         () -> catalog.asModelCatalog().listModelVersions(modelId),
+        "internal error");
+  }
+
+  @Test
+  public void testListModelVersionInfos() throws JsonProcessingException {
+    NameIdentifier modelId = NameIdentifier.of("schema1", "model1");
+    String modelVersionPath =
+        withSlash(
+            GenericModelCatalog.formatModelVersionRequestPath(
+                    NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, "schema1", "model1"))
+                + "/versions");
+
+    ModelVersionDTO[] expectedVersions = {
+      mockModelVersion(
+          0, "uri", new String[] {"alias1", "alias2"}, "comment", Collections.emptyMap()),
+      mockModelVersion(
+          1, "uri", new String[] {"alias3", "alias4"}, "comment", Collections.emptyMap())
+    };
+    ModelVersionInfoListResponse resp = new ModelVersionInfoListResponse(expectedVersions);
+    buildMockResource(
+        Method.GET,
+        modelVersionPath,
+        ImmutableMap.of("details", "true"),
+        null,
+        resp,
+        HttpStatus.SC_OK);
+
+    ModelVersion[] versions = catalog.asModelCatalog().listModelVersionInfos(modelId);
+    Assertions.assertArrayEquals(expectedVersions, versions);
+
+    // Throw model not found exception
+    ErrorResponse errResp =
+        ErrorResponse.notFound(NoSuchModelException.class.getSimpleName(), "model not found");
+    buildMockResource(
+        Method.GET,
+        modelVersionPath,
+        ImmutableMap.of("details", "true"),
+        null,
+        errResp,
+        HttpStatus.SC_NOT_FOUND);
+
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> catalog.asModelCatalog().listModelVersionInfos(modelId),
+        "model not found");
+
+    // Throw RuntimeException
+    ErrorResponse errResp2 = ErrorResponse.internalError("internal error");
+    buildMockResource(
+        Method.GET,
+        modelVersionPath,
+        ImmutableMap.of("details", "true"),
+        null,
+        errResp2,
+        HttpStatus.SC_INTERNAL_SERVER_ERROR);
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> catalog.asModelCatalog().listModelVersionInfos(modelId),
         "internal error");
   }
 

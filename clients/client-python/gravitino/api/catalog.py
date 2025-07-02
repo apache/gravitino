@@ -34,7 +34,7 @@ class Catalog(Auditable):
         RELATIONAL = ("relational", False)
         """"Catalog Type for Relational Data Structure, like db.table, catalog.db.table."""
 
-        FILESET = ("fileset", False)
+        FILESET = ("fileset", True)
         """Catalog Type for Fileset System (including HDFS, S3, etc.), like path/to/file"""
 
         MESSAGING = ("messaging", False)

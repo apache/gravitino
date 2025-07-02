@@ -21,13 +21,16 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import java.util.Arrays;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -85,7 +88,9 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   public Model registerModel(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchModelException, ModelAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    Map<String, String> updatedProperties = checkAndUpdateProperties(catalogIdent, properties);
+    Map<String, String> updatedProperties =
+        checkAndUpdateProperties(
+            catalogIdent, properties, HasPropertyMetadata::modelPropertiesMetadata);
 
     Model registeredModel =
         TreeLockUtils.doWithTreeLock(
@@ -131,6 +136,21 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   }
 
   @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    return internalListModelVersion(
+        ident,
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                ident,
+                LockType.READ,
+                () ->
+                    doWithCatalog(
+                        getCatalogIdentifier(ident),
+                        c -> c.doWithModelOps(m -> m.listModelVersionInfos(ident)),
+                        NoSuchModelException.class)));
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     return internalGetModelVersion(
@@ -171,7 +191,9 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    Map<String, String> updatedProperties = checkAndUpdateProperties(catalogIdent, properties);
+    Map<String, String> updatedProperties =
+        checkAndUpdateProperties(
+            catalogIdent, properties, HasPropertyMetadata::modelVersionPropertiesMetadata);
 
     TreeLockUtils.doWithTreeLock(
         ident,
@@ -244,7 +266,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   public ModelVersion alterModelVersion(
       NameIdentifier ident, int version, ModelVersionChange... changes)
       throws NoSuchModelVersionException, IllegalArgumentException {
-    validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
+    validateAlterProperties(ident, HasPropertyMetadata::modelVersionPropertiesMetadata, changes);
     return executeAlterModelVersion(ident, f -> f.alterModelVersion(ident, version, changes));
   }
 
@@ -253,7 +275,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   public ModelVersion alterModelVersion(
       NameIdentifier ident, String alias, ModelVersionChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    validateAlterProperties(ident, HasPropertyMetadata::modelPropertiesMetadata, changes);
+    validateAlterProperties(ident, HasPropertyMetadata::modelVersionPropertiesMetadata, changes);
     return executeAlterModelVersion(ident, f -> f.alterModelVersion(ident, alias, changes));
   }
 
@@ -276,7 +298,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent,
-                HasPropertyMetadata::modelPropertiesMetadata,
+                HasPropertyMetadata::modelVersionPropertiesMetadata,
                 alteredModelVersion.properties()));
   }
 
@@ -289,12 +311,30 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
         .withHiddenProperties(
             getHiddenPropertyNames(
                 catalogIdent,
-                HasPropertyMetadata::modelPropertiesMetadata,
+                HasPropertyMetadata::modelVersionPropertiesMetadata,
                 modelVersion.properties()));
   }
 
+  private ModelVersion[] internalListModelVersion(
+      NameIdentifier ident, Supplier<ModelVersion[]> supplier) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+    return Arrays.stream(supplier.get())
+        .map(
+            v ->
+                EntityCombinedModelVersion.of(v)
+                    .withHiddenProperties(
+                        getHiddenPropertyNames(
+                            catalogIdent,
+                            HasPropertyMetadata::modelVersionPropertiesMetadata,
+                            v.properties())))
+        .toArray(ModelVersion[]::new);
+  }
+
   private Map<String, String> checkAndUpdateProperties(
-      NameIdentifier catalogIdent, Map<String, String> properties) {
+      NameIdentifier catalogIdent,
+      Map<String, String> properties,
+      Function<HasPropertyMetadata, PropertiesMetadata> propertiesMetadataProvider) {
     TreeLockUtils.doWithTreeLock(
         catalogIdent,
         LockType.READ,
@@ -304,7 +344,8 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 c ->
                     c.doWithPropertiesMeta(
                         p -> {
-                          validatePropertyForCreate(p.modelPropertiesMetadata(), properties);
+                          validatePropertyForCreate(
+                              propertiesMetadataProvider.apply(p), properties);
                           return null;
                         }),
                 IllegalArgumentException.class));

@@ -155,6 +155,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         "The catalog does not support model properties metadata");
   }
 
+  @Override
+  public PropertiesMetadata modelVersionPropertiesMetadata() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "The catalog does not support model version properties metadata");
+  }
+
   /**
    * Retrieves the CatalogOperations instance associated with this catalog. Lazily initializes the
    * instance if not already created.

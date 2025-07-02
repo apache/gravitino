@@ -49,7 +49,7 @@ def s3_is_configured():
 @unittest.skipUnless(s3_is_configured(), "S3 is not configured.")
 class TestGvfsWithS3(TestGvfsWithHDFS):
     # Before running this test, please set the make sure aws-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     s3_access_key = os.environ.get("S3_ACCESS_KEY_ID")
     s3_secret_key = os.environ.get("S3_SECRET_ACCESS_KEY")
     s3_endpoint = os.environ.get("S3_ENDPOINT")
@@ -71,7 +71,9 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
     def setUpClass(cls):
         cls._get_gravitino_home()
 
-        cls.hadoop_conf_path = f"{cls.gravitino_home}/catalogs/hadoop/conf/hadoop.conf"
+        cls.hadoop_conf_path = (
+            f"{cls.gravitino_home}/catalogs/fileset/conf/fileset.conf"
+        )
         # restart the server
         cls.restart_server()
         # create entity
@@ -145,6 +147,32 @@ class TestGvfsWithS3(TestGvfsWithHDFS):
             comment=cls.fileset_comment,
             storage_location=cls.fileset_storage_location,
             properties=cls.fileset_properties,
+        )
+
+        cls.multiple_locations_fileset_storage_location: str = (
+            f"s3a://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        cls.multiple_locations_fileset_storage_location1: str = (
+            f"s3a://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}_1"
+        )
+        cls.multiple_locations_fileset_gvfs_location = (
+            f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        catalog.as_fileset_catalog().create_multiple_location_fileset(
+            ident=cls.multiple_locations_fileset_ident,
+            fileset_type=Fileset.Type.MANAGED,
+            comment=cls.fileset_comment,
+            storage_locations={
+                "default": cls.multiple_locations_fileset_storage_location,
+                "location1": cls.multiple_locations_fileset_storage_location1,
+            },
+            properties={
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "default",
+                **cls.fileset_properties,
+            },
         )
 
         cls.fs = S3FileSystem(
