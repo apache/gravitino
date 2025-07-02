@@ -35,6 +35,12 @@ public final class GravitinoColumn {
   // Column properties
   private final Map<String, Object> properties;
 
+  /**
+   * Constructs a new GravitinoColumn with the specified column and column index.
+   *
+   * @param column the column
+   * @param columnIndex the column index
+   */
   public GravitinoColumn(Column column, int columnIndex) {
     this(
         column.name(),
@@ -46,6 +52,18 @@ public final class GravitinoColumn {
         ImmutableMap.of());
   }
 
+  /**
+   * Constructs a new GravitinoColumn with the specified name, data type, index, comment, nullable,
+   * autoIncrement, and properties.
+   *
+   * @param name the name of the column
+   * @param dataType the data type of the column
+   * @param index the index of the column
+   * @param comment the comment of the column
+   * @param nullable whether the column is nullable
+   * @param autoIncrement whether the column is auto increment
+   * @param properties the properties of the column
+   */
   public GravitinoColumn(
       String name,
       Type dataType,
@@ -63,38 +81,88 @@ public final class GravitinoColumn {
     this.properties = properties;
   }
 
+  /**
+   * Constructs a new GravitinoColumn with the specified name, data type, index, comment, and
+   * nullable.
+   *
+   * @param name the name of the column
+   * @param dataType the data type of the column
+   * @param index the index of the column
+   * @param comment the comment of the column
+   * @param nullable whether the column is nullable
+   */
   public GravitinoColumn(String name, Type dataType, int index, String comment, boolean nullable) {
     this(name, dataType, index, comment, nullable, false, ImmutableMap.of());
   }
 
+  /**
+   * Retrieves the index of the column.
+   *
+   * @return the index of the column
+   */
   public int getIndex() {
     return index;
   }
 
+  /**
+   * Retrieves the properties of the column.
+   *
+   * @return the properties of the column
+   */
   public Map<String, Object> getProperties() {
     return properties;
   }
 
+  /**
+   * Retrieves the name of the column.
+   *
+   * @return the name of the column
+   */
   public String getName() {
     return name;
   }
 
+  /**
+   * Retrieves the data type of the column.
+   *
+   * @return the data type of the column
+   */
   public Type getType() {
     return dataType;
   }
 
+  /**
+   * Retrieves the comment of the column.
+   *
+   * @return the comment of the column
+   */
   public String getComment() {
     return comment;
   }
 
+  /**
+   * Retrieves whether the column is nullable.
+   *
+   * @return whether the column is nullable
+   */
   public boolean isNullable() {
     return nullable;
   }
 
+  /**
+   * Retrieves whether the column is hidden.
+   *
+   * @return whether the column is hidden
+   */
   public boolean isHidden() {
     return false;
   }
 
+  /**
+   * Retrieves whether the column is auto increment.
+   *
+   * @return whether the column is auto increment
+   */
   public boolean isAutoIncrement() {
     return autoIncrement;
   }

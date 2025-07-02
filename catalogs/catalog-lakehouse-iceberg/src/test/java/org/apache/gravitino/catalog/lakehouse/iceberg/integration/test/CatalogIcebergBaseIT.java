@@ -212,12 +212,16 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
     catalogProperties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
     catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
-    catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    if (!"rest".equalsIgnoreCase(TYPE)) {
+      catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    }
     catalogProperties.put(IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
 
     Map<String, String> icebergCatalogProperties = Maps.newHashMap();
     icebergCatalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
-    icebergCatalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    if (!"rest".equalsIgnoreCase(TYPE)) {
+      icebergCatalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    }
     icebergCatalogProperties.put(
         IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
 

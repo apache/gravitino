@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 /** Convert Apache Hive properties between Trino and Apache Gravitino. */
 public class HiveCatalogPropertyConverter extends PropertyConverter {
 
+  /** Logger for Hive catalog between Trino and Gravitino. */
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogPropertyConverter.class);
 
   private static final TreeBidiMap<String, String> TRINO_KEY_TO_GRAVITINO_KEY =

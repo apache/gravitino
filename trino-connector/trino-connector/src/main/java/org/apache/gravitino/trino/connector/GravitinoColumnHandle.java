@@ -33,6 +33,12 @@ public final class GravitinoColumnHandle implements ColumnHandle, GravitinoHandl
   private final String columnName;
   private HandleWrapper<ColumnHandle> handleWrapper = new HandleWrapper<>(ColumnHandle.class);
 
+  /**
+   * Constructs a new GravitinoColumnHandle with the specified column name and handle string.
+   *
+   * @param columnName the name of the column
+   * @param handleString the handle string
+   */
   @JsonCreator
   public GravitinoColumnHandle(
       @JsonProperty("columnName") String columnName,
@@ -44,11 +50,23 @@ public final class GravitinoColumnHandle implements ColumnHandle, GravitinoHandl
     this.handleWrapper = handleWrapper.fromJson(handleString);
   }
 
+  /**
+   * Constructs a new GravitinoColumnHandle with the specified column name and internal column
+   * handle.
+   *
+   * @param columnName the name of the column
+   * @param internalColumnHandle the internal column handle
+   */
   public GravitinoColumnHandle(String columnName, ColumnHandle internalColumnHandle) {
     this.columnName = columnName;
     this.handleWrapper = new HandleWrapper<>(internalColumnHandle);
   }
 
+  /**
+   * Gets the name of the column.
+   *
+   * @return the column name
+   */
   @JsonProperty
   public String getColumnName() {
     return columnName;

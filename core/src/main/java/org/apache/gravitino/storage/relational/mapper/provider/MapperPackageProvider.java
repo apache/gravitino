@@ -16,12 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.catalog.jdbc.trino;
-
-import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
+package org.apache.gravitino.storage.relational.mapper.provider;
 
 /**
- * Property metadata for Trino cluster. This class defines and manages the property metadata for
- * Trino cluster-specific configurations.
+ * A Service Provider Interface (SPI) for providing package names that contain MyBatis Mapper
+ * interfaces. Implementations of this interface allow for the automatic discovery and registration
+ * of mappers from different modules.
  */
-public class TrinoClusterPropertyMeta implements HasPropertyMeta {}
+public interface MapperPackageProvider {
+  /**
+   * Returns the package name where MyBatis Mapper interfaces are located.
+   *
+   * @return A string representing the package name to be scanned.
+   */
+  String getPackageName();
+}

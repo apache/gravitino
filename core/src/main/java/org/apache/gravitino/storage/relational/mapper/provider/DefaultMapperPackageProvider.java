@@ -16,12 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector.catalog.jdbc.trino;
+package org.apache.gravitino.storage.relational.mapper.provider;
 
-import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
+/** The default provider that supplies the primary mapper package for Gravitino. */
+public class DefaultMapperPackageProvider implements MapperPackageProvider {
+  private static final String DEFAULT_MAPPER_PACKAGE =
+      "org.apache.gravitino.storage.relational.mapper";
 
-/**
- * Property metadata for Trino cluster. This class defines and manages the property metadata for
- * Trino cluster-specific configurations.
- */
-public class TrinoClusterPropertyMeta implements HasPropertyMeta {}
+  @Override
+  public String getPackageName() {
+    return DEFAULT_MAPPER_PACKAGE;
+  }
+}

@@ -37,8 +37,6 @@ public abstract class SparkIcebergCatalogRestBackendIT extends SparkIcebergCatal
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, icebergRestServiceUri);
-    catalogProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
 
     return catalogProperties;
   }

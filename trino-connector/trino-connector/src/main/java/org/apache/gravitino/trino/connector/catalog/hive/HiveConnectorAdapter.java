@@ -38,6 +38,7 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   private final HasPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
 
+  /** Constructs a new HiveConnectorAdapter. */
   public HiveConnectorAdapter() {
     this.propertyMetadata = new HivePropertyMeta();
     this.catalogConverter = new HiveCatalogPropertyConverter();

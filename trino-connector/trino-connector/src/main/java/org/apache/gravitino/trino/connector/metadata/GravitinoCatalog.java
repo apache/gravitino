@@ -55,6 +55,12 @@ public class GravitinoCatalog {
             .build();
   }
 
+  /**
+   * Constructs a new GravitinoCatalog with the specified metalake and catalog.
+   *
+   * @param metalake the name of the metalake
+   * @param catalog the catalog
+   */
   public GravitinoCatalog(String metalake, Catalog catalog) {
     this.metalake = metalake;
     this.provider = catalog.provider();
@@ -67,6 +73,16 @@ public class GravitinoCatalog {
     lastModifiedTime = time.toEpochMilli();
   }
 
+  /**
+   * Constructs a new GravitinoCatalog with the specified metalake, provider, name, properties, and
+   * lastModifiedTime.
+   *
+   * @param metalake the name of the metalake
+   * @param provider the provider of the catalog
+   * @param name the name of the catalog
+   * @param properties the properties of the catalog
+   * @param lastModifiedTime the last modified time of the catalog
+   */
   @JsonCreator
   public GravitinoCatalog(
       @JsonProperty("metalake") String metalake,
@@ -81,29 +97,63 @@ public class GravitinoCatalog {
     this.lastModifiedTime = lastModifiedTime;
   }
 
+  /**
+   * Retrieves the provider of the catalog.
+   *
+   * @return the provider of the catalog
+   */
   @JsonProperty
   public String getProvider() {
     return provider;
   }
 
+  /**
+   * Retrieves the name of the catalog.
+   *
+   * @return the name of the catalog
+   */
   @JsonProperty
   public String getName() {
     return name;
   }
 
+  /**
+   * Retrieves the metalake of the catalog.
+   *
+   * @return the metalake of the catalog
+   */
   @JsonProperty
   public String getMetalake() {
     return metalake;
   }
 
+  /**
+   * Retrieves the name identifier of the catalog.
+   *
+   * @return the name identifier of the catalog
+   */
   public NameIdentifier geNameIdentifier() {
     return NameIdentifier.of(metalake, name);
   }
 
+  /**
+   * Retrieves the property of the catalog.
+   *
+   * @param name the name of the property
+   * @param defaultValue the default value of the property
+   * @return the property of the catalog
+   */
   public String getProperty(String name, String defaultValue) {
     return properties.getOrDefault(name, defaultValue);
   }
 
+  /**
+   * Retrieves the required property of the catalog.
+   *
+   * @param name the name of the property
+   * @return the required property of the catalog
+   * @throws Exception if the property is not found
+   */
   public String getRequiredProperty(String name) throws Exception {
     String value = properties.getOrDefault(name, "");
     if (StringUtils.isBlank(value)) {
@@ -113,28 +163,63 @@ public class GravitinoCatalog {
     return value;
   }
 
+  /**
+   * Retrieves the properties of the catalog.
+   *
+   * @return the properties of the catalog
+   */
   @JsonProperty
   public Map<String, String> getProperties() {
     return properties;
   }
 
+  /**
+   * Retrieves the last modified time of the catalog.
+   *
+   * @return the last modified time of the catalog
+   */
   @JsonProperty
   public long getLastModifiedTime() {
     return lastModifiedTime;
   }
 
+  /**
+   * Converts a Gravitino catalog to a JSON string.
+   *
+   * @param catalog the Gravitino catalog
+   * @return the JSON string
+   * @throws JsonProcessingException if the catalog cannot be converted to a JSON string
+   */
   public static String toJson(GravitinoCatalog catalog) throws JsonProcessingException {
     return objectMapper.writeValueAsString(catalog);
   }
 
+  /**
+   * Converts a JSON string to a Gravitino catalog.
+   *
+   * @param jsonString the JSON string
+   * @return the Gravitino catalog
+   * @throws JsonProcessingException if the JSON string cannot be converted to a Gravitino catalog
+   */
   public static GravitinoCatalog fromJson(String jsonString) throws JsonProcessingException {
     return objectMapper.readValue(jsonString, GravitinoCatalog.class);
   }
 
+  /**
+   * Retrieves the region of the catalog.
+   *
+   * @return the region of the catalog
+   */
   public String getRegion() {
     return properties.getOrDefault(CLOUD_REGION_CODE, "");
   }
 
+  /**
+   * Checks if the catalog is in the same region as the specified region.
+   *
+   * @param region the region to check
+   * @return true if the catalog is in the same region as the specified region, false otherwise
+   */
   public boolean isSameRegion(String region) {
     // When the Gravitino connector has not configured the cloud.region-code,
     // or the catalog has not configured the cloud.region-code,
