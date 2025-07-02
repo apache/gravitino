@@ -313,10 +313,9 @@ public class ConfigEntry<T> {
     String stringValue = stringConverter.apply(value);
     if (stringValue == null) {
       // To ensure that a null value is not set in the configuration
-      LOG.warn("Config {} value to set is null, ignore setting to Config.", stringValue);
+      LOG.warn("Config key {} value to set is null, ignore setting to Config.", key);
       return;
     }
-
     properties.put(key, stringValue);
   }
 }
