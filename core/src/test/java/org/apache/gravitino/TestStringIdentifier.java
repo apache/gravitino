@@ -163,6 +163,10 @@ public class TestStringIdentifier {
     String comment1 = "This is a comment";
     StringIdentifier stringIdFromComment2 = StringIdentifier.fromComment(comment1);
     Assertions.assertNull(stringIdFromComment2);
+
+    // Test comment contains parentheses but not the Gravitino prefix
+    String comment2 = "A comment (other info)";
+    Assertions.assertNull(StringIdentifier.fromComment(comment2));
   }
 
   @Test
