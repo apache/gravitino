@@ -19,6 +19,7 @@
 package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
@@ -31,6 +32,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -38,6 +41,8 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -72,7 +77,6 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createCatalog(CATALOG, Catalog.Type.RELATIONAL, "hive", "comment", properties)
         .asSchemas()
         .createSchema(SCHEMA, "test", new HashMap<>());
-
     // try to load the schema as tester2, expect failure
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
@@ -80,6 +84,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().loadSchema(SCHEMA);
         });
+
     // grant tester2 privilege to use the catalog
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -107,51 +112,136 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(1)
   public void testCreateTable() {
     // owner can create table
-    Catalog catalogEntityLoadByTester1 = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
-    catalogEntityLoadByTester1
-        .asTableCatalog()
-        .createTable(NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
+    TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+    tableCatalog.createTable(
+        NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
     // tester2 cannot create table
-    Catalog catalogEntityLoadByTester2 = tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    TableCatalog tableCatalogTester2 =
+        tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
         RuntimeException.class,
         () -> {
-          catalogEntityLoadByTester2
-              .asTableCatalog()
-              .createTable(
-                  NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
+          tableCatalogTester2.createTable(
+              NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
         });
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         role,
-        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.SCHEMA),
+        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.TABLE),
         ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
     // tester2 can now create table
-    catalogEntityLoadByTester2
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
-    catalogEntityLoadByTester2
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(SCHEMA, "table3"), createColumns(), "test2", new HashMap<>());
+    tableCatalogTester2.createTable(
+        NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
+    tableCatalogTester2.createTable(
+        NameIdentifier.of(SCHEMA, "table3"), createColumns(), "test2", new HashMap<>());
   }
 
   @Test
   @Order(2)
-  public void testListTable() {}
+  public void testListTable() {
+    TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+    NameIdentifier[] tablesList =
+        tableCatalog.listTables(org.apache.gravitino.Namespace.of(SCHEMA));
+    assertArrayEquals(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA, "table1"),
+          NameIdentifier.of(SCHEMA, "table2"),
+          NameIdentifier.of(SCHEMA, "table3")
+        },
+        tablesList);
+    // tester2 can only see tables they have privilege for
+    TableCatalog tableCatalogTester2 =
+        tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+    NameIdentifier[] tablesListTester2 =
+        tableCatalogTester2.listTables(org.apache.gravitino.Namespace.of(SCHEMA));
+    assertArrayEquals(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA, "table2"), NameIdentifier.of(SCHEMA, "table3")
+        },
+        tablesListTester2);
+  }
 
   @Test
   @Order(3)
-  public void testLoadTable() {}
+  public void testLoadTable() {
+    TableCatalog tableCatalogTester2 =
+        tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+
+    // tester2 can load table2 and table3, but not table1
+    tableCatalogTester2.loadTable(NameIdentifier.of(SCHEMA, "table2"));
+    tableCatalogTester2.loadTable(NameIdentifier.of(SCHEMA, "table3"));
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
+        RuntimeException.class,
+        () -> {
+          tableCatalogTester2.loadTable(NameIdentifier.of(SCHEMA, "table1"));
+        });
+
+    // grant tester2 privilege to use table1
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.TABLE),
+        ImmutableList.of(Privileges.SelectTable.allow()));
+    tableCatalogTester2.loadTable(NameIdentifier.of(SCHEMA, "table1"));
+  }
 
   @Test
   @Order(4)
-  public void testAlterTable() {}
+  public void testAlterTable() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    TableCatalog tableCatalogTester2 =
+        tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+
+    // tester2 cannot alter table1 (no privilege)
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
+        RuntimeException.class,
+        () -> {
+          tableCatalogTester2.alterTable(
+              NameIdentifier.of(SCHEMA, "table1"),
+              org.apache.gravitino.rel.TableChange.setProperty("key", "value"));
+        });
+    // grant tester2 owner privilege on table1
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+        NORMAL_USER,
+        Owner.Type.USER);
+    tableCatalogTester2.alterTable(
+        NameIdentifier.of(SCHEMA, "table1"), TableChange.setProperty("key", "value"));
+  }
 
   @Test
   @Order(5)
-  public void testDropTable() {}
+  public void testDropTable() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    TableCatalog tableCatalogTester2 =
+        tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+    // reset owner
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+        USER,
+        Owner.Type.USER);
+    // tester2 cannot drop table1
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
+        RuntimeException.class,
+        () -> {
+          tableCatalogTester2.dropTable(NameIdentifier.of(SCHEMA, "table1"));
+        });
+    // tester2 can drop table2 and table3 (they created them)
+    tableCatalogTester2.dropTable(NameIdentifier.of(SCHEMA, "table2"));
+    tableCatalogTester2.dropTable(NameIdentifier.of(SCHEMA, "table3"));
+
+    // owner can drop table1
+    TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+    tableCatalog.dropTable(NameIdentifier.of(SCHEMA, "table1"));
+    // check tables are dropped
+    NameIdentifier[] tablesList = tableCatalog.listTables(Namespace.of(SCHEMA));
+    assertArrayEquals(new NameIdentifier[] {}, tablesList);
+    NameIdentifier[] tablesListTester2 = tableCatalogTester2.listTables(Namespace.of(SCHEMA));
+    assertArrayEquals(new NameIdentifier[] {}, tablesListTester2);
+  }
 }
