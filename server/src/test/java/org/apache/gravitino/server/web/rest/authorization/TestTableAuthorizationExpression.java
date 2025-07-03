@@ -50,6 +50,8 @@ public class TestTableAuthorizationExpression {
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::OWNER", "METALAKE::USE_CATALOG")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_TABLE")));
     assertFalse(
+        mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
+    assertFalse(
         mockEvaluator.getResult(ImmutableSet.of("SCHEMA::CREATE_TABLE", "SCHEMA::USE_SCHEMA")));
     assertTrue(
         mockEvaluator.getResult(

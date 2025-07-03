@@ -34,6 +34,7 @@ dependencies {
   implementation(project(":core"))
 
   implementation(libs.bundles.jetty)
+  implementation(libs.bundles.jersey)
   implementation(libs.bundles.jwt)
   implementation(libs.bundles.kerby)
   implementation(libs.bundles.log4j)

@@ -30,7 +30,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
-import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkUtilIT;
@@ -211,13 +210,5 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .config(sparkConf)
             .enableHiveSupport()
             .getOrCreate();
-  }
-
-  private String getIcebergRestServiceUri() {
-    JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(
-            serverConfig, String.format("gravitino.%s.", icebergRestServiceName));
-    return String.format(
-        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }
 }

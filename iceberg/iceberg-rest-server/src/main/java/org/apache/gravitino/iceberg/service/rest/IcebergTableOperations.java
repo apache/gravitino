@@ -41,6 +41,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
@@ -48,6 +49,10 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDisp
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -114,10 +119,18 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
-      @PathParam("prefix") String prefix,
-      @Encoded() @PathParam("namespace") String namespace,
-      CreateTableRequest createTableRequest,
+      @AuthorizationMetadata(type = MetadataObject.Type.CATALOG) @PathParam("prefix") String prefix,
+      @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) @Encoded() @PathParam("namespace")
+          String namespace,
+      @IcebergAuthorizationMetadata(type = RequestType.CREATE_TABLE)
+          CreateTableRequest createTableRequest,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRestUtils.getCatalogName(prefix);

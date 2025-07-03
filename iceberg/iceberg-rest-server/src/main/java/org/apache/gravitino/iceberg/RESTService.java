@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
+import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
@@ -28,6 +29,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.authorization.IcebergAuthorizationContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationExecutor;
@@ -46,6 +48,8 @@ import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.filter.IcebergRESTAuthInterceptionService;
+import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -88,6 +92,9 @@ public class RESTService implements GravitinoAuxiliaryService {
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
 
+    IcebergAuthorizationContext authorizationContext =
+        IcebergAuthorizationContext.create(configProvider);
+
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider);
@@ -110,6 +117,11 @@ public class RESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
+            if (authorizationContext.authorizationEnabled()) {
+              bind(IcebergRESTAuthInterceptionService.class)
+                  .to(InterceptionService.class)
+                  .in(Singleton.class);
+            }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
             bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);

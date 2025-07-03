@@ -33,7 +33,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Evaluate the runtime result of the AuthorizationExpression. */
 public class AuthorizationExpressionEvaluator {
-
   private final String ognlAuthorizationExpression;
 
   /**
