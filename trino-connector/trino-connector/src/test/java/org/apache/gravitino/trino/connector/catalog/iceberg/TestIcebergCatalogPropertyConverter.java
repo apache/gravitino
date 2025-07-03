@@ -102,7 +102,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("catalog-backend", "hive")
             .put("warehouse", "hdfs://tmp/warehouse")
             .put("unknown-key", "1")
-            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.iceberg.unknown-key", "1")
             .put("trino.bypass.iceberg.table-statistics-enabled", "true")
             .build();
     Catalog mockCatalog =
@@ -121,8 +121,8 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("unknown-key"));
+    Assertions.assertEquals(config.get("iceberg.unknown-key"), "1");
   }
 
   @Test
@@ -138,7 +138,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-password", "ds123")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .put("unknown-key", "1")
-            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.iceberg.unknown-key", "1")
             .put("trino.bypass.iceberg.table-statistics-enabled", "true")
             .build();
     Catalog mockCatalog =
@@ -163,7 +163,7 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("unknown-key"));
+    Assertions.assertEquals(config.get("iceberg.unknown-key"), "1");
   }
 }
