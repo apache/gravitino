@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
@@ -82,7 +81,7 @@ public interface PolicyOperations {
       boolean enabled,
       Policy.Content content,
       List<JobTemplate> jobTemplatesToAssociate)
-      throws PolicyAlreadyExistsException, NoSuchJobTemplateException;
+      throws PolicyAlreadyExistsException;
 
   /**
    * Create a new policy under a metalake.
