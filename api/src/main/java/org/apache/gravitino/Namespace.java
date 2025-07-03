@@ -79,12 +79,7 @@ public class Namespace {
     if (StringUtils.isBlank(namespace)) {
       return empty();
     }
-    String[] levels = namespace.split("\\.");
-    for (String level : levels) {
-      Preconditions.checkArgument(
-          StringUtils.isNotEmpty(level), "Cannot create a namespace with null or empty level");
-    }
-    return new Namespace(levels);
+    return Namespace.of(namespace.split("\\."));
   }
 
   private Namespace(String[] levels) {
