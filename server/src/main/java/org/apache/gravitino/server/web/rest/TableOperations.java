@@ -166,10 +166,10 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::SELECT_TABLE ||CATALOG::SELECT_TABLE || "
+          "METALAKE::SELECT_TABLE || CATALOG::SELECT_TABLE || "
               + "SCHEMA::SELECT_TABLE || TABLE::SELECT_TABLE || "
-              + "METALAKE::MODIFY_TABLE ||CATALOG::MODIFY_TABLE || "
-              + "SCHEMA::MODIFY_TABLE || TABLE:: MODIFY_TABLE || "
+              + "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
+              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
               + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
@@ -203,8 +203,8 @@ public class TableOperations {
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::MODIFY_TABLE ||CATALOG::MODIFY_TABLE || "
-              + "SCHEMA::MODIFY_TABLE || TABLE:: MODIFY_TABLE || "
+          "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
+              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
               + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
