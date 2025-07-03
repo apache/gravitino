@@ -207,7 +207,10 @@ public class CatalogConnectorManager {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(gravitinoCatalog);
                 } else {
-                  if (catalog.type() == Catalog.Type.RELATIONAL) {
+                  if (catalog.type() == Catalog.Type.RELATIONAL
+                      && catalogConnectorFactory
+                          .getSupportedCatalogProviders()
+                          .contains(gravitinoCatalog.getProvider())) {
                     loadCatalog(gravitinoCatalog);
                   }
                 }
