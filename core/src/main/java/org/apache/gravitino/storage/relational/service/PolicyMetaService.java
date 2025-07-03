@@ -25,7 +25,9 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -177,6 +179,36 @@ public class PolicyMetaService {
                         mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
                             metalakeName, ident.name())));
     return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] > 0;
+  }
+
+  public List<PolicyEntity> listPoliciesForMetadataObject(
+      NameIdentifier objectIdent, MetadataObject.Type objectType)
+      throws NoSuchEntityException, IOException {
+    // todo: implement this method
+    throw new UnsupportedOperationException("Not implemented yet");
+  }
+
+  public PolicyEntity getPolicyForMetadataObject(
+      NameIdentifier objectIdent, MetadataObject.Type objectType, NameIdentifier policyIdent)
+      throws NoSuchEntityException, IOException {
+    // todo: implement this method
+    throw new UnsupportedOperationException("Not implemented yet");
+  }
+
+  public List<MetadataObject> listAssociatedMetadataObjectsForPolicy(NameIdentifier policyIdent)
+      throws IOException {
+    // todo: implement this method
+    throw new UnsupportedOperationException("Not implemented yet");
+  }
+
+  public List<PolicyEntity> associatePoliciesWithMetadataObject(
+      NameIdentifier objectIdent,
+      MetadataObject.Type objectType,
+      NameIdentifier[] policiesToAdd,
+      NameIdentifier[] policiesToRemove)
+      throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
+    // todo: implement this method
+    throw new UnsupportedOperationException("Not implemented yet");
   }
 
   public int deletePolicyAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
