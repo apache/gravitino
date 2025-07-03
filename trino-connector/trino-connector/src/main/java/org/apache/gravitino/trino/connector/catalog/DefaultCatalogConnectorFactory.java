@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.catalog;
 
 import io.trino.spi.TrinoException;
 import java.util.HashMap;
+import java.util.Set;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
@@ -77,6 +78,15 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
         TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME,
         new CatalogConnectorContext.Builder(new TrinoClusterConnectorAdapter()));
     LOG.info("Start the DefaultCatalogConnectorFactory");
+  }
+
+  /**
+   * Get supported catalog providers
+   *
+   * @return catalog providers
+   */
+  public Set<String> getSupportedCatalogProviders() {
+    return catalogBuilders.keySet();
   }
 
   /**
