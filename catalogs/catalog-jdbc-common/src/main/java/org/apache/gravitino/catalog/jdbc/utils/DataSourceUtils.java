@@ -137,9 +137,9 @@ public class DataSourceUtils {
 
     if (driver != null) {
       if (decodedUrl.startsWith("jdbc:mysql")) {
-        checkUnsafeParameters(decodedUrl, all, unsafePostgresParameters, "MySQL");
+        checkUnsafeParameters(decodedUrl, all, unsafeMySQLParameters, "MySQL");
       } else if (decodedUrl.startsWith("jdbc:mariadb")) {
-        checkUnsafeParameters(decodedUrl, all, unsafePostgresParameters, "MariaDB");
+        checkUnsafeParameters(decodedUrl, all, unsafeMySQLParameters, "MariaDB");
       } else if (decodedUrl.startsWith("jdbc:postgresql")) {
         checkUnsafeParameters(decodedUrl, all, unsafePostgresParameters, "PostgreSQL");
       }
