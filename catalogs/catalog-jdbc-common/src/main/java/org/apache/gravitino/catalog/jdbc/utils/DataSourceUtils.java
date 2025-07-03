@@ -19,6 +19,8 @@
 package org.apache.gravitino.catalog.jdbc.utils;
 
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -37,6 +39,28 @@ public class DataSourceUtils {
 
   /** SQL statements for database connection pool testing. */
   private static final String POOL_TEST_QUERY = "SELECT 1";
+
+  /** list of bad parameters for MySQL */
+  private static final List<String> mysqlParameters =
+      Arrays.asList(
+          "maxAllowedPacket",
+          "autoDeserialize",
+          "queryInterceptors",
+          "statementInterceptors",
+          "detectCustomCollations",
+          "allowloadlocalinfile",
+          "allowUrlInLocalInfile",
+          "allowLoadLocalInfileInPath");
+
+  /** list of bad parameters for Postgres */
+  private static final List<String> pgParameters =
+      Arrays.asList(
+          "socketFactory",
+          "socketFactoryArg",
+          "sslfactory",
+          "sslhostnameverifier",
+          "sslpasswordcallback",
+          "authenticationPluginClassName");
 
   public static DataSource createDataSource(Map<String, String> properties) {
     return createDataSource(new JdbcConfig(properties));
@@ -78,27 +102,51 @@ public class DataSourceUtils {
     return properties;
   }
 
+  private static String recursiveDecode(String url) {
+    String prev;
+    String decoded = url;
+    int max = 5;
+
+    do {
+      prev = decoded;
+      try {
+        decoded = java.net.URLDecoder.decode(prev, "UTF-8");
+      } catch (Exception e) {
+        throw new GravitinoRuntimeException("Unable to decode JDBC URL");
+      }
+    } while (!prev.equals(decoded) && --max > 0);
+
+    return decoded;
+  }
+
+  private static void checkUnsafeParameters(
+      String url, Map<String, String> config, List<String> unsafeParams, String dbType) {
+
+    String lowerUrl = url.toLowerCase();
+
+    for (String param : unsafeParams) {
+      String lowerParam = param.toLowerCase();
+      if (lowerUrl.contains(lowerParam) || containsKeyIgnoreCase(config, param)) {
+        throw new GravitinoRuntimeException(
+            "Unsafe %s parameter '%s' detected in JDBC URL", dbType, param);
+      }
+    }
+  }
+
   private static void validateJdbcConfig(JdbcConfig jdbcConfig) {
     String driver = jdbcConfig.getJdbcDriver();
     String url = jdbcConfig.getJdbcUrl();
     Map<String, String> all = jdbcConfig.getAllConfig();
-    String lowerUrl = url == null ? "" : url.toLowerCase();
+    String lowerUrl = url.toLowerCase();
+    String decodedUrl = recursiveDecode(lowerUrl);
 
-    if (driver != null && driver.toLowerCase().contains("mysql")) {
-      if (lowerUrl.contains("allowloadlocalinfile=true")
-          || containsKeyIgnoreCase(all, "allowLoadLocalInfile")) {
-        throw new GravitinoRuntimeException(
-            "Unsafe MySQL parameter 'allowLoadLocalInfile' detected in JDBC url");
-      }
-    }
-
-    if (driver != null && driver.toLowerCase().contains("postgresql")) {
-      if (lowerUrl.contains("socketfactory=")
-          || lowerUrl.contains("socketfactoryarg=")
-          || containsKeyIgnoreCase(all, "socketFactory")
-          || containsKeyIgnoreCase(all, "socketFactoryArg")) {
-        throw new GravitinoRuntimeException(
-            "Unsafe PostgreSQL parameters 'socketFactory' or 'socketFactoryArg' detected in JDBC url");
+    if (driver != null) {
+      if (decodedUrl.startsWith("jdbc:mysql")) {
+        checkUnsafeParameters(decodedUrl, all, mysqlParameters, "MySQL");
+      } else if (decodedUrl.startsWith("jdbc:mariadb")) {
+        checkUnsafeParameters(decodedUrl, all, mysqlParameters, "MariaDB");
+      } else if (decodedUrl.startsWith("jdbc:postgresql")) {
+        checkUnsafeParameters(decodedUrl, all, pgParameters, "PostgreSQL");
       }
     }
   }

@@ -70,4 +70,18 @@ public class TestDataSourceUtils {
     Assertions.assertThrows(
         GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
   }
+
+  @Test
+  public void testRejectEncodedAllowLoadLocalInfile() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        "jdbc:mysql://address=(host=172.18.0.1)(port=3309)(%61llowLoadLocalInfile=true),172.18.0.1:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+  }
 }
