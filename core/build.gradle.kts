@@ -101,7 +101,7 @@ jcstress {
 }
 
 jmh {
-  jmhVersion = "1.37"
+  jmhVersion.set(libs.versions.jmh.asProvider())
   warmupIterations = 5
   iterations = 10
   fork = 1

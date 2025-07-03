@@ -122,6 +122,7 @@ openlineage = "1.29.0"
 concurrent-trees = "2.6.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
+jmh = "1.37"
 
 [libraries]
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
