@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
@@ -40,8 +39,7 @@ public class DataSourceUtils {
   /** SQL statements for database connection pool testing. */
   private static final String POOL_TEST_QUERY = "SELECT 1";
 
-  /** list of bad parameters for MySQL */
-  private static final List<String> mysqlParameters =
+  private static final List<String> unsafeMySQLParameters =
       Arrays.asList(
           "maxAllowedPacket",
           "autoDeserialize",
@@ -52,8 +50,7 @@ public class DataSourceUtils {
           "allowUrlInLocalInfile",
           "allowLoadLocalInfileInPath");
 
-  /** list of bad parameters for Postgres */
-  private static final List<String> pgParameters =
+  private static final List<String> unsafePostgresParameters =
       Arrays.asList(
           "socketFactory",
           "socketFactoryArg",
@@ -76,7 +73,8 @@ public class DataSourceUtils {
   }
 
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
-    validateJdbcConfig(jdbcConfig);
+    validateJdbcConfig(
+        jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
@@ -126,35 +124,31 @@ public class DataSourceUtils {
 
     for (String param : unsafeParams) {
       String lowerParam = param.toLowerCase();
-      if (lowerUrl.contains(lowerParam) || containsKeyIgnoreCase(config, param)) {
+      if (lowerUrl.contains(lowerParam) || containsValueIgnoreCase(config, param)) {
         throw new GravitinoRuntimeException(
             "Unsafe %s parameter '%s' detected in JDBC URL", dbType, param);
       }
     }
   }
 
-  private static void validateJdbcConfig(JdbcConfig jdbcConfig) {
-    String driver = jdbcConfig.getJdbcDriver();
-    String url = jdbcConfig.getJdbcUrl();
-    Map<String, String> all = jdbcConfig.getAllConfig();
+  public static void validateJdbcConfig(String driver, String url, Map<String, String> all) {
     String lowerUrl = url.toLowerCase();
     String decodedUrl = recursiveDecode(lowerUrl);
 
     if (driver != null) {
       if (decodedUrl.startsWith("jdbc:mysql")) {
-        checkUnsafeParameters(decodedUrl, all, mysqlParameters, "MySQL");
+        checkUnsafeParameters(decodedUrl, all, unsafePostgresParameters, "MySQL");
       } else if (decodedUrl.startsWith("jdbc:mariadb")) {
-        checkUnsafeParameters(decodedUrl, all, mysqlParameters, "MariaDB");
+        checkUnsafeParameters(decodedUrl, all, unsafePostgresParameters, "MariaDB");
       } else if (decodedUrl.startsWith("jdbc:postgresql")) {
-        checkUnsafeParameters(decodedUrl, all, pgParameters, "PostgreSQL");
+        checkUnsafeParameters(decodedUrl, all, unsafePostgresParameters, "PostgreSQL");
       }
     }
   }
 
-  private static boolean containsKeyIgnoreCase(Map<String, String> map, String key) {
-    Set<String> keys = map.keySet();
-    for (String k : keys) {
-      if (k.equalsIgnoreCase(key)) {
+  private static boolean containsValueIgnoreCase(Map<String, String> map, String value) {
+    for (String keyValue : map.values()) {
+      if (keyValue != null && keyValue.equalsIgnoreCase(value)) {
         return true;
       }
     }
