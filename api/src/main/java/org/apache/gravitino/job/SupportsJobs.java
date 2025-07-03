@@ -65,6 +65,16 @@ public interface SupportsJobs {
   void deleteJobTemplate(String jobTemplateName) throws NoSuchJobTemplateException;
 
   /**
+   * Lists all the jobs by the specified job template name. This will return a list of job handles
+   * associated with the specified job template. Each job handle represents a specific job.
+   *
+   * @param jobTemplateName the name of the job template to list jobs for
+   * @return a list of job handles associated with the specified job template
+   * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   */
+  List<JobHandle> listJobs(String jobTemplateName) throws NoSuchJobTemplateException;
+
+  /**
    * run a job with the template name and configuration. The jobConf is a map of key-value contains
    * the variables that will be used to replace the templated parameters in the job template.
    *
