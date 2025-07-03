@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -112,6 +113,8 @@ public class BaseIT {
   protected String serverUri;
 
   protected String originConfig;
+  private Optional<String> entityStoreBackend;
+  private Optional<String> entityStoreBackendUri = Optional.empty();
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -271,9 +274,10 @@ public class BaseIT {
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
-    if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    if ("MySQL".equalsIgnoreCase(getEntityStoreBackend())) {
       // Start MySQL docker instance.
       String jdbcURL = startAndInitMySQLBackend();
+      entityStoreBackendUri = Optional.of(jdbcURL);
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
       customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, jdbcURL);
@@ -281,9 +285,10 @@ public class BaseIT {
           Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
-    } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    } else if ("PostgreSQL".equalsIgnoreCase(getEntityStoreBackend())) {
       // Start PostgreSQL docker instance.
       String pgJdbcUrl = startAndInitPGBackend();
+      entityStoreBackendUri = Optional.of(pgJdbcUrl);
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
       customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgJdbcUrl);
@@ -461,5 +466,22 @@ public class BaseIT {
     } catch (Exception e) {
       throw new IllegalStateException("Failed to set environment variable", e);
     }
+  }
+
+  protected String getIcebergRestServiceUri() {
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
+    return String.format(
+        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
+  }
+
+  // MySQL or PostgreSQL
+  protected void setEntityStoreBackend(String backend) {
+    entityStoreBackend = Optional.of(backend);
+  }
+
+  private String getEntityStoreBackend() {
+    String backend = System.getenv("jdbcBackend");
+    return entityStoreBackend.orElse(backend);
   }
 }

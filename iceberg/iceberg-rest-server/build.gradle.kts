@@ -64,6 +64,7 @@ dependencies {
   compileOnly(libs.lombok)
 
   // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
+  testImplementation(project(":server"))
   testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:aws"))
   testImplementation(project(":bundles:gcp", configuration = "shadow"))
@@ -98,9 +99,11 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

@@ -44,7 +44,6 @@ import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOp
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -261,13 +260,5 @@ public abstract class FlinkEnvIT extends BaseIT {
       TableResult deleteResult = sql("DROP TABLE IF EXISTS %s", tableName);
       TestUtils.assertTableResult(deleteResult, ResultKind.SUCCESS);
     }
-  }
-
-  private String getIcebergRestServiceUri() {
-    JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(
-            serverConfig, String.format("gravitino.%s.", icebergRestServiceName));
-    return String.format(
-        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }
 }
