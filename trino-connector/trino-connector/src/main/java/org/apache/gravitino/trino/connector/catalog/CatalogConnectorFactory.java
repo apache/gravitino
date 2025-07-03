@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import java.util.Set;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 
 /**
@@ -31,4 +32,11 @@ public interface CatalogConnectorFactory {
    * @return CatalogConnectorContext builder
    */
   CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(GravitinoCatalog catalog);
+
+  /**
+   * Get supported catalog providers
+   *
+   * @return catalog providers
+   */
+  Set<String> getSupportedCatalogProviders();
 }
