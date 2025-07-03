@@ -179,6 +179,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
       for (RoleEntity role : entities) {
         Long roleId = role.id();
+        role =
+            entityStore.get(
+                NameIdentifierUtil.ofRole(metalake, role.name()),
+                Entity.EntityType.ROLE,
+                RoleEntity.class);
         if (loadedRoles.contains(roleId)) {
           continue;
         }

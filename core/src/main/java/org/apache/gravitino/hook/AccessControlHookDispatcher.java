@@ -135,9 +135,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
-    User userAfterRevoke = dispatcher.revokeRolesFromUser(metalake, roles, user);
+    User revokedUser = dispatcher.revokeRolesFromUser(metalake, roles, user);
     notifyRoleUserRelChange(metalake, roles);
-    return userAfterRevoke;
+    return revokedUser;
   }
 
   @Override
@@ -196,18 +196,18 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
-    Role roleAfterGrant = dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
+    Role grantedRole = dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
     notifyRoleUserRelChange(metalake, role);
-    return roleAfterGrant;
+    return grantedRole;
   }
 
   @Override
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
-    Role roleAfterRevoke = dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
+    Role revokedRole = dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
     notifyRoleUserRelChange(metalake, role);
-    return roleAfterRevoke;
+    return revokedRole;
   }
 
   private static void notifyRoleUserRelChange(String metalake, List<String> roles) {
