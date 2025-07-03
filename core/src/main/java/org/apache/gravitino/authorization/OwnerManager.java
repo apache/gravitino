@@ -153,6 +153,9 @@ public class OwnerManager {
           } catch (IOException e) {
             LOG.warn(e.getMessage(), e);
           }
+        } else {
+          throw new UnsupportedOperationException(
+              "Notification for Group Owner is not supported yet.");
         }
       }
     }
