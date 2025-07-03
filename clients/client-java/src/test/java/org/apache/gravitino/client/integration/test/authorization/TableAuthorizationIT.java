@@ -84,8 +84,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().loadSchema(SCHEMA);
         });
-
-    // grant tester2 privilege to use the catalog
+    // grant tester privilege
     List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     SecurableObject catalogObject =
@@ -129,7 +128,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         role,
-        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.TABLE),
+        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.SCHEMA),
         ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
     // tester2 can now create table
     tableCatalogTester2.createTable(

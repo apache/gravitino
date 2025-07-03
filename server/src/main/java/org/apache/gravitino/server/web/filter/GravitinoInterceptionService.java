@@ -41,6 +41,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -56,7 +57,10 @@ public class GravitinoInterceptionService implements InterceptionService {
   @Override
   public Filter getDescriptorFilter() {
     return new ClassListFilter(
-        ImmutableSet.of(CatalogOperations.class.getName(), SchemaOperations.class.getName()));
+        ImmutableSet.of(
+            CatalogOperations.class.getName(),
+            SchemaOperations.class.getName(),
+            TableOperations.class.getName()));
   }
 
   @Override
