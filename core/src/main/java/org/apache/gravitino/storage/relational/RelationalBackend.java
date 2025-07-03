@@ -30,11 +30,12 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.policy.SupportsPolicyOperations;
 import org.apache.gravitino.tag.SupportsTagOperations;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend
-    extends Closeable, SupportsTagOperations, SupportsRelationOperations {
+    extends Closeable, SupportsTagOperations, SupportsRelationOperations, SupportsPolicyOperations {
 
   /**
    * Initializes the Relational Backend environment with the provided configuration.
