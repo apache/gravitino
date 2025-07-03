@@ -24,6 +24,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +60,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
@@ -76,6 +78,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
@@ -674,6 +677,78 @@ public class POConverters {
       return !oldProperties.equals(newFileset.properties());
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static boolean checkPolicyVersionNeedUpdate(
+      PolicyVersionPO oldPolicyVersionPO, PolicyEntity newPolicy) {
+    if (!StringUtils.equals(oldPolicyVersionPO.getPolicyComment(), newPolicy.comment())
+        || oldPolicyVersionPO.isEnabled() != newPolicy.enabled()) {
+      return true;
+    }
+
+    try {
+      PolicyContent oldContent =
+          JsonUtils.anyFieldMapper()
+              .readValue(
+                  oldPolicyVersionPO.getContent(),
+                  Policy.BuiltInType.fromPolicyType(newPolicy.policyType()).contentClass());
+      if (oldContent == null) {
+        return newPolicy.content() != null;
+      }
+      return !oldContent.equals(newPolicy.content());
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static PolicyPO updatePolicyPOWithVersion(
+      PolicyPO oldPolicyPO, PolicyEntity newPolicy, boolean needUpdateVersion) {
+    try {
+      Long lastVersion = oldPolicyPO.getLastVersion();
+      Long currentVersion;
+      PolicyVersionPO newPolicyVersionPO;
+      // Will set the version to the last version + 1
+      if (needUpdateVersion) {
+        lastVersion++;
+        currentVersion = lastVersion;
+        newPolicyVersionPO =
+            PolicyVersionPO.builder()
+                .withMetalakeId(oldPolicyPO.getMetalakeId())
+                .withPolicyId(newPolicy.id())
+                .withVersion(currentVersion)
+                .withPolicyComment(newPolicy.comment())
+                .withEnabled(newPolicy.enabled())
+                .withContent(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.content()))
+                .withDeletedAt(DEFAULT_DELETED_AT)
+                .build();
+      } else {
+        currentVersion = oldPolicyPO.getCurrentVersion();
+        newPolicyVersionPO = oldPolicyPO.getPolicyVersionPO();
+      }
+      return PolicyPO.builder()
+          .withPolicyId(newPolicy.id())
+          .withPolicyName(newPolicy.name())
+          .withPolicyType(newPolicy.policyType())
+          .withMetalakeId(oldPolicyPO.getMetalakeId())
+          .withInheritable(newPolicy.inheritable())
+          .withExclusive(newPolicy.exclusive())
+          .withSupportedObjectTypes(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      // Sort the supported object types to ensure consistent ordering
+                      newPolicy.supportedObjectTypes().stream()
+                          .map(Enum::name)
+                          .sorted()
+                          .collect(Collectors.toCollection(LinkedHashSet::new))))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
+          .withCurrentVersion(currentVersion)
+          .withLastVersion(lastVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withPolicyVersionPO(newPolicyVersionPO)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
     }
   }
 
@@ -1336,6 +1411,45 @@ public class POConverters {
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static PolicyPO initializePolicyPOWithVersion(
+      PolicyEntity policyEntity, PolicyPO.Builder builder) {
+    try {
+      String content = JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.content());
+      PolicyVersionPO policyVersionPO =
+          PolicyVersionPO.builder()
+              .withMetalakeId(builder.getMetalakeId())
+              .withPolicyId(policyEntity.id())
+              .withVersion(INIT_VERSION)
+              .withPolicyComment(policyEntity.comment())
+              .withEnabled(policyEntity.enabled())
+              .withContent(content)
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .build();
+      return builder
+          .withPolicyId(policyEntity.id())
+          .withPolicyName(policyEntity.name())
+          .withPolicyType(policyEntity.policyType())
+          .withInheritable(policyEntity.inheritable())
+          .withExclusive(policyEntity.exclusive())
+          .withSupportedObjectTypes(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      // Sort the supported object types to ensure consistent ordering
+                      policyEntity.supportedObjectTypes().stream()
+                          .map(Enum::name)
+                          .sorted()
+                          .collect(Collectors.toCollection(LinkedHashSet::new))))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withPolicyVersionPO(policyVersionPO)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
     }
   }
 
