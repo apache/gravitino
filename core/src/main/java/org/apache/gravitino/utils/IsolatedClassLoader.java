@@ -172,7 +172,7 @@ public class IsolatedClassLoader implements Closeable {
       try {
         return clazz == null ? doLoadClass(name, resolve) : clazz;
       } catch (Exception e) {
-        throw new ClassNotFoundException("Class no found " + name, e);
+        throw new ClassNotFoundException("Class not found " + name, e);
       }
     }
 

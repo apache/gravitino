@@ -44,7 +44,7 @@ from gravitino.dto.responses.model_version_list_response import (
     ModelVersionInfoListResponse,
     ModelVersionListResponse,
 )
-from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
+from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.exceptions.handlers.model_error_handler import MODEL_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace

@@ -101,6 +101,7 @@ The metadata object that supports ownership is as follows:
 | Topic                |
 | Fileset              |
 | Role                 |
+| Model                |
 
 ### User
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
