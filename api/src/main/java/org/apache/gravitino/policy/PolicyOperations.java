@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.policy;
 
+import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.job.JobTemplate;
 
 /**
  * The interface of the policy operations. The policy operations are used to manage policies under a
@@ -67,12 +70,19 @@ public interface PolicyOperations {
    * @param comment The comment of the policy.
    * @param enabled Whether the policy is enabled or not.
    * @param content The content of the policy.
+   * @param jobTemplatesToAssociate The list of job templates to associate with the policy, can be
+   *     empty or null if no job templates associated.
    * @return The created policy.
    * @throws PolicyAlreadyExistsException If the policy already exists.
    */
   Policy createPolicy(
-      String name, String type, String comment, boolean enabled, Policy.Content content)
-      throws PolicyAlreadyExistsException;
+      String name,
+      String type,
+      String comment,
+      boolean enabled,
+      Policy.Content content,
+      List<JobTemplate> jobTemplatesToAssociate)
+      throws PolicyAlreadyExistsException, NoSuchJobTemplateException;
 
   /**
    * Create a new policy under a metalake.
@@ -92,6 +102,8 @@ public interface PolicyOperations {
    * @param supportedObjectTypes The set of the metadata object types that the policy can be
    *     associated with
    * @param content The content of the policy.
+   * @param jobTemplatesToAssociate The list of job templates to associate with the policy, can be
+   *     empty or null if no job templates associated.
    * @return The created policy.
    * @throws PolicyAlreadyExistsException If the policy already exists.
    */
@@ -103,7 +115,8 @@ public interface PolicyOperations {
       boolean exclusive,
       boolean inheritable,
       Set<MetadataObject.Type> supportedObjectTypes,
-      Policy.Content content)
+      Policy.Content content,
+      List<JobTemplate> jobTemplatesToAssociate)
       throws PolicyAlreadyExistsException;
 
   /**
