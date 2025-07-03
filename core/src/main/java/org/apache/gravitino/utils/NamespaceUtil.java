@@ -83,6 +83,16 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for policy.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for policy
+   */
+  public static Namespace ofPolicy(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.POLICY_SCHEMA_NAME);
+  }
+
+  /**
    * Create a namespace for user.
    *
    * @param metalake The metalake name
