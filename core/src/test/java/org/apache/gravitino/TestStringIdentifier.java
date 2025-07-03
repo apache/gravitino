@@ -165,8 +165,16 @@ public class TestStringIdentifier {
     Assertions.assertNull(stringIdFromComment2);
 
     // Test comment contains parentheses but not the Gravitino prefix
-    String comment2 = "A comment (other info)";
+    String comment2 = "This is a comment (other info)";
     Assertions.assertNull(StringIdentifier.fromComment(comment2));
+
+    // Test comment contains parentheses and Gravitino prefix but not the id
+    String comment3 = "This is a comment (From Gravitino, DO NOT EDIT: )";
+    Assertions.assertNull(StringIdentifier.fromComment(comment3));
+
+    // Test comment where there is no space between Gravitino prefix and id
+    String comment4 = "This is a comment (From Gravitino, DO NOT EDIT:gravitino.v1.uid123123)";
+    Assertions.assertNull(StringIdentifier.fromComment(comment4));
   }
 
   @Test

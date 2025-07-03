@@ -181,12 +181,16 @@ public class StringIdentifier {
     if (left == -1 || right == -1) {
       return null;
     }
-    String innerComment = comment.substring(left + 1, right).trim();
+    String innerComment = comment.substring(left + 1, right);
     if (!innerComment.startsWith(STRING_COMMENT)) {
       return null;
     }
 
-    String idString = innerComment.substring(STRING_COMMENT.length()).trim();
+    String idString = innerComment.substring(STRING_COMMENT.length());
+    if (idString.isEmpty()) {
+      return null;
+    }
+
     return fromString(idString);
   }
 
