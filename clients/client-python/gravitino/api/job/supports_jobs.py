@@ -52,12 +52,12 @@ class SupportsJobs(ABC):
         pass
 
     @abstractmethod
-    def get_job_template(self, job_name: str) -> JobTemplate:
+    def get_job_template(self, job_template_name: str) -> JobTemplate:
         """
         Retrieves a job template by its name.
 
         Args:
-            job_name: The name of the job template to retrieve.
+            job_template_name: The name of the job template to retrieve.
 
         Returns:
             The job template if found, otherwise raises an exception.
@@ -68,13 +68,13 @@ class SupportsJobs(ABC):
         pass
 
     @abstractmethod
-    def delete_job_template(self, job_name: str) -> None:
+    def delete_job_template(self, job_template_name: str) -> None:
         """
         Deletes a job template by its name. This will remove the job template from Gravitino, and it
         will no longer be available for execution.
 
         Args:
-            job_name: The name of the job template to delete.
+            job_template_name: The name of the job template to delete.
 
         Raises:
             NoSuchJobTemplateException: If no job template with the specified name exists.
@@ -82,14 +82,14 @@ class SupportsJobs(ABC):
         pass
 
     @abstractmethod
-    def run_job(self, job_name: str, job_conf: Dict[str, str]) -> JobHandle:
+    def run_job(self, job_template_name: str, job_conf: Dict[str, str]) -> JobHandle:
         """
-        Run a job with the specified name and configuration. The jobConf is a map of key-value
+        Run a job with the template name and configuration. The jobConf is a map of key-value
         contains the variables that will be used to replace the templated parameters in the job
         template.
 
         Args:
-            job_name: The name of the job template to run.
+            job_template_name: The name of the job template to run.
             job_conf: A dictionary containing the job configuration parameters.
 
         Returns:

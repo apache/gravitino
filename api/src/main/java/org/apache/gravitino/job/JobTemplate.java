@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -183,6 +184,112 @@ public final class JobTemplate {
    */
   public static Builder builder() {
     return new Builder();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof JobTemplate)) {
+      return false;
+    }
+
+    JobTemplate that = (JobTemplate) o;
+    return Objects.equals(jobType, that.jobType)
+        && Objects.equals(name, that.name)
+        && Objects.equals(comment, that.comment)
+        && Objects.equals(executable, that.executable)
+        && Objects.equals(arguments, that.arguments)
+        && Objects.equals(configs, that.configs)
+        && Objects.equals(environments, that.environments)
+        && Objects.equals(files, that.files)
+        && Objects.equals(jars, that.jars)
+        && Objects.equals(archives, that.archives);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        jobType,
+        name,
+        comment,
+        executable,
+        arguments,
+        configs,
+        environments,
+        files,
+        jars,
+        archives);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb =
+        new StringBuilder("\nJobTemplate{\n")
+            .append("  jobType=")
+            .append(jobType)
+            .append(",\n")
+            .append("  name='")
+            .append(name)
+            .append("',\n");
+    if (StringUtils.isNotBlank(comment)) {
+      sb.append("  comment='").append(comment).append("',\n");
+    }
+
+    sb.append("  executable='").append(executable).append("',\n");
+
+    if (!arguments.isEmpty()) {
+      sb.append("  arguments=[\n");
+      arguments.forEach(arg -> sb.append("    ").append(arg).append(",\n"));
+      sb.append("  ],\n");
+    } else {
+      sb.append("  arguments=[]\n");
+    }
+
+    if (!configs.isEmpty()) {
+      sb.append("  configs={\n");
+      configs.forEach((k, v) -> sb.append("    ").append(k).append(": ").append(v).append(",\n"));
+      sb.append("  },\n");
+    } else {
+      sb.append("  configs={}\n");
+    }
+
+    if (!environments.isEmpty()) {
+      sb.append("  environments={\n");
+      environments.forEach(
+          (k, v) -> sb.append("    ").append(k).append(": ").append(v).append(",\n"));
+      sb.append("  },\n");
+    } else {
+      sb.append("  environments={}\n");
+    }
+
+    if (!files.isEmpty()) {
+      sb.append("  files=[\n");
+      files.forEach(file -> sb.append("    ").append(file).append(",\n"));
+      sb.append("  ],\n");
+    } else {
+      sb.append("  files=[]\n");
+    }
+
+    if (!jars.isEmpty()) {
+      sb.append("  jars=[\n");
+      jars.forEach(jar -> sb.append("    ").append(jar).append(",\n"));
+      sb.append("  ],\n");
+    } else {
+      sb.append("  jars=[]\n");
+    }
+
+    if (!archives.isEmpty()) {
+      sb.append("  archives=[\n");
+      archives.forEach(archive -> sb.append("    ").append(archive).append(",\n"));
+      sb.append("  ]\n");
+    } else {
+      sb.append("  archives=[]\n");
+    }
+
+    sb.append("}\n");
+    return sb.toString();
   }
 
   /** Builder class for constructing JobTemplate instances. */

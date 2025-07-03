@@ -59,6 +59,56 @@ class JobTemplate:
     jars: List[str] = field(default_factory=list)
     archives: List[str] = field(default_factory=list)
 
+    def __eq__(self, other):
+        if self is other:
+            return True
+        if not isinstance(other, JobTemplate):
+            return False
+        return (
+            self.job_type == other.job_type
+            and self.name == other.name
+            and self.comment == other.comment
+            and self.executable == other.executable
+            and self.arguments == other.arguments
+            and self.configs == other.configs
+            and self.environments == other.environments
+            and self.files == other.files
+            and self.jars == other.jars
+            and self.archives == other.archives
+        )
+
+    def __hash__(self):
+        return hash(
+            (
+                self.job_type,
+                self.name,
+                self.comment,
+                self.executable,
+                tuple(self.arguments),
+                frozenset(self.configs.items()),
+                frozenset(self.environments.items()),
+                tuple(self.files),
+                tuple(self.jars),
+                tuple(self.archives),
+            )
+        )
+
+    def __str__(self):
+        return (
+            f"\nJobTemplate{{\n"
+            f"  job_type={self.job_type},\n"
+            f"  name={self.name},\n"
+            f"  comment={self.comment},\n"
+            f"  executable={self.executable},\n"
+            f"  arguments={self.arguments},\n"
+            f"  configs={self.configs},\n"
+            f"  environments={self.environments},\n"
+            f"  files={self.files},\n"
+            f"  jars={self.jars},\n"
+            f"  archives={self.archives}\n"
+            f"}}"
+        )
+
     @staticmethod
     def builder():
         """

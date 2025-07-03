@@ -49,31 +49,32 @@ public interface SupportsJobs {
   /**
    * Retrieves a job template by its name.
    *
-   * @param jobName the name of the job template to retrieve
+   * @param jobTemplateName the name of the job template to retrieve
    * @return the job template associated with the specified name
    * @throws NoSuchJobTemplateException if no job template with the specified name exists
    */
-  JobTemplate getJobTemplate(String jobName) throws NoSuchJobTemplateException;
+  JobTemplate getJobTemplate(String jobTemplateName) throws NoSuchJobTemplateException;
 
   /**
    * Deletes a job template by its name. This will remove the job template from Gravitino, and it
    * will no longer be available for execution.
    *
-   * @param jobName the name of the job template to delete
+   * @param jobTemplateName the name of the job template to delete
    * @throws NoSuchJobTemplateException if no job template with the specified name exists
    */
-  void deleteJobTemplate(String jobName) throws NoSuchJobTemplateException;
+  void deleteJobTemplate(String jobTemplateName) throws NoSuchJobTemplateException;
 
   /**
-   * run a job with the specified name and configuration. The jobConf is a map of key-value contains
+   * run a job with the template name and configuration. The jobConf is a map of key-value contains
    * the variables that will be used to replace the templated parameters in the job template.
    *
-   * @param jobName the name of the job
+   * @param jobTemplateName the name of the job template to run
    * @param jobConf the configuration for the job
    * @return a handle to the run job
    * @throws NoSuchJobTemplateException if no job template with the specified name exists
    */
-  JobHandle runJob(String jobName, Map<String, String> jobConf) throws NoSuchJobTemplateException;
+  JobHandle runJob(String jobTemplateName, Map<String, String> jobConf)
+      throws NoSuchJobTemplateException;
 
   /**
    * Retrieves a job by its ID.

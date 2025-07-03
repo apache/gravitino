@@ -62,14 +62,17 @@ public interface JobHandle {
 
     /** Called when the job has succeeded. */
     void onJobSucceeded();
+
+    /** Called when the job has been cancelled. */
+    void onJobCancelled();
   }
 
   /**
-   * Get the name of the job.
+   * Get the name of the job template.
    *
-   * @return the name of the job
+   * @return the name of the job template
    */
-  String jobName();
+  String jobTemplateName();
 
   /**
    * Get the unique identifier of the job.
