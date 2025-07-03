@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -141,8 +142,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(2)
   public void testListTable() {
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
-    NameIdentifier[] tablesList =
-        tableCatalog.listTables(org.apache.gravitino.Namespace.of(SCHEMA));
+    NameIdentifier[] tablesList = tableCatalog.listTables(Namespace.of(SCHEMA));
     assertArrayEquals(
         new NameIdentifier[] {
           NameIdentifier.of(SCHEMA, "table1"),
@@ -153,8 +153,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // tester2 can only see tables they have privilege for
     TableCatalog tableCatalogTester2 =
         tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
-    NameIdentifier[] tablesListTester2 =
-        tableCatalogTester2.listTables(org.apache.gravitino.Namespace.of(SCHEMA));
+    NameIdentifier[] tablesListTester2 = tableCatalogTester2.listTables(Namespace.of(SCHEMA));
     assertArrayEquals(
         new NameIdentifier[] {
           NameIdentifier.of(SCHEMA, "table2"), NameIdentifier.of(SCHEMA, "table3")
@@ -167,7 +166,6 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testLoadTable() {
     TableCatalog tableCatalogTester2 =
         tester2Client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
-
     // tester2 can load table2 and table3, but not table1
     tableCatalogTester2.loadTable(NameIdentifier.of(SCHEMA, "table2"));
     tableCatalogTester2.loadTable(NameIdentifier.of(SCHEMA, "table3"));
@@ -177,7 +175,6 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           tableCatalogTester2.loadTable(NameIdentifier.of(SCHEMA, "table1"));
         });
-
     // grant tester2 privilege to use table1
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
@@ -200,8 +197,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         RuntimeException.class,
         () -> {
           tableCatalogTester2.alterTable(
-              NameIdentifier.of(SCHEMA, "table1"),
-              org.apache.gravitino.rel.TableChange.setProperty("key", "value"));
+              NameIdentifier.of(SCHEMA, "table1"), TableChange.setProperty("key", "value"));
         });
     // grant tester2 owner privilege on table1
     gravitinoMetalake.setOwner(
