@@ -169,7 +169,7 @@ public class TagMetaService {
               metalakeId, metadataObject.fullName(), metadataObject.type());
 
       tagPOs =
-          SessionUtils.doWithoutCommitAndFetchResult(
+          SessionUtils.doWithCommitAndFetchResult(
               TagMetadataObjectRelMapper.class,
               mapper ->
                   mapper.listTagPOsByMetadataObjectIdAndType(
@@ -336,7 +336,7 @@ public class TagMetaService {
 
       // Fetch all the tags associated with the metadata object after the operation.
       List<TagPO> tagPOs =
-          SessionUtils.doWithoutCommitAndFetchResult(
+          SessionUtils.getWithoutCommit(
               TagMetadataObjectRelMapper.class,
               mapper ->
                   mapper.listTagPOsByMetadataObjectIdAndType(
