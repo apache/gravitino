@@ -386,6 +386,101 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     getModelVersionIdent(modelEntity.nameIdentifier(), "alias2")));
   }
 
+  @Test
+  public void testModelVersionWithMultipleUris() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+
+    // Create a model entity
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model1",
+            "model1 comment",
+            0,
+            properties,
+            auditInfo);
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    // Create a model version entity with multiple URIs
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri1", "uri-name-2", "uri2"),
+            aliases,
+            "test comment",
+            properties,
+            auditInfo);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
+
+    // Test if the model version can be retrieved by the identifier
+    Assertions.assertEquals(
+        modelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+
+    Assertions.assertEquals(
+        modelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                getModelVersionIdent(modelEntity.nameIdentifier(), "alias1")));
+
+    Assertions.assertEquals(
+        modelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                getModelVersionIdent(modelEntity.nameIdentifier(), "alias2")));
+
+    // Test list model versions
+    List<ModelVersionEntity> modelVersions =
+        ModelVersionMetaService.getInstance()
+            .listModelVersionsByNamespace(getModelVersionNs(modelEntity.nameIdentifier()));
+    Assertions.assertEquals(1, modelVersions.size());
+    Assertions.assertEquals(modelVersionEntity, modelVersions.get(0));
+
+    // Test update model version
+    ModelVersionEntity updatedModelVersionEntity =
+        createModelVersionEntity(
+            modelVersionEntity.modelIdentifier(),
+            modelVersionEntity.version(),
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri1-updated", "uri-name-2", "uri2"),
+            ImmutableList.of("alias2", "alias3"),
+            "updated comment",
+            ImmutableMap.of("k1", "v1", "k2", "v2"),
+            modelVersionEntity.auditInfo());
+
+    Function<ModelVersionEntity, ModelVersionEntity> updatePropertiesUpdater =
+        oldModelVersionEntity -> updatedModelVersionEntity;
+
+    ModelVersionEntity alteredModelVersionEntity =
+        ModelVersionMetaService.getInstance()
+            .updateModelVersion(modelVersionEntity.nameIdentifier(), updatePropertiesUpdater);
+    Assertions.assertEquals(updatedModelVersionEntity, alteredModelVersionEntity);
+
+    // Test if the model version is updated
+    Assertions.assertEquals(
+        updatedModelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+
+    // Test delete the model version
+    Assertions.assertTrue(
+        ModelVersionMetaService.getInstance()
+            .deleteModelVersion(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+
+    // Test fetch a non-exist model version
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .getModelVersionByIdentifier(
+                    getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"model", "schema", "catalog", "metalake"})
   public void testDeleteModelVersionsInDeletion(String input) throws IOException {
