@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization;
 import java.security.Principal;
 import java.util.Objects;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 
 /** Mock GravitinoAuthorizer */

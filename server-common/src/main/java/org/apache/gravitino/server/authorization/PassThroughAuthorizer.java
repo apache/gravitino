@@ -19,7 +19,10 @@ package org.apache.gravitino.server.authorization;
 
 import java.io.IOException;
 import java.security.Principal;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 
 /**
@@ -47,6 +50,13 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public void handleRolePrivilegeChange(Long roleId) {}
+
+  @Override
+  public void handleRolePrivilegeChange(String metalake, String roleName) {}
+
+  @Override
+  public void handleMetadataOwnerChange(
+      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {}
 
   @Override
   public void close() throws IOException {}

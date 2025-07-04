@@ -34,12 +34,12 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -149,7 +149,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String username, String metalake, MetadataObject metadataObject, String privilege) {
     Long metalakeId = getMetalakeId(metalake);
     Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
-    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+    Long metadataId;
+    try {
+      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+    } catch (Exception e) {
+      LOG.debug("Can not get entity id", e);
+      return false;
+    }
     loadPrivilege(metalake, username, userId, metadataObject, metadataId);
     return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
   }
@@ -173,6 +179,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
       for (RoleEntity role : entities) {
         Long roleId = role.id();
+        role =
+            entityStore.get(
+                NameIdentifierUtil.ofRole(metalake, role.name()),
+                Entity.EntityType.ROLE,
+                RoleEntity.class);
         if (loadedRoles.contains(roleId)) {
           continue;
         }

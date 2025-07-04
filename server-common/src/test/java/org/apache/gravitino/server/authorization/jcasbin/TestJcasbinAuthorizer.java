@@ -159,7 +159,12 @@ public class TestJcasbinAuthorizer {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     assertFalse(doAuthorize(currentPrincipal));
     RoleEntity allowRole =
-        getRoleEntity(ALLOW_ROLE_ID, ImmutableList.of(getAllowSecurableObject()));
+        getRoleEntity(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, allowRole.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(allowRole);
     NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
     // Mock adds roles to users.
     when(supportsRelationOperations.listEntitiesByRelation(
@@ -172,7 +177,12 @@ public class TestJcasbinAuthorizer {
     // When permissions are changed but handleRolePrivilegeChange is not executed, the system will
     // use the cached permissions in JCasbin, so authorize can succeed.
     Long newRoleId = -1L;
-    RoleEntity tempNewRole = getRoleEntity(newRoleId, ImmutableList.of());
+    RoleEntity tempNewRole = getRoleEntity(newRoleId, "tempNewRole", ImmutableList.of());
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, tempNewRole.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(tempNewRole);
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
@@ -188,14 +198,26 @@ public class TestJcasbinAuthorizer {
             eq(userNameIdentifier),
             eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(allowRole));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, allowRole.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(allowRole);
     assertTrue(doAuthorize(currentPrincipal));
     // Test deny
-    RoleEntity denyRole = getRoleEntity(DENY_ROLE_ID, ImmutableList.of(getDenySecurableObject()));
+    RoleEntity denyRole =
+        getRoleEntity(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, denyRole.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(denyRole);
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
             eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(allowRole, denyRole));
+
     assertFalse(doAuthorize(currentPrincipal));
   }
 
@@ -243,12 +265,13 @@ public class TestJcasbinAuthorizer {
         .build();
   }
 
-  private static RoleEntity getRoleEntity(Long roleId, List<SecurableObject> securableObjects) {
+  private static RoleEntity getRoleEntity(
+      Long roleId, String roleName, List<SecurableObject> securableObjects) {
     Namespace namespace = NamespaceUtil.ofRole(METALAKE);
     return RoleEntity.builder()
         .withNamespace(namespace)
         .withId(roleId)
-        .withName("roleName")
+        .withName(roleName)
         .withAuditInfo(AuditInfo.EMPTY)
         .withSecurableObjects(securableObjects)
         .build();

@@ -20,6 +20,8 @@ package org.apache.gravitino.server.authorization;
 import java.io.Closeable;
 import java.io.IOException;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.ServerConfig;
 
 /**
@@ -60,6 +62,7 @@ public class GravitinoAuthorizerProvider implements Closeable {
             gravitinoAuthorizer = new PassThroughAuthorizer();
           }
           gravitinoAuthorizer.initialize();
+          GravitinoEnv.getInstance().setGravitinoAuthorizer(gravitinoAuthorizer);
         }
       }
     }
@@ -80,6 +83,7 @@ public class GravitinoAuthorizerProvider implements Closeable {
 
   @Override
   public void close() throws IOException {
+    GravitinoEnv.getInstance().setGravitinoAuthorizer(null);
     if (gravitinoAuthorizer != null) {
       gravitinoAuthorizer.close();
     }
