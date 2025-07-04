@@ -45,6 +45,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -118,7 +119,10 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // owner can create table
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
-        NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
+        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table1"),
+        createColumns(),
+        "test",
+        new HashMap<>());
     // normal user cannot create table
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
@@ -127,7 +131,10 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         RuntimeException.class,
         () -> {
           tableCatalogNormalUser.createTable(
-              NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
+              NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table2"),
+              createColumns(),
+              "test2",
+              new HashMap<>());
         });
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -137,9 +144,15 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
     // normal user can now create table
     tableCatalogNormalUser.createTable(
-        NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
+        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table2"),
+        createColumns(),
+        "test2",
+        new HashMap<>());
     tableCatalogNormalUser.createTable(
-        NameIdentifier.of(SCHEMA, "table3"), createColumns(), "test2", new HashMap<>());
+        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table3"),
+        createColumns(),
+        "test2",
+        new HashMap<>());
   }
 
   @Test
