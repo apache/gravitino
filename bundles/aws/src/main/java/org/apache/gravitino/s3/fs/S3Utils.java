@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.s3.fs;
 
+import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
@@ -39,7 +40,11 @@ public class S3Utils {
         return credential;
       }
     }
-
+    for (Credential credential : credentials) {
+      if (credential instanceof AwsIrsaCredential) {
+        return credential;
+      }
+    }
     // If dynamic credential not found, use the static one
     for (Credential credential : credentials) {
       if (credential instanceof S3SecretKeyCredential) {
