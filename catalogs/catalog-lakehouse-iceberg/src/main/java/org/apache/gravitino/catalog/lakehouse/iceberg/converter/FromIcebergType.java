@@ -32,6 +32,8 @@ import org.apache.iceberg.types.Types;
  */
 public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
 
+  public static final int PRECISION_MICROSECOND = 6;
+
   public FromIcebergType() {}
 
   @Override
@@ -90,13 +92,15 @@ public class FromIcebergType extends TypeUtil.SchemaVisitor<Type> {
       case DATE:
         return org.apache.gravitino.rel.types.Types.DateType.get();
       case TIME:
-        return org.apache.gravitino.rel.types.Types.TimeType.get();
+        return org.apache.gravitino.rel.types.Types.TimeType.of(PRECISION_MICROSECOND);
       case TIMESTAMP:
         Types.TimestampType ts = (Types.TimestampType) primitive;
         if (ts.shouldAdjustToUTC()) {
-          return org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone();
+          return org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(
+              PRECISION_MICROSECOND);
         } else {
-          return org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone();
+          return org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(
+              PRECISION_MICROSECOND);
         }
       case STRING:
         return org.apache.gravitino.rel.types.Types.StringType.get();

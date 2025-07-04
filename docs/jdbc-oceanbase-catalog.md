@@ -102,15 +102,16 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 | `Double`          | `Double`            |
 | `String`          | `Text`              |
 | `Date`            | `Date`              |
-| `Time`            | `Time`              |
-| `Timestamp`       | `Timestamp`         |
+| `Time(p)`         | `Time(p)`           |
+| `Timestamp_tz(p)` | `Timestamp(p)`      |
+| `Timestamp(p)`    | `Datetime(p)`       |
 | `Decimal`         | `Decimal`           |
 | `VarChar`         | `VarChar`           |
 | `FixedChar`       | `FixedChar`         |
 | `Binary`          | `Binary`            |
 
 :::info
-OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 

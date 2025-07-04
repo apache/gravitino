@@ -349,7 +349,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
                 Column.of("float_type", Types.FloatType.get(), "float_type"),
                 Column.of("date_type", Types.DateType.get(), "date_type"),
                 Column.of(
-                    "timestamp_type", Types.TimestampType.withoutTimeZone(), "timestamp_type"),
+                    "timestamp_type", Types.TimestampType.withoutTimeZone(6), "timestamp_type"),
                 Column.of(
                     "array_type", Types.ListType.of(Types.IntegerType.get(), true), "array_type"),
                 Column.of(
@@ -384,7 +384,7 @@ public abstract class FlinkIcebergCatalogIT extends FlinkCommonIT {
           Column.of("bigint_type", Types.LongType.get(), "bigint_type"),
           Column.of("float_type", Types.FloatType.get(), "float_type"),
           Column.of("date_type", Types.DateType.get(), "date_type"),
-          Column.of("timestamp_type", Types.TimestampType.withoutTimeZone(), "timestamp_type"),
+          Column.of("timestamp_type", Types.TimestampType.withoutTimeZone(6), "timestamp_type"),
           Column.of("array_type", Types.ListType.of(Types.IntegerType.get(), true), "array_type"),
           Column.of(
               "map_type",

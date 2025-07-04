@@ -232,25 +232,25 @@ If you doesn't specify distribution expressions, the table distribution will be 
 
 ### Table column types
 
-| Gravitino Type              | Apache Iceberg Type         |
-|-----------------------------|-----------------------------|
-| `Struct`                    | `Struct`                    |
-| `Map`                       | `Map`                       |
-| `List`                      | `Array`                     |
-| `Boolean`                   | `Boolean`                   |
-| `Integer`                   | `Integer`                   |
-| `Long`                      | `Long`                      |
-| `Float`                     | `Float`                     |
-| `Double`                    | `Double`                    |
-| `String`                    | `String`                    |
-| `Date`                      | `Date`                      |
-| `Time`                      | `Time`                      |
-| `TimestampType withZone`    | `TimestampType withZone`    |
-| `TimestampType withoutZone` | `TimestampType withoutZone` |
-| `Decimal`                   | `Decimal`                   |
-| `Fixed`                     | `Fixed`                     |
-| `Binary`                    | `Binary`                    |
-| `UUID`                      | `UUID`                      |
+| Gravitino Type    | Apache Iceberg Type         |
+|-------------------|-----------------------------|
+| `Struct`          | `Struct`                    |
+| `Map`             | `Map`                       |
+| `List`            | `Array`                     |
+| `Boolean`         | `Boolean`                   |
+| `Integer`         | `Integer`                   |
+| `Long`            | `Long`                      |
+| `Float`           | `Float`                     |
+| `Double`          | `Double`                    |
+| `String`          | `String`                    |
+| `Date`            | `Date`                      |
+| `Time[6]`         | `Time`                      |
+| `Timestamp[6]`    | `TimestampType withZone`    |
+| `Timestamp_tz[6]` | `TimestampType withoutZone` |
+| `Decimal`         | `Decimal`                   |
+| `Fixed`           | `Fixed`                     |
+| `Binary`          | `Binary`                    |
+| `UUID`            | `UUID`                      |
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
