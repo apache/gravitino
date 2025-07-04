@@ -240,6 +240,20 @@ public class TestGravitinoConnector extends AbstractTestQueryFramework {
     assertUpdate("call gravitino.system.drop_catalog('memory1')");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory1");
 
+    // test create catalog with config by trino.bypass.
+    assertUpdate(
+        "call gravitino.system.create_catalog('memory1', 'memory', Map(array['trino.bypass.memory.max-data-per-node'], array['128MB']))");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).contains("memory1");
+    assertUpdate("call gravitino.system.drop_catalog('memory1')");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory1");
+
+    // test create catalog with invalid config by trino.bypass.
+    assertQueryFails(
+        "call gravitino.system.create_catalog("
+            + "catalog=>'memory1', provider=>'memory', properties => Map(array['trino.bypass.unknown-direct-key'], array['10']))",
+        format("Create catalog failed. Create catalog failed due to the loading process fails"));
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory1");
+
     assertUpdate(
         "call gravitino.system.create_catalog("
             + "catalog=>'memory1', provider=>'memory', properties => Map(array['max_ttl'], array['10']), ignore_exist => true)");
