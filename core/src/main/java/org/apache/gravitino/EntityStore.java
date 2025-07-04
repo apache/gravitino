@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.Function;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.policy.SupportsPolicyOperations;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
 
@@ -211,6 +212,15 @@ public interface EntityStore extends Closeable {
    */
   default SupportsTagOperations tagOperations() {
     throw new UnsupportedOperationException("tag operations are not supported");
+  }
+
+  /**
+   * Get the extra policy operations that are supported by the entity store.
+   *
+   * @return the policy operations object that are supported by the entity store
+   */
+  default SupportsPolicyOperations policyOperations() {
+    throw new UnsupportedOperationException("policy operations are not supported");
   }
 
   /**
