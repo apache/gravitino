@@ -92,12 +92,13 @@ public class TableOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "METALAKE::SELECT_TABLE || CATALOG::SELECT_TABLE || "
+                    "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
+                        + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA ||SCHEMA::USE_SCHEMA) &&"
+                        + " (METALAKE::SELECT_TABLE || CATALOG::SELECT_TABLE || "
                         + "SCHEMA::SELECT_TABLE || TABLE::SELECT_TABLE || "
                         + "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
-                        + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
-                        + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || "
-                        + "TABLE::OWNER",
+                        + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || TABLE::OWNER)) ||"
+                        + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER ",
                     Entity.EntityType.TABLE,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -117,9 +118,11 @@ public class TableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::CREATE_TABLE || CATALOG::CREATE_TABLE || "
-              + "SCHEMA::CREATE_TABLE || METALAKE::OWNER || "
-              + "CATALOG::OWNER || SCHEMA::OWNER",
+          " ((METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || SCHEMA::USE_CATALOG) && "
+              + "((METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA || SCHEMA::USE_SCHEMA) "
+              + "&& (METALAKE::CREATE_TABLE || CATALOG::CREATE_TABLE || "
+              + "SCHEMA::CREATE_TABLE) || SCHEMA::OWNER)) || "
+              + "METALAKE::OWNER || CATALOG::OWNER",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -166,11 +169,13 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::SELECT_TABLE || CATALOG::SELECT_TABLE || "
+          "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
+              + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA ||SCHEMA::USE_SCHEMA) &&"
+              + " (METALAKE::SELECT_TABLE || CATALOG::SELECT_TABLE || "
               + "SCHEMA::SELECT_TABLE || TABLE::SELECT_TABLE || "
               + "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
-              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
-              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
+              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || TABLE::OWNER)) ||"
+              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -203,9 +208,11 @@ public class TableOperations {
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
-              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
-              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
+          "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
+              + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA ||SCHEMA::USE_SCHEMA) &&"
+              + " (METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
+              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || TABLE::OWNER)) ||"
+              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -243,7 +250,10 @@ public class TableOperations {
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
+      expression =
+          "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || "
+              + "(TABLE::OWNER && (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
+              + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA ||SCHEMA::USE_SCHEMA) )",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
