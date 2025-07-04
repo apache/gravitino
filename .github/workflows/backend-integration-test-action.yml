@@ -56,7 +56,7 @@ jobs:
       - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
         run: >
-          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PuseModernIceberg=${{ inputs.use-modern-iceberg }}
+          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
           -x :web:web:test -x :web:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test 
           -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
