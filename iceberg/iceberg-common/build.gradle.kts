@@ -33,7 +33,15 @@ dependencies {
   implementation(project(":common")) {
     exclude("*")
   }
-  implementation(libs.bundles.iceberg)
+  if (rootProject.extra["useModernIceberg"] as Boolean) {
+    implementation(libs.bundles.iceberg4modern)
+    implementation(libs.bundles.iceberg4cloud4modern)
+    implementation(libs.iceberg.hive.metastore.modern)
+  } else {
+    implementation(libs.bundles.iceberg)
+    implementation(libs.bundles.iceberg4cloud)
+    implementation(libs.iceberg.hive.metastore)
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.kerby) {
     exclude("org.jline")
@@ -42,11 +50,6 @@ dependencies {
   implementation(libs.cglib)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.iceberg.aliyun)
-  implementation(libs.iceberg.aws)
-  implementation(libs.iceberg.azure)
-  implementation(libs.iceberg.hive.metastore)
-  implementation(libs.iceberg.gcp)
   implementation(libs.hadoop2.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")

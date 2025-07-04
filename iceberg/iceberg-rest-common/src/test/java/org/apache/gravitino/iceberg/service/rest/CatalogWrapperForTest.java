@@ -38,6 +38,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
     if (request.name().contains("fail")) {
       throw new AlreadyExistsException("Already exits exception for test");

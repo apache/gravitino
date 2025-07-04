@@ -30,7 +30,12 @@ var paimonVersion: String = libs.versions.paimon.get()
 val flinkVersion: String = libs.versions.flink.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 
-val icebergVersion: String = libs.versions.iceberg.get()
+val useModernIceberg = rootProject.extra["useModernIceberg"] as Boolean
+val icebergVersion: String = if (useModernIceberg) {
+  libs.versions.iceberg4modern.get()
+} else {
+  libs.versions.iceberg.get()
+}
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
 // You can find more detail at the following issues:

@@ -19,12 +19,16 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
+import lombok.SneakyThrows;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.integration.test.extension.HelloOperations;
+import org.apache.gravitino.iceberg.integration.test.extension.HelloResponse;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
-import org.apache.gravitino.iceberg.service.extension.HelloOperations;
-import org.apache.gravitino.iceberg.service.extension.HelloResponse;
+import org.apache.gravitino.iceberg.shim.IcebergShimUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.rest.ErrorHandlers;
 import org.apache.iceberg.rest.HTTPClient;
@@ -47,6 +51,7 @@ public class TestIcebergExtendAPI {
   public static final Logger LOG = LoggerFactory.getLogger(TestIcebergExtendAPI.class);
   private IcebergRESTServerManager icebergRESTServerManager;
   private String uri;
+  private IcebergShimUtils shimUtils = new IcebergShimUtils();
 
   @BeforeAll
   void initIcebergTestEnv() throws Exception {
@@ -64,7 +69,7 @@ public class TestIcebergExtendAPI {
 
   @Test
   void testExtendAPI() {
-    RESTClient client = HTTPClient.builder(ImmutableMap.of()).uri(uri).build();
+    RESTClient client = getHttpClient(uri);
     HelloResponse helloResponse =
         client.get(
             HelloOperations.HELLO_URI_PATH,
@@ -87,5 +92,23 @@ public class TestIcebergExtendAPI {
         JettyServerConfig.fromConfig(
             icebergRESTServerManager.getServerConfig(), IcebergConfig.ICEBERG_CONFIG_PREFIX);
     return jettyServerConfig.getHttpPort();
+  }
+
+  private HTTPClient getHttpClient(String baseUri) {
+    if (shimUtils.useModernIceberg()) {
+      HTTPClient.Builder builder = HTTPClient.builder(ImmutableMap.of()).uri(baseUri);
+      return getBuilderWithAuth(builder).build();
+    } else {
+      return HTTPClient.builder(ImmutableMap.of()).uri(baseUri).build();
+    }
+  }
+
+  @SneakyThrows
+  private HTTPClient.Builder getBuilderWithAuth(HTTPClient.Builder builder) {
+    Class<?> authSessionClass = Class.forName("org.apache.iceberg.rest.auth.AuthSession");
+    Method auth = builder.getClass().getMethod("withAuthSession", authSessionClass);
+    Field emptyField = authSessionClass.getField("EMPTY");
+    Object emptyAuthSession = emptyField.get(null);
+    return (HTTPClient.Builder) auth.invoke(builder, emptyAuthSession);
   }
 }

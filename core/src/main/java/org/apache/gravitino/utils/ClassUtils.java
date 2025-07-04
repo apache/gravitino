@@ -27,4 +27,12 @@ public class ClassUtils {
       throw new RuntimeException(e);
     }
   }
+
+  public static <T> T loadClass(String className, ClassLoader cl) {
+    try {
+      return (T) Class.forName(className, true, cl).getDeclaredConstructor().newInstance();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
 }

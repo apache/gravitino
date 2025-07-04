@@ -40,13 +40,16 @@ public class Version {
       currentVersionInfo.version = projectProperties.getProperty("project.version");
       currentVersionInfo.compileDate = projectProperties.getProperty("compile.date");
       currentVersionInfo.gitCommit = projectProperties.getProperty("git.commit.id");
+      currentVersionInfo.useModernIceberg =
+          Boolean.valueOf(projectProperties.getProperty("useModernIceberg"));
 
       versionInfo = currentVersionInfo;
       versionDTO =
           new VersionDTO(
               currentVersionInfo.version,
               currentVersionInfo.compileDate,
-              currentVersionInfo.gitCommit);
+              currentVersionInfo.gitCommit,
+              currentVersionInfo.useModernIceberg);
     } catch (IOException e) {
       throw new GravitinoRuntimeException(e, "Failed to get Gravitino version");
     }
@@ -70,5 +73,7 @@ public class Version {
     public String compileDate;
     /** build commit id */
     public String gitCommit;
+    /** Use new Iceberg version */
+    public Boolean useModernIceberg;
   }
 }

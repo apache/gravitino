@@ -31,9 +31,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.shim.IcebergRESTConfigProvider;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 
@@ -42,15 +41,15 @@ import org.apache.iceberg.rest.responses.ConfigResponse;
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergConfigOperations {
 
+  private IcebergRESTConfigProvider configProvider;
+
   @SuppressWarnings("UnusedVariable")
   @Context
   private HttpServletRequest httpRequest;
 
-  private final IcebergCatalogWrapperManager catalogWrapperManager;
-
   @Inject
-  public IcebergConfigOperations(IcebergCatalogWrapperManager catalogWrapperManager) {
-    this.catalogWrapperManager = catalogWrapperManager;
+  public IcebergConfigOperations(IcebergRESTConfigProvider configProvider) {
+    this.configProvider = configProvider;
   }
 
   @GET
@@ -58,18 +57,7 @@ public class IcebergConfigOperations {
   @Timed(name = "config." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "config", absolute = true)
   public Response getConfig(@DefaultValue("") @QueryParam("warehouse") String warehouse) {
-    if (warehouse == null || warehouse.isEmpty()) {
-      ConfigResponse response = ConfigResponse.builder().build();
-      return IcebergRestUtils.ok(response);
-    }
-
-    // Get the catalog wrapper which contains the configuration
-    CatalogWrapperForREST catalogWrapper = catalogWrapperManager.getCatalogWrapper(warehouse);
-    ConfigResponse response =
-        ConfigResponse.builder()
-            .withDefaults(catalogWrapper.getCatalogConfigToClient())
-            .withDefault("prefix", warehouse)
-            .build();
+    ConfigResponse response = configProvider.getConfig(warehouse);
     return IcebergRestUtils.ok(response);
   }
 }

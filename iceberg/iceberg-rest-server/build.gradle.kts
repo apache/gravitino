@@ -27,7 +27,12 @@ plugins {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark34.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg.get()
+val useModernIceberg = rootProject.extra["useModernIceberg"] as Boolean
+val icebergVersion: String = if (useModernIceberg) {
+  libs.versions.iceberg4modern.get()
+} else {
+  libs.versions.iceberg.get()
+}
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
@@ -41,10 +46,16 @@ dependencies {
     exclude("*")
   }
   implementation(project(":iceberg:iceberg-common"))
+  implementation(project(":iceberg:iceberg-rest-common"))
+  if (rootProject.extra["useModernIceberg"] as Boolean) {
+    implementation(project(":iceberg:iceberg-rest-modern"))
+    implementation(libs.bundles.iceberg4modern)
+  } else {
+    implementation(libs.bundles.iceberg)
+  }
   implementation(project(":server-common")) {
     exclude("*")
   }
-  implementation(libs.bundles.iceberg)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jwt)
@@ -62,6 +73,8 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
 
   // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
   testImplementation(project(":bundles:aliyun-bundle"))

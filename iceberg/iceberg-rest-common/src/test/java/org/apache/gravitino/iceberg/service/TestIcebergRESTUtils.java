@@ -55,6 +55,7 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   void testSerdeIcebergRESTObject() {
     Schema tableSchema =
         new Schema(

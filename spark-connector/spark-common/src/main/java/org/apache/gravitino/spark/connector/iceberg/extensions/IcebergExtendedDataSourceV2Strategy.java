@@ -20,7 +20,9 @@ package org.apache.gravitino.spark.connector.iceberg.extensions;
 
 import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.toJavaList;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
+import lombok.SneakyThrows;
 import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalog;
 import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.sql.SparkSession;
@@ -212,12 +214,20 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
               spark, setWriteDistributionAndOrdering.table().toIndexedSeq())
           .map(
               catalogAndIdentifier -> {
-                SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec =
-                    new SetWriteDistributionAndOrderingExec(
-                        catalogAndIdentifier.catalog,
-                        catalogAndIdentifier.identifier,
-                        setWriteDistributionAndOrdering.distributionMode(),
-                        setWriteDistributionAndOrdering.sortOrder());
+                SetWriteDistributionAndOrderingExec setWriteDistributionAndOrderingExec = null;
+                // Iceberg 1.6 return DistributionMode, while Iceberg 1.9 return
+                // Option<DistributionMode>
+                Object distributionMode = getDistributionMode(setWriteDistributionAndOrdering);
+                try {
+                  setWriteDistributionAndOrderingExec =
+                      createDistributionAndOrderingExec(
+                          catalogAndIdentifier.catalog,
+                          catalogAndIdentifier.identifier,
+                          distributionMode,
+                          setWriteDistributionAndOrdering.sortOrder());
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
                 return toSeq(setWriteDistributionAndOrderingExec);
               })
           .get();
@@ -265,5 +275,40 @@ public class IcebergExtendedDataSourceV2Strategy extends ExtendedDataSourceV2Str
             "Unsupported catalog type: " + catalog.getClass().getName());
       }
     }
+  }
+
+  private static SetWriteDistributionAndOrderingExec createDistributionAndOrderingExec(
+      TableCatalog catalog, Identifier identifier, Object distributionMode, Object sortOrder)
+      throws Exception {
+    // 1. get the object associated with the scala case class
+    Class<?> companionClass =
+        Class.forName(SetWriteDistributionAndOrderingExec.class.getName() + "$");
+    Object companionInstance = companionClass.getField("MODULE$").get(null);
+
+    // 2. get apply method
+    Class<?>[] paramTypes = getApplyMethodParamTypes(companionClass);
+    Method applyMethod = companionClass.getMethod("apply", paramTypes);
+
+    // 3. invoke apply to create object
+    return (SetWriteDistributionAndOrderingExec)
+        applyMethod.invoke(companionInstance, catalog, identifier, distributionMode, sortOrder);
+  }
+
+  private static Class<?>[] getApplyMethodParamTypes(Class<?> companionClass) {
+    // Scala may generate multiple apply method，use the apply method with 4 arguments
+    for (Method method : companionClass.getMethods()) {
+      if ("apply".equals(method.getName()) && method.getParameterCount() == 4) {
+        return method.getParameterTypes();
+      }
+    }
+    throw new IllegalStateException("Could find apply method with 4 arguments");
+  }
+
+  @SneakyThrows
+  private static Object getDistributionMode(
+      SetWriteDistributionAndOrdering setWriteDistributionAndOrdering) {
+    Method distributionModeMethod =
+        setWriteDistributionAndOrdering.getClass().getMethod("distributionMode");
+    return distributionModeMethod.invoke(setWriteDistributionAndOrdering);
   }
 }
