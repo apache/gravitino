@@ -62,7 +62,6 @@ public class OwnerManager {
 
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
-    notifyOwnerChange(metalake, metadataObject);
     NameIdentifier objectIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     try {
       Optional<Owner> originOwner = getOwner(metalake, metadataObject);
@@ -115,6 +114,7 @@ public class OwnerManager {
           metadataObject,
           authorizationPlugin ->
               authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
+      originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, metadataObject));
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
@@ -130,33 +130,29 @@ public class OwnerManager {
     }
   }
 
-  private void notifyOwnerChange(String metalake, MetadataObject metadataObject) {
+  private void notifyOwnerChange(Owner oldOwner, String metalake, MetadataObject metadataObject) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer != null) {
-      Optional<Owner> owner = getOwner(metalake, metadataObject);
-      if (owner.isPresent()) {
-        Owner ownerEntity = owner.get();
-        if (ownerEntity.type() == Owner.Type.USER) {
-          try {
-            UserEntity userEntity =
-                GravitinoEnv.getInstance()
-                    .entityStore()
-                    .get(
-                        NameIdentifierUtil.ofUser(metalake, ownerEntity.name()),
-                        Entity.EntityType.USER,
-                        UserEntity.class);
-            gravitinoAuthorizer.handleMetadataOwnerChange(
-                metalake,
-                userEntity.id(),
-                MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-                Entity.EntityType.valueOf(metadataObject.type().name()));
-          } catch (IOException e) {
-            LOG.warn(e.getMessage(), e);
-          }
-        } else {
-          throw new UnsupportedOperationException(
-              "Notification for Group Owner is not supported yet.");
+      if (oldOwner.type() == Owner.Type.USER) {
+        try {
+          UserEntity userEntity =
+              GravitinoEnv.getInstance()
+                  .entityStore()
+                  .get(
+                      NameIdentifierUtil.ofUser(metalake, oldOwner.name()),
+                      Entity.EntityType.USER,
+                      UserEntity.class);
+          gravitinoAuthorizer.handleMetadataOwnerChange(
+              metalake,
+              userEntity.id(),
+              MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
+              Entity.EntityType.valueOf(metadataObject.type().name()));
+        } catch (IOException e) {
+          LOG.warn(e.getMessage(), e);
         }
+      } else {
+        throw new UnsupportedOperationException(
+            "Notification for Group Owner is not supported yet.");
       }
     }
   }
