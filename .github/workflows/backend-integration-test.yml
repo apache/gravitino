@@ -57,7 +57,6 @@ jobs:
         java-version: [ 8, 11, 17 ]
         backend: [ h2, mysql, postgresql ]
         test-mode: [ embedded, deploy ]
-        use-modern-iceberg: [ false ]
         exclude:
           - test-mode: 'embedded'
             backend: 'mysql'
@@ -81,7 +80,6 @@ jobs:
         java-version: [ 17 ]
         backend: [ h2, mysql, postgresql ]
         test-mode: [ embedded, deploy ]
-        use-modern-iceberg: [ true ]
         exclude:
           - test-mode: 'embedded'
             backend: 'mysql'
