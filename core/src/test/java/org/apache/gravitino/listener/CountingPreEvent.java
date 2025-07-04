@@ -17,32 +17,21 @@
  *  under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.iceberg.rest.requests.CreateViewRequest;
+import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
 
-/** Represent a pre event before creating Iceberg view. */
-@DeveloperApi
-public class IcebergCreateViewPreEvent extends IcebergViewPreEvent
-    implements SupportsChangingPreEvent {
-  private final CreateViewRequest createViewRequest;
+public class CountingPreEvent extends PreEvent implements SupportsChangingPreEvent {
+  private final int count;
 
-  public IcebergCreateViewPreEvent(
-      IcebergRequestContext icebergRequestContext,
-      NameIdentifier viewIdentifier,
-      CreateViewRequest createViewRequest) {
-    super(icebergRequestContext, viewIdentifier);
-    this.createViewRequest = createViewRequest;
+  protected CountingPreEvent(String user, NameIdentifier identifier, int count) {
+    super(user, identifier);
+    this.count = count;
   }
 
-  public CreateViewRequest createViewRequest() {
-    return createViewRequest;
-  }
-
-  @Override
-  public OperationType operationType() {
-    return OperationType.CREATE_VIEW;
+  public int count() {
+    return count;
   }
 }

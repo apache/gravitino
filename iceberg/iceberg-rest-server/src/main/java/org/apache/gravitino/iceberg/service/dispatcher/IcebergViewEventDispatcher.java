@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewPreEvent;
@@ -79,19 +81,25 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     NameIdentifier nameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), viewIdentifier);
-    eventBus.dispatchEvent(
-        new IcebergCreateViewPreEvent(context, nameIdentifier, createViewRequest));
+    Optional<BaseEvent> transformedEvent =
+        eventBus.dispatchEvent(
+            new IcebergCreateViewPreEvent(context, nameIdentifier, createViewRequest));
+    IcebergCreateViewPreEvent transformedCreateEvent =
+        (IcebergCreateViewPreEvent) transformedEvent.get();
     LoadViewResponse loadViewResponse;
     try {
       loadViewResponse =
-          icebergViewOperationDispatcher.createView(context, namespace, createViewRequest);
+          icebergViewOperationDispatcher.createView(
+              context, namespace, transformedCreateEvent.createViewRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
-          new IcebergCreateViewFailureEvent(context, nameIdentifier, createViewRequest, e));
+          new IcebergCreateViewFailureEvent(
+              context, nameIdentifier, transformedCreateEvent.createViewRequest(), e));
       throw e;
     }
     eventBus.dispatchEvent(
-        new IcebergCreateViewEvent(context, nameIdentifier, createViewRequest, loadViewResponse));
+        new IcebergCreateViewEvent(
+            context, nameIdentifier, transformedCreateEvent.createViewRequest(), loadViewResponse));
     return loadViewResponse;
   }
 
@@ -103,21 +111,28 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
     NameIdentifier gravitinoNameIdentifier =
         IcebergRestUtils.getGravitinoNameIdentifier(
             metalakeName, context.catalogName(), viewIdentifier);
-    eventBus.dispatchEvent(
-        new IcebergReplaceViewPreEvent(context, gravitinoNameIdentifier, replaceViewRequest));
+    Optional<BaseEvent> transformedEvent =
+        eventBus.dispatchEvent(
+            new IcebergReplaceViewPreEvent(context, gravitinoNameIdentifier, replaceViewRequest));
+    IcebergReplaceViewPreEvent transformedReplaceEvent =
+        (IcebergReplaceViewPreEvent) transformedEvent.get();
     LoadViewResponse loadViewResponse;
     try {
       loadViewResponse =
-          icebergViewOperationDispatcher.replaceView(context, viewIdentifier, replaceViewRequest);
+          icebergViewOperationDispatcher.replaceView(
+              context, viewIdentifier, transformedReplaceEvent.replaceViewRequest());
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new IcebergReplaceViewFailureEvent(
-              context, gravitinoNameIdentifier, replaceViewRequest, e));
+              context, gravitinoNameIdentifier, transformedReplaceEvent.replaceViewRequest(), e));
       throw e;
     }
     eventBus.dispatchEvent(
         new IcebergReplaceViewEvent(
-            context, gravitinoNameIdentifier, replaceViewRequest, loadViewResponse));
+            context,
+            gravitinoNameIdentifier,
+            transformedReplaceEvent.replaceViewRequest(),
+            loadViewResponse));
     return loadViewResponse;
   }
 

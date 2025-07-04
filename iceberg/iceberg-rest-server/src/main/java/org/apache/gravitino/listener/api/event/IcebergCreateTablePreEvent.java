@@ -25,7 +25,8 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 
 /** Represent a pre event before creating Iceberg table. */
 @DeveloperApi
-public class IcebergCreateTablePreEvent extends IcebergTablePreEvent {
+public class IcebergCreateTablePreEvent extends IcebergTablePreEvent
+    implements SupportsChangingPreEvent {
   private final CreateTableRequest createTableRequest;
 
   public IcebergCreateTablePreEvent(
