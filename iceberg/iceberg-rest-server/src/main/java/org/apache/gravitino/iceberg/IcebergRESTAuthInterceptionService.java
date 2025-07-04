@@ -23,6 +23,12 @@ import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
@@ -32,8 +38,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
 import org.glassfish.hk2.api.InterceptionService;
@@ -44,6 +52,12 @@ import org.glassfish.hk2.api.InterceptionService;
  * be registered in the hk2 bean container when the gravitino server starts.
  */
 public class IcebergRESTAuthInterceptionService implements InterceptionService {
+
+  private final String metalakeName;
+
+  public IcebergRESTAuthInterceptionService(String metalakeName) {
+    this.metalakeName = metalakeName;
+  }
 
   @Override
   public Filter getDescriptorFilter() {
@@ -59,7 +73,7 @@ public class IcebergRESTAuthInterceptionService implements InterceptionService {
    * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
    * metadata authorization.
    */
-  private static class MetadataAuthorizationMethodInterceptor implements MethodInterceptor {
+  private class MetadataAuthorizationMethodInterceptor implements MethodInterceptor {
 
     /**
      * Determine whether authorization is required and the rules via the authorization annotation ,
@@ -101,9 +115,38 @@ public class IcebergRESTAuthInterceptionService implements InterceptionService {
 
     private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
         Parameter[] parameters, Object[] args) {
-      // TODO: diff from GravitinoInterceptionService
-      // get metalake from configuration, catalog from prefix PathParam, namespace from namespace
-      // PathParam
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = new HashMap<>();
+      nameIdentifierMap.put(
+          Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalakeName));
+      // get catalog & namespace from params
+      String catalog = null;
+      String schema = null;
+      for (int i = 0; i < parameters.length; i++) {
+        Parameter parameter = parameters[i];
+        AuthorizationMetadata authorizeResource =
+            parameter.getAnnotation(AuthorizationMetadata.class);
+        if (authorizeResource == null) {
+          continue;
+        }
+        MetadataObject.Type type = authorizeResource.type();
+        String value = String.valueOf(args[i]);
+        switch (type) {
+          case CATALOG:
+            catalog = value;
+            nameIdentifierMap.put(
+                Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
+            break;
+          case SCHEMA:
+            schema = value;
+            nameIdentifierMap.put(
+                Entity.EntityType.SCHEMA,
+                NameIdentifierUtil.ofSchema(metalakeName, catalog, schema));
+            break;
+          default:
+            break;
+        }
+      }
+      return nameIdentifierMap;
     }
   }
 
