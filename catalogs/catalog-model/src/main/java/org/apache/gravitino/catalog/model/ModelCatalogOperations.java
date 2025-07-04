@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.model;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -244,7 +245,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             // executing the insert operation.
             .withVersion(INIT_VERSION)
             .withAliases(aliasList)
-            .withUri(uri)
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri))
             .withComment(comment)
             .withProperties(properties)
             .withAuditInfo(
@@ -430,7 +431,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         modelVersionEntity.aliases() == null
             ? Lists.newArrayList()
             : Lists.newArrayList(modelVersionEntity.aliases());
-    String entityUri = modelVersionEntity.uri();
+    String entityUri = modelVersionEntity.uris().get(ModelVersion.URI_NAME_UNKNOWN);
     Map<String, String> entityProperties =
         modelVersionEntity.properties() == null
             ? Maps.newHashMap()
@@ -477,7 +478,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         .withModelIdentifier(entityModelIdentifier)
         .withAliases(entityAliases)
         .withComment(entityComment)
-        .withUri(entityUri)
+        .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, entityUri))
         .withProperties(entityProperties)
         .withAuditInfo(
             AuditInfo.builder()
@@ -503,7 +504,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     return ModelVersionImpl.builder()
         .withVersion(modelVersion.version())
         .withAliases(modelVersion.aliases().toArray(new String[0]))
-        .withUri(modelVersion.uri())
+        .withUri(modelVersion.uris().get(ModelVersion.URI_NAME_UNKNOWN))
         .withComment(modelVersion.comment())
         .withProperties(modelVersion.properties())
         .withAuditInfo(modelVersion.auditInfo())

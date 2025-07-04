@@ -1022,39 +1022,33 @@ public class TestPOConverters {
             .withAliases(ImmutableList.of("alias1"))
             .withComment("this is test")
             .withProperties(ImmutableMap.of("key", "value"))
-            .withUri("hdfs://localhost/test")
+            .withUris(ImmutableMap.of("unknown", "hdfs://localhost/test"))
             .withAuditInfo(auditInfo)
             .build();
 
-    ModelVersionPO.Builder builder1 =
-        ModelVersionPO.builder()
-            .withModelId(1L)
-            .withMetalakeId(1L)
-            .withCatalogId(1L)
-            .withSchemaId(1L);
-
-    ModelVersionPO modelVersionPO =
-        POConverters.initializeModelVersionPO(modelVersionEntity, builder1);
-    Assertions.assertEquals(1, modelVersionPO.getModelVersion());
-    Assertions.assertEquals(1L, modelVersionPO.getModelId());
-    Assertions.assertEquals(1L, modelVersionPO.getMetalakeId());
-    Assertions.assertEquals(1L, modelVersionPO.getCatalogId());
-    Assertions.assertEquals(1L, modelVersionPO.getSchemaId());
-    Assertions.assertEquals("this is test", modelVersionPO.getModelVersionComment());
-    Assertions.assertEquals("hdfs://localhost/test", modelVersionPO.getModelVersionUri());
-    Assertions.assertEquals(0L, modelVersionPO.getDeletedAt());
+    List<ModelVersionPO> modelVersionPOs =
+        POConverters.initializeModelVersionPO(modelVersionEntity, 1L);
+    Assertions.assertEquals(1, modelVersionPOs.size());
+    Assertions.assertEquals(1, modelVersionPOs.get(0).getModelVersion());
+    Assertions.assertEquals(1L, modelVersionPOs.get(0).getModelId());
+    Assertions.assertEquals("this is test", modelVersionPOs.get(0).getModelVersionComment());
+    Assertions.assertEquals("unknown", modelVersionPOs.get(0).getModelVersionUriName());
+    Assertions.assertEquals("hdfs://localhost/test", modelVersionPOs.get(0).getModelVersionUri());
+    Assertions.assertEquals(0L, modelVersionPOs.get(0).getDeletedAt());
 
     Map<String, String> resultProperties =
-        JsonUtils.anyFieldMapper().readValue(modelVersionPO.getModelVersionProperties(), Map.class);
+        JsonUtils.anyFieldMapper()
+            .readValue(modelVersionPOs.get(0).getModelVersionProperties(), Map.class);
     Assertions.assertEquals(ImmutableMap.of("key", "value"), resultProperties);
 
     AuditInfo resultAuditInfo =
-        JsonUtils.anyFieldMapper().readValue(modelVersionPO.getAuditInfo(), AuditInfo.class);
+        JsonUtils.anyFieldMapper()
+            .readValue(modelVersionPOs.get(0).getAuditInfo(), AuditInfo.class);
     Assertions.assertEquals(auditInfo, resultAuditInfo);
 
     List<ModelVersionAliasRelPO> aliasPOs =
         POConverters.initializeModelVersionAliasRelPO(
-            modelVersionEntity, modelVersionPO.getModelId());
+            modelVersionEntity, modelVersionPOs.get(0).getModelId());
     Assertions.assertEquals(1, aliasPOs.size());
     Assertions.assertEquals(1, aliasPOs.get(0).getModelVersion());
     Assertions.assertEquals("alias1", aliasPOs.get(0).getModelVersionAlias());
@@ -1069,29 +1063,23 @@ public class TestPOConverters {
             .withAliases(null)
             .withComment(null)
             .withProperties(null)
-            .withUri("hdfs://localhost/test")
+            .withUris(ImmutableMap.of("unknown", "hdfs://localhost/test"))
             .withAuditInfo(auditInfo)
             .build();
 
-    ModelVersionPO.Builder builder2 =
-        ModelVersionPO.builder()
-            .withModelId(1L)
-            .withMetalakeId(1L)
-            .withCatalogId(1L)
-            .withSchemaId(1L);
-
-    ModelVersionPO modelVersionPOWithNull =
-        POConverters.initializeModelVersionPO(modelVersionEntityWithNull, builder2);
-    Assertions.assertNull(modelVersionPOWithNull.getModelVersionComment());
+    List<ModelVersionPO> modelVersionPOsWithNull =
+        POConverters.initializeModelVersionPO(modelVersionEntityWithNull, 1L);
+    Assertions.assertEquals(1, modelVersionPOsWithNull.size());
+    Assertions.assertNull(modelVersionPOsWithNull.get(0).getModelVersionComment());
 
     Map<String, String> resultPropertiesWithNull =
         JsonUtils.anyFieldMapper()
-            .readValue(modelVersionPOWithNull.getModelVersionProperties(), Map.class);
+            .readValue(modelVersionPOsWithNull.get(0).getModelVersionProperties(), Map.class);
     Assertions.assertNull(resultPropertiesWithNull);
 
     List<ModelVersionAliasRelPO> aliasPOsWithNull =
         POConverters.initializeModelVersionAliasRelPO(
-            modelVersionEntityWithNull, modelVersionPOWithNull.getModelId());
+            modelVersionEntityWithNull, modelVersionPOsWithNull.get(0).getModelId());
     Assertions.assertEquals(0, aliasPOsWithNull.size());
   }
 
@@ -1113,6 +1101,7 @@ public class TestPOConverters {
             .withModelVersionComment("this is test")
             .withModelVersionProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+            .withModelVersionUriName("unknown")
             .withModelVersionUri("hdfs://localhost/test")
             .withDeletedAt(0L)
             .build();
@@ -1135,12 +1124,12 @@ public class TestPOConverters {
             .withAliases(aliases)
             .withComment("this is test")
             .withProperties(properties)
-            .withUri("hdfs://localhost/test")
+            .withUris(ImmutableMap.of("unknown", "hdfs://localhost/test"))
             .withAuditInfo(auditInfo)
             .build();
 
     ModelVersionEntity convertedModelVersion =
-        POConverters.fromModelVersionPO(modelIdent, modelVersionPO, aliasPOs);
+        POConverters.fromModelVersionPO(modelIdent, ImmutableList.of(modelVersionPO), aliasPOs);
     assertEquals(expectedModelVersion, convertedModelVersion);
 
     // test null fields
@@ -1154,6 +1143,7 @@ public class TestPOConverters {
             .withModelVersionComment(null)
             .withModelVersionProperties(JsonUtils.anyFieldMapper().writeValueAsString(null))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+            .withModelVersionUriName("unknown")
             .withModelVersionUri("hdfs://localhost/test")
             .withDeletedAt(0L)
             .build();
@@ -1166,12 +1156,13 @@ public class TestPOConverters {
             .withAliases(Collections.emptyList())
             .withComment(null)
             .withProperties(null)
-            .withUri("hdfs://localhost/test")
+            .withUris(ImmutableMap.of("unknown", "hdfs://localhost/test"))
             .withAuditInfo(auditInfo)
             .build();
 
     ModelVersionEntity convertedModelVersionWithNull =
-        POConverters.fromModelVersionPO(modelIdent, modelVersionPOWithNull, aliasPOsWithNull);
+        POConverters.fromModelVersionPO(
+            modelIdent, ImmutableList.of(modelVersionPOWithNull), aliasPOsWithNull);
     assertEquals(expectedModelVersionWithNull, convertedModelVersionWithNull);
   }
 

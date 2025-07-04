@@ -19,9 +19,11 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.h2.ModelVersionMetaH2Provider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.ModelVersionMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -30,8 +32,6 @@ import org.apache.ibatis.annotations.Param;
 public class ModelVersionMetaSQLProviderFactory {
 
   static class ModelVersionMetaMySQLProvider extends ModelVersionMetaBaseSQLProvider {}
-
-  static class ModelVersionMetaH2Provider extends ModelVersionMetaBaseSQLProvider {}
 
   private static final Map<JDBCBackendType, ModelVersionMetaBaseSQLProvider>
       MODEL_VERSION_META_SQL_PROVIDER_MAP =
@@ -51,9 +51,9 @@ public class ModelVersionMetaSQLProviderFactory {
     return MODEL_VERSION_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  public static String insertModelVersionMeta(
-      @Param("modelVersionMeta") ModelVersionPO modelVersionPO) {
-    return getProvider().insertModelVersionMeta(modelVersionPO);
+  public static String insertModelVersionMetas(
+      @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    return getProvider().insertModelVersionMetas(modelVersionPOs);
   }
 
   public static String listModelVersionMetasByModelId(@Param("modelId") Long modelId) {
@@ -107,5 +107,12 @@ public class ModelVersionMetaSQLProviderFactory {
       @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
       @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO) {
     return getProvider().updateModelVersionMeta(newModelVersionPO, oldModelVersionPO);
+  }
+
+  public static String updateModelVersionUris(
+      @Param("modelId") Long modelId,
+      @Param("modelVersion") Integer modelVersion,
+      @Param("uris") Map<String, String> uris) {
+    return getProvider().updateModelVersionUris(modelId, modelVersion, uris);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.meta;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -45,8 +46,8 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
       Field.optional("comment", String.class, "The comment or description of the model entity.");
   public static final Field ALIASES =
       Field.optional("aliases", List.class, "The aliases of the model entity.");
-  public static final Field URL =
-      Field.required("uri", String.class, "The URI of the model entity.");
+  public static final Field URIS =
+      Field.required("uris", Map.class, "The URIs and their names of the model version entity.");
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the model entity.");
   public static final Field AUDIT_INFO =
@@ -60,7 +61,7 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
 
   private List<String> aliases;
 
-  private String uri;
+  private Map<String, String> uris;
 
   private AuditInfo auditInfo;
 
@@ -75,7 +76,7 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
     fields.put(VERSION, version);
     fields.put(COMMENT, comment);
     fields.put(ALIASES, aliases);
-    fields.put(URL, uri);
+    fields.put(URIS, uris);
     fields.put(PROPERTIES, properties);
     fields.put(AUDIT_INFO, auditInfo);
 
@@ -98,8 +99,8 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
     return aliases;
   }
 
-  public String uri() {
-    return uri;
+  public Map<String, String> uris() {
+    return uris;
   }
 
   public Map<String, String> properties() {
@@ -134,6 +135,13 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
   }
 
   @Override
+  public void validate() throws IllegalArgumentException {
+    Entity.super.validate();
+    Preconditions.checkArgument(
+        !uris.isEmpty(), "The uri of the model version entity must not be empty.");
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -148,14 +156,14 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(modelIdent, that.modelIdent)
         && Objects.equals(comment, that.comment)
         && CollectionUtils.isEqualCollection(aliases, that.aliases)
-        && Objects.equals(uri, that.uri)
+        && Objects.equals(uris, that.uris)
         && Objects.equals(properties, that.properties)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(modelIdent, version, comment, aliases, uri, properties, auditInfo);
+    return Objects.hash(modelIdent, version, comment, aliases, uris, properties, auditInfo);
   }
 
   public static Builder builder() {
@@ -189,8 +197,8 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    public Builder withUri(String uri) {
-      model.uri = uri;
+    public Builder withUris(Map<String, String> uris) {
+      model.uris = uris;
       return this;
     }
 

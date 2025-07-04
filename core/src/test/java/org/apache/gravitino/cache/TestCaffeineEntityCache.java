@@ -47,6 +47,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.utils.TestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -614,7 +615,7 @@ public class TestCaffeineEntityCache {
         TestUtil.getTestModelVersionEntity(
             testModelEntity.nameIdentifier(),
             1,
-            "s3://test/path",
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "s3://test/path"),
             ImmutableMap.of(),
             "test model version",
             ImmutableList.of("alias1", "alias2"));

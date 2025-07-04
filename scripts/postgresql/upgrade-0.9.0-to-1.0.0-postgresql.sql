@@ -96,3 +96,11 @@ COMMENT ON COLUMN policy_relation_meta.audit_info IS 'policy relation audit info
 COMMENT ON COLUMN policy_relation_meta.current_version IS 'policy relation current version';
 COMMENT ON COLUMN policy_relation_meta.last_version IS 'policy relation last version';
 COMMENT ON COLUMN policy_relation_meta.deleted_at IS 'policy relation deleted at';
+
+-- using default 'unknown' to fill in the new column for compatibility
+ALTER TABLE model_version_info ADD COLUMN model_version_uri_name VARCHAR(256) NOT NULL DEFAULT 'unknown';
+COMMENT ON COLUMN model_version_info.model_version_uri_name IS 'model version uri name';
+ALTER TABLE model_version_info DROP CONSTRAINT model_version_info_model_id_version_deleted_at_key;
+ALTER TABLE model_version_info ADD CONSTRAINT uk_mid_ver_uri_del UNIQUE (model_id, version, model_version_uri_name, deleted_at);
+-- remove the default value for model_version_uri_name
+ALTER TABLE model_version_info ALTER COLUMN model_version_uri_name DROP DEFAULT;

@@ -36,6 +36,7 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -84,7 +85,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             0,
-            "model_path",
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
             aliases,
             "test comment",
             properties,
@@ -114,7 +115,13 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     // Test insert again to get a new version number
     ModelVersionEntity modelVersionEntity2 =
         createModelVersionEntity(
-            modelEntity.nameIdentifier(), 1, "model_path", null, null, null, auditInfo);
+            modelEntity.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
+            null,
+            null,
+            null,
+            auditInfo);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
@@ -179,7 +186,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             NameIdentifier.of(MODEL_NS, "model2"),
             1,
-            "model_path",
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
             aliases,
             "test comment",
             properties,
@@ -213,7 +220,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             0,
-            "model_path",
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
             aliases,
             "test comment",
             properties,
@@ -231,7 +238,13 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     // Test insert again to get a new version number
     ModelVersionEntity modelVersionEntity2 =
         createModelVersionEntity(
-            modelEntity.nameIdentifier(), 1, "model_path", null, null, null, auditInfo);
+            modelEntity.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
+            null,
+            null,
+            null,
+            auditInfo);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity2));
@@ -277,7 +290,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             0,
-            "model_path",
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
             aliases,
             "test comment",
             properties,
@@ -324,7 +337,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             1,
-            "model_path",
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
             aliases,
             "test comment",
             properties,
@@ -373,6 +386,101 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     getModelVersionIdent(modelEntity.nameIdentifier(), "alias2")));
   }
 
+  @Test
+  public void testModelVersionWithMultipleUris() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, auditInfo);
+
+    // Create a model entity
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model1",
+            "model1 comment",
+            0,
+            properties,
+            auditInfo);
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    // Create a model version entity with multiple URIs
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri1", "uri-name-2", "uri2"),
+            aliases,
+            "test comment",
+            properties,
+            auditInfo);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity));
+
+    // Test if the model version can be retrieved by the identifier
+    Assertions.assertEquals(
+        modelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+
+    Assertions.assertEquals(
+        modelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                getModelVersionIdent(modelEntity.nameIdentifier(), "alias1")));
+
+    Assertions.assertEquals(
+        modelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                getModelVersionIdent(modelEntity.nameIdentifier(), "alias2")));
+
+    // Test list model versions
+    List<ModelVersionEntity> modelVersions =
+        ModelVersionMetaService.getInstance()
+            .listModelVersionsByNamespace(getModelVersionNs(modelEntity.nameIdentifier()));
+    Assertions.assertEquals(1, modelVersions.size());
+    Assertions.assertEquals(modelVersionEntity, modelVersions.get(0));
+
+    // Test update model version
+    ModelVersionEntity updatedModelVersionEntity =
+        createModelVersionEntity(
+            modelVersionEntity.modelIdentifier(),
+            modelVersionEntity.version(),
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri1-updated", "uri-name-2", "uri2"),
+            ImmutableList.of("alias2", "alias3"),
+            "updated comment",
+            ImmutableMap.of("k1", "v1", "k2", "v2"),
+            modelVersionEntity.auditInfo());
+
+    Function<ModelVersionEntity, ModelVersionEntity> updatePropertiesUpdater =
+        oldModelVersionEntity -> updatedModelVersionEntity;
+
+    ModelVersionEntity alteredModelVersionEntity =
+        ModelVersionMetaService.getInstance()
+            .updateModelVersion(modelVersionEntity.nameIdentifier(), updatePropertiesUpdater);
+    Assertions.assertEquals(updatedModelVersionEntity, alteredModelVersionEntity);
+
+    // Test if the model version is updated
+    Assertions.assertEquals(
+        updatedModelVersionEntity,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+
+    // Test delete the model version
+    Assertions.assertTrue(
+        ModelVersionMetaService.getInstance()
+            .deleteModelVersion(getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+
+    // Test fetch a non-exist model version
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .getModelVersionByIdentifier(
+                    getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"model", "schema", "catalog", "metalake"})
   public void testDeleteModelVersionsInDeletion(String input) throws IOException {
@@ -397,7 +505,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             0,
-            "model_path",
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
             aliases,
             "test comment",
             properties,
@@ -408,7 +516,13 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
 
     ModelVersionEntity modelVersionEntity1 =
         createModelVersionEntity(
-            modelEntity.nameIdentifier(), 1, "model_path", null, null, null, auditInfo);
+            modelEntity.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
+            null,
+            null,
+            null,
+            auditInfo);
 
     Assertions.assertDoesNotThrow(
         () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity1));
@@ -492,7 +606,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             version,
-            modelVersionUri,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, modelVersionUri),
             modelVersionAliases,
             modelVersionComment,
             properties,
@@ -502,7 +616,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelVersionEntity.modelIdentifier(),
             modelVersionEntity.version(),
-            modelVersionEntity.uri(),
+            modelVersionEntity.uris(),
             modelVersionEntity.aliases(),
             updatedComment,
             modelVersionEntity.properties(),
@@ -576,7 +690,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             version,
-            modelVersionUri,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, modelVersionUri),
             modelVersionAliases,
             modelVersionComment,
             properties,
@@ -586,7 +700,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelVersionEntity.modelIdentifier(),
             modelVersionEntity.version(),
-            modelVersionEntity.uri(),
+            modelVersionEntity.uris(),
             modelVersionEntity.aliases(),
             modelVersionEntity.comment(),
             updatedProperties,
@@ -659,7 +773,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             version,
-            modelVersionUri,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, modelVersionUri),
             modelVersionAliases,
             modelVersionComment,
             properties,
@@ -669,7 +783,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelVersionEntity.modelIdentifier(),
             modelVersionEntity.version(),
-            updatedUri,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, updatedUri),
             modelVersionEntity.aliases(),
             modelVersionEntity.comment(),
             modelVersionEntity.properties(),
@@ -742,7 +856,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             version,
-            modelVersionUri,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, modelVersionUri),
             modelVersionAliases,
             modelVersionComment,
             properties,
@@ -752,7 +866,7 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelVersionEntity.modelIdentifier(),
             modelVersionEntity.version(),
-            modelVersionEntity.uri(),
+            modelVersionEntity.uris(),
             updatedVersionAliases,
             modelVersionEntity.comment(),
             modelVersionEntity.properties(),
