@@ -21,7 +21,6 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.CharType;
-import io.trino.spi.type.StandardTypes;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
@@ -59,9 +58,7 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       return TimeType.TIME_SECONDS;
     } else if (Name.EXTERNAL == type.name()) {
       String catalogString = ((Types.ExternalType) type).catalogString();
-      if (StandardTypes.JSON.equalsIgnoreCase(catalogString)) {
-        return JSON_TYPE;
-      }
+      return MySQLExternalDataType.safeValueOf(catalogString).getTrinoType();
     }
 
     return super.getTrinoType(type);
@@ -105,7 +102,7 @@ public class MySQLDataTypeTransformer extends GeneralDataTypeTransformer {
       }
       return Types.VarCharType.of(length);
     } else if (typeClass == JSON_TYPE.getClass()) {
-      return Types.ExternalType.of(StandardTypes.JSON);
+      return Types.ExternalType.of(MySQLExternalDataType.JSON.getMysqlTypeName());
     }
 
     return super.getGravitinoType(type);

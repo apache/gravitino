@@ -78,6 +78,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.floatLiteral(Float.valueOf(columnDefaultValue));
       case MysqlTypeConverter.DOUBLE:
         return Literals.doubleLiteral(Double.valueOf(columnDefaultValue));
+      case MysqlTypeConverter.DECIMAL_UNSIGNED:
       case MysqlTypeConverter.DECIMAL:
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));

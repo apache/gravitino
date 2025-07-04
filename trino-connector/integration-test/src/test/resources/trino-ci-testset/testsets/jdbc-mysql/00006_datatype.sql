@@ -79,3 +79,7 @@ drop table tb01;
 drop table tb02;
 
 drop schema gt_mysql.gt_db1 cascade;
+
+show create table gt_mysql.gt_mysql_test_all_type.demo;
+
+select * from gt_mysql.gt_mysql_test_all_type.demo;
