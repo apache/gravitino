@@ -35,6 +35,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -48,6 +50,9 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -83,6 +88,14 @@ public class SchemaOperations {
           () -> {
             Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
+            idents =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    " ((METALAKE::USE_CATALOG||CATALOG::USE_CATALOG) && "
+                        + "(SCHEMA::OWNER || METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA || SCHEMA::USE_SCHEMA)) "
+                        + "|| METALAKE::OWNER || CATALOG::OWNER",
+                    Entity.EntityType.SCHEMA,
+                    idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
             return response;
@@ -96,9 +109,16 @@ public class SchemaOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-schema", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && (METALAKE::CREATE_SCHEMA || CATALOG::CREATE_SCHEMA) )"
+              + "|| METALAKE::OWNER || CATALOG::OWNER",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response createSchema(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
       SchemaCreateRequest request) {
     LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
     try {
@@ -126,10 +146,19 @@ public class SchemaOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-schema", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) &&"
+              + " (METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA || SCHEMA::USE_SCHEMA || SCHEMA::OWNER) ) "
+              + " || METALAKE::OWNER || CATALOG::OWNER ",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response loadSchema(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema) {
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA)
+          String schema) {
     LOG.info("Received load schema request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
@@ -152,10 +181,16 @@ public class SchemaOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-schema", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || CATALOG::OWNER || ((METALAKE::USE_CATALOG||CATALOG::USE_CATALOG) && SCHEMA::OWNER)",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response alterSchema(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
       SchemaUpdatesRequest request) {
     LOG.info("Received alter schema request: {}.{}.{}", metalake, catalog, schema);
     try {
@@ -184,10 +219,16 @@ public class SchemaOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-schema", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || CATALOG::OWNER || ((METALAKE::USE_CATALOG||CATALOG::USE_CATALOG) && SCHEMA::OWNER)",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response dropSchema(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
       @DefaultValue("false") @QueryParam("cascade") boolean cascade) {
     LOG.info("Received drop schema request: {}.{}.{}", metalake, catalog, schema);
     try {
@@ -199,7 +240,6 @@ public class SchemaOperations {
             if (!dropped) {
               LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
             }
-
             Response response = Utils.ok(new DropResponse(dropped));
             LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
             return response;
