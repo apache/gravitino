@@ -248,6 +248,50 @@ public class TagOperations {
     }
   }
 
+  private String[] parseTagsParameter(String tagsParam) {
+    if (tagsParam == null || tagsParam.trim().isEmpty()) {
+      throw new IllegalArgumentException("Tags parameter cannot be null or empty");
+    }
+
+    return Arrays.stream(tagsParam.split(","))
+        .map(String::trim)
+        .filter(tag -> !tag.isEmpty())
+        .toArray(String[]::new);
+  }
+
+  @GET
+  @Path("objects")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-objects-for-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-objects-for-tags", absolute = true)
+  public Response listMetadataObjectsForTags(
+      @PathParam("metalake") String metalake, @QueryParam("tags") String tagsParam) {
+    LOG.info("Received list objects for tags: {} under metalake: {}", tagsParam, metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            String[] tagNames = parseTagsParameter(tagsParam);
+
+            MetadataObject[] objects = tagDispatcher.listMetadataObjectsForTags(metalake, tagNames);
+            objects = objects == null ? new MetadataObject[0] : objects;
+
+            LOG.info(
+                "List {} objects for tags: {} under metalake: {}",
+                objects.length,
+                Arrays.toString(tagNames),
+                metalake);
+
+            MetadataObjectDTO[] objectDTOs =
+                Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
+            return Utils.ok(new MetadataObjectListResponse(objectDTOs));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleTagException(OperationType.LIST, "", tagsParam, e);
+    }
+  }
+
   /**
    * @deprecated This API has moved to {@code
    *     /api/metalakes/{metalake}/objects/{type}/{fullName}/tags}.
