@@ -88,7 +88,6 @@ public class BenchmarkHelper {
     }
 
     List<K> keys = new ArrayList<>(map.keySet());
-    Random random = new Random();
 
     return keys.get(random.nextInt(keys.size()));
   }
