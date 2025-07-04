@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.policy;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -25,6 +26,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.IllegalPolicyException;
+import org.apache.gravitino.job.JobTemplate;
 
 /**
  * The interface of the policy. The policy is a set of rules that can be associated with a metadata
@@ -92,6 +94,15 @@ public interface Policy extends Auditable {
    * @return The content of the policy.
    */
   Content content();
+
+  /**
+   * Get the list of job templates that are associated with the policy. The job templates can be
+   * used to execute jobs that are related to the policy.
+   *
+   * @return The list of job templates that are associated with the policy, can be empty if no job
+   *     templates are associated with the policy.
+   */
+  List<JobTemplate> associatedJobTemplates();
 
   /**
    * Check if the policy is inherited from a parent object or not.
