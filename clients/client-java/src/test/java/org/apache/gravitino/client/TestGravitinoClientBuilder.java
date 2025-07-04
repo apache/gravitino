@@ -58,6 +58,26 @@ public class TestGravitinoClientBuilder {
           new SimpleTokenProvider().getTokenData(), client.getAuthDataProvider().getTokenData());
     }
   }
+
+  @Test
+  public void testGravitinoClientProperties() {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            "rest.client.connection-timeout-ms", "10", "rest.client.socket-timeout-ms", "10");
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1").withHttpClientConfig(properties).build()) {
+      Assertions.assertEquals(properties, client.getProperties());
+    }
+
+    try (MockGravitinoClient client = MockGravitinoClient.builder("http://127.0.0.1").build()) {
+      Assertions.assertEquals(ImmutableMap.of(), client.getProperties());
+    }
+
+    try (MockGravitinoClient client =
+        MockGravitinoClient.builder("http://127.0.0.1").withHeaders(null).build()) {
+      Assertions.assertEquals(ImmutableMap.of(), client.getProperties());
+    }
+  }
 }
 
 class MockGravitinoClient extends GravitinoClientBase {
@@ -66,18 +86,25 @@ class MockGravitinoClient extends GravitinoClientBase {
 
   private AuthDataProvider authDataProvider;
 
+  private Map<String, String> properties;
+
   /**
    * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
    *
    * @param uri The base URI for the Gravitino API.
    * @param authDataProvider The provider of the data which is used for authentication.
    * @param headers The base header of the Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
    */
   private MockGravitinoClient(
-      String uri, AuthDataProvider authDataProvider, Map<String, String> headers) {
-    super(uri, authDataProvider, false, headers);
+      String uri,
+      AuthDataProvider authDataProvider,
+      Map<String, String> headers,
+      Map<String, String> properties) {
+    super(uri, authDataProvider, false, headers, properties);
     this.headers = headers;
     this.authDataProvider = authDataProvider;
+    this.properties = properties;
   }
 
   Map<String, String> getHeaders() {
@@ -86,6 +113,10 @@ class MockGravitinoClient extends GravitinoClientBase {
 
   AuthDataProvider getAuthDataProvider() {
     return authDataProvider;
+  }
+
+  Map<String, String> getProperties() {
+    return properties;
   }
 
   /**
@@ -111,7 +142,7 @@ class MockGravitinoClient extends GravitinoClientBase {
 
     @Override
     public MockGravitinoClient build() {
-      return new MockGravitinoClient(uri, authDataProvider, headers);
+      return new MockGravitinoClient(uri, authDataProvider, headers, properties);
     }
   }
 }

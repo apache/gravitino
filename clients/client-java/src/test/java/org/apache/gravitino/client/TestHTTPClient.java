@@ -40,6 +40,7 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -125,6 +126,22 @@ public class TestHTTPClient {
   @Test
   public void testHeadFailure() throws JsonProcessingException {
     testHttpMethodOnFailure(Method.HEAD, false, false);
+  }
+
+  @Test
+  public void testSocketAndConnectionTimeoutSet() {
+    long connectionTimeoutMs = 10L;
+    int socketTimeoutMs = 10;
+    Map<String, String> properties =
+        ImmutableMap.of(
+            HTTPClient.REST_CONNECTION_TIMEOUT_MS, String.valueOf(connectionTimeoutMs),
+            HTTPClient.REST_SOCKET_TIMEOUT_MS, String.valueOf(socketTimeoutMs));
+
+    ConnectionConfig connectionConfig = HTTPClient.configureConnectionConfig(properties);
+    Assertions.assertNotNull(connectionConfig);
+    Assertions.assertEquals(
+        connectionConfig.getConnectTimeout().getDuration(), connectionTimeoutMs);
+    Assertions.assertEquals(connectionConfig.getSocketTimeout().getDuration(), socketTimeoutMs);
   }
 
   public static void testHttpMethodOnSuccess(
