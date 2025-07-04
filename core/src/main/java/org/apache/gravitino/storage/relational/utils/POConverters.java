@@ -20,12 +20,14 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -48,6 +50,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -55,6 +58,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.BasePolicy;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
@@ -71,6 +75,7 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
@@ -1302,6 +1307,35 @@ public class POConverters {
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static PolicyEntity fromPolicyPO(PolicyPO policyPO, Namespace namespace) {
+    try {
+      return PolicyEntity.builder()
+          .withId(policyPO.getPolicyId())
+          .withName(policyPO.getPolicyName())
+          .withNamespace(namespace)
+          .withType(policyPO.getPolicyType())
+          .withComment(policyPO.getPolicyVersionPO().getPolicyComment())
+          .withEnabled(policyPO.getPolicyVersionPO().isEnabled())
+          .withExclusive(policyPO.isExclusive())
+          .withInheritable(policyPO.isInheritable())
+          .withSupportedObjectTypes(
+              JsonUtils.anyFieldMapper()
+                  .readValue(
+                      policyPO.getSupportedObjectTypes(),
+                      new TypeReference<Set<MetadataObject.Type>>() {}))
+          .withContent(
+              JsonUtils.anyFieldMapper()
+                  .readValue(
+                      policyPO.getPolicyVersionPO().getContent(),
+                      BasePolicy.ContentType.fromString(policyPO.getPolicyType()).contentClass()))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(policyPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
     }
   }
 
