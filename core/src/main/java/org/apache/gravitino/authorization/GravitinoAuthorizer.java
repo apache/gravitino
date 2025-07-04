@@ -15,14 +15,16 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authorization;
+package org.apache.gravitino.authorization;
 
 import java.io.Closeable;
 import java.security.Principal;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Used for metadata authorization. */
 public interface GravitinoAuthorizer extends Closeable {
@@ -65,6 +67,28 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param roleId The role id;
    */
   default void handleRolePrivilegeChange(Long roleId) {};
+
+  /**
+   * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in
+   * order to clear the cache.
+   *
+   * @param metalake The metalake name;
+   * @param roleName The role name;
+   */
+  default void handleRolePrivilegeChange(String metalake, String roleName) {
+    try {
+      RoleEntity entity =
+          GravitinoEnv.getInstance()
+              .entityStore()
+              .get(
+                  NameIdentifierUtil.ofRole(metalake, roleName),
+                  Entity.EntityType.ROLE,
+                  RoleEntity.class);
+      handleRolePrivilegeChange(entity.id());
+    } catch (Exception e) {
+      throw new RuntimeException("Can not get Role Entity", e);
+    }
+  }
 
   /**
    * This method is called to clear the owner relationship in jcasbin when the owner of the metadata

@@ -18,6 +18,7 @@
 package org.apache.gravitino.server.authorization;
 
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.ServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

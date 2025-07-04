@@ -23,6 +23,7 @@ import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -134,6 +135,7 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerManager ownerManager;
   private FutureGrantManager futureGrantManager;
+  private GravitinoAuthorizer gravitinoAuthorizer;
 
   protected GravitinoEnv() {}
 
@@ -362,6 +364,24 @@ public class GravitinoEnv {
    */
   public EventListenerManager eventListenerManager() {
     return eventListenerManager;
+  }
+
+  /**
+   * Set GravitinoAuthorizer to GravitinoEnv
+   *
+   * @param gravitinoAuthorizer the GravitinoAuthorizer instance
+   */
+  public void setGravitinoAuthorizer(GravitinoAuthorizer gravitinoAuthorizer) {
+    this.gravitinoAuthorizer = gravitinoAuthorizer;
+  }
+
+  /**
+   * Get The GravitinoAuthorizer
+   *
+   * @return the GravitinoAuthorizer instance
+   */
+  public GravitinoAuthorizer gravitinoAuthorizer() {
+    return gravitinoAuthorizer;
   }
 
   public void start() {

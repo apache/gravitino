@@ -26,6 +26,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerManager;
@@ -114,7 +115,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
-    return dispatcher.grantRolesToUser(metalake, roles, user);
+    User grantedUser = dispatcher.grantRolesToUser(metalake, roles, user);
+    notifyRoleUserRelChange(metalake, roles);
+    return grantedUser;
   }
 
   @Override
@@ -132,7 +135,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
-    return dispatcher.revokeRolesFromUser(metalake, roles, user);
+    User revokedUser = dispatcher.revokeRolesFromUser(metalake, roles, user);
+    notifyRoleUserRelChange(metalake, roles);
+    return revokedUser;
   }
 
   @Override
@@ -191,13 +196,33 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Role grantPrivilegeToRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
-    return dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
+    Role grantedRole = dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
+    notifyRoleUserRelChange(metalake, role);
+    return grantedRole;
   }
 
   @Override
   public Role revokePrivilegesFromRole(
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
-    return dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
+    Role revokedRole = dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
+    notifyRoleUserRelChange(metalake, role);
+    return revokedRole;
+  }
+
+  private static void notifyRoleUserRelChange(String metalake, List<String> roles) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      for (String role : roles) {
+        gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
+      }
+    }
+  }
+
+  private static void notifyRoleUserRelChange(String metalake, String role) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
+    }
   }
 }
