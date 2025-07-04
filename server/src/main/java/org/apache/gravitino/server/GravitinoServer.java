@@ -128,9 +128,11 @@ public class GravitinoServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(GravitinoInterceptionService.class)
-                .to(InterceptionService.class)
-                .in(Singleton.class);
+            if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+              bind(GravitinoInterceptionService.class)
+                  .to(InterceptionService.class)
+                  .in(Singleton.class);
+            }
             bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
