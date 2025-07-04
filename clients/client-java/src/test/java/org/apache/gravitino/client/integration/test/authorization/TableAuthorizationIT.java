@@ -45,7 +45,6 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -119,10 +118,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // owner can create table
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
-        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table1"),
-        createColumns(),
-        "test",
-        new HashMap<>());
+        NameIdentifier.of(SCHEMA, "table1"), createColumns(), "test", new HashMap<>());
     // normal user cannot create table
     TableCatalog tableCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
@@ -131,10 +127,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         RuntimeException.class,
         () -> {
           tableCatalogNormalUser.createTable(
-              NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table2"),
-              createColumns(),
-              "test2",
-              new HashMap<>());
+              NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
         });
     // grant privileges
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
@@ -144,15 +137,9 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
     // normal user can now create table
     tableCatalogNormalUser.createTable(
-        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table2"),
-        createColumns(),
-        "test2",
-        new HashMap<>());
+        NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
     tableCatalogNormalUser.createTable(
-        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "table3"),
-        createColumns(),
-        "test2",
-        new HashMap<>());
+        NameIdentifier.of(SCHEMA, "table3"), createColumns(), "test2", new HashMap<>());
   }
 
   @Test
@@ -188,7 +175,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         RuntimeException.class,
         () -> {
-          tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
+          tableCatalogNormalUser.loadTable(NameIdentifier.of(CATALOG, SCHEMA, "table1"));
         });
     Table table2 = tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table2"));
     assertEquals("table2", table2.name());
@@ -199,7 +186,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         role,
-        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.TABLE),
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
         ImmutableList.of(Privileges.SelectTable.allow()));
     tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
   }
