@@ -109,8 +109,8 @@ public class CatalogOperations {
                             };
                         return MetadataFilterHelper.filterByExpression(
                                     metalake,
-                                    "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG "
-                                        + "|| METALAKE::OWNER || CATALOG::OWNER",
+                                    "ANY(USE_CATALOG,METALAKE,CATALOG) || "
+                                        + "ANY(OWNER,METALAKE,CATALOG)",
                                     Entity.EntityType.CATALOG,
                                     nameIdentifiers)
                                 .length
@@ -126,8 +126,7 @@ public class CatalogOperations {
               idents =
                   MetadataFilterHelper.filterByExpression(
                       metalake,
-                      "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG "
-                          + "|| METALAKE::OWNER || CATALOG::OWNER",
+                      "ANY(USE_CATALOG,METALAKE,CATALOG) || " + "ANY(OWNER,METALAKE,CATALOG)",
                       Entity.EntityType.CATALOG,
                       idents);
               Response response = Utils.ok(new EntityListResponse(idents));
@@ -216,8 +215,7 @@ public class CatalogOperations {
   @Timed(name = "set-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-catalog", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER",
+      expression = "ANY(USE_CATALOG,METALAKE,CATALOG) || ANY(OWNER,METALAKE,CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response setCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -263,8 +261,7 @@ public class CatalogOperations {
   @Timed(name = "load-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-catalog", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER",
+      expression = "ANY(USE_CATALOG,METALAKE,CATALOG) || ANY(OWNER,METALAKE,CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response loadCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
