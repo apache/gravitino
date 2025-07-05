@@ -28,6 +28,7 @@ import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.BI
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.CHAR;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.DATETIME;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.DECIMAL;
+import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.DECIMAL_UNSIGNED;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.DOUBLE;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.FLOAT;
 import static org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter.INT;
@@ -57,6 +58,7 @@ public class TestMysqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(), DATETIME, null, null);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withTimeZone(), TIMESTAMP, null, null);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL, 10, 2);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), DECIMAL_UNSIGNED, 10, 2);
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), CHAR, 20, null);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null);

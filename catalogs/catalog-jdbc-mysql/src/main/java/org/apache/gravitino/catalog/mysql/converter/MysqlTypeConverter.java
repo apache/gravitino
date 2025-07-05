@@ -37,6 +37,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
   static final String FLOAT = "float";
   static final String DOUBLE = "double";
   static final String DECIMAL = "decimal";
+  static final String DECIMAL_UNSIGNED = "decimal unsigned";
   static final String CHAR = "char";
   static final String BINARY = "binary";
   static final String DATETIME = "datetime";
@@ -81,6 +82,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
         return Types.TimestampType.withTimeZone();
       case DATETIME:
         return Types.TimestampType.withoutTimeZone();
+      case DECIMAL_UNSIGNED:
       case DECIMAL:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
