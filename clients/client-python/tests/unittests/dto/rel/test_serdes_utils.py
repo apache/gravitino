@@ -24,6 +24,7 @@ from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
+from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 
 
 class MockArgType(str, Enum):
@@ -60,6 +61,11 @@ class TestExpressionSerdesUtils(unittest.TestCase):
                     cls._naive_func_expression_dto,
                 ]
             )
+            .build()
+        )
+        cls._unparsed_expression_dto = (
+            UnparsedExpressionDTO.builder()
+            .with_unparsed_expression(unparsed_expression="unparsed_expression")
             .build()
         )
 
@@ -112,5 +118,13 @@ class TestExpressionSerdesUtils(unittest.TestCase):
                 SerdesUtils.write_function_arg(arg=self._field_reference_dto),
                 SerdesUtils.write_function_arg(arg=self._naive_func_expression_dto),
             ],
+        }
+        self.assertDictEqual(result, expected_result)
+
+    def test_write_function_arg_unparsed_expression_dto(self):
+        result = SerdesUtils.write_function_arg(arg=self._unparsed_expression_dto)
+        expected_result = {
+            SerdesUtils.EXPRESSION_TYPE: self._unparsed_expression_dto.arg_type().name.lower(),
+            SerdesUtils.UNPARSED_EXPRESSION: self._unparsed_expression_dto.unparsed_expression(),
         }
         self.assertDictEqual(result, expected_result)
