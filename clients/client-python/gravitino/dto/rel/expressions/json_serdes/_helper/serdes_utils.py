@@ -107,3 +107,20 @@ class SerdesUtils:
                 .with_field_name(field_name=data[cls.FIELD_NAME])
                 .build()
             )
+
+        if arg_type == FunctionArg.ArgType.FUNCTION:
+            Precondition.check_argument(
+                data.get(cls.FUNCTION_NAME) is not None,
+                f"Cannot parse function function arg from missing function name: {data}",
+            )
+            Precondition.check_argument(
+                data.get(cls.FUNCTION_ARGS) is not None,
+                f"Cannot parse function function arg from missing function args: {data}",
+            )
+            args = [cls.read_function_arg(arg) for arg in data[cls.FUNCTION_ARGS]]
+            return (
+                FuncExpressionDTO.builder()
+                .with_function_name(function_name=data[cls.FUNCTION_NAME])
+                .with_function_args(function_args=args or FunctionArg.EMPTY_ARGS)
+                .build()
+            )
