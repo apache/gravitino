@@ -96,3 +96,14 @@ class SerdesUtils:
                 .with_value(value=data[cls.LITERAL_VALUE])
                 .build()
             )
+
+        if arg_type == FunctionArg.ArgType.FIELD:
+            Precondition.check_argument(
+                data.get(cls.FIELD_NAME) is not None,
+                f"Cannot parse field reference arg from missing field name: {data}",
+            )
+            return (
+                FieldReferenceDTO.builder()
+                .with_field_name(field_name=data[cls.FIELD_NAME])
+                .build()
+            )
