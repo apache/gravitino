@@ -40,9 +40,8 @@ public class LineageHttpSink implements LineageSink {
   @Override
   public void initialize(Map<String, String> configs) {
     String httpSinkUrl = configs.getOrDefault("url", "http://localhost:5000/");
-    LOG.info("http sink url {}", httpSinkUrl);
     String authType = configs.get("authType");
-    LOG.info("http sink authentication type {}", authType);
+    LOG.info("Http sink URL: {}, authentication type: {}", httpSinkUrl, authType);
     LineageServerAuthenticationStrategy authStrategy =
         AuthenticationFactory.createStrategy(authType);
 
