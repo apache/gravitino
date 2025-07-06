@@ -227,3 +227,29 @@ class TestExpressionSerdesUtils(unittest.TestCase):
             .with_function_args(function_args=FunctionArg.EMPTY_ARGS)
             .build(),
         )
+
+    def test_read_function_arg_unparsed_expression_dto(self):
+        data = {SerdesUtils.EXPRESSION_TYPE: "invalid_expression_type"}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Unknown function argument type",
+            SerdesUtils.read_function_arg,
+            data=data,
+        )
+
+        data[SerdesUtils.EXPRESSION_TYPE] = (
+            self._unparsed_expression_dto.arg_type().name.lower()
+        )
+        data[SerdesUtils.UNPARSED_EXPRESSION] = {}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse unparsed expression from missing string field unparsedExpression",
+            SerdesUtils.read_function_arg,
+            data=data,
+        )
+
+        data[SerdesUtils.UNPARSED_EXPRESSION] = (
+            self._unparsed_expression_dto.unparsed_expression()
+        )
+        result = SerdesUtils.read_function_arg(data=data)
+        self.assertEqual(result, self._unparsed_expression_dto)
