@@ -20,6 +20,7 @@ from typing import Any, ClassVar, Dict, cast
 from gravitino.api.types.json_serdes._helper.serdes_utils import (
     SerdesUtils as TypesSerdesUtils,
 )
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 
@@ -28,6 +29,7 @@ class SerdesUtils:
     EXPRESSION_TYPE: ClassVar[str] = "type"
     DATA_TYPE: ClassVar[str] = "dataType"
     LITERAL_VALUE: ClassVar[str] = "value"
+    FIELD_NAME: ClassVar[str] = "fieldName"
 
     @classmethod
     def write_function_arg(cls, arg: FunctionArg) -> Dict[str, Any]:
@@ -42,5 +44,8 @@ class SerdesUtils:
                 data_type=expression.data_type()
             )
             arg_data[cls.LITERAL_VALUE] = expression.value()
+
+        if arg_type is FunctionArg.ArgType.FIELD:
+            arg_data[cls.FIELD_NAME] = cast(FieldReferenceDTO, arg).field_name()
 
         return arg_data
