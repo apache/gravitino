@@ -24,6 +24,7 @@ from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
+from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 
 
 class SerdesUtils:
@@ -33,6 +34,7 @@ class SerdesUtils:
     FIELD_NAME: ClassVar[str] = "fieldName"
     FUNCTION_NAME: ClassVar[str] = "funcName"
     FUNCTION_ARGS: ClassVar[str] = "funcArgs"
+    UNPARSED_EXPRESSION: ClassVar[str] = "unparsedExpression"
 
     @classmethod
     def write_function_arg(cls, arg: FunctionArg) -> Dict[str, Any]:
@@ -57,5 +59,9 @@ class SerdesUtils:
             arg_data[cls.FUNCTION_ARGS] = [
                 cls.write_function_arg(func_arg) for func_arg in expression.args()
             ]
+
+        if arg_type is FunctionArg.ArgType.UNPARSED:
+            expression = cast(UnparsedExpressionDTO, arg)
+            arg_data[cls.UNPARSED_EXPRESSION] = expression.unparsed_expression()
 
         return arg_data
