@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
+from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 
@@ -41,6 +42,24 @@ class TestExpressionSerdesUtils(unittest.TestCase):
         cls._field_reference_dto = (
             FieldReferenceDTO.builder()
             .with_field_name(field_name=["field_name"])
+            .build()
+        )
+        cls._naive_func_expression_dto = (
+            FuncExpressionDTO.builder()
+            .with_function_name(function_name="simple_func_name")
+            .with_function_args(function_args=[cls._literal_dto])
+            .build()
+        )
+        cls._func_expression_dto = (
+            FuncExpressionDTO.builder()
+            .with_function_name(function_name="func_name")
+            .with_function_args(
+                function_args=[
+                    cls._literal_dto,
+                    cls._field_reference_dto,
+                    cls._naive_func_expression_dto,
+                ]
+            )
             .build()
         )
 
@@ -70,5 +89,28 @@ class TestExpressionSerdesUtils(unittest.TestCase):
         expected_result = {
             SerdesUtils.EXPRESSION_TYPE: self._field_reference_dto.arg_type().name.lower(),
             SerdesUtils.FIELD_NAME: self._field_reference_dto.field_name(),
+        }
+        self.assertDictEqual(result, expected_result)
+
+    def test_write_function_arg_func_expression_dto(self):
+        result = SerdesUtils.write_function_arg(arg=self._naive_func_expression_dto)
+        expected_result = {
+            SerdesUtils.EXPRESSION_TYPE: self._naive_func_expression_dto.arg_type().name.lower(),
+            SerdesUtils.FUNCTION_NAME: self._naive_func_expression_dto.function_name(),
+            SerdesUtils.FUNCTION_ARGS: [
+                SerdesUtils.write_function_arg(arg=self._literal_dto),
+            ],
+        }
+        self.assertDictEqual(result, expected_result)
+
+        result = SerdesUtils.write_function_arg(arg=self._func_expression_dto)
+        expected_result = {
+            SerdesUtils.EXPRESSION_TYPE: self._func_expression_dto.arg_type().name.lower(),
+            SerdesUtils.FUNCTION_NAME: self._func_expression_dto.function_name(),
+            SerdesUtils.FUNCTION_ARGS: [
+                SerdesUtils.write_function_arg(arg=self._literal_dto),
+                SerdesUtils.write_function_arg(arg=self._field_reference_dto),
+                SerdesUtils.write_function_arg(arg=self._naive_func_expression_dto),
+            ],
         }
         self.assertDictEqual(result, expected_result)
