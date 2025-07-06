@@ -22,6 +22,7 @@ from unittest.mock import patch
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
+from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
@@ -187,3 +188,42 @@ class TestExpressionSerdesUtils(unittest.TestCase):
         data[SerdesUtils.FIELD_NAME] = self._field_reference_dto.field_name()
         result = SerdesUtils.read_function_arg(data=data)
         self.assertEqual(result, self._field_reference_dto)
+
+    def test_read_function_arg_func_expression_dto(self):
+        data = {
+            SerdesUtils.EXPRESSION_TYPE: self._naive_func_expression_dto.arg_type().name.lower()
+        }
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse function function arg from missing function name",
+            SerdesUtils.read_function_arg,
+            data=data,
+        )
+
+        data[SerdesUtils.FUNCTION_NAME] = (
+            self._naive_func_expression_dto.function_name()
+        )
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse function function arg from missing function args",
+            SerdesUtils.read_function_arg,
+            data=data,
+        )
+
+        data[SerdesUtils.FUNCTION_ARGS] = [
+            SerdesUtils.write_function_arg(arg=self._literal_dto),
+        ]
+        result = SerdesUtils.read_function_arg(data=data)
+        self.assertEqual(result, self._naive_func_expression_dto)
+
+        data[SerdesUtils.FUNCTION_ARGS] = []
+        result = SerdesUtils.read_function_arg(data=data)
+        self.assertEqual(
+            result,
+            FuncExpressionDTO.builder()
+            .with_function_name(
+                function_name=self._naive_func_expression_dto.function_name()
+            )
+            .with_function_args(function_args=FunctionArg.EMPTY_ARGS)
+            .build(),
+        )
