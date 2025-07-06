@@ -25,6 +25,7 @@ from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 class MockArgType(str, Enum):
@@ -128,3 +129,46 @@ class TestExpressionSerdesUtils(unittest.TestCase):
             SerdesUtils.UNPARSED_EXPRESSION: self._unparsed_expression_dto.unparsed_expression(),
         }
         self.assertDictEqual(result, expected_result)
+
+    def test_read_function_arg_invalid_data(self):
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse function arg from invalid JSON",
+            SerdesUtils.read_function_arg,
+            data=None,
+        )
+
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse function arg from invalid JSON",
+            SerdesUtils.read_function_arg,
+            data="invalid_data",
+        )
+
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse function arg from missing type",
+            SerdesUtils.read_function_arg,
+            data={},
+        )
+
+    def test_read_function_arg_literal_dto(self):
+        data = {SerdesUtils.EXPRESSION_TYPE: self._literal_dto.arg_type().name.lower()}
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse literal arg from missing data type",
+            SerdesUtils.read_function_arg,
+            data=data,
+        )
+
+        data[SerdesUtils.DATA_TYPE] = self._literal_dto.data_type().simple_string()
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse literal arg from missing literal value",
+            SerdesUtils.read_function_arg,
+            data=data,
+        )
+
+        data[SerdesUtils.LITERAL_VALUE] = self._literal_dto.value()
+        result = SerdesUtils.read_function_arg(data=data)
+        self.assertEqual(result, self._literal_dto)
