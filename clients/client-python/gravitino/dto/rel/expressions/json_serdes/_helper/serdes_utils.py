@@ -25,6 +25,7 @@ from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
+from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition
 
 
@@ -77,9 +78,14 @@ class SerdesUtils:
             data.get(cls.EXPRESSION_TYPE) is not None,
             f"Cannot parse function arg from missing type: {data}",
         )
-        arg_type = str(data[cls.EXPRESSION_TYPE]).lower()
+        try:
+            arg_type = FunctionArg.ArgType(data[cls.EXPRESSION_TYPE].lower())
+        except ValueError:
+            raise IllegalArgumentException(
+                f"Unknown function argument type: {data[cls.EXPRESSION_TYPE]}"
+            )
 
-        if arg_type == FunctionArg.ArgType.LITERAL:
+        if arg_type is FunctionArg.ArgType.LITERAL:
             Precondition.check_argument(
                 data.get(cls.DATA_TYPE) is not None,
                 f"Cannot parse literal arg from missing data type: {data}",
@@ -97,7 +103,7 @@ class SerdesUtils:
                 .build()
             )
 
-        if arg_type == FunctionArg.ArgType.FIELD:
+        if arg_type is FunctionArg.ArgType.FIELD:
             Precondition.check_argument(
                 data.get(cls.FIELD_NAME) is not None,
                 f"Cannot parse field reference arg from missing field name: {data}",
@@ -108,7 +114,7 @@ class SerdesUtils:
                 .build()
             )
 
-        if arg_type == FunctionArg.ArgType.FUNCTION:
+        if arg_type is FunctionArg.ArgType.FUNCTION:
             Precondition.check_argument(
                 data.get(cls.FUNCTION_NAME) is not None,
                 f"Cannot parse function function arg from missing function name: {data}",
@@ -124,3 +130,10 @@ class SerdesUtils:
                 .with_function_args(function_args=args or FunctionArg.EMPTY_ARGS)
                 .build()
             )
+
+        if arg_type is FunctionArg.ArgType.UNPARSED:
+            Precondition.check_argument(
+                isinstance(data.get(cls.UNPARSED_EXPRESSION), str),
+                f"Cannot parse unparsed expression from missing string field unparsedExpression: {data}",
+            )
+            return UnparsedExpressionDTO(data[cls.UNPARSED_EXPRESSION])
