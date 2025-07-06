@@ -20,6 +20,7 @@ from enum import Enum
 from unittest.mock import patch
 
 from gravitino.api.types.types import Types
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 
@@ -35,6 +36,11 @@ class TestExpressionSerdesUtils(unittest.TestCase):
             LiteralDTO.builder()
             .with_data_type(data_type=Types.StringType.get())
             .with_value(value="test_string")
+            .build()
+        )
+        cls._field_reference_dto = (
+            FieldReferenceDTO.builder()
+            .with_field_name(field_name=["field_name"])
             .build()
         )
 
@@ -56,5 +62,13 @@ class TestExpressionSerdesUtils(unittest.TestCase):
             SerdesUtils.EXPRESSION_TYPE: self._literal_dto.arg_type().name.lower(),
             SerdesUtils.DATA_TYPE: self._literal_dto.data_type().simple_string(),
             SerdesUtils.LITERAL_VALUE: self._literal_dto.value(),
+        }
+        self.assertDictEqual(result, expected_result)
+
+    def test_write_function_arg_field_reference_dto(self):
+        result = SerdesUtils.write_function_arg(arg=self._field_reference_dto)
+        expected_result = {
+            SerdesUtils.EXPRESSION_TYPE: self._field_reference_dto.arg_type().name.lower(),
+            SerdesUtils.FIELD_NAME: self._field_reference_dto.field_name(),
         }
         self.assertDictEqual(result, expected_result)
