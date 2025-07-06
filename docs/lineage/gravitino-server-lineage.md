@@ -59,13 +59,13 @@ Log sink prints the log in a separate log file `gravitino_lineage.log`, you coul
 
 Lineage Http sink supports sending the lineage to an Http sink supported by OpenLineage. Consider the example below to configure the HTTP sink.
 
-| Property Name                            | Description                                                                                                                      | Default Value | Required | Since Version |
-|------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| gravitino.lineage.sinks                  | Specifies the lineage sink implementation to use.For http sink `httpSink`.                                                       | (none)        | Yes      | 0.9.0         |
-| gravitino.lineage.httpSink.sinkClass     | Fully qualified class name of the http sink lineage sink implementation  `org.apache.gravitino.lineage.sink.LineageHttpSink`)    | (none)        | Yes      | 0.9.0         |
-| gravitino.lineage.httpSink.url           | URL of the http sink server endpoint for lineage collection(e.g., `http://localhost:5000`)                                       | (none)        | Yes      | 0.9.1         |
-| gravitino.lineage.httpSink.authType      | Authentication type for http sink (options: `apiKey` or `none`)                                                                  | (none)        | Yes      | 0.9.1         |
-| gravitino.lineage.httpSink.apiKey        | API key for authenticating with http sink (required if authType=`apiKey`)                                                        | (none)        | No       | 0.9.1         |
+| Property Name                     | Description                                                                                                                            | Default Value                                      | Required | Since Version |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|----------|---------------|
+| gravitino.lineage.sinks           | Specifies the lineage sink implementation to use.For http sink `http`.                                                                 | `log`                                              | Yes      | 0.9.0         |
+| gravitino.lineage.http.sinkClass  | Fully qualified class name of the http sink lineage sink implementation  `org.apache.gravitino.lineage.sink.LineageHttpSink`)          | `org.apache.gravitino.lineage.sink.LineageLogSink` | Yes      | 0.9.0         |
+| gravitino.lineage.http.url        | URL of the http sink server endpoint for lineage collection(e.g., `http://localhost:5000`)                                             | (none)                                             | Yes      | 0.9.1         |
+| gravitino.lineage.http.authType   | Authentication type for http sink (options: `apiKey` or `none`)                                                                        | (none)                                             | Yes      | 0.9.1         |
+| gravitino.lineage.http.apiKey     | API key for authenticating with http sink (required if authType=`apiKey`)                                                              | (none)                                             | No       | 0.9.1         |
 
 ## High watermark status
 
