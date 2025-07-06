@@ -25,6 +25,7 @@ from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
+from gravitino.utils.precondition import Precondition
 
 
 class SerdesUtils:
@@ -65,3 +66,33 @@ class SerdesUtils:
             arg_data[cls.UNPARSED_EXPRESSION] = expression.unparsed_expression()
 
         return arg_data
+
+    @classmethod
+    def read_function_arg(cls, data: Dict[str, Any]) -> FunctionArg:
+        Precondition.check_argument(
+            data is not None and isinstance(data, dict),
+            f"Cannot parse function arg from invalid JSON: {data}",
+        )
+        Precondition.check_argument(
+            data.get(cls.EXPRESSION_TYPE) is not None,
+            f"Cannot parse function arg from missing type: {data}",
+        )
+        arg_type = str(data[cls.EXPRESSION_TYPE]).lower()
+
+        if arg_type == FunctionArg.ArgType.LITERAL:
+            Precondition.check_argument(
+                data.get(cls.DATA_TYPE) is not None,
+                f"Cannot parse literal arg from missing data type: {data}",
+            )
+            Precondition.check_argument(
+                data.get(cls.LITERAL_VALUE) is not None,
+                f"Cannot parse literal arg from missing literal value: {data}",
+            )
+            return (
+                LiteralDTO.builder()
+                .with_data_type(
+                    data_type=TypesSerdesUtils.read_data_type(data[cls.DATA_TYPE])
+                )
+                .with_value(value=data[cls.LITERAL_VALUE])
+                .build()
+            )
