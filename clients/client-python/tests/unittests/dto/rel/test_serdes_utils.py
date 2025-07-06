@@ -172,3 +172,18 @@ class TestExpressionSerdesUtils(unittest.TestCase):
         data[SerdesUtils.LITERAL_VALUE] = self._literal_dto.value()
         result = SerdesUtils.read_function_arg(data=data)
         self.assertEqual(result, self._literal_dto)
+
+    def test_read_function_arg_field_reference_dto(self):
+        data = {
+            SerdesUtils.EXPRESSION_TYPE: self._field_reference_dto.arg_type().name.lower()
+        }
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Cannot parse field reference arg from missing field name",
+            SerdesUtils.read_function_arg,
+            data=data,
+        )
+
+        data[SerdesUtils.FIELD_NAME] = self._field_reference_dto.field_name()
+        result = SerdesUtils.read_function_arg(data=data)
+        self.assertEqual(result, self._field_reference_dto)
