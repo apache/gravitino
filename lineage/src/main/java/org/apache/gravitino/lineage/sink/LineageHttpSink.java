@@ -59,9 +59,9 @@ public class LineageHttpSink implements LineageSink {
 
     try {
       client.emit(Utils.getClientRunEvent(runEvent));
-      LOG.info("Sent lineage event to Marquez: {}", runEvent);
+      LOG.info("Sent lineage event to http sink: {}", runEvent);
     } catch (OpenLineageClientException e) {
-      LOG.warn("Failed to send lineage event to Marquez ", e);
+      LOG.warn("Failed to send lineage event to http sink ", e);
       throw new BadRequestException(String.format(e.getMessage()), e);
     } catch (JsonProcessingException e) {
       LOG.error("Could not parse lineage run event", e);
