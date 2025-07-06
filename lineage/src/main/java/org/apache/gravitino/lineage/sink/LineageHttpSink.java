@@ -39,7 +39,6 @@ public class LineageHttpSink implements LineageSink {
 
   @Override
   public void initialize(Map<String, String> configs) {
-
     String httpSinkUrl = configs.getOrDefault("url", "http://localhost:5000/");
     LOG.info("http sink url {}", httpSinkUrl);
     String authType = configs.get("authType");
@@ -56,7 +55,6 @@ public class LineageHttpSink implements LineageSink {
 
   @Override
   public void sink(OpenLineage.RunEvent runEvent) {
-
     try {
       client.emit(Utils.getClientRunEvent(runEvent));
       LOG.info("Sent lineage event to http sink: {}", runEvent);
