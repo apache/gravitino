@@ -205,8 +205,8 @@ public class TableOperations {
       expression =
           "( (ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
               + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
-              + " (ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA) || TABLE::OWNER)) ||"
-              + "ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
+              + " (ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA))) ||"
+              + "ANY(OWNER,METALAKE,CATALOG,SCHEMA,TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
