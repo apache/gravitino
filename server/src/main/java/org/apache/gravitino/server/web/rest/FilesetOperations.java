@@ -110,14 +110,25 @@ public class FilesetOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
-                        + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA ||SCHEMA::USE_SCHEMA) && "
-                        + " (METALAKE::READ_FILESET || CATALOG::READ_FILESET "
-                        + "|| SCHEMA::READ_FILESET || FILESET::READ_FILESET "
-                        + "|| METALAKE::WRITE_FILESET || CATALOG::WRITE_FILESET "
-                        + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET) "
-                        + "|| METALAKE::OWNER || CATALOG::OWNER "
-                        + "|| SCHEMA::OWNER || FILESET::OWNER)",
+                    //                    "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
+                    //                        + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA
+                    // ||SCHEMA::USE_SCHEMA) && "
+                    //                        + " (METALAKE::READ_FILESET || CATALOG::READ_FILESET "
+                    //                        + "|| SCHEMA::READ_FILESET || FILESET::READ_FILESET "
+                    //                        + "|| METALAKE::WRITE_FILESET ||
+                    // CATALOG::WRITE_FILESET "
+                    //                        + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET)
+                    // "
+                    //                        + "|| METALAKE::OWNER || CATALOG::OWNER "
+                    //                        + "|| SCHEMA::OWNER || FILESET::OWNER)",
+                    //                    "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
+
+                    "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
+                        + "("
+                        + "  ANY(USE_CATALOG, METALAKE, CATALOG) && "
+                        + "  ANY(USE_SCHEMA, METALAKE, CATALOG, SCHEMA) && "
+                        + "  ( ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) )"
+                        + ")",
                     Entity.EntityType.FILESET,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -202,12 +213,9 @@ public class FilesetOperations {
   @ResponseMetered(name = "load-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::READ_FILESET || CATALOG::READ_FILESET "
-              + "|| SCHEMA::READ_FILESET || FILESET::READ_FILESET "
-              + "|| METALAKE::WRITE_FILESET || CATALOG::WRITE_FILESET "
-              + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET "
-              + "|| METALAKE::OWNER || CATALOG::OWNER "
-              + "|| SCHEMA::OWNER || FILESET::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
+              + "ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) ||"
+              + "ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response loadFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -215,7 +223,8 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
           String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") String fileset) {
+      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
+          String fileset) {
     LOG.info("Received load fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(
