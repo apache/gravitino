@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertLinesMatch;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -167,6 +168,11 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableList.of(Privileges.UseSchema.allow(), Privileges.UseModel.allow()));
     Model modelEntity = modelCatalog.getModel(NameIdentifier.of(SCHEMA, "model1"));
     assertEquals("model1", modelEntity.name());
+    // reset privilege
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.SCHEMA),
+        ImmutableSet.of(Privileges.UseModel.allow()));
   }
 
   @Test
@@ -227,7 +233,6 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               new String[] {"alias2"},
               "comment2",
               null);
-          ;
         });
   }
 
@@ -293,7 +298,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
-  @Order(9)
+  @Order(10)
   public void testDropModelVersion() {
     ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
     Catalog catalogEntityLoadByNormalUser =
