@@ -95,7 +95,7 @@ public class TableOperations {
                     "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
                         + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
                         + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-                        + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE|| TABLE::OWNER)) ||"
+                        + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)) ||"
                         + "ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
                     Entity.EntityType.TABLE,
                     idents);
@@ -169,7 +169,7 @@ public class TableOperations {
           "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
               + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
               + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-              + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE)|| TABLE::OWNER)) ||"
+              + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)) ||"
               + "ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
