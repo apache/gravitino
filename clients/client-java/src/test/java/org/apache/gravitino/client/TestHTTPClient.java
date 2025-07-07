@@ -137,8 +137,8 @@ public class TestHTTPClient {
 
     String path = addRequestTestCaseAndGetPath(Method.GET, body, statusCode, false, true);
 
-    Item response = restClient.get(path, null, Item.class, null, onError);
-    
+    Item response = restClient.get(path, Item.class, (Map<String, String>) null, onError);
+
     Assertions.assertEquals(body, response);
     verify(onError, never()).accept(any());
   }
