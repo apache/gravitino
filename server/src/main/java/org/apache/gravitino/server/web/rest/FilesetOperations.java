@@ -105,12 +105,14 @@ public class FilesetOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "METALAKE::READ_FILESET || CATALOG::READ_FILESET "
+                    "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
+                        + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA ||SCHEMA::USE_SCHEMA) && "
+                        + " (METALAKE::READ_FILESET || CATALOG::READ_FILESET "
                         + "|| SCHEMA::READ_FILESET || FILESET::READ_FILESET "
                         + "|| METALAKE::WRITE_FILESET || CATALOG::WRITE_FILESET "
-                        + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET "
+                        + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET) "
                         + "|| METALAKE::OWNER || CATALOG::OWNER "
-                        + "|| SCHEMA::OWNER || FILESET::OWNER",
+                        + "|| SCHEMA::OWNER || FILESET::OWNER)",
                     Entity.EntityType.FILESET,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -133,7 +135,12 @@ public class FilesetOperations {
   @Timed(name = "create-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-fileset", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::CREATE_FILESET || CATALOG::CREATE_FILESET || SCHEMA::CREATE_FILESET",
+      expression =
+          " ((METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || SCHEMA::USE_CATALOG) && "
+              + "((METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA || SCHEMA::USE_SCHEMA) && "
+              + "(METALAKE::CREATE_FILESET || CATALOG::CREATE_FILESET || "
+              + "SCHEMA::CREATE_FILESET) || SCHEMA::OWNER)) || "
+              + "METALAKE::OWNER || CATALOG::OWNER",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response createFileset(
       @PathParam("metalake") String metalake,
@@ -351,8 +358,8 @@ public class FilesetOperations {
               + "|| SCHEMA::READ_FILESET || FILESET::READ_FILESET "
               + "|| METALAKE::WRITE_FILESET || CATALOG::WRITE_FILESET "
               + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET "
-              + "|| METALAKE::OWNERSHIP || CATALOG::OWNERSHIP "
-              + "|| SCHEMA::OWNERSHIP || FILESET::OWNERSHIP",
+              + "|| METALAKE::OWNER || CATALOG::OWNER "
+              + "|| SCHEMA::OWNER || FILESET::OWNER",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response getFileLocation(
       @PathParam("metalake") String metalake,
