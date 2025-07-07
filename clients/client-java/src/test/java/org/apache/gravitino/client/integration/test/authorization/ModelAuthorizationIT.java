@@ -39,6 +39,8 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.model.ModelChange;
+import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -161,7 +163,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         role,
-        MetadataObjects.of(CATALOG, "schema1", MetadataObject.Type.SCHEMA),
+        MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.SCHEMA),
         ImmutableList.of(Privileges.UseSchema.allow(), Privileges.UseModel.allow()));
     Model modelEntity = modelCatalog.getModel(NameIdentifier.of(SCHEMA, "model1"));
     assertEquals("model1", modelEntity.name());
@@ -184,7 +186,7 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
     modelCatalog.alterModel(
         NameIdentifier.of(SCHEMA, "model1"), new ModelChange.RenameModel("model4"));
     modelCatalog.alterModel(
-        NameIdentifier.of(SCHEMA, "model1"), new ModelChange.RenameModel("model1"));
+        NameIdentifier.of(SCHEMA, "model4"), new ModelChange.RenameModel("model1"));
   }
 
   @Test
@@ -201,6 +203,111 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           modelCatalogLoadByNormalUser.deleteModel(NameIdentifier.of(SCHEMA, "model5"));
         });
-    modelCatalogLoadByNormalUser.deleteModel(NameIdentifier.of(SCHEMA, "model5"));
+    modelCatalog.deleteModel(NameIdentifier.of(SCHEMA, "model5"));
+  }
+
+  @Test
+  @Order(6)
+  public void testLinkModel() {
+    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    Catalog catalogEntityLoadByNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
+    modelCatalog.linkModelVersion(
+        NameIdentifier.of(SCHEMA, "model1"), "uri1", new String[] {"alias1"}, "comment2", null);
+    modelCatalog.linkModelVersion(
+        NameIdentifier.of(SCHEMA, "model1"), "uri2", new String[] {"alias2"}, "comment2", null);
+    assertThrows(
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
+        RuntimeException.class,
+        () -> {
+          modelCatalogLoadByNormalUser.linkModelVersion(
+              NameIdentifier.of(SCHEMA, "model1"),
+              "uri1",
+              new String[] {"alias2"},
+              "comment2",
+              null);
+          ;
+        });
+  }
+
+  @Test
+  @Order(7)
+  public void testListModelVersion() {
+    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    Catalog catalogEntityLoadByNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
+    int[] versions = modelCatalog.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
+    assertEquals(2, versions.length);
+    assertThrows(
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
+        RuntimeException.class,
+        () -> {
+          modelCatalogLoadByNormalUser.linkModelVersion(
+              NameIdentifier.of(SCHEMA, "model1"),
+              "uri1",
+              new String[] {"alias2"},
+              "comment2",
+              null);
+          ;
+        });
+  }
+
+  @Test
+  @Order(8)
+  public void testLoadModelVersion() {
+    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    Catalog catalogEntityLoadByNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
+    ModelVersion version = modelCatalog.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
+    assertEquals(1, version.version());
+    assertThrows(
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
+        RuntimeException.class,
+        () -> {
+          modelCatalogLoadByNormalUser.getModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
+        });
+  }
+
+  @Test
+  @Order(9)
+  public void testAlterModelVersion() {
+    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    Catalog catalogEntityLoadByNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
+    ModelVersion version =
+        modelCatalog.alterModelVersion(
+            NameIdentifier.of(SCHEMA, "model1"), 1, ModelVersionChange.setProperty("key", "value"));
+    assertEquals("value", version.properties().get("key"));
+    assertThrows(
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
+        RuntimeException.class,
+        () -> {
+          modelCatalogLoadByNormalUser.alterModelVersion(
+              NameIdentifier.of(SCHEMA, "model1"),
+              1,
+              ModelVersionChange.setProperty("key", "value"));
+        });
+  }
+
+  @Test
+  @Order(9)
+  public void testDropModelVersion() {
+    ModelCatalog modelCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asModelCatalog();
+    Catalog catalogEntityLoadByNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    ModelCatalog modelCatalogLoadByNormalUser = catalogEntityLoadByNormalUser.asModelCatalog();
+    assertThrows(
+        "Can not access metadata {" + METALAKE + "," + CATALOG + "." + SCHEMA + "model1" + "}.",
+        RuntimeException.class,
+        () -> {
+          modelCatalogLoadByNormalUser.deleteModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
+        });
+    modelCatalog.deleteModelVersion(NameIdentifier.of(SCHEMA, "model1"), 1);
+    int[] versions = modelCatalog.listModelVersions(NameIdentifier.of(SCHEMA, "model1"));
+    assertEquals(1, versions.length);
   }
 }

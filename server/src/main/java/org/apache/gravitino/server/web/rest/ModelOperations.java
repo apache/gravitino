@@ -216,7 +216,7 @@ public class ModelOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
           String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") String model) {
+      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model) {
     LOG.info("Received delete model request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
 
