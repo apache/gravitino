@@ -219,12 +219,12 @@ public class CatalogOperations {
   @ResponseMetered(name = "load-catalog", absolute = true)
   public Response loadCatalog(
       @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
-    LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
+    LOG.debug("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
       Catalog catalog = catalogDispatcher.loadCatalog(ident);
       Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
-      LOG.info("Catalog loaded: {}.{}", metalakeName, catalogName);
+      LOG.debug("Catalog loaded: {}.{}", metalakeName, catalogName);
       return response;
 
     } catch (Exception e) {
