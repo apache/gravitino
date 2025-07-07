@@ -250,7 +250,6 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
               new String[] {"alias2"},
               "comment2",
               null);
-          ;
         });
   }
 
