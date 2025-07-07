@@ -246,7 +246,7 @@ public class TableOperations {
   @AuthorizationExpression(
       expression =
           "( (ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
-              + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA) || TABLE::OWNER ))"
+              + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA) && TABLE::OWNER ))"
               + " || ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
