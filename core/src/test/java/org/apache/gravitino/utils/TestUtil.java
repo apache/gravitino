@@ -171,7 +171,8 @@ public class TestUtil {
    * @return The test {@link TableEntity} entity.
    */
   public static ModelEntity getTestModelEntity() {
-    return getTestModelEntity(generator.nextId(), "test_model", Namespace.of("m1", "c1", "s1"));
+    return getTestModelEntity(
+        generator.nextId(), RandomNameUtils.genRandomName("model"), Namespace.of("m1", "c1", "s1"));
   }
 
   /**
@@ -366,6 +367,17 @@ public class TestUtil {
   }
 
   /**
+   * Returns a test user entity with the given ID, name, and roles.
+   *
+   * @param roles The roles of the user entity.
+   * @return The test {@link UserEntity} entity.
+   */
+  public static UserEntity getTestUserEntity(List<Long> roles) {
+    return getTestUserEntity(
+        generator.nextId(), RandomNameUtils.genRandomName("user"), "test_metalake", roles);
+  }
+
+  /**
    * Returns a test user entity with the given ID, name, and metalake.
    *
    * @param id The ID of the user entity.
@@ -421,7 +433,8 @@ public class TestUtil {
    * @return The test {@link RoleEntity} entity.
    */
   public static RoleEntity getTestRoleEntity() {
-    return getTestRoleEntity(generator.nextId(), "test_role", "test_metalake");
+    return getTestRoleEntity(
+        generator.nextId(), RandomNameUtils.genRandomName("role"), "test_metalake");
   }
 
   /**
