@@ -32,6 +32,9 @@ public class AuthorizationExpressionConverter {
   /** Match authorization expressions */
   public static final Pattern PATTERN = Pattern.compile("([A-Z_]+)::([A-Z_]+)");
 
+  /** Match ANY expressions */
+  public static final Pattern ANY_PATTERN = Pattern.compile("ANY\\(([^)]+)\\)");
+
   /**
    * The EXPRESSION_CACHE caches the result of converting authorization expressions into an OGNL
    * expression.
@@ -51,6 +54,7 @@ public class AuthorizationExpressionConverter {
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {
+    authorizationExpression = replaceAnyExpressions(authorizationExpression);
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
@@ -77,5 +81,41 @@ public class AuthorizationExpressionConverter {
 
           return result.toString();
         });
+  }
+
+  /**
+   * Replaces any expression. For example, replace ANY(OWNER, METALAKE, CATALOG) to METALAKE::OWNER
+   * || CATALOG::OWNER.
+   *
+   * @param expression The original expression
+   * @return The modified expression
+   */
+  public static String replaceAnyExpressions(String expression) {
+    Matcher matcher = ANY_PATTERN.matcher(expression);
+    StringBuffer result = new StringBuffer();
+
+    while (matcher.find()) {
+      String innerContent = matcher.group(1);
+      String[] parts = innerContent.split(",");
+      if (parts.length < 2) {
+        matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(0)));
+        continue;
+      }
+
+      String function = parts[0].trim();
+      StringBuilder replacement = new StringBuilder();
+      for (int i = 1; i < parts.length; i++) {
+        String scope = parts[i].trim();
+        if (!scope.isEmpty()) {
+          if (replacement.length() > 0) {
+            replacement.append(" || ");
+          }
+          replacement.append(scope).append("::").append(function);
+        }
+      }
+      matcher.appendReplacement(result, replacement.toString());
+    }
+    matcher.appendTail(result);
+    return result.toString();
   }
 }
