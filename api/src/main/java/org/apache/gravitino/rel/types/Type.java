@@ -106,7 +106,23 @@ public interface Type {
   abstract class NumericType extends PrimitiveType {}
 
   /** The base type of all date/time types. */
-  abstract class DateTimeType extends PrimitiveType {}
+  abstract class DateTimeType extends PrimitiveType {
+    /**
+     * Indicates that precision for the date/time type was not explicitly set by the user. The value
+     * should be converted to the catalog's default precision.
+     */
+    protected static final int DATE_TIME_PRECISION_NOT_SET = -1;
+    /**
+     * Represents the minimum precision range for timestamp, time and other date/time types. The
+     * minimum precision is 0, which means second-level precision.
+     */
+    protected static final int MIN_ALLOWED_PRECISION = 0;
+    /**
+     * Represents the maximum precision allowed for timestamp, time and other date/time types. The
+     * maximum precision is 12, which means picosecond-level precision.
+     */
+    protected static final int MAX_ALLOWED_PRECISION = 12;
+  }
 
   /** The base type of all interval types. */
   abstract class IntervalType extends PrimitiveType {}

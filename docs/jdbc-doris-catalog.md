@@ -86,21 +86,21 @@ Please refer to
 
 #### Table column types
 
-| Gravitino Type | Doris Type |
-|----------------|------------|
-| `Boolean`      | `Boolean`  |
-| `Byte`         | `TinyInt`  |
-| `Short`        | `SmallInt` |
-| `Integer`      | `Int`      |
-| `Long`         | `BigInt`   |
-| `Float`        | `Float`    |
-| `Double`       | `Double`   |
-| `Decimal`      | `Decimal`  |
-| `Date`         | `Date`     |
-| `Timestamp`    | `Datetime` |
-| `VarChar`      | `VarChar`  |
-| `FixedChar`    | `Char`     |
-| `String`       | `String`   |
+| Gravitino Type | Doris Type    |
+|----------------|---------------|
+| `Boolean`      | `Boolean`     |
+| `Byte`         | `TinyInt`     |
+| `Short`        | `SmallInt`    |
+| `Integer`      | `Int`         |
+| `Long`         | `BigInt`      |
+| `Float`        | `Float`       |
+| `Double`       | `Double`      |
+| `Decimal`      | `Decimal`     |
+| `Date`         | `Date`        |
+| `Timestamp(p)` | `Datetime(p)` |
+| `VarChar`      | `VarChar`     |
+| `FixedChar`    | `Char`        |
+| `String`       | `String`      |
 
 
 Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
