@@ -1501,7 +1501,7 @@ public class TestJDBCBackend {
   public static ModelVersionEntity createModelVersionEntity(
       NameIdentifier modelId,
       Integer version,
-      String modelUri,
+      Map<String, String> modelUris,
       List<String> aliases,
       String comment,
       Map<String, String> properties,
@@ -1509,7 +1509,7 @@ public class TestJDBCBackend {
     return ModelVersionEntity.builder()
         .withModelIdentifier(modelId)
         .withVersion(version)
-        .withUri(modelUri)
+        .withUris(modelUris)
         .withAliases(aliases)
         .withComment(comment)
         .withProperties(properties)
