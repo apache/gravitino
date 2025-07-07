@@ -120,6 +120,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         client.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
     String filename1 = GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset1");
     filesetCatalog.createFileset(
+        //                NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset1"),
         NameIdentifier.of(SCHEMA, "fileset1"),
         "comment",
         Fileset.Type.MANAGED,
@@ -133,7 +134,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         RuntimeException.class,
         () -> {
           filesetCatalogNormalUser.createFileset(
-              NameIdentifier.of(SCHEMA, "fileset2"),
+              NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset2"),
               "comment",
               Fileset.Type.MANAGED,
               storageLocation(GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset2")),
@@ -144,18 +145,20 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     gravitinoMetalake.grantPrivilegesToRole(
         role,
         MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.SCHEMA),
-        ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()));
+        ImmutableList.of(Privileges.UseSchema.allow(), Privileges.CreateFileset.allow()));
     // normal user can now create fileset
     String filename2 = GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset2");
     filesetCatalogNormalUser.createFileset(
-        NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset2"),
+        NameIdentifier.of(SCHEMA, "fileset2"),
+        //        NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset2"),
         "comment",
         Fileset.Type.MANAGED,
         storageLocation(filename2),
         new HashMap<>());
     String filename3 = GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset3");
     filesetCatalogNormalUser.createFileset(
-        NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset3"),
+        NameIdentifier.of(SCHEMA, "fileset3"),
+        //        NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset3"),
         "comment",
         Fileset.Type.MANAGED,
         storageLocation(filename3),
