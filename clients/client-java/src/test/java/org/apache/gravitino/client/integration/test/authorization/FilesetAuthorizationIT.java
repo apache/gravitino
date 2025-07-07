@@ -290,7 +290,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     if (defaultBaseLocation == null) {
       defaultBaseLocation =
           String.format(
-              "hdfs://%s:%d/user/hadoop/%s",
+              "hdfs://%s:%d/user/hive/%s",
               containerSuite.getHiveContainer().getContainerIpAddress(),
               HiveContainer.HDFS_DEFAULTFS_PORT,
               SCHEMA.toLowerCase());
