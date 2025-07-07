@@ -20,28 +20,27 @@
 package org.apache.gravitino.cache;
 
 import java.util.List;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Setup;
 
 /**
- * EntityCachePutBenchmark benchmarks the performance of {@link EntityCache#put} operations for both
- * standard entities and relation-based entity groups.
+ * EntityCacheGetBenchmark benchmarks the performance of the {@link EntityCache#getIfPresent}
+ * operation for both individual entities and entity relations.
  *
- * <p>Each benchmark invocation starts with a cleared cache to ensure that measurements reflect
- * fresh insertions without side effects from previous state.
+ * <p>This benchmark measures the efficiency of cache lookups under varying data sizes (e.g., 10,
+ * 100, 1000 entries), helping evaluate the speed and consistency of the cache's get operations.
  *
- * <p>This benchmark covers two insertion scenarios:
+ * <p>It includes two benchmark methods:
  *
  * <ul>
- *   <li>{@code benchmarkPut}: Inserts a batch of {@link ModelEntity} instances into the cache.
- *   <li>{@code benchmarkPutWithRelation}: Inserts relation mappings between {@link RoleEntity} and
- *       related entities (e.g., users), using a relation type as part of the cache key.
+ *   <li>{@code benchmarkGet}: Retrieves a {@link ModelEntity} by its identifier and type.
+ *   <li>{@code benchmarkGetWithRelations}: Retrieves a list of related entities (e.g., users under
+ *       a role) using a relation type and a {@link RoleEntity} as the lookup key.
  * </ul>
  *
  * @param <E> the type of related entity, extending {@link Entity} and implementing {@link
@@ -49,28 +48,28 @@ import org.openjdk.jmh.annotations.Setup;
  * @see org.apache.gravitino.cache.EntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class EntityCachePutBenchmark<E extends Entity & HasIdentifier>
+public class GetEntityCacheBenchmark<E extends Entity & HasIdentifier>
     extends AbstractEntityBenchmark {
-  @Setup(Level.Invocation)
-  public void prepareForCachePut() {
-    cache.clear();
+
+  @Benchmark
+  public Entity benchmarkGet() {
+    int idx = random.nextInt(entities.size());
+    ModelEntity sampleEntity = (ModelEntity) entities.get(idx);
+
+    return cache.getIfPresent(sampleEntity.nameIdentifier(), sampleEntity.type()).orElse(null);
   }
 
   @Benchmark
   @SuppressWarnings("unchecked")
-  public void benchmarkPut() {
-    entities.forEach(e -> cache.put((ModelEntity) e));
-  }
+  public List<E> benchmarkGetWithRelations() {
+    RoleEntity sampleRoleEntity = (RoleEntity) BenchmarkHelper.getRandomKey(entitiesWithRelations);
 
-  @Benchmark
-  @SuppressWarnings("unchecked")
-  public void benchmarkPutWithRelation() {
-    entitiesWithRelations.forEach(
-        (role, relationEntities) ->
-            cache.put(
-                ((RoleEntity) role).nameIdentifier(),
-                ((RoleEntity) role).type(),
-                SupportsRelationOperations.Type.ROLE_USER_REL,
-                (List<E>) relationEntities));
+    Optional<List<E>> relationFromCache =
+        cache.getIfPresent(
+            SupportsRelationOperations.Type.ROLE_USER_REL,
+            sampleRoleEntity.nameIdentifier(),
+            sampleRoleEntity.type());
+
+    return relationFromCache.orElse(null);
   }
 }

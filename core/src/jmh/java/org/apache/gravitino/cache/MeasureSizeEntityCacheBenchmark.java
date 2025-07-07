@@ -48,7 +48,7 @@ import org.openjdk.jmh.annotations.Benchmark;
  * @see org.apache.gravitino.cache.EntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class EntityCacheSizeBenchmark<E extends Entity & HasIdentifier>
+public class MeasureSizeEntityCacheBenchmark<E extends Entity & HasIdentifier>
     extends AbstractEntityBenchmark {
 
   @Override

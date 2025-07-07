@@ -41,7 +41,7 @@ import org.openjdk.jmh.annotations.Setup;
  * @see org.apache.gravitino.cache.EntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class EntityCacheClearBenchmark<E extends Entity & HasIdentifier>
+public class ClearEntityCacheBenchmark<E extends Entity & HasIdentifier>
     extends AbstractEntityBenchmark {
 
   @Setup(Level.Invocation)

@@ -44,7 +44,7 @@ import org.openjdk.jmh.annotations.Setup;
  * @see org.apache.gravitino.cache.CaffeineEntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class EntityCacheInvalidateBenchmark extends AbstractEntityBenchmark {
+public class InvalidateEntityCacheBenchmark extends AbstractEntityBenchmark {
 
   @Setup(Level.Invocation)
   @SuppressWarnings("unchecked")

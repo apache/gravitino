@@ -43,7 +43,7 @@ import org.openjdk.jmh.annotations.Benchmark;
  * @see org.apache.gravitino.cache.EntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class EntityCacheContainsBenchmark extends AbstractEntityBenchmark {
+public class ContainsEntityCacheBenchmark extends AbstractEntityBenchmark {
 
   @Benchmark
   public boolean benchmarkContains() {
