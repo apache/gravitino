@@ -101,7 +101,7 @@ import org.mockito.Mockito;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestJDBCBackend {
   private final String JDBC_STORE_PATH =
-      "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
+      "D:/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private final String DB_DIR = JDBC_STORE_PATH + "/testdb";
   private final String H2_FILE = DB_DIR + ".mv.db";
   private final Config config = Mockito.mock(Config.class);
