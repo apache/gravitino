@@ -81,7 +81,7 @@ function wait_for_iceberg_rest_server_to_die() {
       break
     fi
 
-    $(kill ${pid} > /dev/null 2> /dev/null)
+    kill ${pid} > /dev/null 2> /dev/null
     if kill -0 ${pid} > /dev/null 2>&1; then
       sleep 3
     else
@@ -91,8 +91,8 @@ function wait_for_iceberg_rest_server_to_die() {
     currentTime=$(date "+%s")
   done
 
-  if [[ forceKill -ne 0 ]]; then
-    $(kill -9 ${pid} > /dev/null 2> /dev/null)
+  if [[ $forceKill -ne 0 ]]; then
+    kill -9 ${pid} > /dev/null 2> /dev/null
   fi
 }
 

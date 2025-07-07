@@ -22,8 +22,10 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 
@@ -34,15 +36,21 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
 
   private static final String CONNECTOR_MEMORY = "memory";
+  private final PropertyConverter catalogConverter;
   private final HasPropertyMeta propertyMetadata;
 
+  /**
+   * Constructs a new MemoryConnectorAdapter. Initializes the property metadata for handling
+   * memory-specific configurations.
+   */
   public MemoryConnectorAdapter() {
+    this.catalogConverter = new CatalogPropertyConverter();
     this.propertyMetadata = new MemoryPropertyMeta();
   }
 
   @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) {
-    return Collections.emptyMap();
+    return catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
   }
 
   @Override

@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLDataTypeTransformer.JSON_TYPE;
+
 import io.trino.spi.TrinoException;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -99,5 +101,13 @@ public class TestMySQLDataTypeTransformer {
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(unsignBigintType),
         io.trino.spi.type.DecimalType.createDecimalType(20, 0));
+  }
+
+  @Test
+  public void testGravitinoExternalJsonTypeToTrinoType() {
+    GeneralDataTypeTransformer generalDataTypeTransformer = new MySQLDataTypeTransformer();
+
+    Type jsonType = Types.ExternalType.of("json");
+    Assertions.assertEquals(generalDataTypeTransformer.getTrinoType(jsonType), JSON_TYPE);
   }
 }

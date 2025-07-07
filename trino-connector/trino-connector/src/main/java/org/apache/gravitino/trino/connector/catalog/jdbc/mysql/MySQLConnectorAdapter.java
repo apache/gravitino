@@ -37,6 +37,10 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   private final PropertyConverter catalogConverter;
   private final HasPropertyMeta propertyMetadata;
 
+  /**
+   * Constructs a new MySQLConnectorAdapter. Initializes the catalog property converter and property
+   * metadata for MySQL-specific configurations.
+   */
   public MySQLConnectorAdapter() {
     this.catalogConverter = new JDBCCatalogPropertyConverter();
     this.propertyMetadata = new MySQLPropertyMeta();

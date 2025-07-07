@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
@@ -89,7 +90,8 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   private CatalogWrapperForREST createCatalogWrapper(String catalogName) {
     Optional<IcebergConfig> icebergConfig = configProvider.getIcebergCatalogConfig(catalogName);
     if (!icebergConfig.isPresent()) {
-      throw new RuntimeException("Couldn't find Iceberg configuration for " + catalogName);
+      throw new NoSuchCatalogException(
+          "Couldn't find Iceberg configuration for catalog %s", catalogName);
     }
     return createCatalogWrapper(catalogName, icebergConfig.get());
   }
