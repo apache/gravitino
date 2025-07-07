@@ -23,6 +23,7 @@ public class TestEntity1 {
   private Long id;
   private String name;
 
+  // 构造方法
   public TestEntity1() {}
 
   public TestEntity1(Long id, String name) {
@@ -30,6 +31,7 @@ public class TestEntity1 {
     this.name = name;
   }
 
+  // Getter 和 Setter 方法
   public Long getId() {
     return id;
   }
