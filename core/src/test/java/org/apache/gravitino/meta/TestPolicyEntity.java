@@ -24,7 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.policy.CustomPolicy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -38,18 +38,14 @@ public class TestPolicyEntity {
 
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     Namespace namespace = Namespace.of("m1", "c1", "s1");
-    CustomPolicy.CustomContent content =
-        CustomPolicy.contentBuilder()
-            .withCustomFields(contentFields)
-            .withProperties(properties)
-            .build();
+    PolicyContent content = PolicyContent.custom(contentFields, properties);
     PolicyEntity policyEntity =
         PolicyEntity.builder()
             .withId(1L)
             .withName("test")
             .withNamespace(namespace)
             .withComment("test comment")
-            .withType("my_compaction")
+            .withPolicyType("my_compaction")
             .withEnabled(false)
             .withExclusive(true)
             .withInheritable(true)
@@ -75,7 +71,7 @@ public class TestPolicyEntity {
             .withId(1L)
             .withName("test")
             .withNamespace(namespace)
-            .withType("my_compaction")
+            .withPolicyType("my_compaction")
             .withEnabled(false)
             .withExclusive(true)
             .withInheritable(true)
@@ -107,7 +103,7 @@ public class TestPolicyEntity {
                 .withId(1L)
                 .withName("test")
                 .withNamespace(Namespace.of("m1", "c1", "s1"))
-                .withType("my_compaction")
+                .withPolicyType("my_compaction")
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());
@@ -119,7 +115,7 @@ public class TestPolicyEntity {
                 .withId(1L)
                 .withName("test")
                 .withNamespace(Namespace.of("m1", "c1", "s1"))
-                .withType("my_compaction")
+                .withPolicyType("my_compaction")
                 .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())

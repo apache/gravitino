@@ -58,7 +58,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
-import org.apache.gravitino.policy.BasePolicy;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
@@ -1316,7 +1316,7 @@ public class POConverters {
           .withId(policyPO.getPolicyId())
           .withName(policyPO.getPolicyName())
           .withNamespace(namespace)
-          .withType(policyPO.getPolicyType())
+          .withPolicyType(policyPO.getPolicyType())
           .withComment(policyPO.getPolicyVersionPO().getPolicyComment())
           .withEnabled(policyPO.getPolicyVersionPO().isEnabled())
           .withExclusive(policyPO.isExclusive())
@@ -1330,7 +1330,7 @@ public class POConverters {
               JsonUtils.anyFieldMapper()
                   .readValue(
                       policyPO.getPolicyVersionPO().getContent(),
-                      BasePolicy.ContentType.fromString(policyPO.getPolicyType()).contentClass()))
+                      Policy.BuiltInType.fromPolicyType(policyPO.getPolicyType()).contentClass()))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(policyPO.getAuditInfo(), AuditInfo.class))
           .build();

@@ -60,8 +60,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.policy.CustomPolicy;
-import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
@@ -777,7 +776,7 @@ public class TestPOConverters {
 
   @Test
   public void testFromPolicyPO() throws JsonProcessingException {
-    Policy.Content content = CustomPolicy.contentBuilder().build();
+    PolicyContent content = PolicyContent.custom(null, null);
     PolicyVersionPO policyVersionPO =
         createPolicyVersionPO(1L, 1L, 1L, "test comment", true, content);
     PolicyPO policyPO =
@@ -805,7 +804,7 @@ public class TestPOConverters {
     assertEquals(expectedPolicy.name(), convertedPolicy.name());
     assertEquals(expectedPolicy.namespace(), convertedPolicy.namespace());
     assertEquals(expectedPolicy.auditInfo().creator(), convertedPolicy.auditInfo().creator());
-    assertEquals(expectedPolicy.type(), convertedPolicy.type());
+    assertEquals(expectedPolicy.policyType(), convertedPolicy.policyType());
     assertEquals(expectedPolicy.comment(), convertedPolicy.comment());
     assertEquals(expectedPolicy.enabled(), convertedPolicy.enabled());
     assertEquals(expectedPolicy.inheritable(), convertedPolicy.inheritable());
@@ -1543,14 +1542,14 @@ public class TestPOConverters {
       boolean exclusive,
       boolean inheritable,
       Set<MetadataObject.Type> supportedObjectTypes,
-      Policy.Content content) {
+      PolicyContent content) {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     return PolicyEntity.builder()
         .withId(id)
         .withName(name)
         .withNamespace(namespace)
-        .withType(type)
+        .withPolicyType(type)
         .withComment(comment)
         .withEnabled(enabled)
         .withExclusive(exclusive)
@@ -1596,7 +1595,7 @@ public class TestPOConverters {
       Long policyId,
       String comment,
       boolean enabled,
-      Policy.Content content)
+      PolicyContent content)
       throws JsonProcessingException {
     return PolicyVersionPO.builder()
         .withId(id)

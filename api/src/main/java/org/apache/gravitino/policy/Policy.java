@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.policy;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
@@ -33,6 +35,114 @@ import org.apache.gravitino.exceptions.IllegalPolicyException;
  */
 @Evolving
 public interface Policy extends Auditable {
+
+  /**
+   * The prefix for built-in policy types. All built-in policy types should start with this prefix.
+   */
+  String BUILT_IN_TYPE_PREFIX = "policy_";
+
+  /** The built-in policy types. Predefined policy types that are provided by the system. */
+  enum BuiltInType {
+    // todo: add built-in policies, such as:
+    //    DATA_COMPACTION(BUILT_IN_TYPE_PREFIX + "data_compaction", true, true,
+    // SUPPORTS_ALL_OBJECT_TYPES
+    //      PolicyContent.DataCompactionContent.class)
+
+    /**
+     * Custom policy type. "custom" is a dummy type for custom policies, all non-built-in types are
+     * custom types.
+     */
+    CUSTOM("custom", null, null, null, PolicyContent.CustomContent.class);
+
+    private final String policyType;
+    private final Boolean exclusive;
+    private final Boolean inheritable;
+    private final ImmutableSet<MetadataObject.Type> supportedObjectTypes;
+    private final Class<? extends PolicyContent> contentClass;
+
+    BuiltInType(
+        String policyType,
+        Boolean exclusive,
+        Boolean inheritable,
+        Set<MetadataObject.Type> supportedObjectTypes,
+        Class<? extends PolicyContent> contentClass) {
+      this.policyType = policyType;
+      this.exclusive = exclusive;
+      this.inheritable = inheritable;
+      this.supportedObjectTypes =
+          supportedObjectTypes == null
+              ? ImmutableSet.of()
+              : ImmutableSet.copyOf(supportedObjectTypes);
+      this.contentClass = contentClass;
+    }
+
+    /**
+     * Get the built-in policy type from the policy type string.
+     *
+     * @param policyType the policy type string
+     * @return the built-in policy type if it matches, otherwise returns CUSTOM type
+     */
+    public static BuiltInType fromPolicyType(String policyType) {
+      Preconditions.checkArgument(StringUtils.isNotBlank(policyType), "policyType cannot be blank");
+      for (BuiltInType type : BuiltInType.values()) {
+        if (type.policyType.equalsIgnoreCase(policyType)) {
+          return type;
+        }
+      }
+
+      if (policyType.startsWith(BUILT_IN_TYPE_PREFIX)) {
+        throw new IllegalPolicyException("Unknown built-in policy type: %s", policyType);
+      }
+
+      // If the policy type is not a built-in type, it is a custom type.
+      return CUSTOM;
+    }
+
+    /**
+     * Get the policy type string.
+     *
+     * @return the policy type string
+     */
+    public String policyType() {
+      return policyType;
+    }
+
+    /**
+     * Check if the policy is exclusive.
+     *
+     * @return true if the policy is exclusive, false otherwise
+     */
+    public Boolean exclusive() {
+      return exclusive;
+    }
+
+    /**
+     * Check if the policy is inheritable.
+     *
+     * @return true if the policy is inheritable, false otherwise
+     */
+    public Boolean inheritable() {
+      return inheritable;
+    }
+
+    /**
+     * Get the set of metadata object types that the policy can be associated with.
+     *
+     * @return the set of metadata object types that the policy can be associated with
+     */
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return supportedObjectTypes;
+    }
+
+    /**
+     * Get the content class of the policy.
+     *
+     * @return the content class of the policy
+     */
+    public Class<? extends PolicyContent> contentClass() {
+      return contentClass;
+    }
+  }
 
   /** The set of metadata object types that the policy can be applied to. */
   Set<MetadataObject.Type> SUPPORTS_ALL_OBJECT_TYPES =
@@ -59,7 +169,7 @@ public interface Policy extends Auditable {
    *
    * @return The type of the policy.
    */
-  String type();
+  String policyType();
 
   /**
    * Get the comment of the policy.
@@ -105,7 +215,7 @@ public interface Policy extends Auditable {
    *
    * @return The content of the policy.
    */
-  Content content();
+  PolicyContent content();
 
   /**
    * Check if the policy is inherited from a parent object or not.
@@ -126,18 +236,46 @@ public interface Policy extends Auditable {
    *
    * @throws IllegalPolicyException if the policy is not valid.
    */
-  void validate() throws IllegalPolicyException;
+  default void validate() throws IllegalPolicyException {
+    Preconditions.checkArgument(StringUtils.isNotBlank(name()), "Policy name cannot be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyType()), "Policy type cannot be blank");
+    Preconditions.checkArgument(content() != null, "Policy content cannot be null");
+    Preconditions.checkArgument(
+        supportedObjectTypes() != null && !supportedObjectTypes().isEmpty(),
+        "Policy must support at least one metadata object type");
+
+    BuiltInType builtInType = BuiltInType.fromPolicyType(policyType());
+    Preconditions.checkArgument(
+        builtInType != BuiltInType.CUSTOM || content() instanceof PolicyContent.CustomContent,
+        "Expected CustomContent for custom policy type, but got %s",
+        content().getClass().getName());
+    if (builtInType != BuiltInType.CUSTOM) {
+      Preconditions.checkArgument(
+          exclusive() == builtInType.exclusive(),
+          "Expected exclusive value %s for built-in policy type %s, but got %s",
+          builtInType.exclusive(),
+          policyType(),
+          exclusive());
+      Preconditions.checkArgument(
+          inheritable() == builtInType.inheritable(),
+          "Expected inheritable value %s for built-in policy type %s, but got %s",
+          builtInType.inheritable(),
+          policyType(),
+          inheritable());
+      Preconditions.checkArgument(
+          supportedObjectTypes().equals(builtInType.supportedObjectTypes()),
+          "Expected supported object types %s for built-in policy type %s, but got %s",
+          builtInType.supportedObjectTypes(),
+          policyType(),
+          supportedObjectTypes());
+    }
+    content().validate();
+  }
 
   /** @return The associated objects of the policy. */
   default AssociatedObjects associatedObjects() {
     throw new UnsupportedOperationException("The associatedObjects method is not supported.");
-  }
-
-  /** The interface of the content of the policy. */
-  interface Content {
-
-    /** @return The additional properties of the policy. */
-    Map<String, String> properties();
   }
 
   /** The interface of the associated objects of the policy. */

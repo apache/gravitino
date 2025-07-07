@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import lombok.ToString;
 import org.apache.gravitino.Audit;
@@ -31,17 +32,19 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.IllegalPolicyException;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 
 @ToString
-public class PolicyEntity implements Entity, Auditable, HasIdentifier {
+public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the policy entity.");
   public static final Field NAME =
       Field.required("name", String.class, "The name of the policy entity.");
-  public static final Field TYPE =
-      Field.required("type", String.class, "The type of the policy entity.");
+  public static final Field POLICY_TYPE =
+      Field.required("policyType", String.class, "The type of the policy entity.");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment of the policy entity.");
   public static final Field ENABLED =
@@ -54,7 +57,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       Field.required(
           "supportedObjectTypes", Set.class, "The supported object types of the policy entity.");
   public static final Field CONTENT =
-      Field.required("content", Policy.Content.class, "The content of the policy entity.");
+      Field.required("content", PolicyContent.class, "The content of the policy entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", AuditInfo.class, "The audit details of the policy entity.");
 
@@ -65,13 +68,13 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
   private Long id;
   private String name;
   private Namespace namespace;
-  private String type;
+  private String policyType;
   private String comment;
   private boolean enabled;
   private boolean exclusive;
   private boolean inheritable;
   private Set<MetadataObject.Type> supportedObjectTypes;
-  private Policy.Content content;
+  private PolicyContent content;
   private AuditInfo auditInfo;
 
   private PolicyEntity() {}
@@ -81,7 +84,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
-    fields.put(TYPE, type);
+    fields.put(POLICY_TYPE, policyType);
     fields.put(COMMENT, comment);
     fields.put(ENABLED, enabled);
     fields.put(EXCLUSIVE, exclusive);
@@ -118,32 +121,50 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     return auditInfo;
   }
 
+  @Override
   public String policyType() {
-    return type;
+    return policyType;
   }
 
+  @Override
   public String comment() {
     return comment;
   }
 
+  @Override
   public boolean enabled() {
     return enabled;
   }
 
+  @Override
   public boolean exclusive() {
     return exclusive;
   }
 
+  @Override
   public boolean inheritable() {
     return inheritable;
   }
 
+  @Override
   public Set<MetadataObject.Type> supportedObjectTypes() {
     return supportedObjectTypes;
   }
 
-  public Policy.Content content() {
+  @Override
+  public PolicyContent content() {
     return content;
+  }
+
+  @Override
+  public Optional<Boolean> inherited() {
+    return Optional.empty();
+  }
+
+  @Override
+  public void validate() throws IllegalPolicyException {
+    Entity.super.validate();
+    Policy.super.validate();
   }
 
   @Override
@@ -156,7 +177,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(type, that.type)
+        && Objects.equals(policyType, that.policyType)
         && Objects.equals(comment, that.comment)
         && Objects.equals(supportedObjectTypes, that.supportedObjectTypes)
         && Objects.equals(content, that.content)
@@ -169,7 +190,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
         id,
         name,
         namespace,
-        type,
+        policyType,
         comment,
         enabled,
         exclusive,
@@ -183,13 +204,13 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
     private Long id;
     private String name;
     private Namespace namespace;
-    private String type;
+    private String policyType;
     private String comment;
     private boolean enabled = true;
     private boolean exclusive;
     private boolean inheritable;
     private Set<MetadataObject.Type> supportedObjectTypes;
-    private Policy.Content content;
+    private PolicyContent content;
     private AuditInfo auditInfo;
 
     public Builder withId(Long id) {
@@ -207,8 +228,8 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    public Builder withType(String type) {
-      this.type = type;
+    public Builder withPolicyType(String policyType) {
+      this.policyType = policyType;
       return this;
     }
 
@@ -237,7 +258,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    public Builder withContent(Policy.Content content) {
+    public Builder withContent(PolicyContent content) {
       this.content = content;
       return this;
     }
@@ -252,7 +273,7 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
       policyEntity.id = id;
       policyEntity.name = name;
       policyEntity.namespace = namespace;
-      policyEntity.type = type;
+      policyEntity.policyType = policyType;
       policyEntity.comment = comment;
       policyEntity.enabled = enabled;
       policyEntity.exclusive = exclusive;
