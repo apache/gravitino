@@ -1370,20 +1370,26 @@ public class POConverters {
 
   public static ModelVersionEntity fromModelVersionPO(
       NameIdentifier modelIdent,
-      ModelVersionPO modelVersionPO,
+      List<ModelVersionPO> modelVersionPOs,
       List<ModelVersionAliasRelPO> aliasRelPOs) {
     List<String> aliases =
         aliasRelPOs.stream()
             .map(ModelVersionAliasRelPO::getModelVersionAlias)
             .collect(Collectors.toList());
 
+    Map<String, String> uris =
+        modelVersionPOs.stream()
+            .collect(
+                Collectors.toMap(
+                    ModelVersionPO::getModelVersionUriName, ModelVersionPO::getModelVersionUri));
+    ModelVersionPO modelVersionPO = modelVersionPOs.get(0);
     try {
       return ModelVersionEntity.builder()
           .withModelIdentifier(modelIdent)
           .withVersion(modelVersionPO.getModelVersion())
           .withAliases(aliases)
           .withComment(modelVersionPO.getModelVersionComment())
-          .withUri(modelVersionPO.getModelVersionUri())
+          .withUris(uris)
           .withProperties(
               JsonUtils.anyFieldMapper()
                   .readValue(modelVersionPO.getModelVersionProperties(), Map.class))
@@ -1439,7 +1445,11 @@ public class POConverters {
           .withMetalakeId(oldModelVersionPO.getMetalakeId())
           .withCatalogId(oldModelVersionPO.getCatalogId())
           .withSchemaId(oldModelVersionPO.getSchemaId())
-          .withModelVersionUri(newModelVersion.uri())
+          // TODO The modelVersionUriName and modelVersionUri here are not actually used.
+          // They are only used for occupying positions to avoid verification failures. They will
+          // be removed when the model version with multiple URIs is supported to be modified later
+          .withModelVersionUriName("uriName")
+          .withModelVersionUri("uri")
           .withModelVersion(oldModelVersionPO.getModelVersion())
           .withModelVersionComment(newModelVersion.comment())
           .withModelVersionProperties(
@@ -1474,21 +1484,30 @@ public class POConverters {
     }
   }
 
-  public static ModelVersionPO initializeModelVersionPO(
-      ModelVersionEntity modelVersionEntity, ModelVersionPO.Builder builder) {
+  public static List<ModelVersionPO> initializeModelVersionPO(
+      ModelVersionEntity modelVersionEntity, Long modelId) {
     try {
-      return builder
-          // Note that version set here will not be used when inserting into database, it will
-          // directly use the version from the query to avoid concurrent version conflict.
-          .withModelVersion(modelVersionEntity.version())
-          .withModelVersionComment(modelVersionEntity.comment())
-          .withModelVersionUri(modelVersionEntity.uri())
-          .withModelVersionProperties(
-              JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.properties()))
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.auditInfo()))
-          .withDeletedAt(DEFAULT_DELETED_AT)
-          .build();
+      String modelVersionProperties =
+          JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.properties());
+      String modelVersionAuditInfo =
+          JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.auditInfo());
+      return modelVersionEntity.uris().entrySet().stream()
+          .map(
+              entry ->
+                  ModelVersionPO.builder()
+                      .withModelId(modelId)
+                      // Note that version set here will not be used when inserting into database,
+                      // it will directly use the version from the query to avoid concurrent version
+                      // conflict.
+                      .withModelVersion(modelVersionEntity.version())
+                      .withModelVersionComment(modelVersionEntity.comment())
+                      .withModelVersionUriName(entry.getKey())
+                      .withModelVersionUri(entry.getValue())
+                      .withModelVersionProperties(modelVersionProperties)
+                      .withAuditInfo(modelVersionAuditInfo)
+                      .withDeletedAt(DEFAULT_DELETED_AT)
+                      .build())
+          .collect(Collectors.toList());
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }
