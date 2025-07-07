@@ -40,6 +40,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -60,7 +61,8 @@ public class GravitinoInterceptionService implements InterceptionService {
         ImmutableSet.of(
             CatalogOperations.class.getName(),
             SchemaOperations.class.getName(),
-            TableOperations.class.getName()));
+            TableOperations.class.getName(),
+            FilesetOperations.class.getName()));
   }
 
   @Override
@@ -136,6 +138,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       String schema = metadatas.get(Entity.EntityType.SCHEMA);
       String table = metadatas.get(Entity.EntityType.TABLE);
       String topic = metadatas.get(Entity.EntityType.TOPIC);
+      String fileset = metadatas.get(Entity.EntityType.FILESET);
       metadatas.forEach(
           (type, metadata) -> {
             switch (type) {
@@ -158,6 +161,12 @@ public class GravitinoInterceptionService implements InterceptionService {
                     Entity.EntityType.TOPIC,
                     NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
                 break;
+              case FILESET:
+                nameIdentifierMap.put(
+                    Entity.EntityType.SCHEMA,
+                    NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
+                break;
+
               case METALAKE:
                 nameIdentifierMap.put(
                     Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
