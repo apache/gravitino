@@ -46,27 +46,20 @@ public class PolicyVersionPO {
       return false;
     }
     PolicyVersionPO that = (PolicyVersionPO) o;
-    return Objects.equal(getId(), that.id)
-        && Objects.equal(getMetalakeId(), that.metalakeId)
-        && Objects.equal(getPolicyId(), that.policyId)
-        && Objects.equal(getVersion(), that.version)
-        && Objects.equal(getPolicyComment(), that.policyComment)
-        && Objects.equal(isEnabled(), that.enabled)
-        && Objects.equal(getContent(), that.content)
-        && Objects.equal(getDeletedAt(), that.deletedAt);
+    return Objects.equal(id, that.id)
+        && Objects.equal(metalakeId, that.metalakeId)
+        && Objects.equal(policyId, that.policyId)
+        && Objects.equal(version, that.version)
+        && Objects.equal(policyComment, that.policyComment)
+        && Objects.equal(enabled, that.enabled)
+        && Objects.equal(content, that.content)
+        && Objects.equal(deletedAt, that.deletedAt);
   }
 
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        getId(),
-        getMetalakeId(),
-        getPolicyId(),
-        getVersion(),
-        getPolicyComment(),
-        isEnabled(),
-        getContent(),
-        getDeletedAt());
+        id, metalakeId, policyId, version, policyComment, enabled, content, deletedAt);
   }
 
   public static class Builder {

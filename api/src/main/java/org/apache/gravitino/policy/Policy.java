@@ -38,7 +38,6 @@ public interface Policy extends Auditable {
   Set<MetadataObject.Type> SUPPORTS_ALL_OBJECT_TYPES =
       new HashSet<MetadataObject.Type>() {
         {
-          add(MetadataObject.Type.METALAKE);
           add(MetadataObject.Type.CATALOG);
           add(MetadataObject.Type.SCHEMA);
           add(MetadataObject.Type.FILESET);

@@ -50,35 +50,35 @@ public class PolicyPO {
       return false;
     }
     PolicyPO policyPO = (PolicyPO) o;
-    return Objects.equal(getPolicyId(), policyPO.policyId)
-        && Objects.equal(getPolicyName(), policyPO.policyName)
-        && Objects.equal(getPolicyType(), policyPO.policyType)
-        && Objects.equal(getMetalakeId(), policyPO.metalakeId)
-        && Objects.equal(isInheritable(), policyPO.inheritable)
-        && Objects.equal(isExclusive(), policyPO.exclusive)
-        && Objects.equal(getSupportedObjectTypes(), policyPO.supportedObjectTypes)
-        && Objects.equal(getAuditInfo(), policyPO.auditInfo)
-        && Objects.equal(getCurrentVersion(), policyPO.currentVersion)
-        && Objects.equal(getLastVersion(), policyPO.lastVersion)
-        && Objects.equal(getPolicyVersionPO(), policyPO.policyVersionPO)
-        && Objects.equal(getDeletedAt(), policyPO.deletedAt);
+    return Objects.equal(policyId, policyPO.policyId)
+        && Objects.equal(policyName, policyPO.policyName)
+        && Objects.equal(policyType, policyPO.policyType)
+        && Objects.equal(metalakeId, policyPO.metalakeId)
+        && Objects.equal(inheritable, policyPO.inheritable)
+        && Objects.equal(exclusive, policyPO.exclusive)
+        && Objects.equal(supportedObjectTypes, policyPO.supportedObjectTypes)
+        && Objects.equal(auditInfo, policyPO.auditInfo)
+        && Objects.equal(currentVersion, policyPO.currentVersion)
+        && Objects.equal(lastVersion, policyPO.lastVersion)
+        && Objects.equal(policyVersionPO, policyPO.policyVersionPO)
+        && Objects.equal(deletedAt, policyPO.deletedAt);
   }
 
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        getPolicyId(),
-        getPolicyName(),
-        getPolicyType(),
-        getMetalakeId(),
-        isInheritable(),
-        isExclusive(),
-        getSupportedObjectTypes(),
-        getAuditInfo(),
-        getCurrentVersion(),
-        getLastVersion(),
-        getPolicyVersionPO(),
-        getDeletedAt());
+        policyId,
+        policyName,
+        policyType,
+        metalakeId,
+        inheritable,
+        exclusive,
+        supportedObjectTypes,
+        auditInfo,
+        currentVersion,
+        lastVersion,
+        policyVersionPO,
+        deletedAt);
   }
 
   public static class Builder {

@@ -30,24 +30,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.IllegalPolicyException;
 
 public class BasePolicy implements Policy {
-  protected String name;
-
-  protected String type;
-
-  @Nullable protected String comment;
-
-  protected boolean enabled;
-
-  protected boolean exclusive;
-
-  protected boolean inheritable;
-
-  protected Set<MetadataObject.Type> supportedObjectTypes;
-
-  protected Content content;
-
-  protected Audit auditInfo;
-
   public enum ContentType {
     // Non-built-in types are all custom types.
     CUSTOM("custom", CustomPolicy.CustomContent.class);
@@ -74,6 +56,24 @@ public class BasePolicy implements Policy {
       return contentClass;
     }
   }
+
+  protected String name;
+
+  protected String type;
+
+  @Nullable protected String comment;
+
+  protected boolean enabled;
+
+  protected boolean exclusive;
+
+  protected boolean inheritable;
+
+  protected Set<MetadataObject.Type> supportedObjectTypes;
+
+  protected Content content;
+
+  protected Audit auditInfo;
 
   @Override
   public String name() {
@@ -124,7 +124,7 @@ public class BasePolicy implements Policy {
   public void validate() throws IllegalPolicyException {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "Policy name cannot be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(type), "Policy type cannot be blank");
-    Preconditions.checkArgument(content() != null, "Policy content cannot be null");
+    Preconditions.checkArgument(content != null, "Policy content cannot be null");
   }
 
   @Override
