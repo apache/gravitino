@@ -47,6 +47,8 @@ tasks.withType<ShadowJar>(ShadowJar::class.java) {
   relocate("org.apache.httpcomponents", "org.apache.gravitino.shaded.org.apache.httpcomponents")
   relocate("org.apache.commons", "org.apache.gravitino.shaded.org.apache.commons")
   relocate("org.antlr", "org.apache.gravitino.shaded.org.antlr")
+
+  mergeServiceFiles()
 }
 
 tasks.jar {

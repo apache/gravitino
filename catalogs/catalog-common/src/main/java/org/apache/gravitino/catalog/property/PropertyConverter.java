@@ -27,9 +27,8 @@ import org.slf4j.LoggerFactory;
 /** Transforming between Apache Gravitino schema/table/column property and engine property. */
 public abstract class PropertyConverter {
 
-  protected static final String TRINO_PROPERTIES_PREFIX = "trino.bypass.";
-
   private static final Logger LOG = LoggerFactory.getLogger(PropertyConverter.class);
+
   /**
    * Mapping that maps engine properties to Gravitino properties. It will return a map that holds
    * the mapping between engine and Gravitino properties.
@@ -38,7 +37,7 @@ public abstract class PropertyConverter {
    */
   public abstract Map<String, String> engineToGravitinoMapping();
 
-  Map<String, String> reverseMap(Map<String, String> map) {
+  public Map<String, String> reverseMap(Map<String, String> map) {
     Map<String, String> res = new HashMap<>();
     for (Map.Entry<String, String> entry : map.entrySet()) {
       res.put(entry.getValue(), entry.getKey());
