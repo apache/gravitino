@@ -57,3 +57,58 @@ class FuncExpressionDTO(FunctionExpression, FunctionArg):
 
     def __hash__(self) -> int:
         return hash((self.arg_type(), self._function_name, tuple(self._function_args)))
+
+    @staticmethod
+    def builder() -> Builder:
+        """The builder for creating a new instance of `FuncExpressionDTO`.
+
+        Returns:
+            Builder: The builder for creating a new instance of `FuncExpressionDTO`.
+        """
+        return FuncExpressionDTO.Builder()
+
+    class Builder:
+        """Builder for `FuncExpressionDTO.`"""
+
+        def __init__(self):
+            self._function_args = None
+            self._function_name = None
+
+        def with_function_name(self, function_name: str) -> FuncExpressionDTO.Builder:
+            """Set the function name for the function expression.
+
+            Args:
+                function_name (str): The function name.
+
+            Returns:
+                FuncExpressionDTO.Builder: The builder.
+            """
+
+            self._function_name = function_name
+            return self
+
+        def with_function_args(
+            self, function_args: List[FunctionArg]
+        ) -> FuncExpressionDTO.Builder:
+            """Set the function arguments for the function expression.
+
+            Args:
+                function_args (List[FunctionArg]): The function arguments.
+
+            Returns:
+                FuncExpressionDTO.Builder: The builder.
+            """
+
+            self._function_args = function_args
+            return self
+
+        def build(self) -> FuncExpressionDTO:
+            """Build the function expression.
+
+            Returns:
+                FuncExpressionDTO: The function expression.
+            """
+
+            return FuncExpressionDTO(
+                function_name=self._function_name, function_args=self._function_args
+            )
