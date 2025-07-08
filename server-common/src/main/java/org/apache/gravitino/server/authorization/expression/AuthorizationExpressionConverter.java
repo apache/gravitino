@@ -126,7 +126,7 @@ public class AuthorizationExpressionConverter {
    * @param experssion
    * @return
    */
-  private static String replaceAnyPrivilege(String experssion) {
+  public static String replaceAnyPrivilege(String experssion) {
     experssion = experssion.replaceAll("ANY_USE_CATALOG", "(ANY(USE_CATALOG,METALAKE,CATALOG))");
     experssion =
         experssion.replaceAll("ANY_USE_SCHEMA", "(ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA))");

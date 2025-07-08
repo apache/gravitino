@@ -65,6 +65,11 @@ public class TableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
 
+  private static final String loadTableAuthorizationExpression =
+      "ANY(OWNER,METALAKE,CATALOG) ||"
+          + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)";
+
   private final TableDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
@@ -91,12 +96,7 @@ public class TableOperations {
             NameIdentifier[] idents = dispatcher.listTables(tableNS);
             idents =
                 MetadataFilterHelper.filterByExpression(
-                    metalake,
-                    "ANY(OWNER,METALAKE,CATALOG) ||"
-                        + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
-                        + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
-                    Entity.EntityType.TABLE,
-                    idents);
+                    metalake, loadTableAuthorizationExpression, Entity.EntityType.TABLE, idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
                 "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
