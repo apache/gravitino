@@ -104,8 +104,8 @@ public class ModelOperations {
                     "ANY(OWNER,METALAKE,CATALOG) ||"
                         + " ( (ANY(USE_CATALOG,METALAKE, CATALOG)) && "
                         + " (SCHEMA::OWNER || "
-                        + "( (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) && （"
-                        + "MODEL::OWNER || (ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))))",
+                        + "( (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) && "
+                        + "(MODEL::OWNER || (ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))))",
                     Entity.EntityType.MODEL,
                     modelIds);
             LOG.info("List {} models under schema {}", modelIds.length, modelNs);
