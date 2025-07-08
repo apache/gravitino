@@ -92,7 +92,7 @@ public class TableOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
+                    "((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
                         + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
                         + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
                         + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)))) ||"
@@ -116,7 +116,7 @@ public class TableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          " ((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
+          " ((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
               + "((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) "
               + "&& (ANY(CREATE_TABLE,METALAKE,CATALOG,SCHEMA)) || SCHEMA::OWNER)) || "
               + "METALAKE::OWNER || CATALOG::OWNER",
@@ -166,7 +166,7 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
+          "((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
               + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
               + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
               + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)))) ||"
@@ -203,7 +203,7 @@ public class TableOperations {
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "( (ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
+          "( (ANY(USE_CATALOG,METALAKE,CATALOG)) && "
               + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
               + " (TABLE::OWNER || ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA))))) ||"
               + "ANY(OWNER,METALAKE,CATALOG)",
@@ -245,7 +245,7 @@ public class TableOperations {
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "( (ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
+          "( (ANY(USE_CATALOG,METALAKE,CATALOG)) && "
               + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA) && TABLE::OWNER ))))"
               + " || ANY(OWNER,METALAKE,CATALOG)",
       accessMetadataType = MetadataObject.Type.TABLE)
