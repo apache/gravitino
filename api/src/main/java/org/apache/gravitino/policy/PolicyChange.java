@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Arrays;
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -57,18 +56,6 @@ public interface PolicyChange {
    */
   static PolicyChange updateContent(Policy.Content content) {
     return new UpdateContent(content);
-  }
-
-  /**
-   * Creates a new policy change to update the associated job templates with the policy.
-   *
-   * @param jobTemplatesToAdd The job templates to add to the policy.
-   * @param jobTemplatesToRemove The job templates to remove from the policy.
-   * @return The policy change.
-   */
-  static PolicyChange updateAssociatedJobTemplates(
-      String[] jobTemplatesToAdd, String[] jobTemplatesToRemove) {
-    return new AssociateJobTemplates(jobTemplatesToAdd, jobTemplatesToRemove);
   }
 
   /** A policy change to rename the policy. */
@@ -203,59 +190,6 @@ public interface PolicyChange {
     @Override
     public String toString() {
       return "UPDATE CONTENT " + content;
-    }
-  }
-
-  /** Creates a new policy change to associate job templates with the policy. */
-  final class AssociateJobTemplates implements PolicyChange {
-    private final String[] jobTemplatesToAdd;
-    private final String[] jobTemplatesToRemove;
-
-    private AssociateJobTemplates(String[] jobTemplatesToAdd, String[] jobTemplatesToRemove) {
-      this.jobTemplatesToAdd = jobTemplatesToAdd == null ? new String[0] : jobTemplatesToAdd;
-      this.jobTemplatesToRemove =
-          jobTemplatesToRemove == null ? new String[0] : jobTemplatesToRemove;
-    }
-
-    /**
-     * Get the job templates to add to the policy.
-     *
-     * @return The job templates to add.
-     */
-    public String[] jobTemplatesToAdd() {
-      return jobTemplatesToAdd;
-    }
-
-    /**
-     * Get the job templates to remove from the policy.
-     *
-     * @return The job templates to remove.
-     */
-    public String[] jobTemplatesToRemove() {
-      return jobTemplatesToRemove;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (o == null || getClass() != o.getClass()) return false;
-      AssociateJobTemplates that = (AssociateJobTemplates) o;
-      return Arrays.equals(jobTemplatesToAdd, that.jobTemplatesToAdd)
-          && Arrays.equals(jobTemplatesToRemove, that.jobTemplatesToRemove);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(
-          Arrays.hashCode(jobTemplatesToAdd), Arrays.hashCode(jobTemplatesToRemove));
-    }
-
-    @Override
-    public String toString() {
-      return "ASSOCIATE JOB TEMPLATES "
-          + "ADD: "
-          + Arrays.toString(jobTemplatesToAdd)
-          + ", REMOVE: "
-          + Arrays.toString(jobTemplatesToRemove);
     }
   }
 }

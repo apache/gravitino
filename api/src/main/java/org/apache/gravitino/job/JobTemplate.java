@@ -197,7 +197,7 @@ public abstract class JobTemplate {
       arguments.forEach(arg -> sb.append("    ").append(arg).append(",\n"));
       sb.append("  ],\n");
     } else {
-      sb.append("  arguments=[]\n");
+      sb.append("  arguments=[],\n");
     }
 
     if (!environments.isEmpty()) {
@@ -206,7 +206,7 @@ public abstract class JobTemplate {
           (k, v) -> sb.append("    ").append(k).append(": ").append(v).append(",\n"));
       sb.append("  },\n");
     } else {
-      sb.append("  environments={}\n");
+      sb.append("  environments={},\n");
     }
 
     if (!customFields.isEmpty()) {
