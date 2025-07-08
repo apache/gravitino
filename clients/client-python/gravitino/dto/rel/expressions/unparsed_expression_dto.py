@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from __future__ import annotations
+
 from gravitino.api.expressions.unparsed_expression import UnparsedExpression
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 
@@ -48,3 +50,42 @@ class UnparsedExpressionDTO(UnparsedExpression, FunctionArg):
         return (
             f"UnparsedExpressionDTO{{unparsedExpression='{self._unparsed_expression}'}}"
         )
+
+    @staticmethod
+    def builder() -> Builder:
+        """A builder instance for `UnparsedExpressionDTO`.
+
+        Returns:
+            Builder: A builder instance for `UnparsedExpressionDTO`.
+        """
+        return UnparsedExpressionDTO.Builder()
+
+    class Builder:
+        """Builder for `UnparsedExpressionDTO`."""
+
+        def __init__(self):
+            self._unparsed_expression = None
+
+        def with_unparsed_expression(
+            self, unparsed_expression: str
+        ) -> UnparsedExpressionDTO.Builder:
+            """Set the unparsed expression.
+
+            Args:
+                unparsed_expression (str): The unparsed expression.
+
+            Returns:
+                Builder: The builder.
+            """
+
+            self._unparsed_expression = unparsed_expression
+            return self
+
+        def build(self) -> UnparsedExpressionDTO:
+            """Build the unparsed expression.
+
+            Returns:
+                UnparsedExpressionDTO: The unparsed expression.
+            """
+
+            return UnparsedExpressionDTO(unparsed_expression=self._unparsed_expression)
