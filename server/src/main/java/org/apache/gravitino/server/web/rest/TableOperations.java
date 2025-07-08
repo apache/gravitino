@@ -93,10 +93,10 @@ public class TableOperations {
                 MetadataFilterHelper.filterByExpression(
                     metalake,
                     "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
-                        + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
+                        + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
                         + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-                        + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)) ||"
-                        + "ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
+                        + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)))) ||"
+                        + "ANY(OWNER,METALAKE,CATALOG)",
                     Entity.EntityType.TABLE,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -167,10 +167,10 @@ public class TableOperations {
   @AuthorizationExpression(
       expression =
           "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
-              + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
+              + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
               + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-              + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)) ||"
-              + "ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
+              + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)))) ||"
+              + "ANY(OWNER,METALAKE,CATALOG)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -204,9 +204,9 @@ public class TableOperations {
   @AuthorizationExpression(
       expression =
           "( (ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
-              + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
-              + " (ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA))) ||"
-              + "ANY(OWNER,METALAKE,CATALOG,SCHEMA,TABLE)",
+              + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
+              + " (TABLE::OWNER || ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA))))) ||"
+              + "ANY(OWNER,METALAKE,CATALOG)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -246,8 +246,8 @@ public class TableOperations {
   @AuthorizationExpression(
       expression =
           "( (ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)) && "
-              + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA) && TABLE::OWNER ))"
-              + " || ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
+              + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA) && TABLE::OWNER ))))"
+              + " || ANY(OWNER,METALAKE,CATALOG)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
