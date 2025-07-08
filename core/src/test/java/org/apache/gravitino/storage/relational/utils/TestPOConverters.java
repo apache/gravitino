@@ -787,7 +787,7 @@ public class TestPOConverters {
         createPolicy(
             1L,
             "test",
-            NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"),
+            NamespaceUtil.ofPolicy("test_metalake"),
             "my_type",
             "test comment",
             true,
@@ -797,8 +797,7 @@ public class TestPOConverters {
             content);
 
     PolicyEntity convertedPolicy =
-        POConverters.fromPolicyPO(
-            policyPO, NamespaceUtil.ofFileset("test_metalake", "test_catalog", "test_schema"));
+        POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy("test_metalake"));
 
     assertEquals(expectedPolicy.id(), convertedPolicy.id());
     assertEquals(expectedPolicy.name(), convertedPolicy.name());

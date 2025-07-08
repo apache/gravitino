@@ -19,6 +19,7 @@
 package org.apache.gravitino.policy;
 
 import java.util.Map;
+import java.util.Objects;
 import org.apache.gravitino.exceptions.IllegalPolicyException;
 
 /** The interface of the content of the policy. */
@@ -53,13 +54,18 @@ public interface PolicyContent {
     private final Map<String, Object> customRules;
     private final Map<String, String> properties;
 
+    /** Default constructor for Jackson deserialization only. */
+    private CustomContent() {
+      this(null, null);
+    }
+
     /**
      * Constructor for CustomContent.
      *
      * @param customRules the custom rules of the policy
      * @param properties the additional properties of the policy
      */
-    public CustomContent(Map<String, Object> customRules, Map<String, String> properties) {
+    private CustomContent(Map<String, Object> customRules, Map<String, String> properties) {
       this.customRules = customRules;
       this.properties = properties;
     }
@@ -81,6 +87,19 @@ public interface PolicyContent {
     @Override
     public void validate() throws IllegalPolicyException {
       // nothing to validate for custom content
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof CustomContent)) return false;
+      CustomContent that = (CustomContent) o;
+      return Objects.equals(customRules, that.customRules)
+          && Objects.equals(properties, that.properties);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(customRules, properties);
     }
   }
 }
