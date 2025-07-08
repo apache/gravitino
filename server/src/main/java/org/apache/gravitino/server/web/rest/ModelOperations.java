@@ -101,10 +101,10 @@ public class ModelOperations {
             modelIds =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+                    "ANY(OWNER,METALAKE,CATALOG) || "
                         + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-                        + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-                        + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA,MODEL)))",
+                        + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+                        + "&& (MODEL::OWNER ||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA,MODEL))))",
                     Entity.EntityType.MODEL,
                     modelIds);
             LOG.info("List {} models under schema {}", modelIds.length, modelNs);
@@ -123,10 +123,10 @@ public class ModelOperations {
   @ResponseMetered(name = "get-model", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA))))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModel(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -158,10 +158,10 @@ public class ModelOperations {
   @ResponseMetered(name = "register-model", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& ANY(CREATE_MODEL,METALAKE, CATALOG, SCHEMA))",
+              + "&& (SCHEMA::OWNER || ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& ANY(CREATE_MODEL,METALAKE, CATALOG, SCHEMA)))",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerModel(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -205,10 +205,10 @@ public class ModelOperations {
   @ResponseMetered(name = "delete-model", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& MODEL::OWNER)",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& MODEL::OWNER))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModel(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -271,10 +271,10 @@ public class ModelOperations {
                                 };
                             return MetadataFilterHelper.filterByExpression(
                                         metalake,
-                                        "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+                                        "ANY(OWNER,METALAKE,CATALOG) || "
                                             + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-                                            + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-                                            + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))",
+                                            + "&&(SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+                                            + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA))))",
                                         Entity.EntityType.MODEL_VERSION,
                                         nameIdentifiers)
                                     .length
@@ -298,10 +298,10 @@ public class ModelOperations {
                                 };
                             return MetadataFilterHelper.filterByExpression(
                                         metalake,
-                                        "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+                                        "ANY(OWNER,METALAKE,CATALOG) || "
                                             + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-                                            + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-                                            + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))",
+                                            + "&& (SCHEMA::OWNER||(ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+                                            + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA))))",
                                         Entity.EntityType.MODEL_VERSION,
                                         nameIdentifiers)
                                     .length
@@ -325,10 +325,10 @@ public class ModelOperations {
   @ResponseMetered(name = "get-model-version", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& (MODEL::OWNER || ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA))))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -369,10 +369,10 @@ public class ModelOperations {
   @ResponseMetered(name = "get-model-alias", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA))))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersionByAlias(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -411,11 +411,20 @@ public class ModelOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "link-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "link-model-version", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER,METALAKE,CATALOG) || "
+              + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
+              + "&& (SCHEMA::OWNER || (ANY(CREATE_MODEL_VERSION,METALAKE, CATALOG, SCHEMA)) "
+              + "&& MODEL::OWNER))",
+      accessMetadataType = MetadataObject.Type.MODEL)
   public Response linkModelVersion(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("model") String model,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
       ModelVersionLinkRequest request) {
     LOG.info("Received link model version request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -448,10 +457,10 @@ public class ModelOperations {
   @ResponseMetered(name = "delete-model-version", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& MODEL::OWNER)",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& MODEL::OWNER))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -497,10 +506,10 @@ public class ModelOperations {
   @ResponseMetered(name = "delete-model-alias", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& MODEL::OWNER)",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& MODEL::OWNER))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModelVersionByAlias(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -547,10 +556,10 @@ public class ModelOperations {
   @ResponseMetered(name = "alter-model-version", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& MODEL::OWNER)",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& MODEL::OWNER))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -602,10 +611,10 @@ public class ModelOperations {
   @ResponseMetered(name = "alter-model-alias", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
+          "ANY(OWNER,METALAKE,CATALOG) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& MODEL::OWNER)",
+              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& MODEL::OWNER))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModelVersionByAlias(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -658,8 +667,8 @@ public class ModelOperations {
       expression =
           "ANY(OWNER,METALAKE,CATALOG,SCHEMA) || "
               + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& MODEL::OWNER)",
+              + "&& (SCHEMA::OWNER||(ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
+              + "&& MODEL::OWNER))",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModel(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
