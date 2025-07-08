@@ -163,7 +163,7 @@ public abstract class RangerAuthorizationPlugin
    * @param authzMetadataObject The authorization metadata object used to perform wildcard search.
    * @return A list of Ranger policies matching the wildcard conditions.
    */
-  protected abstract List<RangerPolicy> wildcardSearchPolies(
+  protected abstract List<RangerPolicy> wildcardSearchPolicies(
       AuthorizationMetadataObject authzMetadataObject);
 
   /**
@@ -196,7 +196,7 @@ public abstract class RangerAuthorizationPlugin
   protected RangerPolicy preciseFindPolicy(
       AuthorizationMetadataObject authzMetadataObject, Map<String, String> preciseFilters)
       throws AuthorizationPluginException {
-    List<RangerPolicy> policies = wildcardSearchPolies(authzMetadataObject);
+    List<RangerPolicy> policies = wildcardSearchPolicies(authzMetadataObject);
     if (!policies.isEmpty()) {
       policies =
           policies.stream()
