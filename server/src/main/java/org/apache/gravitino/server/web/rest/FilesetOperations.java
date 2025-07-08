@@ -214,9 +214,21 @@ public class FilesetOperations {
   @AuthorizationExpression(
       expression =
           "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
-              + "ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) ||"
-              + "ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)",
+              + "("
+              + "   ANY(USE_CATALOG, METALAKE, CATALOG, SCHEMA) && "
+              + "   ( ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
+              + ")",
       accessMetadataType = MetadataObject.Type.FILESET)
+  //  @AuthorizationExpression(
+  //      //      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET)",
+  //
+  //      expression =
+  //          "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA) && "
+  //              + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
+  //              + " ( ANY(READ_FILESET,METALAKE,CATALOG,SCHEMA,FILESET) || "
+  //              + " ANY(WRITE_FILESET,METALAKE,CATALOG,SCHEMA,FILESET) || FILESET::OWNER)) ||"
+  //              + "ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
+  //      accessMetadataType = MetadataObject.Type.FILESET)
   public Response loadFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalake,

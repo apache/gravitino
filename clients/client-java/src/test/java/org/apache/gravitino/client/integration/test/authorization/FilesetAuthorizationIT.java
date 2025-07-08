@@ -195,14 +195,18 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testLoadFileset() {
     FilesetCatalog filesetCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
-    // normal user can load table2 and table3, but not table1
+    // normal user can load fileset2 and fileset3, but not fileset1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         RuntimeException.class,
         () -> {
-          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset1"));
+          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(CATALOG, SCHEMA, "fileset1"));
         });
-    Fileset fileset2 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset2"));
+    Fileset fileset2 =
+        filesetCatalogNormalUser.loadFileset(
+            //            NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset2")
+            NameIdentifier.of(SCHEMA, "fileset2"));
+    //            NameIdentifier.of(CATALOG, SCHEMA, "fileset2"));
     assertEquals("fileset2", fileset2.name());
     Fileset fileset3 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset3"));
     assertEquals("fileset3", fileset3.name());
@@ -214,7 +218,8 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(
             ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
         ImmutableList.of(Privileges.ReadFileset.allow()));
-    filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset1"));
+    Fileset fileset1 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset1"));
+    assertEquals("fileset1", fileset1.name());
   }
 
   @Test
