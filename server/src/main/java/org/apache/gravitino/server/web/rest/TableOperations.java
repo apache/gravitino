@@ -92,11 +92,9 @@ public class TableOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
-                        + "(SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
-                        + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-                        + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER))) ||"
-                        + "ANY(OWNER,METALAKE,CATALOG)",
+                    "ANY(OWNER,METALAKE,CATALOG) ||"
+                        + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+                        + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
                     Entity.EntityType.TABLE,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -116,10 +114,9 @@ public class TableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          " (ANY(USE_CATALOG,METALAKE,CATALOG)) && "
-              + "((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) "
-              + "&& (ANY(CREATE_TABLE,METALAKE,CATALOG,SCHEMA)) || SCHEMA::OWNER) || "
-              + "ANY(OWNER, METALAKE, CATALOG)",
+          "ANY(OWNER,METALAKE,CATALOG) ||"
+              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && ANY_CREATE_TABLE",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -166,11 +163,9 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
-              + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
-              + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-              + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)))) ||"
-              + "ANY(OWNER,METALAKE,CATALOG)",
+          "ANY(OWNER,METALAKE,CATALOG) ||"
+              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -203,10 +198,9 @@ public class TableOperations {
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "( (ANY(USE_CATALOG,METALAKE,CATALOG)) && "
-              + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
-              + " (TABLE::OWNER || ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA))))) ||"
-              + "ANY(OWNER,METALAKE,CATALOG)",
+          "ANY(OWNER,METALAKE,CATALOG) ||"
+              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -245,9 +239,9 @@ public class TableOperations {
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "( (ANY(USE_CATALOG,METALAKE,CATALOG)) && "
-              + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA) && TABLE::OWNER ))))"
-              + " || ANY(OWNER,METALAKE,CATALOG)",
+          "ANY(OWNER,METALAKE,CATALOG) ||"
+              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
