@@ -18,6 +18,13 @@
  */
 package org.apache.gravitino.trino.connector.catalog.iceberg;
 
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.FORMAT;
+import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.FORMAT_VERSION;
+import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_FORMAT_PROPERTY;
+import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_FORMAT_VERSION_PROPERTY;
+import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergTablePropertyConverter.convertTableFormatToGravitino;
+import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergTablePropertyConverter.convertTableFormatToTrino;
+
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
@@ -110,6 +117,17 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
         toGravitinoTableProperties(
             removeKeys(tableMetadata.getProperties(), ICEBERG_PROPERTIES_TO_REMOVE));
 
+    if (propertyMap.containsKey(ICEBERG_FORMAT_PROPERTY)) {
+      properties.put(
+          FORMAT,
+          convertTableFormatToGravitino(propertyMap.get(ICEBERG_FORMAT_PROPERTY).toString()));
+    }
+
+    if (propertyMap.containsKey(ICEBERG_FORMAT_VERSION_PROPERTY)) {
+      properties.put(
+          FORMAT_VERSION, String.valueOf(propertyMap.get(ICEBERG_FORMAT_VERSION_PROPERTY)));
+    }
+
     List<GravitinoColumn> columns = new ArrayList<>();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
@@ -149,6 +167,12 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
     }
 
     Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
+
+    properties.put(
+        ICEBERG_FORMAT_PROPERTY,
+        convertTableFormatToTrino(gravitinoTable.getProperties().get(FORMAT)));
+    properties.put(
+        ICEBERG_FORMAT_VERSION_PROPERTY, gravitinoTable.getProperties().get(FORMAT_VERSION));
 
     if (ArrayUtils.isNotEmpty(gravitinoTable.getPartitioning())) {
       properties.put(
