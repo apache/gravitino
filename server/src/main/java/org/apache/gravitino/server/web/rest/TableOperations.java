@@ -116,10 +116,10 @@ public class TableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          " ((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
+          " (ANY(USE_CATALOG,METALAKE,CATALOG)) && "
               + "((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) "
-              + "&& (ANY(CREATE_TABLE,METALAKE,CATALOG,SCHEMA)) || SCHEMA::OWNER)) || "
-              + "METALAKE::OWNER || CATALOG::OWNER",
+              + "&& (ANY(CREATE_TABLE,METALAKE,CATALOG,SCHEMA)) || SCHEMA::OWNER) || "
+              + "ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
