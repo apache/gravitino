@@ -24,11 +24,11 @@ from .job_template import JobTemplate
 class SupportsJobs(ABC):
     """
     Interface for job management operations. This interface will be mixed with GravitinoClient to
-    provide the ability to manage jobs within the Gravitino system.
+    provide the ability to manage job templates and jobs within the Gravitino system.
     """
 
     @abstractmethod
-    def list_job_templates(self) -> List:
+    def list_job_templates(self) -> List[JobTemplate]:
         """
         Lists all the registered job templates in Gravitino.
 
@@ -68,16 +68,37 @@ class SupportsJobs(ABC):
         pass
 
     @abstractmethod
-    def delete_job_template(self, job_template_name: str) -> None:
+    def delete_job_template(self, job_template_name: str) -> bool:
         """
         Deletes a job template by its name. This will remove the job template from Gravitino, and it
-        will no longer be available for execution.
+        will no longer be available for execution. Only when all the jobs associated with this job
+        template are completed or cancelled, the job template can be deleted successfully, otherwise
+        it will return false.
+
+        The deletion of a job template will also delete all the jobs associated with this template.
 
         Args:
             job_template_name: The name of the job template to delete.
 
+        Returns:
+            bool: True if the job template was deleted successfully, False if the job template
+            does not exist.
+
         Raises:
-            NoSuchJobTemplateException: If no job template with the specified name exists.
+            InUseException: If the job template is currently in use by jobs.
+        """
+        pass
+
+    def list_jobs(self, job_template_name: str = None) -> List[JobHandle]:
+        """
+        Lists all the jobs in Gravitino. If a job template name is provided, it will filter the jobs
+        by that template.
+
+        Args:
+            job_template_name: Optional; if provided, only jobs associated with this template will be listed.
+
+        Returns:
+            List of JobHandle objects representing the jobs.
         """
         pass
 
@@ -117,7 +138,7 @@ class SupportsJobs(ABC):
         pass
 
     @abstractmethod
-    def cancel_job(self, job_id: str) -> None:
+    def cancel_job(self, job_id: str) -> JobHandle:
         """
         Cancels a running job by its ID.
 

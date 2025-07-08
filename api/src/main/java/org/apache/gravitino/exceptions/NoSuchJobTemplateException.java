@@ -23,12 +23,12 @@ import com.google.errorprone.annotations.FormatString;
 
 /**
  * An exception thrown when the job template is not existed. This exception is typically used to
- * indicate that a requested job does not exist in the system.
+ * indicate that a requested job template does not exist in the system.
  */
 public class NoSuchJobTemplateException extends NotFoundException {
 
   /**
-   * Constructs a new NoSuchJobException with the specified detail message.
+   * Constructs a new NoSuchJobTemplateException with the specified detail message.
    *
    * @param message the detail message.
    * @param args the arguments to the message.
@@ -39,7 +39,7 @@ public class NoSuchJobTemplateException extends NotFoundException {
   }
 
   /**
-   * Constructs a new NoSuchJobException with the specified detail message and cause.
+   * Constructs a new NoSuchJobTemplateException with the specified detail message and cause.
    *
    * @param cause the cause of the exception.
    * @param message the detail message.

@@ -44,30 +44,6 @@ public interface JobHandle {
   }
 
   /**
-   * Listener interface for job events. Users can implement this interface to hook in some
-   * customized behavior when a job is queued, started, failed, or succeeded. Note that the listener
-   * is running in the client side, so if the client is terminated, the listener will not work
-   * anymore.
-   */
-  interface Listener {
-
-    /** Called when the job is queued. */
-    void onJobQueued();
-
-    /** Called when the job is started. */
-    void onJobStarted();
-
-    /** Called when the job has failed. */
-    void onJobFailed();
-
-    /** Called when the job has succeeded. */
-    void onJobSucceeded();
-
-    /** Called when the job has been cancelled. */
-    void onJobCancelled();
-  }
-
-  /**
    * Get the name of the job template.
    *
    * @return the name of the job template
@@ -87,12 +63,4 @@ public interface JobHandle {
    * @return the status of the job
    */
   Status jobStatus();
-
-  /**
-   * Add a listener to the job handle. The listener will be notified when the job is queued,
-   * started, failed, or succeeded.
-   *
-   * @param l the listener to be added
-   */
-  void addListener(Listener l);
 }

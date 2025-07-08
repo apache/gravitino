@@ -20,13 +20,14 @@ package org.apache.gravitino.job;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 
 /**
  * Interface for job management operations. This interface will be mixed with GravitinoClient to
- * provide the ability to manage jobs within the Gravitino system.
+ * provide the ability to manage job templates and jobs within the Gravitino system.
  */
 public interface SupportsJobs {
 
@@ -57,12 +58,18 @@ public interface SupportsJobs {
 
   /**
    * Deletes a job template by its name. This will remove the job template from Gravitino, and it
-   * will no longer be available for execution.
+   * will no longer be available for execution. Only when all the jobs associated with this job
+   * template are completed or cancelled, the job template can be deleted successfully, otherwise it
+   * will throw an exception.
+   *
+   * <p>The deletion of a job template will also delete all the jobs associated with this template.
    *
    * @param jobTemplateName the name of the job template to delete
-   * @throws NoSuchJobTemplateException if no job template with the specified name exists
+   * @return true if the job template was successfully deleted, false if the job template does not
+   *     exist
+   * @throws InUseException if there are still jobs associated with the job template
    */
-  void deleteJobTemplate(String jobTemplateName) throws NoSuchJobTemplateException;
+  boolean deleteJobTemplate(String jobTemplateName) throws InUseException;
 
   /**
    * Lists all the jobs by the specified job template name. This will return a list of job handles
@@ -75,7 +82,15 @@ public interface SupportsJobs {
   List<JobHandle> listJobs(String jobTemplateName) throws NoSuchJobTemplateException;
 
   /**
-   * run a job with the template name and configuration. The jobConf is a map of key-value contains
+   * Lists all the jobs in Gravitino. This will return a list of all job handles, regardless of the
+   * job template they are associated with.
+   *
+   * @return a list of all job handles in Gravitino
+   */
+  List<JobHandle> listJobs();
+
+  /**
+   * Run a job with the template name and configuration. The jobConf is a map of key-value contains
    * the variables that will be used to replace the templated parameters in the job template.
    *
    * @param jobTemplateName the name of the job template to run
@@ -96,10 +111,13 @@ public interface SupportsJobs {
   JobHandle getJob(String jobId) throws NoSuchJobException;
 
   /**
-   * Cancels a job by its ID.
+   * Cancel a job by its ID. This operation will attempt to cancel the job if it is still running.
+   * It will return immediately, user could use the job handle to check the status of the job after
+   * cancellation.
    *
    * @param jobId the ID of the job to cancel
+   * @return a handle to the cancelled job
    * @throws NoSuchJobException if the job with the specified ID does not exist
    */
-  void cancelJob(String jobId) throws NoSuchJobException;
+  JobHandle cancelJob(String jobId) throws NoSuchJobException;
 }

@@ -27,25 +27,8 @@ class JobHandle(ABC):
         SUCCEEDED = "SUCCEEDED"
         CANCELLED = "CANCELLED"
 
-    class Listener(ABC):
-        @abstractmethod
-        def on_job_queued(self):
-            pass
-
-        @abstractmethod
-        def on_job_started(self):
-            pass
-
-        @abstractmethod
-        def on_job_failed(self):
-            pass
-
-        @abstractmethod
-        def on_job_succeeded(self):
-            pass
-
     @abstractmethod
-    def job_name(self) -> str:
+    def job_template_name(self) -> str:
         pass
 
     @abstractmethod
@@ -54,8 +37,4 @@ class JobHandle(ABC):
 
     @abstractmethod
     def job_status(self) -> Status:
-        pass
-
-    @abstractmethod
-    def add_listener(self, listener: Listener):
         pass

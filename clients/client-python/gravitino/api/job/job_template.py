@@ -14,290 +14,288 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional
+from abc import abstractmethod, ABC
+from typing import List, Dict, Optional, TypeVar, Generic, Any
 from enum import Enum
+from copy import deepcopy
 
 
 class JobType(Enum):
     """
-    Job type enumeration.
+    JobType is an enum to define the type of the job.
+
+    Gravitino supports different types of jobs, such as Spark and Shell. The job type is
+    required to determine the runtime environment for executing the job.
     """
 
-    SPARK = "SPARK"  # Job type for executing a Spark application.
-    SHELL = "SHELL"  # Job type for executing a shell command.
+    SPARK = "SPARK"
+    """job type for executing Spark jobs"""
+    SHELL = "SHELL"
+    """job type for executing shell commands"""
 
 
-@dataclass
-class JobTemplate:
+T = TypeVar("T", bound="JobTemplate")
+B = TypeVar("B", bound="BaseBuilder")
+
+
+class JobTemplate(ABC):
     """
     JobTemplate is a class to define all the configuration parameters for a job.
-    <p>
+
     JobType is enum to define the type of the job, because Gravitino needs different runtime
     environments to execute different types of jobs, so the job type is required.
-    <p>
-    Some parameters can be templated, which means that they can be replaced with actual values when
-    running the job, for example, arguments can be { "{input_path}}", "{{output_path}" },
-    environment variables can be { "foo": "{{foo_value}}", "bar": "{{bar_value}}" }. the
-    parameters support templating are: arguments, environments, configs
-    <p>
-    The artifacts (files, jars, archives) will be uploaded to the Gravitino server and managed in
-    the staging path when registering the job.
+
+    Some parameters can be templated, which means that they can be replaced with actual values
+    when running the job, for example, arguments can be { "{input_path}}", "{{output_path}" },
+    environment variables can be { "foo": "{{foo_value}}", "bar": "{{bar_value}}" }. the parameters
+    support templating are: arguments, environments.
     """
 
-    # pylint: disable=too-many-instance-attributes
+    def __init__(self, builder: "BaseBuilder"):
+        self._name = builder.name
+        self._comment = builder.comment
+        self._executable = builder.executable
+        self._arguments = builder.arguments
+        self._environments = builder.environments
+        self._custom_fields = builder.custom_fields
 
-    job_type: Optional[JobType] = None
-    name: Optional[str] = None
-    comment: Optional[str] = None
-    executable: Optional[str] = None
-    arguments: List[str] = field(default_factory=list)
-    configs: Dict[str, str] = field(default_factory=dict)
-    environments: Dict[str, str] = field(default_factory=dict)
-    files: List[str] = field(default_factory=list)
-    jars: List[str] = field(default_factory=list)
-    archives: List[str] = field(default_factory=list)
+    @property
+    def name(self) -> str:
+        """
+        Returns:
+            The name of the job template.
+        """
+        return self._name
 
-    def __eq__(self, other):
+    @property
+    def comment(self) -> Optional[str]:
+        """
+        Returns:
+            The comment of the job template, which can be used to describe the job.
+            This field is optional and can be None.
+        """
+        return self._comment
+
+    @property
+    def executable(self) -> str:
+        """
+        Returns:
+            The executable of the job template, which is the command or script that will be executed
+            when the job is run. This field is required and must not be empty.
+        """
+        return self._executable
+
+    @property
+    def arguments(self) -> List[str]:
+        """
+        Returns:
+            The arguments of the job template, which are the parameters that will be passed to the
+            executable when the job is run.
+        """
+        return self._arguments
+
+    @property
+    def environments(self) -> Dict[str, str]:
+        """
+        Returns:
+            The environment variables of the job template, which are key-value pairs that will be
+            set in the environment when the job is run. This can include variables that can be
+            templated with actual values when running the job.
+        """
+        return self._environments
+
+    @property
+    def custom_fields(self) -> Dict[str, str]:
+        """
+        Returns:
+            Custom fields of the job template, which are additional key-value pairs that can be
+            used to store any other information related to the job. This field is optional
+            and can be empty.
+        """
+        return self._custom_fields
+
+    @abstractmethod
+    def job_type(self) -> JobType:
+        """
+        Returns:
+            The type of the job template, which is an enum value indicating the type of job
+            (e.g., SPARK, SHELL). This is required to determine the runtime environment for executing
+            the job.
+        """
+        pass
+
+    def __eq__(self, other: Any) -> bool:
         if self is other:
             return True
         if not isinstance(other, JobTemplate):
             return False
         return (
-            self.job_type == other.job_type
-            and self.name == other.name
-            and self.comment == other.comment
-            and self.executable == other.executable
-            and self.arguments == other.arguments
-            and self.configs == other.configs
-            and self.environments == other.environments
-            and self.files == other.files
-            and self.jars == other.jars
-            and self.archives == other.archives
+            self.job_type() == other.job_type()
+            and self._name == other.name
+            and self._comment == other.comment
+            and self._executable == other.executable
+            and self._arguments == other.arguments
+            and self._environments == other.environments
+            and self._custom_fields == other.custom_fields
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(
             (
-                self.job_type,
-                self.name,
-                self.comment,
-                self.executable,
-                tuple(self.arguments),
-                frozenset(self.configs.items()),
-                frozenset(self.environments.items()),
-                tuple(self.files),
-                tuple(self.jars),
-                tuple(self.archives),
+                self.job_type(),
+                self._name,
+                self._comment,
+                self._executable,
+                tuple(self._arguments),
+                frozenset(self._environments.items()),
+                frozenset(self._custom_fields.items()),
             )
         )
 
-    def __str__(self):
-        return (
-            f"\nJobTemplate{{\n"
-            f"  job_type={self.job_type},\n"
-            f"  name={self.name},\n"
-            f"  comment={self.comment},\n"
-            f"  executable={self.executable},\n"
-            f"  arguments={self.arguments},\n"
-            f"  configs={self.configs},\n"
-            f"  environments={self.environments},\n"
-            f"  files={self.files},\n"
-            f"  jars={self.jars},\n"
-            f"  archives={self.archives}\n"
-            f"}}"
-        )
+    def __str__(self) -> str:
+        res = f"  jobType={self.job_type()},\n  name='{self._name}',\n"
+        if self._comment:
+            res += f"  comment='{self._comment}',\n"
+        res += f"  executable='{self._executable}',\n"
 
-    @staticmethod
-    def builder():
+        if self._arguments:
+            res += (
+                "  arguments=[\n"
+                + "".join(f"    {arg},\n" for arg in self._arguments)
+                + "  ],\n"
+            )
+        else:
+            res += "  arguments=[],\n"
+
+        if self._environments:
+            res += (
+                "  environments={\n"
+                + "".join(f"    {k}: {v},\n" for k, v in self._environments.items())
+                + "  },\n"
+            )
+        else:
+            res += "  environments={},\n"
+
+        if self._custom_fields:
+            res += (
+                "  customFields={\n"
+                + "".join(f"    {k}: {v},\n" for k, v in self._custom_fields.items())
+                + "  }\n"
+            )
+        else:
+            res += "  customFields={}\n"
+
+        return res
+
+    class BaseBuilder(Generic[B, T]):
         """
-        Create a new Builder instance for JobTemplate.
-        """
-        return JobTemplate.Builder()
-
-    class Builder:
-        """
-        Builder class for constructing JobTemplate instances.
+        BaseBuilder is a generic class to build a JobTemplate.
         """
 
-        def __init__(self):
-            self._job_template = JobTemplate()
+        def __init__(self: B):
+            self.name: Optional[str] = None
+            self.comment: Optional[str] = None
+            self.executable: Optional[str] = None
+            self.arguments: List[str] = []
+            self.environments: Dict[str, str] = {}
+            self.custom_fields: Dict[str, str] = {}
 
-        def with_job_type(self, job_type: JobType):
+        def with_name(self: B, name: str) -> B:
             """
-            Set the job type.
+            Sets the name of the job template.
 
             Args:
-                job_type (JobType): The type of the job.
+                name: The name of the job template. It must not be null or empty.
 
             Returns:
-                Builder: This Builder instance.
+                The builder instance for method chaining.
             """
-            self._job_template.job_type = job_type
+            self.name = name
             return self
 
-        def with_name(self, name: str):
+        def with_comment(self: B, comment: str) -> B:
             """
-            Set the name of the job.
+            Sets the comment of the job template.
 
             Args:
-                name (str): The name of the job.
+                comment: The comment of the job template. It can be null or empty.
 
             Returns:
-                Builder: This Builder instance.
+                The builder instance for method chaining.
             """
-            self._job_template.name = name
+            self.comment = comment
             return self
 
-        def with_comment(self, comment: str):
+        def with_executable(self: B, executable: str) -> B:
             """
-            Set the comment for the job.
+            Sets the executable of the job template.
 
             Args:
-                comment (str): The comment or description of the job.
+                executable: The executable of the job template. It must not be null or empty.
 
             Returns:
-                Builder: This Builder instance.
+                The builder instance for method chaining.
             """
-            self._job_template.comment = comment
+            self.executable = executable
             return self
 
-        def with_executable(self, executable: str):
+        def with_arguments(self: B, arguments: List[str]) -> B:
             """
-            Set the executable for the job.
+            Sets the arguments of the job template.
 
             Args:
-                executable (str): The path to the executable.
+                arguments: The arguments of the job template.
 
             Returns:
-                Builder: This Builder instance.
+                The builder instance for method chaining.
             """
-            self._job_template.executable = executable
+            self.arguments = deepcopy(arguments)
             return self
 
-        def with_arguments(self, arguments: List[str]):
+        def with_environments(self: B, environments: Dict[str, str]) -> B:
             """
-            Set the arguments for the job.
+            Sets the environment variables of the job template.
 
             Args:
-                arguments (List[str]): The list of arguments.
+                environments: The environment variables of the job template.
 
             Returns:
-                Builder: This Builder instance.
+                The builder instance for method chaining.
             """
-            self._job_template.arguments = arguments
+            self.environments = deepcopy(environments)
             return self
 
-        def with_configs(self, configs: Dict[str, str]):
+        def with_custom_fields(self: B, custom_fields: Dict[str, str]) -> B:
             """
-            Set the configurations for the job.
+            Sets the custom fields of the job template.
 
             Args:
-                configs (Dict[str, str]): The map of configurations.
+                custom_fields: The custom fields of the job template.
 
             Returns:
-                Builder: This Builder instance.
+                The builder instance for method chaining.
             """
-            self._job_template.configs = configs
+            self.custom_fields = deepcopy(custom_fields)
             return self
 
-        def with_environments(self, environments: Dict[str, str]):
+        def validate(self: B):
             """
-            Set the environment variables for the job.
-
-            Args:
-                environments (Dict[str, str]): The map of environment variables.
-
-            Returns:
-                Builder: This Builder instance.
+            Validates the job template parameters.
             """
-            self._job_template.environments = environments
-            return self
-
-        def with_files(self, files: List[str]):
-            """
-            Set the files to be included in the job.
-
-            Args:
-                files (List[str]): The list of file paths.
-
-            Returns:
-                Builder: This Builder instance.
-            """
-            self._job_template.files = files
-            return self
-
-        def with_jars(self, jars: List[str]):
-            """
-            Set the jars to be included in the job.
-
-            Args:
-                jars (List[str]): The list of jar paths.
-
-            Returns:
-                Builder: This Builder instance.
-            """
-            self._job_template.jars = jars
-            return self
-
-        def with_archives(self, archives: List[str]):
-            """
-            Set the archives to be included in the job.
-
-            Args:
-                archives (List[str]): The list of archive paths.
-
-            Returns:
-                Builder: This Builder instance.
-            """
-            self._job_template.archives = archives
-            return self
-
-        def build(self):
-            """
-            Build the JobTemplate instance.
-
-            Returns:
-                JobTemplate: A new JobTemplate instance.
-
-            Raises:
-                ValueError: If required fields are missing or invalid.
-            """
-            if not self._job_template.job_type:
-                raise ValueError("Job type must not be null")
-            if not self._job_template.name or not self._job_template.name.strip():
+            if not self.name or not self.name.strip():
                 raise ValueError("Job name must not be null or empty")
-            if (
-                not self._job_template.executable
-                or not self._job_template.executable.strip()
-            ):
+            if not self.executable or not self.executable.strip():
                 raise ValueError("Executable must not be null or empty")
+            self.arguments = self.arguments or []
+            self.environments = self.environments or {}
+            self.custom_fields = self.custom_fields or {}
 
-            # Ensure immutability for lists and dictionaries
-            self._job_template.arguments = (
-                []
-                if self._job_template.arguments is None
-                else self._job_template.arguments
-            )
-            self._job_template.configs = (
-                {} if self._job_template.configs is None else self._job_template.configs
-            )
-            self._job_template.environments = (
-                {}
-                if self._job_template.environments is None
-                else self._job_template.environments
-            )
-            self._job_template.files = (
-                [] if self._job_template.files is None else self._job_template.files
-            )
-            self._job_template.jars = (
-                [] if self._job_template.jars is None else self._job_template.jars
-            )
-            self._job_template.archives = (
-                []
-                if self._job_template.archives is None
-                else self._job_template.archives
-            )
+        @abstractmethod
+        def build(self) -> T:
+            """
+            Builds the JobTemplate instance.
 
-            return self._job_template
+            Returns:
+                An instance of JobTemplate with the configured parameters.
+            """
+            pass

@@ -40,13 +40,9 @@ import org.apache.commons.lang3.StringUtils;
  * <ul>
  *   <li>arguments
  *   <li>environments
- *   <li>configs
  * </ul>
- *
- * The artifacts (files, jars, archives) will be uploaded to the Gravitino server and managed in the
- * staging path when registering the job.
  */
-public final class JobTemplate {
+public abstract class JobTemplate {
 
   /**
    * JobType is an enum to define the type of the job.
@@ -63,50 +59,56 @@ public final class JobTemplate {
     SHELL,
   }
 
-  private JobType jobType;
+  /** The name of the job template. */
+  protected final String name;
 
-  private String name;
+  /** The comment or description of the job template. */
+  protected final String comment;
 
-  private String comment;
+  /** The executable path for the job template. */
+  protected final String executable;
 
-  private String executable;
+  /** The list of arguments for the job template. */
+  protected final List<String> arguments;
 
-  private List<String> arguments;
+  /** The map of environment variables for the job template. */
+  protected final Map<String, String> environments;
 
-  private Map<String, String> configs;
+  /** The map of custom fields for the job template. */
+  protected final Map<String, String> customFields;
 
-  private Map<String, String> environments;
-
-  private List<String> files;
-
-  private List<String> jars;
-
-  private List<String> archives;
-
-  private JobTemplate() {
-    // Prevent instantiation
+  /**
+   * Constructs a JobTemplate instance with the specified parameters.
+   *
+   * @param builder the builder containing the job template parameters
+   */
+  protected JobTemplate(BaseBuilder<?, ?> builder) {
+    this.name = builder.name;
+    this.comment = builder.comment;
+    this.executable = builder.executable;
+    this.arguments = builder.arguments;
+    this.environments = builder.environments;
+    this.customFields = builder.customFields;
   }
 
   /**
    * Get the job type.
    *
-   * @return the type of the job
+   * @return the type of the job template
    */
-  public JobType jobType() {
-    return jobType;
-  }
+  public abstract JobType jobType();
 
   /**
-   * Get the name of the job.
+   * Get the name of the job template.
    *
-   * @return the name of the job
+   * @return the name of the job template
    */
   public String name() {
     return name;
   }
 
   /**
-   * Get the comment for the job.
+   * Get the comment for the job template.
    *
    * @return the comment
    */
@@ -115,7 +117,7 @@ public final class JobTemplate {
   }
 
   /**
-   * Get the executable for the job.
+   * Get the executable for the job template.
    *
    * @return the executable path
    */
@@ -124,7 +126,7 @@ public final class JobTemplate {
   }
 
   /**
-   * Get the arguments for the job.
+   * Get the arguments for the job template.
    *
    * @return the list of arguments
    */
@@ -133,16 +135,7 @@ public final class JobTemplate {
   }
 
   /**
-   * Get the configurations for the job.
-   *
-   * @return the map of configurations
-   */
-  public Map<String, String> configs() {
-    return configs;
-  }
-
-  /**
-   * Get the environment variables for the job.
+   * Get the environment variables for the job template.
    *
    * @return the map of environment variables
    */
@@ -151,39 +144,12 @@ public final class JobTemplate {
   }
 
   /**
-   * Get the files to be included in the job.
+   * Get the custom fields for the job template.
    *
-   * @return the list of file paths
+   * @return the map of custom fields
    */
-  public List<String> files() {
-    return files;
-  }
-
-  /**
-   * Get the jars to be included in the job.
-   *
-   * @return the list of jar paths
-   */
-  public List<String> jars() {
-    return jars;
-  }
-
-  /**
-   * Get the archives to be included in the job.
-   *
-   * @return the list of archive paths
-   */
-  public List<String> archives() {
-    return archives;
-  }
-
-  /**
-   * Create a new Builder instance for JobTemplate.
-   *
-   * @return a new Builder instance
-   */
-  public static Builder builder() {
-    return new Builder();
+  public Map<String, String> customFields() {
+    return customFields;
   }
 
   @Override
@@ -196,39 +162,26 @@ public final class JobTemplate {
     }
 
     JobTemplate that = (JobTemplate) o;
-    return Objects.equals(jobType, that.jobType)
+    return Objects.equals(jobType(), that.jobType())
         && Objects.equals(name, that.name)
         && Objects.equals(comment, that.comment)
         && Objects.equals(executable, that.executable)
         && Objects.equals(arguments, that.arguments)
-        && Objects.equals(configs, that.configs)
         && Objects.equals(environments, that.environments)
-        && Objects.equals(files, that.files)
-        && Objects.equals(jars, that.jars)
-        && Objects.equals(archives, that.archives);
+        && Objects.equals(customFields, that.customFields);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        jobType,
-        name,
-        comment,
-        executable,
-        arguments,
-        configs,
-        environments,
-        files,
-        jars,
-        archives);
+        jobType(), name, comment, executable, arguments, environments, customFields);
   }
 
   @Override
   public String toString() {
     StringBuilder sb =
-        new StringBuilder("\nJobTemplate{\n")
-            .append("  jobType=")
-            .append(jobType)
+        new StringBuilder("  jobType=")
+            .append(jobType())
             .append(",\n")
             .append("  name='")
             .append(name)
@@ -247,14 +200,6 @@ public final class JobTemplate {
       sb.append("  arguments=[]\n");
     }
 
-    if (!configs.isEmpty()) {
-      sb.append("  configs={\n");
-      configs.forEach((k, v) -> sb.append("    ").append(k).append(": ").append(v).append(",\n"));
-      sb.append("  },\n");
-    } else {
-      sb.append("  configs={}\n");
-    }
-
     if (!environments.isEmpty()) {
       sb.append("  environments={\n");
       environments.forEach(
@@ -264,188 +209,127 @@ public final class JobTemplate {
       sb.append("  environments={}\n");
     }
 
-    if (!files.isEmpty()) {
-      sb.append("  files=[\n");
-      files.forEach(file -> sb.append("    ").append(file).append(",\n"));
-      sb.append("  ],\n");
+    if (!customFields.isEmpty()) {
+      sb.append("  customFields={\n");
+      customFields.forEach(
+          (k, v) -> sb.append("    ").append(k).append(": ").append(v).append(",\n"));
+      sb.append("  }\n");
     } else {
-      sb.append("  files=[]\n");
+      sb.append("  customFields={}\n");
     }
 
-    if (!jars.isEmpty()) {
-      sb.append("  jars=[\n");
-      jars.forEach(jar -> sb.append("    ").append(jar).append(",\n"));
-      sb.append("  ],\n");
-    } else {
-      sb.append("  jars=[]\n");
-    }
-
-    if (!archives.isEmpty()) {
-      sb.append("  archives=[\n");
-      archives.forEach(archive -> sb.append("    ").append(archive).append(",\n"));
-      sb.append("  ]\n");
-    } else {
-      sb.append("  archives=[]\n");
-    }
-
-    sb.append("}\n");
     return sb.toString();
   }
 
   /** Builder class for constructing JobTemplate instances. */
-  public static class Builder {
-    private final JobTemplate jobTemplate;
+  public abstract static class BaseBuilder<B extends BaseBuilder<B, P>, P extends JobTemplate> {
 
-    private Builder() {
-      this.jobTemplate = new JobTemplate();
-    }
+    private String name;
+    private String comment;
+    private String executable;
+    private List<String> arguments;
+    private Map<String, String> environments;
+    private Map<String, String> customFields;
 
     /**
-     * Set the job type.
+     * Constructor for the BaseBuilder. This constructor is protected to ensure that only subclasses
+     * can instantiate it.
+     */
+    protected BaseBuilder() {}
+
+    /**
+     * Returns the current instance of the builder.
      *
-     * @param jobType the type of the job
+     * @return the current builder instance
+     */
+    protected abstract B self();
+
+    /**
+     * Build the JobTemplate instance.
+     *
+     * @return the constructed JobTemplate instance
+     */
+    public abstract P build();
+
+    /**
+     * Set the name of the job template.
+     *
+     * @param name the name of the job template.
      * @return this Builder instance
      */
-    public Builder withJobType(JobType jobType) {
-      jobTemplate.jobType = jobType;
-      return this;
+    public B withName(String name) {
+      this.name = name;
+      return self();
     }
 
     /**
-     * Set the name of the job.
+     * Set the comment for the job template.
      *
-     * @param name the name of the job
+     * @param comment the comment or description of the job template
      * @return this Builder instance
      */
-    public Builder withName(String name) {
-      jobTemplate.name = name;
-      return this;
+    public B withComment(String comment) {
+      this.comment = comment;
+      return self();
     }
 
     /**
-     * Set the comment for the job.
-     *
-     * @param comment the comment or description of the job
-     * @return this Builder instance
-     */
-    public Builder withComment(String comment) {
-      jobTemplate.comment = comment;
-      return this;
-    }
-
-    /**
-     * Set the executable for the job.
+     * Set the executable for the job template.
      *
      * @param executable the path to the executable
      * @return this Builder instance
      */
-    public Builder withExecutable(String executable) {
-      jobTemplate.executable = executable;
-      return this;
+    public B withExecutable(String executable) {
+      this.executable = executable;
+      return self();
     }
 
     /**
-     * Set the arguments for the job.
+     * Set the arguments for the job template.
      *
      * @param arguments the list of arguments
      * @return this Builder instance
      */
-    public Builder withArguments(List<String> arguments) {
-      jobTemplate.arguments = arguments;
-      return this;
+    public B withArguments(List<String> arguments) {
+      this.arguments = arguments;
+      return self();
     }
 
     /**
-     * Set the configurations for the job.
-     *
-     * @param configs the map of configurations
-     * @return this Builder instance
-     */
-    public Builder withConfigs(Map<String, String> configs) {
-      jobTemplate.configs = configs;
-      return this;
-    }
-
-    /**
-     * Set the environment variables for the job.
+     * Set the environment variables for the job template.
      *
      * @param environments the map of environment variables
      * @return this Builder instance
      */
-    public Builder withEnvironments(Map<String, String> environments) {
-      jobTemplate.environments = environments;
-      return this;
+    public B withEnvironments(Map<String, String> environments) {
+      this.environments = environments;
+      return self();
     }
 
     /**
-     * Set the files to be included in the job.
+     * Set the custom fields for the job template.
      *
-     * @param files the list of file paths
+     * @param customFields the map of custom fields
      * @return this Builder instance
      */
-    public Builder withFiles(List<String> files) {
-      jobTemplate.files = files;
-      return this;
+    public B withCustomFields(Map<String, String> customFields) {
+      this.customFields = customFields;
+      return self();
     }
 
-    /**
-     * Set the jars to be included in the job.
-     *
-     * @param jars the list of jar paths
-     * @return this Builder instance
-     */
-    public Builder withJars(List<String> jars) {
-      jobTemplate.jars = jars;
-      return this;
-    }
-
-    /**
-     * Set the archives to be included in the job.
-     *
-     * @param archives the list of archive paths
-     * @return this Builder instance
-     */
-    public Builder withArchives(List<String> archives) {
-      jobTemplate.archives = archives;
-      return this;
-    }
-
-    /**
-     * Build the jobTemplate instance.
-     *
-     * @return a new jobTemplate instance
-     * @throws IllegalArgumentException if the executable is null or empty
-     */
-    public JobTemplate build() {
-      Preconditions.checkArgument(jobTemplate.jobType != null, "Job type must not be null");
+    /** Validates the parameters of the job template. */
+    protected void validate() {
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(jobTemplate.name), "Job name must not be null or empty");
+          StringUtils.isNotBlank(name), "Job name must not be null or empty");
 
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(jobTemplate.executable), "Executable must not be null or empty");
+          StringUtils.isNotBlank(executable), "Executable must not be null or empty");
 
-      jobTemplate.arguments =
-          jobTemplate.arguments != null
-              ? ImmutableList.copyOf(jobTemplate.arguments)
-              : ImmutableList.of();
-      jobTemplate.configs =
-          jobTemplate.configs != null
-              ? ImmutableMap.copyOf(jobTemplate.configs)
-              : ImmutableMap.of();
-      jobTemplate.environments =
-          jobTemplate.environments != null
-              ? ImmutableMap.copyOf(jobTemplate.environments)
-              : ImmutableMap.of();
-      jobTemplate.files =
-          jobTemplate.files != null ? ImmutableList.copyOf(jobTemplate.files) : ImmutableList.of();
-      jobTemplate.jars =
-          jobTemplate.jars != null ? ImmutableList.copyOf(jobTemplate.jars) : ImmutableList.of();
-      jobTemplate.archives =
-          jobTemplate.archives != null
-              ? ImmutableList.copyOf(jobTemplate.archives)
-              : ImmutableList.of();
-
-      return jobTemplate;
+      this.arguments = arguments != null ? ImmutableList.copyOf(arguments) : ImmutableList.of();
+      this.environments =
+          environments != null ? ImmutableMap.copyOf(environments) : ImmutableMap.of();
+      this.customFields =
+          customFields != null ? ImmutableMap.copyOf(customFields) : ImmutableMap.of();
     }
   }
 }
