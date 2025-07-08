@@ -24,6 +24,12 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
+/**
+ * Utility class for validating JDBC URLs and configurations. It checks for unsafe parameters
+ * specific to MySQL, MariaDB, and PostgreSQL JDBC URLs. Unsafe parameters can lead to security
+ * vulnerabilities or unexpected behavior, so this utility helps ensure that JDBC configurations are
+ * safe to use.
+ */
 public class JdbcUrlUtils {
 
   // Unsafe parameters for MySQL and MariaDB, other parameters like
@@ -53,6 +59,13 @@ public class JdbcUrlUtils {
     // Utility class, no instantiation allowed
   }
 
+  /**
+   * Validates the JDBC configuration by checking the driver and URL for unsafe parameters.
+   *
+   * @param driver the JDBC driver class name
+   * @param url the JDBC URL
+   * @param all the JDBC configuration properties
+   */
   public static void validateJdbcConfig(String driver, String url, Map<String, String> all) {
     String lowerUrl = url.toLowerCase();
     String decodedUrl = recursiveDecode(lowerUrl);
