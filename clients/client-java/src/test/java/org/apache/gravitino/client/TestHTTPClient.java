@@ -129,7 +129,7 @@ public class TestHTTPClient {
 
   @Test
   public void testNullHeadersDoNotCauseNPE() throws Exception {
-    Item body = new Item(0L, "test");
+    Item body = new Item(0L, "hank");
     int statusCode = 200;
 
     ErrorHandler onError = mock(ErrorHandler.class);
