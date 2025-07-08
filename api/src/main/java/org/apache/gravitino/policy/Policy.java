@@ -20,7 +20,6 @@ package org.apache.gravitino.policy;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
@@ -36,10 +35,20 @@ import org.apache.gravitino.exceptions.IllegalPolicyException;
 @Evolving
 public interface Policy extends Auditable {
 
+  /** The set of metadata object types that the policy can be applied to. */
+  Set<MetadataObject.Type> SUPPORTS_ALL_OBJECT_TYPES =
+      ImmutableSet.of(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.MODEL);
+
   /**
    * The prefix for built-in policy types. All built-in policy types should start with this prefix.
    */
-  String BUILT_IN_TYPE_PREFIX = "policy_";
+  String BUILT_IN_TYPE_PREFIX = "system_";
 
   /** The built-in policy types. Predefined policy types that are provided by the system. */
   enum BuiltInType {
@@ -143,19 +152,6 @@ public interface Policy extends Auditable {
       return contentClass;
     }
   }
-
-  /** The set of metadata object types that the policy can be applied to. */
-  Set<MetadataObject.Type> SUPPORTS_ALL_OBJECT_TYPES =
-      new HashSet<MetadataObject.Type>() {
-        {
-          add(MetadataObject.Type.CATALOG);
-          add(MetadataObject.Type.SCHEMA);
-          add(MetadataObject.Type.FILESET);
-          add(MetadataObject.Type.TABLE);
-          add(MetadataObject.Type.TOPIC);
-          add(MetadataObject.Type.MODEL);
-        }
-      };
 
   /**
    * Get the name of the policy.

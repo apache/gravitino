@@ -101,5 +101,10 @@ public interface PolicyContent {
     public int hashCode() {
       return Objects.hash(customRules, properties);
     }
+
+    @Override
+    public String toString() {
+      return "CustomContent{" + "customRules=" + customRules + ", properties=" + properties + '}';
+    }
   }
 }
