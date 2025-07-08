@@ -61,7 +61,6 @@ public class ModelAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
-    containerSuite.startHiveContainer();
     super.startIntegrationTest();
     client
         .loadMetalake(METALAKE)

@@ -101,10 +101,11 @@ public class ModelOperations {
             modelIds =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "ANY(OWNER,METALAKE,CATALOG) || "
-                        + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-                        + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-                        + "&& (MODEL::OWNER ||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA,MODEL))))",
+                    "ANY(OWNER,METALAKE,CATALOG) ||"
+                        + " ( (ANY(USE_CATALOG,METALAKE, CATALOG)) && "
+                        + " (SCHEMA::OWNER || "
+                        + "( (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) && "
+                        + "(ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))) )",
                     Entity.EntityType.MODEL,
                     modelIds);
             LOG.info("List {} models under schema {}", modelIds.length, modelNs);
@@ -123,10 +124,11 @@ public class ModelOperations {
   @ResponseMetered(name = "get-model", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) || "
-              + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& (MODEL::OWNER||ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA))))",
+          "ANY(OWNER,METALAKE,CATALOG) ||"
+              + " ( (ANY(USE_CATALOG,METALAKE, CATALOG)) && "
+              + " (SCHEMA::OWNER || "
+              + "( (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) && "
+              + "(ANY(USE_MODEL,METALAKE, CATALOG, SCHEMA)))) )",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModel(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -158,10 +160,11 @@ public class ModelOperations {
   @ResponseMetered(name = "register-model", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) || "
-              + "((ANY(USE_CATALOG,METALAKE, CATALOG)) "
-              + "&& (SCHEMA::OWNER || ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) "
-              + "&& ANY(CREATE_MODEL,METALAKE, CATALOG, SCHEMA)))",
+          "ANY(OWNER,METALAKE,CATALOG) ||"
+              + " ( (ANY(USE_CATALOG,METALAKE, CATALOG)) && "
+              + " (SCHEMA::OWNER || "
+              + "( (ANY(USE_SCHEMA,METALAKE, CATALOG, SCHEMA)) && "
+              + "(ANY(CREATE_MODEL,METALAKE, CATALOG, SCHEMA)))))",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerModel(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
