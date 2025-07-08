@@ -121,24 +121,24 @@ public class AuthorizationExpressionConverter {
   }
 
   /**
-   * Replace any privilege experssion to any experssion
+   * Replace any privilege expression to any expression
    *
-   * @param experssion
-   * @return
+   * @param expression authorization expression
+   * @return authorization expression
    */
-  private static String replaceAnyPrivilege(String experssion) {
-    experssion = experssion.replaceAll("ANY_USE_CATALOG", "(ANY(USE_CATALOG,METALAKE,CATALOG))");
-    experssion =
-        experssion.replaceAll("ANY_USE_SCHEMA", "(ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA))");
-    experssion =
-        experssion.replaceAll(
+  private static String replaceAnyPrivilege(String expression) {
+    expression = expression.replaceAll("ANY_USE_CATALOG", "(ANY(USE_CATALOG,METALAKE,CATALOG))");
+    expression =
+        expression.replaceAll("ANY_USE_SCHEMA", "(ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA))");
+    expression =
+        expression.replaceAll(
             "ANY_SELECT_TABLE", "(ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE))");
-    experssion =
-        experssion.replaceAll(
+    expression =
+        expression.replaceAll(
             "ANY_MODIFY_TABLE", "(ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE))");
-    experssion =
-        experssion.replaceAll(
+    expression =
+        expression.replaceAll(
             "ANY_CREATE_TABLE", "(ANY(CREATE_TABLE,METALAKE,CATALOG,SCHEMA,TABLE))");
-    return experssion;
+    return expression;
   }
 }
