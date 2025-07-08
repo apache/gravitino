@@ -26,16 +26,27 @@ from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 class TestFieldReferenceDTO(unittest.TestCase):
     def setUp(self):
         self._field_references = [
-            FieldReferenceDTO(field_name=[f"field_name_{idx}"]) for idx in range(3)
+            FieldReferenceDTO.builder()
+            .with_field_name(field_name=[f"field_name_{idx}"])
+            .build()
+            for idx in range(3)
         ]
 
     def test_field_reference_dto(self):
-        dto = FieldReferenceDTO(field_name=self._field_references[0].field_name())
+        dto = (
+            FieldReferenceDTO.builder()
+            .with_field_name(field_name=self._field_references[0].field_name())
+            .build()
+        )
         self.assertListEqual(dto.field_name(), self._field_references[0].field_name())
         self.assertIs(dto.arg_type(), FunctionArg.ArgType.FIELD)
 
     def test_equality(self):
-        dto = FieldReferenceDTO(field_name=self._field_references[0].field_name())
+        dto = (
+            FieldReferenceDTO.builder()
+            .with_field_name(field_name=self._field_references[0].field_name())
+            .build()
+        )
 
         self.assertTrue(dto == self._field_references[0])
         self.assertFalse(dto == self._field_references[1])
@@ -47,3 +58,12 @@ class TestFieldReferenceDTO(unittest.TestCase):
         dto_dict = {dto: idx for idx, dto in enumerate(self._field_references)}
         self.assertEqual(0, dto_dict.get(self._field_references[0]))
         self.assertNotEqual(0, dto_dict.get(self._field_references[1]))
+
+    def test_builder(self):
+        dto = FieldReferenceDTO.builder().with_field_name(["field_name"]).build()
+        self.assertIsInstance(dto, FieldReferenceDTO)
+        self.assertEqual(dto.field_name(), ["field_name"])
+
+        dto = FieldReferenceDTO.builder().with_column_name(["field_name"]).build()
+        self.assertIsInstance(dto, FieldReferenceDTO)
+        self.assertEqual(dto.field_name(), ["field_name"])
