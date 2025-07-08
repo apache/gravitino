@@ -93,9 +93,9 @@ public class TableOperations {
                 MetadataFilterHelper.filterByExpression(
                     metalake,
                     "((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
-                        + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
+                        + "(SCHEMA::OWNER || (ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
                         + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-                        + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)))) ||"
+                        + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER))) ||"
                         + "ANY(OWNER,METALAKE,CATALOG)",
                     Entity.EntityType.TABLE,
                     idents);
