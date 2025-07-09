@@ -66,6 +66,9 @@ public class SchemaOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperations.class);
 
+  private static final String loadSchemaAuthorizationExpression =
+      " ANY(OWNER,METALAKE,CATALOG) || " + "ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA) ";
+
   private final SchemaDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
@@ -90,11 +93,7 @@ public class SchemaOperations {
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
             idents =
                 MetadataFilterHelper.filterByExpression(
-                    metalake,
-                    " ANY(OWNER,METALAKE,CATALOG) || "
-                        + "ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA) ",
-                    Entity.EntityType.SCHEMA,
-                    idents);
+                    metalake, loadSchemaAuthorizationExpression, Entity.EntityType.SCHEMA, idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
             return response;

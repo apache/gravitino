@@ -74,6 +74,9 @@ public class CatalogOperations {
 
   private final CatalogDispatcher catalogDispatcher;
 
+  private static final String loadCatalogAuthorizationExpression =
+      "ANY_USE_CATALOG || ANY(OWNER,METALAKE,CATALOG)";
+
   @Context private HttpServletRequest httpRequest;
 
   @Inject
@@ -109,7 +112,7 @@ public class CatalogOperations {
                             };
                         return MetadataFilterHelper.filterByExpression(
                                     metalake,
-                                    "ANY_USE_CATALOG || ANY(OWNER,METALAKE,CATALOG)",
+                                    loadCatalogAuthorizationExpression,
                                     Entity.EntityType.CATALOG,
                                     nameIdentifiers)
                                 .length
@@ -125,7 +128,7 @@ public class CatalogOperations {
               idents =
                   MetadataFilterHelper.filterByExpression(
                       metalake,
-                      "ANY_USE_CATALOG || ANY(OWNER,METALAKE,CATALOG)",
+                      loadCatalogAuthorizationExpression,
                       Entity.EntityType.CATALOG,
                       idents);
               Response response = Utils.ok(new EntityListResponse(idents));
