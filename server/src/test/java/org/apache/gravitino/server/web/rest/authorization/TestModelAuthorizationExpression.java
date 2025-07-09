@@ -181,7 +181,7 @@ public class TestModelAuthorizationExpression {
   }
 
   @Test
-  public void testLinkModel() throws NoSuchMethodException, OgnlException {
+  public void testLinkModelVersion() throws NoSuchMethodException, OgnlException {
     Method method =
         ModelOperations.class.getMethod(
             "linkModelVersion",
