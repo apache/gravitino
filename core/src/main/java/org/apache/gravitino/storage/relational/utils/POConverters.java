@@ -40,6 +40,7 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
@@ -1571,6 +1572,27 @@ public class POConverters {
   }
 
   public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
-    return StatisticEntity.builder().withId(statisticPO.getStatisticId()).withName(statisticPO.getStatisticName()).withValue(statisticPO.getValue()).build();
+    try {
+      return StatisticEntity.builder().withId(statisticPO.getStatisticId()).withName(statisticPO.getStatisticName()).withValue(JsonUtils.anyFieldMapper().readValue(statisticPO.getValue(), StatisticValue.class)).build();
+    } catch (JsonProcessingException je) {
+      throw new RuntimeException(je);
+    }
+  }
+
+  public static List<StatisticPO> initializeStatisticPOs(List<StatisticEntity> statisticEntities, StatisticPO.Builder builder) {
+    return statisticEntities.stream()
+            .map(statisticEntity -> {
+              try {
+                return builder
+                    .withStatisticId(statisticEntity.id())
+                    .withStatisticName(statisticEntity.name())
+                    .withValue(JsonUtils.objectMapper().writeValueAsString(statisticEntity.value()))
+                    .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.auditInfo()))
+                    .build();
+              } catch (JsonProcessingException e) {
+                throw new RuntimeException("Failed to serialize json object:", e);
+              }
+            })
+            .collect(Collectors.toList());
   }
 }

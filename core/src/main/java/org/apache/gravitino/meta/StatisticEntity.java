@@ -19,7 +19,13 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.collect.Maps;
-import org.apache.gravitino.*;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Auditable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.Field;
+import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.stats.StatisticValue;
 
 import java.util.Map;
 
@@ -29,14 +35,14 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     public static final Field NAME =
             Field.required("name", String.class, "The name of the statistic entity.");
     public static final Field VALUE =
-            Field.required("value", String.class, "The value of the statistic entity.");
+            Field.required("value", StatisticValue.class, "The value of the statistic entity.");
     public static final Field AUDIT_INFO =
             Field.required("audit_info", Audit.class, "The audit details of the statistic entity.");
 
 
     private Long id;
     private String name;
-    private String value;
+    private StatisticValue<?> value;
     private AuditInfo auditInfo;
     private Namespace namespace;
 
@@ -44,7 +50,7 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
 
     @Override
     public Audit auditInfo() {
-        return null;
+        return auditInfo;
     }
 
     @Override
@@ -72,8 +78,15 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
         return id;
     }
 
+    public StatisticValue<?> value() {
+        return value;
+    }
+
+
+
+
     public static Builder builder() {
-        return null;
+        return new Builder();
     }
 
     public static class Builder {
@@ -93,7 +106,7 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
             return this;
         }
 
-        public Builder withValue(String value) {
+        public Builder withValue(StatisticValue<?> value) {
             statisticEntity.value = value;
             return this;
         }

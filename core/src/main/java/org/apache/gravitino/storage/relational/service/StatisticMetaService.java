@@ -26,7 +26,6 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 import java.util.List;
@@ -64,9 +63,11 @@ public class StatisticMetaService {
         if (statisticEntities == null || statisticEntities.isEmpty()) {
             return;
         }
-        SessionUtils.doWithCommitAndFetchResult(
+        StatisticPO.Builder builder = StatisticPO.builder();
+        List<StatisticPO> pos = POConverters.initializeStatisticPOs(statisticEntities, builder);
+        SessionUtils.doWithCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.batchInsertStatisticPOs(statisticEntities));
+                mapper -> mapper.batchInsertStatisticPOs(pos));
     }
 
 

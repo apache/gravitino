@@ -2,23 +2,29 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
+import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 import java.util.List;
 
-public class StatisticMetaMapper {
+public interface StatisticMetaMapper {
 
     String STATISTIC_META_TABLE_NAME = "statistic_meta_version_info";
 
 
-    public List<StatisticPO> listStatisticPOsByObject(long objectId, String name) {
-        return null;
-    }
+    @SelectProvider(
+            type = StatisticSQLProviderFactory.class,
+            method = "listStatisticPOsByObject")
+    List<StatisticPO> listStatisticPOsByObject(long objectId, String name);
 
-    public Object batchInsertStatisticPOs(List<StatisticEntity> statisticEntities) {
-        return null;
-    }
+    @InsertProvider(
+            type = StatisticSQLProviderFactory.class,
+            method = "batchInsertStatisticPOs")
+    void batchInsertStatisticPOs(List<StatisticPO> statisticPOs);
 
-    public void batchDeleteStatisticPOs(List<Long> statisticIds) {
-
-    }
+    @UpdateProvider(
+            type = StatisticSQLProviderFactory.class,
+            method = "batchDeleteStatisticPOs")
+    void batchDeleteStatisticPOs(List<Long> statisticIds);
 }

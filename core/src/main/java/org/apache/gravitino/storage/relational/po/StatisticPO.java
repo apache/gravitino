@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 
 public class StatisticPO {
+    private Long metalakeId;
     private Long statisticId;
 
     private String statisticName;
@@ -39,6 +40,11 @@ public class StatisticPO {
     private Long deletedAt;
     private StatisticPO() {}
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public Long getMetalakeId() { return metalakeId; }
     public Long getStatisticId() {
         return statisticId;
     }
@@ -86,6 +92,7 @@ public class StatisticPO {
         StatisticPO that = (StatisticPO) o;
         return statisticId.equals(that.statisticId)
                 && objectId.equals(that.objectId)
+                && metalakeId.equals(that.metalakeId)
                 && objectType.equals(that.objectType)
                 && statisticName.equals(that.statisticName)
                 && value.equals(that.value)
@@ -97,7 +104,7 @@ public class StatisticPO {
 
     @Override
     public int hashCode() {
-        return Objects.hash(
+        return Objects.hash(metalakeId,
                 statisticId,
                 objectId,
                 objectType,
@@ -115,6 +122,11 @@ public class StatisticPO {
 
         public Builder() {
             this.statisticPO = new StatisticPO();
+        }
+
+        public Builder withMetalakeId(Long metalakeId) {
+            statisticPO.metalakeId = metalakeId;
+            return this;
         }
 
         public Builder withStatisticId(Long statisticId) {
@@ -169,7 +181,8 @@ public class StatisticPO {
             Preconditions.checkArgument(
                     statisticPO.statisticName != null, "`statisticName` is required");
             Preconditions.checkArgument(statisticPO.value != null, "`value` is required");
-
+            Preconditions.checkArgument(
+                    statisticPO.auditInfo != null, "`auditInfo` is required");
             return statisticPO;
         }
     }
