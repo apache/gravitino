@@ -16,22 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.exceptions;
+package org.apache.gravitino.policy;
 
-import com.google.errorprone.annotations.FormatMethod;
-import com.google.errorprone.annotations.FormatString;
+import java.util.Map;
 
-/** An exception thrown when a policy is invalid. */
-public class IllegalPolicyException extends IllegalArgumentException {
+/** The interface of the content of the policy. */
+public interface PolicyContent {
+
+  /** @return The additional properties of the policy. */
+  Map<String, String> properties();
 
   /**
-   * Constructs a new exception with the specified detail message.
+   * Validates the policy content.
    *
-   * @param message the detail message.
-   * @param args the arguments to the message.
+   * @throws IllegalArgumentException if the content is invalid.
    */
-  @FormatMethod
-  public IllegalPolicyException(@FormatString String message, Object... args) {
-    super(String.format(message, args));
-  }
+  void validate() throws IllegalArgumentException;
 }
