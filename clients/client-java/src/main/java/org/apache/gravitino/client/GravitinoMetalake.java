@@ -558,7 +558,7 @@ public class GravitinoMetalake extends MetalakeDTO
     String tagsParam = String.join(",", tagNames);
     MetadataObjectListResponse resp =
         restClient.get(
-            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name()))
+            String.format("api/metalakes/%s", RESTUtils.encodeString(this.name()))
                 + "/objects?tags="
                 + RESTUtils.encodeString(tagsParam),
             MetadataObjectListResponse.class,
