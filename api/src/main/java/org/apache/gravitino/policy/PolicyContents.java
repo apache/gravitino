@@ -20,7 +20,6 @@ package org.apache.gravitino.policy;
 
 import java.util.Map;
 import java.util.Objects;
-import org.apache.gravitino.exceptions.IllegalPolicyException;
 
 /** Utility class for creating instances of {@link PolicyContent}. */
 public class PolicyContents {
@@ -77,7 +76,7 @@ public class PolicyContents {
     }
 
     @Override
-    public void validate() throws IllegalPolicyException {
+    public void validate() throws IllegalArgumentException {
       // nothing to validate for custom content
     }
 

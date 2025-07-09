@@ -19,7 +19,6 @@
 package org.apache.gravitino.policy;
 
 import java.util.Map;
-import org.apache.gravitino.exceptions.IllegalPolicyException;
 
 /** The interface of the content of the policy. */
 public interface PolicyContent {
@@ -30,7 +29,7 @@ public interface PolicyContent {
   /**
    * Validates the policy content.
    *
-   * @throws IllegalPolicyException if the content is invalid.
+   * @throws IllegalArgumentException if the content is invalid.
    */
-  void validate() throws IllegalPolicyException;
+  void validate() throws IllegalArgumentException;
 }

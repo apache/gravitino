@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.meta;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
@@ -25,6 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -32,9 +34,9 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.exceptions.IllegalPolicyException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 
 @ToString
 public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
@@ -162,9 +164,10 @@ public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
   }
 
   @Override
-  public void validate() throws IllegalPolicyException {
+  public void validate() throws IllegalArgumentException {
     Entity.super.validate();
-    Policy.super.validate();
+    validatePolicy();
+    content().validate();
   }
 
   @Override
@@ -198,6 +201,42 @@ public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
         supportedObjectTypes,
         content,
         auditInfo);
+  }
+
+  private void validatePolicy() {
+    Preconditions.checkArgument(StringUtils.isNotBlank(name()), "Policy name cannot be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyType()), "Policy type cannot be blank");
+    Preconditions.checkArgument(content() != null, "Policy content cannot be null");
+    Preconditions.checkArgument(
+        supportedObjectTypes() != null && !supportedObjectTypes().isEmpty(),
+        "Policy must support at least one metadata object type");
+
+    BuiltInType builtInType = BuiltInType.fromPolicyType(policyType());
+    Preconditions.checkArgument(
+        builtInType != BuiltInType.CUSTOM || content() instanceof PolicyContents.CustomContent,
+        "Expected CustomContent for custom policy type, but got %s",
+        content().getClass().getName());
+    if (builtInType != BuiltInType.CUSTOM) {
+      Preconditions.checkArgument(
+          exclusive() == builtInType.exclusive(),
+          "Expected exclusive value %s for built-in policy type %s, but got %s",
+          builtInType.exclusive(),
+          policyType(),
+          exclusive());
+      Preconditions.checkArgument(
+          inheritable() == builtInType.inheritable(),
+          "Expected inheritable value %s for built-in policy type %s, but got %s",
+          builtInType.inheritable(),
+          policyType(),
+          inheritable());
+      Preconditions.checkArgument(
+          supportedObjectTypes().equals(builtInType.supportedObjectTypes()),
+          "Expected supported object types %s for built-in policy type %s, but got %s",
+          builtInType.supportedObjectTypes(),
+          policyType(),
+          supportedObjectTypes());
+    }
   }
 
   public static class Builder {
