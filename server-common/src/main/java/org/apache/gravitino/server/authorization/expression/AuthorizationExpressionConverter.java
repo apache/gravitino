@@ -141,6 +141,10 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_CREATE_TABLE", "(ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+    expression =
+        expression.replaceAll(
+            "SCHEMA_OWNER_WITH_USE_CATALOG",
+            "SCHEMA::OWNER && (ANY(USE_CATALOG, METALAKE, CATALOG))");
     return expression;
   }
 }

@@ -67,8 +67,8 @@ public class TableOperations {
 
   private static final String loadTableAuthorizationExpression =
       "ANY(OWNER, METALAKE, CATALOG) ||"
-          + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)";
+          + "SCHEMA_OWNER_WITH_USE_CATALOG ||"
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)";
 
   private final TableDispatcher dispatcher;
 
@@ -114,9 +114,9 @@ public class TableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) ||"
-              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && ANY_CREATE_TABLE",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -163,8 +163,8 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) ||"
-              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
@@ -198,8 +198,8 @@ public class TableOperations {
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) ||"
-              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
@@ -239,8 +239,8 @@ public class TableOperations {
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER, METALAKE, CATALOG) ||"
-              + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(

@@ -145,8 +145,7 @@ public class SchemaOperations {
   @ResponseMetered(name = "load-schema", absolute = true)
   @AuthorizationExpression(
       expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA) ",
+          " ANY(OWNER, METALAKE, CATALOG) || " + "ANY_USE_CATALOG && SCHEMA_OWNER_WITH_USE_CATALOG",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response loadSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -178,7 +177,7 @@ public class SchemaOperations {
   @Timed(name = "alter-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-schema", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG) || (ANY_USE_CATALOG && SCHEMA::OWNER)",
+      expression = "ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response alterSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -215,7 +214,7 @@ public class SchemaOperations {
   @Timed(name = "drop-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-schema", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG) || (ANY_USE_CATALOG && SCHEMA::OWNER)",
+      expression = "ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response dropSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
