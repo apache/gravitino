@@ -40,7 +40,7 @@ public class SparkTableChangeConverter {
     } else if (change instanceof TableChange.RemoveProperty) {
       TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
       Preconditions.checkArgument(
-          ConnectorConstants.COMMENT.equals(removeProperty.property()) == false,
+          !ConnectorConstants.COMMENT.equals(removeProperty.property()),
           "Gravitino doesn't support remove table comment yet");
       return org.apache.gravitino.rel.TableChange.removeProperty(removeProperty.property());
     } else if (change instanceof TableChange.AddColumn) {
