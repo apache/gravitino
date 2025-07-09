@@ -66,7 +66,7 @@ public class TableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
 
   private static final String loadTableAuthorizationExpression =
-      "ANY(OWNER,METALAKE,CATALOG) ||"
+      "ANY(OWNER, METALAKE, CATALOG) ||"
           + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
           + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)";
 
@@ -114,7 +114,7 @@ public class TableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) ||"
+          "ANY(OWNER, METALAKE, CATALOG) ||"
               + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && ANY_CREATE_TABLE",
       accessMetadataType = MetadataObject.Type.TABLE)
@@ -163,7 +163,7 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) ||"
+          "ANY(OWNER, METALAKE, CATALOG) ||"
               + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
@@ -198,7 +198,7 @@ public class TableOperations {
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) ||"
+          "ANY(OWNER, METALAKE, CATALOG) ||"
               + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
@@ -239,7 +239,7 @@ public class TableOperations {
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(OWNER,METALAKE,CATALOG) ||"
+          "ANY(OWNER, METALAKE, CATALOG) ||"
               + "SCHEMA::OWNER && ANY_USE_CATALOG ||"
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)

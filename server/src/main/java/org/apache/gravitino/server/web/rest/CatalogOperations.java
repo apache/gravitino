@@ -75,7 +75,7 @@ public class CatalogOperations {
   private final CatalogDispatcher catalogDispatcher;
 
   private static final String loadCatalogAuthorizationExpression =
-      "ANY_USE_CATALOG || ANY(OWNER,METALAKE,CATALOG)";
+      "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
   @Context private HttpServletRequest httpRequest;
 
@@ -217,7 +217,7 @@ public class CatalogOperations {
   @Timed(name = "set-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-catalog", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY_USE_CATALOG || ANY(OWNER,METALAKE,CATALOG)",
+      expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response setCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -263,7 +263,7 @@ public class CatalogOperations {
   @Timed(name = "load-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-catalog", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY_USE_CATALOG || ANY(OWNER,METALAKE,CATALOG)",
+      expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response loadCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -290,7 +290,7 @@ public class CatalogOperations {
   @Timed(name = "alter-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-catalog", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER,METALAKE,CATALOG)",
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response alterCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -327,7 +327,7 @@ public class CatalogOperations {
   @Timed(name = "drop-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-catalog", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER,METALAKE,CATALOG)",
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response dropCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
