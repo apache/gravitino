@@ -331,7 +331,7 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/tags/objects:
+  /metalakes/{metalake}/objects:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
     get:
