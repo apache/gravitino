@@ -39,8 +39,8 @@ public interface SupportsJobs {
   List<JobTemplate> listJobTemplates();
 
   /**
-   * Register a job template with the specified job template to Gravitino. The registered job will
-   * be maintained in Gravitino, allowing it to be executed later.
+   * Register a job template with the specified job template to Gravitino. The registered job
+   * template will be maintained in Gravitino, allowing it to be executed later.
    *
    * @param jobTemplate the template for the job
    * @throws JobTemplateAlreadyExistsException if a job template with the same name already exists
@@ -59,15 +59,16 @@ public interface SupportsJobs {
   /**
    * Deletes a job template by its name. This will remove the job template from Gravitino, and it
    * will no longer be available for execution. Only when all the jobs associated with this job
-   * template are completed or cancelled, the job template can be deleted successfully, otherwise it
-   * will throw an exception.
+   * template are completed, failed, or cancelled, the job template can be deleted successfully,
+   * otherwise it will throw an exception.
    *
    * <p>The deletion of a job template will also delete all the jobs associated with this template.
    *
    * @param jobTemplateName the name of the job template to delete
    * @return true if the job template was successfully deleted, false if the job template does not
    *     exist
-   * @throws InUseException if there are still jobs associated with the job template
+   * @throws InUseException if there are still queued or started jobs associated with the job
+   *     template
    */
   boolean deleteJobTemplate(String jobTemplateName) throws InUseException;
 
@@ -112,8 +113,8 @@ public interface SupportsJobs {
 
   /**
    * Cancel a job by its ID. This operation will attempt to cancel the job if it is still running.
-   * It will return immediately, user could use the job handle to check the status of the job after
-   * cancellation.
+   * This method will return immediately, user could use the job handle to check the status of the
+   * job after invoking this method.
    *
    * @param jobId the ID of the job to cancel
    * @return a handle to the cancelled job

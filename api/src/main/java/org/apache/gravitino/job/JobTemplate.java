@@ -33,7 +33,7 @@ import org.apache.commons.lang3.StringUtils;
  * environments to execute different types of jobs, so the job type is required.
  *
  * <p>Some parameters can be templated, which means that they can be replaced with actual values
- * when running the job, for example, arguments can be { "{input_path}}", "{{output_path}" },
+ * when running the job, for example, arguments can be { "{{input_path}}", "{{output_path}}" },
  * environment variables can be { "foo": "{{foo_value}}", "bar": "{{bar_value}}" }. the parameters
  * support templating are:
  *

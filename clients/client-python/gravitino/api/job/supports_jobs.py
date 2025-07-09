@@ -40,7 +40,7 @@ class SupportsJobs(ABC):
     @abstractmethod
     def register_job_template(self, job_template) -> None:
         """
-        Register a job template with  the specified job template to Gravitino. The registered
+        Register a job template with the specified job template to Gravitino. The registered
         job will be maintained in Gravitino, allowing it to be executed later.
 
         Args:
@@ -72,8 +72,8 @@ class SupportsJobs(ABC):
         """
         Deletes a job template by its name. This will remove the job template from Gravitino, and it
         will no longer be available for execution. Only when all the jobs associated with this job
-        template are completed or cancelled, the job template can be deleted successfully, otherwise
-        it will return false.
+        template are completed, failed or cancelled, the job template can be deleted successfully,
+        otherwise it will return false.
 
         The deletion of a job template will also delete all the jobs associated with this template.
 
@@ -85,7 +85,7 @@ class SupportsJobs(ABC):
             does not exist.
 
         Raises:
-            InUseException: If the job template is currently in use by jobs.
+            InUseException: If there are still queued or started jobs associated with this job template.
         """
         pass
 
@@ -140,7 +140,9 @@ class SupportsJobs(ABC):
     @abstractmethod
     def cancel_job(self, job_id: str) -> JobHandle:
         """
-        Cancels a running job by its ID.
+        Cancels a running job by its ID. This operation will attempt to cancel the job if it is
+        still running. This method will return immediately, user could use the job handle to
+        check the status of the job after invoking this method.
 
         Args:
             job_id: The ID of the job to cancel.
