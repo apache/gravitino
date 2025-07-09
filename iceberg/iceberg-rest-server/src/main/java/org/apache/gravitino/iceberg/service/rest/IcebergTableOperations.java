@@ -94,27 +94,22 @@ public class IcebergTableOperations {
       throws Exception {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
-    LOG.info("Received list tables request for catalog: {}, namespace: {}", catalogName, icebergNS);
-
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
-            ListTablesResponse listTablesResponse =
-                tableOperationDispatcher.listTable(context, icebergNS);
-            LOG.info(
-                "Listed {} tables for catalog: {}, namespace: {}",
-                listTablesResponse.identifiers().size(),
-                catalogName,
-                icebergNS);
-            return IcebergRestUtils.ok(listTablesResponse);
-          });
-    } catch (Exception e) {
-      LOG.error("Exception in listTable: {}", e.getClass().getName(), e);
-      throw e; // Re-throw to let IcebergExceptionMapper handle it
-    }
+    LOG.info(
+        "Received list Iceberg tables request, catalog: {}, namespace: {}", catalogName, icebergNS);
+    return Utils.doAs(
+        httpRequest,
+        () -> {
+          IcebergRequestContext context =
+              new IcebergRequestContext(httpServletRequest(), catalogName);
+          ListTablesResponse listTablesResponse =
+              tableOperationDispatcher.listTable(context, icebergNS);
+          LOG.info(
+              "Listed {} tables for catalog: {}, namespace: {}",
+              listTablesResponse.identifiers().size(),
+              catalogName,
+              icebergNS);
+          return IcebergRestUtils.ok(listTablesResponse);
+        });
   }
 
   @POST
@@ -125,23 +120,33 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       CreateTableRequest createTableRequest,
-      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation)
+      throws Exception {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
+        "Received create Iceberg table request, catalog: {}, namespace: {}, create table request: {}, "
             + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
         createTableRequest,
         accessDelegation,
         isCredentialVending);
-    IcebergRequestContext context =
-        new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
-    LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
-    return IcebergRestUtils.ok(loadTableResponse);
+    return Utils.doAs(
+        httpRequest,
+        () -> {
+          IcebergRequestContext context =
+              new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+          LoadTableResponse loadTableResponse =
+              tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
+          LOG.info(
+              "Created table '{}' in catalog: {}, namespace: {}",
+              createTableRequest.name(),
+              catalogName,
+              icebergNS);
+          return IcebergRestUtils.ok(loadTableResponse);
+        });
   }
 
   @POST
@@ -153,22 +158,33 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
-      UpdateTableRequest updateTableRequest) {
+      UpdateTableRequest updateTableRequest)
+      throws Exception {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     if (LOG.isInfoEnabled()) {
       LOG.info(
-          "Update Iceberg table, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
+          "Received update Iceberg table request, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
           catalogName,
           icebergNS,
           table,
           SerializeUpdateTableRequest(updateTableRequest));
     }
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
-    return IcebergRestUtils.ok(loadTableResponse);
+    return Utils.doAs(
+        httpRequest,
+        () -> {
+          IcebergRequestContext context =
+              new IcebergRequestContext(httpServletRequest(), catalogName);
+          TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+          LoadTableResponse loadTableResponse =
+              tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
+          LOG.info(
+              "Successfully updated table '{}' in catalog: {}, namespace: {}",
+              table,
+              catalogName,
+              icebergNS);
+          return IcebergRestUtils.ok(loadTableResponse);
+        });
   }
 
   @DELETE
@@ -180,19 +196,31 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
-      @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
+      @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested)
+      throws Exception {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Drop Iceberg table, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
+        "Received Drop Iceberg table request, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
         catalogName,
         icebergNS,
         table,
         purgeRequested);
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
-    return IcebergRestUtils.noContent();
+    return Utils.doAs(
+        httpRequest,
+        () -> {
+          TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+          IcebergRequestContext context =
+              new IcebergRequestContext(httpServletRequest(), catalogName);
+          tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
+          LOG.info(
+              "Successfully dropped table '{}' in catalog: {}, namespace: {} (purged: {})",
+              table,
+              catalogName,
+              icebergNS,
+              purgeRequested);
+          return IcebergRestUtils.noContent();
+        });
   }
 
   @GET
@@ -205,12 +233,13 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots,
-      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation)
+      throws Exception {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
-        "Load Iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
+        "Received load Iceberg table request, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
             + "credential vending: {}",
         catalogName,
         icebergNS,
@@ -218,12 +247,21 @@ public class IcebergTableOperations {
         accessDelegation,
         isCredentialVending);
     // todo support snapshots
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    IcebergRequestContext context =
-        new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
-    LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.loadTable(context, tableIdentifier);
-    return IcebergRestUtils.ok(loadTableResponse);
+    return Utils.doAs(
+        httpRequest,
+        () -> {
+          TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+          IcebergRequestContext context =
+              new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+          LoadTableResponse loadTableResponse =
+              tableOperationDispatcher.loadTable(context, tableIdentifier);
+          LOG.info(
+              "Successfully loaded table '{}' in catalog: {}, namespace: {}",
+              table,
+              catalogName,
+              icebergNS);
+          return IcebergRestUtils.ok(loadTableResponse);
+        });
   }
 
   @HEAD
@@ -234,22 +272,34 @@ public class IcebergTableOperations {
   public Response tableExists(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
-      @PathParam("table") String table) {
+      @PathParam("table") String table)
+      throws Exception {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Check Iceberg table exists, catalog: {}, namespace: {}, table: {}",
+        "Received check Iceberg table exists request, catalog: {}, namespace: {}, table: {}",
         catalogName,
         icebergNS,
         table);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
-    if (exists) {
-      return IcebergRestUtils.noContent();
-    } else {
-      return IcebergRestUtils.notExists();
-    }
+    return Utils.doAs(
+        httpRequest,
+        () -> {
+          IcebergRequestContext context =
+              new IcebergRequestContext(httpServletRequest(), catalogName);
+          TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+          boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
+          LOG.info(
+              "Table '{}' exists check completed: {} in catalog: {}, namespace: {}",
+              table,
+              exists,
+              catalogName,
+              icebergNS);
+          if (exists) {
+            return IcebergRestUtils.noContent();
+          } else {
+            return IcebergRestUtils.notExists();
+          }
+        });
   }
 
   @POST
@@ -261,9 +311,26 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
-      ReportMetricsRequest request) {
-    icebergMetricsManager.recordMetric(request.report());
-    return IcebergRestUtils.noContent();
+      ReportMetricsRequest request)
+      throws Exception {
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info(
+        "Received report Iceberg table metrics request, catalog: {}, namespace: {}, table: {}",
+        catalogName,
+        icebergNS,
+        table);
+    return Utils.doAs(
+        httpRequest,
+        () -> {
+          icebergMetricsManager.recordMetric(request.report());
+          LOG.info(
+              "Successfully reported metrics for table '{}' in catalog: {}, namespace: {}",
+              table,
+              catalogName,
+              icebergNS);
+          return IcebergRestUtils.noContent();
+        });
   }
 
   // HTTP request is null in Jersey test, override with a mock request when testing.
