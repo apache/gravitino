@@ -54,6 +54,7 @@ public class AuthorizationExpressionConverter {
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {
+    authorizationExpression = replaceAnyPrivilege(authorizationExpression);
     authorizationExpression = replaceAnyExpressions(authorizationExpression);
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
@@ -117,5 +118,33 @@ public class AuthorizationExpressionConverter {
     }
     matcher.appendTail(result);
     return result.toString();
+  }
+
+  /**
+   * Replace any privilege expression to any expression
+   *
+   * @param expression authorization expression
+   * @return authorization expression
+   */
+  public static String replaceAnyPrivilege(String expression) {
+    expression = expression.replaceAll("ANY_USE_CATALOG", "(ANY(USE_CATALOG, METALAKE, CATALOG))");
+    expression =
+        expression.replaceAll("ANY_USE_SCHEMA", "(ANY(USE_SCHEMA, METALAKE, CATALOG, SCHEMA))");
+    expression =
+        expression.replaceAll("ANY_CREATE_SCHEMA", "(ANY(CREATE_SCHEMA, METALAKE, CATALOG))");
+    expression =
+        expression.replaceAll(
+            "ANY_SELECT_TABLE", "(ANY(SELECT_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+    expression =
+        expression.replaceAll(
+            "ANY_MODIFY_TABLE", "(ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_TABLE", "(ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+    expression =
+        expression.replaceAll(
+            "SCHEMA_OWNER_WITH_USE_CATALOG",
+            "SCHEMA::OWNER && (ANY(USE_CATALOG, METALAKE, CATALOG))");
+    return expression;
   }
 }
