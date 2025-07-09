@@ -42,7 +42,7 @@ public class TestAuthorizationExpressionConverter {
     assertFalse(ANY_PATTERN.matcher("ANY").matches());
     assertFalse(ANY_PATTERN.matcher("ANYOWNER,METALAKE,CATALOG").matches());
     assertFalse(ANY_PATTERN.matcher("ANY(OWNER,METALAKE,CATALOG").matches());
-    assertTrue(ANY_PATTERN.matcher("ANY(OWNER,METALAKE,CATALOG)").matches());
+    assertTrue(ANY_PATTERN.matcher("ANY(OWNER, METALAKE, CATALOG)").matches());
     assertTrue(ANY_PATTERN.matcher("ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)").matches());
   }
 
@@ -87,7 +87,7 @@ public class TestAuthorizationExpressionConverter {
             + "|| authorizer.isOwner(principal,METALAKE_NAME,SCHEMA)",
         createTableOgnlExpression);
 
-    String expressionWithOwner2 = "(ANY(OWNER,METALAKE,CATALOG)) && CATALOG::USE_CATALOG)";
+    String expressionWithOwner2 = "(ANY(OWNER, METALAKE, CATALOG)) && CATALOG::USE_CATALOG)";
     String useCatalogOgnExpression =
         AuthorizationExpressionConverter.convertToOgnlExpression(expressionWithOwner2);
     Assertions.assertEquals(
@@ -113,11 +113,11 @@ public class TestAuthorizationExpressionConverter {
     Assertions.assertEquals(
         "METALAKE::OWNER || CATALOG::OWNER && CATALOG::OWNER",
         AuthorizationExpressionConverter.replaceAnyExpressions(
-            "ANY(OWNER,METALAKE,CATALOG) && CATALOG::OWNER"));
+            "ANY(OWNER, METALAKE, CATALOG) && CATALOG::OWNER"));
 
     Assertions.assertEquals(
         "(METALAKE::OWNER || CATALOG::OWNER) && CATALOG::USE_CATALOG",
         AuthorizationExpressionConverter.replaceAnyExpressions(
-            "(ANY(OWNER,METALAKE,CATALOG)) && CATALOG::USE_CATALOG"));
+            "(ANY(OWNER, METALAKE, CATALOG)) && CATALOG::USE_CATALOG"));
   }
 }
