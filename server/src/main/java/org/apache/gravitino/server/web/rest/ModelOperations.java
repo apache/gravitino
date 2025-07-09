@@ -394,7 +394,7 @@ public class ModelOperations {
       expression =
           " ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_USE_MODEL && ANY_CREATE_MODEL_VERSION",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_USE_MODEL && (MODEL::OWNER || ANY_CREATE_MODEL_VERSION)",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response linkModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
