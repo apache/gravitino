@@ -144,8 +144,7 @@ public class SchemaOperations {
   @Timed(name = "load-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-schema", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || " + "ANY_USE_CATALOG && SCHEMA_OWNER_WITH_USE_CATALOG",
+      expression = loadSchemaAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response loadSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
