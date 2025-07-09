@@ -73,12 +73,9 @@ public class TopicOperations {
   @Timed(name = "list-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-topic", absolute = true)
   public Response listTopics(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
-          String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA)
-          String schema) {
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema) {
     try {
       LOG.info("Received list topics request for schema: {}.{}.{}", metalake, catalog, schema);
       return Utils.doAs(
