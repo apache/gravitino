@@ -240,7 +240,7 @@ public class TestModelAuthorizationExpression {
                 "METALAKE::USE_CATALOG")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("MODEL::OWNER", "CATALOG::USE_CATALOG")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("MODEL::OWNER", "SCHEMA::USE_SCHEMA")));
-    assertFalse(
+    assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("MODEL::OWNER", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
     assertTrue(
