@@ -224,7 +224,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   @Test
   @Order(4)
-  public void testAlterTable() {
+  public void testAlterFileset() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     FilesetCatalog filesetCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
@@ -240,7 +240,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // grant normal user owner privilege on fileset1
     gravitinoMetalake.setOwner(
         MetadataObjects.of(
-            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.TABLE),
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
         NORMAL_USER,
         Owner.Type.USER);
     filesetCatalogNormalUser.alterFileset(

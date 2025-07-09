@@ -310,10 +310,8 @@ public class FilesetOperations {
   @ResponseMetered(name = "alter-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::WRITE_FILESET || CATALOG::WRITE_FILESET "
-              + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET "
-              + "|| METALAKE::OWNER || CATALOG::OWNER "
-              + "|| SCHEMA::OWNER || FILESET::OWNER",
+          "ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || "
+              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET)",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -321,7 +319,8 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
           String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") String fileset,
+      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
+          String fileset,
       FilesetUpdatesRequest request) {
     LOG.info("Received alter fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
