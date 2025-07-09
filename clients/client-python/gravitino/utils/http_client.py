@@ -42,6 +42,11 @@ from gravitino.exceptions.base import RESTException, UnknownError
 from gravitino.exceptions.handlers.error_handler import ErrorHandler
 
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(level=logging.DEBUG)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    logger.addHandler(console_handler)
 
 
 class Response:
@@ -50,11 +55,6 @@ class Response:
         self._body = response.read()
         self._headers = response.info()
         self._url = response.url
-
-        logging.basicConfig(level=logging.DEBUG)
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.DEBUG)
-        logger.addHandler(console_handler)
 
     @property
     def status_code(self):
