@@ -41,22 +41,23 @@ public class TestJdbcCatalogOperations {
 
   @Test
   public void testTestConnection() {
-    JdbcCatalogOperations catalogOperations =
+    try (JdbcCatalogOperations catalogOperations =
         new JdbcCatalogOperations(
             new SqliteExceptionConverter(),
             new SqliteTypeConverter(),
             new SqliteDatabaseOperations("/illegal/path"),
             new SqliteTableOperations(),
-            new SqliteColumnDefaultValueConverter());
-    Assertions.assertThrows(
-        GravitinoRuntimeException.class,
-        () ->
-            catalogOperations.testConnection(
-                NameIdentifier.of("metalake", "catalog"),
-                Catalog.Type.RELATIONAL,
-                "sqlite",
-                "comment",
-                ImmutableMap.of()));
+            new SqliteColumnDefaultValueConverter())) {
+      Assertions.assertThrows(
+          GravitinoRuntimeException.class,
+          () ->
+              catalogOperations.testConnection(
+                  NameIdentifier.of("metalake", "catalog"),
+                  Catalog.Type.RELATIONAL,
+                  "sqlite",
+                  "comment",
+                  ImmutableMap.of()));
+    }
   }
 
   @Test
@@ -70,8 +71,8 @@ public class TestJdbcCatalogOperations {
 
     DataSource dataSource =
         Assertions.assertDoesNotThrow(() -> DataSourceUtils.createDataSource(properties));
-    Assertions.assertTrue(dataSource instanceof org.apache.commons.dbcp2.BasicDataSource);
-    Assertions.assertTrue(((BasicDataSource) dataSource).getTestOnBorrow() == false);
+    Assertions.assertInstanceOf(BasicDataSource.class, dataSource);
+    Assertions.assertFalse(((BasicDataSource) dataSource).getTestOnBorrow());
     ((BasicDataSource) dataSource).close();
   }
 }

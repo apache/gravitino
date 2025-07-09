@@ -113,7 +113,7 @@ public class IcebergMetricsManager {
       logMetrics("Drop Iceberg metrics because Iceberg Metrics Manager is closed.", metricsReport);
       return;
     }
-    if (queue.offer(metricsReport) == false) {
+    if (!queue.offer(metricsReport)) {
       logMetrics("Drop Iceberg metrics because metrics queue is full.", metricsReport);
     }
   }
@@ -146,7 +146,7 @@ public class IcebergMetricsManager {
   }
 
   private void writeMetrics() {
-    while (Thread.currentThread().isInterrupted() == false) {
+    while (!Thread.currentThread().isInterrupted()) {
       MetricsReport metricsReport;
       try {
         metricsReport = queue.take();
