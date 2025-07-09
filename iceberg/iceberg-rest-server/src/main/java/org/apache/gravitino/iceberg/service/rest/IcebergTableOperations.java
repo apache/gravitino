@@ -47,6 +47,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDisp
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
@@ -89,13 +90,31 @@ public class IcebergTableOperations {
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
   public Response listTable(
-      @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
+      @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace)
+      throws Exception {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
-    LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    ListTablesResponse listTablesResponse = tableOperationDispatcher.listTable(context, icebergNS);
-    return IcebergRestUtils.ok(listTablesResponse);
+    LOG.info("Received list tables request for catalog: {}, namespace: {}", catalogName, icebergNS);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            ListTablesResponse listTablesResponse =
+                tableOperationDispatcher.listTable(context, icebergNS);
+            LOG.info(
+                "Listed {} tables for catalog: {}, namespace: {}",
+                listTablesResponse.identifiers().size(),
+                catalogName,
+                icebergNS);
+            return IcebergRestUtils.ok(listTablesResponse);
+          });
+    } catch (Exception e) {
+      LOG.error("Exception in listTable: {}", e.getClass().getName(), e);
+      throw e; // Re-throw to let IcebergExceptionMapper handle it
+    }
   }
 
   @POST
