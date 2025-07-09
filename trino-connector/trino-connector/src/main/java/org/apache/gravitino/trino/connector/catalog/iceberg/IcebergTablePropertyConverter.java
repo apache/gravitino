@@ -52,8 +52,4 @@ public class IcebergTablePropertyConverter extends PropertyConverter {
     format = format.replace("iceberg/", "");
     return format.toUpperCase();
   }
-
-  public static String convertTableFormatToGravitino(String format) {
-    return "iceberg/" + format.toLowerCase();
-  }
 }
