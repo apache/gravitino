@@ -25,7 +25,8 @@ import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 
 /** Represent a pre event before updating Iceberg namespace. */
 @DeveloperApi
-public class IcebergUpdateNamespacePreEvent extends IcebergNamespacePreEvent {
+public class IcebergUpdateNamespacePreEvent extends IcebergNamespacePreEvent
+    implements SupportsChangingPreEvent {
   private final UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest;
 
   public IcebergUpdateNamespacePreEvent(

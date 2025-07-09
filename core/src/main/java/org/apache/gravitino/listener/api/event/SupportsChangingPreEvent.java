@@ -19,30 +19,11 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.iceberg.rest.requests.CreateViewRequest;
-
-/** Represent a pre event before creating Iceberg view. */
-@DeveloperApi
-public class IcebergCreateViewPreEvent extends IcebergViewPreEvent
-    implements SupportsChangingPreEvent {
-  private final CreateViewRequest createViewRequest;
-
-  public IcebergCreateViewPreEvent(
-      IcebergRequestContext icebergRequestContext,
-      NameIdentifier viewIdentifier,
-      CreateViewRequest createViewRequest) {
-    super(icebergRequestContext, viewIdentifier);
-    this.createViewRequest = createViewRequest;
-  }
-
-  public CreateViewRequest createViewRequest() {
-    return createViewRequest;
-  }
-
-  @Override
-  public OperationType operationType() {
-    return OperationType.CREATE_VIEW;
-  }
-}
+/**
+ * Marks pre-events that can be modified.
+ *
+ * <p>Pre-events implementing this interface can be transformed in {@link
+ * org.apache.gravitino.listener.api.EventListenerPlugin#transformPreEvent(SupportsChangingPreEvent)}.
+ * All subsequent operations will use the transformed event instead of the original.
+ */
+public interface SupportsChangingPreEvent {}
