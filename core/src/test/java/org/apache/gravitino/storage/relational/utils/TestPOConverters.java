@@ -61,6 +61,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
@@ -776,7 +777,7 @@ public class TestPOConverters {
 
   @Test
   public void testFromPolicyPO() throws JsonProcessingException {
-    PolicyContent content = PolicyContent.custom(null, null);
+    PolicyContent content = PolicyContents.custom(null, null);
     PolicyVersionPO policyVersionPO =
         createPolicyVersionPO(1L, 1L, 1L, "test comment", true, content);
     PolicyPO policyPO =

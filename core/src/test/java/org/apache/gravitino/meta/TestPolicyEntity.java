@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -38,7 +39,7 @@ public class TestPolicyEntity {
 
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     Namespace namespace = Namespace.of("m1", "c1", "s1");
-    PolicyContent content = PolicyContent.custom(contentFields, properties);
+    PolicyContent content = PolicyContents.custom(contentFields, properties);
     PolicyEntity policyEntity =
         PolicyEntity.builder()
             .withId(1L)

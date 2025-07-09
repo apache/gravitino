@@ -61,7 +61,7 @@ public interface Policy extends Auditable {
      * Custom policy type. "custom" is a dummy type for custom policies, all non-built-in types are
      * custom types.
      */
-    CUSTOM("custom", null, null, null, PolicyContent.CustomContent.class);
+    CUSTOM("custom", null, null, null, PolicyContents.CustomContent.class);
 
     private final String policyType;
     private final Boolean exclusive;
@@ -243,7 +243,7 @@ public interface Policy extends Auditable {
 
     BuiltInType builtInType = BuiltInType.fromPolicyType(policyType());
     Preconditions.checkArgument(
-        builtInType != BuiltInType.CUSTOM || content() instanceof PolicyContent.CustomContent,
+        builtInType != BuiltInType.CUSTOM || content() instanceof PolicyContents.CustomContent,
         "Expected CustomContent for custom policy type, but got %s",
         content().getClass().getName());
     if (builtInType != BuiltInType.CUSTOM) {
