@@ -709,7 +709,7 @@ public class TestGravitinoMetalake extends TestBase {
   @Test
   public void testListMetadataObjectsForTags() throws JsonProcessingException {
     String[] tagNames = {"tag1", "tag2"};
-    String path = "/api/metalakes/" + metalakeName + "/tags/objects";
+    String path = "/api/metalakes/" + metalakeName + "/objects";
     Map<String, String> queryParams = Collections.singletonMap("tags", "tag1,tag2");
 
     MetadataObjectDTO[] mockObjects = {
