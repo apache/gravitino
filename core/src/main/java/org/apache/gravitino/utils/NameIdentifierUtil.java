@@ -20,8 +20,6 @@ package org.apache.gravitino.utils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.errorprone.annotations.FormatMethod;
-import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,7 +31,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
-import org.apache.gravitino.exceptions.IllegalNamespaceException;
 
 /**
  * A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
@@ -426,20 +423,6 @@ public class NameIdentifierUtil {
   public static void checkModelVersion(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Model version identifier must not be null");
     NamespaceUtil.checkModelVersion(ident.namespace());
-  }
-
-  /**
-   * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
-   *
-   * @param expression The expression to check.
-   * @param message The message to throw.
-   * @param args The arguments to the message.
-   */
-  @FormatMethod
-  public static void check(boolean expression, @FormatString String message, Object... args) {
-    if (!expression) {
-      throw new IllegalNamespaceException(message, args);
-    }
   }
 
   /**

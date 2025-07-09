@@ -25,7 +25,8 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
 /** Represent a pre event before updating Iceberg table. */
 @DeveloperApi
-public class IcebergUpdateTablePreEvent extends IcebergTablePreEvent {
+public class IcebergUpdateTablePreEvent extends IcebergTablePreEvent
+    implements SupportsChangingPreEvent {
   private final UpdateTableRequest updateTableRequest;
 
   public IcebergUpdateTablePreEvent(
