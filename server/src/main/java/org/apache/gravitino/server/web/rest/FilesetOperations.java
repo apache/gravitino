@@ -350,7 +350,7 @@ public class FilesetOperations {
   @Timed(name = "drop-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-fileset", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || CATALOG::OWNER " + "|| SCHEMA::OWNER || FILESET::OWNER",
+      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET)",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -358,7 +358,8 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
           String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") String fileset) {
+      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
+          String fileset) {
     LOG.info("Received drop fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(

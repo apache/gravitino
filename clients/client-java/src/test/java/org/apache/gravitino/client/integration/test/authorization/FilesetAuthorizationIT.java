@@ -256,7 +256,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // reset owner
     gravitinoMetalake.setOwner(
         MetadataObjects.of(
-            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.TABLE),
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
         USER,
         Owner.Type.USER);
     // normal user cannot drop fileset1
