@@ -55,6 +55,9 @@ public interface Entity extends Serializable {
   /** The tag schema name in the system catalog. */
   String TAG_SCHEMA_NAME = "tag";
 
+  /** The policy schema name in the system catalog. */
+  String POLICY_SCHEMA_NAME = "policy";
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {
@@ -71,6 +74,7 @@ public interface Entity extends Serializable {
     TAG("ta", 10),
     MODEL("mo", 11),
     MODEL_VERSION("mv", 12),
+    POLICY("po", 13),
 
     AUDIT("au", 65534);
 
