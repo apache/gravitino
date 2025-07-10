@@ -21,7 +21,6 @@ package org.apache.gravitino.server;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.HashSet;
 import java.util.Properties;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
