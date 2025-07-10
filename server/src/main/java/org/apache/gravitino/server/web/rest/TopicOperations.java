@@ -59,6 +59,12 @@ import org.slf4j.LoggerFactory;
 public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
 
+  private static final String listTopicsAuthorizationExpression =
+      "ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
+          + "ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
+          + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA";
+
   private final TopicDispatcher dispatcher;
 
   @Context private HttpServletRequest httpRequest;
@@ -84,12 +90,10 @@ public class TopicOperations {
             LOG.info("Listing topics under schema: {}.{}.{}", metalake, catalog, schema);
             Namespace topicNS = NamespaceUtil.ofTopic(metalake, catalog, schema);
             NameIdentifier[] topics = dispatcher.listTopics(topicNS);
+            topics = topics == null ? new NameIdentifier[0] : topics;
             topics =
                 MetadataFilterHelper.filterByExpression(
-                    metalake,
-                    "METALAKE::CONSUME_TOPIC || CATALOG::CONSUME_TOPIC || SCHEMA::CONSUME_TOPIC || TOPIC::CONSUME_TOPIC || METALAKE::PRODUCE_TOPIC ||CATALOG::PRODUCE_TOPIC || SCHEMA::PRODUCE_TOPIC || TOPIC::PRODUCE_TOPIC || METALAKE::OWNERSHIP || CATALOG::OWNERSHIP || SCHEMA::OWNERSHIP || TOPIC::OWNERSHIP",
-                    Entity.EntityType.TOPIC,
-                    topics);
+                    metalake, listTopicsAuthorizationExpression, Entity.EntityType.TOPIC, topics);
             Response response = Utils.ok(new EntityListResponse(topics));
             LOG.info(
                 "List {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
@@ -106,8 +110,9 @@ public class TopicOperations {
   @ResponseMetered(name = "create-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::CREATE_TOPIC || CATALOG::CREATE_TOPIC || SCHEMA::CREATE_TOPIC || METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER",
-      accessMetadataType = MetadataObject.Type.TOPIC)
+          "ANY(CREATE_TOPIC, METALAKE, CATALOG, SCHEMA) || "
+              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC)",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalake,
@@ -153,7 +158,10 @@ public class TopicOperations {
   @ResponseMetered(name = "load-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::CONSUME_TOPIC || CATALOG::CONSUME_TOPIC || SCHEMA::CONSUME_TOPIC || TOPIC::CONSUME_TOPIC || METALAKE::PRODUCE_TOPIC || CATALOG::PRODUCE_TOPIC || SCHEMA::PRODUCE_TOPIC || TOPIC::PRODUCE_TOPIC || METALAKE::OWNERSHIP || CATALOG::OWNERSHIP || SCHEMA::OWNERSHIP || TOPIC::OWNERSHIP",
+          "ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
+              + "ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
+              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA",
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response loadTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -187,7 +195,8 @@ public class TopicOperations {
   @ResponseMetered(name = "alter-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::PRODUCE_TOPIC || CATALOG::PRODUCE_TOPIC || SCHEMA::PRODUCE_TOPIC || TOPIC::PRODUCE_TOPIC || METALAKE::OWNERSHIP || CATALOG::OWNERSHIP || SCHEMA::OWNERSHIP || TOPIC::OWNERSHIP",
+          "ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
+              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC)",
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response alterTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -226,8 +235,7 @@ public class TopicOperations {
   @Timed(name = "drop-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-topic", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "METALAKE::OWNERSHIP || CATALOG::OWNERSHIP || SCHEMA::OWNERSHIP || TOPIC::OWNERSHIP",
+      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC)",
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response dropTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
