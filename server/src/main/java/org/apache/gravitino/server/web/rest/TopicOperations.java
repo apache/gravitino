@@ -100,7 +100,7 @@ public class TopicOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleFilesetException(OperationType.LIST, "", schema, e);
+      return ExceptionHandlers.handleTopicException(OperationType.LIST, "", schema, e);
     }
   }
 
