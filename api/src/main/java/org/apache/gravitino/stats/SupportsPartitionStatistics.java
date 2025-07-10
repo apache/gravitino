@@ -56,10 +56,10 @@ interface SupportsPartitionStatistics {
    * Drops statistics for the specified partitions. If the statistic is unmodifiable, it will throw
    * an UnmodifiableStatisticException.
    *
-   * @param statistics a map where the key is the partition name and the value is a list of
-   *     statistics to be dropped
+   * @param droppedStatistics a map where the key is the partition name and the value is a list of
+   *     statistic names to be dropped
    * @throws UnmodifiableStatisticException if any of the statistics to be dropped are unmodifiable
    */
-  void dropStatistics(Map<String, List<Statistic>> statistics)
+  void dropStatistics(Map<String, List<String>> droppedStatistics)
       throws UnmodifiableStatisticException;
 }
