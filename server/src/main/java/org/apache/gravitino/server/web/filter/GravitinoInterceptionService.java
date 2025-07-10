@@ -40,6 +40,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -60,7 +61,8 @@ public class GravitinoInterceptionService implements InterceptionService {
         ImmutableSet.of(
             CatalogOperations.class.getName(),
             SchemaOperations.class.getName(),
-            TableOperations.class.getName()));
+            TableOperations.class.getName(),
+            ModelOperations.class.getName()));
   }
 
   @Override
@@ -161,6 +163,12 @@ public class GravitinoInterceptionService implements InterceptionService {
               case METALAKE:
                 nameIdentifierMap.put(
                     Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
+                break;
+              case MODEL:
+                String model = metadatas.get(Entity.EntityType.MODEL);
+                nameIdentifierMap.put(
+                    Entity.EntityType.MODEL,
+                    NameIdentifierUtil.ofModel(metadata, catalog, schema, model));
                 break;
               default:
                 break;
