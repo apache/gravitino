@@ -232,9 +232,8 @@ public class TagManager implements TagDispatcher {
         Arrays.stream(names)
             .map(name -> NameIdentifierUtil.ofTag(metalake, name))
             .toArray(NameIdentifier[]::new);
-    NameIdentifier lockId = tagIds[0];
     return TreeLockUtils.doWithTreeLock(
-        lockId,
+        NameIdentifier.of(metalake),
         LockType.READ,
         () -> {
           checkMetalake(NameIdentifier.of(metalake), entityStore);
