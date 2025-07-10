@@ -20,7 +20,6 @@ package org.apache.gravitino.stats;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 
 /** SupportsPartitionStatistics provides methods to list and update statistics for partitions. */
@@ -29,16 +28,10 @@ interface SupportsPartitionStatistics {
   /**
    * Lists statistics for partitions from one partition name to another partition name.
    *
-   * @param fromPartitionName Optional partition name to start listing from, inclusive.
-   * @param toPartitionName Optional partition name to end listing at, exclusive.
-   * @throws IllegalArgumentException if fromPartitionName and toPartitionName are empty at the same
-   *     time or the toPartitionName partition key must be greater than fromPartitionName partition
-   *     key.
+   * @param range the range of partitions to list statistics for, which can be defined by.
    * @return a map where the key is the partition name and the value is a list of statistics
    */
-  Map<String, List<Statistic>> listStatistics(
-      Optional<String> fromPartitionName, Optional<String> toPartitionName)
-      throws IllegalArgumentException;
+  Map<String, List<Statistic>> listStatistics(PartitionRange range);
 
   /**
    * Updates statistics with the provided values. If the statistic exists, it will be updated with
