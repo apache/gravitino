@@ -326,6 +326,9 @@ public class JDBCBackend implements RelationalBackend {
         return TagMetaService.getInstance()
             .deleteTagMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case POLICY:
+        // todo: Implement hard delete logic for policies.
+        return 0;
       case COLUMN:
         return TableColumnMetaService.getInstance()
             .deleteColumnsByLegacyTimeline(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
@@ -371,6 +374,10 @@ public class JDBCBackend implements RelationalBackend {
         return FilesetMetaService.getInstance()
             .deleteFilesetVersionsByRetentionCount(
                 versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+
+      case POLICY:
+        // todo: Implement delete old version logic for policies.
+        return 0;
 
       default:
         throw new IllegalArgumentException(

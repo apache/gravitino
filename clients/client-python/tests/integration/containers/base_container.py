@@ -36,7 +36,7 @@ class BaseContainer:
     _container_name: str
 
     def __init__(
-        self, container_name: str, image_name: str, enviroment: Dict = None, **kwarg
+        self, container_name: str, image_name: str, environment: Dict = None, **kwarg
     ):
         self._container_name = container_name
         self._docker_client = docker.from_env()
@@ -58,7 +58,7 @@ class BaseContainer:
                 image=image_name,
                 name=self._container_name,
                 detach=True,
-                environment=enviroment,
+                environment=environment,
                 network=self._network_name,
                 **kwarg,
             )

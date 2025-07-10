@@ -32,6 +32,11 @@ public class GravitinoRecordSetProvider implements ConnectorRecordSetProvider {
 
   ConnectorRecordSetProvider internalRecordSetProvider;
 
+  /**
+   * Constructs a new GravitinoRecordSetProvider with the specified record set provider.
+   *
+   * @param recordSetProvider the internal connector record set provider
+   */
   public GravitinoRecordSetProvider(ConnectorRecordSetProvider recordSetProvider) {
     this.internalRecordSetProvider = recordSetProvider;
   }

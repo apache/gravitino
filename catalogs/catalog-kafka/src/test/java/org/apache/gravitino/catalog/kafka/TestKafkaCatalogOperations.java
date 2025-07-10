@@ -121,6 +121,12 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
         public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
           throw new UnsupportedOperationException("Not supported");
         }
+
+        @Override
+        public PropertiesMetadata modelVersionPropertiesMetadata()
+            throws UnsupportedOperationException {
+          throw new UnsupportedOperationException("Does not support model version properties");
+        }
       };
   private static EntityStore store;
   private static IdGenerator idGenerator;
@@ -157,6 +163,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Mockito.when(config.get(Configs.CACHE_EXPIRATION_TIME)).thenReturn(3_600_000L);
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
     Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
+    Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
 
     // Mock
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();

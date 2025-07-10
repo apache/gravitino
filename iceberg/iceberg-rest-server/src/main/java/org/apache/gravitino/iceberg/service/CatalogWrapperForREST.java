@@ -106,7 +106,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
-  private Map<String, String> getCatalogConfigToClient() {
+  public Map<String, String> getCatalogConfigToClient() {
     return catalogConfigToClients;
   }
 
@@ -164,7 +164,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     if (StringUtils.isNotBlank(deprecatedValue)) {
-      LOG.warn("%s is deprecated, please use %s instead.", deprecatedProperty, newProperty);
+      LOG.warn("{} is deprecated, please use {} instead.", deprecatedProperty, newProperty);
       properties.remove(deprecatedProperty);
       properties.put(newProperty, deprecatedValue);
     }

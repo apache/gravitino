@@ -28,6 +28,12 @@ class ModelVersion(Auditable):
     registered model.
     """
 
+    PROPERTY_DEFAULT_URI_NAME = "default-uri-name"
+    """The property name for the default URI name of the model version."""
+
+    URI_NAME_UNKNOWN = "unknown"
+    """The reserved URI name to indicate the URI name is unknown."""
+
     @abstractmethod
     def version(self) -> int:
         """
@@ -63,14 +69,27 @@ class ModelVersion(Auditable):
         """
         pass
 
-    @abstractmethod
     def uri(self) -> str:
         """
-        The URI of the model artifact. The URI is the location of the model artifact. The URI can be a
+        The unnamed URI of the model artifact. The URI is the location of the model artifact. The URI can be a
         file path or a remote URI.
 
         Returns:
             The URI of the model artifact.
+        """
+        return self.uris().get(self.URI_NAME_UNKNOWN)
+
+    @abstractmethod
+    def uris(self) -> Dict[str, str]:
+        """
+        The name and corresponding URI of the model artifact. The key is the name of the URI, and the
+        value is the location of the model artifact, which can be a file path or a remote URI.
+
+        The "unknown" URI name is reserved for the compatibility with single URI.
+
+        Returns:
+            The URIs of the model version, the key is the name of the URI and the value is the URI of
+            the model artifact.
         """
         pass
 

@@ -38,6 +38,15 @@ public final class GravitinoTableHandle
   private HandleWrapper<ConnectorTableHandle> handleWrapper =
       new HandleWrapper<>(ConnectorTableHandle.class);
 
+  /**
+   * Constructs a new GravitinoTableHandle with the specified schema name, table name, and handle
+   * string.
+   *
+   * @param schemaName the name of the schema
+   * @param tableName the name of the table
+   * @param handleString the handle string representation
+   * @throws IllegalArgumentException if any parameter is null
+   */
   @JsonCreator
   public GravitinoTableHandle(
       @JsonProperty("schemaName") String schemaName,
@@ -52,6 +61,15 @@ public final class GravitinoTableHandle
     this.handleWrapper = handleWrapper.fromJson(handleString);
   }
 
+  /**
+   * Constructs a new GravitinoTableHandle with the specified schema name, table name, and internal
+   * table handle.
+   *
+   * @param schemaName the name of the schema
+   * @param tableName the name of the table
+   * @param internalTableHandle the internal table handle
+   * @throws IllegalArgumentException if any parameter is null
+   */
   public GravitinoTableHandle(
       String schemaName, String tableName, ConnectorTableHandle internalTableHandle) {
     Preconditions.checkArgument(schemaName != null, "schemaName is not null");
@@ -63,11 +81,21 @@ public final class GravitinoTableHandle
     this.handleWrapper = new HandleWrapper<>(internalTableHandle);
   }
 
+  /**
+   * Gets the name of the schema.
+   *
+   * @return the schema name
+   */
   @JsonProperty
   public String getSchemaName() {
     return schemaName;
   }
 
+  /**
+   * Gets the name of the table.
+   *
+   * @return the table name
+   */
   @JsonProperty
   public String getTableName() {
     return tableName;
@@ -84,6 +112,11 @@ public final class GravitinoTableHandle
     return handleWrapper.getHandle();
   }
 
+  /**
+   * Converts this table handle to a SchemaTableName object.
+   *
+   * @return a SchemaTableName representing this table's schema and name
+   */
   public SchemaTableName toSchemaTableName() {
     return new SchemaTableName(schemaName, tableName);
   }

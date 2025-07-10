@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import java.util.Optional;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,6 +49,57 @@ public class TestIcebergConfig extends IcebergTestBase {
     ConfigResponse response = resp.readEntity(ConfigResponse.class);
     Assertions.assertEquals(0, response.defaults().size());
     Assertions.assertEquals(0, response.overrides().size());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  public void testConfigWithEmptyWarehouse(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    Map<String, String> queryParams = ImmutableMap.of("warehouse", "");
+    Response resp =
+        getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+    Assertions.assertEquals(0, response.defaults().size());
+    Assertions.assertEquals(0, response.overrides().size());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
+  public void testConfigWithValidWarehouse(String prefix) {
+    setUrlPathWithPrefix(prefix);
+    String warehouseName = IcebergRestTestUtil.PREFIX;
+    Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
+    Response resp =
+        getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+    Map<String, String> expectedConfig =
+        ImmutableMap.of(
+            "prefix",
+            warehouseName,
+            IcebergConstants.IO_IMPL,
+            "org.apache.iceberg.aws.s3.S3FileIO",
+            IcebergConstants.ICEBERG_S3_ENDPOINT,
+            "https://s3-endpoint.example.com",
+            IcebergConstants.AWS_S3_REGION,
+            "us-west-2",
+            IcebergConstants.ICEBERG_OSS_ENDPOINT,
+            "https://oss-endpoint.example.com");
+    Assertions.assertEquals(expectedConfig, response.defaults());
+    Assertions.assertEquals(0, response.overrides().size());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"invalid-catalog", "warehouse_123"})
+  public void testConfigWithNonExistentWarehouses(String warehouse) {
+    Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouse);
+    Response resp =
+        getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
+    Assertions.assertEquals(404, resp.getStatus());
   }
 
   @ParameterizedTest

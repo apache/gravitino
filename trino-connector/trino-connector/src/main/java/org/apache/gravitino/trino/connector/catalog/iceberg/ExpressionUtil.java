@@ -77,6 +77,12 @@ public class ExpressionUtil {
           "(" + IDENTIFIER + ")\\s+" + SORT_DIRECTION + "\\s+" + NULL_ORDERING,
           Pattern.CASE_INSENSITIVE);
 
+  /**
+   * Converts an array of transforms to a list of partition fields.
+   *
+   * @param transforms the array of transforms
+   * @return the list of partition fields
+   */
   public static List<String> expressionToPartitionFiled(Transform[] transforms) {
     try {
       List<String> partitionFields = new ArrayList<>();
@@ -92,6 +98,12 @@ public class ExpressionUtil {
     }
   }
 
+  /**
+   * Converts a list of partition fields to an array of transforms.
+   *
+   * @param partitions the list of partition fields
+   * @return the array of transforms
+   */
   public static Transform[] partitionFiledToExpression(List<String> partitions) {
     try {
       List<Transform> partitionTransforms = new ArrayList<>();
@@ -105,6 +117,12 @@ public class ExpressionUtil {
     }
   }
 
+  /**
+   * Converts an array of sort orders to a list of sort order fields.
+   *
+   * @param orders the array of sort orders
+   * @return the list of sort order fields
+   */
   public static List<String> expressionToSortOrderFiled(SortOrder[] orders) {
     try {
       List<String> orderFields = new ArrayList<>();
@@ -120,6 +138,12 @@ public class ExpressionUtil {
     }
   }
 
+  /**
+   * Converts a list of sort order fields to an array of sort orders.
+   *
+   * @param orderFields the list of sort order fields
+   * @return the array of sort orders
+   */
   public static SortOrder[] sortOrderFiledToExpression(List<String> orderFields) {
     try {
       List<SortOrder> sortOrders = new ArrayList<>();

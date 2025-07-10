@@ -218,9 +218,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             Preconditions.checkArgument(
                 asTables() != null, "Catalog does not support table operations");
             Table table = asTables().loadTable(tableIdent);
+            SupportsPartitions partitionOps = table.supportPartitions();
             Preconditions.checkArgument(
-                table.supportPartitions() != null, "Table does not support partition operations");
-            return fn.apply(table.supportPartitions());
+                partitionOps != null, "Table does not support partition operations");
+            return fn.apply(partitionOps);
           });
     }
 
@@ -365,6 +366,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 return store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
               });
       return catalogEntities.stream()
+          // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
+          // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
+          // after reading the catalog entity, we convert it to the new fileset catalog entity.
+          .map(this::convertFilesetCatalogEntity)
           .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
@@ -699,10 +704,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                       return newCatalogBuilder.build();
                     });
+            // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
+            // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
+            // after reading the catalog entity, we convert it to the new fileset catalog entity.
+            CatalogEntity convertedCatalog = convertFilesetCatalogEntity(updatedCatalog);
             return Objects.requireNonNull(
                     catalogCache.get(
-                        updatedCatalog.nameIdentifier(),
-                        id -> createCatalogWrapper(updatedCatalog, null)))
+                        convertedCatalog.nameIdentifier(),
+                        id -> createCatalogWrapper(convertedCatalog, null)))
                 .catalog;
 
           } catch (NoSuchEntityException ne) {
@@ -934,7 +943,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private CatalogWrapper loadCatalogInternal(NameIdentifier ident) throws NoSuchCatalogException {
     try {
       CatalogEntity entity = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-      return createCatalogWrapper(entity, null);
+      // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
+      // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
+      // after reading the catalog entity, we convert it to the new fileset catalog entity.
+      CatalogEntity convertedEntity = convertFilesetCatalogEntity(entity);
+      return createCatalogWrapper(convertedEntity, null);
 
     } catch (NoSuchEntityException ne) {
       LOG.warn("Catalog {} does not exist", ident, ne);
@@ -1197,5 +1210,35 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
 
     return builder.withProperties(newProps);
+  }
+
+  private CatalogEntity convertFilesetCatalogEntity(CatalogEntity entity) {
+    if (entity.getType() != FILESET) {
+      return entity;
+    }
+
+    if ("hadoop".equalsIgnoreCase(entity.getProvider())) {
+      // If the provider is "hadoop", we need to convert it to a fileset catalog entity.
+      // This is a special case to maintain compatibility.
+      return CatalogEntity.builder()
+          .withId(entity.id())
+          .withName(entity.name())
+          .withNamespace(entity.namespace())
+          .withType(FILESET)
+          .withProvider("fileset")
+          .withComment(entity.getComment())
+          .withProperties(entity.getProperties())
+          .withAuditInfo(
+              AuditInfo.builder()
+                  .withCreator(entity.auditInfo().creator())
+                  .withCreateTime(entity.auditInfo().createTime())
+                  .withLastModifier(entity.auditInfo().lastModifier())
+                  .withLastModifiedTime(entity.auditInfo().lastModifiedTime())
+                  .build())
+          .build();
+    }
+
+    // If the provider is not "hadoop", we assume it is already a fileset catalog entity.
+    return entity;
   }
 }
