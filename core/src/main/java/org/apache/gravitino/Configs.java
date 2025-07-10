@@ -368,62 +368,42 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10_000);
 
+  // Cache entry expiration time
+  public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
+      new ConfigBuilder("gravitino.cache.expireTimeInMs")
+          .doc(
+              "Time-to-live (TTL) for each cache entry after it is written, in milliseconds."
+                  + "Default is 3,600,000 ms (1 hour).")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .longConf()
+          .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(3_600_000L);
 
-    // Whether to enable cache store
-    public static final ConfigEntry<Boolean> CACHE_ENABLED =
-            new ConfigBuilder("gravitino.cache.enabled")
-                    .doc("Whether to enable the cached Entity store.")
-                    .version(ConfigConstants.VERSION_1_0_0)
-                    .booleanConf()
-                    .createWithDefault(true);
+  // Whether to enable cache statistics logging
+  public static final ConfigEntry<Boolean> CACHE_STATS_ENABLED =
+      new ConfigBuilder("gravitino.cache.enableStats")
+          .doc(
+              "Whether to enable cache statistics logging such as hit/miss count, load failures, and size.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .booleanConf()
+          .createWithDefault(false);
 
-    // Maximum number of entries in the cache
-    public static final ConfigEntry<Integer> CACHE_MAX_ENTRIES =
-            new ConfigBuilder("gravitino.cache.maxEntries")
-                    .doc("Maximum number of entries allowed in the cache.")
-                    .version(ConfigConstants.VERSION_1_0_0)
-                    .intConf()
-                    .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-                    .createWithDefault(10_000);
+  // Whether to enable weighted cache
+  public static final ConfigEntry<Boolean> CACHE_WEIGHER_ENABLED =
+      new ConfigBuilder("gravitino.cache.enableWeigher")
+          .doc(
+              "Whether to enable weighted cache eviction. "
+                  + "Entries are evicted based on weight instead of count.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .booleanConf()
+          .createWithDefault(true);
 
-    // Cache entry expiration time
-    public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
-            new ConfigBuilder("gravitino.cache.expireTimeInMs")
-                    .doc(
-                            "Time-to-live (TTL) for each cache entry after it is written, in milliseconds."
-                                    + "Default is 3,600,000 ms (1 hour).")
-                    .version(ConfigConstants.VERSION_1_0_0)
-                    .longConf()
-                    .checkValue(value -> value >= 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
-                    .createWithDefault(3_600_000L);
-
-    // Whether to enable cache statistics logging
-    public static final ConfigEntry<Boolean> CACHE_STATS_ENABLED =
-            new ConfigBuilder("gravitino.cache.enableStats")
-                    .doc(
-                            "Whether to enable cache statistics logging such as hit/miss count, load failures, and size.")
-                    .version(ConfigConstants.VERSION_1_0_0)
-                    .booleanConf()
-                    .createWithDefault(false);
-
-    // Whether to enable weighted cache
-    public static final ConfigEntry<Boolean> CACHE_WEIGHER_ENABLED =
-            new ConfigBuilder("gravitino.cache.enableWeigher")
-                    .doc(
-                            "Whether to enable weighted cache eviction. "
-                                    + "Entries are evicted based on weight instead of count.")
-                    .version(ConfigConstants.VERSION_1_0_0)
-                    .booleanConf()
-                    .createWithDefault(true);
-
-    // Provider name for cache
-    public static final ConfigEntry<String> CACHE_IMPLEMENTATION =
-            new ConfigBuilder("gravitino.cache.implementation")
-                    .doc("Which cache implementation to use")
-                    .version(ConfigConstants.VERSION_1_0_0)
-                    .stringConf()
-                    .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
-                    .createWithDefault("caffeine");
+  // Provider name for cache
+  public static final ConfigEntry<String> CACHE_IMPLEMENTATION =
+      new ConfigBuilder("gravitino.cache.implementation")
+          .doc("Which cache implementation to use")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault("caffeine");
 }
-
-
