@@ -39,6 +39,7 @@ const OAuthCallbackPage = () => {
         // The backend OAuth callback endpoint should redirect here with the token
         const access_token = searchParams.get('access_token') || searchParams.get('token')
         const refresh_token = searchParams.get('refresh_token')
+        const expires_in = searchParams.get('expires_in')
         const error = searchParams.get('error')
         const errorDescription = searchParams.get('error_description')
 
@@ -57,7 +58,7 @@ const OAuthCallbackPage = () => {
         }
 
         // Process the OAuth callback
-        await dispatch(handleOAuthCallback({ access_token, refresh_token, router }))
+        await dispatch(handleOAuthCallback({ access_token, refresh_token, expires_in, router }))
 
         // Success - user will be redirected by the action
       } catch (err) {

@@ -151,7 +151,7 @@ export const initiateOAuthFlow = createAsyncThunk('auth/initiateOAuthFlow', asyn
 
 export const handleOAuthCallback = createAsyncThunk(
   'auth/handleOAuthCallback',
-  async ({ access_token, refresh_token, router }, { dispatch }) => {
+  async ({ access_token, refresh_token, expires_in, router }, { dispatch }) => {
     if (!access_token) {
       throw new Error('No OAuth access token received')
     }
@@ -163,6 +163,10 @@ export const handleOAuthCallback = createAsyncThunk(
 
     // Store the OAuth access token
     localStorage.setItem('accessToken', access_token)
+    if (expires_in) {
+      localStorage.setItem('expiredIn', expires_in)
+      dispatch(setExpiredIn(expires_in))
+    }
     localStorage.setItem('isIdle', false)
     dispatch(setAuthToken(access_token))
 
@@ -170,7 +174,7 @@ export const handleOAuthCallback = createAsyncThunk(
     await dispatch(initialVersion())
     router.push('/metalakes')
 
-    return { token: access_token }
+    return { token: access_token, expired: expires_in }
   }
 )
 

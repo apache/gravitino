@@ -194,16 +194,21 @@ public class OAuthController {
         userInfo.setEmail("user@example.com");
       }
 
-      // No longer create Gravitino session, just use the Azure AD JWT token
       LOG.info("Passing Azure AD JWT token to frontend for user: {}", userInfo.getEmail());
       String jwtToken = tokenResponse.getAccessToken();
+      Integer expiresIn = null;
+      try {
+        expiresIn = tokenResponse.getExpiresIn();
+      } catch (Exception e) {
+        LOG.warn("Could not extract expires_in from token response", e);
+      }
 
       // Clean up session
       session.removeAttribute(STATE_SESSION_KEY);
       session.removeAttribute(REDIRECT_AFTER_LOGIN_KEY);
 
-      // Redirect to frontend with JWT token
-      String frontendUrl = buildFrontendRedirectUrl(jwtToken);
+      // Redirect to frontend with JWT token and expires_in
+      String frontendUrl = buildFrontendRedirectUrl(jwtToken, expiresIn);
 
       LOG.info("OAuth login successful for user: {}", userInfo.getEmail());
       LOG.info("Redirecting to frontend: {}", frontendUrl);
@@ -268,14 +273,19 @@ public class OAuthController {
     return sessionState != null && sessionState.equals(receivedState);
   }
 
-  /** Build frontend redirect URL with token */
-  private String buildFrontendRedirectUrl(String token) throws Exception {
+  /** Build frontend redirect URL with token and expires_in */
+  private String buildFrontendRedirectUrl(String token, Integer expiresIn) throws Exception {
     String baseUrl = oauthConfig.getFrontendBaseUrl();
     LOG.info("Frontend base URL: {}", baseUrl);
     if (!Strings.isNullOrEmpty(baseUrl)) {
-      return baseUrl
-          + "/ui/oauth/callback?access_token="
-          + URLEncoder.encode(token, StandardCharsets.UTF_8.name());
+      String url =
+          baseUrl
+              + "/ui/oauth/callback?access_token="
+              + URLEncoder.encode(token, StandardCharsets.UTF_8.name());
+      if (expiresIn != null) {
+        url += "&expires_in=" + expiresIn;
+      }
+      return url;
     } else {
       return null;
     }
