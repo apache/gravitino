@@ -28,6 +28,7 @@ import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
 
+/** Generate AWS IRSA to access S3 data. */
 public class AwsIrsaCredentialProvider implements CredentialProvider {
 
   private WebIdentityTokenFileCredentialsProvider credentialsProvider;
