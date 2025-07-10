@@ -99,7 +99,7 @@ public class MetadataIdConverter {
    * @return The metadata id.
    * @throws IOException if an error occurs while loading the entity.
    */
-  public static Long getID(MetadataObject metadataObject, String metalake) throws IOException {
+  public static Long getID(MetadataObject metadataObject, String metalake) {
     Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
@@ -119,7 +119,7 @@ public class MetadataIdConverter {
     try {
       entity = entityStore.get(normalizedIdent, entityType, getEntityClass(entityType));
     } catch (IOException e) {
-      throw new IOException(
+      throw new RuntimeException(
           "failed to load entity from entity store: " + metadataObject.fullName(), e);
     }
 
