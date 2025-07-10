@@ -54,12 +54,12 @@ public class AuthorizationExpressionConverter {
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {
-    authorizationExpression = replaceAnyPrivilege(authorizationExpression);
-    authorizationExpression = replaceAnyExpressions(authorizationExpression);
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
-          Matcher matcher = PATTERN.matcher(expression);
+          String replacedExpression = replaceAnyPrivilege(authorizationExpression);
+          replacedExpression = replaceAnyExpressions(replacedExpression);
+          Matcher matcher = PATTERN.matcher(replacedExpression);
           StringBuffer result = new StringBuffer();
 
           while (matcher.find()) {
