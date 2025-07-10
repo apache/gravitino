@@ -59,11 +59,10 @@ import org.slf4j.LoggerFactory;
 public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
 
-  private static final String listTopicsAuthorizationExpression =
-      "ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-          + "ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-          + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA";
+  private static final String loadTopicsAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || " +
+              "SCHEMA_OWNER_WITH_USE_CATALOG || " +
+              "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_CONSUME_TOPIC || ANY_PRODUCE_TOPIC)";
 
   private final TopicDispatcher dispatcher;
 
@@ -93,7 +92,7 @@ public class TopicOperations {
             topics = topics == null ? new NameIdentifier[0] : topics;
             topics =
                 MetadataFilterHelper.filterByExpression(
-                    metalake, listTopicsAuthorizationExpression, Entity.EntityType.TOPIC, topics);
+                    metalake, loadTopicsAuthorizationExpression, Entity.EntityType.TOPIC, topics);
             Response response = Utils.ok(new EntityListResponse(topics));
             LOG.info(
                 "List {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
@@ -110,8 +109,9 @@ public class TopicOperations {
   @ResponseMetered(name = "create-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(CREATE_TOPIC, METALAKE, CATALOG, SCHEMA) || "
-              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC)",
+          "ANY(OWNER,METALAKE,CATALOG) || " +
+                  "SCHEMA_OWNER_WITH_USE_CATALOG || " +
+                  "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TOPIC",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -157,11 +157,7 @@ public class TopicOperations {
   @Timed(name = "load-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-topic", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-              + "ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA",
+      expression = loadTopicsAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response loadTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -195,8 +191,9 @@ public class TopicOperations {
   @ResponseMetered(name = "alter-topic", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC) || "
-              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC)",
+              "ANY(OWNER,METALAKE,CATALOG) || " +
+                      "SCHEMA_OWNER_WITH_USE_CATALOG || " +
+                      "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_PRODUCE_TOPIC)",
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response alterTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -235,7 +232,10 @@ public class TopicOperations {
   @Timed(name = "drop-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-topic", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC)",
+      expression =
+              "ANY(OWNER,METALAKE,CATALOG) || " +
+                      "SCHEMA_OWNER_WITH_USE_CATALOG || " +
+                      "ANY_USE_CATALOG && ANY_USE_SCHEMA && TOPIC::OWNER",
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response dropTopic(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
