@@ -514,4 +514,8 @@ public class NameIdentifierUtil {
   public static NameIdentifier ofGroup(String metalake, String groupName) {
     return NameIdentifier.of(NamespaceUtil.ofGroup(metalake), groupName);
   }
+
+  public static NameIdentifier ofStatistic(NameIdentifier identifier, String name) {
+    return NameIdentifier.of(Namespace.fromString(identifier.toString()), name);
+  }
 }

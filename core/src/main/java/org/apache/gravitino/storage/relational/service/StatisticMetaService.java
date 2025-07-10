@@ -59,11 +59,23 @@ public class StatisticMetaService {
                 .collect(Collectors.toList());
     }
 
-    public void batchInsertStatisticPOs(List<StatisticEntity> statisticEntities) {
+    public void batchInsertStatisticPOs(List<StatisticEntity> statisticEntities, String metalake, NameIdentifier entity, Entity.EntityType type) {
         if (statisticEntities == null || statisticEntities.isEmpty()) {
             return;
         }
+        Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+        Long objectId;
+        MetadataObject object = NameIdentifierUtil.toMetadataObject(entity, type);
+        if (type == Entity.EntityType.METALAKE) {
+            objectId = metalakeId;
+        } else {
+            objectId = MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
+        }
         StatisticPO.Builder builder = StatisticPO.builder();
+        builder.withMetalakeId(metalakeId);
+        builder.withObjectId(objectId);
+        builder.withObjectType(object.type().name());
+
         List<StatisticPO> pos = POConverters.initializeStatisticPOs(statisticEntities, builder);
         SessionUtils.doWithCommit(
                 StatisticMetaMapper.class,
