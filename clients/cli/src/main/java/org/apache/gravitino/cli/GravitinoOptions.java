@@ -119,7 +119,6 @@ public class GravitinoOptions {
     options.addOption(createArgOption(NULL, "column value can be null (true/false)"));
     options.addOption(createArgOption(AUTO, "column value auto-increments (true/false)"));
     options.addOption(createArgOption(DEFAULT, "default column value"));
-    options.addOption(createSimpleOption("o", OWNER, "display entity owner"));
     options.addOption(createArgOption(COLUMNFILE, "CSV file describing columns"));
     options.addOption(createSimpleOption(null, ALL, "on all entities"));
 
