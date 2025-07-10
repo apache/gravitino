@@ -61,13 +61,13 @@ public class TestFilesetAuthorizationExpression {
 
   @Test
   public void testLoadFileset() throws OgnlException, NoSuchFieldException, IllegalAccessException {
-    Field loadTableAuthorizationExpressionField =
+    Field loadFilesetAuthorizationExpressionField =
         FilesetOperations.class.getDeclaredField("loadFilesetAuthorizationExpression");
-    loadTableAuthorizationExpressionField.setAccessible(true);
-    String loadModelAuthorizationExperssion =
-        (String) loadTableAuthorizationExpressionField.get(null);
+    loadFilesetAuthorizationExpressionField.setAccessible(true);
+    String loadFilesetAuthorizationExpression =
+        (String) loadFilesetAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =
-        new MockAuthorizationExpressionEvaluator(loadModelAuthorizationExperssion);
+        new MockAuthorizationExpressionEvaluator(loadFilesetAuthorizationExpression);
     assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::USE_CATALOG")));
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
