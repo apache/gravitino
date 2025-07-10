@@ -22,11 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -59,7 +58,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  private static String hmsUri;
   private String role = "role";
   private String defaultBaseLocation;
 
@@ -67,18 +65,10 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void startIntegrationTest() throws Exception {
     containerSuite.startHiveContainer();
     super.startIntegrationTest();
-    hmsUri =
-        String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
-    Map<String, String> properties = Maps.newHashMap();
-    properties.put("metastore.uris", hmsUri);
-    properties.put("location", defaultBaseLocation());
-
     client
         .loadMetalake(METALAKE)
-        .createCatalog(CATALOG, Catalog.Type.FILESET, "hadoop", "comment", properties)
+        .createCatalog(
+            CATALOG, Catalog.Type.FILESET, "hadoop", "comment", ImmutableMap.of("k1", "k2"))
         .asSchemas()
         .createSchema(SCHEMA, "test", new HashMap<>());
     // try to load the schema as normal user, expect failure
@@ -150,7 +140,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     String filename2 = GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset2");
     filesetCatalogNormalUser.createFileset(
         NameIdentifier.of(SCHEMA, "fileset2"),
-        //        NameIdentifier.of(SCHEMA, "fileset2"),
         "comment",
         Fileset.Type.MANAGED,
         storageLocation(filename2),
@@ -158,7 +147,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     String filename3 = GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset3");
     filesetCatalogNormalUser.createFileset(
         NameIdentifier.of(SCHEMA, "fileset3"),
-        //        NameIdentifier.of(SCHEMA, "fileset3"),
         "comment",
         Fileset.Type.MANAGED,
         storageLocation(filename3),
@@ -202,11 +190,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         () -> {
           filesetCatalogNormalUser.loadFileset(NameIdentifier.of(CATALOG, SCHEMA, "fileset1"));
         });
-    Fileset fileset2 =
-        filesetCatalogNormalUser.loadFileset(
-            //            NameIdentifierUtil.ofFileset(METALAKE, CATALOG, SCHEMA, "fileset2")
-            NameIdentifier.of(SCHEMA, "fileset2"));
-    //            NameIdentifier.of(CATALOG, SCHEMA, "fileset2"));
+    Fileset fileset2 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset2"));
     assertEquals("fileset2", fileset2.name());
     Fileset fileset3 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset3"));
     assertEquals("fileset3", fileset3.name());
@@ -251,20 +235,6 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(5)
   public void testGetFileLocation() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-
-    //    FilesetCatalog filesetCatalog =
-    //        client.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
-
-    // create a fileset to test getFileLocation.
-    //    String filename4 = GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset4");
-    //    filesetCatalog.createFileset(
-    //        // NameIdentifier.of(SCHEMA, "fileset1"),
-    //        NameIdentifier.of(SCHEMA, "fileset4"),
-    //        "comment",
-    //        Fileset.Type.MANAGED,
-    //        storageLocation(filename4),
-    //        new HashMap<>());
-
     FilesetCatalog filesetCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
 

@@ -81,6 +81,11 @@ public class FilesetOperations {
 
   private final FilesetDispatcher dispatcher;
 
+  private static final String loadFilesetAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)";
+
   @Context private HttpServletRequest httpRequest;
 
   @Inject
@@ -110,12 +115,7 @@ public class FilesetOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
-                        + "("
-                        + "  ANY(USE_CATALOG, METALAKE, CATALOG) && "
-                        + "  ANY(USE_SCHEMA, METALAKE, CATALOG, SCHEMA) && "
-                        + "  ( ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) )"
-                        + ")",
+                    loadFilesetAuthorizationExpression,
                     Entity.EntityType.FILESET,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -139,11 +139,9 @@ public class FilesetOperations {
   @ResponseMetered(name = "create-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          " ((METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || SCHEMA::USE_CATALOG) && "
-              + "((METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA || SCHEMA::USE_SCHEMA) && "
-              + "(METALAKE::CREATE_FILESET || CATALOG::CREATE_FILESET || "
-              + "SCHEMA::CREATE_FILESET) || SCHEMA::OWNER)) || "
-              + "METALAKE::OWNER || CATALOG::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && SCHEMA::CREATE_FILESET",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response createFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -199,23 +197,8 @@ public class FilesetOperations {
   @Timed(name = "load-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-fileset", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
-              + "("
-              + "   ANY(USE_CATALOG, METALAKE, CATALOG, SCHEMA) && "
-              + "   ( ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
-              + ")",
+      expression = loadFilesetAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.FILESET)
-  //  @AuthorizationExpression(
-  //      //      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET)",
-  //
-  //      expression =
-  //          "((ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA) && "
-  //              + "(ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
-  //              + " ( ANY(READ_FILESET,METALAKE,CATALOG,SCHEMA,FILESET) || "
-  //              + " ANY(WRITE_FILESET,METALAKE,CATALOG,SCHEMA,FILESET) || FILESET::OWNER)) ||"
-  //              + "ANY(OWNER,METALAKE,CATALOG,SCHEMA)",
-  //      accessMetadataType = MetadataObject.Type.FILESET)
   public Response loadFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
           String metalake,
@@ -297,8 +280,9 @@ public class FilesetOperations {
   @ResponseMetered(name = "alter-fileset", absolute = true)
   @AuthorizationExpression(
       expression =
-          "ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || "
-              + "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET)",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -337,7 +321,10 @@ public class FilesetOperations {
   @Timed(name = "drop-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-fileset", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET)",
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -374,12 +361,7 @@ public class FilesetOperations {
   @Timed(name = "get-file-location." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-file-location", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
-              + "("
-              + "   ANY(USE_CATALOG, METALAKE, CATALOG, SCHEMA) && "
-              + "   ( ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
-              + ")",
+      expression = loadFilesetAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response getFileLocation(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)

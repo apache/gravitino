@@ -40,8 +40,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
-import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
+import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -63,7 +63,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             CatalogOperations.class.getName(),
             SchemaOperations.class.getName(),
             TableOperations.class.getName(),
-            ModelOperations.class.getName()),
+            ModelOperations.class.getName(),
             FilesetOperations.class.getName()));
   }
 
@@ -165,7 +165,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                 break;
               case FILESET:
                 nameIdentifierMap.put(
-                    Entity.EntityType.SCHEMA,
+                    Entity.EntityType.FILESET,
                     NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
                 break;
               case MODEL:
@@ -174,10 +174,10 @@ public class GravitinoInterceptionService implements InterceptionService {
                     Entity.EntityType.MODEL,
                     NameIdentifierUtil.ofModel(metadata, catalog, schema, model));
                 break;
-               case METALAKE:
-                   nameIdentifierMap.put(
-                           Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
-                   break;
+              case METALAKE:
+                nameIdentifierMap.put(
+                    Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
+                break;
               default:
                 break;
             }

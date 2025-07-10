@@ -154,6 +154,12 @@ public class AuthorizationExpressionConverter {
             "(ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL))");
     expression =
         expression.replaceAll("ANY_CREATE_MODEL", "(ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA))");
+    expression =
+        expression.replaceAll(
+            "ANY_READ_FILESET", "(ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");
+    expression =
+        expression.replaceAll(
+            "ANY_WRITE_FILESET", "(ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");
     return expression;
   }
 }
