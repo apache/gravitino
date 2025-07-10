@@ -103,11 +103,6 @@ public class IcebergTableOperations {
               new IcebergRequestContext(httpServletRequest(), catalogName);
           ListTablesResponse listTablesResponse =
               tableOperationDispatcher.listTable(context, icebergNS);
-          LOG.info(
-              "Listed {} tables for catalog: {}, namespace: {}",
-              listTablesResponse.identifiers().size(),
-              catalogName,
-              icebergNS);
           return IcebergRestUtils.ok(listTablesResponse);
         });
   }
@@ -140,11 +135,6 @@ public class IcebergTableOperations {
               new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
           LoadTableResponse loadTableResponse =
               tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
-          LOG.info(
-              "Created table '{}' in catalog: {}, namespace: {}",
-              createTableRequest.name(),
-              catalogName,
-              icebergNS);
           return IcebergRestUtils.ok(loadTableResponse);
         });
   }
@@ -178,11 +168,6 @@ public class IcebergTableOperations {
           TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
           LoadTableResponse loadTableResponse =
               tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
-          LOG.info(
-              "Successfully updated table '{}' in catalog: {}, namespace: {}",
-              table,
-              catalogName,
-              icebergNS);
           return IcebergRestUtils.ok(loadTableResponse);
         });
   }
@@ -213,12 +198,6 @@ public class IcebergTableOperations {
           IcebergRequestContext context =
               new IcebergRequestContext(httpServletRequest(), catalogName);
           tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
-          LOG.info(
-              "Successfully dropped table '{}' in catalog: {}, namespace: {} (purged: {})",
-              table,
-              catalogName,
-              icebergNS,
-              purgeRequested);
           return IcebergRestUtils.noContent();
         });
   }
@@ -255,11 +234,6 @@ public class IcebergTableOperations {
               new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
           LoadTableResponse loadTableResponse =
               tableOperationDispatcher.loadTable(context, tableIdentifier);
-          LOG.info(
-              "Successfully loaded table '{}' in catalog: {}, namespace: {}",
-              table,
-              catalogName,
-              icebergNS);
           return IcebergRestUtils.ok(loadTableResponse);
         });
   }
@@ -288,12 +262,6 @@ public class IcebergTableOperations {
               new IcebergRequestContext(httpServletRequest(), catalogName);
           TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
           boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
-          LOG.info(
-              "Table '{}' exists check completed: {} in catalog: {}, namespace: {}",
-              table,
-              exists,
-              catalogName,
-              icebergNS);
           if (exists) {
             return IcebergRestUtils.noContent();
           } else {
@@ -324,11 +292,6 @@ public class IcebergTableOperations {
         httpRequest,
         () -> {
           icebergMetricsManager.recordMetric(request.report());
-          LOG.info(
-              "Successfully reported metrics for table '{}' in catalog: {}, namespace: {}",
-              table,
-              catalogName,
-              icebergNS);
           return IcebergRestUtils.noContent();
         });
   }
