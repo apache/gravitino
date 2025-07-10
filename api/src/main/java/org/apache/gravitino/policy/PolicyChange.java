@@ -54,7 +54,7 @@ public interface PolicyChange {
    * @param content The new content for the policy.
    * @return The policy change.
    */
-  static PolicyChange updateContent(Policy.Content content) {
+  static PolicyChange updateContent(PolicyContent content) {
     return new UpdateContent(content);
   }
 
@@ -160,9 +160,9 @@ public interface PolicyChange {
 
   /** A policy change to update the content of the policy. */
   final class UpdateContent implements PolicyChange {
-    private final Policy.Content content;
+    private final PolicyContent content;
 
-    private UpdateContent(Policy.Content content) {
+    private UpdateContent(PolicyContent content) {
       this.content = content;
     }
 
@@ -171,7 +171,7 @@ public interface PolicyChange {
      *
      * @return The content of the policy change.
      */
-    public Policy.Content getContent() {
+    public PolicyContent getContent() {
       return content;
     }
 

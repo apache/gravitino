@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.policy.Policy.SUPPORTS_ALL_OBJECT_TYPES;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -36,6 +37,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -52,11 +54,14 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
@@ -70,6 +75,8 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -766,6 +773,44 @@ public class TestPOConverters {
     assertEquals(1, updatePO2.getLastVersion());
     assertEquals(1, updatePO2.getFilesetVersionPOs().get(0).getVersion());
     assertEquals("test1", updatePO2.getFilesetName());
+  }
+
+  @Test
+  public void testFromPolicyPO() throws JsonProcessingException {
+    PolicyContent content = PolicyContents.custom(null, null);
+    PolicyVersionPO policyVersionPO =
+        createPolicyVersionPO(1L, 1L, 1L, "test comment", true, content);
+    PolicyPO policyPO =
+        createPolicyPO(
+            1L, "test", "my_type", 1L, true, true, SUPPORTS_ALL_OBJECT_TYPES, policyVersionPO);
+
+    PolicyEntity expectedPolicy =
+        createPolicy(
+            1L,
+            "test",
+            NamespaceUtil.ofPolicy("test_metalake"),
+            "my_type",
+            "test comment",
+            true,
+            true,
+            true,
+            SUPPORTS_ALL_OBJECT_TYPES,
+            content);
+
+    PolicyEntity convertedPolicy =
+        POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy("test_metalake"));
+
+    assertEquals(expectedPolicy.id(), convertedPolicy.id());
+    assertEquals(expectedPolicy.name(), convertedPolicy.name());
+    assertEquals(expectedPolicy.namespace(), convertedPolicy.namespace());
+    assertEquals(expectedPolicy.auditInfo().creator(), convertedPolicy.auditInfo().creator());
+    assertEquals(expectedPolicy.policyType(), convertedPolicy.policyType());
+    assertEquals(expectedPolicy.comment(), convertedPolicy.comment());
+    assertEquals(expectedPolicy.enabled(), convertedPolicy.enabled());
+    assertEquals(expectedPolicy.inheritable(), convertedPolicy.inheritable());
+    assertEquals(expectedPolicy.exclusive(), convertedPolicy.exclusive());
+    assertEquals(expectedPolicy.supportedObjectTypes(), convertedPolicy.supportedObjectTypes());
+    assertEquals(expectedPolicy.content(), convertedPolicy.content());
   }
 
   @Test
@@ -1483,6 +1528,83 @@ public class TestPOConverters {
         .withStorageLocation(storageLocation)
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withVersion(1L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private static PolicyEntity createPolicy(
+      Long id,
+      String name,
+      Namespace namespace,
+      String type,
+      String comment,
+      boolean enabled,
+      boolean exclusive,
+      boolean inheritable,
+      Set<MetadataObject.Type> supportedObjectTypes,
+      PolicyContent content) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return PolicyEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withPolicyType(type)
+        .withComment(comment)
+        .withEnabled(enabled)
+        .withExclusive(exclusive)
+        .withInheritable(inheritable)
+        .withSupportedObjectTypes(supportedObjectTypes)
+        .withContent(content)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private static PolicyPO createPolicyPO(
+      Long id,
+      String name,
+      String policyType,
+      Long metalakeId,
+      boolean inheritable,
+      boolean exclusive,
+      Set<MetadataObject.Type> supportedObjectTypes,
+      PolicyVersionPO policyVersionPO)
+      throws JsonProcessingException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    return PolicyPO.builder()
+        .withPolicyId(id)
+        .withPolicyName(name)
+        .withPolicyType(policyType)
+        .withMetalakeId(metalakeId)
+        .withInheritable(inheritable)
+        .withExclusive(exclusive)
+        .withSupportedObjectTypes(
+            JsonUtils.anyFieldMapper().writeValueAsString(supportedObjectTypes))
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .withPolicyVersionPO(policyVersionPO)
+        .build();
+  }
+
+  private static PolicyVersionPO createPolicyVersionPO(
+      Long id,
+      Long metalakeId,
+      Long policyId,
+      String comment,
+      boolean enabled,
+      PolicyContent content)
+      throws JsonProcessingException {
+    return PolicyVersionPO.builder()
+        .withId(id)
+        .withMetalakeId(metalakeId)
+        .withPolicyId(policyId)
+        .withVersion(1L)
+        .withPolicyComment(comment)
+        .withEnabled(enabled)
+        .withContent(JsonUtils.anyFieldMapper().writeValueAsString(content))
         .withDeletedAt(0L)
         .build();
   }

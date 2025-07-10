@@ -89,7 +89,7 @@ public class TopicDTO implements Topic {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof Topic)) {
+    if (!(o instanceof TopicDTO)) {
       return false;
     }
     TopicDTO topicDTO = (TopicDTO) o;

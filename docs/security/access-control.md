@@ -114,7 +114,7 @@ This process allows all users belonging to that user group to have the access co
 
 Metadata objects are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
 `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `ROLE`, `METALAKE`. A metadata object is combined by a `type` and a
-comma-separated `name`. For example, a `CATAGLOG` object has a name "catalog1" with type
+comma-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
 "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
 object has a name "catalog1.schema1.table1" with type "TABLE". A `METALAKE` object has a name "metalake1".
 
