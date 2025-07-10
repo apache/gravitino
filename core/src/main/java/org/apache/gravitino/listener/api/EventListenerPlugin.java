@@ -20,10 +20,12 @@
 package org.apache.gravitino.listener.api;
 
 import java.util.Map;
+import javax.validation.constraints.NotNull;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.SupportsChangingPreEvent;
 
 /**
  * Defines an interface for event listeners that manage the lifecycle and state of a plugin,
@@ -120,6 +122,19 @@ public interface EventListenerPlugin {
    *     listener is SYNC mode, the exception will be ignored and logged only in other conditions.
    */
   default void onPreEvent(PreEvent preEvent) throws ForbiddenException {}
+
+  /**
+   * Transforms a pre-event before listener processing.
+   *
+   * <p>Plugins can modify the pre-event through this method. Transformation order follows the event
+   * listener configuration sequence.
+   *
+   * @param preEvent Pre-event to transform
+   * @return Transformed pre-event
+   */
+  default @NotNull SupportsChangingPreEvent transformPreEvent(SupportsChangingPreEvent preEvent) {
+    return preEvent;
+  }
 
   /**
    * Specifies the default operational mode for event processing by the plugin. The default

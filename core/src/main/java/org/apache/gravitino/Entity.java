@@ -55,42 +55,27 @@ public interface Entity extends Serializable {
   /** The tag schema name in the system catalog. */
   String TAG_SCHEMA_NAME = "tag";
 
+  /** The policy schema name in the system catalog. */
+  String POLICY_SCHEMA_NAME = "policy";
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {
-    METALAKE("ml", 0),
-    CATALOG("ca", 1),
-    SCHEMA("sc", 2),
-    TABLE("ta", 3),
-    COLUMN("co", 4),
-    FILESET("fi", 5),
-    TOPIC("to", 6),
-    USER("us", 7),
-    GROUP("gr", 8),
-    ROLE("ro", 9),
-    TAG("ta", 10),
-    MODEL("mo", 11),
-    MODEL_VERSION("mv", 12),
-
-    AUDIT("au", 65534);
-
-    // Short name can be used to identify the entity type in the logs, persistent storage, etc.
-    private final String shortName;
-    private final int index;
-
-    EntityType(String shortName, int index) {
-      this.shortName = shortName;
-      this.index = index;
-    }
-
-    public static EntityType fromShortName(String shortName) {
-      for (EntityType entityType : EntityType.values()) {
-        if (entityType.shortName.equals(shortName)) {
-          return entityType;
-        }
-      }
-      throw new IllegalArgumentException("Unknown entity type: " + shortName);
-    }
+    METALAKE,
+    CATALOG,
+    SCHEMA,
+    TABLE,
+    COLUMN,
+    FILESET,
+    TOPIC,
+    USER,
+    GROUP,
+    ROLE,
+    TAG,
+    MODEL,
+    MODEL_VERSION,
+    POLICY,
+    AUDIT;
 
     /**
      * Returns the parent entity types of the given entity type. The parent entity types are the

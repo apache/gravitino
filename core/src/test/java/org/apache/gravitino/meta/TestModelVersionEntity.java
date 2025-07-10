@@ -21,10 +21,12 @@ package org.apache.gravitino.meta;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.model.ModelVersion;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +46,7 @@ public class TestModelVersionEntity {
             .withComment("test comment")
             .withAliases(aliases)
             .withProperties(properties)
-            .withUri("test_uri")
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "test_uri"))
             .withAuditInfo(auditInfo)
             .build();
 
@@ -54,7 +56,10 @@ public class TestModelVersionEntity {
     Assertions.assertEquals("test comment", modelVersionEntity.comment());
     Assertions.assertEquals(aliases, modelVersionEntity.aliases());
     Assertions.assertEquals(properties, modelVersionEntity.properties());
-    Assertions.assertEquals("test_uri", modelVersionEntity.uri());
+    Assertions.assertEquals(1, modelVersionEntity.uris().size());
+    Assertions.assertTrue(modelVersionEntity.uris().containsKey(ModelVersion.URI_NAME_UNKNOWN));
+    Assertions.assertEquals(
+        "test_uri", modelVersionEntity.uris().get(ModelVersion.URI_NAME_UNKNOWN));
     Assertions.assertEquals(auditInfo, modelVersionEntity.auditInfo());
     Assertions.assertEquals(
         Namespace.of("m1", "c1", "s1", "model1"), modelVersionEntity.namespace());
@@ -67,7 +72,7 @@ public class TestModelVersionEntity {
             .withVersion(1)
             .withAliases(aliases)
             .withProperties(properties)
-            .withUri("test_uri")
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "test_uri"))
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertNull(modelVersionEntity2.comment());
@@ -78,7 +83,7 @@ public class TestModelVersionEntity {
             .withVersion(1)
             .withComment("test comment")
             .withAliases(aliases)
-            .withUri("test_uri")
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "test_uri"))
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertNull(modelVersionEntity3.properties());
@@ -89,7 +94,7 @@ public class TestModelVersionEntity {
             .withVersion(1)
             .withComment("test comment")
             .withProperties(properties)
-            .withUri("test_uri")
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "test_uri"))
             .withAuditInfo(auditInfo)
             .build();
     Assertions.assertTrue(modelVersionEntity4.aliases().isEmpty());
@@ -102,18 +107,26 @@ public class TestModelVersionEntity {
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          ModelVersionEntity.builder()
-              .withVersion(1)
-              .withAuditInfo(
-                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
-              .build();
-        });
+        () ->
+            ModelVersionEntity.builder()
+                .withVersion(1)
+                .withAuditInfo(
+                    AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+                .build());
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          ModelVersionEntity.builder().withVersion(1).withUri("test_uri").build();
-        });
+        () ->
+            ModelVersionEntity.builder()
+                .withVersion(1)
+                .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "test_uri"))
+                .build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ModelVersionEntity.builder().withVersion(1).build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> ModelVersionEntity.builder().withVersion(1).withUris(Collections.emptyMap()).build());
   }
 }

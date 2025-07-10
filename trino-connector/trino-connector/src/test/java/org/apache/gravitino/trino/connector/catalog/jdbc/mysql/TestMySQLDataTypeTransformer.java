@@ -19,7 +19,15 @@
 
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLDataTypeTransformer.JSON_TYPE;
+
 import io.trino.spi.TrinoException;
+import io.trino.spi.type.DateType;
+import io.trino.spi.type.DoubleType;
+import io.trino.spi.type.IntegerType;
+import io.trino.spi.type.RealType;
+import io.trino.spi.type.VarbinaryType;
+import io.trino.spi.type.VarcharType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
@@ -99,5 +107,74 @@ public class TestMySQLDataTypeTransformer {
     Assertions.assertEquals(
         generalDataTypeTransformer.getTrinoType(unsignBigintType),
         io.trino.spi.type.DecimalType.createDecimalType(20, 0));
+  }
+
+  @Test
+  public void testGravitinoExternalTypeToTrinoType() {
+    GeneralDataTypeTransformer generalDataTypeTransformer = new MySQLDataTypeTransformer();
+
+    Type mediumintType = Types.ExternalType.of("mediumint");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(mediumintType), IntegerType.INTEGER);
+
+    Type mediumintUnsignedType = Types.ExternalType.of("mediumint unsigned");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(mediumintUnsignedType), IntegerType.INTEGER);
+
+    Type floatUnsignedType = Types.ExternalType.of("float unsigned");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(floatUnsignedType), RealType.REAL);
+
+    Type doubleUnsignedType = Types.ExternalType.of("double unsigned");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(doubleUnsignedType), DoubleType.DOUBLE);
+
+    Type tinytextType = Types.ExternalType.of("tinytext");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(tinytextType), VarcharType.VARCHAR);
+
+    Type mediumtextType = Types.ExternalType.of("mediumtext");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(mediumtextType), VarcharType.VARCHAR);
+
+    Type longtextType = Types.ExternalType.of("longtext");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(longtextType), VarcharType.VARCHAR);
+
+    Type yearType = Types.ExternalType.of("year");
+    Assertions.assertEquals(generalDataTypeTransformer.getTrinoType(yearType), DateType.DATE);
+
+    Type enumType = Types.ExternalType.of("enum");
+    Assertions.assertEquals(generalDataTypeTransformer.getTrinoType(enumType), VarcharType.VARCHAR);
+
+    Type setType = Types.ExternalType.of("set");
+    Assertions.assertEquals(generalDataTypeTransformer.getTrinoType(setType), VarcharType.VARCHAR);
+
+    Type jsonType = Types.ExternalType.of("json");
+    Assertions.assertEquals(generalDataTypeTransformer.getTrinoType(jsonType), JSON_TYPE);
+
+    Type varbinaryType = Types.ExternalType.of("varbinary");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(varbinaryType), VarbinaryType.VARBINARY);
+
+    Type tinyblobType = Types.ExternalType.of("tinyblob");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(tinyblobType), VarbinaryType.VARBINARY);
+
+    Type mediumblobType = Types.ExternalType.of("mediumblob");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(mediumblobType), VarbinaryType.VARBINARY);
+
+    Type longblobType = Types.ExternalType.of("longblob");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(longblobType), VarbinaryType.VARBINARY);
+
+    Type geometryType = Types.ExternalType.of("geometry");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(geometryType), VarbinaryType.VARBINARY);
+
+    Type unknownType = Types.ExternalType.of("unknown");
+    Assertions.assertEquals(
+        generalDataTypeTransformer.getTrinoType(unknownType), VarcharType.VARCHAR);
   }
 }

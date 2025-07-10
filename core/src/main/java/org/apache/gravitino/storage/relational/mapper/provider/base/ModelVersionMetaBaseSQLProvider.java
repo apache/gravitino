@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -26,27 +28,38 @@ import org.apache.ibatis.annotations.Param;
 
 public class ModelVersionMetaBaseSQLProvider {
 
-  public String insertModelVersionMeta(@Param("modelVersionMeta") ModelVersionPO modelVersionPO) {
-    return "INSERT INTO "
+  public String insertModelVersionMetas(
+      @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    return "<script>"
+        + "INSERT INTO "
         + ModelVersionMetaMapper.TABLE_NAME
-        + "(metalake_id, catalog_id, schema_id, model_id, version,"
-        + " model_version_comment, model_version_properties, model_version_uri,"
-        + " audit_info, deleted_at)"
-        + " SELECT metalake_id, catalog_id, schema_id, model_id, model_latest_version,"
-        + " #{modelVersionMeta.modelVersionComment}, #{modelVersionMeta.modelVersionProperties},"
-        + " #{modelVersionMeta.modelVersionUri}, #{modelVersionMeta.auditInfo},"
-        + " #{modelVersionMeta.deletedAt}"
+        + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
+        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
+        + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, m.model_latest_version, v.model_version_comment,"
+        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
+        + " FROM ("
+        + "<foreach collection='modelVersionMetas' item='version' separator='UNION ALL'>"
+        + " SELECT"
+        + " #{version.modelId} AS model_id, #{version.modelVersionComment} AS model_version_comment,"
+        + " #{version.modelVersionProperties} AS model_version_properties, #{version.auditInfo} AS audit_info,"
+        + " #{version.deletedAt} AS deleted_at, #{version.modelVersionUriName} AS model_version_uri_name,"
+        + " #{version.modelVersionUri} AS model_version_uri "
+        + "</foreach>"
+        + " ) v"
+        + " JOIN"
+        + " (SELECT metalake_id, catalog_id, schema_id, model_id, model_latest_version"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " WHERE model_id = #{modelVersionMeta.modelId} AND deleted_at = 0";
+        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0) m"
+        + " ON v.model_id = m.model_id"
+        + "</script>";
   }
 
   public String listModelVersionMetasByModelId(@Param("modelId") Long modelId) {
-    return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, model_id AS modelId, version AS modelVersion,"
-        + " model_version_comment AS modelVersionComment, model_version_properties AS"
-        + " modelVersionProperties, model_version_uri AS modelVersionUri, audit_info AS"
-        + " auditInfo, deleted_at AS deletedAt"
+    return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId,"
+        + " model_id AS modelId, version AS modelVersion, model_version_comment AS modelVersionComment,"
+        + " model_version_properties AS modelVersionProperties, model_version_uri_name AS modelVersionUriName,"
+        + " model_version_uri AS modelVersionUri, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelVersionMetaMapper.TABLE_NAME
         + " WHERE model_id = #{modelId} AND deleted_at = 0";
@@ -54,11 +67,10 @@ public class ModelVersionMetaBaseSQLProvider {
 
   public String selectModelVersionMeta(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
-    return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId,"
-        + " schema_id AS schemaId, model_id AS modelId, version AS modelVersion,"
-        + " model_version_comment AS modelVersionComment, model_version_properties AS"
-        + " modelVersionProperties, model_version_uri AS modelVersionUri, audit_info AS"
-        + " auditInfo, deleted_at AS deletedAt"
+    return "SELECT metalake_id AS metalakeId, catalog_id AS catalogId, schema_id AS schemaId, "
+        + " model_id AS modelId, version AS modelVersion, model_version_comment AS modelVersionComment,"
+        + " model_version_properties AS modelVersionProperties, model_version_uri_name AS modelVersionUriName,"
+        + " model_version_uri AS modelVersionUri, audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelVersionMetaMapper.TABLE_NAME
         + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
@@ -66,11 +78,10 @@ public class ModelVersionMetaBaseSQLProvider {
 
   public String selectModelVersionMetaByAlias(
       @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return "SELECT mvi.metalake_id AS metalakeId, mvi.catalog_id AS catalogId,"
-        + " mvi.schema_id AS schemaId, mvi.model_id AS modelId, mvi.version AS modelVersion,"
-        + " mvi.model_version_comment AS modelVersionComment, mvi.model_version_properties AS"
-        + " modelVersionProperties, mvi.model_version_uri AS modelVersionUri, mvi.audit_info AS"
-        + " auditInfo, mvi.deleted_at AS deletedAt"
+    return "SELECT mvi.metalake_id AS metalakeId, mvi.catalog_id AS catalogId, mvi.schema_id AS schemaId,"
+        + " mvi.model_id AS modelId, mvi.version AS modelVersion, mvi.model_version_comment AS modelVersionComment,"
+        + " mvi.model_version_properties AS modelVersionProperties, mvi.model_version_uri_name AS modelVersionUriName,"
+        + " mvi.model_version_uri AS modelVersionUri, mvi.audit_info AS auditInfo, mvi.deleted_at AS deletedAt"
         + " FROM "
         + ModelVersionMetaMapper.TABLE_NAME
         + " mvi"
@@ -162,7 +173,6 @@ public class ModelVersionMetaBaseSQLProvider {
         + "version = #{newModelVersionMeta.modelVersion}, "
         + "model_version_comment = #{newModelVersionMeta.modelVersionComment}, "
         + "model_version_properties = #{newModelVersionMeta.modelVersionProperties}, "
-        + "model_version_uri = #{newModelVersionMeta.modelVersionUri}, "
         + "audit_info = #{newModelVersionMeta.auditInfo}, "
         + "deleted_at = #{newModelVersionMeta.deletedAt} "
         + "WHERE model_id = #{oldModelVersionMeta.modelId} "
@@ -172,8 +182,24 @@ public class ModelVersionMetaBaseSQLProvider {
         + "AND version = #{oldModelVersionMeta.modelVersion} "
         + "AND model_version_comment = #{oldModelVersionMeta.modelVersionComment} "
         + "AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties} "
-        + "AND model_version_uri = #{oldModelVersionMeta.modelVersionUri} "
         + "AND audit_info = #{oldModelVersionMeta.auditInfo} "
         + "AND deleted_at = 0";
+  }
+
+  public String updateModelVersionUris(
+      @Param("modelId") Long modelId,
+      @Param("modelVersion") Integer modelVersion,
+      @Param("uris") Map<String, String> uris) {
+    return "<script>"
+        + "UPDATE "
+        + ModelVersionMetaMapper.TABLE_NAME
+        + " SET"
+        + " model_version_uri = CASE"
+        + "<foreach collection='uris' index='k' item='v' separator=''>"
+        + " WHEN model_version_uri_name = #{k} THEN #{v}"
+        + "</foreach>"
+        + " ELSE model_version_uri END"
+        + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0"
+        + "</script>";
   }
 }

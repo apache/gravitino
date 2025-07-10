@@ -39,7 +39,7 @@ public class TestMySQLCatalogPropertyConverter {
             .put("jdbc-password", "test")
             .put("trino.bypass.join-pushdown.strategy", "EAGER")
             .put("unknown-key", "1")
-            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.mysql.unknown-key", "1")
             .build();
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
@@ -58,7 +58,7 @@ public class TestMySQLCatalogPropertyConverter {
     Assertions.assertEquals(config.get("join-pushdown.strategy"), "EAGER");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("unknown-key"));
+    Assertions.assertEquals(config.get("mysql.unknown-key"), "1");
   }
 }

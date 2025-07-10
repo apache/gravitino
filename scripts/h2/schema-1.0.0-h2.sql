@@ -317,11 +317,12 @@ CREATE TABLE IF NOT EXISTS `model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_comment` TEXT DEFAULT NULL COMMENT 'model version comment',
     `model_version_properties` MEDIUMTEXT DEFAULT NULL COMMENT 'model version properties',
+    `model_version_uri_name` VARCHAR(128) NOT NULL COMMENT 'model version uri name',
     `model_version_uri` TEXT NOT NULL COMMENT 'model storage uri',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mid_ver_del` (`model_id`, `version`, `deleted_at`),
+    UNIQUE KEY `uk_mid_ver_uri_del` (`model_id`, `version`, `model_version_uri_name`, `deleted_at`),
     KEY `idx_vmid` (`metalake_id`),
     KEY `idx_vcid` (`catalog_id`),
     KEY `idx_vsid` (`schema_id`)
