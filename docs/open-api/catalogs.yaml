@@ -284,6 +284,7 @@ components:
             - relational
             - fileset
             - messaging
+            - model
         provider:
           type: string
           description: The provider of the catalog
@@ -295,8 +296,9 @@ components:
             - jdbc-mysql
             - jdbc-postgresql
             - jdbc-doris
-            - hadoop
+            - fileset
             - kafka
+            - model
         comment:
           type: string
           description: A comment about the catalog
@@ -344,7 +346,6 @@ components:
       required:
         - name
         - type
-        - provider
       properties:
         name:
           type: string
@@ -359,7 +360,7 @@ components:
             - model
         provider:
           type: string
-          description: The provider of the catalog
+          description: The provider of the catalog (provider is not required for fileset and model catalog)
           enum:
             - hive
             - lakehouse-iceberg
@@ -369,7 +370,6 @@ components:
             - jdbc-postgresql
             - jdbc-doris
             - jdbc-oceanbase
-            - hadoop
             - kafka
         comment:
           type: string
@@ -555,7 +555,7 @@ components:
           {
             "name": "my_hadoop_catalog",
             "type": "fileset",
-            "provider": "hadoop",
+            "provider": "fileset",
             "comment": "This is my hadoop catalog",
             "properties": {
               "key2": "value2"

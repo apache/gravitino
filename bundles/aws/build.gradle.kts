@@ -27,7 +27,7 @@ plugins {
 dependencies {
   compileOnly(project(":api"))
   compileOnly(project(":catalogs:catalog-common"))
-  compileOnly(project(":catalogs:catalog-hadoop"))
+  compileOnly(project(":catalogs:catalog-fileset"))
   compileOnly(project(":core"))
   compileOnly(libs.hadoop3.aws)
   compileOnly(libs.hadoop3.client.api)
@@ -63,9 +63,21 @@ tasks.withType(ShadowJar::class.java) {
     exclude(dependency("org.slf4j:slf4j-api"))
   }
 
-  relocate("org.apache.commons.lang3", "org.apache.gravitino.aws.shaded.org.apache.commons.lang3")
-  relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
+  relocate("com.amazonaws", "org.apache.gravitino.aws.shaded.com.amazonaws")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")
+  relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
+  relocate("com.google.errorprone", "org.apache.gravitino.aws.shaded.com.google.errorprone")
+  relocate("com.google.thirdparty", "org.apache.gravitino.aws.shaded.com.google.thirdparty")
+  relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
+  relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
+  relocate("org.apache.hadoop.fs.s3a", "org.apache.gravitino.aws.shaded.org.apache.hadoop.fs.s3a")
+  relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
+  relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
+  relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
+  relocate("org.wildfly.openssl", "org.apache.gravitino.aws.shaded.org.wildfly.openssl")
+  relocate("software.amazon", "org.apache.gravitino.aws.shaded.software.amazon")
+
+  mergeServiceFiles()
 }
 
 tasks.jar {
@@ -74,5 +86,5 @@ tasks.jar {
 }
 
 tasks.compileJava {
-  dependsOn(":catalogs:catalog-hadoop:runtimeJars")
+  dependsOn(":catalogs:catalog-fileset:runtimeJars")
 }

@@ -144,6 +144,7 @@ public class TestJDBCBackend {
   @AfterAll
   public void tearDown() throws IOException {
     dropAllTables();
+    backend.close();
     File dir = new File(DB_DIR);
     if (dir.exists()) {
       Files.delete(Paths.get(DB_DIR));
@@ -151,7 +152,6 @@ public class TestJDBCBackend {
 
     Files.delete(Paths.get(H2_FILE));
     Files.delete(Paths.get(JDBC_STORE_PATH));
-    backend.close();
   }
 
   @BeforeEach
@@ -1501,7 +1501,7 @@ public class TestJDBCBackend {
   public static ModelVersionEntity createModelVersionEntity(
       NameIdentifier modelId,
       Integer version,
-      String modelUri,
+      Map<String, String> modelUris,
       List<String> aliases,
       String comment,
       Map<String, String> properties,
@@ -1509,7 +1509,7 @@ public class TestJDBCBackend {
     return ModelVersionEntity.builder()
         .withModelIdentifier(modelId)
         .withVersion(version)
-        .withUri(modelUri)
+        .withUris(modelUris)
         .withAliases(aliases)
         .withComment(comment)
         .withProperties(properties)

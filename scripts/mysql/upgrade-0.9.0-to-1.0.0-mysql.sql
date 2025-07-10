@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy version info';
 
 CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
@@ -61,3 +61,10 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     KEY `idx_pid` (`policy_id`),
     KEY `idx_mid` (`metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
+
+-- using default 'unknown' to fill in the new column for compatibility
+ALTER TABLE `model_version_info` ADD COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL DEFAULT 'unknown' COMMENT 'model version uri name' AFTER `model_version_properties`;
+ALTER TABLE `model_version_info` DROP INDEX `uk_mid_ver_del`;
+ALTER TABLE `model_version_info` ADD CONSTRAINT `uk_mid_ver_uri_del` UNIQUE KEY (`model_id`, `version`, `model_version_uri_name`, `deleted_at`);
+-- remove the default value for model_version_uri_name
+ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` DROP DEFAULT;

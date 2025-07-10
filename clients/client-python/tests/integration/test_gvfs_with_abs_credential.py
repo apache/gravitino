@@ -53,7 +53,7 @@ def azure_abs_with_credential_is_prepared():
 )
 class TestGvfsWithCredentialABS(TestGvfsWithABS):
     # Before running this test, please set the make sure azure-bundle-xxx.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     azure_abs_account_key = os.environ.get("ABS_ACCOUNT_KEY_FOR_CREDENTIAL")
     azure_abs_account_name = os.environ.get("ABS_ACCOUNT_NAME_FOR_CREDENTIAL")
     azure_abs_container_name = os.environ.get("ABS_CONTAINER_NAME_FOR_CREDENTIAL")
@@ -115,6 +115,34 @@ class TestGvfsWithCredentialABS(TestGvfsWithABS):
                 f"{cls.catalog_name}/{cls.schema_name}/{cls.fileset_name}"
             ),
             properties=cls.fileset_properties,
+        )
+
+        cls.multiple_locations_fileset_storage_location: str = (
+            f"abfss://{cls.azure_abs_container_name}@{cls.azure_abs_account_name}.dfs.core.windows.net/"
+            f"{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        cls.multiple_locations_fileset_storage_location1: str = (
+            f"abfss://{cls.azure_abs_container_name}@{cls.azure_abs_account_name}.dfs.core.windows.net/"
+            f"{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}_1"
+        )
+        cls.multiple_locations_fileset_gvfs_location = (
+            f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        catalog.as_fileset_catalog().create_multiple_location_fileset(
+            ident=cls.multiple_locations_fileset_ident,
+            fileset_type=Fileset.Type.MANAGED,
+            comment=cls.fileset_comment,
+            storage_locations={
+                "default": cls.multiple_locations_fileset_storage_location,
+                "location1": cls.multiple_locations_fileset_storage_location1,
+            },
+            properties={
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "default",
+                **cls.fileset_properties,
+            },
         )
 
         cls.fs = AzureBlobFileSystem(

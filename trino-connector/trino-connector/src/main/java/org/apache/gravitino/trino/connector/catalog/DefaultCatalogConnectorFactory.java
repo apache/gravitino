@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.catalog;
 
 import io.trino.spi.TrinoException;
 import java.util.HashMap;
+import java.util.Set;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
@@ -43,10 +44,18 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   private static final String POSTGRESQL_CONNECTOR_PROVIDER_NAME = "jdbc-postgresql";
   private static final String TRINO_CLUSTER_CONNECTOR_PROVIDER_NAME = "trino-cluster";
 
+  /** Map of catalog provider names to their corresponding connector context builders */
   protected final HashMap<String, CatalogConnectorContext.Builder> catalogBuilders =
       new HashMap<>();
+
+  /** The region code indicates the location of this Trino instance */
   protected final String region;
 
+  /**
+   * Constructs a new DefaultCatalogConnectorFactory.
+   *
+   * @param config the Gravitino configuration
+   */
   public DefaultCatalogConnectorFactory(GravitinoConfig config) {
     this.region = config.getRegion();
 
@@ -71,6 +80,21 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
     LOG.info("Start the DefaultCatalogConnectorFactory");
   }
 
+  /**
+   * Get supported catalog providers
+   *
+   * @return catalog providers
+   */
+  public Set<String> getSupportedCatalogProviders() {
+    return catalogBuilders.keySet();
+  }
+
+  /**
+   * Creates a new catalog connector context builder for the specified Gravitino catalog.
+   *
+   * @param catalog the Gravitino catalog for which to create the connector context
+   * @return a new catalog connector context builder
+   */
   public CatalogConnectorContext.Builder createCatalogConnectorContextBuilder(
       GravitinoCatalog catalog) {
     String catalogProvider = catalog.getProvider();

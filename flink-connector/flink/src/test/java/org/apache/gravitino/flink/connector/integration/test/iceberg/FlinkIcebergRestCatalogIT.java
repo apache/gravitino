@@ -39,8 +39,6 @@ public class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
     catalogProperties.put(
-        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
-    catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, icebergRestServiceUri);
     return catalogProperties;
   }

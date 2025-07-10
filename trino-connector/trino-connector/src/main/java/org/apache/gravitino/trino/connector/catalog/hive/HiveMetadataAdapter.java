@@ -63,6 +63,13 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
           HivePropertyMeta.HIVE_BUCKET_COUNT_KEY,
           HivePropertyMeta.HIVE_SORT_ORDER_KEY);
 
+  /**
+   * Constructs a new HiveMetadataAdapter.
+   *
+   * @param schemaProperties the schema properties metadata
+   * @param tableProperties the table properties metadata
+   * @param columnProperties the column properties metadata
+   */
   public HiveMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,

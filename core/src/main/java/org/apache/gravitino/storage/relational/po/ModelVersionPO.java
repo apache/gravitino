@@ -41,6 +41,8 @@ public class ModelVersionPO {
 
   private String modelVersionProperties;
 
+  private String modelVersionUriName;
+
   private String modelVersionUri;
 
   private String auditInfo;
@@ -96,6 +98,11 @@ public class ModelVersionPO {
       return this;
     }
 
+    public Builder withModelVersionUriName(String modelVersionUriName) {
+      modelVersionPO.modelVersionUriName = modelVersionUriName;
+      return this;
+    }
+
     public Builder withModelVersionUri(String modelVersionUri) {
       modelVersionPO.modelVersionUri = modelVersionUri;
       return this;
@@ -112,6 +119,9 @@ public class ModelVersionPO {
     }
 
     public ModelVersionPO build() {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(modelVersionPO.modelVersionUriName),
+          "Model version uri name cannot be empty");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(modelVersionPO.modelVersionUri),
           "Model version uri cannot be empty");

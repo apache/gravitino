@@ -34,7 +34,7 @@ from gravitino.dto.responses.model_version_list_response import (
     ModelVersionInfoListResponse,
     ModelVersionListResponse,
 )
-from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
+from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.namespace import Namespace
 from gravitino.utils import Response
 from tests.unittests import mock_base

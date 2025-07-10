@@ -27,12 +27,23 @@ import java.util.function.Function;
  * handle Type serialization
  */
 public final class TypeDeserializer extends FromStringDeserializer<Type> {
+  /** Function to load Type objects from TypeId. */
   private final Function<TypeId, Type> typeLoader;
 
+  /**
+   * Constructs a new TypeDeserializer using a TypeManager.
+   *
+   * @param typeManager the type manager to use for loading types
+   */
   public TypeDeserializer(TypeManager typeManager) {
     this(typeManager::getType);
   }
 
+  /**
+   * Constructs a new TypeDeserializer using a custom type loader function.
+   *
+   * @param typeLoader the function to load types from type IDs
+   */
   public TypeDeserializer(Function<TypeId, Type> typeLoader) {
     super(Type.class);
     this.typeLoader = requireNonNull(typeLoader, "typeLoader is null");
