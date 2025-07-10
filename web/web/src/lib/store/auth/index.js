@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi, getOAuthConfigApi, initiateOAuthFlowApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 
@@ -84,38 +84,113 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   localStorage.setItem('isIdle', false)
   dispatch(setAuthToken(access_token))
   dispatch(setExpiredIn(expires_in))
-
   await dispatch(initialVersion())
-
   router.push('/metalakes')
 
   return { token: access_token, expired: expires_in }
 })
 
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
+  console.log('Logging out...')
   localStorage.removeItem('accessToken')
   localStorage.removeItem('authParams')
+  dispatch(clearIntervalId())
   dispatch(setAuthToken(''))
   await router.push('/login')
 
   return { token: null }
 })
 
-export const setIntervalId = createAsyncThunk('auth/setIntervalId', async (expiredIn, { dispatch }) => {
+export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', async (expiredIn, { dispatch }) => {
   const localExpiredIn = localStorage.getItem('expiredIn')
-
-  // ** the expired time obtained from the backend is in seconds, default value is 299 seconds
   const expired = (expiredIn ?? Number(localExpiredIn)) * (2 / 3) * 1000
   const defaultExpired = 299 * (2 / 3) * 1000
 
   let intervalId = setInterval(() => {
+    if (localStorage.getItem('isIdle') === 'true') {
+      console.log('User is idle, skipping token refresh')
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('authParams')
+      dispatch(clearIntervalId())
+      dispatch(setAuthToken(''))
+
+      return
+    }
     dispatch(refreshToken())
   }, expired || defaultExpired)
+
+  dispatch(setIntervalId(intervalId))
 
   return {
     intervalId
   }
 })
+
+// OAuth Authorization Code Flow actions
+export const getOAuthConfig = createAsyncThunk('auth/getOAuthConfig', async () => {
+  const [err, res] = await to(getAuthConfigsApi())
+
+  if (err || !res) {
+    throw new Error(err?.message || 'Failed to fetch OAuth configuration')
+  }
+
+  // Process the configs response to extract OAuth information
+  const authenticators = res['gravitino.authenticators'] || []
+  const isOAuthEnabled = authenticators.includes('oauth')
+
+  if (!isOAuthEnabled) {
+    // OAuth is not enabled, return minimal config
+    return {
+      authorizationCodeFlowEnabled: false,
+      providerName: null
+    }
+  }
+
+  // OAuth is enabled, return the configuration
+  const oauthServerUri = res['gravitino.authenticator.oauth.serverUri']
+  const oauthTokenPath = res['gravitino.authenticator.oauth.tokenPath']
+
+  return {
+    authorizationCodeFlowEnabled: true,
+    providerName: 'Azure AD', // You can make this configurable
+    serverUri: oauthServerUri,
+    tokenPath: oauthTokenPath,
+    authorizeUrl: oauthServerUri + '/oauth2/authorize', // Standard OAuth2 authorize endpoint
+    tokenUrl: oauthServerUri + oauthTokenPath
+  }
+})
+
+export const initiateOAuthFlow = createAsyncThunk('auth/initiateOAuthFlow', async redirectUri => {
+  // This will redirect the browser to the OAuth provider
+  initiateOAuthFlowApi(redirectUri)
+
+  return { redirecting: true }
+})
+
+export const handleOAuthCallback = createAsyncThunk(
+  'auth/handleOAuthCallback',
+  async ({ access_token, refresh_token, router }, { dispatch }) => {
+    if (!access_token) {
+      throw new Error('No OAuth access token received')
+    }
+    console.log('OAuth Callback received access_token:', access_token)
+    if (refresh_token) {
+      console.log('OAuth Callback received refresh_token:', refresh_token)
+      localStorage.setItem('refresh_token', refresh_token)
+    }
+
+    // Store the OAuth access token
+    localStorage.setItem('accessToken', access_token)
+    localStorage.setItem('isIdle', false)
+    dispatch(setAuthToken(access_token))
+
+    // Initialize version and redirect to main app
+    await dispatch(initialVersion())
+    router.push('/metalakes')
+
+    return { token: access_token }
+  }
+)
 
 export const authSlice = createSlice({
   name: 'auth',
@@ -125,15 +200,22 @@ export const authSlice = createSlice({
     authToken: null,
     authParams: null,
     expiredIn: null,
-    intervalId: null
+    intervalId: null,
+
+    // OAuth Authorization Code Flow state
+    oauthConfig: null,
+    oauthSupported: false,
+    oauthRedirecting: false
   },
   reducers: {
     setIntervalId(state, action) {
-      state.intervalId = this.setIntervalId()
+      state.intervalId = action.payload
     },
-    clearIntervalId(state, action) {
-      clearInterval(state.intervalId)
-      state.intervalId = null
+    clearIntervalId(state) {
+      if (state.intervalId) {
+        clearInterval(state.intervalId)
+        state.intervalId = null
+      }
     },
     setAuthToken(state, action) {
       state.authToken = action.payload
@@ -143,6 +225,9 @@ export const authSlice = createSlice({
     },
     setExpiredIn(state, action) {
       state.expiredIn = action.payload
+    },
+    setOAuthRedirecting(state, action) {
+      state.oauthRedirecting = action.payload
     }
   },
   extraReducers: builder => {
@@ -151,12 +236,35 @@ export const authSlice = createSlice({
       state.authType = action.payload.authType
     })
     builder.addCase(refreshToken.fulfilled, (state, action) => {
+      console.log('Token refreshed successfully:', action.payload.token)
+      localStorage.setItem('accessToken', action.payload.token)
+      localStorage.setItem('expiredIn', action.payload.expiredIn)
+      localStorage.setItem('isIdle', false)
       state.authToken = action.payload.token
       state.expiredIn = action.payload.expiredIn
+    })
+
+    // OAuth Authorization Code Flow reducers
+    builder.addCase(getOAuthConfig.fulfilled, (state, action) => {
+      state.oauthConfig = action.payload
+      state.oauthSupported = action.payload.authorizationCodeFlowEnabled
+    })
+    builder.addCase(getOAuthConfig.rejected, state => {
+      state.oauthSupported = false
+    })
+    builder.addCase(initiateOAuthFlow.fulfilled, (state, action) => {
+      state.oauthRedirecting = action.payload.redirecting
+    })
+    builder.addCase(handleOAuthCallback.fulfilled, (state, action) => {
+      state.authToken = action.payload.token
+      state.oauthRedirecting = false
+    })
+    builder.addCase(handleOAuthCallback.rejected, state => {
+      state.oauthRedirecting = false
     })
   }
 })
 
-export const { setAuthToken, setAuthParams, setExpiredIn } = authSlice.actions
+export const { setAuthToken, setAuthParams, setExpiredIn, clearIntervalId, setOAuthRedirecting } = authSlice.actions
 
 export default authSlice.reducer

@@ -22,7 +22,7 @@
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Roboto } from 'next/font/google'
-
+import { useEffect, useState, useRef } from 'react'
 import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
 
 import clsx from 'clsx'
@@ -30,8 +30,16 @@ import * as yup from 'yup'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 
-import { useAppDispatch } from '@/lib/hooks/useStore'
-import { loginAction } from '@/lib/store/auth'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
+import { useAuth } from '@/lib/provider/session'
+import {
+  loginAction,
+  setIntervalIdAction,
+  clearIntervalId,
+  getAuthConfigs,
+  getOAuthConfig,
+  initiateOAuthFlow
+} from '@/lib/store/auth'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
@@ -52,6 +60,12 @@ const schema = yup.object().shape({
 const LoginPage = () => {
   const router = useRouter()
   const dispatch = useAppDispatch()
+  const store = useAppSelector(state => state.auth)
+  const { authError } = useAuth()
+  const [oauthConfig, setOauthConfig] = useState(null)
+  const [configLoading, setConfigLoading] = useState(true)
+  const [configError, setConfigError] = useState(null)
+  const fetchingRef = useRef(false)
 
   const {
     control,
@@ -64,14 +78,81 @@ const LoginPage = () => {
     resolver: yupResolver(schema)
   })
 
+  useEffect(() => {
+    // Prevent multiple simultaneous fetches
+    if (fetchingRef.current) {
+      return
+    }
+
+    fetchingRef.current = true
+    setConfigLoading(true)
+    setConfigError(null)
+
+    // Fetch auth configuration to determine login method
+    dispatch(getAuthConfigs())
+      .then(result => {
+        if (result.payload) {
+          // Also fetch OAuth-specific configuration
+          dispatch(getOAuthConfig())
+            .then(oauthResult => {
+              if (oauthResult.payload) {
+                setOauthConfig(oauthResult.payload)
+              } else {
+                setOauthConfig({ authorizationCodeFlowEnabled: false })
+              }
+              setConfigLoading(false)
+              fetchingRef.current = false
+            })
+            .catch(error => {
+              // OAuth not configured, continue with regular auth
+              setOauthConfig({ authorizationCodeFlowEnabled: false })
+              setConfigLoading(false)
+              fetchingRef.current = false
+            })
+        } else {
+          setConfigError('Failed to load authentication configuration')
+          setConfigLoading(false)
+          fetchingRef.current = false
+        }
+      })
+      .catch(error => {
+        setConfigError('Failed to load authentication configuration: ' + error.message)
+        setOauthConfig({ authorizationCodeFlowEnabled: false })
+        setConfigLoading(false)
+        fetchingRef.current = false
+      })
+
+    // Cleanup function
+    return () => {
+      fetchingRef.current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run only once on mount
+
   const onSubmit = async data => {
-    dispatch(loginAction({ params: data, router }))
+    await dispatch(loginAction({ params: data, router }))
+    await dispatch(setIntervalIdAction())
 
     reset({ ...data })
   }
 
   const onError = errors => {
     console.error('fields error', errors)
+  }
+
+  const handleOAuthLogin = async () => {
+    try {
+      // Get current URL to redirect back to after OAuth
+      const currentUrl = window.location.origin
+      const redirectUri = `${currentUrl}/oauth/callback`
+
+      // Initiate OAuth flow
+      await dispatch(initiateOAuthFlow(redirectUri))
+    } catch (error) {
+      console.error('OAuth login failed:', error)
+
+      // Could show error toast here
+    }
   }
 
   return (
@@ -91,6 +172,38 @@ const LoginPage = () => {
               </Typography>
             </Box>
 
+            {/* Auth error display */}
+            {authError && (
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
+                <Typography variant='body2' color='error'>
+                  Authentication Error: {authError}
+                </Typography>
+              </Box>
+            )}
+
+            {/* Show OAuth redirect button if authorization code flow is enabled */}
+            {oauthConfig?.authorizationCodeFlowEnabled ? (
+              <>
+                <Button
+                  fullWidth
+                  size='large'
+                  variant='contained'
+                  onClick={handleOAuthLogin}
+                  disabled={store.oauthRedirecting}
+                  sx={{ mb: 3, mt: 4 }}
+                >
+                  {store.oauthRedirecting
+                    ? 'Redirecting...'
+                    : `Login with ${oauthConfig?.providerName || 'OAuth Provider'}`}
+                </Button>
+
+                <Typography variant='body2' sx={{ textAlign: 'center', my: 2 }}>
+                  Or use client credentials:
+                </Typography>
+              </>
+            ) : null}
+
+            {/* Client credentials form */}
             <form autoComplete='off' onSubmit={handleSubmit(onSubmit, onError)}>
               <Grid item xs={12} sx={{ mt: 4 }}>
                 <FormControl fullWidth>

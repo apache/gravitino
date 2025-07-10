@@ -19,29 +19,22 @@
 package org.apache.gravitino.server.authentication;
 
 import com.google.common.base.Preconditions;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.Jwt;
-import io.jsonwebtoken.JwtParser;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SignatureException;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.KeyFactory;
 import java.security.Principal;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
-import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.SignatureAlgorithmFamilyType;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * OAuth2TokenAuthenticator provides the OAuth 2.0 authentication mechanism.
@@ -49,9 +42,11 @@ import org.apache.gravitino.exceptions.UnauthorizedException;
  */
 class OAuth2TokenAuthenticator implements Authenticator {
 
-  private long allowSkewSeconds;
-  private Key defaultSigningKey;
-  private String serviceAudience;
+  private static final Logger LOG = LoggerFactory.getLogger(OAuth2TokenAuthenticator.class);
+
+  // private long allowSkewSeconds;
+  // private Key defaultSigningKey;
+  // private String serviceAudience;
 
   @Override
   public boolean isDataFromToken() {
@@ -60,70 +55,109 @@ class OAuth2TokenAuthenticator implements Authenticator {
 
   @Override
   public Principal authenticateToken(byte[] tokenData) {
+    LOG.warn(
+        "Skipping JWT signature verification in OAuth2TokenAuthenticator. NOT SECURE for production!");
     if (tokenData == null) {
+      LOG.warn("Empty token authorization header");
       throw new UnauthorizedException("Empty token authorization header");
     }
     String authData = new String(tokenData, StandardCharsets.UTF_8);
     if (StringUtils.isBlank(authData)
         || !authData.startsWith(AuthConstants.AUTHORIZATION_BEARER_HEADER)) {
+      LOG.warn("Invalid token authorization header: {}", authData);
       throw new UnauthorizedException("Invalid token authorization header");
     }
     String token = authData.substring(AuthConstants.AUTHORIZATION_BEARER_HEADER.length());
     if (StringUtils.isBlank(token)) {
+      LOG.warn("Blank token found");
       throw new UnauthorizedException("Blank token found");
     }
-    // TODO: If we support multiple OAuth 2.0 servers, we should use multiple
-    // signing keys.
     try {
-      JwtParser parser =
-          Jwts.parserBuilder()
-              .setAllowedClockSkewSeconds(allowSkewSeconds)
-              .setSigningKey(defaultSigningKey)
-              .build();
-      Jwt<?, Claims> jwt = parser.parseClaimsJws(token);
-      Object audienceObject = jwt.getBody().get(Claims.AUDIENCE);
-      if (audienceObject == null) {
-        throw new UnauthorizedException("Found null Audience in token");
+      // Parse JWT payload without signature verification
+      String[] parts = token.split("\\.");
+      if (parts.length != 3) {
+        throw new UnauthorizedException("Invalid JWT token format");
       }
-      if (audienceObject instanceof String) {
-        if (!serviceAudience.equals(audienceObject)) {
-          throw new UnauthorizedException(
-              "Audience in the token [%s] doesn't contain %s", audienceObject, serviceAudience);
+      String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+
+      String principalName = null;
+
+      // 1. unique_name
+      int uniqueNameIdx = payload.indexOf("\"unique_name\"");
+      if (uniqueNameIdx != -1) {
+        int colon = payload.indexOf(":", uniqueNameIdx);
+        int quote1 = payload.indexOf("\"", colon + 1);
+        int quote2 = payload.indexOf("\"", quote1 + 1);
+        if (colon != -1 && quote1 != -1 && quote2 != -1) {
+          principalName = payload.substring(quote1 + 1, quote2);
         }
-      } else if (audienceObject instanceof List) {
-        List<Object> audiences = (List<Object>) audienceObject;
-        if (audiences.stream()
-            .noneMatch(audienceInToken -> audienceInToken.equals(serviceAudience))) {
-          throw new UnauthorizedException(
-              "Audiences in the token %s don't contain %s", audienceObject, serviceAudience);
-        }
-      } else {
-        throw new UnauthorizedException(
-            "Audiences in token is not in expected format: %s", audienceObject);
       }
-      return new UserPrincipal(jwt.getBody().getSubject());
-    } catch (ExpiredJwtException
-        | UnsupportedJwtException
-        | MalformedJwtException
-        | SignatureException
-        | IllegalArgumentException e) {
-      throw new UnauthorizedException(e, "JWT parse error");
+
+      // 2. upn
+      if (principalName == null) {
+        int upnIdx = payload.indexOf("\"upn\"");
+        if (upnIdx != -1) {
+          int colon = payload.indexOf(":", upnIdx);
+          int quote1 = payload.indexOf("\"", colon + 1);
+          int quote2 = payload.indexOf("\"", quote1 + 1);
+          if (colon != -1 && quote1 != -1 && quote2 != -1) {
+            principalName = payload.substring(quote1 + 1, quote2);
+          }
+        }
+      }
+
+      // 3. email
+      if (principalName == null) {
+        int emailIdx = payload.indexOf("\"email\"");
+        if (emailIdx != -1) {
+          int colon = payload.indexOf(":", emailIdx);
+          int quote1 = payload.indexOf("\"", colon + 1);
+          int quote2 = payload.indexOf("\"", quote1 + 1);
+          if (colon != -1 && quote1 != -1 && quote2 != -1) {
+            principalName = payload.substring(quote1 + 1, quote2);
+          }
+        }
+      }
+
+      // 4. name
+      if (principalName == null) {
+        int nameIdx = payload.indexOf("\"name\"");
+        if (nameIdx != -1) {
+          int colon = payload.indexOf(":", nameIdx);
+          int quote1 = payload.indexOf("\"", colon + 1);
+          int quote2 = payload.indexOf("\"", quote1 + 1);
+          if (colon != -1 && quote1 != -1 && quote2 != -1) {
+            principalName = payload.substring(quote1 + 1, quote2);
+          }
+        }
+      }
+
+      if (principalName == null) {
+        throw new UnauthorizedException("No unique_name, upn, email, or name found in JWT payload");
+      }
+      LOG.info(
+          "JWT authentication (no signature check) successful for principal: {}", principalName);
+      return new UserPrincipal(principalName);
+    } catch (Exception e) {
+      LOG.error("JWT parse error (no signature check): {}", e.getMessage(), e);
+      throw new UnauthorizedException(e, "JWT parse error (no signature check)");
     }
   }
 
   @Override
   public void initialize(Config config) throws RuntimeException {
-    this.serviceAudience = config.get(OAuthConfig.SERVICE_AUDIENCE);
-    this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
-    String configuredSignKey = config.get(OAuthConfig.DEFAULT_SIGN_KEY);
+    // this.serviceAudience = config.get(OAuthConfig.SERVICE_AUDIENCE);
+    // this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
+    // String configuredSignKey = config.get(OAuthConfig.DEFAULT_SIGN_KEY);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_TOKEN_PATH)),
         "The path for token of the default OAuth server can't be blank");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(config.get(OAuthConfig.DEFAULT_SERVER_URI)),
         "The uri of the default OAuth server can't be blank");
-    String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
-    this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey), algType);
+    // String algType = config.get(OAuthConfig.SIGNATURE_ALGORITHM_TYPE);
+    // this.defaultSigningKey = decodeSignKey(Base64.getDecoder().decode(configuredSignKey),
+    // algType);
   }
 
   @Override

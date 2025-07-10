@@ -46,9 +46,15 @@ const AuthProvider = ({ children }) => {
   const router = useRouter()
   const [loading, setLoading] = useState(authProvider.loading)
 
+  const searchParams = useSearchParams()
+  const accessTokenFromUrl = searchParams.get('access_token')
+
+  if (typeof window !== 'undefined' && accessTokenFromUrl) {
+    localStorage.setItem('accessToken', accessTokenFromUrl)
+  }
+
   const token = (typeof window !== 'undefined' && localStorage.getItem('accessToken')) || null
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
-  const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
 
   const expiredIn = localStorage.getItem('expiredIn') && JSON.parse(localStorage.getItem('expiredIn')) // seconds

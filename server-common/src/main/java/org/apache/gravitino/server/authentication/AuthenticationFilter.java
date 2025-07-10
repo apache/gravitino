@@ -54,6 +54,18 @@ public class AuthenticationFilter implements Filter {
   @Override
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
+    HttpServletRequest httpRequest = (HttpServletRequest) request;
+    String path = httpRequest.getRequestURI();
+
+    // Allow public access to auth configuration endpoints and OAuth flow endpoints
+    if (path.equals("/configs")
+        || path.equals("/api/oauth/config")
+        || path.equals("/api/oauth/authorize")
+        || path.equals("/api/oauth/callback")) {
+      chain.doFilter(request, response);
+      return;
+    }
+
     try {
       List<Authenticator> authenticators;
       if (filterAuthenticators == null || filterAuthenticators.isEmpty()) {

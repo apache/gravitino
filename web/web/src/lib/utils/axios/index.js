@@ -38,6 +38,7 @@ import { AxiosCanceler } from './axiosCancel'
 import { NextAxios } from './Axios'
 import { checkStatus } from './checkStatus'
 import { useAuth as Auth } from '../../provider/session'
+import { githubApis } from '@/lib/api/github'
 
 let isRefreshing = false
 
@@ -51,9 +52,10 @@ const refreshToken = async () => {
 }
 
 const resetToLoginState = () => {
+  console.error('Resetting to login state due to authentication failure')
   localStorage.removeItem('accessToken')
   localStorage.removeItem('authParams')
-  window.location.href = '/login'
+  window.location.href = '/ui/login'
 }
 
 /**
@@ -246,7 +248,16 @@ const transform = {
 
     checkStatus(error?.response?.status, msg, errorMessageMode)
 
-    if (response?.status === 401 && !originConfig._retry) {
+    // Don't auto-refresh for certain endpoints that are expected to return 401
+    const skipAutoRefreshUrls = ['/api/oauth/config', '/configs']
+    const shouldSkipAutoRefresh = skipAutoRefreshUrls.some(url => response?.config?.url?.includes(url))
+
+    if (
+      response?.status === 401 &&
+      !originConfig._retry &&
+      response.config.url !== githubApis.GET &&
+      !shouldSkipAutoRefresh
+    ) {
       // Log out directly if idle for more than 30 minutes
       const isIdle = localStorage.getItem('isIdle') && JSON.parse(localStorage.getItem('isIdle'))
       if (isIdle) {
@@ -275,7 +286,11 @@ const transform = {
           console.error(err)
         } finally {
           isRefreshing = false
-          location.reload()
+
+          // Only reload if this wasn't a login/config related error
+          if (!shouldSkipAutoRefresh) {
+            location.reload()
+          }
         }
       }
     }

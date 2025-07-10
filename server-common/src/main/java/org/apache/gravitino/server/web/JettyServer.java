@@ -50,6 +50,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -254,6 +255,7 @@ public final class JettyServer {
     servletContextHandler = new ServletContextHandler();
     servletContextHandler.setContextPath("/");
     servletContextHandler.addServlet(DefaultServlet.class, "/");
+    configureSessionHandler();
   }
 
   private void initializeWebAppServletContextHandler() {
@@ -311,6 +313,19 @@ public final class JettyServer {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
+    }
+    configureSessionHandler();
+  }
+
+  private void configureSessionHandler() {
+    // Configure session handler to disable secure cookies for localhost development
+    String host = GravitinoEnv.getInstance().config().get(JettyServerConfig.WEBSERVER_HOST);
+    if ("localhost".equals(host) || "127.0.0.1".equals(host) || "0.0.0.0".equals(host)) {
+      // For localhost development, disable secure cookies so OAuth sessions work over HTTP
+      if (servletContextHandler.getSessionHandler() == null) {
+        servletContextHandler.setSessionHandler(new SessionHandler());
+      }
+      servletContextHandler.getSessionHandler().getSessionCookieConfig().setSecure(false);
     }
   }
 
