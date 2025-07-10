@@ -105,27 +105,6 @@ public class OAuthAuthorizationCodeConfig extends Config {
           .booleanConf()
           .createWithDefault(false);
 
-  // Session Management
-  public static final ConfigEntry<Long> SESSION_TIMEOUT_SECONDS =
-      new ConfigBuilder("gravitino.authenticator.oauth.session-timeout-seconds")
-          .doc("The timeout for OAuth sessions in seconds")
-          .version(ConfigConstants.VERSION_0_8_0)
-          .longConf()
-          .createWithDefault(3600L); // 1 hour
-
-  public static final ConfigEntry<String> STATE_STORE_TYPE =
-      new ConfigBuilder("gravitino.authenticator.oauth.state-store-type")
-          .doc("The type of store for OAuth state parameters (memory, redis)")
-          .version(ConfigConstants.VERSION_0_8_0)
-          .stringConf()
-          .createWithDefault("memory");
-  public static final ConfigEntry<String> RESPONSE_MODE =
-      new ConfigBuilder("gravitino.authenticator.oauth.response-mode")
-          .doc("OAuth response mode (optional)")
-          .version(ConfigConstants.VERSION_0_8_0)
-          .stringConf()
-          .createWithDefault(null);
-
   public static final ConfigEntry<String> FRONTEND_BASE_URL =
       new ConfigBuilder("gravitino.authenticator.oauth.frontend-base-url")
           .doc("Base URL of the Gravitino frontend for redirects after OAuth completion")
@@ -177,23 +156,6 @@ public class OAuthAuthorizationCodeConfig extends Config {
 
   public boolean isAuthorizationCodeFlowEnabled() {
     return get(ENABLE_AUTHORIZATION_CODE_FLOW);
-  }
-
-  public long getSessionTimeoutSeconds() {
-    return get(SESSION_TIMEOUT_SECONDS);
-  }
-
-  public String getStateStoreType() {
-    return get(STATE_STORE_TYPE);
-  }
-
-  public String getResponseMode() {
-    try {
-      return get(RESPONSE_MODE);
-    } catch (Exception e) {
-      // Response mode is optional, return null if not configured
-      return null;
-    }
   }
 
   public String getFrontendBaseUrl() {

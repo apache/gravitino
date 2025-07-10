@@ -53,14 +53,13 @@ public class OAuthController {
   private OAuthAuthorizationCodeConfig oauthConfig;
   private OAuthTokenService tokenService;
   private JwtValidationService jwtValidator;
-  // private OAuthSessionManager sessionManager;
 
   public OAuthController() {
     // Initialize services - access configuration from GravitinoEnv
     this.oauthConfig =
         new OAuthAuthorizationCodeConfig(GravitinoEnv.getInstance().config().getAllConfig());
     this.tokenService = new OAuthTokenService(oauthConfig);
-    // this.sessionManager = new OAuthSessionManager();
+
     // Initialize JwtValidationService with JWKS URI
     String jwksUri = GravitinoEnv.getInstance().config().get(OAuthAuthorizationCodeConfig.JWKS_URI);
     this.jwtValidator = new JwtValidationService(jwksUri);
@@ -234,13 +233,12 @@ public class OAuthController {
   @Produces(MediaType.APPLICATION_JSON)
   public Response getConfig() {
     try {
-      OAuthConfigResponse config = new OAuthConfigResponse();
-      config.setAuthorizationCodeFlowEnabled(oauthConfig.isAuthorizationCodeFlowEnabled());
-      config.setProviderName(oauthConfig.getProviderName());
-      config.setClientId(oauthConfig.getClientId()); // Safe to expose client ID
-
-      return Response.ok(config).build();
-
+      OAuthConfigResponse resp = new OAuthConfigResponse();
+      if (oauthConfig != null && oauthConfig.isAuthorizationCodeFlowEnabled()) {
+        resp.setProviderName(oauthConfig.getProviderName());
+      }
+      resp.setAuthorizationCodeFlowEnabled(oauthConfig.isAuthorizationCodeFlowEnabled());
+      return Response.ok(resp).build();
     } catch (Exception e) {
       LOG.error("Failed to get OAuth configuration", e);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
@@ -307,17 +305,8 @@ public class OAuthController {
 
   /** OAuth configuration response for frontend */
   public static class OAuthConfigResponse {
-    private boolean authorizationCodeFlowEnabled;
     private String providerName;
-    private String clientId;
-
-    public boolean isAuthorizationCodeFlowEnabled() {
-      return authorizationCodeFlowEnabled;
-    }
-
-    public void setAuthorizationCodeFlowEnabled(boolean authorizationCodeFlowEnabled) {
-      this.authorizationCodeFlowEnabled = authorizationCodeFlowEnabled;
-    }
+    private boolean isAuthorizationCodeFlowEnabled;
 
     public String getProviderName() {
       return providerName;
@@ -327,12 +316,12 @@ public class OAuthController {
       this.providerName = providerName;
     }
 
-    public String getClientId() {
-      return clientId;
+    public boolean isAuthorizationCodeFlowEnabled() {
+      return isAuthorizationCodeFlowEnabled;
     }
 
-    public void setClientId(String clientId) {
-      this.clientId = clientId;
+    public void setAuthorizationCodeFlowEnabled(boolean isAuthorizationCodeFlowEnabled) {
+      this.isAuthorizationCodeFlowEnabled = isAuthorizationCodeFlowEnabled;
     }
   }
 }

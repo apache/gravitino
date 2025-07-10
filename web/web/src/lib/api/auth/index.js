@@ -35,15 +35,6 @@ export const loginApi = (url, params) => {
   )
 }
 
-// OAuth Authorization Code Flow APIs
-export const getOAuthConfigApi = () => {
-  // The OAuth config is part of the main configs endpoint
-  // We'll process the response in the store to extract OAuth-specific info
-  return defHttp.get({
-    url: '/configs'
-  })
-}
-
 export const initiateOAuthFlowApi = redirectUri => {
   const params = new URLSearchParams()
   if (redirectUri) {
@@ -59,5 +50,12 @@ export const handleOAuthCallbackApi = () => {
   // This function is here for completeness but not typically called directly
   return defHttp.get({
     url: '/api/oauth/callback'
+  })
+}
+
+export const getOAuthConfigsApi = () => {
+  return defHttp.get({
+    url: '/api/oauth/config',
+    headers: { Accept: 'application/json' }
   })
 }

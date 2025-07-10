@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi, getOAuthConfigApi, initiateOAuthFlowApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi, initiateOAuthFlowApi, getOAuthConfigsApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 
@@ -126,41 +126,23 @@ export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', 
   }
 })
 
-// OAuth Authorization Code Flow actions
 export const getOAuthConfig = createAsyncThunk('auth/getOAuthConfig', async () => {
-  const [err, res] = await to(getAuthConfigsApi())
-
+  const [err, res] = await to(getOAuthConfigsApi())
   if (err || !res) {
-    throw new Error(err?.message || 'Failed to fetch OAuth configuration')
+    throw new Error(err?.message || 'Failed to fetch OAuth configs')
   }
-
-  // Process the configs response to extract OAuth information
-  const authenticators = res['gravitino.authenticators'] || []
-  const isOAuthEnabled = authenticators.includes('oauth')
-
-  if (!isOAuthEnabled) {
-    // OAuth is not enabled, return minimal config
-    return {
-      authorizationCodeFlowEnabled: false,
-      providerName: null
-    }
-  }
-
-  // OAuth is enabled, return the configuration
-  const oauthServerUri = res['gravitino.authenticator.oauth.serverUri']
-  const oauthTokenPath = res['gravitino.authenticator.oauth.tokenPath']
 
   return {
-    authorizationCodeFlowEnabled: true,
-    providerName: 'Azure AD', // You can make this configurable
-    serverUri: oauthServerUri,
-    tokenPath: oauthTokenPath,
-    authorizeUrl: oauthServerUri + '/oauth2/authorize', // Standard OAuth2 authorize endpoint
-    tokenUrl: oauthServerUri + oauthTokenPath
+    providerName: res.providerName,
+    authorizationCodeFlowEnabled: res.authorizationCodeFlowEnabled
   }
 })
 
-export const initiateOAuthFlow = createAsyncThunk('auth/initiateOAuthFlow', async redirectUri => {
+export const initiateOAuthFlow = createAsyncThunk('auth/initiateOAuthFlow', async () => {
+  // Construct the redirect URI here
+  const currentUrl = window.location.origin
+  const redirectUri = `${currentUrl}/oauth/callback`
+
   // This will redirect the browser to the OAuth provider
   initiateOAuthFlowApi(redirectUri)
 

@@ -126,7 +126,6 @@ const LoginPage = () => {
     return () => {
       fetchingRef.current = false
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run only once on mount
 
   const onSubmit = async data => {
@@ -142,16 +141,9 @@ const LoginPage = () => {
 
   const handleOAuthLogin = async () => {
     try {
-      // Get current URL to redirect back to after OAuth
-      const currentUrl = window.location.origin
-      const redirectUri = `${currentUrl}/oauth/callback`
-
-      // Initiate OAuth flow
-      await dispatch(initiateOAuthFlow(redirectUri))
+      await dispatch(initiateOAuthFlow())
     } catch (error) {
       console.error('OAuth login failed:', error)
-
-      // Could show error toast here
     }
   }
 
