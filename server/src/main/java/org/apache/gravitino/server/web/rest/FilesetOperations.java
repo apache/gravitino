@@ -110,19 +110,6 @@ public class FilesetOperations {
             idents =
                 MetadataFilterHelper.filterByExpression(
                     metalake,
-                    //                    "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
-                    //                        + "(METALAKE::USE_SCHEMA || CATALOG::USE_SCHEMA
-                    // ||SCHEMA::USE_SCHEMA) && "
-                    //                        + " (METALAKE::READ_FILESET || CATALOG::READ_FILESET "
-                    //                        + "|| SCHEMA::READ_FILESET || FILESET::READ_FILESET "
-                    //                        + "|| METALAKE::WRITE_FILESET ||
-                    // CATALOG::WRITE_FILESET "
-                    //                        + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET)
-                    // "
-                    //                        + "|| METALAKE::OWNER || CATALOG::OWNER "
-                    //                        + "|| SCHEMA::OWNER || FILESET::OWNER)",
-                    //                    "( (METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) && "
-
                     "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
                         + "("
                         + "  ANY(USE_CATALOG, METALAKE, CATALOG) && "
