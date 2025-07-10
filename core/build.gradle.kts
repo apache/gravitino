@@ -19,73 +19,73 @@ import net.ltgt.gradle.errorprone.errorprone
  * under the License.
  */
 plugins {
-    `maven-publish`
-    id("java")
-    id("idea")
-    alias(libs.plugins.jcstress)
-    alias(libs.plugins.jmh)
+  `maven-publish`
+  id("java")
+  id("idea")
+  alias(libs.plugins.jcstress)
+  alias(libs.plugins.jmh)
 }
 
 dependencies {
-    implementation(project(":api"))
-    implementation(project(":common"))
-    implementation(project(":catalogs:catalog-common"))
-    implementation(libs.bundles.log4j)
-    implementation(libs.bundles.metrics)
-    implementation(libs.bundles.prometheus)
-    implementation(libs.caffeine)
-    implementation(libs.commons.dbcp2)
-    implementation(libs.commons.io)
-    implementation(libs.commons.lang3)
-    implementation(libs.commons.collections4)
-    implementation(libs.concurrent.trees)
-    implementation(libs.guava)
-    implementation(libs.h2db)
-    implementation(libs.mybatis)
+  implementation(project(":api"))
+  implementation(project(":common"))
+  implementation(project(":catalogs:catalog-common"))
+  implementation(libs.bundles.log4j)
+  implementation(libs.bundles.metrics)
+  implementation(libs.bundles.prometheus)
+  implementation(libs.caffeine)
+  implementation(libs.commons.dbcp2)
+  implementation(libs.commons.io)
+  implementation(libs.commons.lang3)
+  implementation(libs.commons.collections4)
+  implementation(libs.concurrent.trees)
+  implementation(libs.guava)
+  implementation(libs.h2db)
+  implementation(libs.mybatis)
 
-    annotationProcessor(libs.lombok)
+  annotationProcessor(libs.lombok)
 
-    compileOnly(libs.lombok)
-    compileOnly(libs.servlet) // fix error-prone compile error
+  compileOnly(libs.lombok)
+  compileOnly(libs.servlet) // fix error-prone compile error
 
-    testAnnotationProcessor(libs.lombok)
-    testCompileOnly(libs.lombok)
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
 
-    testImplementation(project(":integration-test-common", "testArtifacts"))
-    testImplementation(project(":server-common"))
-    testImplementation(project(":clients:client-java"))
-    testImplementation(libs.awaitility)
-    testImplementation(libs.junit.jupiter.api)
-    testImplementation(libs.junit.jupiter.params)
-    testImplementation(libs.mockito.core)
-    testImplementation(libs.mockito.inline)
-    testImplementation(libs.mysql.driver)
-    testImplementation(libs.postgresql.driver)
-    testImplementation(libs.testcontainers)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server-common"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(libs.awaitility)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
 
-    testRuntimeOnly(libs.junit.jupiter.engine)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 
-    jcstressImplementation(libs.mockito.core)
+  jcstressImplementation(libs.mockito.core)
 }
 
 tasks.test {
-    val testMode = project.properties["testMode"] as? String ?: "embedded"
-    if (testMode == "embedded") {
-        environment("GRAVITINO_HOME", project.rootDir.path)
-    } else {
-        environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
-    }
+  val testMode = project.properties["testMode"] as? String ?: "embedded"
+  if (testMode == "embedded") {
+    environment("GRAVITINO_HOME", project.rootDir.path)
+  } else {
+    environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+  }
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    if (name.contains("jcstress", ignoreCase = true)) {
-        options.errorprone?.excludedPaths?.set(".*/generated/.*")
-    }
+  if (name.contains("jcstress", ignoreCase = true)) {
+    options.errorprone?.excludedPaths?.set(".*/generated/.*")
+  }
 }
 
 tasks.named<JavaCompile>("jmhCompileGeneratedClasses").configure {
-    options.errorprone?.isEnabled = false
-    options.compilerArgs.removeAll { it.contains("Xplugin:ErrorProne") }
+  options.errorprone?.isEnabled = false
+  options.compilerArgs.removeAll { it.contains("Xplugin:ErrorProne") }
 }
 
 jcstress {
@@ -96,16 +96,16 @@ jcstress {
      - default : takes minutes, good number of iterations
      - tough : takes tens of minutes, large number of iterations, most reliable
       */
-    mode = "default"
-    jvmArgsPrepend = "-Djdk.stdout.sync=true"
+  mode = "default"
+  jvmArgsPrepend = "-Djdk.stdout.sync=true"
 }
 
 jmh {
-    jmhVersion.set(libs.versions.jmh.asProvider())
-    warmupIterations = 5
-    iterations = 10
-    fork = 1
-    threads = 4
-    resultFormat = "csv"
-    resultsFile = file("$buildDir/reports/jmh/results.csv")
+  jmhVersion.set(libs.versions.jmh.asProvider())
+  warmupIterations = 5
+  iterations = 10
+  fork = 1
+  threads = 4
+  resultFormat = "csv"
+  resultsFile = file("$buildDir/reports/jmh/results.csv")
 }
