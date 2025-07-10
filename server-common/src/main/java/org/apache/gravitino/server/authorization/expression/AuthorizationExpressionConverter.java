@@ -145,6 +145,15 @@ public class AuthorizationExpressionConverter {
         expression.replaceAll(
             "SCHEMA_OWNER_WITH_USE_CATALOG",
             "SCHEMA::OWNER && (ANY(USE_CATALOG, METALAKE, CATALOG))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_MODEL", "(ANY(USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_MODEL_VERSION",
+            "(ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL))");
+    expression =
+        expression.replaceAll("ANY_CREATE_MODEL", "(ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA))");
     return expression;
   }
 }
