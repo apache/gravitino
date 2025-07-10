@@ -83,7 +83,7 @@ public class FilesetOperations {
 
   private static final String loadFilesetAuthorizationExpression =
       "ANY(OWNER, METALAKE, CATALOG) || "
-          + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
           + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)";
 
   @Context private HttpServletRequest httpRequest;
@@ -140,7 +140,7 @@ public class FilesetOperations {
   @AuthorizationExpression(
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
-              + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && SCHEMA::CREATE_FILESET",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response createFileset(
@@ -281,7 +281,7 @@ public class FilesetOperations {
   @AuthorizationExpression(
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
-              + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
@@ -323,7 +323,7 @@ public class FilesetOperations {
   @AuthorizationExpression(
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
-              + "ANY_USE_CATALOG && SCHEMA::OWNER || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
