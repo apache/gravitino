@@ -237,18 +237,56 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
           filesetCatalogNormalUser.alterFileset(
               NameIdentifier.of(SCHEMA, "fileset1"), FilesetChange.setProperty("key", "value"));
         });
-    // grant normal user owner privilege on fileset1
-    gravitinoMetalake.setOwner(
+    // grant normal user write privilege on fileset1
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
         MetadataObjects.of(
             ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
-        NORMAL_USER,
-        Owner.Type.USER);
+        ImmutableList.of(Privileges.WriteFileset.allow()));
     filesetCatalogNormalUser.alterFileset(
         NameIdentifier.of(SCHEMA, "fileset1"), FilesetChange.setProperty("key", "value"));
   }
 
   @Test
   @Order(5)
+  public void testGetFileLocation() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+
+    //    FilesetCatalog filesetCatalog =
+    //        client.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+
+    // create a fileset to test getFileLocation.
+    //    String filename4 = GravitinoITUtils.genRandomName("FilesetAuthorizationIT_fileset4");
+    //    filesetCatalog.createFileset(
+    //        // NameIdentifier.of(SCHEMA, "fileset1"),
+    //        NameIdentifier.of(SCHEMA, "fileset4"),
+    //        "comment",
+    //        Fileset.Type.MANAGED,
+    //        storageLocation(filename4),
+    //        new HashMap<>());
+
+    FilesetCatalog filesetCatalogNormalUser =
+        normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+
+    // normal user cannot alter fileset1 (no privilege)
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
+        RuntimeException.class,
+        () -> {
+          filesetCatalogNormalUser.getFileLocation(
+              NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "fileset1"), "/test");
+        });
+    // grant normal user owner privilege on fileset4
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        NORMAL_USER,
+        Owner.Type.USER);
+    filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
+  }
+
+  @Test
+  @Order(6)
   public void testDropFileset() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     FilesetCatalog filesetCatalogNormalUser =

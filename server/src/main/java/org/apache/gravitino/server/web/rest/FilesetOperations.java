@@ -388,12 +388,11 @@ public class FilesetOperations {
   @ResponseMetered(name = "get-file-location", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::READ_FILESET || CATALOG::READ_FILESET "
-              + "|| SCHEMA::READ_FILESET || FILESET::READ_FILESET "
-              + "|| METALAKE::WRITE_FILESET || CATALOG::WRITE_FILESET "
-              + "|| SCHEMA::WRITE_FILESET || FILESET::WRITE_FILESET "
-              + "|| METALAKE::OWNER || CATALOG::OWNER "
-              + "|| SCHEMA::OWNER || FILESET::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||"
+              + "("
+              + "   ANY(USE_CATALOG, METALAKE, CATALOG, SCHEMA) && "
+              + "   ( ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET) || ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
+              + ")",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response getFileLocation(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -401,7 +400,8 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
           String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") String fileset,
+      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
+          String fileset,
       @QueryParam("sub_path") @NotNull String subPath,
       @QueryParam("location_name") String locationName) {
     LOG.info(
