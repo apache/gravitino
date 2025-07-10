@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import logging
 from typing import Tuple
 from urllib.request import Request, build_opener
 from urllib.parse import urlencode
@@ -40,13 +39,6 @@ from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
 from gravitino.exceptions.base import RESTException, UnknownError
 from gravitino.exceptions.handlers.error_handler import ErrorHandler
-
-logger = logging.getLogger(__name__)
-if not logger.handlers:
-    logging.basicConfig(level=logging.DEBUG)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    logger.addHandler(console_handler)
 
 
 class Response:
