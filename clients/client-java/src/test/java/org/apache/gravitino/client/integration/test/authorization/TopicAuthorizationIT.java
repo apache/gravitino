@@ -73,9 +73,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     properties.put("bootstrap.servers", kafkaBootstrapServers);
     client
         .loadMetalake(METALAKE)
-        .createCatalog(CATALOG, Catalog.Type.MESSAGING, "kafka", "comment", properties)
-        .asSchemas()
-        .createSchema(SCHEMA, "test", new HashMap<>());
+        .createCatalog(CATALOG, Catalog.Type.MESSAGING, "kafka", "comment", properties);
     // try to load the schema as normal user, expect failure
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
@@ -197,7 +195,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
         RuntimeException.class,
         () -> {
           topicCatalogNormalUser.alterTopic(
-              NameIdentifier.of(SCHEMA, "topic1"), TopicChange.setProperty("key", "value"));
+              NameIdentifier.of(SCHEMA, "topic1"), TopicChange.updateComment("new comment"));
         });
     // grant normal user owner privilege on topic1
     gravitinoMetalake.setOwner(
@@ -205,7 +203,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
         NORMAL_USER,
         Owner.Type.USER);
     topicCatalogNormalUser.alterTopic(
-        NameIdentifier.of(SCHEMA, "topic1"), TopicChange.setProperty("key", "value"));
+        NameIdentifier.of(SCHEMA, "topic1"), TopicChange.updateComment("new comment"));
   }
 
   @Test
