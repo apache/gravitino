@@ -121,6 +121,13 @@ public class MetadataFilterHelper {
         nameIdentifierMap.put(
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
+      case MODEL:
+        nameIdentifierMap.put(Entity.EntityType.MODEL, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
       case TOPIC:
         nameIdentifierMap.put(Entity.EntityType.TOPIC, nameIdentifier);
         nameIdentifierMap.put(

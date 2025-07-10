@@ -74,6 +74,9 @@ public class CatalogOperations {
 
   private final CatalogDispatcher catalogDispatcher;
 
+  private static final String loadCatalogAuthorizationExpression =
+      "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
+
   @Context private HttpServletRequest httpRequest;
 
   @Inject
@@ -109,8 +112,7 @@ public class CatalogOperations {
                             };
                         return MetadataFilterHelper.filterByExpression(
                                     metalake,
-                                    "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG "
-                                        + "|| METALAKE::OWNER || CATALOG::OWNER",
+                                    loadCatalogAuthorizationExpression,
                                     Entity.EntityType.CATALOG,
                                     nameIdentifiers)
                                 .length
@@ -126,8 +128,7 @@ public class CatalogOperations {
               idents =
                   MetadataFilterHelper.filterByExpression(
                       metalake,
-                      "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG "
-                          + "|| METALAKE::OWNER || CATALOG::OWNER",
+                      loadCatalogAuthorizationExpression,
                       Entity.EntityType.CATALOG,
                       idents);
               Response response = Utils.ok(new EntityListResponse(idents));
@@ -216,8 +217,7 @@ public class CatalogOperations {
   @Timed(name = "set-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-catalog", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER",
+      expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response setCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -263,8 +263,7 @@ public class CatalogOperations {
   @Timed(name = "load-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-catalog", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || METALAKE::OWNER || CATALOG::OWNER",
+      expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response loadCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -291,7 +290,7 @@ public class CatalogOperations {
   @Timed(name = "alter-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-catalog", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || CATALOG::OWNER",
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response alterCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
@@ -328,7 +327,7 @@ public class CatalogOperations {
   @Timed(name = "drop-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-catalog", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || CATALOG::OWNER",
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response dropCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)

@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.ANY_PATTERN;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.PATTERN;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,6 +35,15 @@ public class TestAuthorizationExpressionConverter {
     assertFalse(PATTERN.matcher("KEY::").matches());
     assertFalse(PATTERN.matcher("::VALUE").matches());
     assertTrue(PATTERN.matcher("CATALOG::CREATE_TABLE").matches());
+  }
+
+  @Test
+  public void testAnyPatter() {
+    assertFalse(ANY_PATTERN.matcher("ANY").matches());
+    assertFalse(ANY_PATTERN.matcher("ANYOWNER,METALAKE,CATALOG").matches());
+    assertFalse(ANY_PATTERN.matcher("ANY(OWNER,METALAKE,CATALOG").matches());
+    assertTrue(ANY_PATTERN.matcher("ANY(OWNER, METALAKE, CATALOG)").matches());
+    assertTrue(ANY_PATTERN.matcher("ANY(USE_CATALOG,METALAKE,CATALOG,SCHEMA)").matches());
   }
 
   @Test
@@ -76,5 +86,38 @@ public class TestAuthorizationExpressionConverter {
             + "@org.apache.gravitino.authorization.Privilege$Name@CREATE_SCHEMA) "
             + "|| authorizer.isOwner(principal,METALAKE_NAME,SCHEMA)",
         createTableOgnlExpression);
+
+    String expressionWithOwner2 = "(ANY(OWNER, METALAKE, CATALOG)) && CATALOG::USE_CATALOG)";
+    String useCatalogOgnExpression =
+        AuthorizationExpressionConverter.convertToOgnlExpression(expressionWithOwner2);
+    Assertions.assertEquals(
+        "(authorizer.isOwner(principal,METALAKE_NAME,METALAKE) "
+            + "|| authorizer.isOwner(principal,METALAKE_NAME,CATALOG))"
+            + " && authorizer.authorize(principal,METALAKE_NAME,CATALOG"
+            + ",@org.apache.gravitino.authorization.Privilege$Name@USE_CATALOG))",
+        useCatalogOgnExpression);
+  }
+
+  @Test
+  public void testReplaseAnyExpression() {
+    Assertions.assertEquals(
+        "METALAKE::USE_CATALOG || CATALOG::USE_CATALOG || CATALOG::OWNER",
+        AuthorizationExpressionConverter.replaceAnyExpressions(
+            "ANY(USE_CATALOG,METALAKE,CATALOG) || CATALOG::OWNER"));
+
+    Assertions.assertEquals(
+        "(METALAKE::USE_CATALOG || CATALOG::USE_CATALOG) || CATALOG::OWNER",
+        AuthorizationExpressionConverter.replaceAnyExpressions(
+            "(ANY(USE_CATALOG,METALAKE,CATALOG)) || CATALOG::OWNER"));
+
+    Assertions.assertEquals(
+        "METALAKE::OWNER || CATALOG::OWNER && CATALOG::OWNER",
+        AuthorizationExpressionConverter.replaceAnyExpressions(
+            "ANY(OWNER, METALAKE, CATALOG) && CATALOG::OWNER"));
+
+    Assertions.assertEquals(
+        "(METALAKE::OWNER || CATALOG::OWNER) && CATALOG::USE_CATALOG",
+        AuthorizationExpressionConverter.replaceAnyExpressions(
+            "(ANY(OWNER, METALAKE, CATALOG)) && CATALOG::USE_CATALOG"));
   }
 }

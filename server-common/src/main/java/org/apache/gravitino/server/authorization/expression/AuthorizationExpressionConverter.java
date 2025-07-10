@@ -32,6 +32,9 @@ public class AuthorizationExpressionConverter {
   /** Match authorization expressions */
   public static final Pattern PATTERN = Pattern.compile("([A-Z_]+)::([A-Z_]+)");
 
+  /** Match ANY expressions */
+  public static final Pattern ANY_PATTERN = Pattern.compile("ANY\\(([^)]+)\\)");
+
   /**
    * The EXPRESSION_CACHE caches the result of converting authorization expressions into an OGNL
    * expression.
@@ -51,6 +54,8 @@ public class AuthorizationExpressionConverter {
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {
+    authorizationExpression = replaceAnyPrivilege(authorizationExpression);
+    authorizationExpression = replaceAnyExpressions(authorizationExpression);
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
@@ -77,5 +82,78 @@ public class AuthorizationExpressionConverter {
 
           return result.toString();
         });
+  }
+
+  /**
+   * Replaces any expression. For example, replace ANY(OWNER, METALAKE, CATALOG) to METALAKE::OWNER
+   * || CATALOG::OWNER.
+   *
+   * @param expression The original expression
+   * @return The modified expression
+   */
+  public static String replaceAnyExpressions(String expression) {
+    Matcher matcher = ANY_PATTERN.matcher(expression);
+    StringBuffer result = new StringBuffer();
+
+    while (matcher.find()) {
+      String innerContent = matcher.group(1);
+      String[] parts = innerContent.split(",");
+      if (parts.length < 2) {
+        matcher.appendReplacement(result, Matcher.quoteReplacement(matcher.group(0)));
+        continue;
+      }
+
+      String function = parts[0].trim();
+      StringBuilder replacement = new StringBuilder();
+      for (int i = 1; i < parts.length; i++) {
+        String scope = parts[i].trim();
+        if (!scope.isEmpty()) {
+          if (replacement.length() > 0) {
+            replacement.append(" || ");
+          }
+          replacement.append(scope).append("::").append(function);
+        }
+      }
+      matcher.appendReplacement(result, replacement.toString());
+    }
+    matcher.appendTail(result);
+    return result.toString();
+  }
+
+  /**
+   * Replace any privilege expression to any expression
+   *
+   * @param expression authorization expression
+   * @return authorization expression
+   */
+  public static String replaceAnyPrivilege(String expression) {
+    expression = expression.replaceAll("ANY_USE_CATALOG", "(ANY(USE_CATALOG, METALAKE, CATALOG))");
+    expression =
+        expression.replaceAll("ANY_USE_SCHEMA", "(ANY(USE_SCHEMA, METALAKE, CATALOG, SCHEMA))");
+    expression =
+        expression.replaceAll("ANY_CREATE_SCHEMA", "(ANY(CREATE_SCHEMA, METALAKE, CATALOG))");
+    expression =
+        expression.replaceAll(
+            "ANY_SELECT_TABLE", "(ANY(SELECT_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+    expression =
+        expression.replaceAll(
+            "ANY_MODIFY_TABLE", "(ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_TABLE", "(ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+    expression =
+        expression.replaceAll(
+            "SCHEMA_OWNER_WITH_USE_CATALOG",
+            "SCHEMA::OWNER && (ANY(USE_CATALOG, METALAKE, CATALOG))");
+    expression =
+        expression.replaceAll(
+            "ANY_USE_MODEL", "(ANY(USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_MODEL_VERSION",
+            "(ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL))");
+    expression =
+        expression.replaceAll("ANY_CREATE_MODEL", "(ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA))");
+    return expression;
   }
 }
