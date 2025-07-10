@@ -94,8 +94,7 @@ public class IcebergTableOperations {
       @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
-    LOG.info(
-        "Received list Iceberg tables request, catalog: {}, namespace: {}", catalogName, icebergNS);
+    LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
           httpRequest,
@@ -124,7 +123,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Received create Iceberg table request, catalog: {}, namespace: {}, create table request: {}, "
+        "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
             + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
@@ -160,7 +159,7 @@ public class IcebergTableOperations {
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     if (LOG.isInfoEnabled()) {
       LOG.info(
-          "Received update Iceberg table request, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
+          "Update Iceberg table, catalog: {}, namespace: {}, table: {}, updateTableRequest: {}",
           catalogName,
           icebergNS,
           table,
@@ -195,7 +194,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Received Drop Iceberg table request, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
+        "Drop Iceberg table, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
         catalogName,
         icebergNS,
         table,
@@ -230,7 +229,7 @@ public class IcebergTableOperations {
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
-        "Received load Iceberg table request, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
+        "Load Iceberg table, catalog: {}, namespace: {}, table: {}, access delegation: {}, "
             + "credential vending: {}",
         catalogName,
         icebergNS,
@@ -266,7 +265,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Received check Iceberg table exists request, catalog: {}, namespace: {}, table: {}",
+        "Check Iceberg table exists, catalog: {}, namespace: {}, table: {}",
         catalogName,
         icebergNS,
         table);
@@ -302,7 +301,7 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Received report Iceberg table metrics request, catalog: {}, namespace: {}, table: {}",
+        "Report Iceberg table metrics, catalog: {}, namespace: {}, table: {}",
         catalogName,
         icebergNS,
         table);

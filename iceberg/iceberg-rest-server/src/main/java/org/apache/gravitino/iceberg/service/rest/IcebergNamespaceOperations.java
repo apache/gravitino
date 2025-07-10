@@ -39,11 +39,13 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -88,10 +90,19 @@ public class IcebergNamespaceOperations {
         parent.isEmpty() ? Namespace.empty() : RESTUtil.decodeNamespace(parent);
     LOG.info(
         "List Iceberg namespaces, catalog: {}, parentNamespace: {}", catalogName, parentNamespace);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    ListNamespacesResponse response =
-        namespaceOperationDispatcher.listNamespaces(context, parentNamespace);
-    return IcebergRestUtils.ok(response);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            ListNamespacesResponse response =
+                namespaceOperationDispatcher.listNamespaces(context, parentNamespace);
+            return IcebergRestUtils.ok(response);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @GET
@@ -104,11 +115,19 @@ public class IcebergNamespaceOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("Load Iceberg namespace, catalog: {}, namespace: {}", catalogName, icebergNS);
-
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    GetNamespaceResponse getNamespaceResponse =
-        namespaceOperationDispatcher.loadNamespace(context, icebergNS);
-    return IcebergRestUtils.ok(getNamespaceResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            GetNamespaceResponse getNamespaceResponse =
+                namespaceOperationDispatcher.loadNamespace(context, icebergNS);
+            return IcebergRestUtils.ok(getNamespaceResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @HEAD
@@ -121,13 +140,21 @@ public class IcebergNamespaceOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("Check Iceberg namespace exists, catalog: {}, namespace: {}", catalogName, icebergNS);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-
-    boolean exists = namespaceOperationDispatcher.namespaceExists(context, icebergNS);
-    if (exists) {
-      return IcebergRestUtils.noContent();
-    } else {
-      return IcebergRestUtils.notExists();
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            boolean exists = namespaceOperationDispatcher.namespaceExists(context, icebergNS);
+            if (exists) {
+              return IcebergRestUtils.noContent();
+            } else {
+              return IcebergRestUtils.notExists();
+            }
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
     }
   }
 
@@ -142,9 +169,18 @@ public class IcebergNamespaceOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("Drop Iceberg namespace, catalog: {}, namespace: {}", catalogName, icebergNS);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    namespaceOperationDispatcher.dropNamespace(context, icebergNS);
-    return IcebergRestUtils.noContent();
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            namespaceOperationDispatcher.dropNamespace(context, icebergNS);
+            return IcebergRestUtils.noContent();
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @POST
@@ -158,10 +194,19 @@ public class IcebergNamespaceOperations {
         "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
         catalogName,
         createNamespaceRequest);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    CreateNamespaceResponse createNamespaceResponse =
-        namespaceOperationDispatcher.createNamespace(context, createNamespaceRequest);
-    return IcebergRestUtils.ok(createNamespaceResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            CreateNamespaceResponse createNamespaceResponse =
+                namespaceOperationDispatcher.createNamespace(context, createNamespaceRequest);
+            return IcebergRestUtils.ok(createNamespaceResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @POST
@@ -180,11 +225,20 @@ public class IcebergNamespaceOperations {
         catalogName,
         icebergNS,
         SerializeUpdateNamespacePropertiesRequest(updateNamespacePropertiesRequest));
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
-        namespaceOperationDispatcher.updateNamespace(
-            context, icebergNS, updateNamespacePropertiesRequest);
-    return IcebergRestUtils.ok(updateNamespacePropertiesResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            UpdateNamespacePropertiesResponse updateNamespacePropertiesResponse =
+                namespaceOperationDispatcher.updateNamespace(
+                    context, icebergNS, updateNamespacePropertiesRequest);
+            return IcebergRestUtils.ok(updateNamespacePropertiesResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @POST
@@ -203,11 +257,20 @@ public class IcebergNamespaceOperations {
         catalogName,
         icebergNS,
         registerTableRequest);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    LoadTableResponse loadTableResponse =
-        namespaceOperationDispatcher.registerTable(context, icebergNS, registerTableRequest);
-
-    return IcebergRestUtils.ok(loadTableResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            LoadTableResponse loadTableResponse =
+                namespaceOperationDispatcher.registerTable(
+                    context, icebergNS, registerTableRequest);
+            return IcebergRestUtils.ok(loadTableResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   // HTTP request is null in Jersey test, override with a mock request when testing.
