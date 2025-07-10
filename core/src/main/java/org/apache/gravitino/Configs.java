@@ -368,7 +368,6 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(10_000);
 
-
   // Cache entry expiration time
   public static final ConfigEntry<Long> CACHE_EXPIRATION_TIME =
       new ConfigBuilder("gravitino.cache.expireTimeInMs")
