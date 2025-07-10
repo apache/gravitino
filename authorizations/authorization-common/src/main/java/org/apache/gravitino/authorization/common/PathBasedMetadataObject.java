@@ -155,7 +155,8 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
 
     for (String name : names) {
       Preconditions.checkArgument(
-          name != null && !name.isEmpty(), "Cannot create a path based metadata object with null name");
+          name != null && !name.isEmpty(),
+          "Cannot create a path based metadata object with null name");
     }
   }
 
