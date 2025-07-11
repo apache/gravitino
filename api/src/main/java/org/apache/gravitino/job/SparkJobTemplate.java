@@ -121,6 +121,7 @@ public class SparkJobTemplate extends JobTemplate {
         && Objects.equals(configs, that.configs);
   }
 
+  @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), className, jars, files, archives, configs);
   }
