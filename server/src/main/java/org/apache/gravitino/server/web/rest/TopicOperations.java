@@ -31,6 +31,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.TopicDispatcher;
@@ -44,6 +46,9 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -53,6 +58,11 @@ import org.slf4j.LoggerFactory;
 @Path("/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/topics")
 public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
+
+  private static final String loadTopicsAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_CONSUME_TOPIC || ANY_PRODUCE_TOPIC)";
 
   private final TopicDispatcher dispatcher;
 
@@ -66,6 +76,7 @@ public class TopicOperations {
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-topic", absolute = true)
   public Response listTopics(
       @PathParam("metalake") String metalake,
       @PathParam("catalog") String catalog,
@@ -78,13 +89,17 @@ public class TopicOperations {
             LOG.info("Listing topics under schema: {}.{}.{}", metalake, catalog, schema);
             Namespace topicNS = NamespaceUtil.ofTopic(metalake, catalog, schema);
             NameIdentifier[] topics = dispatcher.listTopics(topicNS);
+            topics = topics == null ? new NameIdentifier[0] : topics;
+            topics =
+                MetadataFilterHelper.filterByExpression(
+                    metalake, loadTopicsAuthorizationExpression, Entity.EntityType.TOPIC, topics);
             Response response = Utils.ok(new EntityListResponse(topics));
             LOG.info(
                 "List {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleFilesetException(OperationType.LIST, "", schema, e);
+      return ExceptionHandlers.handleTopicException(OperationType.LIST, "", schema, e);
     }
   }
 
@@ -92,10 +107,18 @@ public class TopicOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-topic", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER,METALAKE,CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TOPIC",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTopic(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
       TopicCreateRequest request) {
     LOG.info("Received create topic request: {}.{}.{}", metalake, catalog, schema);
     try {
@@ -133,11 +156,16 @@ public class TopicOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-topic", absolute = true)
+  @AuthorizationExpression(
+      expression = loadTopicsAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.TOPIC)
   public Response loadTopic(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("topic") String topic) {
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("topic") @AuthorizationMetadata(type = MetadataObject.Type.TOPIC) String topic) {
     LOG.info(
         "Received load topic request for topic: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
@@ -161,11 +189,19 @@ public class TopicOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-topic", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER,METALAKE,CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_PRODUCE_TOPIC)",
+      accessMetadataType = MetadataObject.Type.TOPIC)
   public Response alterTopic(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("topic") String topic,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("topic") @AuthorizationMetadata(type = MetadataObject.Type.TOPIC) String topic,
       TopicUpdatesRequest request) {
     LOG.info("Received alter topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
@@ -195,11 +231,19 @@ public class TopicOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-topic." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-topic", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER,METALAKE,CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TOPIC::OWNER",
+      accessMetadataType = MetadataObject.Type.TOPIC)
   public Response dropTopic(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("topic") String topic) {
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("topic") @AuthorizationMetadata(type = MetadataObject.Type.TOPIC) String topic) {
     LOG.info("Received drop topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
       return Utils.doAs(
