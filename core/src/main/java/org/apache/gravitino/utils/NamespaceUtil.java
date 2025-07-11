@@ -199,8 +199,6 @@ public class NamespaceUtil {
         modelIdent.name());
   }
 
-
-
   /**
    * Check if the given metalake namespace is legal, throw an {@link IllegalNamespaceException} if
    * it's illegal.
@@ -331,6 +329,4 @@ public class NamespaceUtil {
       throw new IllegalNamespaceException(message, args);
     }
   }
-
-
 }

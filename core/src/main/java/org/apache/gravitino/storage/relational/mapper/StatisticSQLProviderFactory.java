@@ -20,28 +20,33 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.provider.base.StatisticBaseSQLProvider;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
-import java.util.Map;
-
 public class StatisticSQLProviderFactory {
 
-    static class StatisticMySQLProvider extends StatisticBaseSQLProvider {};
-    static class StatisticH2Provider extends StatisticBaseSQLProvider {};
+  static class StatisticMySQLProvider extends StatisticBaseSQLProvider {};
 
-    private static final Map<JDBCBackend.JDBCBackendType, StatisticBaseSQLProvider> STATISTIC_SQL_PROVIDERS =
-            ImmutableMap.of(JDBCBackend.JDBCBackendType.H2, new StatisticH2Provider(), JDBCBackend.JDBCBackendType.MYSQL, new StatisticMySQLProvider());
+  static class StatisticH2Provider extends StatisticBaseSQLProvider {};
 
-    public static StatisticBaseSQLProvider getProvider() {
-        String databaseId =
-                SqlSessionFactoryHelper.getInstance()
-                        .getSqlSessionFactory()
-                        .getConfiguration()
-                        .getDatabaseId();
-        JDBCBackend.JDBCBackendType jdbcBackendType =
-                JDBCBackend.JDBCBackendType.fromString(databaseId);
-        return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
-    }
+  private static final Map<JDBCBackend.JDBCBackendType, StatisticBaseSQLProvider>
+      STATISTIC_SQL_PROVIDERS =
+          ImmutableMap.of(
+              JDBCBackend.JDBCBackendType.H2,
+              new StatisticH2Provider(),
+              JDBCBackend.JDBCBackendType.MYSQL,
+              new StatisticMySQLProvider());
+
+  public static StatisticBaseSQLProvider getProvider() {
+    String databaseId =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .getConfiguration()
+            .getDatabaseId();
+    JDBCBackend.JDBCBackendType jdbcBackendType =
+        JDBCBackend.JDBCBackendType.fromString(databaseId);
+    return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
+  }
 }

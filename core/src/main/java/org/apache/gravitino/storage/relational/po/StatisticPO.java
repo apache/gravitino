@@ -19,171 +19,172 @@
 package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Preconditions;
-
 import java.util.Objects;
 
 public class StatisticPO {
-    private Long metalakeId;
-    private Long statisticId;
+  private Long metalakeId;
+  private Long statisticId;
 
-    private String statisticName;
+  private String statisticName;
 
-    private String value;
-    private Long objectId;
+  private String value;
+  private Long objectId;
 
-    private String objectType;
+  private String objectType;
 
-    private String auditInfo;
+  private String auditInfo;
 
-    private Long currentVersion;
-    private Long lastVersion;
-    private Long deletedAt;
-    private StatisticPO() {}
+  private Long currentVersion;
+  private Long lastVersion;
+  private Long deletedAt;
 
-    public static Builder builder() {
-        return new Builder();
+  private StatisticPO() {}
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public Long getMetalakeId() {
+    return metalakeId;
+  }
+
+  public Long getStatisticId() {
+    return statisticId;
+  }
+
+  public Long getObjectId() {
+    return objectId;
+  }
+
+  public String getObjectType() {
+    return objectType;
+  }
+
+  public String getStatisticName() {
+    return statisticName;
+  }
+
+  public String getValue() {
+    return value;
+  }
+
+  public String getAuditInfo() {
+    return auditInfo;
+  }
+
+  public Long getCurrentVersion() {
+    return currentVersion;
+  }
+
+  public Long getLastVersion() {
+    return lastVersion;
+  }
+
+  public Long getDeletedAt() {
+    return deletedAt;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof StatisticPO)) {
+      return false;
+    }
+    StatisticPO that = (StatisticPO) o;
+    return statisticId.equals(that.statisticId)
+        && objectId.equals(that.objectId)
+        && metalakeId.equals(that.metalakeId)
+        && objectType.equals(that.objectType)
+        && statisticName.equals(that.statisticName)
+        && value.equals(that.value)
+        && auditInfo.equals(that.auditInfo)
+        && currentVersion.equals(that.currentVersion)
+        && lastVersion.equals(that.lastVersion)
+        && deletedAt.equals(that.deletedAt);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        metalakeId,
+        statisticId,
+        objectId,
+        objectType,
+        statisticName,
+        value,
+        auditInfo,
+        currentVersion,
+        lastVersion,
+        deletedAt);
+  }
+
+  public static class Builder {
+
+    private final StatisticPO statisticPO;
+
+    public Builder() {
+      this.statisticPO = new StatisticPO();
     }
 
-    public Long getMetalakeId() { return metalakeId; }
-    public Long getStatisticId() {
-        return statisticId;
+    public Builder withMetalakeId(Long metalakeId) {
+      statisticPO.metalakeId = metalakeId;
+      return this;
     }
 
-    public Long getObjectId() {
-        return objectId;
+    public Builder withStatisticId(Long statisticId) {
+      statisticPO.statisticId = statisticId;
+      return this;
     }
 
-    public String getObjectType() {
-        return objectType;
+    public Builder withObjectId(Long objectId) {
+      statisticPO.objectId = objectId;
+      return this;
     }
 
-    public String getStatisticName() {
-        return statisticName;
+    public Builder withObjectType(String objectType) {
+      statisticPO.objectType = objectType;
+      return this;
     }
 
-    public String getValue() {
-        return value;
+    public Builder withStatisticName(String statisticName) {
+      statisticPO.statisticName = statisticName;
+      return this;
     }
 
-    public String getAuditInfo() {
-        return auditInfo;
+    public Builder withValue(String value) {
+      statisticPO.value = value;
+      return this;
     }
 
-    public Long getCurrentVersion() {
-        return currentVersion;
+    public Builder withAuditInfo(String auditInfo) {
+      statisticPO.auditInfo = auditInfo;
+      return this;
     }
 
-    public Long getLastVersion() {
-        return lastVersion;
+    public Builder withCurrentVersion(Long currentVersion) {
+      statisticPO.currentVersion = currentVersion;
+      return this;
     }
 
-    public Long getDeletedAt() {
-        return deletedAt;
+    public Builder withLastVersion(Long lastVersion) {
+      statisticPO.lastVersion = lastVersion;
+      return this;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof StatisticPO)) {
-            return false;
-        }
-        StatisticPO that = (StatisticPO) o;
-        return statisticId.equals(that.statisticId)
-                && objectId.equals(that.objectId)
-                && metalakeId.equals(that.metalakeId)
-                && objectType.equals(that.objectType)
-                && statisticName.equals(that.statisticName)
-                && value.equals(that.value)
-                && auditInfo.equals(that.auditInfo)
-                && currentVersion.equals(that.currentVersion)
-                && lastVersion.equals(that.lastVersion)
-                && deletedAt.equals(that.deletedAt);
+    public Builder withDeletedAt(Long deletedAt) {
+      statisticPO.deletedAt = deletedAt;
+      return this;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(metalakeId,
-                statisticId,
-                objectId,
-                objectType,
-                statisticName,
-                value,
-                auditInfo,
-                currentVersion,
-                lastVersion,
-                deletedAt);
+    public StatisticPO build() {
+      Preconditions.checkArgument(statisticPO.objectId != null, "`objectId is required");
+      Preconditions.checkArgument(statisticPO.objectType != null, "`objectType` is required");
+      Preconditions.checkArgument(statisticPO.statisticName != null, "`statisticName` is required");
+      Preconditions.checkArgument(statisticPO.value != null, "`value` is required");
+      Preconditions.checkArgument(statisticPO.auditInfo != null, "`auditInfo` is required");
+      return statisticPO;
     }
-
-    public static class Builder {
-
-        private final StatisticPO statisticPO;
-
-        public Builder() {
-            this.statisticPO = new StatisticPO();
-        }
-
-        public Builder withMetalakeId(Long metalakeId) {
-            statisticPO.metalakeId = metalakeId;
-            return this;
-        }
-
-        public Builder withStatisticId(Long statisticId) {
-            statisticPO.statisticId = statisticId;
-            return this;
-        }
-
-        public Builder withObjectId(Long objectId) {
-            statisticPO.objectId = objectId;
-            return this;
-        }
-
-        public Builder withObjectType(String objectType) {
-            statisticPO.objectType = objectType;
-            return this;
-        }
-
-        public Builder withStatisticName(String statisticName) {
-            statisticPO.statisticName = statisticName;
-            return this;
-        }
-
-        public Builder withValue(String value) {
-            statisticPO.value = value;
-            return this;
-        }
-
-        public Builder withAuditInfo(String auditInfo) {
-            statisticPO.auditInfo = auditInfo;
-            return this;
-        }
-
-        public Builder withCurrentVersion(Long currentVersion) {
-            statisticPO.currentVersion = currentVersion;
-            return this;
-        }
-
-        public Builder withLastVersion(Long lastVersion) {
-            statisticPO.lastVersion = lastVersion;
-            return this;
-        }
-
-        public Builder withDeletedAt(Long deletedAt) {
-            statisticPO.deletedAt = deletedAt;
-            return this;
-        }
-
-        public StatisticPO build() {
-            Preconditions.checkArgument(statisticPO.objectId != null, "`objectId is required");
-            Preconditions.checkArgument(
-                    statisticPO.objectType != null, "`objectType` is required");
-            Preconditions.checkArgument(
-                    statisticPO.statisticName != null, "`statisticName` is required");
-            Preconditions.checkArgument(statisticPO.value != null, "`value` is required");
-            Preconditions.checkArgument(
-                    statisticPO.auditInfo != null, "`auditInfo` is required");
-            return statisticPO;
-        }
-    }
+  }
 }

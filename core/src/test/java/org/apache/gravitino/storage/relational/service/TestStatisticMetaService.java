@@ -19,6 +19,9 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.Lists;
+import java.io.IOException;
+import java.time.Instant;
+import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -38,323 +41,321 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.time.Instant;
-import java.util.List;
-
 public class TestStatisticMetaService extends TestJDBCBackend {
-    StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
+  StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
 
-    @Test
-    public void testInsertStatistics() throws Exception {
-        String metalakeName = "metalake";
-        AuditInfo auditInfo =
-                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-        BaseMetalake metalake =
-                createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-        backend.insert(metalake, false);
+  @Test
+  public void testInsertStatistics() throws Exception {
+    String metalakeName = "metalake";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
 
-        List<StatisticEntity> statisticEntities = Lists.newArrayList();
-        StatisticEntity statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
+    List<StatisticEntity> statisticEntities = Lists.newArrayList();
+    StatisticEntity statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
 
-        NameIdentifier nameIdentifier = NameIdentifierUtil.ofMetalake(metalakeName);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,  nameIdentifier, Entity.EntityType.METALAKE);
+    NameIdentifier nameIdentifier = NameIdentifierUtil.ofMetalake(metalakeName);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, nameIdentifier, Entity.EntityType.METALAKE);
 
-        List<StatisticEntity> listEntities = statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
-        Assertions.assertEquals(1, listEntities.size());
-        Assertions.assertEquals("test", listEntities.get(0).name());
-        Assertions.assertEquals("test", listEntities.get(0).value().value());
-    }
+    List<StatisticEntity> listEntities =
+        statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
+    Assertions.assertEquals(1, listEntities.size());
+    Assertions.assertEquals("test", listEntities.get(0).name());
+    Assertions.assertEquals("test", listEntities.get(0).value().value());
+  }
 
-    @Test
-    public void testDeleteStatistics() throws IOException  {
-        String metalakeName = "metalake";
-        AuditInfo auditInfo =
-                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-        BaseMetalake metalake =
-                createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-        backend.insert(metalake, false);
+  @Test
+  public void testDeleteStatistics() throws IOException {
+    String metalakeName = "metalake";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
 
-        List<StatisticEntity> statisticEntities = Lists.newArrayList();
-        NameIdentifier nameIdentifier = NameIdentifierUtil.ofMetalake(metalakeName);
-        StatisticEntity statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,  nameIdentifier, Entity.EntityType.METALAKE);
+    List<StatisticEntity> statisticEntities = Lists.newArrayList();
+    NameIdentifier nameIdentifier = NameIdentifierUtil.ofMetalake(metalakeName);
+    StatisticEntity statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, nameIdentifier, Entity.EntityType.METALAKE);
 
-        List<Long> ids = Lists.newArrayList(statisticEntity.id());
-        statisticMetaService.batchDeleteStatisticPOs(ids);
-        List<StatisticEntity> listEntities = statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
-        Assertions.assertEquals(0, listEntities.size());
-    }
+    List<Long> ids = Lists.newArrayList(statisticEntity.id());
+    statisticMetaService.batchDeleteStatisticPOs(ids);
+    List<StatisticEntity> listEntities =
+        statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
+    Assertions.assertEquals(0, listEntities.size());
+  }
 
-    private static StatisticEntity createStatisticEntity(AuditInfo auditInfo) {
-        return StatisticEntity.builder()
-                .withId(RandomIdGenerator.INSTANCE.nextId())
-                .withName("test")
-                .withValue(StatisticValues.longValue(100L))
-                .withAuditInfo(auditInfo)
-                .build();
-    }
+  private static StatisticEntity createStatisticEntity(AuditInfo auditInfo) {
+    return StatisticEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName("test")
+        .withValue(StatisticValues.longValue(100L))
+        .withAuditInfo(auditInfo)
+        .build();
+  }
 
+  @Test
+  public void testDeleteMetadataObject() throws Exception {
+    String metalakeName = "metalake";
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
 
-    @Test
-    public void testDeleteMetadataObject() throws Exception {
-        String metalakeName = "metalake";
-        AuditInfo auditInfo =
-                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-        BaseMetalake metalake =
-                createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-        backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
-        CatalogEntity catalog =
-                createCatalog(
-                        RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
-        backend.insert(catalog, false);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog"),
+            "schema",
+            auditInfo);
+    backend.insert(schema, false);
 
-        SchemaEntity schema =
-                createSchemaEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog"),
-                        "schema",
-                        auditInfo);
-        backend.insert(schema, false);
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "fileset",
+            auditInfo);
+    backend.insert(fileset, false);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "table",
+            auditInfo);
+    backend.insert(table, false);
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "topic",
+            auditInfo);
+    backend.insert(topic, false);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "model",
+            "comment",
+            1,
+            null,
+            auditInfo);
+    backend.insert(model, false);
 
-        FilesetEntity fileset =
-                createFilesetEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "fileset",
-                        auditInfo);
-        backend.insert(fileset, false);
-        TableEntity table =
-                createTableEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "table",
-                        auditInfo);
-        backend.insert(table, false);
-        TopicEntity topic =
-                createTopicEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "topic",
-                        auditInfo);
-        backend.insert(topic, false);
-        ModelEntity model =
-                createModelEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "model",
-                        "comment",
-                        1,
-                        null,
-                        auditInfo);
-        backend.insert(model, false);
+    // insert stats
+    List<StatisticEntity> statisticEntities = Lists.newArrayList();
+    StatisticEntity statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
 
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
-        // insert stats
-        List<StatisticEntity> statisticEntities = Lists.newArrayList();
-        StatisticEntity statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                table.nameIdentifier(), Entity.EntityType.TABLE);
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
-        statisticEntities.clear();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                topic.nameIdentifier(), Entity.EntityType.TOPIC);
+    // assert stats
+    Assertions.assertEquals(3, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
 
-        statisticEntities.clear();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                fileset.nameIdentifier(), Entity.EntityType.FILESET);
+    // Test to delete model
+    ModelMetaService.getInstance().deleteModel(model.nameIdentifier());
 
-        // assert stats
-        Assertions.assertEquals(3, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
+    // assert stats
+    Assertions.assertEquals(2, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
 
-        // Test to delete model
-        ModelMetaService.getInstance().deleteModel(model.nameIdentifier());
+    // Test to delete table
+    TableMetaService.getInstance().deleteTable(table.nameIdentifier());
+    // assert stats
+    Assertions.assertEquals(1, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
 
-        // assert stats
-        Assertions.assertEquals(2, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
+    // Test to delete topic
+    TopicMetaService.getInstance().deleteTopic(topic.nameIdentifier());
+    // assert stats
+    Assertions.assertEquals(0, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
 
-        // Test to delete table
-        TableMetaService.getInstance().deleteTable(table.nameIdentifier());
-        // assert stats
-        Assertions.assertEquals(1, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
+    // Test to delete fileset
+    FilesetMetaService.getInstance().deleteFileset(fileset.nameIdentifier());
+    // assert stats
+    Assertions.assertEquals(2, countActiveStats(metalake.id()));
+    Assertions.assertEquals(4, countAllStats(metalake.id()));
 
-        // Test to delete topic
-        TopicMetaService.getInstance().deleteTopic(topic.nameIdentifier());
-        // assert stats
-        Assertions.assertEquals(0, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
+    // Test to delete schema
+    SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false);
+    // assert stats
+    Assertions.assertEquals(2, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
 
-        // Test to delete fileset
-        FilesetMetaService.getInstance().deleteFileset(fileset.nameIdentifier());
-        // assert stats
-        Assertions.assertEquals(2, countActiveStats(metalake.id()));
-        Assertions.assertEquals(4, countAllStats(metalake.id()));
+    // Test to delete catalog
+    CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false);
+    // assert stats
+    Assertions.assertEquals(2, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
 
-        // Test to delete schema
-        SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false);
-        // assert stats
-        Assertions.assertEquals(2, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
+    // Test to delete catalog with cascade mode
+    catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
-        // Test to delete catalog
-        CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false);
-        // assert stats
-        Assertions.assertEquals(2, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
+    schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog"),
+            "schema",
+            auditInfo);
+    backend.insert(schema, false);
 
-        // Test to delete catalog with cascade mode
-        catalog =
-                createCatalog(
-                        RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
-        backend.insert(catalog, false);
+    fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "fileset",
+            auditInfo);
+    backend.insert(fileset, false);
+    table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "table",
+            auditInfo);
+    backend.insert(table, false);
 
-        schema =
-                createSchemaEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog"),
-                        "schema",
-                        auditInfo);
-        backend.insert(schema, false);
+    topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "topic",
+            auditInfo);
+    backend.insert(topic, false);
 
-        fileset =
-                createFilesetEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "fileset",
-                        auditInfo);
-        backend.insert(fileset, false);
-        table =
-                createTableEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "table",
-                        auditInfo);
-        backend.insert(table, false);
+    model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "model",
+            "comment",
+            1,
+            null,
+            auditInfo);
+    backend.insert(model, false);
+    // insert stats
+    statisticEntities = Lists.newArrayList();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
 
-        topic =
-                createTopicEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "topic",
-                        auditInfo);
-        backend.insert(topic, false);
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
-        model =
-                createModelEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "model",
-                        "comment",
-                        1,
-                        null,
-                        auditInfo);
-        backend.insert(model, false);
-        // insert stats
-        statisticEntities = Lists.newArrayList();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                table.nameIdentifier(), Entity.EntityType.TABLE);
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
-        statisticEntities.clear();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                topic.nameIdentifier(), Entity.EntityType.TOPIC);
+    CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true);
 
-        statisticEntities.clear();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                fileset.nameIdentifier(), Entity.EntityType.FILESET);
+    // assert stats
+    Assertions.assertEquals(0, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
 
-        CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true);
+    // Test to delete schema with cascade mode
+    catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
+    backend.insert(catalog, false);
 
-        // assert stats
-        Assertions.assertEquals(0, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
+    schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog"),
+            "schema",
+            auditInfo);
+    backend.insert(schema, false);
 
-        // Test to delete schema with cascade mode
-        catalog =
-                createCatalog(
-                        RandomIdGenerator.INSTANCE.nextId(), Namespace.of("metalake"), "catalog", auditInfo);
-        backend.insert(catalog, false);
+    fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "fileset",
+            auditInfo);
+    backend.insert(fileset, false);
+    table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "table",
+            auditInfo);
+    backend.insert(table, false);
+    topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "topic",
+            auditInfo);
+    backend.insert(topic, false);
+    model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of("metalake", "catalog", "schema"),
+            "model",
+            "comment",
+            1,
+            null,
+            auditInfo);
+    backend.insert(model, false);
 
-        schema =
-                createSchemaEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog"),
-                        "schema",
-                        auditInfo);
-        backend.insert(schema, false);
+    // insert stats
+    statisticEntities = Lists.newArrayList();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
 
-        fileset =
-                createFilesetEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "fileset",
-                        auditInfo);
-        backend.insert(fileset, false);
-        table =
-                createTableEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "table",
-                        auditInfo);
-        backend.insert(table, false);
-        topic =
-                createTopicEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "topic",
-                        auditInfo);
-        backend.insert(topic, false);
-        model =
-                createModelEntity(
-                        RandomIdGenerator.INSTANCE.nextId(),
-                        Namespace.of("metalake", "catalog", "schema"),
-                        "model",
-                        "comment",
-                        1,
-                        null,
-                        auditInfo);
-        backend.insert(model, false);
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
-        // insert stats
-        statisticEntities = Lists.newArrayList();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                table.nameIdentifier(), Entity.EntityType.TABLE);
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
-        statisticEntities.clear();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                topic.nameIdentifier(), Entity.EntityType.TOPIC);
+    // delete object
+    SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
 
-        statisticEntities.clear();
-        statisticEntity = createStatisticEntity(auditInfo);
-        statisticEntities.add(statisticEntity);
-        statisticMetaService.batchInsertStatisticPOs(statisticEntities, metalakeName,
-                fileset.nameIdentifier(), Entity.EntityType.FILESET);
-
-        // delete object
-        SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
-
-        // assert stats count
-        Assertions.assertEquals(0, countActiveStats(metalake.id()));
-        Assertions.assertEquals(3, countAllStats(metalake.id()));
-    }
+    // assert stats count
+    Assertions.assertEquals(0, countActiveStats(metalake.id()));
+    Assertions.assertEquals(3, countAllStats(metalake.id()));
+  }
 }

@@ -47,16 +47,44 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.*;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.StatisticEntity;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
-import org.apache.gravitino.storage.relational.po.*;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionPO;
+import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.StatisticPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
+import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -1193,13 +1221,17 @@ public class TestPOConverters {
         StatisticEntity.builder()
             .withId(1L)
             .withName("test_statistic")
-            .withNamespace(NameIdentifierUtil.ofStatistic(NameIdentifierUtil.ofTable("test", "test", "test", "test"), "test").namespace())
-                .withValue(StatisticValues.stringValue("test"))
-                .withAuditInfo(
+            .withNamespace(
+                NameIdentifierUtil.ofStatistic(
+                        NameIdentifierUtil.ofTable("test", "test", "test", "test"), "test")
+                    .namespace())
+            .withValue(StatisticValues.stringValue("test"))
+            .withAuditInfo(
                 AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build())
             .build());
     StatisticPO.Builder builder = StatisticPO.builder();
-    List<StatisticPO> statisticPOs = POConverters.initializeStatisticPOs(statisticEntities, builder);
+    List<StatisticPO> statisticPOs =
+        POConverters.initializeStatisticPOs(statisticEntities, builder);
 
     assertEquals(1, statisticPOs.get(0).getCurrentVersion());
     assertEquals(1, statisticPOs.get(0).getLastVersion());
@@ -1207,18 +1239,18 @@ public class TestPOConverters {
     assertEquals("test", statisticPOs.get(0).getValue());
     assertEquals("test_statistic", statisticPOs.get(0).getStatisticName());
 
-
     StatisticPO statisticPO =
-            StatisticPO.builder().withStatisticId(1L)
-                    .withLastVersion(1L)
-                    .withCurrentVersion(1L)
-                    .withStatisticName("test")
-                    .withValue("test")
-                    .withObjectId(1L)
-                    .withObjectType("CATALOG")
-                    .withDeletedAt(0L)
-                    .withMetalakeId(1L)
-                    .build();
+        StatisticPO.builder()
+            .withStatisticId(1L)
+            .withLastVersion(1L)
+            .withCurrentVersion(1L)
+            .withStatisticName("test")
+            .withValue("test")
+            .withObjectId(1L)
+            .withObjectType("CATALOG")
+            .withDeletedAt(0L)
+            .withMetalakeId(1L)
+            .build();
     StatisticEntity entity = POConverters.fromStatisticPO(statisticPO);
     Assertions.assertEquals(1L, entity.id());
     Assertions.assertEquals("test", entity.name());
@@ -1654,6 +1686,4 @@ public class TestPOConverters {
         .withAuditInfo(auditInfo)
         .build();
   }
-
-
 }

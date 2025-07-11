@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -28,67 +30,67 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
-/** The service class for statistic metadata. It provides the basic database operations for statistic. */
+/**
+ * The service class for statistic metadata. It provides the basic database operations for
+ * statistic.
+ */
 public class StatisticMetaService {
 
-    private static final StatisticMetaService INSTANCE = new StatisticMetaService();
+  private static final StatisticMetaService INSTANCE = new StatisticMetaService();
 
-    public static StatisticMetaService getInstance() {
-        return INSTANCE;
+  public static StatisticMetaService getInstance() {
+    return INSTANCE;
+  }
+
+  private StatisticMetaService() {}
+
+  public List<StatisticEntity> listStatisticPOsByObject(
+      NameIdentifier identifier, Entity.EntityType type) {
+    long metalakeId =
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
+    MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
+    long objectId =
+        MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
+    List<StatisticPO> statisticPOs =
+        SessionUtils.getWithoutCommit(
+            StatisticMetaMapper.class,
+            mapper -> mapper.listStatisticPOsByObject(objectId, type.name()));
+    return statisticPOs.stream().map(POConverters::fromStatisticPO).collect(Collectors.toList());
+  }
+
+  public void batchInsertStatisticPOs(
+      List<StatisticEntity> statisticEntities,
+      String metalake,
+      NameIdentifier entity,
+      Entity.EntityType type) {
+    if (statisticEntities == null || statisticEntities.isEmpty()) {
+      return;
     }
-
-    private StatisticMetaService() {}
-
-
-    public List<StatisticEntity> listStatisticPOsByObject(NameIdentifier identifier, Entity.EntityType type) {
-        long metalakeId =
-                MetalakeMetaService.getInstance()
-                        .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
-        MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
-        long objectId = MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
-        List<StatisticPO> statisticPOs =
-                SessionUtils.getWithoutCommit(
-                        StatisticMetaMapper.class,
-                        mapper -> mapper.listStatisticPOsByObject(objectId, type.name())
-                );
-        return statisticPOs.stream()
-                .map(POConverters::fromStatisticPO)
-                .collect(Collectors.toList());
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    Long objectId;
+    MetadataObject object = NameIdentifierUtil.toMetadataObject(entity, type);
+    if (type == Entity.EntityType.METALAKE) {
+      objectId = metalakeId;
+    } else {
+      objectId =
+          MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
     }
+    StatisticPO.Builder builder = StatisticPO.builder();
+    builder.withMetalakeId(metalakeId);
+    builder.withObjectId(objectId);
+    builder.withObjectType(object.type().name());
 
-    public void batchInsertStatisticPOs(List<StatisticEntity> statisticEntities, String metalake, NameIdentifier entity, Entity.EntityType type) {
-        if (statisticEntities == null || statisticEntities.isEmpty()) {
-            return;
-        }
-        Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-        Long objectId;
-        MetadataObject object = NameIdentifierUtil.toMetadataObject(entity, type);
-        if (type == Entity.EntityType.METALAKE) {
-            objectId = metalakeId;
-        } else {
-            objectId = MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
-        }
-        StatisticPO.Builder builder = StatisticPO.builder();
-        builder.withMetalakeId(metalakeId);
-        builder.withObjectId(objectId);
-        builder.withObjectType(object.type().name());
+    List<StatisticPO> pos = POConverters.initializeStatisticPOs(statisticEntities, builder);
+    SessionUtils.doWithCommit(
+        StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(pos));
+  }
 
-        List<StatisticPO> pos = POConverters.initializeStatisticPOs(statisticEntities, builder);
-        SessionUtils.doWithCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.batchInsertStatisticPOs(pos));
+  public void batchDeleteStatisticPOs(List<Long> statisticIds) {
+    if (statisticIds == null || statisticIds.isEmpty()) {
+      return;
     }
-
-
-    public void batchDeleteStatisticPOs(List<Long> statisticIds) {
-        if (statisticIds == null || statisticIds.isEmpty()) {
-            return;
-        }
-        SessionUtils.doWithCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.batchDeleteStatisticPOs(statisticIds));
-    }
+    SessionUtils.doWithCommit(
+        StatisticMetaMapper.class, mapper -> mapper.batchDeleteStatisticPOs(statisticIds));
+  }
 }

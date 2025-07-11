@@ -1230,14 +1230,13 @@ public class TestJDBCBackend {
 
   protected Integer countAllStats(Long metalakeId) {
     try (SqlSession sqlSession =
-                 SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-         Connection connection = sqlSession.getConnection();
-         Statement statement1 = connection.createStatement();
-         ResultSet rs1 =
-                 statement1.executeQuery(
-                         String.format(
-                                 "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d",
-                                 metalakeId))) {
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d", metalakeId))) {
       if (rs1.next()) {
         return rs1.getInt(1);
       } else {
@@ -1250,14 +1249,14 @@ public class TestJDBCBackend {
 
   protected Integer countActiveStats(Long metalakeId) {
     try (SqlSession sqlSession =
-                 SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-         Connection connection = sqlSession.getConnection();
-         Statement statement1 = connection.createStatement();
-         ResultSet rs1 =
-                 statement1.executeQuery(
-                         String.format(
-                                 "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d AND deleted_at = 0",
-                                 metalakeId))) {
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d AND deleted_at = 0",
+                    metalakeId))) {
       if (rs1.next()) {
         return rs1.getInt(1);
       } else {

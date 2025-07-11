@@ -19,6 +19,7 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.collect.Maps;
+import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -27,108 +28,104 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.stats.StatisticValue;
 
-import java.util.Map;
-
 public class StatisticEntity implements Entity, HasIdentifier, Auditable {
-    public static final Field ID =
-            Field.required("id", Long.class, "The unique identifier of the statistic entity.");
-    public static final Field NAME =
-            Field.required("name", String.class, "The name of the statistic entity.");
-    public static final Field VALUE =
-            Field.required("value", StatisticValue.class, "The value of the statistic entity.");
-    public static final Field AUDIT_INFO =
-            Field.required("audit_info", Audit.class, "The audit details of the statistic entity.");
+  public static final Field ID =
+      Field.required("id", Long.class, "The unique identifier of the statistic entity.");
+  public static final Field NAME =
+      Field.required("name", String.class, "The name of the statistic entity.");
+  public static final Field VALUE =
+      Field.required("value", StatisticValue.class, "The value of the statistic entity.");
+  public static final Field AUDIT_INFO =
+      Field.required("audit_info", Audit.class, "The audit details of the statistic entity.");
 
+  private Long id;
+  private String name;
+  private StatisticValue<?> value;
+  private AuditInfo auditInfo;
+  private Namespace namespace;
 
-    private Long id;
-    private String name;
-    private StatisticValue<?> value;
-    private AuditInfo auditInfo;
-    private Namespace namespace;
+  @Override
+  public Audit auditInfo() {
+    return auditInfo;
+  }
 
+  @Override
+  public Map<Field, Object> fields() {
+    Map<Field, Object> fields = Maps.newHashMap();
+    fields.put(ID, id);
+    fields.put(NAME, name);
+    fields.put(VALUE, value);
+    fields.put(AUDIT_INFO, auditInfo);
+    return fields;
+  }
 
+  @Override
+  public EntityType type() {
+    return EntityType.STATISTIC;
+  }
 
-    @Override
-    public Audit auditInfo() {
-        return auditInfo;
+  @Override
+  public String name() {
+    return name;
+  }
+
+  @Override
+  public Long id() {
+    return id;
+  }
+
+  @Override
+  public Namespace namespace() {
+    return namespace;
+  }
+
+  public StatisticValue<?> value() {
+    return value;
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static class Builder {
+    private final StatisticEntity statisticEntity;
+
+    private Builder() {
+      statisticEntity = new StatisticEntity();
     }
 
-    @Override
-    public Map<Field, Object> fields() {
-        Map<Field, Object> fields = Maps.newHashMap();
-        fields.put(ID, id);
-        fields.put(NAME, name);
-        fields.put(VALUE, value);
-        fields.put(AUDIT_INFO, auditInfo);
-        return fields;
+    public Builder withId(Long id) {
+      statisticEntity.id = id;
+      return this;
     }
 
-    @Override
-    public EntityType type() {
-        return EntityType.STATISTIC;
+    public Builder withName(String name) {
+      statisticEntity.name = name;
+      return this;
     }
 
-    @Override
-    public String name() {
-        return name;
+    public Builder withValue(StatisticValue<?> value) {
+      statisticEntity.value = value;
+      return this;
     }
 
-    @Override
-    public Long id() {
-        return id;
+    public Builder withAuditInfo(AuditInfo auditInfo) {
+      statisticEntity.auditInfo = auditInfo;
+      return this;
     }
 
-    public StatisticValue<?> value() {
-        return value;
+    public Builder withNamespace(Namespace namespace) {
+      statisticEntity.namespace = namespace;
+      return this;
     }
 
-
-
-
-    public static Builder builder() {
-        return new Builder();
+    public Builder withNamespace(String namespace) {
+      statisticEntity.namespace = Namespace.of(namespace);
+      return this;
     }
 
-    public static class Builder {
-        private final StatisticEntity statisticEntity;
-
-        private Builder() {
-            statisticEntity = new StatisticEntity();
-        }
-
-        public Builder withId(Long id) {
-            statisticEntity.id = id;
-            return this;
-        }
-
-        public Builder withName(String name) {
-            statisticEntity.name = name;
-            return this;
-        }
-
-        public Builder withValue(StatisticValue<?> value) {
-            statisticEntity.value = value;
-            return this;
-        }
-
-        public Builder withAuditInfo(AuditInfo auditInfo) {
-            statisticEntity.auditInfo = auditInfo;
-            return this;
-        }
-
-        public Builder withNamespace(Namespace namespace) {
-            statisticEntity.namespace = namespace;
-            return this;
-        }
-
-        public Builder withNamespace(String namespace) {
-            statisticEntity.namespace = Namespace.of(namespace);
-            return this;
-        }
-
-
-        public StatisticEntity build() {
-            return statisticEntity;
-        }
+    public StatisticEntity build() {
+      return statisticEntity;
     }
+  }
 }
