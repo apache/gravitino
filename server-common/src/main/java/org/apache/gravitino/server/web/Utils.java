@@ -213,8 +213,7 @@ public class Utils {
 
     String dataOperation =
         httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION);
-    if (StringUtils.isNotBlank(
-        httpRequest.getHeader(FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION))) {
+    if (StringUtils.isNotBlank(dataOperation)) {
       filteredHeaders.put(
           FilesetAuditConstants.HTTP_HEADER_FILESET_DATA_OPERATION,
           FilesetDataOperation.checkValid(dataOperation)
