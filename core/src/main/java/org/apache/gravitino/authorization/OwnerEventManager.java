@@ -55,12 +55,13 @@ public class OwnerEventManager extends OwnerManager {
     NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     String user = PrincipalUtils.getCurrentUserName();
     OwnerInfo ownerInfo = new OwnerInfo(ownerName, ownerType);
-    eventBus.dispatchEvent(new SetOwnerPreEvent(user, identifier, ownerInfo));
+    MetadataObject.Type type = metadataObject.type();
+    eventBus.dispatchEvent(new SetOwnerPreEvent(user, identifier, ownerInfo, type));
     try {
       ownerManager.setOwner(metalake, metadataObject, ownerName, ownerType);
-      eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo));
+      eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo, type));
     } catch (Exception e) {
-      eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo));
+      eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo, type));
       throw e;
     }
   }
@@ -70,17 +71,18 @@ public class OwnerEventManager extends OwnerManager {
     NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     String user = PrincipalUtils.getCurrentUserName();
     OwnerInfo ownerInfo = null;
-    eventBus.dispatchEvent(new GetOwnerPreEvent(user, identifier, ownerInfo));
+    MetadataObject.Type type = metadataObject.type();
+    eventBus.dispatchEvent(new GetOwnerPreEvent(user, identifier, ownerInfo, type));
     try {
       Optional<Owner> owner = ownerManager.getOwner(metalake, metadataObject);
       if (owner.isPresent()) {
         ownerInfo = new OwnerInfo(owner.get().name(), owner.get().type());
       }
 
-      eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo));
+      eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo, type));
       return owner;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo));
+      eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo, type));
       throw e;
     }
   }

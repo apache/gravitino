@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
@@ -26,7 +27,8 @@ import org.apache.gravitino.listener.api.info.OwnerInfo;
 @DeveloperApi
 public class GetOwnerEvent extends OwnerEvent {
 
-  public GetOwnerEvent(String user, NameIdentifier identifier, OwnerInfo ownerInfo) {
-    super(user, identifier, ownerInfo);
+  public GetOwnerEvent(
+      String user, NameIdentifier identifier, OwnerInfo ownerInfo, MetadataObject.Type type) {
+    super(user, identifier, ownerInfo, type);
   }
 }

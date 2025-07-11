@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import lombok.Getter;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
@@ -28,9 +29,12 @@ import org.apache.gravitino.listener.api.info.OwnerInfo;
 @Getter
 public abstract class OwnerEvent extends Event {
   private final OwnerInfo ownerInfo;
+  private final MetadataObject.Type type;
 
-  public OwnerEvent(String user, NameIdentifier identifier, OwnerInfo ownerInfo) {
+  public OwnerEvent(
+      String user, NameIdentifier identifier, OwnerInfo ownerInfo, MetadataObject.Type type) {
     super(user, identifier);
     this.ownerInfo = ownerInfo;
+    this.type = type;
   }
 }
