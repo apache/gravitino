@@ -17,6 +17,7 @@
 import unittest
 
 from gravitino import GravitinoAdminClient, GravitinoClient
+from gravitino.constants.timeout import TIMEOUT
 from tests.unittests import mock_base
 
 
@@ -43,3 +44,23 @@ class TestMetalake(unittest.TestCase):
         self.assertEqual(
             expected_headers, gravitino_client._rest_client.request_headers
         )
+
+    # pylint: disable=W0212
+    def test_gravitino_client_timeout(self, *mock_methods):
+        gravitino_admin_client = GravitinoAdminClient(
+            uri="http://localhost:8090",
+        )
+        self.assertEqual(TIMEOUT, gravitino_admin_client._rest_client.timeout)
+
+        gravitino_admin_client = GravitinoAdminClient(
+            uri="http://localhost:8090",
+            timeout=60,
+        )
+        self.assertEqual(60, gravitino_admin_client._rest_client.timeout)
+
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name="test",
+            timeout=60,
+        )
+        self.assertEqual(60, gravitino_client._rest_client.timeout)
