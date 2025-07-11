@@ -24,6 +24,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
 
+/** Event triggered before retrieving the owner information of a metadata object. */
 @DeveloperApi
 public class GetOwnerPreEvent extends OwnerPreEvent {
   public GetOwnerPreEvent(

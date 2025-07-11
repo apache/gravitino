@@ -24,6 +24,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
 
+/** Event triggered when getting the owner of a metadata object fails. */
 @DeveloperApi
 public class GetOwnerFailureEvent extends OwnerFailureEvent {
   public GetOwnerFailureEvent(

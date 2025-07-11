@@ -19,14 +19,13 @@
 
 package org.apache.gravitino.listener.api.event;
 
-import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
 
+/** Base class for owner-related failure events in the listener API. */
 @DeveloperApi
-@Getter
 public abstract class OwnerFailureEvent extends FailureEvent {
   private final OwnerInfo ownerInfo;
   private final MetadataObject.Type type;
@@ -40,5 +39,13 @@ public abstract class OwnerFailureEvent extends FailureEvent {
     super(user, identifier, exception);
     this.ownerInfo = ownerInfo;
     this.type = type;
+  }
+
+  public OwnerInfo getOwnerInfo() {
+    return ownerInfo;
+  }
+
+  public MetadataObject.Type getType() {
+    return type;
   }
 }

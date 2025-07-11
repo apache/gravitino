@@ -24,6 +24,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
 
+/** Event triggered when setting an owner fails. */
 @DeveloperApi
 public class SetOwnerFailureEvent extends OwnerFailureEvent {
   public SetOwnerFailureEvent(

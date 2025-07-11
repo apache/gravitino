@@ -24,6 +24,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
 
+/**
+ * Represents an event that occurs when an owner is set for a metadata object. This event is
+ * triggered after the owner has been successfully set.
+ */
 @DeveloperApi
 public class SetOwnerEvent extends OwnerEvent {
   public SetOwnerEvent(

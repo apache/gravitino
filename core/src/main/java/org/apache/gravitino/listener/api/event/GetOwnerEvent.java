@@ -24,6 +24,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.listener.api.info.OwnerInfo;
 
+/**
+ * GetOwnerEvent is an event that is triggered when the owner of a metadata object is retrieved
+ * successfully.
+ */
 @DeveloperApi
 public class GetOwnerEvent extends OwnerEvent {
 
