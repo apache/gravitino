@@ -36,7 +36,7 @@ the future versions.
 4. Same tag can be associated to both parent and child metadata objects. When you list the
    associated tags of a child metadata object, this tag will be included twice in the result
    list with different `inherited` values.
-   :::
+:::
 
 ## Tag operations
 
