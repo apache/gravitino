@@ -23,6 +23,7 @@ import { NavigationEvents } from './rootLayout/navigation-events'
 import Provider from '@/lib/provider'
 import Layout from './rootLayout/Layout'
 import StyledToast from '../components/StyledToast'
+import MsalProviderWrapper from './msal-provider'
 
 import '../lib/icons/iconify-icons.css'
 
@@ -38,10 +39,12 @@ const RootLayout = ({ children }) => {
   return (
     <html lang='en' suppressHydrationWarning>
       <body>
-        <Provider>
-          <NavigationEvents />
-          <Layout>{children}</Layout>
-        </Provider>
+        <MsalProviderWrapper>
+          <Provider>
+            <NavigationEvents />
+            <Layout>{children}</Layout>
+          </Provider>
+        </MsalProviderWrapper>
         <StyledToast />
       </body>
     </html>

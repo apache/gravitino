@@ -17,6 +17,8 @@
     "gen:icons": "tsx src/lib/icons/iconify-icons.js && prettier --write src/lib/icons/iconify-icons.css"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.15.0",
+    "@azure/msal-react": "^3.0.15",
     "@emotion/cache": "^11.11.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
