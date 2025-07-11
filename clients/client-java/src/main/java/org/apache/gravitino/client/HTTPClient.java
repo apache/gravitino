@@ -673,7 +673,9 @@ public class HTTPClient implements RESTClient {
     // avoid failures.
     request.setHeader(HttpHeaders.CONTENT_TYPE, bodyMimeType);
     request.setHeader(HttpHeaders.ACCEPT, VERSION_HEADER);
-    requestHeaders.forEach(request::setHeader);
+    if (requestHeaders != null) {
+      requestHeaders.forEach(request::setHeader);
+    }
   }
 
   /**

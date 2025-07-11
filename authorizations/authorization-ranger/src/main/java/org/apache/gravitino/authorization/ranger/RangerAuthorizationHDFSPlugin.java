@@ -158,7 +158,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
   @Override
   /** Wildcard search the Ranger policies in the different Ranger service. */
-  protected List<RangerPolicy> wildcardSearchPolies(
+  protected List<RangerPolicy> wildcardSearchPolicies(
       AuthorizationMetadataObject authzMetadataObject) {
     Preconditions.checkArgument(authzMetadataObject instanceof PathBasedMetadataObject);
     PathBasedMetadataObject pathBasedMetadataObject = (PathBasedMetadataObject) authzMetadataObject;
@@ -205,8 +205,8 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       MetadataObject.Type operationType,
       AuthorizationMetadataObject oldAuthzMetaObject,
       AuthorizationMetadataObject newAuthzMetaObject) {
-    List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaObject);
-    List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaObject);
+    List<RangerPolicy> oldPolicies = wildcardSearchPolicies(oldAuthzMetaObject);
+    List<RangerPolicy> existNewPolicies = wildcardSearchPolicies(newAuthzMetaObject);
     if (oldPolicies.isEmpty()) {
       LOG.warn("Cannot find the Ranger policy for the metadata object({})!", oldAuthzMetaObject);
       return;

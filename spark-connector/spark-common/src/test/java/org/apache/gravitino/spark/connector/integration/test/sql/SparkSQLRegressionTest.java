@@ -112,7 +112,7 @@ public abstract class SparkSQLRegressionTest {
       throw new RuntimeException(e);
     }
 
-    if (testCases.isEmpty() == false) {
+    if (!testCases.isEmpty()) {
       sqlTestCaseGroups.add(
           new TestCaseGroup(testCases, prepareSql, cleanupSql, parentCatalogType));
     }
