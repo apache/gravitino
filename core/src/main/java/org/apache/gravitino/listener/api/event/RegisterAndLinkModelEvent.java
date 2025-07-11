@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.info.ModelInfo;
 
@@ -28,7 +29,7 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
  */
 public class RegisterAndLinkModelEvent extends ModelEvent {
   private final ModelInfo registeredModelInfo;
-  private final String uri;
+  private final Map<String, String> uris;
 
   /**
    * Constructs a new instance of {@link RegisterAndLinkModelEvent}, capturing the user, identifier,
@@ -38,14 +39,17 @@ public class RegisterAndLinkModelEvent extends ModelEvent {
    * @param identifier The identifier of the Model involved in the operation. This encapsulates some
    *     information.
    * @param registeredModelInfo The final state of the model post-creation.
-   * @param uri The uri of the linked model version.
+   * @param uris The URIs of the linked model version.
    */
   public RegisterAndLinkModelEvent(
-      String user, NameIdentifier identifier, ModelInfo registeredModelInfo, String uri) {
+      String user,
+      NameIdentifier identifier,
+      ModelInfo registeredModelInfo,
+      Map<String, String> uris) {
     super(user, identifier);
 
     this.registeredModelInfo = registeredModelInfo;
-    this.uri = uri;
+    this.uris = uris;
   }
 
   /**
@@ -58,12 +62,12 @@ public class RegisterAndLinkModelEvent extends ModelEvent {
   }
 
   /**
-   * Retrieves the uri of the linked model version.
+   * Retrieves the URIs of the linked model version.
    *
-   * @return the uri of the linked model version
+   * @return the URIs of the linked model version
    */
-  public String uri() {
-    return uri;
+  public Map<String, String> uris() {
+    return uris;
   }
 
   /**
