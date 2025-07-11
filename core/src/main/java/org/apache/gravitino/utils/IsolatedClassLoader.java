@@ -151,6 +151,7 @@ public class IsolatedClassLoader implements Closeable {
     try {
       if (classLoader != null) {
         classLoader.close();
+        classLoader = null;
       }
     } catch (Exception e) {
       LOG.warn("Failed to close classloader", e);
