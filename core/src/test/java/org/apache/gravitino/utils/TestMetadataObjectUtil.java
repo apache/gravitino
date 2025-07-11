@@ -31,7 +31,7 @@ public class TestMetadataObjectUtil {
   public void testToEntityType() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> MetadataObjectUtil.toEntityType(null),
+        () -> MetadataObjectUtil.toEntityType((MetadataObject) null),
         "metadataObject cannot be null");
 
     Assertions.assertEquals(

@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import lombok.Getter;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -44,7 +45,7 @@ import org.slf4j.LoggerFactory;
  */
 public class OwnerManager {
   private static final Logger LOG = LoggerFactory.getLogger(OwnerManager.class);
-  private final EntityStore store;
+  @Getter private final EntityStore store;
 
   public OwnerManager(EntityStore store) {
     if (store instanceof SupportsRelationOperations) {

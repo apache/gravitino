@@ -23,6 +23,7 @@ import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
+import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -509,7 +510,8 @@ public class GravitinoEnv {
           new AccessControlHookDispatcher(accessControlManager);
       this.accessControlDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
-      this.ownerManager = new OwnerManager(entityStore);
+      OwnerManager ownerManager = new OwnerManager(entityStore);
+      this.ownerManager = new OwnerEventManager(eventBus, ownerManager);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
