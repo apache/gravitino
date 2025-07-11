@@ -16,6 +16,8 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   format = 'PARQUET',
+   format_version = '2',
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb04'
 )"
 
