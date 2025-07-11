@@ -65,3 +65,19 @@ Define the gravitino.namespace
 {{- define "gravitino.namespace" -}}
     {{- .Release.Namespace -}}
 {{- end -}}
+
+{{/*
+Return the proper Gravitino image name
+*/}}
+{{- define "gravitino.image" -}}
+  {{- include "common.images.image" (dict "imageRoot" .Values.image "global" .Values.global) -}}
+{{- end -}}
+
+{{/*
+Return the proper MySQL image name for the init-mysql initContainer
+*/}}
+{{- define "init-mysql.image" -}}
+{{- if .Values.mysql.enabled -}}
+  {{- include "common.images.image" (dict "imageRoot" .Values.mysql.image "global" .Values.global) -}}
+{{- end -}}
+{{- end -}}

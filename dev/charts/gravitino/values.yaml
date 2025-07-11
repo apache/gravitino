@@ -16,18 +16,23 @@
 # specific language governing permissions and limitations
 # under the License.
 #
+global:
+  # Set if you want to change the default docker registry, e.g. a private one.
+  #  imageRegistry: myRegistryName
 
-image:
-  repository: apache/gravitino
-  tag: 1.0.0-SNAPSHOT
-  pullPolicy: IfNotPresent
   ## Optionally specify an array of pullSecrets (secrets must be manually created in the namespace)
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
   ## Example:
-  ## pullSecrets:
-  ##   - myRegistryKeySecretName
+  ## imagePullSecrets:
+  ##   - name: my-registry-secret
   ##
-  pullSecrets: []
+  imagePullSecrets: []
+
+image:
+  registry: docker.io
+  repository: apache/gravitino
+  tag: 0.9.1
+  pullPolicy: IfNotPresent
 
 ## MySQL chart configuration
 ## ref: https://github.com/bitnami/charts/blob/main/bitnami/mysql/values.yaml
@@ -44,9 +49,7 @@ mysql:
   ##
   image:
     tag: 8.0.36-debian-12-r12
-  ## @param initdbScriptsConfigMap ConfigMap with the initdb scripts
-  ##
-  initdbScriptsConfigMap: gravitino-mysql-init
+  sqlScriptVersion: 0.9.0
   ## MySQL Authentication parameters
   ##
   auth:
@@ -417,6 +420,14 @@ resources: {}
 #   limits:
 #     cpu: 2000m
 #     memory: 3Gi
+
+initResources: {}
+#  limits:
+#     cpu: "25m"
+#     memory: "128Mi"
+#  requests:
+#     cpu: "25m"
+#     memory: "128Mi"
 
 ## Node labels for pod assignment
 ## ref: https://kubernetes.io/docs/user-guide/node-selection/
