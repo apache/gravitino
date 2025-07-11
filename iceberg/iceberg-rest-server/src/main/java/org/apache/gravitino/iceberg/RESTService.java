@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.Servlet;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -107,14 +108,14 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergNamespaceEventDispatcher(
             icebergNamespaceOperationExecutor, eventBus, metalakeName);
 
-    IcebergRESTAuthInterceptionService authInterceptor =
-        new IcebergRESTAuthInterceptionService(metalakeName);
-
     config.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(authInterceptor).to(InterceptionService.class);
+            if (icebergConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+              bind(new IcebergRESTAuthInterceptionService(metalakeName))
+                  .to(InterceptionService.class);
+            }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
             bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
