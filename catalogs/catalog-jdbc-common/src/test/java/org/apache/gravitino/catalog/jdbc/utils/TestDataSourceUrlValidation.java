@@ -28,7 +28,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestDataSourceUtils {
+public class TestDataSourceUrlValidation {
 
   @Test
   public void testCreateDataSource() throws SQLException {
