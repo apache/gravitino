@@ -1608,7 +1608,11 @@ public class POConverters {
                 return builder
                     .withStatisticId(statisticEntity.id())
                     .withStatisticName(statisticEntity.name())
-                    .withValue(JsonUtils.objectMapper().writeValueAsString(statisticEntity.value()))
+                    .withValue(
+                        JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.value()))
+                    .withDeletedAt(DEFAULT_DELETED_AT)
+                    .withCurrentVersion(INIT_VERSION)
+                    .withLastVersion(INIT_VERSION)
                     .withAuditInfo(
                         JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.auditInfo()))
                     .build();

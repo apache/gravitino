@@ -303,8 +303,8 @@ public class JsonUtils {
                     .addSerializer(Type.class, new TypeSerializer())
                     .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
                     .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
-                        .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
-                        .addSerializer(StatisticValue.class, new StatisticValueSerializer()));
+                    .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
+                    .addSerializer(StatisticValue.class, new StatisticValueSerializer()));
   }
 
   /**
@@ -1331,9 +1331,10 @@ public class JsonUtils {
     }
   }
 
-  public static class StatisticValueDeserializer extends JsonDeserializer<StatisticValue<?>> {
+  public static class StatisticValueDeserializer extends JsonDeserializer<StatisticValue> {
     @Override
-    public StatisticValue<?> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+    public StatisticValue<?> deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException {
       JsonNode node = p.getCodec().readTree(p);
       return getStatisticValue(node);
     }
@@ -1341,9 +1342,7 @@ public class JsonUtils {
 
   private static StatisticValue<?> getStatisticValue(JsonNode node) throws IOException {
     Preconditions.checkArgument(
-        node != null && !node.isNull() && node.isObject(),
-        "Cannot parse statistic value from invalid JSON: %s",
-            node);
+        node != null && !node.isNull(), "Cannot parse statistic value from invalid JSON: %s", node);
     if (node.isIntegralNumber()) {
       return StatisticValues.longValue(node.asLong());
     } else if (node.isFloatingPointNumber()) {
@@ -1364,29 +1363,32 @@ public class JsonUtils {
       return StatisticValues.listValue(values);
     } else if (node.isObject()) {
       ObjectNode objectNode = (ObjectNode) node;
-        Map<String, StatisticValue<?>> map = Maps.newHashMap();
-        objectNode.fields().forEachRemaining(
-            entry -> {
-              try {
-                StatisticValue<?> value = getStatisticValue(entry.getValue());
-                if (value != null) {
-                  map.put(entry.getKey(), value);
+      Map<String, StatisticValue<?>> map = Maps.newHashMap();
+      objectNode
+          .fields()
+          .forEachRemaining(
+              entry -> {
+                try {
+                  StatisticValue<?> value = getStatisticValue(entry.getValue());
+                  if (value != null) {
+                    map.put(entry.getKey(), value);
+                  }
+                } catch (IOException e) {
+                  throw new RuntimeException(e);
                 }
-              } catch (IOException e) {
-                throw new RuntimeException(e);
-              }
-            });
-        return StatisticValues.objectValue(map);
+              });
+      return StatisticValues.objectValue(map);
     } else {
-      throw new UnsupportedEncodingException(String.format("Don't support json node type %s", node.getNodeType()));
+      throw new UnsupportedEncodingException(
+          String.format("Don't support json node type %s", node.getNodeType()));
     }
   }
 
-  public static class StatisticValueSerializer extends JsonSerializer<StatisticValue<?>> {
+  public static class StatisticValueSerializer extends JsonSerializer<StatisticValue> {
 
     @Override
-    public void serialize(StatisticValue<?> value, JsonGenerator gen, SerializerProvider serializers)
-            throws IOException {
+    public void serialize(StatisticValue value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
       if (value.dataType().name() == Type.Name.BOOLEAN) {
         gen.writeBoolean((Boolean) value.value());
       } else if (value.dataType().name() == Type.Name.STRING) {
@@ -1397,13 +1399,14 @@ public class JsonUtils {
         gen.writeNumber((Long) value.value());
       } else if (value.dataType().name() == Type.Name.LIST) {
         gen.writeStartArray();
-        for (StatisticValue<?> element : (List<StatisticValue<?>>)value.value()) {
+        for (StatisticValue<?> element : (List<StatisticValue<?>>) value.value()) {
           serialize(element, gen, serializers);
         }
         gen.writeEndArray();
       } else if (value.dataType().name() == Type.Name.STRUCT) {
         gen.writeStartObject();
-        for (Map.Entry<String, StatisticValue<?>> entry : ((Map<String, StatisticValue<?>>)value.value()).entrySet()) {
+        for (Map.Entry<String, StatisticValue<?>> entry :
+            ((Map<String, StatisticValue<?>>) value.value()).entrySet()) {
           gen.writeFieldName(entry.getKey());
           serialize(entry.getValue(), gen, serializers);
         }
@@ -1413,7 +1416,6 @@ public class JsonUtils {
       }
     }
   }
-
 
   /** Custom JSON serializer for PartitionDTO objects. */
   public static class PartitionDTOSerializer extends JsonSerializer<PartitionDTO> {

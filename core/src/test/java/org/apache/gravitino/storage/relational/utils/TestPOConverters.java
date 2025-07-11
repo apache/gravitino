@@ -1230,13 +1230,14 @@ public class TestPOConverters {
                 AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build())
             .build());
     StatisticPO.Builder builder = StatisticPO.builder();
+    builder.withObjectType(MetadataObject.Type.CATALOG.name()).withObjectId(1L);
     List<StatisticPO> statisticPOs =
         POConverters.initializeStatisticPOs(statisticEntities, builder);
 
     assertEquals(1, statisticPOs.get(0).getCurrentVersion());
     assertEquals(1, statisticPOs.get(0).getLastVersion());
     assertEquals(0, statisticPOs.get(0).getDeletedAt());
-    assertEquals("test", statisticPOs.get(0).getValue());
+    assertEquals("\"test\"", statisticPOs.get(0).getValue());
     assertEquals("test_statistic", statisticPOs.get(0).getStatisticName());
 
     StatisticPO statisticPO =
@@ -1245,11 +1246,18 @@ public class TestPOConverters {
             .withLastVersion(1L)
             .withCurrentVersion(1L)
             .withStatisticName("test")
-            .withValue("test")
+            .withValue("\"test\"")
             .withObjectId(1L)
             .withObjectType("CATALOG")
             .withDeletedAt(0L)
             .withMetalakeId(1L)
+            .withAuditInfo(
+                JsonUtils.anyFieldMapper()
+                    .writeValueAsString(
+                        AuditInfo.builder()
+                            .withCreator("creator")
+                            .withCreateTime(FIX_INSTANT)
+                            .build()))
             .build();
     StatisticEntity entity = POConverters.fromStatisticPO(statisticPO);
     Assertions.assertEquals(1L, entity.id());
