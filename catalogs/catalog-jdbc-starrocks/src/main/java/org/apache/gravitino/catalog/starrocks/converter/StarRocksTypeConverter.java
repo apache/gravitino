@@ -22,7 +22,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 
-/** Type converter for Apache StarRocks. */
+/** Type converter for StarRocks. */
 public class StarRocksTypeConverter extends JdbcTypeConverter {
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
