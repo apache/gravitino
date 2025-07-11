@@ -57,13 +57,15 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
    * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
    *     support the case that the client-side version is higher than the server-side version.
    * @param headers The base header for Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
    */
   private GravitinoAdminClient(
       String uri,
       AuthDataProvider authDataProvider,
       boolean checkVersion,
-      Map<String, String> headers) {
-    super(uri, authDataProvider, checkVersion, headers);
+      Map<String, String> headers,
+      Map<String, String> properties) {
+    super(uri, authDataProvider, checkVersion, headers, properties);
   }
 
   /**
@@ -256,7 +258,7 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     public GravitinoAdminClient build() {
       Preconditions.checkArgument(
           uri != null && !uri.isEmpty(), "The argument 'uri' must be a valid URI");
-      return new GravitinoAdminClient(uri, authDataProvider, checkVersion, headers);
+      return new GravitinoAdminClient(uri, authDataProvider, checkVersion, headers, properties);
     }
   }
 }

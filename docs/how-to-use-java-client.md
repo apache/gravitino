@@ -1,0 +1,45 @@
+---
+title: "How to use Apache Gravitino Java client"
+slug: /how-to-use-gravitino-java-client
+date: 2025-07-09
+keyword: Gravitino Java client
+license: This software is licensed under the Apache License version 2.
+---
+
+## Introduction
+
+You can use Gravitino Java client library with Spark, Spring and other Java environment.
+
+First of all, You must have a Gravitino server set up and run, You can refer document of How to install Gravitino to build Gravitino server from source code and install it in your local.
+
+## Gravitino Java client configurations
+
+You can customize the Gravitino Java client by using `withClientConfig`. 
+```java
+ Map<String, String> properties =
+        ImmutableMap.of(
+            "gravitino.client.connectionTimeoutMs", "10", 
+            "gravitino.client.socketTimeoutMs", "10"
+        );
+
+GravitinoClient gravitinoClient = GravitinoClient.builder("http://localhost:8090")
+.withMetalake("metalake")
+.withClientConfig(properties) // add custom client config (optional)
+.builder();
+
+GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http://localhost:8090")
+.withClientConfig(properties) // add custom client config (optional)
+.builder();
+// ...
+```
+
+### Gravitino Java client configuration
+
+| Configuration item                     | Description                                          | Default value | Required | Since version |
+|----------------------------------------|------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.client.connectionTimeoutMs` | An optional http connection timeout in milliseconds. | (none)        | No       | 1.0.0         |
+| `gravitino.client.socketTimeoutMs`     | An optional http socket timeout in milliseconds.     | (none)        | No       | 1.0.0         |
+
+## License
+
+Gravitino is under the Apache License Version 2.0, See the [LICENSE](https://github.com/apache/gravitino/blob/main/LICENSE) for the details.
