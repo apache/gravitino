@@ -148,7 +148,7 @@ public abstract class BaseModelVersion implements ModelVersion {
     /**
      * Sets the URI of the model artifact.
      *
-     * @param uri The URIs of the model artifact.
+     * @param uri The URI of the model artifact.
      * @return The builder instance.
      */
     @Override
