@@ -240,6 +240,7 @@ public class SparkJobTemplate extends JobTemplate {
      */
     @Override
     public SparkJobTemplate build() {
+      validate();
       return new SparkJobTemplate(this);
     }
 
