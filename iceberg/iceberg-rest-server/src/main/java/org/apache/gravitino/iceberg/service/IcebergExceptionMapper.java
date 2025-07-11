@@ -71,6 +71,10 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
 
   @Override
   public Response toResponse(Exception ex) {
+    return toRESTResponse(ex);
+  }
+
+  public static Response toRESTResponse(Exception ex) {
     int status =
         EXCEPTION_ERROR_CODES.getOrDefault(
             ex.getClass(), Status.INTERNAL_SERVER_ERROR.getStatusCode());
