@@ -17,22 +17,37 @@
 
 package org.apache.gravitino.server.authorization;
 
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 /** Test of {@link MetadataFilterHelper} */
 public class TestMetadataFilterHelper {
+
+  @BeforeAll
+  public static void setup() {
+    MockedStatic<GravitinoEnv> mockedStatic = mockStatic(GravitinoEnv.class);
+    GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
+    mockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+    Config configMock = mock(Config.class);
+    when(gravitinoEnv.config()).thenReturn(configMock);
+    when(configMock.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(true);
+  }
 
   @Test
   public void testFilter() {
