@@ -36,6 +36,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.TableDispatcher;
@@ -49,6 +51,9 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -59,6 +64,11 @@ import org.slf4j.LoggerFactory;
 public class TableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
+
+  private static final String loadTableAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) ||"
+          + "SCHEMA_OWNER_WITH_USE_CATALOG ||"
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)";
 
   private final TableDispatcher dispatcher;
 
@@ -84,6 +94,9 @@ public class TableOperations {
           () -> {
             Namespace tableNS = NamespaceUtil.ofTable(metalake, catalog, schema);
             NameIdentifier[] idents = dispatcher.listTables(tableNS);
+            idents =
+                MetadataFilterHelper.filterByExpression(
+                    metalake, loadTableAuthorizationExpression, Entity.EntityType.TABLE, idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
                 "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
@@ -99,10 +112,18 @@ public class TableOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
       TableCreateRequest request) {
     LOG.info(
         "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
@@ -140,11 +161,19 @@ public class TableOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table) {
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table) {
     LOG.info(
         "Received load table request for table: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
@@ -167,11 +196,19 @@ public class TableOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table,
       TableUpdatesRequest request) {
     LOG.info("Received alter table request: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
@@ -200,11 +237,19 @@ public class TableOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+          String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
     LOG.info(
         "Received {} table request: {}.{}.{}.{}",

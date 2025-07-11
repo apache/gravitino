@@ -65,12 +65,11 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestModelOperations extends JerseyTest {
+public class TestModelOperations extends BaseOperationsTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
 

@@ -61,14 +61,13 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestSchemaOperations extends JerseyTest {
+public class TestSchemaOperations extends BaseOperationsTest {
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
