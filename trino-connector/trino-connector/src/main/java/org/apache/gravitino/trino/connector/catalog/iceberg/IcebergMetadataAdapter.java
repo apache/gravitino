@@ -20,7 +20,6 @@ package org.apache.gravitino.trino.connector.catalog.iceberg;
 
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.FORMAT;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.FORMAT_VERSION;
-import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants.PROVIDER;
 import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_FORMAT_PROPERTY;
 import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergPropertyMeta.ICEBERG_FORMAT_VERSION_PROPERTY;
 import static org.apache.gravitino.trino.connector.catalog.iceberg.IcebergTablePropertyConverter.convertTableFormatToTrino;
@@ -120,9 +119,6 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
     if (propertyMap.containsKey(ICEBERG_FORMAT_PROPERTY)) {
       String format = propertyMap.get(ICEBERG_FORMAT_PROPERTY).toString();
       properties.put(FORMAT, format);
-      properties.put(PROVIDER, format);
-      properties.put(
-          FORMAT_VERSION, String.valueOf(propertyMap.get(ICEBERG_FORMAT_VERSION_PROPERTY)));
     }
 
     List<GravitinoColumn> columns = new ArrayList<>();
