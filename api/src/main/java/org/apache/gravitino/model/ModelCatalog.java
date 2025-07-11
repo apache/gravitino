@@ -75,8 +75,8 @@ public interface ModelCatalog {
   /**
    * Register a model in the catalog if the model is not existed, otherwise the {@link
    * ModelAlreadyExistsException} will be thrown. The {@link Model} object will be created when the
-   * model is registered, users can call {@link ModelCatalog#linkModelVersion(NameIdentifier, Map,
-   * String[], String, Map)} to link the model version to the registered {@link Model}.
+   * model is registered, users can call {@link ModelCatalog#linkModelVersion(NameIdentifier,
+   * String, String[], String, Map)} to link the model version to the registered {@link Model}.
    *
    * @param ident The name identifier of the model.
    * @param comment The comment of the model. The comment is optional and can be null.
@@ -96,7 +96,7 @@ public interface ModelCatalog {
    * linked to the registered model.
    *
    * @param ident The name identifier of the model.
-   * @param uris The names and URIs of the model version artifact.
+   * @param uri The model artifact URI.
    * @param aliases The aliases of the model version. The aliases should be unique in this model,
    *     otherwise the {@link ModelVersionAliasesAlreadyExistException} will be thrown. The aliases
    *     are optional and can be empty. Also, be aware that the alias cannot be a number or a number
@@ -111,14 +111,14 @@ public interface ModelCatalog {
    */
   default Model registerModel(
       NameIdentifier ident,
-      Map<String, String> uris,
+      String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchSchemaException, ModelAlreadyExistsException,
           ModelVersionAliasesAlreadyExistException {
     Model model = registerModel(ident, comment, properties);
-    linkModelVersion(ident, uris, aliases, comment, properties);
+    linkModelVersion(ident, uri, aliases, comment, properties);
     return model;
   }
 

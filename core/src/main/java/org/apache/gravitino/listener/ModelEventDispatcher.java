@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -122,7 +123,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public Model registerModel(
       NameIdentifier ident,
-      Map<String, String> uris,
+      String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
@@ -130,7 +131,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
           ModelVersionAliasesAlreadyExistException {
     ModelInfo registerModelRequest = new ModelInfo(ident.name(), properties, comment);
     ModelVersionInfo linkModelVersionRequest =
-        new ModelVersionInfo(uris, comment, properties, aliases);
+        new ModelVersionInfo(
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri), comment, properties, aliases);
     String user = PrincipalUtils.getCurrentUserName();
     RegisterAndLinkModelPreEvent registerAndLinkModelPreEvent =
         new RegisterAndLinkModelPreEvent(
@@ -138,9 +140,14 @@ public class ModelEventDispatcher implements ModelDispatcher {
 
     eventBus.dispatchEvent(registerAndLinkModelPreEvent);
     try {
-      Model registeredModel = dispatcher.registerModel(ident, uris, aliases, comment, properties);
+      Model registeredModel = dispatcher.registerModel(ident, uri, aliases, comment, properties);
       ModelInfo registeredModelInfo = new ModelInfo(registeredModel);
-      eventBus.dispatchEvent(new RegisterAndLinkModelEvent(user, ident, registeredModelInfo, uris));
+      eventBus.dispatchEvent(
+          new RegisterAndLinkModelEvent(
+              user,
+              ident,
+              registeredModelInfo,
+              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri)));
       return registeredModel;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -203,17 +210,19 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      Map<String, String> uris,
+      String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    ModelVersionInfo linkModelRequest = new ModelVersionInfo(uris, comment, properties, aliases);
+    ModelVersionInfo linkModelRequest =
+        new ModelVersionInfo(
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri), comment, properties, aliases);
     String user = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new LinkModelVersionPreEvent(user, ident, linkModelRequest));
     try {
-      dispatcher.linkModelVersion(ident, uris, aliases, comment, properties);
+      dispatcher.linkModelVersion(ident, uri, aliases, comment, properties);
       eventBus.dispatchEvent(new LinkModelVersionEvent(user, ident, linkModelRequest));
     } catch (Exception e) {
       eventBus.dispatchEvent(new LinkModelVersionFailureEvent(user, ident, e, linkModelRequest));

@@ -64,7 +64,6 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
-import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -405,8 +404,8 @@ public class TestModelCatalogOperations {
     Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
 
     String[] aliases = new String[] {"alias1", "alias2"};
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
-    ops.linkModelVersion(modelIdent, uris, aliases, "version1 comment", versionProperties);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
 
     Model loadedModel = ops.getModel(modelIdent);
     Assertions.assertEquals(1, loadedModel.latestVersion());
@@ -414,7 +413,7 @@ public class TestModelCatalogOperations {
     ModelVersion loadedVersion = ops.getModelVersion(modelIdent, 0);
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertEquals("version1 comment", loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals("model_version_path", loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // Test get a model version using alias
@@ -431,7 +430,7 @@ public class TestModelCatalogOperations {
             ops.linkModelVersion(
                 NameIdentifierUtil.ofModel(
                     METALAKE_NAME, CATALOG_NAME, schemaName, "non-existent-model"),
-                uris,
+                "model_version_path",
                 aliases,
                 "version1 comment",
                 versionProperties));
@@ -443,7 +442,7 @@ public class TestModelCatalogOperations {
             ops.linkModelVersion(
                 NameIdentifierUtil.ofModel(
                     METALAKE_NAME, CATALOG_NAME, "non-existent-schema", modelName),
-                uris,
+                "model_version_path",
                 aliases,
                 "version1 comment",
                 versionProperties));
@@ -453,13 +452,21 @@ public class TestModelCatalogOperations {
         ModelVersionAliasesAlreadyExistException.class,
         () ->
             ops.linkModelVersion(
-                modelIdent, uris, new String[] {"alias1"}, "version1 comment", versionProperties));
+                modelIdent,
+                "model_version_path",
+                new String[] {"alias1"},
+                "version1 comment",
+                versionProperties));
 
     Assertions.assertThrows(
         ModelVersionAliasesAlreadyExistException.class,
         () ->
             ops.linkModelVersion(
-                modelIdent, uris, new String[] {"alias2"}, "version1 comment", versionProperties));
+                modelIdent,
+                "model_version_path",
+                new String[] {"alias2"},
+                "version1 comment",
+                versionProperties));
 
     // Test get a model version from non-existent model
     Assertions.assertThrows(
@@ -483,7 +490,7 @@ public class TestModelCatalogOperations {
     StringIdentifier versionId2 = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties2 = StringIdentifier.newPropertiesWithId(versionId2, null);
 
-    ops.linkModelVersion(modelIdent, uris, null, null, versionProperties2);
+    ops.linkModelVersion(modelIdent, "model_version_path2", null, null, versionProperties2);
 
     // Test get a model version with null alias, comment and properties
     ModelVersion loadedVersion2 = ops.getModelVersion(modelIdent, 1);
@@ -491,7 +498,6 @@ public class TestModelCatalogOperations {
     Assertions.assertNull(loadedVersion2.comment());
     Assertions.assertEquals(versionProperties2, loadedVersion2.properties());
     Assertions.assertEquals(0, loadedVersion2.aliases().length);
-    Assertions.assertEquals(uris, loadedVersion2.uris());
 
     // Test get a model version with alias
     Assertions.assertThrows(
@@ -515,10 +521,10 @@ public class TestModelCatalogOperations {
     // Create a model version
     StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
 
     String[] aliases = new String[] {"alias1", "alias2"};
-    ops.linkModelVersion(modelIdent, uris, aliases, "version1 comment", versionProperties);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
 
     // List linked model versions
     int[] versions = ops.listModelVersions(modelIdent);
@@ -528,7 +534,7 @@ public class TestModelCatalogOperations {
     ModelVersion loadedVersion = ops.getModelVersion(modelIdent, versions[0]);
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertEquals("version1 comment", loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals("model_version_path", loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // Create another model version
@@ -536,7 +542,8 @@ public class TestModelCatalogOperations {
     Map<String, String> versionProperties2 = StringIdentifier.newPropertiesWithId(versionId2, null);
 
     String[] aliases2 = new String[] {"alias3", "alias4"};
-    ops.linkModelVersion(modelIdent, uris, aliases2, "version2 comment", versionProperties2);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path2", aliases2, "version2 comment", versionProperties2);
 
     // List linked model versions
     int[] versions2 = ops.listModelVersions(modelIdent);
@@ -580,37 +587,37 @@ public class TestModelCatalogOperations {
     // Create a model version
     StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
 
     String[] aliases = new String[] {"alias1", "alias2"};
-    ops.linkModelVersion(modelIdent, uris, aliases, "version1 comment", versionProperties);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
 
     // List linked model versions info
     ModelVersion[] versions = ops.listModelVersionInfos(modelIdent);
     Assertions.assertEquals(1, versions.length);
     Assertions.assertEquals(0, versions[0].version());
     Assertions.assertEquals("version1 comment", versions[0].comment());
-    Assertions.assertEquals(uris, versions[0].uris());
+    Assertions.assertEquals("model_version_path", versions[0].uri());
     Assertions.assertEquals(versionProperties, versions[0].properties());
 
     // Create another model version
     StringIdentifier versionId2 = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties2 = StringIdentifier.newPropertiesWithId(versionId2, null);
-    Map<String, String> uris2 = ImmutableMap.of("n3", "u3");
 
     String[] aliases2 = new String[] {"alias3", "alias4"};
-    ops.linkModelVersion(modelIdent, uris2, aliases2, "version2 comment", versionProperties2);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path2", aliases2, "version2 comment", versionProperties2);
 
     // List linked model versions
     ModelVersion[] versions2 = ops.listModelVersionInfos(modelIdent);
     Assertions.assertEquals(2, versions2.length);
     Assertions.assertEquals(0, versions2[0].version());
     Assertions.assertEquals("version1 comment", versions2[0].comment());
-    Assertions.assertEquals(uris, versions2[0].uris());
+    Assertions.assertEquals("model_version_path", versions2[0].uri());
     Assertions.assertEquals(versionProperties, versions2[0].properties());
     Assertions.assertEquals(1, versions2[1].version());
     Assertions.assertEquals("version2 comment", versions2[1].comment());
-    Assertions.assertEquals(uris2, versions2[1].uris());
+    Assertions.assertEquals("model_version_path2", versions2[1].uri());
     Assertions.assertEquals(versionProperties2, versions2[1].properties());
 
     // Test list model versions in a non-existent model
@@ -631,171 +638,6 @@ public class TestModelCatalogOperations {
   }
 
   @Test
-  public void testLinkAndGetModelVersionUriWithoutDefaultUriName() {
-    // Create schema and model
-    String schemaName = randomSchemaName();
-    createSchema(schemaName);
-
-    NameIdentifier modelIdent =
-        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, "model");
-    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> properties = StringIdentifier.newPropertiesWithId(stringId, null);
-
-    ops.registerModel(modelIdent, "model comment", properties);
-
-    // Link a model version to the registered model
-    StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
-
-    String[] aliases = new String[] {"alias1", "alias2"};
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
-    ops.linkModelVersion(modelIdent, uris, aliases, "version comment", versionProperties);
-
-    Model loadedModel = ops.getModel(modelIdent);
-    Assertions.assertEquals(1, loadedModel.latestVersion());
-    ModelVersion loadedVersion = ops.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(0, loadedVersion.version());
-    Assertions.assertEquals("version comment", loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
-    Assertions.assertEquals(versionProperties, loadedVersion.properties());
-
-    // Test get uri with uri name
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, 0, "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, 0, "n2"));
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, "alias1", "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, "alias1", "n2"));
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, "alias2", "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, "alias2", "n2"));
-
-    // Test get uri without uri name
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ops.getModelVersionUri(modelIdent, 0, null));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ops.getModelVersionUri(modelIdent, "alias1", null));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> ops.getModelVersionUri(modelIdent, "alias2", null));
-
-    // Test get uri from non-existing version
-    Assertions.assertThrows(
-        NoSuchModelVersionException.class, () -> ops.getModelVersionUri(modelIdent, 1, "n1"));
-    Assertions.assertThrows(
-        NoSuchModelVersionException.class,
-        () -> ops.getModelVersionUri(modelIdent, "alias3", "n1"));
-
-    // Test get uri with no-existing uri name
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, 0, "n3"));
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, "alias1", "n3"));
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, "alias2", "n3"));
-  }
-
-  @Test
-  public void testLinkAndGetModelVersionUriWithDefaultUriName() {
-    // Create schema and model
-    String schemaName = randomSchemaName();
-    createSchema(schemaName);
-
-    NameIdentifier modelIdent =
-        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, schemaName, "model");
-    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> properties =
-        StringIdentifier.newPropertiesWithId(
-            stringId, ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n1"));
-
-    ops.registerModel(modelIdent, "model comment", properties);
-
-    // Link a model version without default uri name
-    StringIdentifier versionId1 = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> versionPropsWithoutDefaultUriName =
-        StringIdentifier.newPropertiesWithId(versionId1, null);
-
-    String[] aliases = new String[] {"alias1", "alias2"};
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
-    ops.linkModelVersion(
-        modelIdent, uris, aliases, "version1 comment", versionPropsWithoutDefaultUriName);
-
-    Model loadedModel = ops.getModel(modelIdent);
-    Assertions.assertEquals(1, loadedModel.latestVersion());
-    ModelVersion version1 = ops.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(0, version1.version());
-    Assertions.assertEquals("version1 comment", version1.comment());
-    Assertions.assertEquals(uris, version1.uris());
-    Assertions.assertEquals(versionPropsWithoutDefaultUriName, version1.properties());
-
-    // Test get uri with uri name
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, 0, "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, 0, "n2"));
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, "alias1", "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, "alias1", "n2"));
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, "alias2", "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, "alias2", "n2"));
-
-    // Test get uri without uri name
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, 0, null));
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, "alias1", null));
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, "alias2", null));
-
-    // Test get uri from non-existing version
-    Assertions.assertThrows(
-        NoSuchModelVersionException.class, () -> ops.getModelVersionUri(modelIdent, 1, "n1"));
-    Assertions.assertThrows(
-        NoSuchModelVersionException.class,
-        () -> ops.getModelVersionUri(modelIdent, "alias3", "n1"));
-
-    // Test get uri with no-existing uri name
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, 0, "n3"));
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, "alias1", "n3"));
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, "alias2", "n3"));
-
-    // Link a model version without default uri name
-    StringIdentifier versionId2 = StringIdentifier.fromId(idGenerator.nextId());
-    Map<String, String> versionPropsWithDefaultUriName =
-        StringIdentifier.newPropertiesWithId(
-            versionId2, ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n2"));
-    ops.linkModelVersion(
-        modelIdent,
-        uris,
-        new String[] {"alias3"},
-        "version2 comment",
-        versionPropsWithDefaultUriName);
-
-    ModelVersion version2 = ops.getModelVersion(modelIdent, 1);
-    Assertions.assertEquals(1, version2.version());
-    Assertions.assertEquals("version2 comment", version2.comment());
-    Assertions.assertEquals(uris, version2.uris());
-    Assertions.assertEquals(versionPropsWithDefaultUriName, version2.properties());
-
-    // Test get uri with uri name
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, 1, "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, 1, "n2"));
-    Assertions.assertEquals("u1", ops.getModelVersionUri(modelIdent, "alias3", "n1"));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, "alias3", "n2"));
-
-    // Test get uri without uri name
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, 1, null));
-    Assertions.assertEquals("u2", ops.getModelVersionUri(modelIdent, "alias3", null));
-
-    // Test get uri with no-existing uri name
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, 1, "n3"));
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> ops.getModelVersionUri(modelIdent, "alias3", "n3"));
-  }
-
-  @Test
   public void testDeleteModelVersion() {
     // Create schema and model
     String schemaName = randomSchemaName();
@@ -812,10 +654,10 @@ public class TestModelCatalogOperations {
     // Create a model version
     StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
 
     String[] aliases = new String[] {"alias1", "alias2"};
-    ops.linkModelVersion(modelIdent, uris, aliases, "version1 comment", versionProperties);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
 
     // Delete the model version
     Assertions.assertTrue(ops.deleteModelVersion(modelIdent, 0));
@@ -840,7 +682,8 @@ public class TestModelCatalogOperations {
             0));
 
     // Test delete model version using alias
-    ops.linkModelVersion(modelIdent, uris, aliases, "version1 comment", versionProperties);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
 
     Assertions.assertTrue(ops.deleteModelVersion(modelIdent, "alias1"));
     Assertions.assertFalse(ops.deleteModelVersion(modelIdent, "alias1"));
@@ -853,7 +696,8 @@ public class TestModelCatalogOperations {
     Model loadedModel = ops.getModel(modelIdent);
     Assertions.assertEquals(2, loadedModel.latestVersion());
 
-    ops.linkModelVersion(modelIdent, uris, aliases, "version1 comment", versionProperties);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
     int[] versions = ops.listModelVersions(modelIdent);
     Assertions.assertEquals(1, versions.length);
     Assertions.assertEquals(2, versions[0]);
@@ -876,10 +720,10 @@ public class TestModelCatalogOperations {
     // Create a model version
     StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
 
     String[] aliases = new String[] {"alias1", "alias2"};
-    ops.linkModelVersion(modelIdent, uris, aliases, "version1 comment", versionProperties);
+    ops.linkModelVersion(
+        modelIdent, "model_version_path", aliases, "version1 comment", versionProperties);
 
     // Delete the model
     Assertions.assertTrue(ops.deleteModel(modelIdent));
@@ -1078,7 +922,7 @@ public class TestModelCatalogOperations {
 
     String versionComment = "version1 comment";
     String versionNewComment = "new version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
 
     NameIdentifier modelIdent =
@@ -1090,7 +934,7 @@ public class TestModelCatalogOperations {
     StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1101,7 +945,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // update comment via version and validate
@@ -1110,7 +954,7 @@ public class TestModelCatalogOperations {
 
     Assertions.assertEquals(0, updatedModelVersion.version());
     Assertions.assertEquals(versionNewComment, updatedModelVersion.comment());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
   }
 
@@ -1124,7 +968,7 @@ public class TestModelCatalogOperations {
 
     String versionComment = "version1 comment";
     String versionNewComment = "new version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
     String versionAlias = versionAliases[0];
 
@@ -1137,7 +981,7 @@ public class TestModelCatalogOperations {
     StringIdentifier versionId = StringIdentifier.fromId(idGenerator.nextId());
     Map<String, String> versionProperties = StringIdentifier.newPropertiesWithId(versionId, null);
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     Model loadedModel = ops.getModel(modelIdent);
 
@@ -1149,7 +993,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // update comment via alias and validate
@@ -1160,7 +1004,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, updatedModelVersion.version());
     Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(versionNewComment, updatedModelVersion.comment());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
   }
 
@@ -1173,7 +1017,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
 
     NameIdentifier modelIdent =
@@ -1191,7 +1035,7 @@ public class TestModelCatalogOperations {
     tmpMap.put("key1", "new value");
     Map<String, String> newProperties = ImmutableMap.copyOf(tmpMap);
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1202,7 +1046,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // set property via version and validate
@@ -1213,7 +1057,7 @@ public class TestModelCatalogOperations {
         ops.alterModelVersion(modelIdent, 0, updatePropertyChange, addPropertyChange);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(newProperties, updatedModelVersion.properties());
@@ -1228,7 +1072,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
 
     NameIdentifier modelIdent =
@@ -1246,7 +1090,7 @@ public class TestModelCatalogOperations {
     tmpMap.put("key1", "new value");
     Map<String, String> newProperties = ImmutableMap.copyOf(tmpMap);
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1257,7 +1101,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // set property via version and validate
@@ -1269,7 +1113,7 @@ public class TestModelCatalogOperations {
             modelIdent, versionAliases[0], updatePropertyChange, addPropertyChange);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(newProperties, updatedModelVersion.properties());
@@ -1284,7 +1128,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
 
     NameIdentifier modelIdent =
@@ -1300,7 +1144,7 @@ public class TestModelCatalogOperations {
     Map<String, String> newVersionProperties =
         StringIdentifier.newPropertiesWithId(versionId, ImmutableMap.of("key1", "value1"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1311,7 +1155,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // set property via version and validate
@@ -1320,7 +1164,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, 0, removeProperty);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(newVersionProperties, updatedModelVersion.properties());
@@ -1335,7 +1179,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
 
     NameIdentifier modelIdent =
@@ -1351,7 +1195,7 @@ public class TestModelCatalogOperations {
     Map<String, String> newVersionProperties =
         StringIdentifier.newPropertiesWithId(versionId, ImmutableMap.of("key1", "value1"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1362,7 +1206,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // set property via version and validate
@@ -1372,7 +1216,7 @@ public class TestModelCatalogOperations {
         ops.alterModelVersion(modelIdent, versionAliases[0], removeProperty);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(newVersionProperties, updatedModelVersion.properties());
@@ -1387,7 +1231,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
     String newVersionUri = "s3://bucket/path/to/new/version";
 
@@ -1402,7 +1246,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1413,7 +1257,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version uri
@@ -1421,8 +1265,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, 0, updateUriChange);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(
-        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, newVersionUri), updatedModelVersion.uris());
+    Assertions.assertEquals(newVersionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
@@ -1437,7 +1280,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
     String newVersionUri = "s3://bucket/path/to/new/version";
 
@@ -1452,7 +1295,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1463,7 +1306,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version uri
@@ -1472,8 +1315,7 @@ public class TestModelCatalogOperations {
         ops.alterModelVersion(modelIdent, versionAliases[0], updateUriChange);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(
-        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, newVersionUri), updatedModelVersion.uris());
+    Assertions.assertEquals(newVersionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(versionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
@@ -1488,7 +1330,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
     String[] newVersionAliases = new String[] {"new_alias1", "new_alias2"};
 
@@ -1503,7 +1345,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1514,7 +1356,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version aliases
@@ -1522,7 +1364,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, 0, change);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(newVersionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
@@ -1531,7 +1373,7 @@ public class TestModelCatalogOperations {
     ModelVersion reloadVersion = ops.getModelVersion(modelIdent, 0);
     Assertions.assertEquals(0, reloadVersion.version());
     Assertions.assertArrayEquals(newVersionAliases, reloadVersion.aliases());
-    Assertions.assertEquals(uris, reloadVersion.uris());
+    Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());
   }
@@ -1545,7 +1387,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
     String[] newVersionAliases = new String[] {"new_alias1", "new_alias2"};
 
@@ -1560,7 +1402,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1571,7 +1413,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version aliases
@@ -1579,7 +1421,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, "alias1", change);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(newVersionAliases, updatedModelVersion.aliases());
     Assertions.assertEquals(versionProperties, updatedModelVersion.properties());
@@ -1588,7 +1430,7 @@ public class TestModelCatalogOperations {
     ModelVersion reloadVersion = ops.getModelVersion(modelIdent, "new_alias2");
     Assertions.assertEquals(0, reloadVersion.version());
     Assertions.assertArrayEquals(newVersionAliases, reloadVersion.aliases());
-    Assertions.assertEquals(uris, reloadVersion.uris());
+    Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());
   }
@@ -1602,7 +1444,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model2 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
     String[] newVersionAliases = new String[] {"new_alias1", "new_alias2"};
 
@@ -1617,7 +1459,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1628,7 +1470,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version aliases
@@ -1637,7 +1479,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, 0, change);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, updatedModelVersion.aliases());
@@ -1648,7 +1490,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, reloadVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, reloadVersion.aliases());
-    Assertions.assertEquals(uris, reloadVersion.uris());
+    Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());
   }
@@ -1662,7 +1504,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model3 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias1", "alias2"};
     String[] newVersionAliases = new String[] {"new_alias1", "new_alias2"};
 
@@ -1677,7 +1519,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1688,7 +1530,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version aliases
@@ -1697,7 +1539,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, "alias1", change);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, updatedModelVersion.aliases());
@@ -1708,7 +1550,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, reloadVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, reloadVersion.aliases());
-    Assertions.assertEquals(uris, reloadVersion.uris());
+    Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());
   }
@@ -1722,7 +1564,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias2", "alias3"};
 
     NameIdentifier modelIdent =
@@ -1736,7 +1578,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1747,7 +1589,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version aliases
@@ -1757,7 +1599,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, 0, change);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),
@@ -1770,7 +1612,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),
         Arrays.stream(reloadVersion.aliases()).collect(Collectors.toSet()));
-    Assertions.assertEquals(uris, reloadVersion.uris());
+    Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());
   }
@@ -1784,7 +1626,7 @@ public class TestModelCatalogOperations {
     String modelComment = "model1 comment";
 
     String versionComment = "version1 comment";
-    Map<String, String> uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "model_version_path";
     String[] versionAliases = new String[] {"alias2", "alias3"};
 
     NameIdentifier modelIdent =
@@ -1798,7 +1640,7 @@ public class TestModelCatalogOperations {
         StringIdentifier.newPropertiesWithId(
             versionId, ImmutableMap.of("key1", "value1", "key2", "value2"));
 
-    ops.linkModelVersion(modelIdent, uris, versionAliases, versionComment, versionProperties);
+    ops.linkModelVersion(modelIdent, versionUri, versionAliases, versionComment, versionProperties);
 
     // validate loaded model
     Model loadedModel = ops.getModel(modelIdent);
@@ -1809,7 +1651,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(0, loadedVersion.version());
     Assertions.assertArrayEquals(versionAliases, loadedVersion.aliases());
     Assertions.assertEquals(versionComment, loadedVersion.comment());
-    Assertions.assertEquals(uris, loadedVersion.uris());
+    Assertions.assertEquals(versionUri, loadedVersion.uri());
     Assertions.assertEquals(versionProperties, loadedVersion.properties());
 
     // validate update version aliases
@@ -1819,7 +1661,7 @@ public class TestModelCatalogOperations {
     ModelVersion updatedModelVersion = ops.alterModelVersion(modelIdent, "alias3", change);
 
     Assertions.assertEquals(0, updatedModelVersion.version());
-    Assertions.assertEquals(uris, updatedModelVersion.uris());
+    Assertions.assertEquals(versionUri, updatedModelVersion.uri());
     Assertions.assertEquals(versionComment, updatedModelVersion.comment());
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),
@@ -1832,7 +1674,7 @@ public class TestModelCatalogOperations {
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),
         Arrays.stream(reloadVersion.aliases()).collect(Collectors.toSet()));
-    Assertions.assertEquals(uris, reloadVersion.uris());
+    Assertions.assertEquals(versionUri, reloadVersion.uri());
     Assertions.assertEquals(versionComment, reloadVersion.comment());
     Assertions.assertEquals(versionProperties, reloadVersion.properties());
   }

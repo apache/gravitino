@@ -34,7 +34,7 @@ public abstract class BaseModelVersion implements ModelVersion {
 
   @Nullable protected String comment;
 
-  protected Map<String, String> uris;
+  protected String uri;
 
   protected Map<String, String> properties;
 
@@ -58,10 +58,10 @@ public abstract class BaseModelVersion implements ModelVersion {
     return comment;
   }
 
-  /** @return the URIs of the model artifact. */
+  /** @return the URI of the model artifact. */
   @Override
-  public Map<String, String> uris() {
-    return uris;
+  public String uri() {
+    return uri;
   }
 
   /** @return the properties of the model version. */
@@ -84,7 +84,7 @@ public abstract class BaseModelVersion implements ModelVersion {
 
     SELF withComment(String comment);
 
-    SELF withUris(Map<String, String> uris);
+    SELF withUri(String uri);
 
     SELF withProperties(Map<String, String> properties);
 
@@ -103,7 +103,7 @@ public abstract class BaseModelVersion implements ModelVersion {
 
     protected String comment;
 
-    protected Map<String, String> uris;
+    protected String uri;
 
     protected Map<String, String> properties;
 
@@ -146,14 +146,14 @@ public abstract class BaseModelVersion implements ModelVersion {
     }
 
     /**
-     * Sets the URIs of the model artifact.
+     * Sets the URI of the model artifact.
      *
-     * @param uris The URIs of the model artifact.
+     * @param uri The URIs of the model artifact.
      * @return The builder instance.
      */
     @Override
-    public SELF withUris(Map<String, String> uris) {
-      this.uris = uris;
+    public SELF withUri(String uri) {
+      this.uri = uri;
       return self();
     }
 

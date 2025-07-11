@@ -79,14 +79,14 @@ public class TestModelEvent {
     this.alterNameModel = getMockModel("modelA_rename", "commentA");
     this.alterCommentModelVersion =
         getMockModelVersion(
-            ImmutableMap.of("name1", "uri1", "name2", "uri2"),
+            "uriA",
             1,
             new String[] {"aliasProduction"},
             newModelVersionComment,
             ImmutableMap.of("color", "#FFFFFF"));
     this.otherAlterCommentModelVersion =
         getMockModelVersion(
-            ImmutableMap.of("name3", "uri3"),
+            "uriB",
             2,
             new String[] {"aliasTest"},
             newModelVersionComment,
@@ -95,13 +95,8 @@ public class TestModelEvent {
     this.modelUpdateCommentChange = getMockModelVersionChange("new comment");
 
     this.firstModelVersion =
-        mockModelVersion(
-            ImmutableMap.of("name1", "uri1", "name2", "uri2"),
-            new String[] {"aliasProduction"},
-            "versionInfoA");
-    this.secondModelVersion =
-        mockModelVersion(
-            ImmutableMap.of("name3", "uri3"), new String[] {"aliasTest"}, "versionInfoB");
+        mockModelVersion("uriA", new String[] {"aliasProduction"}, "versionInfoA");
+    this.secondModelVersion = mockModelVersion("uriB", new String[] {"aliasTest"}, "versionInfoB");
 
     this.notExistingIdent =
         NameIdentifierUtil.ofModel("metalake", "catalog", "schema", "not_exist");
@@ -140,8 +135,7 @@ public class TestModelEvent {
   @Test
   void testModelVersionInfo() {
     ModelVersion modelVersion =
-        mockModelVersion(
-            ImmutableMap.of("nameA", "uriA"), new String[] {"aliasProduction"}, "versionInfoA");
+        mockModelVersion("uriA", new String[] {"aliasProduction"}, "versionInfoA");
     ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
 
     checkModelVersionInfo(modelVersionInfo, modelVersion);
@@ -149,8 +143,7 @@ public class TestModelEvent {
 
   @Test
   void testModelVersionInfoWithoutComment() {
-    ModelVersion modelVersion =
-        mockModelVersion(ImmutableMap.of("nameA", "uriA"), new String[] {"aliasProduction"}, null);
+    ModelVersion modelVersion = mockModelVersion("uriA", new String[] {"aliasProduction"}, null);
     ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
 
     checkModelVersionInfo(modelVersionInfo, modelVersion);
@@ -159,8 +152,7 @@ public class TestModelEvent {
   @Test
   void testModelVersionInfoWithAudit() {
     ModelVersion modelVersion =
-        getMockModelWithAudit(
-            ImmutableMap.of("nameA", "uriA"), new String[] {"aliasProduction"}, "versionInfoA");
+        getMockModelWithAudit("uriA", new String[] {"aliasProduction"}, "versionInfoA");
     ModelVersionInfo modelVersionInfo = new ModelVersionInfo(modelVersion);
 
     checkModelVersionInfo(modelVersionInfo, modelVersion);
@@ -224,7 +216,7 @@ public class TestModelEvent {
   void testRegisterAndLinkModelEvent() {
     dispatcher.registerModel(
         existingIdentA,
-        ImmutableMap.of("name1", "uri1", "name2", "uri2"),
+        "uriA",
         new String[] {"aliasProduction"},
         "commentA",
         ImmutableMap.of("color", "#FFFFFF"));
@@ -246,7 +238,8 @@ public class TestModelEvent {
     ModelVersionInfo linkModelVersionRequest =
         registerAndLinkModelPreEvent.linkModelVersionRequest();
 
-    Assertions.assertEquals(firstModelVersion.uris(), linkModelVersionRequest.uris());
+    Assertions.assertEquals(
+        firstModelVersion.uri(), linkModelVersionRequest.uris().get(ModelVersion.URI_NAME_UNKNOWN));
     Assertions.assertEquals("commentA", linkModelVersionRequest.comment().orElse(null));
     checkArray(firstModelVersion.aliases(), linkModelVersionRequest.aliases().orElse(null));
     checkProperties(firstModelVersion.properties(), linkModelVersionRequest.properties());
@@ -267,7 +260,8 @@ public class TestModelEvent {
 
     // validate post-event model uri info
     Map<String, String> versionUris = registerAndLinkModelEvent.uris();
-    Assertions.assertEquals(firstModelVersion.uris(), versionUris);
+    Assertions.assertEquals(
+        firstModelVersion.uri(), versionUris.get(ModelVersion.URI_NAME_UNKNOWN));
   }
 
   @Test
@@ -277,7 +271,7 @@ public class TestModelEvent {
         () ->
             failureDispatcher.registerModel(
                 existingIdentA,
-                ImmutableMap.of("name1", "uri1", "name2", "uri2"),
+                "uriA",
                 new String[] {"aliasProduction"},
                 "commentA",
                 ImmutableMap.of("color", "#FFFFFF")));
@@ -300,7 +294,8 @@ public class TestModelEvent {
         registerAndLinkModelFailureEvent.linkModelVersionRequest();
 
     checkModelInfo(registerModelRequest, modelA);
-    Assertions.assertEquals(firstModelVersion.uris(), linkModelVersionRequest.uris());
+    Assertions.assertEquals(
+        firstModelVersion.uri(), linkModelVersionRequest.uris().get(ModelVersion.URI_NAME_UNKNOWN));
     Assertions.assertEquals("commentA", linkModelVersionRequest.comment().orElse(null));
     checkArray(firstModelVersion.aliases(), linkModelVersionRequest.aliases().orElse(null));
     checkProperties(firstModelVersion.properties(), linkModelVersionRequest.properties());
@@ -435,7 +430,7 @@ public class TestModelEvent {
   void testLinkModelVersionEvent() {
     dispatcher.linkModelVersion(
         existingIdentA,
-        ImmutableMap.of("name1", "uri1", "name2", "uri2"),
+        "uriA",
         new String[] {"aliasProduction"},
         "versionInfoA",
         ImmutableMap.of("color", "#FFFFFF"));
@@ -472,7 +467,7 @@ public class TestModelEvent {
         () ->
             failureDispatcher.linkModelVersion(
                 existingIdentA,
-                ImmutableMap.of("name1", "uri1", "name2", "uri2"),
+                "uriA",
                 new String[] {"aliasProduction"},
                 "versionInfoA",
                 ImmutableMap.of("color", "#FFFFFF")));
@@ -1072,7 +1067,7 @@ public class TestModelEvent {
 
     // validate ModelVersionInfo
     Assertions.assertEquals(
-        ImmutableMap.of("name1", "uri1", "name2", "uri2"), modelVersionInfo.uris());
+        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uriA"), modelVersionInfo.uris());
     Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
     Assertions.assertArrayEquals(
         new String[] {"aliasProduction"}, modelVersionInfo.aliases().get());
@@ -1098,7 +1093,8 @@ public class TestModelEvent {
     ModelVersionInfo modelVersionInfo = alterModelVersionEvent.alteredModelVersionInfo();
 
     // validate ModelVersionInfo
-    Assertions.assertEquals(ImmutableMap.of("name3", "uri3"), modelVersionInfo.uris());
+    Assertions.assertEquals(
+        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uriB"), modelVersionInfo.uris());
     Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
     Assertions.assertArrayEquals(new String[] {"aliasTest"}, modelVersionInfo.aliases().get());
     Assertions.assertTrue(modelVersionInfo.comment().isPresent());
@@ -1167,7 +1163,7 @@ public class TestModelEvent {
         .thenReturn(modelB);
     when(dispatcher.registerModel(
             existingIdentA,
-            ImmutableMap.of("name1", "uri1", "name2", "uri2"),
+            "uriA",
             new String[] {"aliasProduction"},
             "commentA",
             ImmutableMap.of("color", "#FFFFFF")))
@@ -1224,14 +1220,11 @@ public class TestModelEvent {
   }
 
   private ModelVersion getMockModelVersion(
-      Map<String, String> uris,
-      int version,
-      String[] aliases,
-      String comment,
-      Map<String, String> properties) {
+      String uri, int version, String[] aliases, String comment, Map<String, String> properties) {
     ModelVersion mockModelVersion = mock(ModelVersion.class);
     when(mockModelVersion.version()).thenReturn(version);
-    when(mockModelVersion.uris()).thenReturn(uris);
+    when(mockModelVersion.uri()).thenReturn(uri);
+    when(mockModelVersion.uris()).thenReturn(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri));
     when(mockModelVersion.aliases()).thenReturn(aliases);
     when(mockModelVersion.comment()).thenReturn(comment);
     when(mockModelVersion.properties()).thenReturn(properties);
@@ -1252,11 +1245,11 @@ public class TestModelEvent {
     return model;
   }
 
-  private ModelVersion mockModelVersion(
-      Map<String, String> uris, String[] aliases, String comment) {
+  private ModelVersion mockModelVersion(String uri, String[] aliases, String comment) {
     ModelVersion modelVersion = mock(ModelVersion.class);
     when(modelVersion.version()).thenReturn(1);
-    when(modelVersion.uris()).thenReturn(uris);
+    when(modelVersion.uri()).thenReturn(uri);
+    when(modelVersion.uris()).thenReturn(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri));
     when(modelVersion.aliases()).thenReturn(aliases);
     when(modelVersion.comment()).thenReturn(comment);
     when(modelVersion.properties()).thenReturn(ImmutableMap.of("color", "#FFFFFF"));
@@ -1264,9 +1257,8 @@ public class TestModelEvent {
     return modelVersion;
   }
 
-  private ModelVersion getMockModelWithAudit(
-      Map<String, String> uris, String[] aliases, String comment) {
-    ModelVersion modelVersion = mockModelVersion(uris, aliases, comment);
+  private ModelVersion getMockModelWithAudit(String uri, String[] aliases, String comment) {
+    ModelVersion modelVersion = mockModelVersion(uri, aliases, comment);
     Audit mockAudit = mock(Audit.class);
 
     when(mockAudit.creator()).thenReturn("demo_user");
@@ -1292,7 +1284,8 @@ public class TestModelEvent {
 
   private void checkModelVersionInfo(ModelVersionInfo modelVersionInfo, ModelVersion modelVersion) {
     // check normal fields
-    Assertions.assertEquals(modelVersion.uris(), modelVersionInfo.uris());
+    Assertions.assertEquals(
+        modelVersion.uri(), modelVersionInfo.uris().get(ModelVersion.URI_NAME_UNKNOWN));
     Assertions.assertEquals(modelVersion.comment(), modelVersionInfo.comment().orElse(null));
 
     // check aliases

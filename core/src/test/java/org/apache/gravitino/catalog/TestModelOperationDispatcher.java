@@ -38,7 +38,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
-import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
@@ -162,12 +161,11 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(0, model.latestVersion());
 
     String[] aliases = new String[] {"alias1", "alias2"};
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
-    modelOperationDispatcher.linkModelVersion(modelIdent, uris, aliases, "comment", props);
+    modelOperationDispatcher.linkModelVersion(modelIdent, "path", aliases, "comment", props);
 
     ModelVersion linkedModelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
     Assertions.assertEquals(0, linkedModelVersion.version());
-    Assertions.assertEquals(uris, linkedModelVersion.uris());
+    Assertions.assertEquals("path", linkedModelVersion.uri());
     Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
     Assertions.assertEquals("comment", linkedModelVersion.comment());
     Assertions.assertEquals(props, linkedModelVersion.properties());
@@ -177,14 +175,14 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion linkedModelVersionWithAlias =
         modelOperationDispatcher.getModelVersion(modelIdent, "alias1");
     Assertions.assertEquals(0, linkedModelVersionWithAlias.version());
-    Assertions.assertEquals(uris, linkedModelVersionWithAlias.uris());
+    Assertions.assertEquals("path", linkedModelVersionWithAlias.uri());
     Assertions.assertArrayEquals(aliases, linkedModelVersionWithAlias.aliases());
     Assertions.assertFalse(linkedModelVersionWithAlias.properties().containsKey(ID_KEY));
 
     ModelVersion linkedModelVersionWithAlias2 =
         modelOperationDispatcher.getModelVersion(modelIdent, "alias2");
     Assertions.assertEquals(0, linkedModelVersionWithAlias2.version());
-    Assertions.assertEquals(uris, linkedModelVersionWithAlias2.uris());
+    Assertions.assertEquals("path", linkedModelVersionWithAlias2.uri());
     Assertions.assertArrayEquals(aliases, linkedModelVersionWithAlias2.aliases());
     Assertions.assertFalse(linkedModelVersionWithAlias2.properties().containsKey(ID_KEY));
 
@@ -193,7 +191,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     testPropertyException(
         () ->
             modelOperationDispatcher.linkModelVersion(
-                modelIdent, uris, aliases, "comment", illegalProps),
+                modelIdent, "path", aliases, "comment", illegalProps),
         "Properties or property prefixes are reserved and cannot be set",
         ID_KEY);
   }
@@ -214,10 +212,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
     String[] aliases1 = new String[] {"alias1"};
     String[] aliases2 = new String[] {"alias2"};
-    Map<String, String> uris1 = ImmutableMap.of("n1", "u1", "n2", "u2");
-    Map<String, String> uris2 = ImmutableMap.of("n3", "u3");
-    modelOperationDispatcher.linkModelVersion(modelIdent, uris1, aliases1, "comment", props);
-    modelOperationDispatcher.linkModelVersion(modelIdent, uris2, aliases2, "comment", props);
+    modelOperationDispatcher.linkModelVersion(modelIdent, "path1", aliases1, "comment", props);
+    modelOperationDispatcher.linkModelVersion(modelIdent, "path2", aliases2, "comment", props);
 
     int[] versions = modelOperationDispatcher.listModelVersions(modelIdent);
     Assertions.assertEquals(2, versions.length);
@@ -241,13 +237,12 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(0, model.latestVersion());
 
     String[] aliases = new String[] {"alias1", "alias2"};
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
-    modelOperationDispatcher.linkModelVersion(modelIdent, uris, aliases, "comment", props);
+    modelOperationDispatcher.linkModelVersion(modelIdent, "path", aliases, "comment", props);
 
     ModelVersion[] versions = modelOperationDispatcher.listModelVersionInfos(modelIdent);
     Assertions.assertEquals(1, versions.length);
     Assertions.assertEquals(0, versions[0].version());
-    Assertions.assertEquals(uris, versions[0].uris());
+    Assertions.assertEquals("path", versions[0].uri());
     Assertions.assertArrayEquals(aliases, versions[0].aliases());
     Assertions.assertEquals("comment", versions[0].comment());
     Assertions.assertEquals(props, versions[0].properties());
@@ -268,8 +263,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(0, model.latestVersion());
 
     String[] aliases = new String[] {"alias1"};
-    Map<String, String> uris1 = ImmutableMap.of("n1", "u1", "n2", "u2");
-    modelOperationDispatcher.linkModelVersion(modelIdent, uris1, aliases, "comment", props);
+    modelOperationDispatcher.linkModelVersion(modelIdent, "path", aliases, "comment", props);
     Assertions.assertTrue(modelOperationDispatcher.deleteModelVersion(modelIdent, 0));
     Assertions.assertFalse(modelOperationDispatcher.deleteModelVersion(modelIdent, 0));
     Assertions.assertThrows(
@@ -281,160 +275,12 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
     // Tet delete model version with alias
     String[] aliases2 = new String[] {"alias2"};
-    Map<String, String> uris2 = ImmutableMap.of("n3", "u3");
-    modelOperationDispatcher.linkModelVersion(modelIdent, uris2, aliases2, "comment", props);
+    modelOperationDispatcher.linkModelVersion(modelIdent, "path2", aliases2, "comment", props);
     Assertions.assertTrue(modelOperationDispatcher.deleteModelVersion(modelIdent, "alias2"));
     Assertions.assertFalse(modelOperationDispatcher.deleteModelVersion(modelIdent, "alias2"));
     Assertions.assertThrows(
         NoSuchModelVersionException.class,
         () -> modelOperationDispatcher.getModelVersion(modelIdent, "alias2"));
-  }
-
-  @Test
-  public void testLinkAndGetModelVersionUriWithoutDefaultUriName() {
-    String schemaName = randomSchemaName();
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
-
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    String modelName = randomModelName();
-    NameIdentifier modelIdent =
-        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
-
-    Model model = modelOperationDispatcher.registerModel(modelIdent, "comment", props);
-    Assertions.assertEquals(0, model.latestVersion());
-
-    String[] aliases = new String[] {"alias1", "alias2"};
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
-    modelOperationDispatcher.linkModelVersion(modelIdent, uris, aliases, "comment", props);
-
-    ModelVersion linkedModelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(0, linkedModelVersion.version());
-    Assertions.assertEquals(uris, linkedModelVersion.uris());
-    Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
-    Assertions.assertEquals("comment", linkedModelVersion.comment());
-    Assertions.assertEquals(props, linkedModelVersion.properties());
-    Assertions.assertFalse(linkedModelVersion.properties().containsKey(ID_KEY));
-
-    // get uri with uri name
-    Assertions.assertEquals("u1", modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n1"));
-    Assertions.assertEquals("u2", modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n2"));
-    Assertions.assertEquals(
-        "u1", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias1", "n1"));
-    Assertions.assertEquals(
-        "u1", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias2", "n1"));
-    Assertions.assertEquals(
-        "u2", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias1", "n2"));
-    Assertions.assertEquals(
-        "u2", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias2", "n2"));
-
-    // get uri without uri name
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, 0, null));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, "alias1", null));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, "alias2", null));
-
-    // non-existing version
-    Assertions.assertThrows(
-        NoSuchModelVersionException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, 1, "n1"));
-    Assertions.assertThrows(
-        NoSuchModelVersionException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, "alias3", "n1"));
-
-    // no-existing uri name
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n3"));
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, "alias1", "n3"));
-    Assertions.assertThrows(
-        NoSuchModelVersionURINameException.class,
-        () -> modelOperationDispatcher.getModelVersionUri(modelIdent, "alias2", "n3"));
-  }
-
-  @Test
-  public void testLinkAndGetModelVersionUriWithDefaultUriName() {
-    String schemaName = randomSchemaName();
-    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
-
-    // set default uri name to "n1" at model level
-    Map<String, String> modelProps =
-        ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n1", "k1", "v1");
-    String modelName = randomModelName();
-    NameIdentifier modelIdent =
-        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
-
-    Model model = modelOperationDispatcher.registerModel(modelIdent, "comment", modelProps);
-    Assertions.assertEquals(0, model.latestVersion());
-
-    String[] aliases = new String[] {"alias1", "alias2"};
-    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
-    // link a model version without default uri name
-    Map<String, String> versionPropsWithoutDefaultUriName = ImmutableMap.of("k1", "v1", "k2", "v2");
-    modelOperationDispatcher.linkModelVersion(
-        modelIdent, uris, aliases, "comment", versionPropsWithoutDefaultUriName);
-
-    ModelVersion version1 = modelOperationDispatcher.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(0, version1.version());
-    Assertions.assertEquals(uris, version1.uris());
-    Assertions.assertArrayEquals(aliases, version1.aliases());
-    Assertions.assertEquals("comment", version1.comment());
-    Assertions.assertEquals(versionPropsWithoutDefaultUriName, version1.properties());
-    Assertions.assertFalse(version1.properties().containsKey(ID_KEY));
-
-    // get uri with uri name
-    Assertions.assertEquals("u1", modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n1"));
-    Assertions.assertEquals("u2", modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n2"));
-    Assertions.assertEquals(
-        "u1", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias1", "n1"));
-    Assertions.assertEquals(
-        "u1", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias2", "n1"));
-    Assertions.assertEquals(
-        "u2", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias1", "n2"));
-    Assertions.assertEquals(
-        "u2", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias2", "n2"));
-
-    // get uri without uri name
-    Assertions.assertEquals("u1", modelOperationDispatcher.getModelVersionUri(modelIdent, 0, null));
-    Assertions.assertEquals(
-        "u1", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias1", null));
-    Assertions.assertEquals(
-        "u1", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias2", null));
-
-    // link a model version with default uri name
-    Map<String, String> versionPropsWithDefaultUriName =
-        ImmutableMap.of(ModelVersion.PROPERTY_DEFAULT_URI_NAME, "n2", "k1", "v1");
-    modelOperationDispatcher.linkModelVersion(
-        modelIdent, uris, new String[] {"alias3"}, "comment", versionPropsWithDefaultUriName);
-
-    ModelVersion version2 = modelOperationDispatcher.getModelVersion(modelIdent, 1);
-    Assertions.assertEquals(1, version2.version());
-    Assertions.assertEquals(uris, version2.uris());
-    Assertions.assertArrayEquals(new String[] {"alias3"}, version2.aliases());
-    Assertions.assertEquals("comment", version2.comment());
-    Assertions.assertEquals(versionPropsWithDefaultUriName, version2.properties());
-    Assertions.assertFalse(version2.properties().containsKey(ID_KEY));
-
-    // get uri with uri name
-    Assertions.assertEquals("u1", modelOperationDispatcher.getModelVersionUri(modelIdent, 1, "n1"));
-    Assertions.assertEquals("u2", modelOperationDispatcher.getModelVersionUri(modelIdent, 1, "n2"));
-    Assertions.assertEquals(
-        "u1", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias3", "n1"));
-    Assertions.assertEquals(
-        "u2", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias3", "n2"));
-
-    // get uri without uri name
-    Assertions.assertEquals("u2", modelOperationDispatcher.getModelVersionUri(modelIdent, 1, null));
-    Assertions.assertEquals(
-        "u2", modelOperationDispatcher.getModelVersionUri(modelIdent, "alias3", null));
   }
 
   @Test
@@ -585,7 +431,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
     String versionNewComment = "new version comment";
@@ -598,13 +444,13 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
     ModelVersionChange changeComment = ModelVersionChange.updateComment(versionNewComment);
     ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, "alias1");
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, "alias1", changeComment);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(versionNewComment, alteredModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
@@ -620,7 +466,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Map<String, String> newProps = ImmutableMap.of("k1", "new value", "k2", "v2", "k3", "v3");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -632,7 +478,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange[] changes =
         new ModelVersionChange[] {
@@ -643,7 +489,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, 0, changes);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
@@ -660,7 +506,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Map<String, String> newProps = ImmutableMap.of("k1", "new value", "k2", "v2", "k3", "v3");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -672,7 +518,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange[] changes =
         new ModelVersionChange[] {
@@ -684,7 +530,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], changes);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
@@ -701,7 +547,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Map<String, String> newProps = ImmutableMap.of("k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -713,7 +559,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change = ModelVersionChange.removeProperty("k1");
 
@@ -721,7 +567,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
@@ -738,7 +584,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     Map<String, String> newProps = ImmutableMap.of("k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -750,7 +596,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change = ModelVersionChange.removeProperty("k1");
 
@@ -759,7 +605,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
@@ -776,7 +622,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String newUri = "s3://new-bucket/new-path/new-model.json";
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -788,7 +634,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change = ModelVersionChange.updateUri(newUri);
     ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
@@ -812,7 +658,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String newUri = "s3://new-bucket/new-path/new-model.json";
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -824,7 +670,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change = ModelVersionChange.updateUri(newUri);
     ModelVersion modelVersion =
@@ -848,7 +694,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -860,7 +706,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(new String[] {"new_alias1", "new_alias2"}, versionAliases);
@@ -868,7 +714,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"new_alias1", "new_alias2"}, alteredModelVersion.aliases());
@@ -877,7 +723,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
     // Reload model version
     ModelVersion reloadedModelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(modelVersion.uris(), reloadedModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"new_alias1", "new_alias2"}, reloadedModelVersion.aliases());
@@ -894,7 +740,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -906,7 +752,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(new String[] {"new_alias1", "new_alias2"}, versionAliases);
@@ -915,7 +761,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"new_alias1", "new_alias2"}, alteredModelVersion.aliases());
@@ -925,7 +771,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // Reload model version
     ModelVersion reloadedModelVersion =
         modelOperationDispatcher.getModelVersion(modelIdent, "new_alias1");
-    Assertions.assertEquals(modelVersion.uris(), reloadedModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"new_alias1", "new_alias2"}, reloadedModelVersion.aliases());
@@ -942,7 +788,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -954,7 +800,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(
@@ -963,7 +809,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, alteredModelVersion.aliases());
@@ -972,7 +818,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
     // Reload model version
     ModelVersion reloadedModelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(modelVersion.uris(), reloadedModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, reloadedModelVersion.aliases());
@@ -989,7 +835,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -1001,7 +847,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(
@@ -1011,7 +857,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, alteredModelVersion.aliases());
@@ -1021,7 +867,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // Reload model version
     ModelVersion reloadedModelVersion =
         modelOperationDispatcher.getModelVersion(modelIdent, "new_alias1");
-    Assertions.assertEquals(modelVersion.uris(), reloadedModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
     Assertions.assertArrayEquals(
         new String[] {"alias2", "new_alias1", "new_alias2"}, reloadedModelVersion.aliases());
@@ -1038,7 +884,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias2", "alias3"};
     String versionComment = "version which tests update";
 
@@ -1050,7 +896,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(
@@ -1059,7 +905,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),
@@ -1069,7 +915,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
 
     // Reload model version
     ModelVersion reloadedModelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
-    Assertions.assertEquals(modelVersion.uris(), reloadedModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),
@@ -1087,7 +933,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    String versionUri = "s3://test-bucket/test-path/model.json";
     String[] versionAliases = {"alias2", "alias3"};
     String versionComment = "version which tests update";
 
@@ -1099,7 +945,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
 
     modelOperationDispatcher.linkModelVersion(
-        modelIdent, versionUris, versionAliases, versionComment, props);
+        modelIdent, versionUri, versionAliases, versionComment, props);
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(
@@ -1108,7 +954,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, "alias2", change);
 
-    Assertions.assertEquals(modelVersion.uris(), alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), alteredModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),
@@ -1119,7 +965,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     // Reload model version
     ModelVersion reloadedModelVersion =
         modelOperationDispatcher.getModelVersion(modelIdent, "alias1");
-    Assertions.assertEquals(modelVersion.uris(), reloadedModelVersion.uris());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
     Assertions.assertEquals(
         ImmutableSet.of("alias1", "alias2"),

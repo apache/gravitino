@@ -32,7 +32,7 @@ public class TestModelVersion extends BaseModelVersion {
       modelVersion.version = version;
       modelVersion.comment = comment;
       modelVersion.aliases = aliases;
-      modelVersion.uris = uris;
+      modelVersion.uri = uri;
       modelVersion.properties = properties;
       modelVersion.auditInfo = auditInfo;
       return modelVersion;

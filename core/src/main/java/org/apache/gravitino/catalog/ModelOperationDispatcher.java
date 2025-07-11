@@ -186,7 +186,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      Map<String, String> uris,
+      String uri,
       String[] aliases,
       String comment,
       Map<String, String> properties)
@@ -205,7 +205,7 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                 c ->
                     c.doWithModelOps(
                         m -> {
-                          m.linkModelVersion(ident, uris, aliases, comment, updatedProperties);
+                          m.linkModelVersion(ident, uri, aliases, comment, updatedProperties);
                           return null;
                         }),
                 NoSuchModelException.class,
