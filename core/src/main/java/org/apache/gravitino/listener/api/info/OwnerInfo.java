@@ -19,15 +19,25 @@
 
 package org.apache.gravitino.listener.api.info;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.Owner.Type;
 
 @DeveloperApi
-@Getter
-@AllArgsConstructor
 public class OwnerInfo {
   private final String name;
   private final Owner.Type type;
+
+  public OwnerInfo(String name, Type type) {
+    this.name = name;
+    this.type = type;
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public Type getType() {
+    return type;
+  }
 }
