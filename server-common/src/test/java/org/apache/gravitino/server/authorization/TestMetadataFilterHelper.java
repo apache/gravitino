@@ -31,6 +31,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -39,14 +40,23 @@ import org.mockito.MockedStatic;
 /** Test of {@link MetadataFilterHelper} */
 public class TestMetadataFilterHelper {
 
+  private static MockedStatic<GravitinoEnv> mockedStaticGravitinoEnv;
+
   @BeforeAll
   public static void setup() {
-    MockedStatic<GravitinoEnv> mockedStatic = mockStatic(GravitinoEnv.class);
+    mockedStaticGravitinoEnv = mockStatic(GravitinoEnv.class);
     GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
-    mockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+    mockedStaticGravitinoEnv.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
     Config configMock = mock(Config.class);
     when(gravitinoEnv.config()).thenReturn(configMock);
     when(configMock.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(true);
+  }
+
+  @AfterAll
+  public static void stop() {
+    if (mockedStaticGravitinoEnv != null) {
+      mockedStaticGravitinoEnv.close();
+    }
   }
 
   @Test
