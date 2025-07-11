@@ -21,14 +21,13 @@ package org.apache.gravitino.listener.api.info;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.Owner.Type;
 
 @DeveloperApi
 public class OwnerInfo {
   private final String name;
   private final Owner.Type type;
 
-  public OwnerInfo(String name, Type type) {
+  public OwnerInfo(String name, Owner.Type type) {
     this.name = name;
     this.type = type;
   }
@@ -37,7 +36,7 @@ public class OwnerInfo {
     return name;
   }
 
-  public Type getType() {
+  public Owner.Type getType() {
     return type;
   }
 }
