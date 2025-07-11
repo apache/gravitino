@@ -68,12 +68,12 @@ public class TestModelAuthorizationExpression {
 
   @Test
   public void testLoadModel() throws OgnlException, NoSuchFieldException, IllegalAccessException {
-    Field loadTableAuthorizationExpressionField =
+    Field loadModelAuthorizationExpressionField =
         ModelOperations.class.getDeclaredField("loadModelAuthorizationExpression");
-    loadTableAuthorizationExpressionField.setAccessible(true);
-    String loadTableAuthExpression = (String) loadTableAuthorizationExpressionField.get(null);
+    loadModelAuthorizationExpressionField.setAccessible(true);
+    String loadModelAuthExpression = (String) loadModelAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =
-        new MockAuthorizationExpressionEvaluator(loadTableAuthExpression);
+        new MockAuthorizationExpressionEvaluator(loadModelAuthExpression);
     assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
