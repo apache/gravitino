@@ -82,6 +82,7 @@ class TestColumnDTO(unittest.TestCase):
         column_dto_2 = self._string_columns[2]
         self.assertNotEqual(column_dto_1, column_dto_2)
         self.assertEqual(column_dto_1, column_dto_1)
+        self.assertNotEqual(column_dto_1, "test")
 
     def test_column_dto_hash(self):
         column_dto_1 = self._string_columns[1]
