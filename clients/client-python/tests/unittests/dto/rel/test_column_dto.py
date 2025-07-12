@@ -30,6 +30,7 @@ from gravitino.dto.rel.expressions.json_serdes.column_default_value_serdes impor
     ColumnDefaultValueSerdes,
 )
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
+from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -334,6 +335,44 @@ class TestColumnDTO(unittest.TestCase):
                 FuncExpressionDTO.builder()
                 .with_function_name("test_function")
                 .with_function_args(func_args)
+                .build()
+            )
+            column_dto = (
+                ColumnDTO.builder()
+                .with_name(name=str(data_type.name()))
+                .with_data_type(data_type=data_type)
+                .with_default_value(default_value=default_value)
+                .with_comment(comment=data_type.simple_string())
+                .build()
+            )
+            expected_dict["name"] = str(data_type.name())
+            expected_dict["type"] = TypeSerdes.serialize(data_type)
+            expected_dict["comment"] = data_type.simple_string()
+            expected_dict["defaultValue"] = ColumnDefaultValueSerdes.serialize(
+                value=default_value
+            )
+            expected_dict["nullable"] = True
+            expected_dict["autoIncrement"] = False
+
+            serialized_result = column_dto.to_json()
+            deserialized_dto = ColumnDTO.from_json(serialized_result)
+
+            self.assertDictEqual(json.loads(serialized_result), expected_dict)
+            self.assertEqual(deserialized_dto, column_dto)
+
+    def test_column_dto_serialize_with_default_value_unparsed(self):
+        expected_dict = {
+            "name": "",
+            "type": "",
+            "comment": "",
+            "defaultValue": None,
+            "nullable": False,
+            "autoIncrement": False,
+        }
+        for data_type in self._supported_types:
+            default_value = (
+                UnparsedExpressionDTO.builder()
+                .with_unparsed_expression("unparsed_expression")
                 .build()
             )
             column_dto = (
