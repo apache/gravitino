@@ -19,6 +19,8 @@ import unittest
 
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
+from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 
@@ -45,7 +47,21 @@ class TestFunctionArg(unittest.TestCase):
         self.assertEqual(FunctionArg.EMPTY_ARGS, [])
 
     def test_function_arg_validate(self):
-        LiteralDTO(data_type=Types.StringType.get(), value="test").validate(
+        literal_dto = (
+            LiteralDTO.builder()
+            .with_data_type(Types.StringType.get())
+            .with_value("test")
+            .build()
+        )
+        literal_dto.validate(columns=self._columns)
+
+        field_ref_dto = (
+            FieldReferenceDTO.builder().with_column_name(self._column_names).build()
+        )
+        field_ref_dto.validate(columns=self._columns)
+
+        FuncExpressionDTO.builder().with_function_name(
+            "test_function"
+        ).with_function_args([field_ref_dto, literal_dto]).build().validate(
             columns=self._columns
         )
-        # TODO: add unit test for FunctionArg with children

@@ -17,13 +17,20 @@
 
 import json
 import unittest
+from itertools import product
 
 from gravitino.api.column import Column
 from gravitino.api.types.json_serdes import TypeSerdes
 from gravitino.api.types.json_serdes._helper.serdes_utils import SerdesUtils
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
+from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
+from gravitino.dto.rel.expressions.json_serdes.column_default_value_serdes import (
+    ColumnDefaultValueSerdes,
+)
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
+from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.exceptions.base import IllegalArgumentException
 
 
@@ -75,6 +82,7 @@ class TestColumnDTO(unittest.TestCase):
         column_dto_2 = self._string_columns[2]
         self.assertNotEqual(column_dto_1, column_dto_2)
         self.assertEqual(column_dto_1, column_dto_1)
+        self.assertNotEqual(column_dto_1, "test")
 
     def test_column_dto_hash(self):
         column_dto_1 = self._string_columns[1]
@@ -214,3 +222,179 @@ class TestColumnDTO(unittest.TestCase):
                 deserialized_column_dto.default_value(), Column.DEFAULT_VALUE_NOT_SET
             )
             self.assertEqual(serialized_json, deserialized_json)
+
+    def test_column_dto_serdes_with_default_value_literal(self):
+        expected_dict = {
+            "name": "",
+            "type": "",
+            "comment": "",
+            "defaultValue": None,
+            "nullable": False,
+            "autoIncrement": False,
+        }
+        for data_type, default_value_type in product(
+            self._supported_types, self._supported_types
+        ):
+            default_value = (
+                LiteralDTO.builder()
+                .with_data_type(default_value_type)
+                .with_value(default_value_type.simple_string())
+                .build()
+            )
+            column_dto = (
+                ColumnDTO.builder()
+                .with_name(name=str(data_type.name()))
+                .with_data_type(data_type=data_type)
+                .with_default_value(default_value=default_value)
+                .with_comment(comment=data_type.simple_string())
+                .build()
+            )
+            expected_dict["name"] = str(data_type.name())
+            expected_dict["type"] = TypeSerdes.serialize(data_type)
+            expected_dict["comment"] = data_type.simple_string()
+            expected_dict["defaultValue"] = ColumnDefaultValueSerdes.serialize(
+                value=default_value
+            )
+            expected_dict["nullable"] = True
+            expected_dict["autoIncrement"] = False
+
+            serialized_result = column_dto.to_json()
+            deserialized_dto = ColumnDTO.from_json(serialized_result)
+
+            self.assertDictEqual(json.loads(serialized_result), expected_dict)
+            self.assertEqual(deserialized_dto, column_dto)
+
+    def test_column_dto_serdes_with_default_value_field_ref(self):
+        expected_dict = {
+            "name": "",
+            "type": "",
+            "comment": "",
+            "defaultValue": None,
+            "nullable": False,
+            "autoIncrement": False,
+        }
+        default_value = (
+            FieldReferenceDTO.builder().with_column_name(["field_reference"]).build()
+        )
+        for data_type in self._supported_types:
+            column_dto = (
+                ColumnDTO.builder()
+                .with_name(name=str(data_type.name()))
+                .with_data_type(data_type=data_type)
+                .with_default_value(default_value=default_value)
+                .with_comment(comment=data_type.simple_string())
+                .build()
+            )
+            expected_dict["name"] = str(data_type.name())
+            expected_dict["type"] = TypeSerdes.serialize(data_type)
+            expected_dict["comment"] = data_type.simple_string()
+            expected_dict["defaultValue"] = ColumnDefaultValueSerdes.serialize(
+                value=default_value
+            )
+            expected_dict["nullable"] = True
+            expected_dict["autoIncrement"] = False
+
+            serialized_result = column_dto.to_json()
+            deserialized_dto = ColumnDTO.from_json(serialized_result)
+
+            self.assertDictEqual(json.loads(serialized_result), expected_dict)
+            self.assertEqual(deserialized_dto, column_dto)
+
+    def test_column_dto_serdes_with_default_value_func_expression(self):
+        expected_dict = {
+            "name": "",
+            "type": "",
+            "comment": "",
+            "defaultValue": None,
+            "nullable": False,
+            "autoIncrement": False,
+        }
+        func_args = [
+            LiteralDTO.builder()
+            .with_data_type(Types.StringType.get())
+            .with_value("year")
+            .build(),
+            FieldReferenceDTO.builder().with_column_name(["birthday"]).build(),
+            FuncExpressionDTO.builder()
+            .with_function_name("randint")
+            .with_function_args(
+                [
+                    LiteralDTO.builder()
+                    .with_data_type(Types.IntegerType.get())
+                    .with_value("1")
+                    .build(),
+                    LiteralDTO.builder()
+                    .with_data_type(Types.IntegerType.get())
+                    .with_value("100")
+                    .build(),
+                ]
+            )
+            .build(),
+        ]
+        for data_type in self._supported_types:
+            default_value = (
+                FuncExpressionDTO.builder()
+                .with_function_name("test_function")
+                .with_function_args(func_args)
+                .build()
+            )
+            column_dto = (
+                ColumnDTO.builder()
+                .with_name(name=str(data_type.name()))
+                .with_data_type(data_type=data_type)
+                .with_default_value(default_value=default_value)
+                .with_comment(comment=data_type.simple_string())
+                .build()
+            )
+            expected_dict["name"] = str(data_type.name())
+            expected_dict["type"] = TypeSerdes.serialize(data_type)
+            expected_dict["comment"] = data_type.simple_string()
+            expected_dict["defaultValue"] = ColumnDefaultValueSerdes.serialize(
+                value=default_value
+            )
+            expected_dict["nullable"] = True
+            expected_dict["autoIncrement"] = False
+
+            serialized_result = column_dto.to_json()
+            deserialized_dto = ColumnDTO.from_json(serialized_result)
+
+            self.assertDictEqual(json.loads(serialized_result), expected_dict)
+            self.assertEqual(deserialized_dto, column_dto)
+
+    def test_column_dto_serialize_with_default_value_unparsed(self):
+        expected_dict = {
+            "name": "",
+            "type": "",
+            "comment": "",
+            "defaultValue": None,
+            "nullable": False,
+            "autoIncrement": False,
+        }
+        for data_type in self._supported_types:
+            default_value = (
+                UnparsedExpressionDTO.builder()
+                .with_unparsed_expression("unparsed_expression")
+                .build()
+            )
+            column_dto = (
+                ColumnDTO.builder()
+                .with_name(name=str(data_type.name()))
+                .with_data_type(data_type=data_type)
+                .with_default_value(default_value=default_value)
+                .with_comment(comment=data_type.simple_string())
+                .build()
+            )
+            expected_dict["name"] = str(data_type.name())
+            expected_dict["type"] = TypeSerdes.serialize(data_type)
+            expected_dict["comment"] = data_type.simple_string()
+            expected_dict["defaultValue"] = ColumnDefaultValueSerdes.serialize(
+                value=default_value
+            )
+            expected_dict["nullable"] = True
+            expected_dict["autoIncrement"] = False
+
+            serialized_result = column_dto.to_json()
+            deserialized_dto = ColumnDTO.from_json(serialized_result)
+
+            self.assertDictEqual(json.loads(serialized_result), expected_dict)
+            self.assertEqual(deserialized_dto, column_dto)
