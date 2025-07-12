@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.Servlet;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -46,6 +47,7 @@ import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -110,6 +112,10 @@ public class RESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
+            if (icebergConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+              bind(new IcebergRESTAuthInterceptionService(metalakeName))
+                  .to(InterceptionService.class);
+            }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
             bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
