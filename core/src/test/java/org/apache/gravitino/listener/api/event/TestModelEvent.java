@@ -1224,7 +1224,6 @@ public class TestModelEvent {
     ModelVersion mockModelVersion = mock(ModelVersion.class);
     when(mockModelVersion.version()).thenReturn(version);
     when(mockModelVersion.uri()).thenReturn(uri);
-    when(mockModelVersion.uris()).thenReturn(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri));
     when(mockModelVersion.aliases()).thenReturn(aliases);
     when(mockModelVersion.comment()).thenReturn(comment);
     when(mockModelVersion.properties()).thenReturn(properties);
@@ -1249,7 +1248,6 @@ public class TestModelEvent {
     ModelVersion modelVersion = mock(ModelVersion.class);
     when(modelVersion.version()).thenReturn(1);
     when(modelVersion.uri()).thenReturn(uri);
-    when(modelVersion.uris()).thenReturn(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri));
     when(modelVersion.aliases()).thenReturn(aliases);
     when(modelVersion.comment()).thenReturn(comment);
     when(modelVersion.properties()).thenReturn(ImmutableMap.of("color", "#FFFFFF"));
