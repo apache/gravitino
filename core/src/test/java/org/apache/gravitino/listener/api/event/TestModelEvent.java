@@ -238,7 +238,8 @@ public class TestModelEvent {
     ModelVersionInfo linkModelVersionRequest =
         registerAndLinkModelPreEvent.linkModelVersionRequest();
 
-    Assertions.assertEquals(firstModelVersion.uri(), linkModelVersionRequest.uri());
+    Assertions.assertEquals(
+        firstModelVersion.uri(), linkModelVersionRequest.uris().get(ModelVersion.URI_NAME_UNKNOWN));
     Assertions.assertEquals("commentA", linkModelVersionRequest.comment().orElse(null));
     checkArray(firstModelVersion.aliases(), linkModelVersionRequest.aliases().orElse(null));
     checkProperties(firstModelVersion.properties(), linkModelVersionRequest.properties());
@@ -258,8 +259,9 @@ public class TestModelEvent {
     checkModelInfo(modelInfo, modelA);
 
     // validate post-event model uri info
-    String versionUri = registerAndLinkModelEvent.uri();
-    Assertions.assertEquals(firstModelVersion.uri(), versionUri);
+    Map<String, String> versionUris = registerAndLinkModelEvent.uris();
+    Assertions.assertEquals(
+        firstModelVersion.uri(), versionUris.get(ModelVersion.URI_NAME_UNKNOWN));
   }
 
   @Test
@@ -292,7 +294,8 @@ public class TestModelEvent {
         registerAndLinkModelFailureEvent.linkModelVersionRequest();
 
     checkModelInfo(registerModelRequest, modelA);
-    Assertions.assertEquals(firstModelVersion.uri(), linkModelVersionRequest.uri());
+    Assertions.assertEquals(
+        firstModelVersion.uri(), linkModelVersionRequest.uris().get(ModelVersion.URI_NAME_UNKNOWN));
     Assertions.assertEquals("commentA", linkModelVersionRequest.comment().orElse(null));
     checkArray(firstModelVersion.aliases(), linkModelVersionRequest.aliases().orElse(null));
     checkProperties(firstModelVersion.properties(), linkModelVersionRequest.properties());
@@ -626,6 +629,182 @@ public class TestModelEvent {
   }
 
   @Test
+  void testGetModelVersionUriFailureEventViaVersion() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getModelVersionUri(existingIdentA, 1, "n1"));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(GetModelVersionUriFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((GetModelVersionUriFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    GetModelVersionUriFailureEvent getModelVersionUriFailureEvent =
+        (GetModelVersionUriFailureEvent) event;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriFailureEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriFailureEvent.version().isPresent());
+    Assertions.assertEquals(1, getModelVersionUriFailureEvent.version().get());
+    Assertions.assertFalse(getModelVersionUriFailureEvent.alias().isPresent());
+    Assertions.assertEquals("n1", getModelVersionUriFailureEvent.uriName());
+  }
+
+  @Test
+  void testGetModelVersionUriFailureEventViaAlias() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getModelVersionUri(existingIdentA, "alias", "n1"));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(GetModelVersionUriFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((GetModelVersionUriFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    GetModelVersionUriFailureEvent getModelVersionUriFailureEvent =
+        (GetModelVersionUriFailureEvent) event;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriFailureEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriFailureEvent.alias().isPresent());
+    Assertions.assertEquals("alias", getModelVersionUriFailureEvent.alias().get());
+    Assertions.assertFalse(getModelVersionUriFailureEvent.version().isPresent());
+    Assertions.assertEquals("n1", getModelVersionUriFailureEvent.uriName());
+  }
+
+  @Test
+  void testGetModelVersionUriEventViaVersion() {
+    dispatcher.getModelVersionUri(existingIdentA, 1, "n1");
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetModelVersionUriPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    GetModelVersionUriPreEvent getModelVersionUriPreEvent = (GetModelVersionUriPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriPreEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriPreEvent.version().isPresent());
+    Assertions.assertEquals(1, getModelVersionUriPreEvent.version().get());
+    Assertions.assertFalse(getModelVersionUriPreEvent.alias().isPresent());
+    Assertions.assertEquals("n1", getModelVersionUriPreEvent.uriName());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetModelVersionUriEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    GetModelVersionUriEvent getModelVersionUriEvent = (GetModelVersionUriEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriEvent.version().isPresent());
+    Assertions.assertEquals(1, getModelVersionUriEvent.version().get());
+    Assertions.assertFalse(getModelVersionUriEvent.alias().isPresent());
+    Assertions.assertEquals("n1", getModelVersionUriEvent.uriName());
+    Assertions.assertEquals("u1", getModelVersionUriEvent.uri());
+  }
+
+  @Test
+  void testGetModelVersionUriEventWithoutUriNameViaVersion() {
+    dispatcher.getModelVersionUri(existingIdentA, 1, null);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetModelVersionUriPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    GetModelVersionUriPreEvent getModelVersionUriPreEvent = (GetModelVersionUriPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriPreEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriPreEvent.version().isPresent());
+    Assertions.assertEquals(1, getModelVersionUriPreEvent.version().get());
+    Assertions.assertFalse(getModelVersionUriPreEvent.alias().isPresent());
+    Assertions.assertNull(getModelVersionUriPreEvent.uriName());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetModelVersionUriEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    GetModelVersionUriEvent getModelVersionUriEvent = (GetModelVersionUriEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriEvent.version().isPresent());
+    Assertions.assertEquals(1, getModelVersionUriEvent.version().get());
+    Assertions.assertFalse(getModelVersionUriEvent.alias().isPresent());
+    Assertions.assertNull(getModelVersionUriEvent.uriName());
+    Assertions.assertEquals("u1", getModelVersionUriEvent.uri());
+  }
+
+  @Test
+  void testGetModelVersionUriEventViaAlias() {
+    dispatcher.getModelVersionUri(existingIdentA, "alias", "n1");
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetModelVersionUriPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    GetModelVersionUriPreEvent getModelVersionUriPreEvent = (GetModelVersionUriPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriPreEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriPreEvent.alias().isPresent());
+    Assertions.assertEquals("alias", getModelVersionUriPreEvent.alias().get());
+    Assertions.assertFalse(getModelVersionUriPreEvent.version().isPresent());
+    Assertions.assertEquals("n1", getModelVersionUriPreEvent.uriName());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetModelVersionUriEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    GetModelVersionUriEvent getModelVersionUriEvent = (GetModelVersionUriEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriEvent.alias().isPresent());
+    Assertions.assertEquals("alias", getModelVersionUriEvent.alias().get());
+    Assertions.assertFalse(getModelVersionUriEvent.version().isPresent());
+    Assertions.assertEquals("n1", getModelVersionUriEvent.uriName());
+    Assertions.assertEquals("u1", getModelVersionUriEvent.uri());
+  }
+
+  @Test
+  void testGetModelVersionUriEventWithoutUriNameViaAlias() {
+    dispatcher.getModelVersionUri(existingIdentA, "alias", null);
+
+    // validate pre-event
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetModelVersionUriPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+
+    GetModelVersionUriPreEvent getModelVersionUriPreEvent = (GetModelVersionUriPreEvent) preEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriPreEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriPreEvent.alias().isPresent());
+    Assertions.assertEquals("alias", getModelVersionUriPreEvent.alias().get());
+    Assertions.assertFalse(getModelVersionUriPreEvent.version().isPresent());
+    Assertions.assertNull(getModelVersionUriPreEvent.uriName());
+
+    // validate post-event
+    Event postEvent = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetModelVersionUriEvent.class, postEvent.getClass());
+    Assertions.assertEquals(OperationType.GET_MODEL_VERSION_URI, postEvent.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, postEvent.operationStatus());
+
+    GetModelVersionUriEvent getModelVersionUriEvent = (GetModelVersionUriEvent) postEvent;
+    Assertions.assertEquals(existingIdentA, getModelVersionUriEvent.identifier());
+    Assertions.assertTrue(getModelVersionUriEvent.alias().isPresent());
+    Assertions.assertEquals("alias", getModelVersionUriEvent.alias().get());
+    Assertions.assertFalse(getModelVersionUriEvent.version().isPresent());
+    Assertions.assertNull(getModelVersionUriEvent.uriName());
+    Assertions.assertEquals("u1", getModelVersionUriEvent.uri());
+  }
+
+  @Test
   void testDeleteModelVersionFailureEventViaVersion() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -887,7 +1066,8 @@ public class TestModelEvent {
     ModelVersionInfo modelVersionInfo = alterModelVersionEvent.alteredModelVersionInfo();
 
     // validate ModelVersionInfo
-    Assertions.assertEquals("uriA", modelVersionInfo.uri());
+    Assertions.assertEquals(
+        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uriA"), modelVersionInfo.uris());
     Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
     Assertions.assertArrayEquals(
         new String[] {"aliasProduction"}, modelVersionInfo.aliases().get());
@@ -913,7 +1093,8 @@ public class TestModelEvent {
     ModelVersionInfo modelVersionInfo = alterModelVersionEvent.alteredModelVersionInfo();
 
     // validate ModelVersionInfo
-    Assertions.assertEquals("uriB", modelVersionInfo.uri());
+    Assertions.assertEquals(
+        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uriB"), modelVersionInfo.uris());
     Assertions.assertTrue(modelVersionInfo.aliases().isPresent());
     Assertions.assertArrayEquals(new String[] {"aliasTest"}, modelVersionInfo.aliases().get());
     Assertions.assertTrue(modelVersionInfo.comment().isPresent());
@@ -1016,6 +1197,10 @@ public class TestModelEvent {
     when(dispatcher.alterModelVersion(existingIdentB, "aliasTest", modelUpdateCommentChange))
         .thenReturn(otherAlterCommentModelVersion);
 
+    when(dispatcher.getModelVersionUri(existingIdentA, 1, "n1")).thenReturn("u1");
+    when(dispatcher.getModelVersionUri(existingIdentA, 1, null)).thenReturn("u1");
+    when(dispatcher.getModelVersionUri(existingIdentA, "alias", "n1")).thenReturn("u1");
+    when(dispatcher.getModelVersionUri(existingIdentA, "alias", null)).thenReturn("u1");
     return dispatcher;
   }
 
@@ -1097,7 +1282,8 @@ public class TestModelEvent {
 
   private void checkModelVersionInfo(ModelVersionInfo modelVersionInfo, ModelVersion modelVersion) {
     // check normal fields
-    Assertions.assertEquals(modelVersion.uri(), modelVersionInfo.uri());
+    Assertions.assertEquals(
+        modelVersion.uri(), modelVersionInfo.uris().get(ModelVersion.URI_NAME_UNKNOWN));
     Assertions.assertEquals(modelVersion.comment(), modelVersionInfo.comment().orElse(null));
 
     // check aliases
