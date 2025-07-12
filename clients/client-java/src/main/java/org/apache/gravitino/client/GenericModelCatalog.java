@@ -348,7 +348,9 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
     NameIdentifier modelFullIdent = modelFullNameIdentifier(ident);
     ModelVersionResponse resp =
         restClient.put(
-            formatModelVersionRequestPath(modelFullIdent) + "/aliases/" + alias,
+            formatModelVersionRequestPath(modelFullIdent)
+                + "/aliases/"
+                + RESTUtils.encodeString(alias),
             req,
             ModelVersionResponse.class,
             Collections.emptyMap(),
