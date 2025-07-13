@@ -22,6 +22,7 @@ package org.apache.gravitino.listener.api.info;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Owner;
 
+/** Owner information that used in owner operation events. */
 @DeveloperApi
 public class OwnerInfo {
   private final String name;
