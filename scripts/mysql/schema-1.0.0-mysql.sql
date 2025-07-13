@@ -374,3 +374,21 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     KEY `idx_pid` (`policy_id`),
     KEY `idx_mid` (`metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
+
+CREATE TABLE IF NOT EXISTS `statistic_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `statistic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'statistic id',
+    `statistic_name` VARCHAR(128) NOT NULL COMMENT 'statistic name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `statistic_value` MEDIUMTEXT NOT NULL COMMENT 'statistic value',
+    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
+    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'statistic audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'statistic deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metalake_id`, `metadata_object_id`, `deleted_at`),
+    KEY `idx_stid` (`statistic_id`),
+    KEY `idx_moid` (`metadata_object_id`),
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'statistic metadata';

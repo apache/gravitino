@@ -52,7 +52,7 @@ public class StatisticBaseSQLProvider {
         + "</script>";
   }
 
-  public String batchDeleteStatistics(@Param("statisticIds") List<Long> statisticIds) {
+  public String batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds) {
     return "<script>"
         + "UPDATE "
         + STATISTIC_META_TABLE_NAME
@@ -74,7 +74,7 @@ public class StatisticBaseSQLProvider {
         + " WHERE object_id = #{objectId} AND deleted_at = 0";
   }
 
-  public String listStatisticsByObjectId(@Param("objectId") Long objectId) {
+  public String listStatisticPOsByObjectId(@Param("objectId") Long objectId) {
     return "SELECT statistic_id as statisticId, statistic_name as statisticName, object_id as objectId, object_type as objectType, audit_info as auditInfo, current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
         + STATISTIC_META_TABLE_NAME
         + " WHERE object_id = #{objectId} AND deleted_at = 0";

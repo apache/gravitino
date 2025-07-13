@@ -20,16 +20,19 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.provider.base.StatisticBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.annotations.Param;
 
 public class StatisticSQLProviderFactory {
 
-  static class StatisticMySQLProvider extends StatisticBaseSQLProvider {};
+  static class StatisticMySQLProvider extends StatisticBaseSQLProvider {}
 
-  static class StatisticH2Provider extends StatisticBaseSQLProvider {};
+  static class StatisticH2Provider extends StatisticBaseSQLProvider {}
 
   private static final Map<JDBCBackend.JDBCBackendType, StatisticBaseSQLProvider>
       STATISTIC_SQL_PROVIDERS =
@@ -48,5 +51,39 @@ public class StatisticSQLProviderFactory {
     JDBCBackend.JDBCBackendType jdbcBackendType =
         JDBCBackend.JDBCBackendType.fromString(databaseId);
     return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
+  }
+
+  public static String batchInsertStatisticPOs(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
+    return getProvider().batchInsertStatisticPOs(statisticPOs);
+  }
+
+  public static String batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds) {
+    return getProvider().batchDeleteStatisticPOs(statisticIds);
+  }
+
+  public static String softDeleteStatisticsByObjectId(@Param("objectId") Long objectId) {
+    return getProvider().softDeleteStatisticsByObjectId(objectId);
+  }
+
+  public static String listStatisticPOsByObjectId(@Param("objectId") Long objectId) {
+    return getProvider().listStatisticPOsByObjectId(objectId);
+  }
+
+  public static String softDeleteStatisticsByMetalakeId(Long metalakeId) {
+    return getProvider().softDeleteStatisticsByMetalakeId(metalakeId);
+  }
+
+  public static String softDeleteStatisticsByCatalogId(Long catalogId) {
+    return getProvider().softDeleteStatisticsByCatalogId(catalogId);
+  }
+
+  public static String softDeleteStatisticsBySchemaId(Long schemaId) {
+    return getProvider().softDeleteStatisticsBySchemaId(schemaId);
+  }
+
+  public static String deleteStatisticsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return getProvider().deleteStatisticsByLegacyTimeline(legacyTimeline, limit);
   }
 }

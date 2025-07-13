@@ -55,7 +55,7 @@ public class StatisticMetaService {
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
             StatisticMetaMapper.class,
-            mapper -> mapper.listStatisticPOsByObject(objectId, type.name()));
+            mapper -> mapper.listStatisticPOsByObjectId(objectId, type.name()));
     return statisticPOs.stream().map(POConverters::fromStatisticPO).collect(Collectors.toList());
   }
 
@@ -92,5 +92,11 @@ public class StatisticMetaService {
     }
     SessionUtils.doWithCommit(
         StatisticMetaMapper.class, mapper -> mapper.batchDeleteStatisticPOs(statisticIds));
+  }
+
+  public int deleteStatisticsByLegacyTimeline(long legacyTimeline, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        StatisticMetaMapper.class,
+        mapper -> mapper.deleteStatisticsByLegacyTimeline(legacyTimeline, limit));
   }
 }

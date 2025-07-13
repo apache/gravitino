@@ -61,6 +61,7 @@ import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
@@ -339,6 +340,10 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return ModelVersionMetaService.getInstance()
             .deleteModelVersionMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case STATISTIC:
+        return StatisticMetaService.getInstance()
+            .deleteStatisticsByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
