@@ -284,9 +284,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
             "Unsupported table change type: " + change.getClass().getName());
       }
     }
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateTableProperties(setProperties));
-    }
 
     // Last modified comment
     if (null != updateComment) {
