@@ -28,6 +28,7 @@ import java.util.List;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerEventManager;
@@ -90,6 +91,8 @@ public class TestOwnerEvent {
         MetadataObjects.of(
             ImmutableList.of("test_catalog", "test_schema", "test_table"),
             MetadataObject.Type.TABLE);
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, "test_catalog", "test_schema", "test_table");
     String ownerName = "test_owner";
     Owner.Type ownerType = Owner.Type.USER;
 
@@ -106,11 +109,17 @@ public class TestOwnerEvent {
       SetOwnerPreEvent setOwnerPreEvent = (SetOwnerPreEvent) preEvents.get(0);
       Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerPreEvent.metadataObjectType());
       Assertions.assertEquals(new OwnerInfo(ownerName, ownerType), setOwnerPreEvent.ownerInfo());
+      Assertions.assertEquals(identifier, setOwnerPreEvent.identifier());
+      Assertions.assertEquals(OperationStatus.UNPROCESSED, setOwnerPreEvent.operationStatus());
+      Assertions.assertEquals(OperationType.SET_OWNER, setOwnerPreEvent.operationType());
 
       Assertions.assertEquals(1, postEvents.size());
       SetOwnerEvent setOwnerEvent = (SetOwnerEvent) postEvents.get(0);
       Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerEvent.metadataObjectType());
       Assertions.assertEquals(new OwnerInfo(ownerName, ownerType), setOwnerEvent.ownerInfo());
+      Assertions.assertEquals(identifier, setOwnerEvent.identifier());
+      Assertions.assertEquals(OperationStatus.SUCCESS, setOwnerEvent.operationStatus());
+      Assertions.assertEquals(OperationType.SET_OWNER, setOwnerEvent.operationType());
 
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
@@ -134,6 +143,9 @@ public class TestOwnerEvent {
       SetOwnerPreEvent setOwnerPreEvent = (SetOwnerPreEvent) preEvents.get(0);
       Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerPreEvent.metadataObjectType());
       Assertions.assertEquals(new OwnerInfo(ownerName, ownerType), setOwnerPreEvent.ownerInfo());
+      Assertions.assertEquals(identifier, setOwnerPreEvent.identifier());
+      Assertions.assertEquals(OperationStatus.UNPROCESSED, setOwnerPreEvent.operationStatus());
+      Assertions.assertEquals(OperationType.SET_OWNER, setOwnerPreEvent.operationType());
 
       Assertions.assertEquals(1, postEvents.size());
       Assertions.assertTrue(postEvents.get(0) instanceof SetOwnerFailureEvent);
@@ -141,6 +153,9 @@ public class TestOwnerEvent {
       Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerFailureEvent.metadataObjectType());
       Assertions.assertEquals(
           new OwnerInfo(ownerName, ownerType), setOwnerFailureEvent.ownerInfo());
+      Assertions.assertEquals(identifier, setOwnerFailureEvent.identifier());
+      Assertions.assertEquals(OperationStatus.FAILURE, setOwnerFailureEvent.operationStatus());
+      Assertions.assertEquals(OperationType.SET_OWNER, setOwnerFailureEvent.operationType());
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
       dummyEventListener.clear();
@@ -154,6 +169,8 @@ public class TestOwnerEvent {
         MetadataObjects.of(
             ImmutableList.of("test_catalog", "test_schema", "test_table"),
             MetadataObject.Type.TABLE);
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, "test_catalog", "test_schema", "test_table");
     Owner expectedOwner = new OwnerImpl("test_owner", Owner.Type.USER);
 
     OwnerManager spyOwnerManger = Mockito.spy(innerOwnerManager);
@@ -175,12 +192,18 @@ public class TestOwnerEvent {
       GetOwnerPreEvent getOwnerPreEvent = (GetOwnerPreEvent) preEvents.get(0);
       Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerPreEvent.metadataObjectType());
       Assertions.assertNull(getOwnerPreEvent.ownerInfo());
+      Assertions.assertEquals(identifier, getOwnerPreEvent.identifier());
+      Assertions.assertEquals(OperationStatus.UNPROCESSED, getOwnerPreEvent.operationStatus());
+      Assertions.assertEquals(OperationType.GET_OWNER, getOwnerPreEvent.operationType());
 
       Assertions.assertEquals(1, postEvents.size());
       GetOwnerEvent getOwnerEvent = (GetOwnerEvent) postEvents.get(0);
       Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerEvent.metadataObjectType());
       Assertions.assertEquals(
           new OwnerInfo(expectedOwner.name(), expectedOwner.type()), getOwnerEvent.ownerInfo());
+      Assertions.assertEquals(identifier, getOwnerEvent.identifier());
+      Assertions.assertEquals(OperationStatus.SUCCESS, getOwnerEvent.operationStatus());
+      Assertions.assertEquals(OperationType.GET_OWNER, getOwnerEvent.operationType());
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
       dummyEventListener.clear();
@@ -203,12 +226,19 @@ public class TestOwnerEvent {
       GetOwnerPreEvent getOwnerPreEvent = (GetOwnerPreEvent) preEvents.get(0);
       Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerPreEvent.metadataObjectType());
       Assertions.assertNull(getOwnerPreEvent.ownerInfo());
+      Assertions.assertEquals(identifier, getOwnerPreEvent.identifier());
+      Assertions.assertEquals(OperationStatus.UNPROCESSED, getOwnerPreEvent.operationStatus());
+      Assertions.assertEquals(OperationType.GET_OWNER, getOwnerPreEvent.operationType());
 
       Assertions.assertEquals(1, postEvents.size());
-      Assertions.assertTrue(postEvents.get(0) instanceof SetOwnerFailureEvent);
+      Assertions.assertTrue(postEvents.get(0) instanceof GetOwnerFailureEvent);
       GetOwnerFailureEvent getOwnerFailureEvent = (GetOwnerFailureEvent) postEvents.get(0);
       Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerFailureEvent.metadataObjectType());
       Assertions.assertNull(getOwnerFailureEvent.ownerInfo());
+      Assertions.assertEquals(identifier, getOwnerFailureEvent.identifier());
+      Assertions.assertEquals(OperationStatus.FAILURE, getOwnerFailureEvent.operationStatus());
+      Assertions.assertEquals(OperationType.GET_OWNER, getOwnerFailureEvent.operationType());
+
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
       dummyEventListener.clear();
