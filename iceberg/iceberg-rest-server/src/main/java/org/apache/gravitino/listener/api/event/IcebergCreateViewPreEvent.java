@@ -25,7 +25,8 @@ import org.apache.iceberg.rest.requests.CreateViewRequest;
 
 /** Represent a pre event before creating Iceberg view. */
 @DeveloperApi
-public class IcebergCreateViewPreEvent extends IcebergViewPreEvent {
+public class IcebergCreateViewPreEvent extends IcebergViewPreEvent
+    implements SupportsChangingPreEvent {
   private final CreateViewRequest createViewRequest;
 
   public IcebergCreateViewPreEvent(

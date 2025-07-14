@@ -21,17 +21,32 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** An exception thrown when a policy is invalid. */
-public class IllegalPolicyException extends IllegalArgumentException {
+/**
+ * An exception thrown when a job is not found. This exception is typically used to indicate that a
+ * requested job does not exist in the system.
+ */
+public class NoSuchJobException extends NotFoundException {
 
   /**
-   * Constructs a new exception with the specified detail message.
+   * Constructs a new NoSuchJobException with the specified detail message.
    *
    * @param message the detail message.
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public IllegalPolicyException(@FormatString String message, Object... args) {
-    super(String.format(message, args));
+  public NoSuchJobException(@FormatString String message, Object... args) {
+    super(message, args);
+  }
+
+  /**
+   * Constructs a new NoSuchJobException with the specified detail message and cause.
+   *
+   * @param cause the cause of the exception.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public NoSuchJobException(Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

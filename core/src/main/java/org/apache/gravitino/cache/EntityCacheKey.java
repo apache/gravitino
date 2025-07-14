@@ -138,7 +138,7 @@ public class EntityCacheKey {
    */
   @Override
   public String toString() {
-    String stringExpr = identifier.toString() + ":" + type.getShortName();
+    String stringExpr = identifier.toString() + ":" + type.toString();
     if (relationType != null) {
       stringExpr += ":" + relationType.name();
     }

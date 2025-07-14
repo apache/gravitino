@@ -1051,8 +1051,58 @@ public class TestMysqlTableOperations extends TestMysql {
     sql = MysqlTableOperations.addIndexDefinition(successIndex);
     Assertions.assertEquals("ADD PRIMARY KEY  (`col_1`, `col_2`)", sql);
 
-    TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", false);
-    sql = MysqlTableOperations.deleteIndexDefinition(null, deleteIndex);
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_op_table";
+    String tableComment = "test_comment";
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(INT)
+            .withComment("id")
+            .withNullable(false)
+            .build());
+    columns.add(
+        JdbcColumn.builder()
+            .withName("col_2")
+            .withType(INT)
+            .withNullable(true)
+            .withDefaultValue(Literals.NULL)
+            .build());
+    Map<String, String> properties = new HashMap<>();
+    properties.put(MYSQL_AUTO_INCREMENT_OFFSET_KEY, "10");
+
+    Index[] indexes = new Index[] {Indexes.unique("uk_2", new String[][] {{"col_1"}})};
+    // create table
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        tableComment,
+        properties,
+        null,
+        Distributions.NONE,
+        indexes);
+
+    // load table
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+
+    // If ifExists is set to true then the code should not throw an exception if the index doesn't
+    // exist.
+    TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", true);
+    sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex);
     Assertions.assertEquals("DROP INDEX `uk_1`", sql);
+
+    // The index existence check should only verify existence when ifExists is false, preventing
+    // failures when dropping non-existent indexes.
+    TableChange.DeleteIndex deleteIndex2 = new TableChange.DeleteIndex("uk_1", false);
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> MysqlTableOperations.deleteIndexDefinition(load, deleteIndex2));
+    Assertions.assertEquals("Index does not exist", thrown.getMessage());
+
+    TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
+    sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex3);
+    Assertions.assertEquals("DROP INDEX `uk_2`", sql);
   }
 }
