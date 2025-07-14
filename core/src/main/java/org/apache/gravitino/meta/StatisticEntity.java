@@ -125,6 +125,7 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     }
 
     public StatisticEntity build() {
+      statisticEntity.validate();
       return statisticEntity;
     }
   }

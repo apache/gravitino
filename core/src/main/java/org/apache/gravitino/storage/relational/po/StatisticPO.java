@@ -182,10 +182,15 @@ public class StatisticPO {
       Preconditions.checkArgument(statisticPO.metadataObjectId != null, "`objectId is required");
       Preconditions.checkArgument(
           statisticPO.metadataObjectType != null, "`objectType` is required");
+      Preconditions.checkArgument(statisticPO.statisticId != null, "`statisticId` is required");
       Preconditions.checkArgument(statisticPO.statisticName != null, "`statisticName` is required");
       Preconditions.checkArgument(statisticPO.statisticValue != null, "`value` is required");
       Preconditions.checkArgument(statisticPO.auditInfo != null, "`auditInfo` is required");
-      // TODO: Add validation for currentVersion and lastVersion if needed
+      Preconditions.checkArgument(statisticPO.metalakeId != null, "`metalakeId` is required");
+      Preconditions.checkArgument(statisticPO.deletedAt != null, "`deletedAt` is required");
+      Preconditions.checkArgument(statisticPO.lastVersion != null, "`lastVersion` is required");
+      Preconditions.checkArgument(
+          statisticPO.currentVersion != null, "`currentVersion` is required");
       return statisticPO;
     }
   }
