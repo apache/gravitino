@@ -71,6 +71,7 @@ public class JdbcUrlUtils {
     String lowerUrl = url.toLowerCase();
     String decodedUrl = recursiveDecode(lowerUrl);
 
+    // As H2 is only used for testing, we do not check unsafe parameters for H2.
     if (driver != null) {
       if (decodedUrl.startsWith("jdbc:mysql")) {
         checkUnsafeParameters(decodedUrl, all, UNSAFE_MYSQL_PARAMETERS, "MySQL");
