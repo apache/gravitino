@@ -163,6 +163,12 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_CONSUME_TOPIC", "(ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))");
+    expression =
+        expression.replaceAll(
+            "ANY_READ_FILESET", "(ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");
+    expression =
+        expression.replaceAll(
+            "ANY_WRITE_FILESET", "(ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");
     return expression;
   }
 }
