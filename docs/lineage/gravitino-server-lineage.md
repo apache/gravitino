@@ -63,9 +63,9 @@ Lineage Http sink supports sending the lineage to an Http sink supported by Open
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|----------|---------------|
 | gravitino.lineage.sinks           | Specifies the lineage sink implementation to use.For http sink `http`.                                                                 | `log`                                              | Yes      | 0.9.0         |
 | gravitino.lineage.http.sinkClass  | Fully qualified class name of the http sink lineage sink implementation  `org.apache.gravitino.lineage.sink.LineageHttpSink`)          | `org.apache.gravitino.lineage.sink.LineageLogSink` | Yes      | 0.9.0         |
-| gravitino.lineage.http.url        | URL of the http sink server endpoint for lineage collection(e.g., `http://localhost:5000`)                                             | (none)                                             | Yes      | 0.10.0        |
-| gravitino.lineage.http.authType   | Authentication type for http sink (options: `apiKey` or `none`)                                                                        | (none)                                             | Yes      | 0.10.0        |
-| gravitino.lineage.http.apiKey     | API key for authenticating with http sink (required if authType=`apiKey`)                                                              | (none)                                             | No       | 0.10.0        |
+| gravitino.lineage.http.url        | URL of the http sink server endpoint for lineage collection(e.g., `http://localhost:5000`)                                             | (none)                                             | Yes      | 1.0.0         |
+| gravitino.lineage.http.authType   | Authentication type for http sink (options: `apiKey` or `none`)                                                                        | (none)                                             | Yes      | 1.0.0         |
+| gravitino.lineage.http.apiKey     | API key for authenticating with http sink (required if authType=`apiKey`)                                                              | (none)                                             | No       | 1.0.0         |
 
 ## High watermark status
 
