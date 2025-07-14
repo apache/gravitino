@@ -13,14 +13,33 @@ public interface StatisticMetaMapper {
   String STATISTIC_META_TABLE_NAME = "statistic_meta";
 
   @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByObjectId")
-  List<StatisticPO> listStatisticPOsByObjectId(
-      @Param("objectId") long objectId, @Param("name") String name);
+  List<StatisticPO> listStatisticPOsByObjectId(@Param("objectId") long objectId);
 
   @InsertProvider(type = StatisticSQLProviderFactory.class, method = "batchInsertStatisticPOs")
   void batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);
 
   @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
-  String batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds);
+  Integer batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds);
+
+  @UpdateProvider(
+      type = StatisticSQLProviderFactory.class,
+      method = "softDeleteStatisticsByObjectId")
+  Integer softDeleteStatisticsByObjectId(@Param("objectId") Long objectId);
+
+  @UpdateProvider(
+      type = StatisticSQLProviderFactory.class,
+      method = "softDeleteStatisticsByMetalakeId")
+  Integer softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  @UpdateProvider(
+      type = StatisticSQLProviderFactory.class,
+      method = "softDeleteStatisticsByCatalogId")
+  Integer softDeleteStatisticsByCatalogId(@Param("catalogId") Long catalogId);
+
+  @UpdateProvider(
+      type = StatisticSQLProviderFactory.class,
+      method = "softDeleteStatisticsBySchemaId")
+  Integer softDeleteStatisticsBySchemaId(@Param("schemaId") Long schemaId);
 
   @DeleteProvider(
       type = StatisticSQLProviderFactory.class,

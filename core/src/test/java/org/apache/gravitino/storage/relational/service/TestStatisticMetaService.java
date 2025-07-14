@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.Entity;
@@ -45,7 +44,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
   StatisticMetaService statisticMetaService = StatisticMetaService.getInstance();
 
   @Test
-  public void testInsertStatistics() throws Exception {
+  public void testStatisticsLifeCycle() throws Exception {
     String metalakeName = "metalake";
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -65,39 +64,13 @@ public class TestStatisticMetaService extends TestJDBCBackend {
         statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
     Assertions.assertEquals(1, listEntities.size());
     Assertions.assertEquals("test", listEntities.get(0).name());
-    Assertions.assertEquals("test", listEntities.get(0).value().value());
-  }
-
-  @Test
-  public void testDeleteStatistics() throws IOException {
-    String metalakeName = "metalake";
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    BaseMetalake metalake =
-        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
-    backend.insert(metalake, false);
-
-    List<StatisticEntity> statisticEntities = Lists.newArrayList();
-    NameIdentifier nameIdentifier = NameIdentifierUtil.ofMetalake(metalakeName);
-    StatisticEntity statisticEntity = createStatisticEntity(auditInfo);
-    statisticEntities.add(statisticEntity);
-    statisticMetaService.batchInsertStatisticPOs(
-        statisticEntities, metalakeName, nameIdentifier, Entity.EntityType.METALAKE);
+    Assertions.assertEquals(100L, listEntities.get(0).value().value());
 
     List<Long> ids = Lists.newArrayList(statisticEntity.id());
     statisticMetaService.batchDeleteStatisticPOs(ids);
-    List<StatisticEntity> listEntities =
+    listEntities =
         statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
     Assertions.assertEquals(0, listEntities.size());
-  }
-
-  private static StatisticEntity createStatisticEntity(AuditInfo auditInfo) {
-    return StatisticEntity.builder()
-        .withId(RandomIdGenerator.INSTANCE.nextId())
-        .withName("test")
-        .withValue(StatisticValues.longValue(100L))
-        .withAuditInfo(auditInfo)
-        .build();
   }
 
   @Test
@@ -357,5 +330,14 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     // assert stats count
     Assertions.assertEquals(0, countActiveStats(metalake.id()));
     Assertions.assertEquals(3, countAllStats(metalake.id()));
+  }
+
+  private static StatisticEntity createStatisticEntity(AuditInfo auditInfo) {
+    return StatisticEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName("test")
+        .withValue(StatisticValues.longValue(100L))
+        .withAuditInfo(auditInfo)
+        .build();
   }
 }

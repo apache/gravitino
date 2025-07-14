@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.ROLE_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper.STATISTIC_META_TABLE_NAME;
 
 import java.util.List;
@@ -62,7 +61,7 @@ public class StatisticBaseSQLProvider {
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE FALSE "
         + "<foreach collection='statisticIds' item='item' separator=' '>"
-        + " OR (statistic_id = #{item.statisticId} AND"
+        + " OR (statistic_id = #{item} AND"
         + " deleted_at = 0 )"
         + "</foreach>"
         + "</script>";
@@ -73,18 +72,21 @@ public class StatisticBaseSQLProvider {
         + STATISTIC_META_TABLE_NAME
         + "SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE object_id = #{objectId} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{objectId} AND deleted_at = 0";
   }
 
   public String listStatisticPOsByObjectId(@Param("objectId") Long objectId) {
-    return "SELECT statistic_id as statisticId, statistic_name as statisticName, object_id as objectId, object_type as objectType, audit_info as auditInfo, current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
+    return "SELECT statistic_id as statisticId, statistic_name as statisticName, metalake_id as metalakeId,"
+        + " statistic_value as statisticValue, metadata_object_id as metadataObjectId,"
+        + "metadata_object_type as metadataObjectType, audit_info as auditInfo,"
+        + "current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
         + STATISTIC_META_TABLE_NAME
-        + " WHERE object_id = #{objectId} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{objectId} AND deleted_at = 0";
   }
 
   public String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
-        + SECURABLE_OBJECT_TABLE_NAME
+        + STATISTIC_META_TABLE_NAME
         + " ob SET ob.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE exists (SELECT * from "

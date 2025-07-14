@@ -44,6 +44,7 @@ import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -258,7 +259,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ModelMetaMapper.class,
-                    mapper -> mapper.softDeleteModelMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteModelMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    StatisticMetaMapper.class,
+                    mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -307,7 +312,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     OwnerMetaMapper.class,
-                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteOwnerRelByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    StatisticMetaMapper.class,
+                    mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)));
       }
     }
     return true;

@@ -43,6 +43,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -269,7 +270,11 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ModelMetaMapper.class,
-                  mapper -> mapper.softDeleteModelMetasByCatalogId(catalogId)));
+                  mapper -> mapper.softDeleteModelMetasByCatalogId(catalogId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.softDeleteStatisticsByCatalogId(catalogId)));
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
@@ -301,7 +306,11 @@ public class CatalogMetaService {
                   TagMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                          catalogId, MetadataObject.Type.CATALOG.name())));
+                          catalogId, MetadataObject.Type.CATALOG.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.softDeleteStatisticsByObjectId(catalogId)));
     }
 
     return true;

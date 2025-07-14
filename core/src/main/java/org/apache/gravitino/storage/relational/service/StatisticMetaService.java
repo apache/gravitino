@@ -54,8 +54,7 @@ public class StatisticMetaService {
         MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
-            StatisticMetaMapper.class,
-            mapper -> mapper.listStatisticPOsByObjectId(objectId, type.name()));
+            StatisticMetaMapper.class, mapper -> mapper.listStatisticPOsByObjectId(objectId));
     return statisticPOs.stream().map(POConverters::fromStatisticPO).collect(Collectors.toList());
   }
 
@@ -86,11 +85,11 @@ public class StatisticMetaService {
         StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(pos));
   }
 
-  public void batchDeleteStatisticPOs(List<Long> statisticIds) {
+  public int batchDeleteStatisticPOs(List<Long> statisticIds) {
     if (statisticIds == null || statisticIds.isEmpty()) {
-      return;
+      return 0;
     }
-    SessionUtils.doWithCommit(
+    return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class, mapper -> mapper.batchDeleteStatisticPOs(statisticIds));
   }
 

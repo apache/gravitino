@@ -34,6 +34,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
@@ -260,7 +261,11 @@ public class FilesetMetaService {
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())));
+                        filesetId, MetadataObject.Type.FILESET.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.softDeleteStatisticsByObjectId(filesetId)));
 
     return true;
   }
