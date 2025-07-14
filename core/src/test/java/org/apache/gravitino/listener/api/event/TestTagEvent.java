@@ -235,7 +235,7 @@ public class TestTagEvent {
         OperationType.LIST_METADATA_OBJECTS_FOR_TAGS, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
     Assertions.assertArrayEquals(
-        tagNames, ((ListMetadataObjectsForTagsEvent) postevent).getTagNames());
+        tagNames, ((ListMetadataObjectsForTagsEvent) postevent).tagNames());
   }
 
   @Test

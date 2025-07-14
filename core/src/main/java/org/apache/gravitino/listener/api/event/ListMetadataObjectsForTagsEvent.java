@@ -47,7 +47,7 @@ public final class ListMetadataObjectsForTagsEvent extends TagEvent {
    *
    * @return the tag names.
    */
-  public String[] getTagNames() {
+  public String[] tagNames() {
     return tagNames;
   }
 
