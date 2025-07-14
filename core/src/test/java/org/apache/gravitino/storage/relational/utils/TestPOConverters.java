@@ -1231,6 +1231,7 @@ public class TestPOConverters {
             .build());
     StatisticPO.Builder builder = StatisticPO.builder();
     builder.withMetadataObjectType(MetadataObject.Type.CATALOG.name()).withMetadataObjectId(1L);
+    builder.withMetalakeId(1L);
     List<StatisticPO> statisticPOs =
         POConverters.initializeStatisticPOs(statisticEntities, builder);
 

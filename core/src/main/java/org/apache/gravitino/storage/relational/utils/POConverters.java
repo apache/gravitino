@@ -1594,6 +1594,8 @@ public class POConverters {
           .withValue(
               JsonUtils.anyFieldMapper()
                   .readValue(statisticPO.getStatisticValue(), StatisticValue.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(statisticPO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException je) {
       throw new RuntimeException(je);
