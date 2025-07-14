@@ -34,13 +34,23 @@ public class StatisticSQLProviderFactory {
 
   static class StatisticH2Provider extends StatisticBaseSQLProvider {}
 
+  static class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
+    @Override
+    protected String softDeleteSQL() {
+      return " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+          + " timestamp '1970-01-01 00:00:00')*1000))) ";
+    }
+  }
+
   private static final Map<JDBCBackend.JDBCBackendType, StatisticBaseSQLProvider>
       STATISTIC_SQL_PROVIDERS =
           ImmutableMap.of(
               JDBCBackend.JDBCBackendType.H2,
               new StatisticH2Provider(),
               JDBCBackend.JDBCBackendType.MYSQL,
-              new StatisticMySQLProvider());
+              new StatisticMySQLProvider(),
+              JDBCBackend.JDBCBackendType.POSTGRESQL,
+              new StatisticPostgresSQLProvider());
 
   public static StatisticBaseSQLProvider getProvider() {
     String databaseId =
@@ -70,15 +80,15 @@ public class StatisticSQLProviderFactory {
     return getProvider().listStatisticPOsByObjectId(objectId);
   }
 
-  public static String softDeleteStatisticsByMetalakeId(Long metalakeId) {
+  public static String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteStatisticsByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteStatisticsByCatalogId(Long catalogId) {
+  public static String softDeleteStatisticsByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().softDeleteStatisticsByCatalogId(catalogId);
   }
 
-  public static String softDeleteStatisticsBySchemaId(Long schemaId) {
+  public static String softDeleteStatisticsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().softDeleteStatisticsBySchemaId(schemaId);
   }
 

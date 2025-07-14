@@ -146,46 +146,52 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticMetaService.batchInsertStatisticPOs(
         statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, model.nameIdentifier(), Entity.EntityType.MODEL);
+
     // assert stats
-    Assertions.assertEquals(3, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(4, countActiveStats(metalake.id()));
+    Assertions.assertEquals(4, countAllStats(metalake.id()));
 
     // Test to delete model
     ModelMetaService.getInstance().deleteModel(model.nameIdentifier());
 
     // assert stats
-    Assertions.assertEquals(2, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(3, countActiveStats(metalake.id()));
+    Assertions.assertEquals(4, countAllStats(metalake.id()));
 
     // Test to delete table
     TableMetaService.getInstance().deleteTable(table.nameIdentifier());
     // assert stats
-    Assertions.assertEquals(1, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(2, countActiveStats(metalake.id()));
+    Assertions.assertEquals(4, countAllStats(metalake.id()));
 
     // Test to delete topic
     TopicMetaService.getInstance().deleteTopic(topic.nameIdentifier());
     // assert stats
-    Assertions.assertEquals(0, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(1, countActiveStats(metalake.id()));
+    Assertions.assertEquals(4, countAllStats(metalake.id()));
 
     // Test to delete fileset
     FilesetMetaService.getInstance().deleteFileset(fileset.nameIdentifier());
     // assert stats
-    Assertions.assertEquals(2, countActiveStats(metalake.id()));
+    Assertions.assertEquals(0, countActiveStats(metalake.id()));
     Assertions.assertEquals(4, countAllStats(metalake.id()));
 
     // Test to delete schema
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false);
     // assert stats
-    Assertions.assertEquals(2, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(0, countActiveStats(metalake.id()));
+    Assertions.assertEquals(4, countAllStats(metalake.id()));
 
     // Test to delete catalog
     CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false);
     // assert stats
-    Assertions.assertEquals(2, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(0, countActiveStats(metalake.id()));
+    Assertions.assertEquals(4, countAllStats(metalake.id()));
 
     // Test to delete catalog with cascade mode
     catalog =
@@ -235,7 +241,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(model, false);
     // insert stats
-    statisticEntities = Lists.newArrayList();
+    statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOs(
@@ -253,11 +259,21 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticMetaService.batchInsertStatisticPOs(
         statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, model.nameIdentifier(), Entity.EntityType.MODEL);
+
+    // assert stats
+    Assertions.assertEquals(4, countActiveStats(metalake.id()));
+    Assertions.assertEquals(8, countAllStats(metalake.id()));
+
     CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true);
 
     // assert stats
     Assertions.assertEquals(0, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(8, countAllStats(metalake.id()));
 
     // Test to delete schema with cascade mode
     catalog =
@@ -324,12 +340,22 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticMetaService.batchInsertStatisticPOs(
         statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
+    statisticEntities.clear();
+    statisticEntity = createStatisticEntity(auditInfo);
+    statisticEntities.add(statisticEntity);
+    statisticMetaService.batchInsertStatisticPOs(
+        statisticEntities, metalakeName, model.nameIdentifier(), Entity.EntityType.MODEL);
+
+    // assert stats count
+    Assertions.assertEquals(4, countActiveStats(metalake.id()));
+    Assertions.assertEquals(12, countAllStats(metalake.id()));
+
     // delete object
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
 
     // assert stats count
     Assertions.assertEquals(0, countActiveStats(metalake.id()));
-    Assertions.assertEquals(3, countAllStats(metalake.id()));
+    Assertions.assertEquals(12, countAllStats(metalake.id()));
   }
 
   private static StatisticEntity createStatisticEntity(AuditInfo auditInfo) {
