@@ -34,6 +34,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
@@ -259,5 +260,23 @@ public class RelationalEntityStore
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
     return backend.updateEntityRelations(
         relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
+      Type relType, List<E> entities, List<Relation> relations, boolean overwrite)
+      throws IOException {
+    for (Relation relation : relations) {
+      cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
+    }
+    backend.insertEntitiesAndRelations(relType, entities, relations, overwrite);
+  }
+
+  @Override
+  public int deleteRelations(Type relType, List<Relation> relations) throws IOException {
+    for (Relation relation : relations) {
+      cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
+    }
+    return backend.deleteRelations(relType, relations);
   }
 }

@@ -20,13 +20,24 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+import static org.apache.gravitino.Entity.EntityType.FILESET;
+import static org.apache.gravitino.Entity.EntityType.MODEL;
+import static org.apache.gravitino.Entity.EntityType.STATISTIC;
+import static org.apache.gravitino.Entity.EntityType.TABLE;
+import static org.apache.gravitino.Entity.EntityType.TOPIC;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -35,6 +46,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -49,6 +61,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -74,6 +87,7 @@ import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -525,6 +539,17 @@ public class JDBCBackend implements RelationalBackend {
               PolicyMetaService.getInstance()
                   .listPoliciesForMetadataObject(nameIdentifier, identType);
         }
+
+      case METADATA_OBJECT_STAT_REL:
+        Set<Entity.EntityType> allowTypes = Sets.newHashSet(FILESET, TABLE, TOPIC, MODEL);
+
+        if (allowTypes.contains(identType)) {
+          return (List<E>)
+              StatisticMetaService.getInstance().listStatisticsByEntity(nameIdentifier, identType);
+        } else {
+          throw new IllegalArgumentException(
+              String.format("METADATA_OBJECT_STAT_REL doesn't support type %s", identType.name()));
+        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -570,6 +595,76 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
+      Type relType, List<E> entities, List<Relation> relations, boolean overwrite)
+      throws IOException {
+    switch (relType) {
+      case METADATA_OBJECT_STAT_REL:
+        if (!overwrite) {
+          throw new IllegalArgumentException(
+              "The overwrite must be true for metadata object stats relation");
+        }
+
+        StatisticMetaService metaService = StatisticMetaService.getInstance();
+        Map<Relation.Vertex, List<Relation>> groupedRelations =
+            relations.stream()
+                .collect(Collectors.groupingBy(relation -> relation.getSourceVertex()));
+
+        if (groupedRelations.isEmpty()) {
+          return;
+        }
+
+        Preconditions.checkArgument(
+            groupedRelations.size() == 1,
+            "The relations must have the same source identifier and type, but got %s groups",
+            groupedRelations.size());
+
+        groupedRelations.forEach(
+            (sourceVertex, insertRelations) -> {
+              String metalake = NameIdentifierUtil.getMetalake(sourceVertex.getIdentifier());
+              insertRelations.sort(Comparator.comparing(r -> r.getDestIdent().name()));
+              entities.sort(Comparator.comparing(HasIdentifier::name));
+
+              Preconditions.checkArgument(
+                  entities.size() == insertRelations.size(),
+                  "The size of entities and relations must be the same, but got %s and %s",
+                  entities.size(),
+                  insertRelations.size());
+
+              for (int index = 0; index < entities.size(); index++) {
+                E entity = entities.get(index);
+                Relation relation = insertRelations.get(index);
+
+                Preconditions.checkArgument(
+                    entity.nameIdentifier().equals(relation.getDestIdent()),
+                    "The identifier of entity %s must match the destination identifier of relation %s",
+                    entity.nameIdentifier(),
+                    relation.getDestIdent());
+
+                Preconditions.checkArgument(
+                    entity.type() == STATISTIC,
+                    "The entity type must be STATISTIC, but got %s",
+                    entity.type());
+                Preconditions.checkArgument(
+                    relation.getDestType() == STATISTIC,
+                    "The destination type of relation must be STATISTIC, but got %s",
+                    relation.getDestType());
+              }
+
+              metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                  (List<StatisticEntity>) entities,
+                  metalake,
+                  sourceVertex.getIdentifier(),
+                  sourceVertex.getType());
+            });
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E getEntityByRelation(
       Type relType,
       NameIdentifier srcIdentifier,
@@ -581,6 +676,46 @@ public class JDBCBackend implements RelationalBackend {
         return (E)
             PolicyMetaService.getInstance()
                 .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  public int deleteRelations(Type relType, List<Relation> relations) throws IOException {
+    switch (relType) {
+      case METADATA_OBJECT_STAT_REL:
+        AtomicInteger deleteCount = new AtomicInteger(0);
+        Map<Relation.Vertex, List<Relation>> groupedRelations =
+            relations.stream().collect(Collectors.groupingBy(Relation::getSourceVertex));
+
+        if (groupedRelations.isEmpty()) {
+          return 0; // No relations to delete.
+        }
+
+        Preconditions.checkArgument(
+            groupedRelations.size() == 1,
+            "The relations must have the same source identifier and type, but got %s groups",
+            groupedRelations.size());
+
+        groupedRelations.forEach(
+            (sourceVertex, deleteRelations) -> {
+              List<String> statsToDelete =
+                  deleteRelations.stream()
+                      .map(relation -> relation.getDestIdent().name())
+                      .collect(Collectors.toList());
+              deleteRelations.forEach(
+                  relation ->
+                      Preconditions.checkArgument(
+                          relation.getDestType() == STATISTIC,
+                          "The destination type of relation must be STATISTIC, but got %s",
+                          relation.getDestType()));
+              deleteCount.addAndGet(
+                  StatisticMetaService.getInstance()
+                      .batchDeleteStatisticPOs(
+                          sourceVertex.getIdentifier(), sourceVertex.getType(), statsToDelete));
+            });
+        return deleteCount.get();
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

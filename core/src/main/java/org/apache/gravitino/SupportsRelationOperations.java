@@ -42,6 +42,7 @@ public interface SupportsRelationOperations {
     JOB_TEMPLATE_JOB_REL,
     /** Policy and metadata object relationship */
     POLICY_METADATA_OBJECT_REL,
+    METADATA_OBJECT_STAT_REL
   }
 
   /**
@@ -148,4 +149,32 @@ public interface SupportsRelationOperations {
     throw new UnsupportedOperationException(
         "updateEntityRelations is not supported by this implementation");
   }
+
+  /**
+   * Inserts a list of entities and their associated relations into the storage.
+   *
+   * @param <E> The type of entities being inserted, which must extend Entity and implement
+   *     HasIdentifier.
+   * @param relType The type of relation to be established between the entities.
+   * @param entities The list of entities to be inserted, which must implement the Entity and
+   *     HasIdentifier
+   * @param relations The list of relations to be established between the entities.
+   * @param overwrite If true, existing relations will be overwritten; if false, new relations will
+   *     be added
+   * @throws IOException If an error occurs during the insertion process, such as a storage issue.
+   */
+  <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
+      Type relType, List<E> entities, List<Relation> relations, boolean overwrite)
+      throws IOException;
+
+  /**
+   * Deletes a list of relations of a specific type.
+   *
+   * @param relType The type of relation to be deleted.
+   * @param relations The list of relations to be deleted, which must implement the Relation
+   *     interface.
+   * @return The number of relations deleted.
+   * @throws IOException If an error occurs during the deletion process, such as a storage issue.
+   */
+  int deleteRelations(Type relType, List<Relation> relations) throws IOException;
 }
