@@ -26,6 +26,11 @@ import java.util.Objects;
  * Represents a job template for executing shell scripts. This class extends the JobTemplate class
  * and provides functionality specific to shell job templates, including a list of scripts to be
  * executed.
+ *
+ * <p>Scripts are a list of shell files that will be leveraged by the "executable". Scripts must be
+ * put in the place where Gravitino server can access them. Current Gravitino can support scripts in
+ * the local file system, or on the web server (e.g., HTTP, HTTPS, FTP). Distributed file systems
+ * like HDFS or S3 will be supported in the future.
  */
 public class ShellJobTemplate extends JobTemplate {
 
