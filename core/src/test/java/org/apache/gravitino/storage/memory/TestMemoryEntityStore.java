@@ -155,8 +155,8 @@ public class TestMemoryEntityStore {
     public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
         throws E, IOException {
       Map<NameIdentifier, Entity> snapshot = createSnapshot();
+      lock.lock();
       try {
-        lock.lock();
         return executable.execute();
       } catch (Exception e) {
         if (snapshot != null) {
@@ -176,8 +176,8 @@ public class TestMemoryEntityStore {
     }
 
     public Map<NameIdentifier, Entity> createSnapshot() {
+      lock.lock();
       try {
-        lock.lock();
         return entityMap.entrySet().stream()
             .collect(
                 Collectors.toMap(
