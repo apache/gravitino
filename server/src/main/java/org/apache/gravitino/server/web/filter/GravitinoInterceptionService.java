@@ -40,6 +40,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
@@ -64,7 +65,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             SchemaOperations.class.getName(),
             TableOperations.class.getName(),
             ModelOperations.class.getName(),
-            TopicOperations.class.getName()));
+            TopicOperations.class.getName(),
+            FilesetOperations.class.getName()));
   }
 
   @Override
@@ -140,6 +142,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       String schema = metadatas.get(Entity.EntityType.SCHEMA);
       String table = metadatas.get(Entity.EntityType.TABLE);
       String topic = metadatas.get(Entity.EntityType.TOPIC);
+      String fileset = metadatas.get(Entity.EntityType.FILESET);
       metadatas.forEach(
           (type, metadata) -> {
             switch (type) {
@@ -162,15 +165,20 @@ public class GravitinoInterceptionService implements InterceptionService {
                     Entity.EntityType.TOPIC,
                     NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic));
                 break;
-              case METALAKE:
+              case FILESET:
                 nameIdentifierMap.put(
-                    Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
+                    Entity.EntityType.FILESET,
+                    NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
                 break;
               case MODEL:
                 String model = metadatas.get(Entity.EntityType.MODEL);
                 nameIdentifierMap.put(
                     Entity.EntityType.MODEL,
                     NameIdentifierUtil.ofModel(metadata, catalog, schema, model));
+                break;
+              case METALAKE:
+                nameIdentifierMap.put(
+                    Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalake));
                 break;
               default:
                 break;
