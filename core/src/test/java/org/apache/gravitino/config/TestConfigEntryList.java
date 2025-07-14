@@ -159,4 +159,17 @@ public class TestConfigEntryList {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> testConfWithoutDefault.readFrom(configMap));
   }
+
+  @Test
+  public void testSeqToStrWithNullElement() {
+    ConfigEntry<List<Integer>> testConf =
+        new ConfigBuilder("gravitino.seq.null")
+            .intConf()
+            .toSequence()
+            .createWithDefault(Lists.newArrayList());
+
+    Assertions.assertDoesNotThrow(
+        () -> testConf.writeTo(configMapEmpty, Lists.newArrayList(1, null, 2)));
+    Assertions.assertEquals("1,2", configMapEmpty.get("gravitino.seq.null"));
+  }
 }
