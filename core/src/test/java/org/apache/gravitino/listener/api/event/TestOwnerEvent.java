@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.info.OwnerInfo;
 import org.apache.gravitino.storage.relational.RelationalBackend;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -102,7 +103,15 @@ public class TestOwnerEvent {
       List<Event> postEvents = dummyEventListener.getPostEvents();
 
       Assertions.assertEquals(1, preEvents.size());
+      SetOwnerPreEvent setOwnerPreEvent = (SetOwnerPreEvent) preEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerPreEvent.metadataObjectType());
+      Assertions.assertEquals(new OwnerInfo(ownerName, ownerType), setOwnerPreEvent.ownerInfo());
+
       Assertions.assertEquals(1, postEvents.size());
+      SetOwnerEvent setOwnerEvent = (SetOwnerEvent) postEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerEvent.metadataObjectType());
+      Assertions.assertEquals(new OwnerInfo(ownerName, ownerType), setOwnerEvent.ownerInfo());
+
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
       dummyEventListener.clear();
@@ -122,8 +131,16 @@ public class TestOwnerEvent {
       List<Event> postEvents = dummyEventListener.getPostEvents();
 
       Assertions.assertEquals(1, preEvents.size());
+      SetOwnerPreEvent setOwnerPreEvent = (SetOwnerPreEvent) preEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerPreEvent.metadataObjectType());
+      Assertions.assertEquals(new OwnerInfo(ownerName, ownerType), setOwnerPreEvent.ownerInfo());
+
       Assertions.assertEquals(1, postEvents.size());
       Assertions.assertTrue(postEvents.get(0) instanceof SetOwnerFailureEvent);
+      SetOwnerFailureEvent setOwnerFailureEvent = (SetOwnerFailureEvent) postEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, setOwnerFailureEvent.metadataObjectType());
+      Assertions.assertEquals(
+          new OwnerInfo(ownerName, ownerType), setOwnerFailureEvent.ownerInfo());
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
       dummyEventListener.clear();
@@ -155,7 +172,15 @@ public class TestOwnerEvent {
       List<Event> postEvents = dummyEventListener.getPostEvents();
 
       Assertions.assertEquals(1, preEvents.size());
+      GetOwnerPreEvent getOwnerPreEvent = (GetOwnerPreEvent) preEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerPreEvent.metadataObjectType());
+      Assertions.assertNull(getOwnerPreEvent.ownerInfo());
+
       Assertions.assertEquals(1, postEvents.size());
+      GetOwnerEvent getOwnerEvent = (GetOwnerEvent) postEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerEvent.metadataObjectType());
+      Assertions.assertEquals(
+          new OwnerInfo(expectedOwner.name(), expectedOwner.type()), getOwnerEvent.ownerInfo());
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
       dummyEventListener.clear();
@@ -175,8 +200,15 @@ public class TestOwnerEvent {
       List<Event> postEvents = dummyEventListener.getPostEvents();
 
       Assertions.assertEquals(1, preEvents.size());
+      GetOwnerPreEvent getOwnerPreEvent = (GetOwnerPreEvent) preEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerPreEvent.metadataObjectType());
+      Assertions.assertNull(getOwnerPreEvent.ownerInfo());
+
       Assertions.assertEquals(1, postEvents.size());
       Assertions.assertTrue(postEvents.get(0) instanceof SetOwnerFailureEvent);
+      GetOwnerFailureEvent getOwnerFailureEvent = (GetOwnerFailureEvent) postEvents.get(0);
+      Assertions.assertEquals(MetadataObject.Type.TABLE, getOwnerFailureEvent.metadataObjectType());
+      Assertions.assertNull(getOwnerFailureEvent.ownerInfo());
     } finally {
       ownerManager.setOwnerManager(innerOwnerManager);
       dummyEventListener.clear();

@@ -35,4 +35,14 @@ public class GetOwnerEvent extends OwnerEvent {
       String user, NameIdentifier identifier, OwnerInfo ownerInfo, MetadataObject.Type type) {
     super(user, identifier, ownerInfo, type);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_OWNER;
+  }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }

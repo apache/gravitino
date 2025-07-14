@@ -35,4 +35,9 @@ public class GetOwnerFailureEvent extends OwnerFailureEvent {
       MetadataObject.Type type) {
     super(user, identifier, exception, ownerInfo, type);
   }
+
+  @Override
+  public OperationType operationType() {
+    return OperationType.GET_OWNER;
+  }
 }

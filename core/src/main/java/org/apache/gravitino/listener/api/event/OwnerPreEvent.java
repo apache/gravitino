@@ -37,11 +37,11 @@ public abstract class OwnerPreEvent extends PreEvent {
     this.type = type;
   }
 
-  public OwnerInfo getOwnerInfo() {
+  public OwnerInfo ownerInfo() {
     return ownerInfo;
   }
 
-  public MetadataObject.Type getType() {
+  public MetadataObject.Type metadataObjectType() {
     return type;
   }
 }

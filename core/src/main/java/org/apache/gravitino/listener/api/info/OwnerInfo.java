@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import com.google.common.base.Objects;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.Owner;
 
@@ -39,5 +40,22 @@ public class OwnerInfo {
 
   public Owner.Type getType() {
     return type;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof OwnerInfo)) {
+      return false;
+    }
+    OwnerInfo ownerInfo = (OwnerInfo) o;
+    return Objects.equal(name, ownerInfo.name) && type == ownerInfo.type;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(name, type);
   }
 }

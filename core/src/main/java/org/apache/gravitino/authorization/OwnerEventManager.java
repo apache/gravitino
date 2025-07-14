@@ -25,6 +25,8 @@ import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.GetOwnerEvent;
+import org.apache.gravitino.listener.api.event.GetOwnerFailureEvent;
 import org.apache.gravitino.listener.api.event.GetOwnerPreEvent;
 import org.apache.gravitino.listener.api.event.SetOwnerEvent;
 import org.apache.gravitino.listener.api.event.SetOwnerFailureEvent;
@@ -78,10 +80,10 @@ public class OwnerEventManager implements OwnerDispatcher {
         ownerInfo = new OwnerInfo(owner.get().name(), owner.get().type());
       }
 
-      eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo, type));
+      eventBus.dispatchEvent(new GetOwnerEvent(user, identifier, ownerInfo, type));
       return owner;
     } catch (Exception e) {
-      eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo, type));
+      eventBus.dispatchEvent(new GetOwnerFailureEvent(user, identifier, e, ownerInfo, type));
       throw e;
     }
   }
