@@ -54,12 +54,12 @@ public class AuthorizationExpressionConverter {
    * @return an OGNL expression used to call GravitinoAuthorizer
    */
   public static String convertToOgnlExpression(String authorizationExpression) {
-    authorizationExpression = replaceAnyPrivilege(authorizationExpression);
-    authorizationExpression = replaceAnyExpressions(authorizationExpression);
     return EXPRESSION_CACHE.computeIfAbsent(
         authorizationExpression,
         (expression) -> {
-          Matcher matcher = PATTERN.matcher(expression);
+          String replacedExpression = replaceAnyPrivilege(authorizationExpression);
+          replacedExpression = replaceAnyExpressions(replacedExpression);
+          Matcher matcher = PATTERN.matcher(replacedExpression);
           StringBuffer result = new StringBuffer();
 
           while (matcher.find()) {
@@ -154,6 +154,15 @@ public class AuthorizationExpressionConverter {
             "(ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL))");
     expression =
         expression.replaceAll("ANY_CREATE_MODEL", "(ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_TOPIC", "(ANY(CREATE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))");
+    expression =
+        expression.replaceAll(
+            "ANY_PRODUCE_TOPIC", "(ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))");
+    expression =
+        expression.replaceAll(
+            "ANY_CONSUME_TOPIC", "(ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))");
     expression =
         expression.replaceAll(
             "ANY_READ_FILESET", "(ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");

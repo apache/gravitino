@@ -21,7 +21,10 @@ import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
@@ -51,6 +54,9 @@ public class MetadataFilterHelper {
       Entity.EntityType entityType,
       String privilege,
       NameIdentifier[] metadataList) {
+    if (!enableAuthorization()) {
+      return metadataList;
+    }
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
@@ -81,6 +87,9 @@ public class MetadataFilterHelper {
       NameIdentifier[] nameIdentifiers) {
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
+    if (!enableAuthorization()) {
+      return nameIdentifiers;
+    }
     return Arrays.stream(nameIdentifiers)
         .filter(
             metaDataName -> {
@@ -128,6 +137,13 @@ public class MetadataFilterHelper {
         nameIdentifierMap.put(
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
+      case TOPIC:
+        nameIdentifierMap.put(Entity.EntityType.TOPIC, nameIdentifier);
+        nameIdentifierMap.put(
+            Entity.EntityType.SCHEMA, NameIdentifierUtil.getSchemaIdentifier(nameIdentifier));
+        nameIdentifierMap.put(
+            Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
+        break;
       case FILESET:
         nameIdentifierMap.put(Entity.EntityType.FILESET, nameIdentifier);
         nameIdentifierMap.put(
@@ -139,5 +155,10 @@ public class MetadataFilterHelper {
         break;
     }
     return nameIdentifierMap;
+  }
+
+  private static boolean enableAuthorization() {
+    Config config = GravitinoEnv.getInstance().config();
+    return config != null && config.get(Configs.ENABLE_AUTHORIZATION);
   }
 }
