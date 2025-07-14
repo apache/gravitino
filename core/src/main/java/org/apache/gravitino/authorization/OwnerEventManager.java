@@ -33,20 +33,19 @@ import org.apache.gravitino.listener.api.info.OwnerInfo;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
-public class OwnerEventManager extends OwnerManager {
+public class OwnerEventManager implements OwnerDispatcher {
   private final EventBus eventBus;
 
-  @Getter private OwnerManager ownerManager;
+  @Getter private OwnerDispatcher ownerDispatcher;
 
-  public OwnerEventManager(EventBus eventBus, OwnerManager ownerManager) {
-    super(ownerManager.getStore());
+  public OwnerEventManager(EventBus eventBus, OwnerDispatcher ownerDispatcher) {
     this.eventBus = eventBus;
-    this.ownerManager = ownerManager;
+    this.ownerDispatcher = ownerDispatcher;
   }
 
   @VisibleForTesting
-  public void setOwnerManager(OwnerManager ownerManager) {
-    this.ownerManager = ownerManager;
+  public void setOwnerManager(OwnerDispatcher ownerDispatcher) {
+    this.ownerDispatcher = ownerDispatcher;
   }
 
   @Override
@@ -58,7 +57,7 @@ public class OwnerEventManager extends OwnerManager {
     MetadataObject.Type type = metadataObject.type();
     eventBus.dispatchEvent(new SetOwnerPreEvent(user, identifier, ownerInfo, type));
     try {
-      ownerManager.setOwner(metalake, metadataObject, ownerName, ownerType);
+      ownerDispatcher.setOwner(metalake, metadataObject, ownerName, ownerType);
       eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo, type));
     } catch (Exception e) {
       eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo, type));
@@ -74,7 +73,7 @@ public class OwnerEventManager extends OwnerManager {
     MetadataObject.Type type = metadataObject.type();
     eventBus.dispatchEvent(new GetOwnerPreEvent(user, identifier, ownerInfo, type));
     try {
-      Optional<Owner> owner = ownerManager.getOwner(metalake, metadataObject);
+      Optional<Owner> owner = ownerDispatcher.getOwner(metalake, metadataObject);
       if (owner.isPresent()) {
         ownerInfo = new OwnerInfo(owner.get().name(), owner.get().type());
       }

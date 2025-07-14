@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  * owner. Because the post hook will call the methods. We shouldn't add the lock of the metadata
  * object. Otherwise, it will cause deadlock.
  */
-public class OwnerManager {
+public class OwnerManager implements OwnerDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(OwnerManager.class);
   @Getter private final EntityStore store;
 
@@ -59,6 +59,7 @@ public class OwnerManager {
     }
   }
 
+  @Override
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
 
@@ -129,6 +130,7 @@ public class OwnerManager {
     }
   }
 
+  @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     OwnerImpl owner = new OwnerImpl();
