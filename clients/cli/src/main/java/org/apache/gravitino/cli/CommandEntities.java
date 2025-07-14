@@ -54,7 +54,6 @@ public class CommandEntities {
     VALID_ENTITIES.add(TOPIC);
     VALID_ENTITIES.add(FILESET);
     VALID_ENTITIES.add(ROLE);
-    VALID_ENTITIES.add(MODEL);
   }
 
   /**
