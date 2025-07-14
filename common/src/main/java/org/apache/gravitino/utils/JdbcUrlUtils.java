@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.utils;
 
+import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -103,7 +104,7 @@ public class JdbcUrlUtils {
     do {
       prev = decoded;
       try {
-        decoded = java.net.URLDecoder.decode(prev, "UTF-8");
+        decoded = URLDecoder.decode(prev, "UTF-8");
       } catch (Exception e) {
         throw new GravitinoRuntimeException("Unable to decode JDBC URL");
       }
