@@ -42,3 +42,53 @@ class FieldReferenceDTO(NamedReference, FunctionArg):
 
     def __hash__(self) -> int:
         return hash((self.arg_type(), tuple(self._field_name)))
+
+    @staticmethod
+    def builder() -> Builder:
+        """The builder for creating a new instance of `FieldReferenceDTO`.
+
+        Returns:
+            Builder: The builder for creating a new instance of `FieldReferenceDTO`.
+        """
+        return FieldReferenceDTO.Builder()
+
+    class Builder:
+        """Builder for `FieldRererenceDTO`"""
+
+        def __init__(self):
+            self._field_name = None
+
+        def with_field_name(self, field_name: List[str]) -> FieldReferenceDTO.Builder:
+            """Set the field name for the field reference.
+
+            Args:
+                field_name (List[str]): The field name.
+
+            Returns:
+                FieldReferenceDTO.Builder: The builder.
+            """
+
+            self._field_name = field_name
+            return self
+
+        def with_column_name(self, column_name: List[str]) -> FieldReferenceDTO.Builder:
+            """Set the column name for the field reference.
+
+            Args:
+                column_name (List[str]): The column name.
+
+            Returns:
+                FieldReferenceDTO.Builder: The builder.
+            """
+
+            self._field_name = column_name
+            return self
+
+        def build(self) -> FieldReferenceDTO:
+            """Build the field reference.
+
+            Returns:
+                FieldReferenceDTO: The field reference.
+            """
+
+            return FieldReferenceDTO(field_name=self._field_name)

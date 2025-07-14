@@ -108,7 +108,7 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
 
   /** Wildcard search the Ranger policies in the different Ranger service. */
   @Override
-  protected List<RangerPolicy> wildcardSearchPolies(
+  protected List<RangerPolicy> wildcardSearchPolicies(
       AuthorizationMetadataObject authzMetadataObject) {
     List<String> resourceDefines = policyResourceDefinesRule();
     Map<String, String> searchFilters = new HashMap<>();
@@ -199,8 +199,8 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
       MetadataObject.Type operationType,
       AuthorizationMetadataObject oldAuthzMetaObject,
       AuthorizationMetadataObject newAuthzMetaObject) {
-    List<RangerPolicy> oldPolicies = wildcardSearchPolies(oldAuthzMetaObject);
-    List<RangerPolicy> existNewPolicies = wildcardSearchPolies(newAuthzMetaObject);
+    List<RangerPolicy> oldPolicies = wildcardSearchPolicies(oldAuthzMetaObject);
+    List<RangerPolicy> existNewPolicies = wildcardSearchPolicies(newAuthzMetaObject);
     if (oldPolicies.isEmpty()) {
       LOG.warn("Cannot find the Ranger policy for the metadata object({})!", oldAuthzMetaObject);
       return;

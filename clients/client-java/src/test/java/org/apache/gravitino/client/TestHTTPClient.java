@@ -127,6 +127,22 @@ public class TestHTTPClient {
     testHttpMethodOnFailure(Method.HEAD, false, false);
   }
 
+  @Test
+  public void testNullHeadersDoNotCauseNPE() throws Exception {
+    Item body = new Item(0L, "hank");
+    int statusCode = 200;
+
+    ErrorHandler onError = mock(ErrorHandler.class);
+    doThrow(new RuntimeException("Failure response")).when(onError).accept(any());
+
+    String path = addRequestTestCaseAndGetPath(Method.GET, body, statusCode, false, true);
+
+    Item response = restClient.get(path, Item.class, (Map<String, String>) null, onError);
+
+    Assertions.assertEquals(body, response);
+    verify(onError, never()).accept(any());
+  }
+
   public static void testHttpMethodOnSuccess(
       Method method, boolean hasRequestBody, boolean hasResponseBody)
       throws JsonProcessingException {

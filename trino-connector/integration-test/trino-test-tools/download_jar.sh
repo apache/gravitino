@@ -18,7 +18,6 @@
 # under the License.
 
 set -e
-#!/bin/bash
 
 # Function to download a JAR file if it does not already exist
 download_jar() {

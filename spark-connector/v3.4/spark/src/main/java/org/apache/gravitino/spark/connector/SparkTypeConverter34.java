@@ -38,7 +38,7 @@ public class SparkTypeConverter34 extends SparkTypeConverter {
   @Override
   public DataType toSparkType(Type gravitinoType) {
     if (gravitinoType instanceof Types.TimestampType
-        && ((Types.TimestampType) gravitinoType).hasTimeZone() == false) {
+        && !((Types.TimestampType) gravitinoType).hasTimeZone()) {
       return DataTypes.TimestampNTZType;
     } else {
       return super.toSparkType(gravitinoType);

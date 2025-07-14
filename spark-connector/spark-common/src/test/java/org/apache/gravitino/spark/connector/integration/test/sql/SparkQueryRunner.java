@@ -282,7 +282,7 @@ public class SparkQueryRunner {
     List<String> codes = new ArrayList<>();
     for (String line : lines) {
       String trimmedLine = line.trim();
-      if (trimmedLine.startsWith("--") && trimmedLine.startsWith("--QUERY-DELIMITER") == false) {
+      if (trimmedLine.startsWith("--") && !trimmedLine.startsWith("--QUERY-DELIMITER")) {
         comments.add(line);
       } else {
         codes.add(line);
