@@ -1331,6 +1331,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for StatisticValue objects. */
   public static class StatisticValueDeserializer extends JsonDeserializer<StatisticValue> {
     @Override
     public StatisticValue<?> deserialize(JsonParser p, DeserializationContext ctxt)
@@ -1384,6 +1385,7 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON serializer for StatisticValue objects. */
   public static class StatisticValueSerializer extends JsonSerializer<StatisticValue> {
 
     @Override
