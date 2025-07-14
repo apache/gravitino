@@ -34,16 +34,18 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticBaseSQLProvider {
 
-  public String batchInsertStatisticPOs(@Param("statistics") List<StatisticPO> statistics) {
+  public String batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs) {
     return "<script>"
         + "INSERT INTO "
         + STATISTIC_META_TABLE_NAME
-        + " (statistic_id, statistic_name, object_id, object_type, audit_info, current_version, last_version, deleted_at) VALUES "
-        + "<foreach collection='statistics' item='item' separator=','>"
+        + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id, metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='statisticPOs' item='item' separator=','>"
         + "(#{item.statisticId}, "
         + "#{item.statisticName}, "
-        + "#{item.objectId}, "
-        + "#{item.objectType}, "
+        + "#{item.statisticValue}, "
+        + "#{item.metalakeId}, "
+        + "#{item.metadataObjectId}, "
+        + "#{item.metadataObjectType}, "
         + "#{item.auditInfo}, "
         + "#{item.currentVersion}, "
         + "#{item.lastVersion}, "

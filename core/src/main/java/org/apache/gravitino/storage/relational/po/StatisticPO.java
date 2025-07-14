@@ -27,10 +27,10 @@ public class StatisticPO {
 
   private String statisticName;
 
-  private String value;
-  private Long objectId;
+  private String statisticValue;
+  private Long metadataObjectId;
 
-  private String objectType;
+  private String metadataObjectType;
 
   private String auditInfo;
 
@@ -52,20 +52,20 @@ public class StatisticPO {
     return statisticId;
   }
 
-  public Long getObjectId() {
-    return objectId;
+  public Long getMetadataObjectId() {
+    return metadataObjectId;
   }
 
-  public String getObjectType() {
-    return objectType;
+  public String getMetadataObjectType() {
+    return metadataObjectType;
   }
 
   public String getStatisticName() {
     return statisticName;
   }
 
-  public String getValue() {
-    return value;
+  public String getStatisticValue() {
+    return statisticValue;
   }
 
   public String getAuditInfo() {
@@ -94,11 +94,11 @@ public class StatisticPO {
     }
     StatisticPO that = (StatisticPO) o;
     return statisticId.equals(that.statisticId)
-        && objectId.equals(that.objectId)
+        && metadataObjectId.equals(that.metadataObjectId)
         && metalakeId.equals(that.metalakeId)
-        && objectType.equals(that.objectType)
+        && metadataObjectType.equals(that.metadataObjectType)
         && statisticName.equals(that.statisticName)
-        && value.equals(that.value)
+        && statisticValue.equals(that.statisticValue)
         && auditInfo.equals(that.auditInfo)
         && currentVersion.equals(that.currentVersion)
         && lastVersion.equals(that.lastVersion)
@@ -110,10 +110,10 @@ public class StatisticPO {
     return Objects.hash(
         metalakeId,
         statisticId,
-        objectId,
-        objectType,
+        metadataObjectId,
+        metadataObjectType,
         statisticName,
-        value,
+        statisticValue,
         auditInfo,
         currentVersion,
         lastVersion,
@@ -138,13 +138,13 @@ public class StatisticPO {
       return this;
     }
 
-    public Builder withObjectId(Long objectId) {
-      statisticPO.objectId = objectId;
+    public Builder withMetadataObjectId(Long objectId) {
+      statisticPO.metadataObjectId = objectId;
       return this;
     }
 
-    public Builder withObjectType(String objectType) {
-      statisticPO.objectType = objectType;
+    public Builder withMetadataObjectType(String objectType) {
+      statisticPO.metadataObjectType = objectType;
       return this;
     }
 
@@ -153,8 +153,8 @@ public class StatisticPO {
       return this;
     }
 
-    public Builder withValue(String value) {
-      statisticPO.value = value;
+    public Builder withStatisticValue(String value) {
+      statisticPO.statisticValue = value;
       return this;
     }
 
@@ -179,11 +179,13 @@ public class StatisticPO {
     }
 
     public StatisticPO build() {
-      Preconditions.checkArgument(statisticPO.objectId != null, "`objectId is required");
-      Preconditions.checkArgument(statisticPO.objectType != null, "`objectType` is required");
+      Preconditions.checkArgument(statisticPO.metadataObjectId != null, "`objectId is required");
+      Preconditions.checkArgument(
+          statisticPO.metadataObjectType != null, "`objectType` is required");
       Preconditions.checkArgument(statisticPO.statisticName != null, "`statisticName` is required");
-      Preconditions.checkArgument(statisticPO.value != null, "`value` is required");
+      Preconditions.checkArgument(statisticPO.statisticValue != null, "`value` is required");
       Preconditions.checkArgument(statisticPO.auditInfo != null, "`auditInfo` is required");
+      // TODO: Add validation for currentVersion and lastVersion if needed
       return statisticPO;
     }
   }

@@ -1592,7 +1592,8 @@ public class POConverters {
           .withId(statisticPO.getStatisticId())
           .withName(statisticPO.getStatisticName())
           .withValue(
-              JsonUtils.anyFieldMapper().readValue(statisticPO.getValue(), StatisticValue.class))
+              JsonUtils.anyFieldMapper()
+                  .readValue(statisticPO.getStatisticValue(), StatisticValue.class))
           .build();
     } catch (JsonProcessingException je) {
       throw new RuntimeException(je);
@@ -1608,7 +1609,7 @@ public class POConverters {
                 return builder
                     .withStatisticId(statisticEntity.id())
                     .withStatisticName(statisticEntity.name())
-                    .withValue(
+                    .withStatisticValue(
                         JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.value()))
                     .withDeletedAt(DEFAULT_DELETED_AT)
                     .withCurrentVersion(INIT_VERSION)

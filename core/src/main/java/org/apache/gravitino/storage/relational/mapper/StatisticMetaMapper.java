@@ -10,14 +10,14 @@ import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface StatisticMetaMapper {
 
-  String STATISTIC_META_TABLE_NAME = "statistic_meta_version_info";
+  String STATISTIC_META_TABLE_NAME = "statistic_meta";
 
   @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByObjectId")
   List<StatisticPO> listStatisticPOsByObjectId(
       @Param("objectId") long objectId, @Param("name") String name);
 
   @InsertProvider(type = StatisticSQLProviderFactory.class, method = "batchInsertStatisticPOs")
-  String batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);
+  void batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);
 
   @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
   String batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds);

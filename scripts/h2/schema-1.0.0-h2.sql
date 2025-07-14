@@ -399,5 +399,5 @@ CREATE TABLE IF NOT EXISTS `statistic_meta` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metalake_id`, `metadata_object_id`, `deleted_at`),
     KEY `idx_stid` (`statistic_id`),
-    KEY `idx_moid` (`metadata_object_id`),
+    KEY `idx_moid` (`metadata_object_id`)
     ) ENGINE=InnoDB;

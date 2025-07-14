@@ -78,8 +78,8 @@ public class StatisticMetaService {
     }
     StatisticPO.Builder builder = StatisticPO.builder();
     builder.withMetalakeId(metalakeId);
-    builder.withObjectId(objectId);
-    builder.withObjectType(object.type().name());
+    builder.withMetadataObjectId(objectId);
+    builder.withMetadataObjectType(object.type().name());
 
     List<StatisticPO> pos = POConverters.initializeStatisticPOs(statisticEntities, builder);
     SessionUtils.doWithCommit(

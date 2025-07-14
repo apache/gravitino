@@ -372,6 +372,7 @@ public class JDBCBackend implements RelationalBackend {
       case TAG:
       case MODEL:
       case MODEL_VERSION:
+      case STATISTIC:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 
