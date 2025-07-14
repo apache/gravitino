@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.listener;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -131,8 +130,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
           ModelVersionAliasesAlreadyExistException {
     ModelInfo registerModelRequest = new ModelInfo(ident.name(), properties, comment);
     ModelVersionInfo linkModelVersionRequest =
-        new ModelVersionInfo(
-            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri), comment, properties, aliases);
+        new ModelVersionInfo(uri, comment, properties, aliases);
     String user = PrincipalUtils.getCurrentUserName();
     RegisterAndLinkModelPreEvent registerAndLinkModelPreEvent =
         new RegisterAndLinkModelPreEvent(
@@ -142,12 +140,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     try {
       Model registeredModel = dispatcher.registerModel(ident, uri, aliases, comment, properties);
       ModelInfo registeredModelInfo = new ModelInfo(registeredModel);
-      eventBus.dispatchEvent(
-          new RegisterAndLinkModelEvent(
-              user,
-              ident,
-              registeredModelInfo,
-              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri)));
+      eventBus.dispatchEvent(new RegisterAndLinkModelEvent(user, ident, registeredModelInfo, uri));
       return registeredModel;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -215,9 +208,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    ModelVersionInfo linkModelRequest =
-        new ModelVersionInfo(
-            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri), comment, properties, aliases);
+    ModelVersionInfo linkModelRequest = new ModelVersionInfo(uri, comment, properties, aliases);
     String user = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new LinkModelVersionPreEvent(user, ident, linkModelRequest));

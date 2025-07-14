@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.info;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Audit;
@@ -54,17 +55,41 @@ public class ModelVersionInfo {
   }
 
   /**
-   * Constructs a {@link ModelVersionInfo} instance based on given URIs, comment, properties, and
+   * Constructs a {@link ModelVersionInfo} instance based on given URI, comment, properties, and
    * aliases.
    *
-   * @param uris The URIs of the model version.
+   * @param uri The URI of the model version.
    * @param comment The comment of the model version.
    * @param properties The properties of the model version.
    * @param aliases The aliases of the model version.
    */
   public ModelVersionInfo(
-      Map<String, String> uris, String comment, Map<String, String> properties, String[] aliases) {
-    this(uris, comment, properties, aliases, null);
+      String uri, String comment, Map<String, String> properties, String[] aliases) {
+    this(uri, comment, properties, aliases, null);
+  }
+
+  /**
+   * Constructs a {@link ModelVersionInfo} instance based on given URI, comment, properties,
+   * aliases, and audit information.
+   *
+   * @param uri The URI of the model version.
+   * @param comment The comment of the model version.
+   * @param properties The properties of the model version.
+   * @param aliases The aliases of the model version.
+   * @param auditInfo The audit information of the model version.
+   */
+  public ModelVersionInfo(
+      String uri,
+      String comment,
+      Map<String, String> properties,
+      String[] aliases,
+      Audit auditInfo) {
+    this.uris =
+        uri == null ? Collections.emptyMap() : ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri);
+    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+    this.comment = Optional.ofNullable(comment);
+    this.audit = Optional.ofNullable(auditInfo);
+    this.aliases = Optional.ofNullable(aliases);
   }
 
   /**
@@ -84,11 +109,19 @@ public class ModelVersionInfo {
       String[] aliases,
       Audit auditInfo) {
     this.uris = uris;
-
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     this.comment = Optional.ofNullable(comment);
     this.audit = Optional.ofNullable(auditInfo);
     this.aliases = Optional.ofNullable(aliases);
+  }
+
+  /**
+   * Returns the unknown URI of the model version.
+   *
+   * @return the unknown URI of the model version.
+   */
+  public String uri() {
+    return uris.get(ModelVersion.URI_NAME_UNKNOWN);
   }
 
   /**

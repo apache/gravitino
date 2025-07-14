@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.info.ModelInfo;
+import org.apache.gravitino.model.ModelVersion;
 
 /**
  * Represents an event that is generated after a model is successfully registered and a model
@@ -30,6 +32,24 @@ import org.apache.gravitino.listener.api.info.ModelInfo;
 public class RegisterAndLinkModelEvent extends ModelEvent {
   private final ModelInfo registeredModelInfo;
   private final Map<String, String> uris;
+
+  /**
+   * Constructs a new instance of {@link RegisterAndLinkModelEvent}, capturing the user, identifier,
+   * registered model information, and linked model version information.
+   *
+   * @param user The user responsible for triggering the model operation.
+   * @param identifier The identifier of the Model involved in the operation. This encapsulates some
+   *     information.
+   * @param registeredModelInfo The final state of the model post-creation.
+   * @param uri The URI of the linked model version.
+   */
+  public RegisterAndLinkModelEvent(
+      String user, NameIdentifier identifier, ModelInfo registeredModelInfo, String uri) {
+    super(user, identifier);
+
+    this.registeredModelInfo = registeredModelInfo;
+    this.uris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri);
+  }
 
   /**
    * Constructs a new instance of {@link RegisterAndLinkModelEvent}, capturing the user, identifier,
@@ -59,6 +79,15 @@ public class RegisterAndLinkModelEvent extends ModelEvent {
    */
   public ModelInfo registeredModelInfo() {
     return registeredModelInfo;
+  }
+
+  /**
+   * Retrieves the unknown URI of the linked model version.
+   *
+   * @return the unknown URI of the linked model version
+   */
+  public String uri() {
+    return uris.get(ModelVersion.URI_NAME_UNKNOWN);
   }
 
   /**
