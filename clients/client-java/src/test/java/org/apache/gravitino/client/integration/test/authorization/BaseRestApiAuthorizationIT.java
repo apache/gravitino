@@ -56,13 +56,19 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             Configs.AUTHORIZATION_IMPL.getKey(),
             JcasbinAuthorizer.class.getCanonicalName(),
             Configs.CACHE_ENABLED.getKey(),
-            "false"));
+            "false",
+            Configs.AUTHENTICATORS.getKey(),
+            "simple"));
+    putServiceAdmin();
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    gravitinoMetalake.addUser(USER);
     gravitinoMetalake.addUser(NORMAL_USER);
     normalUserClient = GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build();
+  }
+
+  protected void putServiceAdmin() {
+    customConfigs.put(Configs.SERVICE_ADMINS.getKey(), String.join(",", USER));
   }
 
   @AfterAll

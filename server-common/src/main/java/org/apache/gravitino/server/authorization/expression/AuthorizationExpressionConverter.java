@@ -127,6 +127,8 @@ public class AuthorizationExpressionConverter {
    * @return authorization expression
    */
   public static String replaceAnyPrivilege(String expression) {
+    expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
+    expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
     expression = expression.replaceAll("ANY_USE_CATALOG", "(ANY(USE_CATALOG, METALAKE, CATALOG))");
     expression =
         expression.replaceAll("ANY_USE_SCHEMA", "(ANY(USE_SCHEMA, METALAKE, CATALOG, SCHEMA))");
