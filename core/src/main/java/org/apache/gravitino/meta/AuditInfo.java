@@ -168,12 +168,13 @@ public final class AuditInfo implements Audit, Entity {
 
   /** Builder class for creating instances of {@link AuditInfo}. */
   public static class Builder {
-    private AuditInfo auditInfo;
+    @Nullable private String creator;
+    @Nullable private Instant createTime;
+    @Nullable private String lastModifier;
+    @Nullable private Instant lastModifiedTime;
 
     /** Constructs a new {@link Builder}. */
-    private Builder() {
-      this.auditInfo = new AuditInfo();
-    }
+    private Builder() {}
 
     /**
      * Sets the creator's name.
@@ -182,7 +183,7 @@ public final class AuditInfo implements Audit, Entity {
      * @return the builder instance.
      */
     public Builder withCreator(String creator) {
-      this.auditInfo.creator = creator;
+      this.creator = creator;
       return this;
     }
 
@@ -193,7 +194,7 @@ public final class AuditInfo implements Audit, Entity {
      * @return the builder instance.
      */
     public Builder withCreateTime(Instant createTime) {
-      this.auditInfo.createTime = createTime;
+      this.createTime = createTime;
       return this;
     }
 
@@ -204,7 +205,7 @@ public final class AuditInfo implements Audit, Entity {
      * @return the builder instance.
      */
     public Builder withLastModifier(String lastModifier) {
-      this.auditInfo.lastModifier = lastModifier;
+      this.lastModifier = lastModifier;
       return this;
     }
 
@@ -215,7 +216,7 @@ public final class AuditInfo implements Audit, Entity {
      * @return the builder instance.
      */
     public Builder withLastModifiedTime(Instant lastModifiedTime) {
-      this.auditInfo.lastModifiedTime = lastModifiedTime;
+      this.lastModifiedTime = lastModifiedTime;
       return this;
     }
 
@@ -225,6 +226,12 @@ public final class AuditInfo implements Audit, Entity {
      * @return the constructed and validated {@link AuditInfo} instance.
      */
     public AuditInfo build() {
+      AuditInfo auditInfo = new AuditInfo();
+      auditInfo.creator = this.creator;
+      auditInfo.createTime = this.createTime;
+      auditInfo.lastModifier = this.lastModifier;
+      auditInfo.lastModifiedTime = this.lastModifiedTime;
+
       auditInfo.validate();
       return auditInfo;
     }
