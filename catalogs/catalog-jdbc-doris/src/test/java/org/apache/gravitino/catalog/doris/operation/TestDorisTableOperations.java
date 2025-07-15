@@ -719,4 +719,24 @@ public class TestDorisTableOperations extends TestDoris {
         TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
         "Non-datetime type should return 0 precision");
   }
+
+  @Test
+  public void testCalculateDatetimePrecisionWithUnsupportedDriverVersion() {
+    DorisTableOperations operationsWithOldDriver =
+        new DorisTableOperations() {
+          @Override
+          protected String getMySQLDriverVersion() {
+            return "mysql-connector-java-8.0.11 (Revision: a0ca826f5cdf51a98356fdfb1bf251eb042f80bf)";
+          }
+
+          @Override
+          public boolean isMySQLDriverVersionSupported(String driverVersion) {
+            return false;
+          }
+        };
+
+    Assertions.assertNull(
+        operationsWithOldDriver.calculateDatetimePrecision("DATETIME", 26, 0),
+        "DATETIME type should return null for unsupported driver version");
+  }
 }

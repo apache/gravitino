@@ -799,6 +799,23 @@ public class DorisTableOperations extends JdbcTableOperations {
   @Override
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     String upperTypeName = typeName.toUpperCase();
+
+    // Check driver version compatibility first
+    boolean isDatetimeType = "DATETIME".equals(upperTypeName);
+
+    if (isDatetimeType) {
+      String driverVersion = getMySQLDriverVersion();
+      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
+        LOG.warn(
+            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
+                + "Returning null for {} type precision. Driver version: {}",
+            driverVersion,
+            upperTypeName,
+            driverVersion);
+        return null;
+      }
+    }
+
     if (upperTypeName.equals("DATETIME")) {
       // DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
       return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
