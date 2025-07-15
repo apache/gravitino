@@ -49,7 +49,7 @@ public final class ListMetadataObjectsForTagsFailureEvent extends TagFailureEven
    *
    * @return the tag names.
    */
-  public String[] getTagNames() {
+  public String[] tagNames() {
     return tagNames;
   }
 
