@@ -73,6 +73,20 @@ public class MetadataObjectUtil {
   }
 
   /**
+   * Map the given {@link MetadataObject}'s type to the corresponding {@link Entity.EntityType}.
+   *
+   * @param type The metadata object type
+   * @return The entity type
+   * @throws IllegalArgumentException if the metadata object type is unknown
+   */
+  public static Entity.EntityType toEntityType(MetadataObject.Type type) {
+    Preconditions.checkArgument(type != null, "metadataObject type cannot be null");
+
+    return Optional.ofNullable(TYPE_TO_TYPE_MAP.get(type))
+        .orElseThrow(() -> new IllegalArgumentException("Unknown metadata object type: " + type));
+  }
+
+  /**
    * Convert the given {@link MetadataObject} full name to the corresponding {@link NameIdentifier}.
    *
    * @param metalakeName The metalake name

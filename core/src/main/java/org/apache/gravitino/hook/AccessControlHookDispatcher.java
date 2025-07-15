@@ -28,7 +28,7 @@ import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -153,9 +153,9 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     Role createdRole = dispatcher.createRole(metalake, role, properties, securableObjects);
 
     // Set the creator as the owner of role.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerDispatcher != null) {
+      ownerDispatcher.setOwner(
           metalake,
           NameIdentifierUtil.toMetadataObject(
               AuthorizationUtils.ofRole(metalake, role), Entity.EntityType.ROLE),
