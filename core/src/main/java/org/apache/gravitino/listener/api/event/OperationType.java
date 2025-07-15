@@ -140,5 +140,9 @@ public enum OperationType {
   GRANT_PRIVILEGES,
   REVOKE_PRIVILEGES,
 
+  // Owner operations
+  GET_OWNER,
+  SET_OWNER,
+
   UNKNOWN,
 }
