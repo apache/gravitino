@@ -86,7 +86,7 @@ public class DownloaderUtils {
    * @param directories Directories to check
    * @throws IOException If file operations fail
    */
-  public static void checkAndCleanDriverConflicts(String targetUrl, String... directories)
+  private static void checkAndCleanDriverConflicts(String targetUrl, String... directories)
       throws IOException {
     String expectedFileName = getFileName(targetUrl);
     String expectedVersion = extractVersion(expectedFileName);
