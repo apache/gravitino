@@ -132,7 +132,6 @@ public class OwnerManager implements OwnerDispatcher {
     }
   }
 
-  @Override
   private void notifyOwnerChange(Owner oldOwner, String metalake, MetadataObject metadataObject) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer != null) {
@@ -160,6 +159,7 @@ public class OwnerManager implements OwnerDispatcher {
     }
   }
 
+  @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     OwnerImpl owner = new OwnerImpl();
