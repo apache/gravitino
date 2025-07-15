@@ -20,8 +20,6 @@ package org.apache.gravitino.iceberg.integration.test.authorization;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
-
 public class IcebergRESTTableAuthIT extends IcebergRESTAuthBaseIT {
 
   @Test

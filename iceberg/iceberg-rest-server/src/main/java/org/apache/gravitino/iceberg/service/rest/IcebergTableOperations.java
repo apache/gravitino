@@ -118,9 +118,9 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::CREATE_TABLE || CATALOG::CREATE_TABLE || "
-              + "SCHEMA::CREATE_TABLE || METALAKE::OWNER || "
-              + "CATALOG::OWNER || SCHEMA::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
       @PathParam("prefix") String prefix,
@@ -160,9 +160,9 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "update-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
-              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
-              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateTable(
       @PathParam("prefix") String prefix,
@@ -201,7 +201,10 @@ public class IcebergTableOperations {
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @PathParam("prefix") String prefix,
@@ -238,11 +241,9 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::SELECT_TABLE || CATALOG::SELECT_TABLE || "
-              + "SCHEMA::SELECT_TABLE || TABLE::SELECT_TABLE || "
-              + "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
-              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
-              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("prefix") String prefix,
@@ -285,10 +286,9 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "table-exits", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::SELECT_TABLE || CATALOG::SELECT_TABLE || "
-              + "SCHEMA::SELECT_TABLE || TABLE::SELECT_TABLE || "
-              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || "
-              + "TABLE::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response tableExists(
       @PathParam("prefix") String prefix,
@@ -327,9 +327,9 @@ public class IcebergTableOperations {
   @ResponseMetered(name = "report-table-metrics", absolute = true)
   @AuthorizationExpression(
       expression =
-          "METALAKE::MODIFY_TABLE || CATALOG::MODIFY_TABLE || "
-              + "SCHEMA::MODIFY_TABLE || TABLE::MODIFY_TABLE || "
-              + "METALAKE::OWNER || CATALOG::OWNER || SCHEMA::OWNER || TABLE::OWNER",
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response reportTableMetrics(
       @PathParam("prefix") String prefix,

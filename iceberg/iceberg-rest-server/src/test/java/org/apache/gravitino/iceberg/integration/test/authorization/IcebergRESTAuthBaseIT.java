@@ -18,15 +18,14 @@
  */
 package org.apache.gravitino.iceberg.integration.test.authorization;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.iceberg.integration.test.IcebergRESTServiceBaseIT;
 import org.apache.iceberg.rest.RESTClient;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class IcebergRESTAuthBaseIT extends IcebergRESTServiceBaseIT {
@@ -54,5 +53,4 @@ public abstract class IcebergRESTAuthBaseIT extends IcebergRESTServiceBaseIT {
     // put configs
     return configMap;
   }
-
 }
