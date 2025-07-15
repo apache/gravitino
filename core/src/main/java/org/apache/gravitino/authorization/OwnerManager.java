@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import lombok.Getter;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -42,9 +43,9 @@ import org.slf4j.LoggerFactory;
  * owner. Because the post hook will call the methods. We shouldn't add the lock of the metadata
  * object. Otherwise, it will cause deadlock.
  */
-public class OwnerManager {
+public class OwnerManager implements OwnerDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(OwnerManager.class);
-  private final EntityStore store;
+  @Getter private final EntityStore store;
 
   public OwnerManager(EntityStore store) {
     if (store instanceof SupportsRelationOperations) {
@@ -58,6 +59,7 @@ public class OwnerManager {
     }
   }
 
+  @Override
   public void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType) {
 
@@ -128,6 +130,7 @@ public class OwnerManager {
     }
   }
 
+  @Override
   public Optional<Owner> getOwner(String metalake, MetadataObject metadataObject) {
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     OwnerImpl owner = new OwnerImpl();
