@@ -67,14 +67,13 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestPermissionOperations extends JerseyTest {
+public class TestPermissionOperations extends BaseOperationsTest {
 
   private static final AccessControlManager manager = mock(AccessControlManager.class);
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);

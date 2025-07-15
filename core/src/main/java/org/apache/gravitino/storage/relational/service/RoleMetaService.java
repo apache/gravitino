@@ -40,6 +40,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -83,6 +84,18 @@ public class RoleMetaService {
   public List<RolePO> listRolesByUserId(Long userId) {
     return SessionUtils.getWithoutCommit(
         RoleMetaMapper.class, mapper -> mapper.listRolesByUserId(userId));
+  }
+
+  public List<RoleEntity> listRolesByUserIdent(NameIdentifier userIdent) {
+    UserEntity user = UserMetaService.getInstance().getUserByIdentifier(userIdent);
+    String metalake = NameIdentifierUtil.getMetalake(userIdent);
+    List<RolePO> rolePOs = listRolesByUserId(user.id());
+    return rolePOs.stream()
+        .map(
+            po ->
+                POConverters.fromRolePO(
+                    po, Collections.emptyList(), AuthorizationUtils.ofRoleNamespace(metalake)))
+        .collect(Collectors.toList());
   }
 
   public List<RoleEntity> listRolesByMetadataObject(
@@ -293,7 +306,7 @@ public class RoleMetaService {
     return true;
   }
 
-  private static List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
+  public static List<SecurableObjectPO> listSecurableObjectsByRoleId(Long roleId) {
     return SessionUtils.getWithoutCommit(
         SecurableObjectMapper.class, mapper -> mapper.listSecurableObjectsByRoleId(roleId));
   }

@@ -23,6 +23,9 @@ import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -132,8 +135,9 @@ public class GravitinoEnv {
   private AuditLogManager auditLogManager;
 
   private EventBus eventBus;
-  private OwnerManager ownerManager;
+  private OwnerDispatcher ownerDispatcher;
   private FutureGrantManager futureGrantManager;
+  private GravitinoAuthorizer gravitinoAuthorizer;
 
   protected GravitinoEnv() {}
 
@@ -338,12 +342,12 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the OwnerManager associated with the Gravitino environment.
+   * Get the Owner dispatcher associated with the Gravitino environment.
    *
    * @return The OwnerManager instance.
    */
-  public OwnerManager ownerManager() {
-    return ownerManager;
+  public OwnerDispatcher ownerDispatcher() {
+    return ownerDispatcher;
   }
 
   /**
@@ -362,6 +366,24 @@ public class GravitinoEnv {
    */
   public EventListenerManager eventListenerManager() {
     return eventListenerManager;
+  }
+
+  /**
+   * Set GravitinoAuthorizer to GravitinoEnv
+   *
+   * @param gravitinoAuthorizer the GravitinoAuthorizer instance
+   */
+  public void setGravitinoAuthorizer(GravitinoAuthorizer gravitinoAuthorizer) {
+    this.gravitinoAuthorizer = gravitinoAuthorizer;
+  }
+
+  /**
+   * Get The GravitinoAuthorizer
+   *
+   * @return the GravitinoAuthorizer instance
+   */
+  public GravitinoAuthorizer gravitinoAuthorizer() {
+    return gravitinoAuthorizer;
   }
 
   public void start() {
@@ -509,11 +531,12 @@ public class GravitinoEnv {
           new AccessControlHookDispatcher(accessControlManager);
       this.accessControlDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
-      this.ownerManager = new OwnerManager(entityStore);
+      OwnerDispatcher ownerManager = new OwnerManager(entityStore);
+      this.ownerDispatcher = new OwnerEventManager(eventBus, ownerManager);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
-      this.ownerManager = null;
+      this.ownerDispatcher = null;
       this.futureGrantManager = null;
     }
 

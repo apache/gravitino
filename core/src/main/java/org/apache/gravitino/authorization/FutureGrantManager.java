@@ -48,18 +48,18 @@ import org.apache.gravitino.meta.UserEntity;
  */
 public class FutureGrantManager {
   EntityStore entityStore;
-  OwnerManager ownerManager;
+  OwnerDispatcher ownerDispatcher;
 
-  public FutureGrantManager(EntityStore entityStore, OwnerManager ownerManager) {
+  public FutureGrantManager(EntityStore entityStore, OwnerDispatcher ownerDispatcher) {
     this.entityStore = entityStore;
-    this.ownerManager = ownerManager;
+    this.ownerDispatcher = ownerDispatcher;
   }
 
   public void grantNewlyCreatedCatalog(String metalake, BaseCatalog catalog) {
     try {
       MetadataObject metalakeObject =
           MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE);
-      Optional<Owner> ownerOptional = ownerManager.getOwner(metalake, metalakeObject);
+      Optional<Owner> ownerOptional = ownerDispatcher.getOwner(metalake, metalakeObject);
       ownerOptional.ifPresent(
           owner -> {
             AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
