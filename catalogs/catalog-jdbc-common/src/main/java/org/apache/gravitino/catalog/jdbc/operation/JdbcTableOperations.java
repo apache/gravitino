@@ -637,10 +637,37 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * Calculate the precision for time/datetime/timestamp types.
    *
-   * @param typeName the type name from database
-   * @param columnSize the column size from database
-   * @param scale the scale from database
-   * @return the precision of the time/datetime/timestamp type
+   * <p>This method provides a default behavior returning null for catalogs that do not implement
+   * this method. Developers should override this method when their database supports precision
+   * specification for datetime types.</p>
+   *
+   * <p><strong>When to return null:</strong>
+   * <ul>
+   *   <li>When the database does not support precision for datetime types</li>
+   *   <li>When the driver version is incompatible (e.g., MySQL driver &lt; 8.0.16)</li>
+   *   <li>When the type is not a datetime type (TIME, TIMESTAMP, DATETIME)</li>
+   *   <li>When the precision cannot be accurately calculated from the provided parameters</li>
+   * </ul>
+   *
+   * <p><strong>When to return non-null:</strong>
+   * <ul>
+   *   <li>When the database supports precision for datetime types and the driver version is compatible</li>
+   *   <li>When the precision can be accurately calculated from columnSize (e.g., columnSize - format_length)</li>
+   *   <li>For TIME types: return columnSize - 8 (for 'HH:MM:SS' format)</li>
+   *   <li>For TIMESTAMP/DATETIME types: return columnSize - 19 (for 'YYYY-MM-DD HH:MM:SS' format)</li>
+   * </ul>
+   *
+   * <p><strong>Examples:</strong>
+   * <ul>
+   *   <li>TIME(3) with columnSize=11: return 3 (11-8)</li>
+   *   <li>TIMESTAMP(6) with columnSize=25: return 6 (25-19)</li>
+   *   <li>DATETIME(0) with columnSize=19: return 0 (19-19)</li>
+   * </ul>
+   *
+   * @param typeName the type name from database (e.g., "TIME", "TIMESTAMP", "DATETIME")
+   * @param columnSize the column size from database (total length including format and precision)
+   * @param scale the scale from database (usually 0 for datetime types)
+   * @return the precision of the time/datetime/timestamp type, or null if not supported/calculable
    */
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     return null;
