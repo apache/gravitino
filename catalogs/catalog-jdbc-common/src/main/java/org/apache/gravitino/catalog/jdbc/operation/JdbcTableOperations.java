@@ -639,29 +639,34 @@ public abstract class JdbcTableOperations implements TableOperation {
    *
    * <p>This method provides a default behavior returning null for catalogs that do not implement
    * this method. Developers should override this method when their database supports precision
-   * specification for datetime types.</p>
+   * specification for datetime types.
    *
    * <p><strong>When to return null:</strong>
+   *
    * <ul>
-   *   <li>When the database does not support precision for datetime types</li>
-   *   <li>When the driver version is incompatible (e.g., MySQL driver &lt; 8.0.16)</li>
-   *   <li>When the type is not a datetime type (TIME, TIMESTAMP, DATETIME)</li>
-   *   <li>When the precision cannot be accurately calculated from the provided parameters</li>
+   *   <li>When the database does not support precision for datetime types
+   *   <li>When the driver version is incompatible (e.g., MySQL driver &lt; 8.0.16)
+   *   <li>When the type is not a datetime type (TIME, TIMESTAMP, DATETIME)
+   *   <li>When the precision cannot be accurately calculated from the provided parameters
    * </ul>
    *
    * <p><strong>When to return non-null:</strong>
+   *
    * <ul>
-   *   <li>When the database supports precision for datetime types and the driver version is compatible</li>
-   *   <li>When the precision can be accurately calculated from columnSize (e.g., columnSize - format_length)</li>
-   *   <li>For TIME types: return columnSize - 8 (for 'HH:MM:SS' format)</li>
-   *   <li>For TIMESTAMP/DATETIME types: return columnSize - 19 (for 'YYYY-MM-DD HH:MM:SS' format)</li>
+   *   <li>When the database supports precision for datetime types and the driver version is
+   *       compatible
+   *   <li>When the precision can be accurately calculated from columnSize (e.g., columnSize -
+   *       format_length)
+   *   <li>For TIME types: return columnSize - 8 (for 'HH:MM:SS' format)
+   *   <li>For TIMESTAMP/DATETIME types: return columnSize - 19 (for 'YYYY-MM-DD HH:MM:SS' format)
    * </ul>
    *
    * <p><strong>Examples:</strong>
+   *
    * <ul>
-   *   <li>TIME(3) with columnSize=11: return 3 (11-8)</li>
-   *   <li>TIMESTAMP(6) with columnSize=25: return 6 (25-19)</li>
-   *   <li>DATETIME(0) with columnSize=19: return 0 (19-19)</li>
+   *   <li>TIME(3) with columnSize=11: return 3 (11-8)
+   *   <li>TIMESTAMP(6) with columnSize=25: return 6 (25-19)
+   *   <li>DATETIME(0) with columnSize=19: return 0 (19-19)
    * </ul>
    *
    * @param typeName the type name from database (e.g., "TIME", "TIMESTAMP", "DATETIME")
