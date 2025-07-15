@@ -234,6 +234,7 @@ public class TestJdbcTableOperations {
     // Test invalid MySQL formats
     Assertions.assertFalse(
         JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-invalid"));
+    Assertions.assertFalse(JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported(""));
     Assertions.assertFalse(JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported(null));
 
     // Test non-MySQL drivers (should be supported)
