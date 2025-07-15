@@ -52,6 +52,11 @@ public class DummyEventListener implements EventListenerPlugin {
     postEvents.add(event);
   }
 
+  public void clear() {
+    postEvents.clear();
+    preEvents.clear();
+  }
+
   @Override
   public void onPreEvent(PreEvent preEvent) {
     if (preEvent.equals(TestEventListenerManager.DUMMY_FORBIDDEN_PRE_EVENT_INSTANCE)) {

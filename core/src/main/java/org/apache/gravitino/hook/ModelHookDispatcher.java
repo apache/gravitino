@@ -26,7 +26,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
@@ -73,7 +73,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.namespace().level(0),
@@ -148,7 +148,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, uri, aliases, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.name(),
