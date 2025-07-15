@@ -26,7 +26,7 @@ import org.apache.gravitino.listener.api.info.OwnerInfo;
 
 /** Event triggered before setting the owner of a metadata object. */
 @DeveloperApi
-public class SetOwnerPreEvent extends OwnerPreEvent {
+public final class SetOwnerPreEvent extends OwnerPreEvent {
   public SetOwnerPreEvent(
       String user, NameIdentifier identifier, OwnerInfo ownerInfo, MetadataObject.Type type) {
     super(user, identifier, ownerInfo, type);

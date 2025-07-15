@@ -29,7 +29,7 @@ import org.apache.gravitino.listener.api.info.OwnerInfo;
  * triggered after the owner has been successfully set.
  */
 @DeveloperApi
-public class SetOwnerEvent extends OwnerEvent {
+public final class SetOwnerEvent extends OwnerEvent {
   public SetOwnerEvent(
       String user, NameIdentifier identifier, OwnerInfo ownerInfo, MetadataObject.Type type) {
     super(user, identifier, ownerInfo, type);
@@ -38,10 +38,5 @@ public class SetOwnerEvent extends OwnerEvent {
   @Override
   public OperationType operationType() {
     return OperationType.SET_OWNER;
-  }
-
-  @Override
-  public OperationStatus operationStatus() {
-    return OperationStatus.SUCCESS;
   }
 }

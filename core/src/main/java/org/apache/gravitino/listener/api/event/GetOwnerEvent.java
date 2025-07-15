@@ -29,7 +29,7 @@ import org.apache.gravitino.listener.api.info.OwnerInfo;
  * successfully.
  */
 @DeveloperApi
-public class GetOwnerEvent extends OwnerEvent {
+public final class GetOwnerEvent extends OwnerEvent {
 
   public GetOwnerEvent(
       String user, NameIdentifier identifier, OwnerInfo ownerInfo, MetadataObject.Type type) {
@@ -39,10 +39,5 @@ public class GetOwnerEvent extends OwnerEvent {
   @Override
   public OperationType operationType() {
     return OperationType.GET_OWNER;
-  }
-
-  @Override
-  public OperationStatus operationStatus() {
-    return OperationStatus.SUCCESS;
   }
 }

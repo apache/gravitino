@@ -44,4 +44,9 @@ public abstract class OwnerEvent extends Event {
   public MetadataObject.Type metadataObjectType() {
     return type;
   }
+
+  @Override
+  public OperationStatus operationStatus() {
+    return OperationStatus.SUCCESS;
+  }
 }
