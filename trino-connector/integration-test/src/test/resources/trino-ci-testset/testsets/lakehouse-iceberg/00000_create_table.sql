@@ -11,6 +11,7 @@ CREATE TABLE gt_db2.tb02 (
     name varchar,
     salary int
 ) with (
+      format = 'ORC',
       partitioning = ARRAY['name'],
       sorted_by = ARRAY['salary']
     );
