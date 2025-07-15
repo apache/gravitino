@@ -43,7 +43,7 @@ public class ListMetadataObjectsForTagsPreEvent extends TagPreEvent {
    *
    * @return the tag names.
    */
-  public String[] getTagNames() {
+  public String[] tagNames() {
     return tagNames;
   }
 

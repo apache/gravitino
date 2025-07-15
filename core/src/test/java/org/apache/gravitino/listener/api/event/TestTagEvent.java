@@ -226,7 +226,7 @@ public class TestTagEvent {
     Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAGS, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
     Assertions.assertArrayEquals(
-        tagNames, ((ListMetadataObjectsForTagsPreEvent) preEvent).getTagNames());
+        tagNames, ((ListMetadataObjectsForTagsPreEvent) preEvent).tagNames());
 
     Event postevent = dummyEventListener.popPostEvent();
     Assertions.assertEquals(identifier.toString(), postevent.identifier().toString());
@@ -558,7 +558,7 @@ public class TestTagEvent {
         GravitinoRuntimeException.class,
         ((ListMetadataObjectsForTagsFailureEvent) event).exception().getClass());
     Assertions.assertArrayEquals(
-        tagNames, ((ListMetadataObjectsForTagsFailureEvent) event).getTagNames());
+        tagNames, ((ListMetadataObjectsForTagsFailureEvent) event).tagNames());
     Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAGS, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
