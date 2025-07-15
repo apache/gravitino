@@ -255,14 +255,14 @@ public class RelationalEntityStore
 
   @Override
   public List<PolicyEntity> listAssociatedPoliciesForMetadataObject(
-      NameIdentifier objectIdent, MetadataObject.Type objectType)
+      NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchEntityException, IOException {
     return backend.listAssociatedPoliciesForMetadataObject(objectIdent, objectType);
   }
 
   @Override
   public PolicyEntity getPolicyForMetadataObject(
-      NameIdentifier objectIdent, MetadataObject.Type objectType, NameIdentifier policyIdent)
+      NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier policyIdent)
       throws NoSuchEntityException, IOException {
     return backend.getPolicyForMetadataObject(objectIdent, objectType, policyIdent);
   }
@@ -270,7 +270,7 @@ public class RelationalEntityStore
   @Override
   public List<PolicyEntity> associatePoliciesWithMetadataObject(
       NameIdentifier objectIdent,
-      MetadataObject.Type objectType,
+      Entity.EntityType objectType,
       NameIdentifier[] policiesToAdd,
       NameIdentifier[] policiesToRemove)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {

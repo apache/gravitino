@@ -21,6 +21,7 @@ package org.apache.gravitino.policy;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -56,7 +57,7 @@ public interface SupportsPolicyOperations {
    * @throws IOException If an error occurs while accessing the entity store.
    */
   List<PolicyEntity> listAssociatedPoliciesForMetadataObject(
-      NameIdentifier objectIdent, MetadataObject.Type objectType)
+      NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchEntityException, IOException;
 
   /**
@@ -70,7 +71,7 @@ public interface SupportsPolicyOperations {
    * @throws IOException If an error occurs while accessing the entity store.
    */
   PolicyEntity getPolicyForMetadataObject(
-      NameIdentifier objectIdent, MetadataObject.Type objectType, NameIdentifier policyIdent)
+      NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier policyIdent)
       throws NoSuchEntityException, IOException;
 
   /**
@@ -89,7 +90,7 @@ public interface SupportsPolicyOperations {
    */
   List<PolicyEntity> associatePoliciesWithMetadataObject(
       NameIdentifier objectIdent,
-      MetadataObject.Type objectType,
+      Entity.EntityType objectType,
       NameIdentifier[] policiesToAdd,
       NameIdentifier[] policiesToRemove)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException;
