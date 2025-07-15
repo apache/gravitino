@@ -397,7 +397,7 @@ CREATE TABLE IF NOT EXISTS `statistic_meta` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'statistic last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'statistic deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metalake_id`, `metadata_object_id`, `deleted_at`),
+    UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metadata_object_id`, `deleted_at`),
     KEY `idx_stid` (`statistic_id`),
     KEY `idx_moid` (`metadata_object_id`)
     ) ENGINE=InnoDB;

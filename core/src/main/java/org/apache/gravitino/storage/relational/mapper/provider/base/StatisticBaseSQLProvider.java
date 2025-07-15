@@ -52,7 +52,8 @@ public class StatisticBaseSQLProvider {
         + "</script>";
   }
 
-  public String batchDeleteStatisticPOs(@Param("statisticNames") List<String> statisticNames) {
+  public String batchDeleteStatisticPOs(
+      @Param("objectId") Long objectId, @Param("statisticNames") List<String> statisticNames) {
     return "<script>"
         + "UPDATE "
         + STATISTIC_META_TABLE_NAME
@@ -60,7 +61,7 @@ public class StatisticBaseSQLProvider {
         + " WHERE FALSE "
         + "<foreach collection='statisticNames' item='item' separator=' '>"
         + " OR (statistic_name = #{item} AND"
-        + " deleted_at = 0 )"
+        + " deleted_at = 0 AND metadata_object_id = #{objectId})"
         + "</foreach>"
         + "</script>";
   }

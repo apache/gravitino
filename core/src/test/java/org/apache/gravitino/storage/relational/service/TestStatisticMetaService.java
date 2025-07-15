@@ -22,6 +22,7 @@ import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.List;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.AuditInfo;
@@ -67,7 +68,9 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     Assertions.assertEquals(100L, listEntities.get(0).value().value());
 
     List<String> names = Lists.newArrayList(statisticEntity.name());
-    statisticMetaService.batchDeleteStatisticPOs(names);
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(nameIdentifier, Entity.EntityType.METALAKE);
+    statisticMetaService.batchDeleteStatisticPOs(metalakeName, metadataObject, names);
     listEntities =
         statisticMetaService.listStatisticsByObject(nameIdentifier, Entity.EntityType.METALAKE);
     Assertions.assertEquals(0, listEntities.size());

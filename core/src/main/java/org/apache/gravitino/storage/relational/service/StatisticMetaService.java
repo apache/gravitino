@@ -85,12 +85,23 @@ public class StatisticMetaService {
         StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(pos));
   }
 
-  public int batchDeleteStatisticPOs(List<String> statisticNames) {
+  public int batchDeleteStatisticPOs(
+      String metalake, MetadataObject object, List<String> statisticNames) {
     if (statisticNames == null || statisticNames.isEmpty()) {
       return 0;
     }
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    Long objectId;
+    if (object.type() == MetadataObject.Type.METALAKE) {
+      objectId = metalakeId;
+    } else {
+      objectId =
+          MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
+    }
+
     return SessionUtils.doWithCommitAndFetchResult(
-        StatisticMetaMapper.class, mapper -> mapper.batchDeleteStatisticPOs(statisticNames));
+        StatisticMetaMapper.class,
+        mapper -> mapper.batchDeleteStatisticPOs(objectId, statisticNames));
   }
 
   public int deleteStatisticsByLegacyTimeline(long legacyTimeline, int limit) {
