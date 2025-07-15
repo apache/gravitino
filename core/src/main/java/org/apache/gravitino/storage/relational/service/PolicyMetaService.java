@@ -19,8 +19,12 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,17 +32,22 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
+import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -182,33 +191,201 @@ public class PolicyMetaService {
   }
 
   public List<PolicyEntity> listPoliciesForMetadataObject(
-      NameIdentifier objectIdent, MetadataObject.Type objectType)
+      NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchEntityException, IOException {
-    // todo: implement this method
-    throw new UnsupportedOperationException("Not implemented yet");
+    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    String metalake = objectIdent.namespace().level(0);
+
+    List<PolicyPO> PolicyPOs;
+    try {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+      Long metadataObjectId =
+          MetadataObjectService.getMetadataObjectId(
+              metalakeId, metadataObject.fullName(), metadataObject.type());
+
+      PolicyPOs =
+          SessionUtils.doWithoutCommitAndFetchResult(
+              PolicyMetadataObjectRelMapper.class,
+              mapper ->
+                  mapper.listPolicyPOsByMetadataObjectIdAndType(
+                      metadataObjectId, metadataObject.type().toString()));
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, objectIdent.toString());
+      throw e;
+    }
+
+    return PolicyPOs.stream()
+        .map(PolicyPO -> POConverters.fromPolicyPO(PolicyPO, NamespaceUtil.ofPolicy(metalake)))
+        .collect(Collectors.toList());
   }
 
   public PolicyEntity getPolicyForMetadataObject(
-      NameIdentifier objectIdent, MetadataObject.Type objectType, NameIdentifier policyIdent)
+      NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier policyIdent)
       throws NoSuchEntityException, IOException {
-    // todo: implement this method
-    throw new UnsupportedOperationException("Not implemented yet");
+    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    String metalake = objectIdent.namespace().level(0);
+
+    PolicyPO policyPO;
+    try {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+      Long metadataObjectId =
+          MetadataObjectService.getMetadataObjectId(
+              metalakeId, metadataObject.fullName(), metadataObject.type());
+
+      policyPO =
+          SessionUtils.getWithoutCommit(
+              PolicyMetadataObjectRelMapper.class,
+              mapper ->
+                  mapper.getPolicyPOsByMetadataObjectAndPolicyName(
+                      metadataObjectId, metadataObject.type().toString(), policyIdent.name()));
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, policyIdent.toString());
+      throw e;
+    }
+
+    if (policyPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.POLICY.name().toLowerCase(),
+          policyIdent.name());
+    }
+
+    return POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake));
   }
 
   public List<MetadataObject> listAssociatedMetadataObjectsForPolicy(NameIdentifier policyIdent)
       throws IOException {
-    // todo: implement this method
-    throw new UnsupportedOperationException("Not implemented yet");
+    String metalakeName = policyIdent.namespace().level(0);
+    String policyName = policyIdent.name();
+
+    try {
+      List<PolicyMetadataObjectRelPO> policyMetadataObjectRelPOs =
+          SessionUtils.doWithCommitAndFetchResult(
+              PolicyMetadataObjectRelMapper.class,
+              mapper ->
+                  mapper.listPolicyMetadataObjectRelsByMetalakeAndPolicyName(
+                      metalakeName, policyName));
+
+      List<MetadataObject> metadataObjects = Lists.newArrayList();
+      Map<String, List<PolicyMetadataObjectRelPO>> policyMetadataObjectRelPOsByType =
+          policyMetadataObjectRelPOs.stream()
+              .collect(Collectors.groupingBy(PolicyMetadataObjectRelPO::getMetadataObjectType));
+
+      for (Map.Entry<String, List<PolicyMetadataObjectRelPO>> entry :
+          policyMetadataObjectRelPOsByType.entrySet()) {
+        String metadataObjectType = entry.getKey();
+        List<PolicyMetadataObjectRelPO> rels = entry.getValue();
+
+        List<Long> metadataObjectIds =
+            rels.stream()
+                .map(PolicyMetadataObjectRelPO::getMetadataObjectId)
+                .collect(Collectors.toList());
+        Map<Long, String> metadataObjectNames =
+            MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP
+                .get(MetadataObject.Type.valueOf(metadataObjectType))
+                .apply(metadataObjectIds);
+
+        for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
+          String fullName = metadataObjectName.getValue();
+
+          // Metadata object may be deleted asynchronously when we query the name, so it will
+          // return null, we should skip this metadata object.
+          if (fullName != null) {
+            metadataObjects.add(
+                MetadataObjects.parse(fullName, MetadataObject.Type.valueOf(metadataObjectType)));
+          }
+        }
+      }
+
+      return metadataObjects;
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, policyIdent.toString());
+      throw e;
+    }
   }
 
   public List<PolicyEntity> associatePoliciesWithMetadataObject(
       NameIdentifier objectIdent,
-      MetadataObject.Type objectType,
+      Entity.EntityType objectType,
       NameIdentifier[] policiesToAdd,
       NameIdentifier[] policiesToRemove)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
-    // todo: implement this method
-    throw new UnsupportedOperationException("Not implemented yet");
+    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    String metalake = objectIdent.namespace().level(0);
+
+    try {
+      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+      Long metadataObjectId =
+          MetadataObjectService.getMetadataObjectId(
+              metalakeId, metadataObject.fullName(), metadataObject.type());
+
+      // Fetch all the policies need to associate with the metadata object.
+      List<String> policyNamesToAdd =
+          Arrays.stream(policiesToAdd).map(NameIdentifier::name).collect(Collectors.toList());
+      List<PolicyPO> policyPOsToAdd =
+          policyNamesToAdd.isEmpty()
+              ? Collections.emptyList()
+              : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToAdd);
+
+      // Fetch all the policies need to remove from the metadata object.
+      List<String> policyNamesToRemove =
+          Arrays.stream(policiesToRemove).map(NameIdentifier::name).collect(Collectors.toList());
+      List<PolicyPO> policyPOsToRemove =
+          policyNamesToRemove.isEmpty()
+              ? Collections.emptyList()
+              : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToRemove);
+
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            // Insert the policy metadata object relations.
+            if (policyPOsToAdd.isEmpty()) {
+              return;
+            }
+
+            List<PolicyMetadataObjectRelPO> policyRelsToAdd =
+                policyPOsToAdd.stream()
+                    .map(
+                        policyPO ->
+                            POConverters.initializePolicyMetadataObjectRelPOWithVersion(
+                                policyPO.getPolicyId(),
+                                metadataObjectId,
+                                metadataObject.type().toString()))
+                    .collect(Collectors.toList());
+            SessionUtils.doWithoutCommit(
+                PolicyMetadataObjectRelMapper.class,
+                mapper -> mapper.batchInsertPolicyMetadataObjectRels(policyRelsToAdd));
+          },
+          () -> {
+            // Remove the policy metadata object relations.
+            if (policyPOsToRemove.isEmpty()) {
+              return;
+            }
+
+            List<Long> policyIdsToRemove =
+                policyPOsToRemove.stream().map(PolicyPO::getPolicyId).collect(Collectors.toList());
+            SessionUtils.doWithoutCommit(
+                PolicyMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.batchDeletePolicyMetadataObjectRelsByPolicyIdsAndMetadataObject(
+                        metadataObjectId, metadataObject.type().toString(), policyIdsToRemove));
+          });
+
+      // Fetch all the policies associated with the metadata object after the operation.
+      List<PolicyPO> policyPOs =
+          SessionUtils.doWithoutCommitAndFetchResult(
+              PolicyMetadataObjectRelMapper.class,
+              mapper ->
+                  mapper.listPolicyPOsByMetadataObjectIdAndType(
+                      metadataObjectId, metadataObject.type().toString()));
+
+      return policyPOs.stream()
+          .map(policyPO -> POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake)))
+          .collect(Collectors.toList());
+
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, objectIdent.toString());
+      throw e;
+    }
   }
 
   public int deletePolicyAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
@@ -261,7 +438,7 @@ public class PolicyMetaService {
     PolicyPO policyPO =
         SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class,
-            mapper -> mapper.selectTagMetaByMetalakeAndName(metalakeName, policyName));
+            mapper -> mapper.selectPolicyMetaByMetalakeAndName(metalakeName, policyName));
 
     if (policyPO == null) {
       throw new NoSuchEntityException(
@@ -270,5 +447,12 @@ public class PolicyMetaService {
           policyName);
     }
     return policyPO;
+  }
+
+  private List<PolicyPO> getPolicyPOsByMetalakeAndNames(
+      String metalakeName, List<String> policyNames) {
+    return SessionUtils.getWithoutCommit(
+        PolicyMetaMapper.class,
+        mapper -> mapper.listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames));
   }
 }
