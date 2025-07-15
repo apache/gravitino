@@ -68,8 +68,9 @@ public class StatisticSQLProviderFactory {
     return getProvider().batchInsertStatisticPOs(statisticPOs);
   }
 
-  public static String batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds) {
-    return getProvider().batchDeleteStatisticPOs(statisticIds);
+  public static String batchDeleteStatisticPOs(
+      @Param("statisticNames") List<String> statisticNames) {
+    return getProvider().batchDeleteStatisticPOs(statisticNames);
   }
 
   public static String softDeleteStatisticsByObjectId(@Param("objectId") Long objectId) {

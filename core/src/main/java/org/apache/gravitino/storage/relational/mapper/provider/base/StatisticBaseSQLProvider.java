@@ -52,14 +52,14 @@ public class StatisticBaseSQLProvider {
         + "</script>";
   }
 
-  public String batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds) {
+  public String batchDeleteStatisticPOs(@Param("statisticNames") List<String> statisticNames) {
     return "<script>"
         + "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
         + " WHERE FALSE "
-        + "<foreach collection='statisticIds' item='item' separator=' '>"
-        + " OR (statistic_id = #{item} AND"
+        + "<foreach collection='statisticNames' item='item' separator=' '>"
+        + " OR (statistic_name = #{item} AND"
         + " deleted_at = 0 )"
         + "</foreach>"
         + "</script>";

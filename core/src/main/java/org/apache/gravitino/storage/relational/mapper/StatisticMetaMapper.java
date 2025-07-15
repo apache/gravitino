@@ -37,7 +37,7 @@ public interface StatisticMetaMapper {
   void batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);
 
   @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
-  Integer batchDeleteStatisticPOs(@Param("statisticIds") List<Long> statisticIds);
+  Integer batchDeleteStatisticPOs(@Param("statisticNames") List<String> statisticNames);
 
   @UpdateProvider(
       type = StatisticSQLProviderFactory.class,

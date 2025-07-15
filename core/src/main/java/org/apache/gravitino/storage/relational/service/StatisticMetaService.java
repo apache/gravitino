@@ -44,7 +44,7 @@ public class StatisticMetaService {
 
   private StatisticMetaService() {}
 
-  public List<StatisticEntity> listStatisticPOsByObject(
+  public List<StatisticEntity> listStatisticsByObject(
       NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance()
@@ -85,12 +85,12 @@ public class StatisticMetaService {
         StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(pos));
   }
 
-  public int batchDeleteStatisticPOs(List<Long> statisticIds) {
-    if (statisticIds == null || statisticIds.isEmpty()) {
+  public int batchDeleteStatisticPOs(List<String> statisticNames) {
+    if (statisticNames == null || statisticNames.isEmpty()) {
       return 0;
     }
     return SessionUtils.doWithCommitAndFetchResult(
-        StatisticMetaMapper.class, mapper -> mapper.batchDeleteStatisticPOs(statisticIds));
+        StatisticMetaMapper.class, mapper -> mapper.batchDeleteStatisticPOs(statisticNames));
   }
 
   public int deleteStatisticsByLegacyTimeline(long legacyTimeline, int limit) {

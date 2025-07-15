@@ -61,15 +61,15 @@ public class TestStatisticMetaService extends TestJDBCBackend {
         statisticEntities, metalakeName, nameIdentifier, Entity.EntityType.METALAKE);
 
     List<StatisticEntity> listEntities =
-        statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
+        statisticMetaService.listStatisticsByObject(nameIdentifier, Entity.EntityType.METALAKE);
     Assertions.assertEquals(1, listEntities.size());
     Assertions.assertEquals("test", listEntities.get(0).name());
     Assertions.assertEquals(100L, listEntities.get(0).value().value());
 
-    List<Long> ids = Lists.newArrayList(statisticEntity.id());
-    statisticMetaService.batchDeleteStatisticPOs(ids);
+    List<String> names = Lists.newArrayList(statisticEntity.name());
+    statisticMetaService.batchDeleteStatisticPOs(names);
     listEntities =
-        statisticMetaService.listStatisticPOsByObject(nameIdentifier, Entity.EntityType.METALAKE);
+        statisticMetaService.listStatisticsByObject(nameIdentifier, Entity.EntityType.METALAKE);
     Assertions.assertEquals(0, listEntities.size());
   }
 
