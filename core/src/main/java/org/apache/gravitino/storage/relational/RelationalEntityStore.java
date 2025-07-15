@@ -39,7 +39,9 @@ import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.SupportsPolicyOperations;
 import org.apache.gravitino.tag.SupportsTagOperations;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
@@ -51,7 +53,10 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface
  */
 public class RelationalEntityStore
-    implements EntityStore, SupportsTagOperations, SupportsRelationOperations {
+    implements EntityStore,
+        SupportsTagOperations,
+        SupportsRelationOperations,
+        SupportsPolicyOperations {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -169,6 +174,11 @@ public class RelationalEntityStore
   }
 
   @Override
+  public SupportsPolicyOperations policyOperations() {
+    return this;
+  }
+
+  @Override
   public SupportsRelationOperations relationOperations() {
     return this;
   }
@@ -235,5 +245,36 @@ public class RelationalEntityStore
       throws IOException {
     cache.invalidate(srcIdentifier, srcType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+  }
+
+  @Override
+  public List<MetadataObject> listAssociatedMetadataObjectsForPolicy(NameIdentifier policyIdent)
+      throws IOException {
+    return backend.listAssociatedMetadataObjectsForPolicy(policyIdent);
+  }
+
+  @Override
+  public List<PolicyEntity> listAssociatedPoliciesForMetadataObject(
+      NameIdentifier objectIdent, MetadataObject.Type objectType)
+      throws NoSuchEntityException, IOException {
+    return backend.listAssociatedPoliciesForMetadataObject(objectIdent, objectType);
+  }
+
+  @Override
+  public PolicyEntity getPolicyForMetadataObject(
+      NameIdentifier objectIdent, MetadataObject.Type objectType, NameIdentifier policyIdent)
+      throws NoSuchEntityException, IOException {
+    return backend.getPolicyForMetadataObject(objectIdent, objectType, policyIdent);
+  }
+
+  @Override
+  public List<PolicyEntity> associatePoliciesWithMetadataObject(
+      NameIdentifier objectIdent,
+      MetadataObject.Type objectType,
+      NameIdentifier[] policiesToAdd,
+      NameIdentifier[] policiesToRemove)
+      throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
+    return backend.associatePoliciesWithMetadataObject(
+        objectIdent, objectType, policiesToAdd, policiesToRemove);
   }
 }
