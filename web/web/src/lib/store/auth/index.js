@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi, initiateOAuthFlowApi, getOAuthConfigsApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi, getOAuthConfigsApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 
@@ -138,17 +138,6 @@ export const getOAuthConfig = createAsyncThunk('auth/getOAuthConfig', async () =
   }
 })
 
-export const initiateOAuthFlow = createAsyncThunk('auth/initiateOAuthFlow', async () => {
-  // Construct the redirect URI here
-  const currentUrl = window.location.origin
-  const redirectUri = `${currentUrl}/oauth/callback`
-
-  // This will redirect the browser to the OAuth provider
-  initiateOAuthFlowApi(redirectUri)
-
-  return { redirecting: true }
-})
-
 export const handleOAuthCallback = createAsyncThunk(
   'auth/handleOAuthCallback',
   async ({ access_token, refresh_token, expires_in, router }, { dispatch }) => {
@@ -237,9 +226,6 @@ export const authSlice = createSlice({
     })
     builder.addCase(getOAuthConfig.rejected, state => {
       state.oauthSupported = false
-    })
-    builder.addCase(initiateOAuthFlow.fulfilled, (state, action) => {
-      state.oauthRedirecting = action.payload.redirecting
     })
     builder.addCase(handleOAuthCallback.fulfilled, (state, action) => {
       state.authToken = action.payload.token

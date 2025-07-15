@@ -19,104 +19,19 @@
 
 'use client'
 
-import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Roboto } from 'next/font/google'
-import { useEffect, useState, useRef } from 'react'
 import { Box, Card, Grid, Button, CardContent, Typography } from '@mui/material'
 import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from '@azure/msal-react'
+import { getMsalConfig } from '@/lib/auth/msal'
 
 import clsx from 'clsx'
-
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { useAuth } from '@/lib/provider/session'
-import {
-  loginAction,
-  setIntervalIdAction,
-  clearIntervalId,
-  getAuthConfigs,
-  getOAuthConfig,
-  initiateOAuthFlow
-} from '@/lib/store/auth'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
 const LoginPage = () => {
-  const router = useRouter()
-  const dispatch = useAppDispatch()
-  const store = useAppSelector(state => state.auth)
   const { authError } = useAuth()
-  const [oauthConfig, setOauthConfig] = useState(null)
-  const [configLoading, setConfigLoading] = useState(true)
-  const [configError, setConfigError] = useState(null)
-  const fetchingRef = useRef(false)
-
-  useEffect(() => {
-    // Prevent multiple simultaneous fetches
-    if (fetchingRef.current) {
-      return
-    }
-
-    fetchingRef.current = true
-    setConfigLoading(true)
-    setConfigError(null)
-
-    // Fetch auth configuration to determine login method
-    dispatch(getAuthConfigs())
-      .then(result => {
-        if (result.payload) {
-          // Also fetch OAuth-specific configuration
-          dispatch(getOAuthConfig())
-            .then(oauthResult => {
-              if (oauthResult.payload) {
-                setOauthConfig(oauthResult.payload)
-              } else {
-                setOauthConfig({ authorizationCodeFlowEnabled: false })
-              }
-              setConfigLoading(false)
-              fetchingRef.current = false
-            })
-            .catch(error => {
-              // OAuth not configured, continue with regular auth
-              setOauthConfig({ authorizationCodeFlowEnabled: false })
-              setConfigLoading(false)
-              fetchingRef.current = false
-            })
-        } else {
-          setConfigError('Failed to load authentication configuration')
-          setConfigLoading(false)
-          fetchingRef.current = false
-        }
-      })
-      .catch(error => {
-        setConfigError('Failed to load authentication configuration: ' + error.message)
-        setOauthConfig({ authorizationCodeFlowEnabled: false })
-        setConfigLoading(false)
-        fetchingRef.current = false
-      })
-
-    // Cleanup function
-    return () => {
-      fetchingRef.current = false
-    }
-  }, [dispatch]) // Run only once on mount, dispatch is a safe dependency
-
-  const onSubmit = async data => {
-    await dispatch(loginAction({ params: data, router }))
-    await dispatch(setIntervalIdAction())
-  }
-
-  const onError = errors => {
-    console.error('fields error', errors)
-  }
-
-  const handleOAuthLogin = async () => {
-    try {
-      await dispatch(initiateOAuthFlow())
-    } catch (error) {
-      console.error('OAuth login failed:', error)
-    }
-  }
 
   return (
     <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
@@ -163,7 +78,7 @@ function LoginButton() {
 
   const handleLogin = () => {
     instance.loginRedirect({
-      scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read']
+      scopes: getMsalConfig().auth.scope
     })
   }
 

@@ -26,6 +26,7 @@ import { useSearchParams } from 'next/navigation'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
 import { initialVersion, fetchGitHubInfo } from '@/lib/store/sys'
+import { getAccessToken } from '@/lib/auth/msal'
 
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken } from '../store/auth'
@@ -87,8 +88,21 @@ const AuthProvider = ({ children }) => {
         dispatch(fetchGitHubInfo())
         goToMetalakeListPage()
       } else if (authType === 'oauth') {
-        if (token) {
-          dispatch(setAuthToken(token))
+        let tokenToUse = token
+
+        // Try to get token from MSAL if not present in localStorage
+        if (!tokenToUse) {
+          tokenToUse = await getAccessToken()
+          if (tokenToUse) {
+            console.info('[AuthProvider] Token obtained from MSAL')
+          } else {
+            console.warn('[AuthProvider] No token found in localStorage or MSAL')
+          }
+        } else {
+          console.info('[AuthProvider] Token obtained from localStorage')
+        }
+        if (tokenToUse) {
+          dispatch(setAuthToken(tokenToUse))
           dispatch(initialVersion())
           dispatch(fetchGitHubInfo())
           goToMetalakeListPage()

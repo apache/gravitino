@@ -58,6 +58,26 @@ public class ConfigServlet extends HttpServlet {
       for (ConfigEntry<?> key : oauthConfigEntries) {
         configs.put(key.getKey(), serverConfig.get(key));
       }
+      // Add provider-prefixed OAuth config entries
+      String provider = serverConfig.getRawString("gravitino.authenticator.oauth.provider");
+      configs.put("gravitino.authenticator.oauth.provider", provider);
+      if (provider != null) {
+        if (provider.equalsIgnoreCase("azure")) {
+          String[] azureKeys = {
+            "gravitino.authenticator.oauth.azure.client-id",
+            "gravitino.authenticator.oauth.azure.authority",
+            "gravitino.authenticator.oauth.azure.redirect-uri",
+            "gravitino.authenticator.oauth.azure.jwks-uri",
+            "gravitino.authenticator.oauth.azure.scope"
+          };
+          for (String key : azureKeys) {
+            String value = serverConfig.getRawString(key);
+            if (value != null) {
+              configs.put(key, value);
+            }
+          }
+        }
+      }
     }
 
     List<String> visibleConfigs = serverConfig.get(Configs.VISIBLE_CONFIGS);

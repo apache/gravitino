@@ -73,4 +73,48 @@ public interface OAuthConfig {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .create();
+
+  // Extensible OAuth provider configs
+  ConfigEntry<String> PROVIDER =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "provider")
+          .doc("The OAuth provider to use (e.g., azure)")
+          .version(ConfigConstants.VERSION_0_3_0)
+          .stringConf()
+          .create();
+
+  // Azure-specific configs
+  ConfigEntry<String> AZURE_CLIENT_ID =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "azure.client-id")
+          .doc("Azure OAuth client ID")
+          .version(ConfigConstants.VERSION_0_3_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> AZURE_AUTHORITY =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "azure.authority")
+          .doc("Azure OAuth authority URL")
+          .version(ConfigConstants.VERSION_0_3_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> AZURE_REDIRECT_URI =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "azure.redirect-uri")
+          .doc("Azure OAuth redirect URI")
+          .version(ConfigConstants.VERSION_0_3_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> AZURE_JWKS_URI =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "azure.jwks-uri")
+          .doc("Azure JWKS URI for token validation")
+          .version(ConfigConstants.VERSION_0_3_0)
+          .stringConf()
+          .create();
+
+  ConfigEntry<String> AZURE_SCOPE =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "azure.scope")
+          .doc("Azure OAuth scopes")
+          .version(ConfigConstants.VERSION_0_3_0)
+          .stringConf()
+          .create();
 }

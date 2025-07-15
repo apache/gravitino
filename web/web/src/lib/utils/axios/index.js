@@ -39,6 +39,7 @@ import { NextAxios } from './Axios'
 import { checkStatus } from './checkStatus'
 import { useAuth as Auth } from '../../provider/session'
 import { githubApis } from '@/lib/api/github'
+import { getAccessToken } from '@/lib/auth/msal'
 
 let isRefreshing = false
 
@@ -189,10 +190,9 @@ const transform = {
    * @param {CreateAxiosOptions} options
    * @returns {InternalAxiosRequestConfig}
    */
-  requestInterceptors: (config, options) => {
+  requestInterceptors: async (config, options) => {
     // ** Pre-Request Configuration Handling
-    const token = localStorage.getItem('accessToken')
-
+    const token = await getAccessToken()
     if (token && config?.requestOptions?.withToken !== false) {
       // ** jwt token
       config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
@@ -215,47 +215,75 @@ const transform = {
    * @returns {Promise<any>}
    */
   responseInterceptorsCatch: (axiosInstance, error) => {
-    const { response, code, message, config: originConfig } = error || {}
-    const errorMessageMode = originConfig?.requestOptions?.errorMessageMode || 'none'
-    const msg = response?.data?.error?.message ?? response?.data?.message ?? ''
-    const err = error?.toString?.() ?? ''
-    let errMessage = ''
+    // Destructure with optional chaining to avoid errors if error or its properties are undefined
+    const response = error?.response
+    const code = error?.code
+    const message = error?.message
+    const originConfig = error?.config
 
+    // Safe access to nested properties with fallbacks
+    const errorMessageMode = originConfig?.requestOptions?.errorMessageMode ?? 'none'
+    const msg = response?.data?.error?.message ?? response?.data?.message ?? ''
+    const err = error?.toString() ?? ''
+
+    // Log everything to understand what the error looks like
+    console.error('Axios error caught:', {
+      message,
+      code,
+      err,
+      responseData: response?.data,
+      status: response?.status,
+      originConfig,
+      url: originConfig?.url,
+      method: originConfig?.method,
+      error
+    })
+
+    // Early exit if axios request is cancelled
     if (axios.isCancel(error)) {
+      console.warn('Request cancelled:', error)
+
       return Promise.reject(error)
     }
 
     try {
-      if (code === 'ECONNABORTED' && message.indexOf('timeout') !== -1) {
-        errMessage = 'The interface request timed out, please refresh the page and try again!'
-      }
-      if (err?.includes('Network Error')) {
-        errMessage = 'Unable to connect to Gravitino. Please check if Gravitino is running.'
-      }
-
-      if (errMessage) {
+      if (code === 'ECONNABORTED' && message?.includes('timeout')) {
+        const timeoutMsg = 'The interface request timed out, please refresh the page and try again!'
         if (errorMessageMode === 'modal') {
-          console.log({ title: 'Error Tip', text: errMessage, icon: 'error' })
+          console.log({ title: 'Error Tip', text: timeoutMsg, icon: 'error' })
         } else if (errorMessageMode === 'message') {
-          toast.error(errMessage)
+          toast.error(timeoutMsg)
         }
 
         return Promise.reject(error)
       }
-    } catch (error) {
-      throw new Error(error)
+
+      if (err?.includes('Network Error')) {
+        const networkMsg = 'Unable to connect to Gravitino. Please check if Gravitino is running.'
+        if (errorMessageMode === 'modal') {
+          console.log({ title: 'Error Tip', text: networkMsg, icon: 'error' })
+        } else if (errorMessageMode === 'message') {
+          toast.error(networkMsg)
+        }
+
+        return Promise.reject(error)
+      }
+    } catch (catchError) {
+      console.error('Error in error handler:', catchError)
+      throw catchError
     }
 
-    checkStatus(error?.response?.status, msg, errorMessageMode)
+    checkStatus(response?.status, msg, errorMessageMode)
 
-    // Don't auto-refresh for certain endpoints that are expected to return 401
+    // Skip auto-refresh for some URLs
     const skipAutoRefreshUrls = ['/api/oauth/config', '/configs']
-    const shouldSkipAutoRefresh = skipAutoRefreshUrls.some(url => response?.config?.url?.includes(url))
+
+    const shouldSkipAutoRefresh = skipAutoRefreshUrls.some(url => originConfig?.url?.includes(url))
 
     if (
       response?.status === 401 &&
-      !originConfig._retry &&
-      response.config.url !== githubApis.GET &&
+      !originConfig?._retry &&
+      originConfig?.url !== githubApis.GET &&
       !shouldSkipAutoRefresh
     ) {
       // Log out directly if idle for more than 30 minutes
@@ -283,7 +311,7 @@ const transform = {
               resetToLoginState()
             })
         } catch (err) {
-          console.error(err)
+          console.error('Error refreshing token:', err)
         } finally {
           isRefreshing = false
 
@@ -296,8 +324,10 @@ const transform = {
     }
 
     const retryRequest = new AxiosRetry()
-    const { isOpenRetry } = originConfig.requestOptions.retryRequest
-    originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
+    const isOpenRetry = originConfig?.requestOptions?.retryRequest?.isOpenRetry
+    if (originConfig?.method?.toUpperCase() === RequestEnum.GET && isOpenRetry) {
+      retryRequest.retry(axiosInstance, error)
+    }
 
     return Promise.reject(error)
   }

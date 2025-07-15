@@ -183,6 +183,23 @@ authenticator:
     defaultSignKey: ""
     serverUri: ""
     tokenPath: /realms/myrealm/protocol/openid-connect/token
+    # Azure OAuth provider config template (uncomment and fill to enable)
+    # provider: azure
+    # azure:
+    #   clientId: "<azure_client_id>"  # Azure AD Application (client) ID
+    #   authority: "https://login.microsoftonline.com/<azure_tenant_id"  # Azure AD tenant-specific authority
+    #   redirectUri: "http://<gravitino_base_url>/ui/oauth/callback"  # Must be registered in Azure AD
+    #   jwksUri: "https://login.microsoftonline.com/<tenant_id>/discovery/v2.0/keys"  # Azure JWKS endpoint
+    #   scope: "openid profile email"  # Space-separated scopes
+
+    # Example Azure OAuth config for testing
+    provider: azure
+    azure:
+      clientId: "6e8e8cd2-75c6-480b-be71-c45227f622f2"
+      authority: "https://login.microsoftonline.com/00fc7e42-ad65-4c4c-ab54-848ba124a5b7"
+      redirectUri: "http://localhost:8090/ui/oauth/callback"
+      jwksUri: "https://login.microsoftonline.com/00fc7e42-ad65-4c4c-ab54-848ba124a5b7/discovery/v2.0/keys"
+      scope: "openid profile email"
 
 ## Audit log configuration
 ##

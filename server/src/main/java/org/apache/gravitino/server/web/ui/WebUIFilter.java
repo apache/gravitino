@@ -38,10 +38,7 @@ public class WebUIFilter implements Filter {
     String lastPathSegment = path.substring(path.lastIndexOf("/") + 1);
 
     // Allow public access to auth configuration endpoints and OAuth flow endpoints
-    if (path.equals("/configs")
-        || path.equals("/api/oauth/config")
-        || path.equals("/api/oauth/authorize")
-        || path.equals("/api/oauth/callback")) {
+    if (path.equals("/configs")) {
       // Continue processing without authentication for auth config and OAuth endpoints
       chain.doFilter(request, response);
       return;
