@@ -645,4 +645,66 @@ public abstract class JdbcTableOperations implements TableOperation {
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     return null;
   }
+
+  /** Get MySQL driver version from DatabaseMetaData */
+  protected String getMySQLDriverVersion() {
+    try {
+      if (dataSource != null) {
+        try (Connection connection = dataSource.getConnection()) {
+          return connection.getMetaData().getDriverVersion();
+        }
+      }
+    } catch (SQLException e) {
+      LOG.debug("Failed to get driver version", e);
+    }
+    return null;
+  }
+
+  /**
+   * Check if driver version supports accurate columnSize for precision calculation. For MySQL
+   * driver: Only versions >= 8.0.16 return accurate columnSize for datetime precision For other
+   * drivers (like OceanBase): Assume they support accurate precision calculation
+   */
+  public boolean isMySQLDriverVersionSupported(String driverVersion) {
+    if (driverVersion == null) {
+      return false;
+    }
+
+    // For non-MySQL drivers, assume they support accurate precision calculation
+    if (!driverVersion.startsWith("mysql-connector-java-")) {
+      LOG.debug(
+          "Non-MySQL driver detected: {}. Assuming it supports accurate precision calculation.",
+          driverVersion);
+      return true;
+    }
+
+    // Extract version from driver string like "mysql-connector-java-8.0.19 (Revision: ...)"
+    String versionPattern = "mysql-connector-java-(\\d+\\.\\d+\\.\\d+)";
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(versionPattern);
+    java.util.regex.Matcher matcher = pattern.matcher(driverVersion);
+
+    if (matcher.find()) {
+      String versionStr = matcher.group(1);
+      try {
+        String[] parts = versionStr.split("\\.");
+        int major = Integer.parseInt(parts[0]);
+        int minor = Integer.parseInt(parts[1]);
+        int patch = Integer.parseInt(parts[2]);
+
+        // Check if version >= 8.0.16
+        if (major > 8) {
+          return true;
+        } else if (major == 8 && minor > 0) {
+          return true;
+        } else {
+          return major == 8 && minor == 0 && patch >= 16;
+        }
+      } catch (NumberFormatException e) {
+        LOG.debug("Failed to parse driver version: {}", versionStr, e);
+        return false;
+      }
+    }
+
+    return false;
+  }
 }
