@@ -92,6 +92,9 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
+  @AuthorizationExpression(
+          expression = "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_SELECT_TABLE",
+          accessMetadataType = MetadataObject.Type.TABLE)
   public Response listTable(
       @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
