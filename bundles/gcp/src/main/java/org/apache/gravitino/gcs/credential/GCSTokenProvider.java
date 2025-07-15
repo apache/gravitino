@@ -26,10 +26,13 @@ import com.google.auth.oauth2.DownscopedCredentials;
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -261,12 +264,12 @@ public class GCSTokenProvider implements CredentialProvider {
     String gcsCredentialFilePath = gcsCredentialConfig.gcsCredentialFilePath();
     if (StringUtils.isBlank(gcsCredentialFilePath)) {
       return GoogleCredentials.getApplicationDefault();
-    } else {
-      File credentialsFile = new File(gcsCredentialFilePath);
-      if (!credentialsFile.exists()) {
-        throw new IOException("GCS credential file does not exist." + gcsCredentialFilePath);
-      }
-      return GoogleCredentials.fromStream(new FileInputStream(credentialsFile));
+    }
+    Path credentialsFilePath = Paths.get(gcsCredentialFilePath);
+    try (InputStream fileInputStream = Files.newInputStream(credentialsFilePath)) {
+      return GoogleCredentials.fromStream(fileInputStream);
+    } catch (NoSuchFileException e) {
+      throw new IOException("GCS credential file does not exist." + gcsCredentialFilePath, e);
     }
   }
 }
