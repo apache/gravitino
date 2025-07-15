@@ -18,6 +18,8 @@ DROP COLUMN
 )
 COMMENT ''
 WITH (
+   format = 'PARQUET',
+   format_version = '2',
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01'
 )"
 
@@ -29,6 +31,8 @@ RENAME COLUMN
 )
 COMMENT ''
 WITH (
+   format = 'PARQUET',
+   format_version = '2',
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01'
 )"
 
@@ -40,6 +44,8 @@ SET COLUMN TYPE
 )
 COMMENT ''
 WITH (
+   format = 'PARQUET',
+   format_version = '2',
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01'
 )"
 
@@ -51,6 +57,8 @@ COMMENT
 )
 COMMENT 'test table comments'
 WITH (
+   format = 'PARQUET',
+   format_version = '2',
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01'
 )"
 
@@ -62,6 +70,8 @@ COMMENT
 )
 COMMENT 'test table comments'
 WITH (
+   format = 'PARQUET',
+   format_version = '2',
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01'
 )"
 
@@ -74,6 +84,8 @@ ADD COLUMN
 )
 COMMENT 'test table comments'
 WITH (
+   format = 'PARQUET',
+   format_version = '2',
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_db2%/tb01'
 )"
 
