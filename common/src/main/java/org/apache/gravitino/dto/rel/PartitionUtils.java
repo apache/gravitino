@@ -38,7 +38,7 @@ public class PartitionUtils {
   public static void validateFieldExistence(ColumnDTO[] columns, String[] fieldName)
       throws IllegalArgumentException {
     Preconditions.checkArgument(ArrayUtils.isNotEmpty(columns), "columns cannot be null or empty");
-
+    Preconditions.checkArgument(fieldName != null && fieldName.length > 0 && fieldName[0] != null && !fieldName[0].trim().isEmpty(), "fieldName[0] cannot be null, empty or blank");
     List<ColumnDTO> partitionColumn =
         Arrays.stream(columns)
             // (TODO) Need to consider the case sensitivity issues.
