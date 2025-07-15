@@ -41,6 +41,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
@@ -48,6 +49,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDisp
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -90,6 +92,9 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "list-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-table", absolute = true)
+  @AuthorizationExpression(
+          expression = "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_SELECT_TABLE",
+          accessMetadataType = MetadataObject.Type.TABLE)
   public Response listTable(
       @PathParam("prefix") String prefix, @Encoded() @PathParam("namespace") String namespace) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
@@ -114,6 +119,12 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
@@ -150,6 +161,12 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "update-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateTable(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
@@ -186,6 +203,12 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
@@ -219,6 +242,12 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
@@ -258,6 +287,12 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "table-exits", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response tableExists(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
@@ -293,6 +328,12 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "report-table-metrics." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "report-table-metrics", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response reportTableMetrics(
       @PathParam("prefix") String prefix,
       @Encoded() @PathParam("namespace") String namespace,
