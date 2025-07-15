@@ -639,14 +639,18 @@ public abstract class JdbcTableOperations implements TableOperation {
    *
    * @param typeName the type name from database
    * @param columnSize the column size from database
-   * @param scale
+   * @param scale the scale from database
    * @return the precision of the time/datetime/timestamp type
    */
   public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
     return null;
   }
 
-  /** Get MySQL driver version from DatabaseMetaData */
+  /**
+   * Get MySQL driver version from DatabaseMetaData
+   *
+   * @return the driver version string, or null if not available
+   */
   protected String getMySQLDriverVersion() {
     try {
       if (dataSource != null) {
@@ -662,11 +666,14 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   /**
    * Check if driver version supports accurate columnSize for precision calculation. For MySQL
-   * driver: Only versions >= 8.0.16 return accurate columnSize for datetime precision For other
+   * driver: Only versions &gt;= 8.0.16 return accurate columnSize for datetime precision. For other
    * drivers (like OceanBase): Assume they support accurate precision calculation
+   *
+   * @param driverVersion the driver version string to check
+   * @return true if the driver version supports accurate precision calculation, false otherwise
    */
   public boolean isMySQLDriverVersionSupported(String driverVersion) {
-    if (driverVersion == null) {
+    if (StringUtils.isBlank(driverVersion)) {
       return false;
     }
 
