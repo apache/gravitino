@@ -68,7 +68,7 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
   }
 
   protected void putServiceAdmin() {
-    customConfigs.put(Configs.SERVICE_ADMINS.getKey(), String.join(",", USER));
+    customConfigs.put(Configs.SERVICE_ADMINS.getKey(), USER);
   }
 
   @AfterAll
