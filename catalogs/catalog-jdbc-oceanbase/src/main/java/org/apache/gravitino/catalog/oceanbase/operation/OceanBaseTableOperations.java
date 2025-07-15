@@ -299,9 +299,6 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
             "Unsupported table change type: " + change.getClass().getName());
       }
     }
-    if (!setProperties.isEmpty()) {
-      alterSql.add(generateTableProperties(setProperties));
-    }
 
     // Last modified comment
     if (null != updateComment) {
@@ -361,11 +358,11 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
-    if (deleteIndex.isIfExists()) {
-      if (Arrays.stream(lazyLoadTable.index())
-          .anyMatch(index -> index.name().equals(deleteIndex.getName()))) {
-        throw new IllegalArgumentException("Index does not exist");
-      }
+    if (!deleteIndex.isIfExists()) {
+      Preconditions.checkArgument(
+          Arrays.stream(lazyLoadTable.index())
+              .anyMatch(index -> index.name().equals(deleteIndex.getName())),
+          "Index does not exist");
     }
     return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
   }

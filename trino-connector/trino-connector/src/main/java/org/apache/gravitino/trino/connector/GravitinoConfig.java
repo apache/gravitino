@@ -119,6 +119,13 @@ public class GravitinoConfig {
           "10",
           false);
 
+  private static final ConfigEntry GRAVITINO_TRINO_SKIP_VERSION_VALIDATION =
+      new ConfigEntry(
+          "gravitino.trino.skip-version-validation",
+          "The property to specify whether skip Trino version validation or not. Note there may be compatiablity problem if true.",
+          "false",
+          false);
+
   /**
    * Constructs a new GravitinoConfig with the specified configuration.
    *
@@ -291,6 +298,18 @@ public class GravitinoConfig {
     return config.getOrDefault(
         GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND.key,
         GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND.defaultValue);
+  }
+
+  /**
+   * Whether skip Trino version validation or not.
+   *
+   * @return whether skip Trino version validation or not
+   */
+  public Boolean isSkipTrinoVersionValidation() {
+    return Boolean.parseBoolean(
+        config.getOrDefault(
+            GRAVITINO_TRINO_SKIP_VERSION_VALIDATION.key,
+            GRAVITINO_TRINO_SKIP_VERSION_VALIDATION.defaultValue));
   }
 
   static class ConfigEntry {
