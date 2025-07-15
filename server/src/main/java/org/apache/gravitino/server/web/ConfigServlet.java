@@ -29,6 +29,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.auth.ProviderType;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authentication.OAuthConfig;
@@ -45,6 +46,14 @@ public class ConfigServlet extends HttpServlet {
   private static final ImmutableSet<ConfigEntry<?>> basicConfigEntries =
       ImmutableSet.of(Configs.AUTHENTICATORS, Configs.ENABLE_AUTHORIZATION);
 
+  private static final ImmutableSet<ConfigEntry<?>> azureConfigEntries =
+      ImmutableSet.of(
+          OAuthConfig.AZURE_CLIENT_ID,
+          OAuthConfig.AZURE_AUTHORITY,
+          OAuthConfig.AZURE_REDIRECT_URI,
+          OAuthConfig.AZURE_JWKS_URI,
+          OAuthConfig.AZURE_SCOPE);
+
   private final Map<String, Object> configs = Maps.newHashMap();
 
   public ConfigServlet(ServerConfig serverConfig) {
@@ -57,6 +66,26 @@ public class ConfigServlet extends HttpServlet {
         .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
       for (ConfigEntry<?> key : oauthConfigEntries) {
         configs.put(key.getKey(), serverConfig.get(key));
+      }
+      // Add provider-prefixed OAuth config entries
+      String provider = serverConfig.getRawString(OAuthConfig.PROVIDER.getKey());
+      configs.put(OAuthConfig.PROVIDER.getKey(), provider);
+      if (provider != null) {
+        try {
+          ProviderType providerType = ProviderType.valueOf(provider.trim().toUpperCase());
+          switch (providerType) {
+            case AZURE:
+              for (ConfigEntry<?> key : azureConfigEntries) {
+                configs.put(key.getKey(), serverConfig.get(key));
+              }
+              break;
+              // Add more providers here as needed
+            default:
+              break;
+          }
+        } catch (IllegalArgumentException e) {
+          LOG.warn("Unknown provider type: {}", provider);
+        }
       }
     }
 
