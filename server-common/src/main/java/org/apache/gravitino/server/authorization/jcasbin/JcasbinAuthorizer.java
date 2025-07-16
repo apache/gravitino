@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -37,13 +40,12 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
 import org.casbin.jcasbin.model.Model;
 import org.slf4j.Logger;
@@ -56,6 +58,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer enforcer;
+
+  private final Set<String> serviceAdmins = ConcurrentHashMap.newKeySet();
 
   /**
    * loadedRoles is used to cache roles that have loaded permissions. When the permissions of a role
@@ -72,6 +76,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Model model = new Model();
       model.loadModelFromText(modelData);
       enforcer = new Enforcer(model, new GravitinoAdapter());
+      Config config = GravitinoEnv.getInstance().config();
+      if (config != null) {
+        serviceAdmins.addAll(config.get(Configs.SERVICE_ADMINS));
+      }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -89,6 +97,28 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
     return authorizeInternal(principal, metalake, metadataObject, AuthConstants.OWNER);
+  }
+
+  @Override
+  public boolean isServiceAdmin() {
+    return GravitinoEnv.getInstance()
+        .accessControlDispatcher()
+        .isServiceAdmin(PrincipalUtils.getCurrentUserName());
+  }
+
+  @Override
+  public boolean isMetalakeUser(String metalake) {
+    String currentUserName = PrincipalUtils.getCurrentUserName();
+    if (StringUtils.isBlank(currentUserName)) {
+      return false;
+    }
+    try {
+      return GravitinoEnv.getInstance().accessControlDispatcher().getUser(metalake, currentUserName)
+          != null;
+    } catch (Exception e) {
+      LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
+      return false;
+    }
   }
 
   @Override
@@ -121,21 +151,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
   }
 
-  private static Long getMetalakeId(String metalake) {
-    try {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      BaseMetalake metalakeEntity =
-          entityStore.get(
-              NameIdentifierUtil.ofMetalake(metalake),
-              Entity.EntityType.METALAKE,
-              BaseMetalake.class);
-      Long metalakeId = metalakeEntity.id();
-      return metalakeId;
-    } catch (Exception e) {
-      throw new RuntimeException("Can not get metalake id by entity store", e);
-    }
-  }
-
   private boolean authorizeByJcasbin(
       Long userId, MetadataObject metadataObject, Long metadataId, String privilege) {
     return enforcer.enforce(
@@ -147,10 +162,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private boolean loadPrivilegeAndAuthorize(
       String username, String metalake, MetadataObject metadataObject, String privilege) {
-    Long metalakeId = getMetalakeId(metalake);
-    Long userId = UserMetaService.getInstance().getUserIdByMetalakeIdAndName(metalakeId, username);
     Long metadataId;
+    Long userId;
     try {
+      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+      UserEntity userEntity =
+          entityStore.get(
+              NameIdentifierUtil.ofUser(metalake, username),
+              Entity.EntityType.USER,
+              UserEntity.class);
+      userId = userEntity.id();
       metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);

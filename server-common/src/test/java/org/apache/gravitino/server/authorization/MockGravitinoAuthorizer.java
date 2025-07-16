@@ -65,6 +65,11 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean isServiceAdmin() {
+    return false;
+  }
+
+  @Override
   public void handleRolePrivilegeChange(Long roleId) {}
 
   @Override
