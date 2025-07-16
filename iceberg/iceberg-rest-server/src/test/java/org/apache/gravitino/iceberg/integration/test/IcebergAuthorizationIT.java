@@ -58,7 +58,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 public class IcebergAuthorizationIT extends BaseIT {
 
   private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
-  protected static final String METALAKE_NAME = "test";
+  protected static final String METALAKE_NAME = "test_metalake";
   protected static final String CATALOG_NAME = "iceberg";
 
   protected static final String SUPER_USER = "super";

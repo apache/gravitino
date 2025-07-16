@@ -446,10 +446,16 @@ public class GravitinoEnv {
     auditLogManager.init(config, eventListenerManager);
   }
 
+  public void initEntityStore() {
+    if (entityStore == null) {
+      this.entityStore = EntityStoreFactory.createEntityStore(config);
+      entityStore.initialize(config);
+    }
+  }
+
   private void initGravitinoServerComponents() {
     // Initialize EntityStore
-    this.entityStore = EntityStoreFactory.createEntityStore(config);
-    entityStore.initialize(config);
+    initEntityStore();
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();

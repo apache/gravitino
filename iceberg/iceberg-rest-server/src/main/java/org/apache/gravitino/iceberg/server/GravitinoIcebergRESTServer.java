@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.server;
 
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.RESTService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
@@ -46,6 +47,9 @@ public class GravitinoIcebergRESTServer {
 
   private void initialize() {
     gravitinoEnv.initializeBaseComponents(serverConfig);
+    if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+      gravitinoEnv.initEntityStore();
+    }
     icebergRESTService.serviceInit(
         serverConfig.getConfigsWithPrefix(IcebergConfig.ICEBERG_CONFIG_PREFIX));
     ServerAuthenticator.getInstance().initialize(serverConfig);

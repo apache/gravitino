@@ -28,6 +28,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
+import org.apache.gravitino.iceberg.service.authorization.IcebergAuthorizationContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -41,7 +42,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
  */
 public class IcebergMetadataAuthorizationMethodInterceptor
     extends BaseMetadataAuthorizationMethodInterceptor {
-  private final String metalakeName = "test";
+  private final String metalakeName = IcebergAuthorizationContext.getInstance().metalakeName();
 
   @Override
   Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(

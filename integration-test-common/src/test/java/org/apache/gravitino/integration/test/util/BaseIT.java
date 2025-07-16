@@ -114,7 +114,6 @@ public class BaseIT {
 
   protected String originConfig;
   private Optional<String> entityStoreBackend;
-  private Optional<String> entityStoreBackendUri = Optional.empty();
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -277,7 +276,6 @@ public class BaseIT {
     if ("MySQL".equalsIgnoreCase(getEntityStoreBackend())) {
       // Start MySQL docker instance.
       String jdbcURL = startAndInitMySQLBackend();
-      entityStoreBackendUri = Optional.of(jdbcURL);
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
       customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, jdbcURL);
@@ -288,7 +286,6 @@ public class BaseIT {
     } else if ("PostgreSQL".equalsIgnoreCase(getEntityStoreBackend())) {
       // Start PostgreSQL docker instance.
       String pgJdbcUrl = startAndInitPGBackend();
-      entityStoreBackendUri = Optional.of(pgJdbcUrl);
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
       customConfigs.put(Configs.ENTITY_RELATIONAL_STORE_KEY, "JDBCBackend");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, pgJdbcUrl);
