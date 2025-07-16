@@ -77,6 +77,34 @@ export const providers = [
     ]
   },
   {
+    label: 'StarRocks',
+    value: 'jdbc-starrocks',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:9030'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
     label: 'Apache Hive',
     value: 'hive',
     defaultProps: [
