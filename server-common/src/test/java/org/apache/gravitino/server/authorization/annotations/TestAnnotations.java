@@ -99,7 +99,7 @@ public class TestAnnotations {
             .getParameters()[0];
     AuthorizationMetadata annotation = argument.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(annotation);
-    Assertions.assertEquals(MetadataObject.Type.TABLE, annotation.type());
+    Assertions.assertEquals(Entity.EntityType.TABLE, annotation.type());
   }
 
   @Test
@@ -113,12 +113,12 @@ public class TestAnnotations {
     AuthorizationMetadata metalakeAnnotation =
         argumentMetalake.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(metalakeAnnotation);
-    Assertions.assertEquals(MetadataObject.Type.METALAKE, metalakeAnnotation.type());
+    Assertions.assertEquals(Entity.EntityType.METALAKE, metalakeAnnotation.type());
 
     Parameter argumentCatalog = arguments[1];
     AuthorizationMetadata catalogAnnotation =
         argumentCatalog.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(catalogAnnotation);
-    Assertions.assertEquals(MetadataObject.Type.CATALOG, catalogAnnotation.type());
+    Assertions.assertEquals(Entity.EntityType.CATALOG, catalogAnnotation.type());
   }
 }
