@@ -68,7 +68,7 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(1)
   public void testCreateMetalake() {
     assertThrows(
-        "Current user can not create metalake.",
+        "Only service admins can create metalakes, current user can't create the metalake,  you should configure it in the server configuration first",
         RuntimeException.class,
         () -> {
           normalUserClient.createMetalake("testMetalake2", "", new HashMap<>());
@@ -88,6 +88,9 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
     serviceAdminClient.loadMetalake("testMetalake2").addUser(SERVICE_ADMIN_BUT_NOT_OWNER);
     assertMetalakeEquals(
         new String[] {METALAKE, "testMetalake2"}, serviceAdminButNotOwnerClient.listMetalakes());
+    GravitinoAdminClient tempClient =
+        GravitinoAdminClient.builder(serverUri).withSimpleAuth("tempUse").build();
+    assertMetalakeEquals(new String[] {}, tempClient.listMetalakes());
   }
 
   @Test

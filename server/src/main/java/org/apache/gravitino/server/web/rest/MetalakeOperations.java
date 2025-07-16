@@ -126,7 +126,9 @@ public class MetalakeOperations {
   @ResponseMetered(name = "create-metalake", absolute = true)
   @AuthorizationExpression(
       expression = "SERVICE_ADMIN",
-      errorMessage = "Current user can not create metalake.")
+      errorMessage =
+          "Only service admins can create metalakes, current user can't create the metalake,"
+              + "  you should configure it in the server configuration first")
   public Response createMetalake(MetalakeCreateRequest request) {
     LOG.info("Received create metalake request for {}", request.getName());
     try {

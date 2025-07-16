@@ -23,8 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -61,7 +59,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer enforcer;
 
-  private final Set<String> serviceAdmins = Collections.synchronizedSet(new HashSet<>());
+  private final Set<String> serviceAdmins = ConcurrentHashMap.newKeySet();
 
   /**
    * loadedRoles is used to cache roles that have loaded permissions. When the permissions of a role
