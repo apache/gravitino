@@ -403,6 +403,8 @@ public class GravitinoEnv {
         entityStore.close();
       } catch (Exception e) {
         LOG.warn("Failed to close EntityStore.", e);
+      } finally {
+        entityStore = null;
       }
     }
 

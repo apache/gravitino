@@ -113,7 +113,7 @@ public class BaseIT {
   protected String serverUri;
 
   protected String originConfig;
-  private Optional<String> entityStoreBackend;
+  private Optional<String> entityStoreBackend = Optional.empty();
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
