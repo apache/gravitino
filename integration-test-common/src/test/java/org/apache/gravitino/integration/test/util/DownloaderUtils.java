@@ -92,9 +92,11 @@ public class DownloaderUtils {
     String expectedVersion = extractVersion(expectedFileName);
     String driverType = getDriverType(expectedFileName);
 
-    // expectedVersion and driverType can be null when the driver type is not currently supported 
+    // expectedVersion and driverType can be null when the driver type is not currently supported
     if (expectedVersion == null || driverType == null) {
-      LOG.warn("Unable to extract driver version or type from URL: {}. Only mysql and postgresql drivers are currently supported.", targetUrl);
+      LOG.warn(
+          "Unable to extract driver version or type from URL: {}. Only mysql and postgresql drivers are currently supported.",
+          targetUrl);
       return;
     }
 
