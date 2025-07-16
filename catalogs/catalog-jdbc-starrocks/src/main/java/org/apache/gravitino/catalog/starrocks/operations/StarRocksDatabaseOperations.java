@@ -19,29 +19,118 @@
 package org.apache.gravitino.catalog.starrocks.operations;
 
 import com.google.common.collect.ImmutableSet;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.NotImplementedException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import org.apache.gravitino.catalog.starrocks.utils.StarRocksUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.meta.AuditInfo;
 
 /** Database operations for StarRocks. */
 public class StarRocksDatabaseOperations extends JdbcDatabaseOperations {
+  public static final String COMMENT_KEY = "comment";
+
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
-    throw new NotImplementedException("To be implemented in the future");
+    StringBuilder sqlBuilder = new StringBuilder();
+
+    // Append database name
+    sqlBuilder.append(String.format("CREATE DATABASE `%s`", databaseName));
+
+    // Doris does not support setting schema comment, put comment in properties
+    Map<String, String> newProperties = new HashMap<>(properties);
+    newProperties.put(COMMENT_KEY, comment);
+
+    // Append properties
+    sqlBuilder.append(StarRocksUtils.generatePropertiesSql(newProperties));
+
+    String result = sqlBuilder.toString();
+    LOG.info("Generated create database:{} sql: {}", databaseName, result);
+    return result;
   }
 
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
-    throw new NotImplementedException("To be implemented in the future");
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder.append(String.format("DROP DATABASE `%s`", databaseName));
+    if (cascade) {
+      sqlBuilder.append(" FORCE");
+      return sqlBuilder.toString();
+    }
+
+    // Execute the query and check if there exists any tables in the database
+    String query = String.format("SHOW TABLES IN `%s`", databaseName);
+
+    try (final Connection connection = this.dataSource.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(query)) {
+      if (resultSet.next()) {
+        throw new IllegalStateException(
+            String.format(
+                "Database %s is not empty, the value of cascade should be true.", databaseName));
+      }
+    } catch (SQLException sqlException) {
+      throw this.exceptionMapper.toGravitinoException(sqlException);
+    }
+
+    return sqlBuilder.toString();
   }
 
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
-    throw new NotImplementedException("To be implemented in the future");
+    List<String> allDatabases = listDatabases();
+    String dbName =
+        allDatabases.stream()
+            .filter(db -> db.equals(databaseName))
+            .findFirst()
+            .orElseThrow(
+                () -> new NoSuchSchemaException("Database %s could not be found", databaseName));
+
+    Map<String, String> properties = getDatabaseProperties(databaseName);
+
+    // extract comment from properties
+    String comment = properties.remove(COMMENT_KEY);
+
+    return JdbcSchema.builder()
+        .withName(dbName)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
+
+  protected Map<String, String> getDatabaseProperties(String databaseName) {
+
+    String showCreateDatabaseSql = String.format("SHOW CREATE DATABASE `%s`", databaseName);
+    StringBuilder createDatabaseSb = new StringBuilder();
+    try (final Connection connection = this.dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(showCreateDatabaseSql);
+        ResultSet resultSet = statement.executeQuery()) {
+      while (resultSet.next()) {
+        createDatabaseSb.append(resultSet.getString("Create Database"));
+      }
+    } catch (SQLException sqlException) {
+      throw this.exceptionMapper.toGravitinoException(sqlException);
+    }
+
+    String createDatabaseSql = createDatabaseSb.toString();
+
+    if (StringUtils.isEmpty(createDatabaseSql)) {
+      throw new NoSuchTableException("Database %s does not exist.", databaseName);
+    }
+
+    return StarRocksUtils.extractPropertiesFromSql(createDatabaseSql);
   }
 
   @Override

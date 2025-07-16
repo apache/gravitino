@@ -19,15 +19,37 @@
 
 package org.apache.gravitino.catalog.starrocks;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcTablePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class StarRocksTablePropertiesMeta extends JdbcTablePropertiesMetadata {
 
+  public static final String REPLICATION_FACTOR = "replication_num";
+  public static final int DEFAULT_REPLICATION_FACTOR = 1;
+  public static final int DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE = 3;
+
+  private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
+
+  static {
+    List<PropertyEntry<?>> propertyEntries =
+        ImmutableList.of(
+            PropertyEntry.integerOptionalPropertyEntry(
+                REPLICATION_FACTOR,
+                "The number of replications for the table. If not specified and the number of backend server less than 3,"
+                    + " the default value will be used",
+                false /* immutable */,
+                DEFAULT_REPLICATION_FACTOR, /* default value */
+                false /* hidden */));
+
+    PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
+  }
+
   @Override
   protected Map<String, PropertyEntry<?>> specificPropertyEntries() {
-    return ImmutableMap.of();
+    return PROPERTIES_METADATA;
   }
 }

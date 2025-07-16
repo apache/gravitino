@@ -49,6 +49,34 @@ export const messagingProviders = [
 
 export const providers = [
   {
+    label: 'StarRocks',
+    value: 'jdbc-starrocks',
+    defaultProps: [
+      {
+        key: 'jdbc-driver',
+        value: '',
+        required: true,
+        description: 'e.g. com.mysql.jdbc.Driver'
+      },
+      {
+        key: 'jdbc-url',
+        value: '',
+        required: true,
+        description: 'e.g. jdbc:mysql://localhost:9030'
+      },
+      {
+        key: 'jdbc-user',
+        value: '',
+        required: true
+      },
+      {
+        key: 'jdbc-password',
+        value: '',
+        required: true
+      }
+    ]
+  },
+  {
     label: 'Apache Doris',
     value: 'jdbc-doris',
     defaultProps: [
@@ -532,6 +560,20 @@ const relationalColumnTypeMap = {
     'timestamp_tz',
     'varchar'
   ],
+  'jdbc-starrocks': [
+    'boolean',
+    'char',
+    'date',
+    'decimal',
+    'double',
+    'float',
+    'integer',
+    'long',
+    'short',
+    'string',
+    'timestamp',
+    'varchar'
+  ],
   'jdbc-doris': [
     'boolean',
     'byte',
@@ -609,6 +651,11 @@ const relationalTablePropInfoMap = {
       'serde.parameter',
       'table-type'
     ],
+    allowDelete: true,
+    allowAdd: true
+  },
+  'jdbc-starrocks': {
+    reserved: [],
     allowDelete: true,
     allowAdd: true
   },
