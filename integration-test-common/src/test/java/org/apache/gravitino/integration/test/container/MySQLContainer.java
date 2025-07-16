@@ -132,13 +132,31 @@ public class MySQLContainer extends BaseContainer {
             DriverManager.getConnection(mySQLJdbcUrl, USER_NAME, getPassword());
         Statement statement = connection.createStatement()) {
 
-      String query = String.format("CREATE DATABASE IF NOT EXISTS %s;", testDatabaseName);
+      // validate database name to ensure it only contains safe characters
+      String databaseName = testDatabaseName.toString();
+      if (!isValidDatabaseName(databaseName)) {
+        throw new IllegalArgumentException("Invalid database name: " + databaseName);
+      }
+
+      String query = String.format("CREATE DATABASE IF NOT EXISTS `%s`;", databaseName);
       // FIXME: String, which is used in SQL, can be unsafe
       statement.execute(query);
       LOG.info(String.format("MySQL container database %s has been created", testDatabaseName));
     } catch (Exception e) {
       throw new RuntimeException("Failed to create database", e);
     }
+  }
+
+  private boolean isValidDatabaseName(String databaseName) {
+    if (databaseName == null || databaseName.isEmpty()) {
+      return false;
+    }
+
+    if (databaseName.length() > 64) {
+      return false;
+    }
+
+    return databaseName.matches("^[a-zA-Z0-9_$]+$");
   }
 
   public String getUsername() {

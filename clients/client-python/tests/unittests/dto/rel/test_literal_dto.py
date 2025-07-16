@@ -23,7 +23,12 @@ from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 
 class TestLiteralDTO(unittest.TestCase):
     def setUp(self):
-        self._literal_dto = LiteralDTO(data_type=Types.IntegerType.get(), value="-1")
+        self._literal_dto = (
+            LiteralDTO.builder()
+            .with_data_type(data_type=Types.IntegerType.get())
+            .with_value(value="-1")
+            .build()
+        )
 
     def test_literal_dto(self):
         self.assertEqual(self._literal_dto.value(), "-1")
@@ -35,14 +40,31 @@ class TestLiteralDTO(unittest.TestCase):
 
     def test_literal_dto_null(self):
         self.assertEqual(
-            LiteralDTO.NULL, LiteralDTO(data_type=Types.NullType.get(), value="NULL")
+            LiteralDTO.NULL,
+            LiteralDTO.builder()
+            .with_data_type(data_type=Types.NullType.get())
+            .with_value(value="NULL")
+            .build(),
         )
 
     def test_literal_dto_hash(self):
-        second_literal_dto: LiteralDTO = LiteralDTO(
-            data_type=Types.IntegerType.get(), value="2"
+        second_literal_dto: LiteralDTO = (
+            LiteralDTO.builder()
+            .with_data_type(data_type=Types.IntegerType.get())
+            .with_value(value="2")
+            .build()
         )
         literal_dto_dict = {self._literal_dto: "test1", second_literal_dto: "test2"}
 
         self.assertEqual("test1", literal_dto_dict.get(self._literal_dto))
         self.assertNotEqual("test2", literal_dto_dict.get(self._literal_dto))
+
+    def test_builder(self):
+        dto = (
+            LiteralDTO.Builder()
+            .with_value("-1")
+            .with_data_type(Types.IntegerType.get())
+            .build()
+        )
+        self.assertIsInstance(dto, LiteralDTO)
+        self.assertTrue(dto == self._literal_dto)

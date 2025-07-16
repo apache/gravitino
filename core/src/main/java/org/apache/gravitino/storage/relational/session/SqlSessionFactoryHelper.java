@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.session;
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.ServiceLoader;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.pool2.impl.BaseObjectPoolConfig;
 import org.apache.gravitino.Config;
@@ -30,26 +31,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.RelationDatasourceMetricsSource;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
-import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
-import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
-import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
-import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
-import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -82,9 +65,12 @@ public class SqlSessionFactoryHelper {
     // Initialize the data source
     BasicDataSource dataSource = new BasicDataSource();
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    String driverClass = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
+    JdbcUrlUtils.validateJdbcConfig(jdbcUrl, driverClass, config.getAllConfig());
+
     JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
     dataSource.setUrl(jdbcUrl);
-    dataSource.setDriverClassName(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER));
+    dataSource.setDriverClassName(driverClass);
     dataSource.setUsername(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER));
     dataSource.setPassword(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD));
     // Close the auto commit, so that we can control the transaction manual commit
@@ -119,26 +105,10 @@ public class SqlSessionFactoryHelper {
     // Initialize the configuration
     Configuration configuration = new Configuration(environment);
     configuration.setDatabaseId(jdbcType.name().toLowerCase());
-    configuration.addMapper(MetalakeMetaMapper.class);
-    configuration.addMapper(CatalogMetaMapper.class);
-    configuration.addMapper(SchemaMetaMapper.class);
-    configuration.addMapper(TableMetaMapper.class);
-    configuration.addMapper(TableColumnMapper.class);
-    configuration.addMapper(FilesetMetaMapper.class);
-    configuration.addMapper(FilesetVersionMapper.class);
-    configuration.addMapper(TopicMetaMapper.class);
-    configuration.addMapper(UserMetaMapper.class);
-    configuration.addMapper(RoleMetaMapper.class);
-    configuration.addMapper(UserRoleRelMapper.class);
-    configuration.addMapper(GroupMetaMapper.class);
-    configuration.addMapper(GroupRoleRelMapper.class);
-    configuration.addMapper(SecurableObjectMapper.class);
-    configuration.addMapper(TagMetaMapper.class);
-    configuration.addMapper(TagMetadataObjectRelMapper.class);
-    configuration.addMapper(OwnerMetaMapper.class);
-    configuration.addMapper(ModelMetaMapper.class);
-    configuration.addMapper(ModelVersionMetaMapper.class);
-    configuration.addMapper(ModelVersionAliasRelMapper.class);
+    ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
+    for (MapperPackageProvider provider : loader) {
+      configuration.addMappers(provider.getPackageName());
+    }
 
     // Create the SqlSessionFactory object, it is a singleton object
     if (sqlSessionFactory == null) {

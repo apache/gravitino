@@ -26,6 +26,7 @@ import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 
 /**
  * Utility class for creating a {@link DataSource} from a {@link JdbcConfig}. It is mainly
@@ -51,6 +52,8 @@ public class DataSourceUtils {
   }
 
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
+    JdbcUrlUtils.validateJdbcConfig(
+        jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
     String jdbcUrl = jdbcConfig.getJdbcUrl();
@@ -74,6 +77,23 @@ public class DataSourceUtils {
     Properties properties = new Properties();
     properties.putAll(jdbcConfig.getAllConfig());
     return properties;
+  }
+
+  private static String recursiveDecode(String url) {
+    String prev;
+    String decoded = url;
+    int max = 5;
+
+    do {
+      prev = decoded;
+      try {
+        decoded = java.net.URLDecoder.decode(prev, "UTF-8");
+      } catch (Exception e) {
+        throw new GravitinoRuntimeException("Unable to decode JDBC URL");
+      }
+    } while (!prev.equals(decoded) && --max > 0);
+
+    return decoded;
   }
 
   public static void closeDataSource(DataSource dataSource) {

@@ -137,6 +137,28 @@ catalog:
   ##
   cacheEvictionIntervalMs: 3600000
 
+## THE CONFIGURATION FOR Gravitino ENTITY CACHE
+##
+cache:
+  ## Enable/disable the entity cache
+  ##
+  enabled: true
+  ## Max number of cache entries
+  ##
+  maxEntries: 10000
+  ## TTL for cache entries in ms
+  ##
+  expireTimeInMs: 3600000
+  ## Enable cache hit/miss stats logging
+  ##
+  enableStats: false
+  ## Use weight-based eviction
+  ##
+  enableWeigher: true
+  ## Cache backend implementation
+  ##
+  implementation: caffeine
+
 ## THE CONFIGURATION FOR authorization
 ##
 authorization:

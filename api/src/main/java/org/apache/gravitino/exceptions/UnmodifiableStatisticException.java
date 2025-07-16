@@ -21,9 +21,8 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** An exception thrown when a policy is invalid. */
-public class IllegalPolicyException extends IllegalArgumentException {
-
+/** An exception thrown when users modify an unmodifiable statistic */
+public class UnmodifiableStatisticException extends GravitinoRuntimeException {
   /**
    * Constructs a new exception with the specified detail message.
    *
@@ -31,7 +30,20 @@ public class IllegalPolicyException extends IllegalArgumentException {
    * @param args the arguments to the message.
    */
   @FormatMethod
-  public IllegalPolicyException(@FormatString String message, Object... args) {
-    super(String.format(message, args));
+  public UnmodifiableStatisticException(@FormatString String message, Object... args) {
+    super(message, args);
+  }
+
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause the cause.
+   * @param message the detail message.
+   * @param args the arguments to the message.
+   */
+  @FormatMethod
+  public UnmodifiableStatisticException(
+      Throwable cause, @FormatString String message, Object... args) {
+    super(cause, message, args);
   }
 }

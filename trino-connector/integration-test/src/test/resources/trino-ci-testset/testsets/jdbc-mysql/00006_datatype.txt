@@ -20,7 +20,8 @@ CREATE TABLE
    f13 date,
    f14 time(0),
    f15 timestamp(0),
-   f16 timestamp(0) with time zone
+   f16 timestamp(0) with time zone,
+   f17 json
 )
 COMMENT ''
 WITH (
@@ -31,8 +32,8 @@ INSERT: 1 row
 
 INSERT: 1 row
 
-"Sample text 1","Text1               ","65","123.456","7.89","12.34","false","1","100","1000","1000","100000","2024-01-01","08:00:00","2024-01-01 08:00:00","2024-01-01 08:00:00 UTC"
-"","","","","","","","","","","","","","","",""
+"Sample text 1","Text1               ","65","123.456","7.89","12.34","false","1","100","1000","1000","100000","2024-01-01","08:00:00","2024-01-01 08:00:00","2024-01-01 08:00:00 UTC","{""x"":300,""y"":""AFRICA"",""z"":null}"
+"","","","","","","","","","","","","","","","",""
 
 CREATE TABLE
 
@@ -52,7 +53,8 @@ CREATE TABLE
    f13 date NOT NULL,
    f14 time(0) NOT NULL,
    f15 timestamp(0) NOT NULL,
-   f16 timestamp(0) with time zone NOT NULL
+   f16 timestamp(0) with time zone NOT NULL,
+   f17 json NOT NULL
 )
 COMMENT ''
 WITH (

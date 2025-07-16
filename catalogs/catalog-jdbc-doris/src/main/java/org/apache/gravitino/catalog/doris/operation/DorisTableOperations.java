@@ -774,7 +774,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
-    if (deleteIndex.isIfExists()) {
+    if (!deleteIndex.isIfExists()) {
       Preconditions.checkArgument(
           Arrays.stream(lazyLoadTable.index())
               .anyMatch(index -> index.name().equals(deleteIndex.getName())),

@@ -160,7 +160,7 @@ public class RESTUtils {
 
     Random random = new Random();
     final int maxRetry = 200;
-    for (int i = portRangeStart; i <= portRangeEnd || i < portRangeStart + maxRetry; ++i) {
+    for (int i = portRangeStart; i <= portRangeEnd && i < portRangeStart + maxRetry; ++i) {
       int randomNumber = random.nextInt(portRangeEnd - portRangeStart + 1) + portRangeStart;
       try (ServerSocket socket = new ServerSocket(randomNumber)) {
         return socket.getLocalPort();

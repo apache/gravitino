@@ -19,9 +19,11 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 
 /**
@@ -72,8 +74,16 @@ public class Namespace {
    * @return A namespace with the given levels
    */
   public static Namespace fromString(String namespace) {
-    // todo: escape the dots in the levels if needed
-    return new Namespace(namespace.split("\\."));
+    Preconditions.checkArgument(namespace != null, "Cannot create a namespace with null input");
+    Preconditions.checkArgument(!namespace.endsWith("."), "Cannot create a namespace end with dot");
+    Preconditions.checkArgument(
+        !namespace.startsWith("."), "Cannot create a namespace starting with a dot");
+    Preconditions.checkArgument(
+        !namespace.contains(".."), "Cannot create a namespace with an empty level");
+    if (StringUtils.isBlank(namespace)) {
+      return empty();
+    }
+    return Namespace.of(namespace.split("\\."));
   }
 
   private Namespace(String[] levels) {
