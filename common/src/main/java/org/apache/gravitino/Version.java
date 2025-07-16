@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 import org.apache.gravitino.dto.VersionDTO;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -33,10 +34,16 @@ public class Version {
 
   private Version() {
     Properties projectProperties = new Properties();
-    try {
+    try (InputStream inputStream =
+        Version.class.getClassLoader().getResourceAsStream("gravitino-build-info.properties")) {
+      if (inputStream == null) {
+        throw new GravitinoRuntimeException(
+            new IOException("Resource gravitino-build-info.properties not found"),
+            "Failed to get Gravitino version: Build info properties file is missing.");
+      }
+
       VersionInfo currentVersionInfo = new VersionInfo();
-      projectProperties.load(
-          Version.class.getClassLoader().getResourceAsStream("gravitino-build-info.properties"));
+      projectProperties.load(inputStream);
       currentVersionInfo.version = projectProperties.getProperty("project.version");
       currentVersionInfo.compileDate = projectProperties.getProperty("compile.date");
       currentVersionInfo.gitCommit = projectProperties.getProperty("git.commit.id");
