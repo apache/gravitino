@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -124,7 +125,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isSelf(String metalake, Entity.EntityType type, NameIdentifier nameIdentifier) {
+  public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+    String metalake = nameIdentifier.namespace().level(0);
     String currentUserName = PrincipalUtils.getCurrentUserName();
     if (Entity.EntityType.USER == type) {
       return Objects.equals(nameIdentifier.name(), currentUserName);
@@ -150,6 +152,27 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
     }
     throw new UnsupportedOperationException("Unsupported Entity Type.");
+  }
+
+  @Override
+  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject metalakeObject =
+        MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
+    // metalake owner can set owner in metalake.
+    if (isOwner(currentPrincipal, metalake, metalakeObject)) {
+      return true;
+    }
+    MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type.toUpperCase());
+    MetadataObject metadataObject =
+        MetadataObjects.of(Arrays.asList(fullName.split("\\.")), metadataType);
+    do {
+      if (isOwner(currentPrincipal, metalake, metadataObject)) {
+        return true;
+      }
+      // metadata parent owner can set owner.
+    } while ((metadataObject = MetadataObjects.parent(metadataObject)) != null);
+    return false;
   }
 
   @Override
