@@ -21,6 +21,7 @@ package org.apache.gravitino.server.authorization.annotations;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
