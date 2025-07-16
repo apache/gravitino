@@ -1603,12 +1603,18 @@ public class POConverters {
   }
 
   public static List<StatisticPO> initializeStatisticPOs(
-      List<StatisticEntity> statisticEntities, StatisticPO.Builder builder) {
+      List<StatisticEntity> statisticEntities,
+      Long metalakeId,
+      Long objectId,
+      MetadataObject.Type objectType) {
     return statisticEntities.stream()
         .map(
             statisticEntity -> {
               try {
-                return builder
+                return StatisticPO.builder()
+                    .withMetalakeId(metalakeId)
+                    .withMetadataObjectId(objectId)
+                    .withMetadataObjectType(objectType.name())
                     .withStatisticId(statisticEntity.id())
                     .withStatisticName(statisticEntity.name())
                     .withStatisticValue(

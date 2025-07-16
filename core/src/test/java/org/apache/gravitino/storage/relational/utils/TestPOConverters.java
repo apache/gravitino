@@ -1229,11 +1229,9 @@ public class TestPOConverters {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build())
             .build());
-    StatisticPO.Builder builder = StatisticPO.builder();
-    builder.withMetadataObjectType(MetadataObject.Type.CATALOG.name()).withMetadataObjectId(1L);
-    builder.withMetalakeId(1L);
+
     List<StatisticPO> statisticPOs =
-        POConverters.initializeStatisticPOs(statisticEntities, builder);
+        POConverters.initializeStatisticPOs(statisticEntities, 1L, 1L, MetadataObject.Type.CATALOG);
 
     assertEquals(1, statisticPOs.get(0).getCurrentVersion());
     assertEquals(1, statisticPOs.get(0).getLastVersion());
