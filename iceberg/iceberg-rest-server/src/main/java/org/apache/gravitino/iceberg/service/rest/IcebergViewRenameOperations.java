@@ -31,10 +31,12 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,9 +68,18 @@ public class IcebergViewRenameOperations {
         catalogName,
         renameViewRequest.source(),
         renameViewRequest.destination());
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    viewOperationDispatcher.renameView(context, renameViewRequest);
-    return IcebergRestUtils.noContent();
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            viewOperationDispatcher.renameView(context, renameViewRequest);
+            return IcebergRestUtils.noContent();
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   // HTTP request is null in Jersey test, override with a mock request when testing.
