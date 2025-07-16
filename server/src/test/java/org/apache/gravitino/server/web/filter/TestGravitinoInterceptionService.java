@@ -114,6 +114,11 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
+    public boolean isServiceAdmin() {
+      return false;
+    }
+
+    @Override
     public void handleRolePrivilegeChange(Long roleId) {}
 
     @Override

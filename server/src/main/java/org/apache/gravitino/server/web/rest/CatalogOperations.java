@@ -103,23 +103,24 @@ public class CatalogOperations {
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             if (verbose) {
               Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
-              Arrays.stream(catalogs)
-                  .filter(
-                      catalog -> {
-                        NameIdentifier[] nameIdentifiers =
-                            new NameIdentifier[] {
-                              NameIdentifierUtil.ofCatalog(metalake, catalog.name())
-                            };
-                        return MetadataFilterHelper.filterByExpression(
-                                    metalake,
-                                    loadCatalogAuthorizationExpression,
-                                    Entity.EntityType.CATALOG,
-                                    nameIdentifiers)
-                                .length
-                            > 0;
-                      })
-                  .collect(Collectors.toList())
-                  .toArray(new Catalog[0]);
+              catalogs =
+                  Arrays.stream(catalogs)
+                      .filter(
+                          catalog -> {
+                            NameIdentifier[] nameIdentifiers =
+                                new NameIdentifier[] {
+                                  NameIdentifierUtil.ofCatalog(metalake, catalog.name())
+                                };
+                            return MetadataFilterHelper.filterByExpression(
+                                        metalake,
+                                        loadCatalogAuthorizationExpression,
+                                        Entity.EntityType.CATALOG,
+                                        nameIdentifiers)
+                                    .length
+                                > 0;
+                          })
+                      .collect(Collectors.toList())
+                      .toArray(new Catalog[0]);
               Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
               LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
               return response;

@@ -19,6 +19,7 @@ package org.apache.gravitino.server.authorization.expression;
 
 import java.security.Principal;
 import java.util.Map;
+import java.util.Optional;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
@@ -67,7 +68,8 @@ public class AuthorizationExpressionEvaluator {
           ognlContext.put(metadataType.name(), metadataObject);
         });
     NameIdentifier nameIdentifier = metadataNames.get(Entity.EntityType.METALAKE);
-    ognlContext.put("METALAKE_NAME", nameIdentifier.name());
+    ognlContext.put(
+        "METALAKE_NAME", Optional.ofNullable(nameIdentifier).map(NameIdentifier::name).orElse(""));
     try {
       Object value = Ognl.getValue(ognlAuthorizationExpression, ognlContext);
       return (boolean) value;

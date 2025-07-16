@@ -96,6 +96,22 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
+  @Order(2)
+  public void testListCatalogInfo() {
+    Catalog[] catalogs = normalUserClient.loadMetalake(METALAKE).listCatalogsInfo();
+    assertCatalogEquals(new String[] {}, catalogs);
+    catalogs = client.loadMetalake(METALAKE).listCatalogsInfo();
+    assertCatalogEquals(new String[] {catalog1, catalog2}, catalogs);
+  }
+
+  private void assertCatalogEquals(String[] expectCatalogs, Catalog[] actualCatalogs) {
+    assertEquals(expectCatalogs.length, actualCatalogs.length);
+    for (int i = 0; i < expectCatalogs.length; i++) {
+      assertEquals(expectCatalogs[i], actualCatalogs[i].name());
+    }
+  }
+
+  @Test
   @Order(3)
   public void testDeleteCatalog() {
     String[] catalogs = client.loadMetalake(METALAKE).listCatalogs();
