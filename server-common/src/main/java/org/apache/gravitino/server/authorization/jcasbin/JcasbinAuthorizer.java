@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.IOUtils;
@@ -34,6 +35,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
@@ -122,6 +124,35 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean isSelf(String metalake, Entity.EntityType type, NameIdentifier nameIdentifier) {
+    String currentUserName = PrincipalUtils.getCurrentUserName();
+    if (Entity.EntityType.USER == type) {
+      return Objects.equals(nameIdentifier.name(), currentUserName);
+    } else if (Entity.EntityType.ROLE == type) {
+      try {
+        Long roleId =
+            MetadataIdConverter.getID(
+                MetadataObjects.of(
+                    String.join(
+                        ".",
+                        nameIdentifier.namespace().level(1),
+                        nameIdentifier.namespace().level(2)),
+                    nameIdentifier.name(),
+                    MetadataObject.Type.ROLE),
+                metalake);
+        UserEntity userEntity = getUserEntity(currentUserName, metalake);
+        Long userId = userEntity.id();
+        loadRolePrivilege(metalake, currentUserName, userId);
+        return enforcer.hasRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      } catch (Exception e) {
+        LOG.warn("can not get user id or role id.", e);
+        return false;
+      }
+    }
+    throw new UnsupportedOperationException("Unsupported Entity Type.");
+  }
+
+  @Override
   public void handleRolePrivilegeChange(Long roleId) {
     loadedRoles.remove(roleId);
     enforcer.deleteRole(String.valueOf(roleId));
@@ -165,12 +196,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     Long metadataId;
     Long userId;
     try {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      UserEntity userEntity =
-          entityStore.get(
-              NameIdentifierUtil.ofUser(metalake, username),
-              Entity.EntityType.USER,
-              UserEntity.class);
+      UserEntity userEntity = getUserEntity(username, metalake);
       userId = userEntity.id();
       metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     } catch (Exception e) {
@@ -181,6 +207,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
   }
 
+  private static UserEntity getUserEntity(String username, String metalake) throws IOException {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    UserEntity userEntity =
+        entityStore.get(
+            NameIdentifierUtil.ofUser(metalake, username),
+            Entity.EntityType.USER,
+            UserEntity.class);
+    return userEntity;
+  }
+
   private void loadPrivilege(
       String metalake,
       String username,
@@ -188,33 +224,37 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       Long metadataObjectId) {
     try {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
-      List<RoleEntity> entities =
-          entityStore
-              .relationOperations()
-              .listEntitiesByRelation(
-                  SupportsRelationOperations.Type.ROLE_USER_REL,
-                  userNameIdentifier,
-                  Entity.EntityType.USER);
-
-      for (RoleEntity role : entities) {
-        Long roleId = role.id();
-        role =
-            entityStore.get(
-                NameIdentifierUtil.ofRole(metalake, role.name()),
-                Entity.EntityType.ROLE,
-                RoleEntity.class);
-        if (loadedRoles.contains(roleId)) {
-          continue;
-        }
-        enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-        loadPolicyByRoleEntity(role);
-        loadedRoles.add(roleId);
-      }
+      loadRolePrivilege(metalake, username, userId);
       loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
+    }
+  }
+
+  private void loadRolePrivilege(String metalake, String username, Long userId) throws IOException {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
+    List<RoleEntity> entities =
+        entityStore
+            .relationOperations()
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                userNameIdentifier,
+                Entity.EntityType.USER);
+
+    for (RoleEntity role : entities) {
+      Long roleId = role.id();
+      role =
+          entityStore.get(
+              NameIdentifierUtil.ofRole(metalake, role.name()),
+              Entity.EntityType.ROLE,
+              RoleEntity.class);
+      if (loadedRoles.contains(roleId)) {
+        continue;
+      }
+      enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      loadPolicyByRoleEntity(role);
+      loadedRoles.add(roleId);
     }
   }
 

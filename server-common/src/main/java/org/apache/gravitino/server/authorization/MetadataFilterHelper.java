@@ -152,6 +152,7 @@ public class MetadataFilterHelper {
             Entity.EntityType.CATALOG, NameIdentifierUtil.getCatalogIdentifier(nameIdentifier));
         break;
       default:
+        nameIdentifierMap.put(entityType, nameIdentifier);
         break;
     }
     return nameIdentifierMap;

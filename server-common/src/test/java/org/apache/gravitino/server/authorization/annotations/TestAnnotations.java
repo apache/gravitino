@@ -32,13 +32,13 @@ public class TestAnnotations {
   static class TestResourceAnnotationClass {
 
     public void methodWithAnnotatedParam(
-        @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table) {
+        @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table) {
       // dummy method
     }
 
     public void listSchemas(
-        @AuthorizationMetadata(type = MetadataObject.Type.METALAKE) String metalake,
-        @AuthorizationMetadata(type = MetadataObject.Type.CATALOG) String catalog) {
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog) {
       // dummy method
     }
   }

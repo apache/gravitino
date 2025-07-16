@@ -70,6 +70,19 @@ public interface GravitinoAuthorizer extends Closeable {
   }
 
   /**
+   * Determine whether the user accessing is oneself, or whether the group being accessed contains
+   * oneself.
+   *
+   * @param metalake metalake
+   * @param type user or group
+   * @param nameIdentifier name of user or group
+   * @return authorization result
+   */
+  default boolean isSelf(String metalake, Entity.EntityType type, NameIdentifier nameIdentifier) {
+    return true;
+  }
+
+  /**
    * Determine whether the user is the metalake user
    *
    * @param metalake metalake

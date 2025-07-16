@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -178,7 +179,10 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
 
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
-    return dispatcher.deleteRole(metalake, role);
+    Role oldRole = getRole(metalake, role);
+    boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
+    notifyRoleUserRelChange(((RoleEntity) oldRole).id());
+    return resultOfDeleteRole;
   }
 
   @Override
@@ -223,6 +227,13 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer != null) {
       gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
+    }
+  }
+
+  private static void notifyRoleUserRelChange(Long role) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.handleRolePrivilegeChange(role);
     }
   }
 }
