@@ -52,8 +52,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
-import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
-import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -80,8 +78,6 @@ public class TestJcasbinAuthorizer {
 
   private static final String METALAKE = "testMetalake";
 
-  private static UserMetaService mockUserMetaService = mock(UserMetaService.class);
-
   private static EntityStore entityStore = mock(EntityStore.class);
 
   private static GravitinoEnv gravitinoEnv = mock(GravitinoEnv.class);
@@ -91,11 +87,7 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<PrincipalUtils> principalUtilsMockedStatic;
 
-  private static MockedStatic<UserMetaService> userMetaServiceMockedStatic;
-
   private static MockedStatic<GravitinoEnv> gravitinoEnvMockedStatic;
-
-  private static MockedStatic<MetalakeMetaService> metalakeMetaServiceMockedStatic;
 
   private static MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic;
 
@@ -107,15 +99,10 @@ public class TestJcasbinAuthorizer {
   public static void setup() throws IOException {
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
-    when(mockUserMetaService.getUserIdByMetalakeIdAndName(USER_METALAKE_ID, USERNAME))
-        .thenReturn(USER_ID);
     principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
-    userMetaServiceMockedStatic = mockStatic(UserMetaService.class);
-    metalakeMetaServiceMockedStatic = mockStatic(MetalakeMetaService.class);
     metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
-    userMetaServiceMockedStatic.when(UserMetaService::getInstance).thenReturn(mockUserMetaService);
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
@@ -124,6 +111,11 @@ public class TestJcasbinAuthorizer {
         .thenReturn(CATALOG_ID);
     when(gravitinoEnv.entityStore()).thenReturn(entityStore);
     when(entityStore.relationOperations()).thenReturn(supportsRelationOperations);
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofUser(METALAKE, USERNAME)),
+            eq(Entity.EntityType.USER),
+            eq(UserEntity.class)))
+        .thenReturn(getUserEntity());
     BaseMetalake baseMetalake =
         BaseMetalake.builder()
             .withId(USER_METALAKE_ID)
@@ -142,12 +134,6 @@ public class TestJcasbinAuthorizer {
   public static void stop() {
     if (principalUtilsMockedStatic != null) {
       principalUtilsMockedStatic.close();
-    }
-    if (userMetaServiceMockedStatic != null) {
-      userMetaServiceMockedStatic.close();
-    }
-    if (metalakeMetaServiceMockedStatic != null) {
-      metalakeMetaServiceMockedStatic.close();
     }
     if (metadataIdConverterMockedStatic != null) {
       metadataIdConverterMockedStatic.close();

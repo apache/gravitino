@@ -43,5 +43,12 @@ public @interface AuthorizationExpression {
    *
    * @return accessMetadataType
    */
-  MetadataObject.Type accessMetadataType();
+  MetadataObject.Type accessMetadataType() default MetadataObject.Type.METALAKE;
+
+  /**
+   * Error message when authorization failed.
+   *
+   * @return error message
+   */
+  String errorMessage() default "";
 }

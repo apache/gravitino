@@ -49,6 +49,11 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean isServiceAdmin() {
+    return true;
+  }
+
+  @Override
   public void handleRolePrivilegeChange(Long roleId) {}
 
   @Override
