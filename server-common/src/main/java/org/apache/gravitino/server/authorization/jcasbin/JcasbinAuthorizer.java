@@ -101,7 +101,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public boolean isServiceAdmin() {
-    return serviceAdmins.contains(PrincipalUtils.getCurrentUserName());
+    return GravitinoEnv.getInstance()
+        .accessControlDispatcher()
+        .isServiceAdmin(PrincipalUtils.getCurrentUserName());
   }
 
   @Override
@@ -111,13 +113,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return false;
     }
     try {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      UserEntity userEntity =
-          entityStore.get(
-              NameIdentifierUtil.ofUser(metalake, currentUserName),
-              Entity.EntityType.USER,
-              UserEntity.class);
-      return userEntity != null;
+      return GravitinoEnv.getInstance().accessControlDispatcher().getUser(metalake, currentUserName)
+          != null;
     } catch (Exception e) {
       LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
       return false;
