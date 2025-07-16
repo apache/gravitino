@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service.rest;
 
 import java.util.Arrays;
 import java.util.Optional;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
@@ -40,11 +41,13 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
 import org.apache.iceberg.catalog.Namespace;
+import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
 
@@ -56,6 +59,18 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     ResourceConfig resourceConfig =
         IcebergRestTestUtil.getIcebergResourceConfig(
             MockIcebergNamespaceOperations.class, true, Arrays.asList(dummyEventListener));
+
+    // register a mock HttpServletRequest with user info
+    resourceConfig.register(
+        new AbstractBinder() {
+          @Override
+          protected void configure() {
+            HttpServletRequest mockRequest = Mockito.mock(HttpServletRequest.class);
+            Mockito.when(mockRequest.getUserPrincipal()).thenReturn(() -> "test-user");
+            bind(mockRequest).to(HttpServletRequest.class);
+          }
+        });
+
     return resourceConfig;
   }
 
