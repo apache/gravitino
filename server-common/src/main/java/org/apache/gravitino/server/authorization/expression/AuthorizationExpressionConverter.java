@@ -71,7 +71,7 @@ public class AuthorizationExpressionConverter {
             } else if (AuthConstants.SELF.equals(privilegeOrExpression)) {
               replacement =
                   String.format(
-                      "authorizer.isSelf(METALAKE_NAME,@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
+                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
                       type, type);
             } else {
               replacement =
