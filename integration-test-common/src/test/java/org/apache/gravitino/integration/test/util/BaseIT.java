@@ -307,7 +307,10 @@ public class BaseIT {
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
     if (ignoreIcebergRestService) {
-      customConfigs.put(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + AuxiliaryServiceManager.AUX_SERVICE_NAMES, "");
+      customConfigs.put(
+          AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+              + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+          "");
     }
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
