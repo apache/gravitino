@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +41,7 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -51,8 +53,8 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
   private static final String SCHEMA = "schema";
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
   private static String hmsUri;
-  private static String role = "role";
-  private static String TEMP_USER = "user3";
+  private static final String role = "role";
+  private static final String TEMP_USER = "user3";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -87,6 +89,13 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         new Column[] {Column.of("col1", Types.StringType.get())},
         "test",
         new HashMap<>());
+  }
+
+  @AfterAll
+  @Override
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().dropSchema(SCHEMA, true);
+    super.stopIntegrationTest();
   }
 
   @Test
