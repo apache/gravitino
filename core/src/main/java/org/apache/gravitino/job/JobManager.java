@@ -63,7 +63,7 @@ public class JobManager implements JobOperationDispatcher, Closeable {
             String.format("Staging directory %s exists but is not a directory", stagingDirPath));
       }
 
-      if (!stagingDir.canExecute() || !stagingDir.canRead() || !stagingDir.canWrite()) {
+      if (!(stagingDir.canExecute() && stagingDir.canRead() && stagingDir.canWrite())) {
         throw new IllegalArgumentException(
             String.format("Staging directory %s is not accessible", stagingDirPath));
       }
