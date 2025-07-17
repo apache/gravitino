@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +40,6 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -89,13 +87,6 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         new Column[] {Column.of("col1", Types.StringType.get())},
         "test",
         new HashMap<>());
-  }
-
-  @AfterAll
-  @Override
-  public void stopIntegrationTest() throws IOException, InterruptedException {
-    containerSuite.close();
-    super.stopIntegrationTest();
   }
 
   @Test
