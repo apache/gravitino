@@ -92,7 +92,8 @@ public class RESTService implements GravitinoAuxiliaryService {
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
 
-    IcebergAuthorizationContext context = IcebergAuthorizationContext.create(configProvider);
+    IcebergAuthorizationContext authorizationContext =
+        IcebergAuthorizationContext.create(configProvider);
 
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
@@ -116,7 +117,7 @@ public class RESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            if (context.authorizationEnabled()) {
+            if (authorizationContext.authorizationEnabled()) {
               bind(IcebergRESTAuthInterceptionService.class)
                   .to(InterceptionService.class)
                   .in(Singleton.class);

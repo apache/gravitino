@@ -39,7 +39,6 @@ public class IcebergAuthorizationContext {
   }
 
   public static IcebergAuthorizationContext create(IcebergConfigProvider configProvider) {
-    Preconditions.checkState(InstanceHolder.INSTANCE == null);
     Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuth) {
       Preconditions.checkArgument(
