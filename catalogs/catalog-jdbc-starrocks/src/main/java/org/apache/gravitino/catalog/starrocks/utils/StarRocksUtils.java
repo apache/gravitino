@@ -213,6 +213,9 @@ public class StarRocksUtils {
     int bucketNum = Distributions.AUTO;
     if (matcher.find(5)) {
       String bucketValue = matcher.group(5);
+      if (bucketValue == null) {
+        return bucketNum;
+      }
       // Use -1 to indicate auto bucket.
       bucketNum = Integer.parseInt(bucketValue);
     }

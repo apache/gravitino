@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import org.apache.gravitino.catalog.starrocks.utils.StarRocksUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.slf4j.Logger;
@@ -39,20 +40,16 @@ public class StarRocksDatabaseOperations extends JdbcDatabaseOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(StarRocksDatabaseOperations.class);
 
-  public static final String COMMENT_KEY = "comment";
-
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
     StringBuilder sqlBuilder = new StringBuilder();
     sqlBuilder.append(String.format("CREATE DATABASE `%s`", databaseName));
 
-    // StarRocks support set properties, but can't get them after setting. So disable set properties
-    // now
-    // https://docs.starrocks.io/docs/3.3/sql-reference/sql-statements/Database/SHOW_CREATE_DATABASE/
-    if (!properties.isEmpty()) {
-      throw new IllegalArgumentException("Current not support set StarRocks database properties!");
-    }
+    // Append properties
+    sqlBuilder.append("\n");
+    sqlBuilder.append(StarRocksUtils.generatePropertiesSql(properties));
+
     String ddl = sqlBuilder.toString();
     LOG.info("Generated create database:{} sql: {}", databaseName, ddl);
     return ddl;
@@ -90,6 +87,8 @@ public class StarRocksDatabaseOperations extends JdbcDatabaseOperations {
             .findFirst()
             .orElseThrow(
                 () -> new NoSuchSchemaException("Database %s could not be found", databaseName));
+    // StarRocks support set properties, but can't get them after setting
+    // https://docs.starrocks.io/docs/3.3/sql-reference/sql-statements/Database/SHOW_CREATE_DATABASE/
     return JdbcSchema.builder()
         .withName(dbName)
         .withComment("")
