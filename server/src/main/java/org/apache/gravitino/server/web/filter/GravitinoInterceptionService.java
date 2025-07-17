@@ -28,9 +28,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.ConstructorInterceptor;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -41,6 +43,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
+import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
@@ -61,6 +64,7 @@ public class GravitinoInterceptionService implements InterceptionService {
   public Filter getDescriptorFilter() {
     return new ClassListFilter(
         ImmutableSet.of(
+            MetalakeOperations.class.getName(),
             CatalogOperations.class.getName(),
             SchemaOperations.class.getName(),
             TableOperations.class.getName(),
@@ -112,15 +116,25 @@ public class GravitinoInterceptionService implements InterceptionService {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =
                 metadataContext.get(Entity.EntityType.valueOf(type.name()));
-            return Utils.forbidden(
-                String.format("Can not access metadata {%s}.", accessMetadataName.name()),
-                new ForbiddenException("Can not access metadata {%s}.", accessMetadataName));
+            String errorMessage = expressionAnnotation.errorMessage();
+            return buildNoAuthResponse(errorMessage, accessMetadataName);
           }
         }
         return methodInvocation.proceed();
       } catch (Exception ex) {
         return Utils.forbidden("Can not access metadata. Cause by: " + ex.getMessage(), ex);
       }
+    }
+
+    private Response buildNoAuthResponse(String errorMessage, NameIdentifier accessMetadataName) {
+      if (StringUtils.isNotBlank(errorMessage)) {
+        return Utils.forbidden(
+            errorMessage,
+            new ForbiddenException("Can not access metadata, cause by: %s", errorMessage));
+      }
+      return Utils.forbidden(
+          String.format("Can not access metadata {%s}.", accessMetadataName.name()),
+          new ForbiddenException("Can not access metadata {%s}.", accessMetadataName));
     }
 
     private Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(

@@ -61,6 +61,25 @@ public interface GravitinoAuthorizer extends Closeable {
   boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject);
 
   /**
+   * Determine whether the user is the service admin.
+   *
+   * @return authorization result
+   */
+  default boolean isServiceAdmin() {
+    return true;
+  }
+
+  /**
+   * Determine whether the user is the metalake user
+   *
+   * @param metalake metalake
+   * @return authorization result
+   */
+  default boolean isMetalakeUser(String metalake) {
+    return true;
+  };
+
+  /**
    * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in
    * order to clear the cache.
    *
