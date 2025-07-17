@@ -28,8 +28,8 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -235,19 +235,6 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
     NameIdentifierUtil.checkModel(ident);
 
-    if (uris == null || uris.isEmpty()) {
-      throw new IllegalArgumentException("At least one URI needs to be set for the model version");
-    }
-    uris.forEach(
-        (name, uri) -> {
-          if (StringUtils.isBlank(name)) {
-            throw new IllegalArgumentException("URI name must not be blank");
-          }
-          if (StringUtils.isBlank(uri)) {
-            throw new IllegalArgumentException("URI must not be blank for name: " + name);
-          }
-        });
-
     StringIdentifier stringId = StringIdentifier.fromProperties(properties);
     Preconditions.checkArgument(stringId != null, "Property string identifier should not be null");
 
@@ -288,7 +275,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     NameIdentifierUtil.checkModel(ident);
     NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, version);
 
-    return internalGetModelVersionUri(ident, modelVersionIdent, uriName);
+    return internalGetModelVersionUri(ident, modelVersionIdent, Optional.ofNullable(uriName));
   }
 
   @Override
@@ -297,7 +284,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     NameIdentifierUtil.checkModel(ident);
     NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, alias);
 
-    return internalGetModelVersionUri(ident, modelVersionIdent, uriName);
+    return internalGetModelVersionUri(ident, modelVersionIdent, Optional.ofNullable(uriName));
   }
 
   @Override
@@ -558,13 +545,13 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   }
 
   private String internalGetModelVersionUri(
-      NameIdentifier modelIdent, NameIdentifier modelVersionIdent, String uriName) {
+      NameIdentifier modelIdent, NameIdentifier modelVersionIdent, Optional<String> uriName) {
     ModelVersion modelVersion = internalGetModelVersion(modelVersionIdent);
 
     Map<String, String> uris = modelVersion.uris();
-    // If the uriName is not null, get from the uris directly
-    if (uriName != null) {
-      return getUriByName(uris, uriName, modelVersionIdent);
+    // If the uriName is present, get from the uris directly
+    if (uriName.isPresent()) {
+      return getUriByName(uris, uriName.get(), modelVersionIdent);
     }
 
     // If there is only one uri of the model version, use it
@@ -587,7 +574,8 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       return getUriByName(uris, defaultUriName, modelVersionIdent);
     }
 
-    throw new IllegalArgumentException("Either uri name of default uri name should be provided");
+    throw new IllegalArgumentException(
+        "The default uri name needs to be set when the uri name is not specified");
   }
 
   private String getUriByName(
