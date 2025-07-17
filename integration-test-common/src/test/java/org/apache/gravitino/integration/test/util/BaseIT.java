@@ -149,12 +149,10 @@ public class BaseIT {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
 
-    /*
     if (originConfig != null) {
       Files.deleteIfExists(configPath);
       FileUtils.write(configPath.toFile(), originConfig, StandardCharsets.UTF_8);
     }
-     */
   }
 
   protected void downLoadJDBCDriver() throws IOException {

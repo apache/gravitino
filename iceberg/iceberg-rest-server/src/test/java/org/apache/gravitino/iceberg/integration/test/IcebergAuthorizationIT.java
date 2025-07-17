@@ -27,7 +27,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Catalog;
@@ -56,10 +55,11 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 /**
- * Starts a Gravitino server to create metalake, catalogs; and starts a standalone Iceberg REST
- * server to do the Authorization. NORMAL_USER is a normal user, has no privileges, you could use
- * Gravitino client to verify the Spark SQL result. SUPER_USER is the owner of metalake, has all
- * privileges, you could use Gravitino client to verify the Spark SQL result.
+ * This is starts a Gravitino server to create metalake, catalogs and starts a standalone Iceberg
+ * REST server to do the Authorization. There are two users: SUPER_USER is the owner of metalake,
+ * has all privileges while NORMAL_USER is the user for Spark SQL, doesn't have privileges by
+ * default. You could use Spark SQL to try to do the operation and use Gravitino client to grant
+ * privilege or verify the Spark SQL result.
  */
 public class IcebergAuthorizationIT extends BaseIT {
 
@@ -243,7 +243,7 @@ public class IcebergAuthorizationIT extends BaseIT {
     return customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY);
   }
 
-  protected Map<String, String> getTableInfo(String tableName) {
+  protected Map<String, String> etTableInfo(String tableName) {
     return convertToStringMap(sql("desc table extended %s", tableName));
   }
 
@@ -278,10 +278,6 @@ public class IcebergAuthorizationIT extends BaseIT {
               return value;
             })
         .toArray(Object[]::new);
-  }
-
-  private static Set<String> convertToStringSet(List<Object[]> objects, int index) {
-    return objects.stream().map(row -> String.valueOf(row[index])).collect(Collectors.toSet());
   }
 
   private static Map<String, String> convertToStringMap(List<Object[]> objects) {

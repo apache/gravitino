@@ -40,7 +40,6 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -50,7 +49,6 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,17 +133,6 @@ public abstract class RangerBaseE2EIT extends BaseIT {
             .replace("__REPLACE__RANGER_ADMIN_URL", RangerITEnv.RANGER_ADMIN_URL)
             .replace("__REPLACE__RANGER_HIVE_REPO_NAME", RangerITEnv.RANGER_HIVE_REPO_NAME);
     FileUtils.writeStringToFile(new File(xmlPath), templateContext, StandardCharsets.UTF_8);
-  }
-
-  @BeforeAll
-  @Override
-  public void startIntegrationTest() throws Exception {
-    // Doesn't start Iceberg REST server to simple configuration.
-    customConfigs.put(
-        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-            + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-        "");
-    super.startIntegrationTest();
   }
 
   protected void cleanIT() {

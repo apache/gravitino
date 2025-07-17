@@ -164,9 +164,8 @@ public class IcebergTableOperations {
   @Timed(name = "update-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-table", absolute = true)
   public Response updateTable(
-      @AuthorizationMetadata(type = MetadataObject.Type.CATALOG) @PathParam("prefix") String prefix,
-      @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace,
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       UpdateTableRequest updateTableRequest) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
@@ -233,19 +232,10 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
-  @AuthorizationExpression(
-      expression =
-          "((ANY(USE_CATALOG,METALAKE,CATALOG)) && "
-              + "(SCHEMA::OWNER || ((ANY(USE_SCHEMA,METALAKE,CATALOG,SCHEMA)) &&"
-              + " ( ANY(SELECT_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || "
-              + " ANY(MODIFY_TABLE,METALAKE,CATALOG,SCHEMA,TABLE) || TABLE::OWNER)))) ||"
-              + "ANY(OWNER,METALAKE,CATALOG)",
-      accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
-      @AuthorizationMetadata(type = MetadataObject.Type.CATALOG) @PathParam("prefix") String prefix,
-      @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace,
-      @AuthorizationMetadata(type = MetadataObject.Type.TABLE) @PathParam("table") String table,
+      @PathParam("prefix") String prefix,
+      @Encoded() @PathParam("namespace") String namespace,
+      @PathParam("table") String table,
       @DefaultValue("all") @QueryParam("snapshots") String snapshots,
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);

@@ -43,7 +43,7 @@ public class IcebergAuthorizationContext {
     if (enableAuth) {
       Preconditions.checkArgument(
           configProvider instanceof DynamicIcebergConfigProvider,
-          "Please enable dynamic config provider is enable auth");
+          "Please enable dynamic config provider if using authorization.");
     }
     InstanceHolder.INSTANCE =
         new IcebergAuthorizationContext(enableAuth, configProvider.getMetalakeName());

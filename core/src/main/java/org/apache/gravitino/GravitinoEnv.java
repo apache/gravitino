@@ -121,6 +121,7 @@ public class GravitinoEnv {
   private TagDispatcher tagDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
+  public AccessControlDispatcher accessManager;
 
   private IdGenerator idGenerator;
 
@@ -533,10 +534,9 @@ public class GravitinoEnv {
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
-      AccessControlManager accessControlManager =
-          new AccessControlManager(entityStore, idGenerator, config);
+      this.accessManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
       AccessControlHookDispatcher accessControlHookDispatcher =
-          new AccessControlHookDispatcher(accessControlManager);
+          new AccessControlHookDispatcher(accessManager);
       this.accessControlDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
       OwnerDispatcher ownerManager = new OwnerManager(entityStore);

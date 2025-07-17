@@ -66,6 +66,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
             extractNameIdentifierFromParameters(parameters, args);
         AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
             new AuthorizationExpressionEvaluator(expression);
+
         boolean authorizeResult = authorizationExpressionEvaluator.evaluate(metadataContext);
         if (!authorizeResult) {
           MetadataObject.Type type = expressionAnnotation.accessMetadataType();
