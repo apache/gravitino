@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.cli;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.commons.cli.CommandLine;
 import org.apache.gravitino.cli.commands.Command;
 
@@ -32,6 +35,51 @@ public class MetalakeCommandHandler extends CommandHandler {
   private final CommandContext context;
   private final String command;
   private String metalake;
+
+  public static Map<String, CliOptions> cliOptions =
+      ImmutableMap.of(
+          CommandActions.LIST,
+              new CliOptions(
+                  ImmutableList.of(), ImmutableList.of(GravitinoOptions.CommandOptions.OUTPUT)),
+          CommandActions.DETAILS,
+              new CliOptions(
+                  ImmutableList.of(),
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.AUDIT,
+                      GravitinoOptions.CommandOptions.OUTPUT)),
+          CommandActions.CREATE,
+              new CliOptions(
+                  ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
+                  ImmutableList.of(GravitinoOptions.CommandOptions.COMMENT)),
+          CommandActions.DELETE,
+              new CliOptions(
+                  ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
+                  ImmutableList.of(GravitinoOptions.CommandOptions.FORCE)),
+          CommandActions.SET,
+              new CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.PROPERTY,
+                      GravitinoOptions.CommandOptions.VALUE),
+                  ImmutableList.of()),
+          CommandActions.REMOVE,
+              new CliOptions(
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.METALAKE,
+                      GravitinoOptions.CommandOptions.PROPERTY),
+                  ImmutableList.of()),
+          CommandActions.PROPERTIES,
+              new CliOptions(
+                  ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
+                  ImmutableList.of(GravitinoOptions.CommandOptions.OUTPUT)),
+          CommandActions.UPDATE,
+              new CliOptions(
+                  ImmutableList.of(GravitinoOptions.CommandOptions.METALAKE),
+                  ImmutableList.of(
+                      GravitinoOptions.CommandOptions.ENABLE,
+                      GravitinoOptions.CommandOptions.DISABLE,
+                      GravitinoOptions.CommandOptions.COMMENT,
+                      GravitinoOptions.CommandOptions.RENAME)));
 
   /**
    * Constructs a MetalakeCommandHandler instance.
