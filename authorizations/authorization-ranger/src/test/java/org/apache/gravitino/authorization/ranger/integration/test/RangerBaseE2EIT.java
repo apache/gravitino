@@ -40,6 +40,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -137,9 +138,13 @@ public abstract class RangerBaseE2EIT extends BaseIT {
   }
 
   @BeforeAll
+  @Override
   public void startIntegrationTest() throws Exception {
     // Doesn't start Iceberg REST server to simple configuration.
-    ignoreIcebergRestService = true;
+    customConfigs.put(
+        AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+            + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+        "");
     super.startIntegrationTest();
   }
 

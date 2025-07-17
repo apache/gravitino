@@ -20,6 +20,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 import java.io.IOException;
 import java.util.HashMap;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -58,9 +59,10 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             Configs.CACHE_ENABLED.getKey(),
             "false",
             Configs.AUTHENTICATORS.getKey(),
-            "simple"));
-    // Doesn't start Iceberg REST server to simple configuration.
-    ignoreIcebergRestService = true;
+            "simple",
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            ""));
     putServiceAdmin();
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());

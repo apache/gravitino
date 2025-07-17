@@ -36,6 +36,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -54,7 +55,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
-/** */
+/**
+ * Starts a Gravitino server to create metalake, catalogs; and starts a standalone Iceberg REST
+ * server to do the Authorization. NORMAL_USER is a normal user, has no privileges, you could use
+ * Gravitino client to verify the Spark SQL result. SUPER_USER is the owner of metalake, has all
+ * privileges, you could use Gravitino client to verify the Spark SQL result.
+ */
 public class IcebergAuthorizationIT extends BaseIT {
 
   private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
@@ -134,7 +140,6 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   private void startGravitinoServerWithoutIcebergREST() throws Exception {
     setEntityStoreBackend("PostgreSQL");
-    ignoreIcebergRestService = true;
     // Enable authorization
     customConfigs.putAll(
         ImmutableMap.of(
@@ -149,7 +154,10 @@ public class IcebergAuthorizationIT extends BaseIT {
             Configs.AUTHORIZATION_IMPL.getKey(),
             JcasbinAuthorizer.class.getCanonicalName(),
             Configs.CACHE_ENABLED.getKey(),
-            "false"));
+            "false",
+            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+            ""));
     super.startIntegrationTest();
   }
 
