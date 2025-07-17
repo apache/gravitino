@@ -149,10 +149,12 @@ public class BaseIT {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
 
+    /*
     if (originConfig != null) {
       Files.deleteIfExists(configPath);
       FileUtils.write(configPath.toFile(), originConfig, StandardCharsets.UTF_8);
     }
+     */
   }
 
   protected void downLoadJDBCDriver() throws IOException {
@@ -161,9 +163,14 @@ public class BaseIT {
       String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
       String icebergCatalogPath =
           ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+      String icebergRESTServerPath = ITUtils.joinPath(gravitinoHome, "iceberg-rest-server", "libs");
       DownloaderUtils.downloadFile(
-          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath, icebergRESTServerPath);
+      DownloaderUtils.downloadFile(
+          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL,
+          serverPath,
+          icebergCatalogPath,
+          icebergRESTServerPath);
     } else {
       Path icebergLibsPath =
           Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs");

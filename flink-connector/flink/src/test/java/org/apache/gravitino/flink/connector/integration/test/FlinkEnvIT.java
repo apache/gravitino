@@ -75,7 +75,8 @@ public abstract class FlinkEnvIT extends BaseIT {
   protected String icebergRestServiceUri;
 
   @BeforeAll
-  void startUp() throws Exception {
+  @Override
+  public void startIntegrationTest() throws Exception {
     initHiveEnv();
     if (lakeHouseIcebergProvider.equalsIgnoreCase(getProvider())) {
       initIcebergRestServiceEnv();
@@ -91,12 +92,17 @@ public abstract class FlinkEnvIT extends BaseIT {
   }
 
   @AfterAll
-  void stop() throws Exception {
-    stopCatalogEnv();
-    stopFlinkEnv();
-    stopHdfsEnv();
-    super.stopIntegrationTest();
-    LOG.info("Stop Flink env successfully.");
+  @Override
+  public void stopIntegrationTest() {
+    try {
+      stopCatalogEnv();
+      stopFlinkEnv();
+      stopHdfsEnv();
+      super.stopIntegrationTest();
+      LOG.info("Stop Flink env successfully.");
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   protected void initCatalogEnv() throws Exception {};
