@@ -230,8 +230,6 @@ public class TagOperations {
           httpRequest,
           () -> {
             MetadataObject[] objects = tagDispatcher.listMetadataObjectsForTag(metalake, tagName);
-            objects = objects == null ? new MetadataObject[0] : objects;
-
             LOG.info(
                 "List {} objects for tag: {} under metalake: {}",
                 objects.length,
@@ -273,10 +271,7 @@ public class TagOperations {
           httpRequest,
           () -> {
             String[] tagNames = parseTagsParameter(tagsParam);
-
             MetadataObject[] objects = tagDispatcher.listMetadataObjectsForTags(metalake, tagNames);
-            objects = objects == null ? new MetadataObject[0] : objects;
-
             LOG.info(
                 "List {} objects for tags: {} under metalake: {}",
                 objects.length,
