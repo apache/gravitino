@@ -21,6 +21,7 @@ package org.apache.gravitino.hook;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -52,6 +53,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * only delegates access control operations to the underlying access control dispatcher but also
  * executes some hook operations before or after the underlying operations.
  */
+@Slf4j
 public class AccessControlHookDispatcher implements AccessControlDispatcher {
   private final AccessControlDispatcher dispatcher;
 
@@ -179,9 +181,16 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
 
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
-    Role oldRole = getRole(metalake, role);
+    Role oldRole = null;
+    try {
+      oldRole = getRole(metalake, role);
+    } catch (NoSuchRoleException e) {
+      log.debug(e.getMessage());
+    }
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
-    notifyRoleUserRelChange(((RoleEntity) oldRole).id());
+    if (oldRole != null) {
+      notifyRoleUserRelChange(((RoleEntity) oldRole).id());
+    }
     return resultOfDeleteRole;
   }
 
