@@ -20,10 +20,16 @@
 package org.apache.gravitino.cache.it;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.cache.BenchmarkHelper;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.State;
 
 /**
  * Benchmark for testing the performance of the {@code EntityStore.exists()} method.
@@ -42,6 +48,9 @@ import org.openjdk.jmh.annotations.Benchmark;
  * @see org.apache.gravitino.EntityStore#exists(org.apache.gravitino.NameIdentifier,
  *     Entity.EntityType)
  */
+@BenchmarkMode({Mode.Throughput, Mode.AverageTime})
+@OutputTimeUnit(TimeUnit.SECONDS)
+@State(Scope.Thread)
 public class ContainsEntityStorageBenchmark extends AbstractEntityStorageBenchmark {
 
   @Benchmark

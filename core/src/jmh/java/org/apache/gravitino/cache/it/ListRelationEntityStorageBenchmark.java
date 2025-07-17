@@ -21,6 +21,7 @@ package org.apache.gravitino.cache.it;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
@@ -29,6 +30,11 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.openjdk.jmh.annotations.Benchmark;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.Mode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
+import org.openjdk.jmh.annotations.Scope;
+import org.openjdk.jmh.annotations.State;
 
 /**
  * Benchmark for testing the performance of listing entities via relation operations in a {@link
@@ -48,6 +54,9 @@ import org.openjdk.jmh.annotations.Benchmark;
  * @see RelationalEntityStore#listEntitiesByRelation(SupportsRelationOperations.Type,
  *     org.apache.gravitino.NameIdentifier, Entity.EntityType, boolean)
  */
+@BenchmarkMode({Mode.Throughput, Mode.AverageTime})
+@OutputTimeUnit(TimeUnit.SECONDS)
+@State(Scope.Thread)
 public class ListRelationEntityStorageBenchmark<E extends Entity & HasIdentifier>
     extends AbstractEntityStorageBenchmark {
 

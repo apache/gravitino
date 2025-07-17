@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -96,7 +97,7 @@ import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 @OutputTimeUnit(TimeUnit.SECONDS)
 @State(Scope.Thread)
 public class AbstractEntityStorageBenchmark<E extends Entity & HasIdentifier> {
-  protected static final Random random = new Random();
+  protected static final Random random = ThreadLocalRandom.current();
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractEntityStorageBenchmark.class.getName());
   private static final String JDBC_STORE_PATH =
@@ -106,6 +107,7 @@ public class AbstractEntityStorageBenchmark<E extends Entity & HasIdentifier> {
   private static final String BENCHMARK_METALAKE_NAME = "benchmark_metalake";
   private static final String BENCHMARK_CATALOG_NAME = "benchmark_catalog";
   private static final String BENCHMARK_SCHEMA_NAME = "benchmark_schema";
+  private static final boolean CACHE_ENABLED = true;
   private static RandomIdGenerator generator = new RandomIdGenerator();
   protected List<ModelEntity> entities;
   protected Map<UserEntity, Entity> entitiesWithRelations;
@@ -168,7 +170,6 @@ public class AbstractEntityStorageBenchmark<E extends Entity & HasIdentifier> {
    * @return The map of relation entities.
    */
   protected Map<UserEntity, Entity> getRelationEntities(int entityCnt) {
-
     Map<UserEntity, Entity> relationEntities = Maps.newHashMap();
     for (int i = 0; i < entityCnt; i++) {
       RoleEntity testRoleEntity =
@@ -230,7 +231,7 @@ public class AbstractEntityStorageBenchmark<E extends Entity & HasIdentifier> {
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
     // Fix cache config for test
-    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(CACHE_ENABLED);
     Mockito.when(config.get(Configs.CACHE_MAX_ENTRIES)).thenReturn(10_000);
     Mockito.when(config.get(Configs.CACHE_EXPIRATION_TIME)).thenReturn(3_600_000L);
     Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
