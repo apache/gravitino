@@ -206,7 +206,7 @@ public class FullName {
    * Helper method to determine a specific part of the full name exits.
    *
    * @param partNo The part of the name to obtain.
-   * @return True if the part exitsts.
+   * @return True if the part exists.
    */
   public boolean hasNamePart(int partNo) {
     /* Extract the name part from the full name if available. */
