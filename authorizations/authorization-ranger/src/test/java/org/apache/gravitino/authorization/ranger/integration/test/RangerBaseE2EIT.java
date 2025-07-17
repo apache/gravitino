@@ -49,6 +49,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -133,6 +134,13 @@ public abstract class RangerBaseE2EIT extends BaseIT {
             .replace("__REPLACE__RANGER_ADMIN_URL", RangerITEnv.RANGER_ADMIN_URL)
             .replace("__REPLACE__RANGER_HIVE_REPO_NAME", RangerITEnv.RANGER_HIVE_REPO_NAME);
     FileUtils.writeStringToFile(new File(xmlPath), templateContext, StandardCharsets.UTF_8);
+  }
+
+  @BeforeAll
+  public void startIntegrationTest() throws Exception {
+    // Doesn't start Iceberg REST server to simple configuration.
+    ignoreIcebergRestService = true;
+    super.startIntegrationTest();
   }
 
   protected void cleanIT() {

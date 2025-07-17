@@ -62,13 +62,12 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     MetadataObject schemaObject =
         MetadataObjects.of(Arrays.asList(CATALOG_NAME, SCHEMA_NAME), MetadataObject.Type.SCHEMA);
     metalakeClientWithAllPrivilege.setOwner(schemaObject, SUPER_USER, Owner.Type.USER);
+    sql("USE rest;");
   }
 
   @Test
   void testCreateTable() {
     grantUseSchemaRole(SCHEMA_NAME);
-    sql("USE rest;");
-    sql("CREATE DATABASE IF NOT EXISTS %s;", SCHEMA_NAME);
     sql("USE %s;", SCHEMA_NAME);
     boolean exists =
         catalogClientWithAllPrivilege

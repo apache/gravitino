@@ -59,6 +59,8 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             "false",
             Configs.AUTHENTICATORS.getKey(),
             "simple"));
+    // Doesn't start Iceberg REST server to simple configuration.
+    ignoreIcebergRestService = true;
     putServiceAdmin();
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
