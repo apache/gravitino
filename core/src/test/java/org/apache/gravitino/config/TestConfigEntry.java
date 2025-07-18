@@ -19,6 +19,8 @@
 package org.apache.gravitino.config;
 
 import com.google.common.collect.Lists;
+
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
@@ -167,5 +169,12 @@ public class TestConfigEntry {
     testConfOptional.writeTo(configMap, Optional.of("test"));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> testConfOptional.readFrom(configMap));
+  }
+
+  @Test
+  public void testStrToSeqEmptyString() {
+    ConfigEntry<String> conf = new ConfigBuilder("gravitino.test.seq").stringConf().create();
+    List<String> result = conf.strToSeq("", s -> s);
+    Assertions.assertTrue(result.isEmpty());
   }
 }
