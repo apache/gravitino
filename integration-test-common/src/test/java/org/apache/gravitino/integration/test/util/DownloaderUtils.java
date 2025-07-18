@@ -36,6 +36,7 @@ public class DownloaderUtils {
 
   public static void downloadFile(String fileUrl, String... destinationDirectories)
       throws IOException {
+
     URL url = new URL(fileUrl);
     URLConnection connection = url.openConnection();
     String fileName = getFileName(url);
@@ -61,8 +62,9 @@ public class DownloaderUtils {
     }
   }
 
-  private static String getFileName(URL url) {
-    String[] pathSegments = url.getPath().split("/");
+  /** Extract filename from URL string */
+  public static String getFileName(String url) {
+    String[] pathSegments = url.split("/");
     return pathSegments[pathSegments.length - 1];
   }
 }
