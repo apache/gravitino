@@ -19,7 +19,6 @@
 package org.apache.gravitino.config;
 
 import com.google.common.collect.Lists;
-
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
