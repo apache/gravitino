@@ -72,9 +72,9 @@ logger.lineage.level = info
 logger.lineage.appenderRef.lineage_file.ref = lineage_file
 logger.lineage.additivity = false
 
-logger.restRquests.name = org.apache.gravitino.server.web.rest
-logger.restRquests.level = warn
-logger.restRquests.additivity = false
+logger.restRequests.name = org.apache.gravitino.server.web.rest
+logger.restRequests.level = warn
+logger.restRequests.additivity = false
 
 # Configure root logger
 rootLogger.level = info
