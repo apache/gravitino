@@ -68,3 +68,7 @@ class TestLiteralDTO(unittest.TestCase):
         )
         self.assertIsInstance(dto, LiteralDTO)
         self.assertTrue(dto == self._literal_dto)
+
+    def test_literal_dto_equality(self):
+        self.assertEqual(self._literal_dto, self._literal_dto)
+        self.assertNotEqual(self._literal_dto, "test")

@@ -16,16 +16,18 @@
 # under the License.
 # pylint: disable=C0302
 from __future__ import annotations
+
 from typing import List
+
 from .type import (
-    Type,
+    ComplexType,
+    DateTimeType,
+    FractionType,
+    IntegralType,
+    IntervalType,
     Name,
     PrimitiveType,
-    IntegralType,
-    FractionType,
-    DateTimeType,
-    IntervalType,
-    ComplexType,
+    Type,
 )
 
 
@@ -815,7 +817,7 @@ class Types:
             )
 
         def __eq__(self, other):
-            if not isinstance(other, Types.ListType):
+            if isinstance(other, Types.ListType):
                 return (
                     self._element_nullable == other.element_nullable()
                     and self._element_type == other.element_type()
@@ -972,7 +974,7 @@ class Types:
             Returns:
                 True if both UnionType objects have the same types, False otherwise.
             """
-            if not isinstance(other, Types.UnionType):
+            if isinstance(other, Types.UnionType):
                 return self._types == other.types()
             return False
 
@@ -1025,7 +1027,7 @@ class Types:
             Returns:
                 True if both unparsed_type objects have the same unparsed type string, False otherwise.
             """
-            if not isinstance(other, Types.UnparsedType):
+            if isinstance(other, Types.UnparsedType):
                 return self._unparsed_type == other.unparsed_type()
             return False
 
