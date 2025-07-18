@@ -128,9 +128,8 @@ public class Decimal {
     }
     Decimal decimal = (Decimal) o;
     return scale == decimal.scale
-    && precision == decimal.precision
-    && Objects.equals(value, decimal.value);
-
+        && precision == decimal.precision
+        && Objects.equals(value, decimal.value);
   }
 
   @Override
