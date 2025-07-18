@@ -26,14 +26,23 @@ from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 class TestFuncExpressionDTO(unittest.TestCase):
     def setUp(self) -> None:
         self._func_args = [
-            LiteralDTO(value="year", data_type=Types.StringType.get()),
-            FieldReferenceDTO(field_name=["birthday"]),
+            LiteralDTO.builder()
+            .with_value(value="year")
+            .with_data_type(data_type=Types.StringType.get())
+            .build(),
+            FieldReferenceDTO.builder()
+            .with_field_name(field_name=["birthday"])
+            .build(),
         ]
         self._func_expressions = [
-            FuncExpressionDTO(function_name="function_without_args", function_args=[]),
-            FuncExpressionDTO(
-                function_name="function_with_args", function_args=self._func_args
-            ),
+            FuncExpressionDTO.builder()
+            .with_function_name(function_name="function_without_args")
+            .with_function_args(function_args=[])
+            .build(),
+            FuncExpressionDTO.builder()
+            .with_function_name(function_name="function_with_args")
+            .with_function_args(function_args=self._func_args)
+            .build(),
         ]
 
     def test_func_expression_dto(self):
@@ -46,8 +55,11 @@ class TestFuncExpressionDTO(unittest.TestCase):
 
     def test_equality(self):
         dto = self._func_expressions[1]
-        dto1 = FuncExpressionDTO(
-            function_name="function_with_args", function_args=self._func_args
+        dto1 = (
+            FuncExpressionDTO.builder()
+            .with_function_name(function_name="function_with_args")
+            .with_function_args(function_args=self._func_args)
+            .build()
         )
         self.assertTrue(dto == dto1)
         self.assertFalse(dto == self._func_expressions[0])
@@ -57,3 +69,14 @@ class TestFuncExpressionDTO(unittest.TestCase):
         dto_dict = {dto: idx for idx, dto in enumerate(self._func_expressions)}
         self.assertEqual(0, dto_dict.get(self._func_expressions[0]))
         self.assertNotEqual(0, dto_dict.get(self._func_expressions[1]))
+
+    def test_builder(self):
+        dto = (
+            FuncExpressionDTO.builder()
+            .with_function_name("function_name")
+            .with_function_args(self._func_args)
+            .build()
+        )
+        self.assertIsInstance(dto, FuncExpressionDTO)
+        self.assertEqual(dto.function_name(), "function_name")
+        self.assertListEqual(dto.args(), self._func_args)

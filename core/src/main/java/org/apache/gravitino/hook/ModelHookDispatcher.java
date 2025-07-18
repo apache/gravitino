@@ -26,12 +26,13 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
@@ -73,7 +74,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.namespace().level(0),
@@ -123,6 +124,18 @@ public class ModelHookDispatcher implements ModelDispatcher {
   }
 
   @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    return dispatcher.getModelVersionUri(ident, alias, uriName);
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    return dispatcher.getModelVersionUri(ident, version, uriName);
+  }
+
+  @Override
   public boolean deleteModelVersion(NameIdentifier ident, int version) {
     return dispatcher.deleteModelVersion(ident, version);
   }
@@ -153,7 +166,7 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, uri, aliases, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.name(),

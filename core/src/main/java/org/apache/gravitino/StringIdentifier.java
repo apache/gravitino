@@ -176,12 +176,21 @@ public class StringIdentifier {
       return null;
     }
 
-    int left = comment.lastIndexOf('(');
-    int right = comment.lastIndexOf(')');
-    if (left == -1 || right == -1) {
+    String pattern = "(" + STRING_COMMENT;
+    int startIndex = comment.indexOf(pattern);
+    if (startIndex == -1) {
       return null;
     }
-    String innerComment = comment.substring(left + 1, right);
+
+    String commentSubstring = comment.substring(startIndex);
+
+    int left = 0;
+    int right = commentSubstring.indexOf(')', pattern.length());
+    if (right == -1) {
+      return null;
+    }
+
+    String innerComment = commentSubstring.substring(left + 1, right);
     if (!innerComment.startsWith(STRING_COMMENT)) {
       return null;
     }

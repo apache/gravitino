@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.authorization;
 
+import static org.apache.gravitino.Catalog.Type.FILESET;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.List;
@@ -27,7 +29,9 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -226,6 +230,7 @@ class TestAuthorizationUtils {
     TableDispatcher tableDispatcher = Mockito.mock(TableDispatcher.class);
     Catalog catalog = Mockito.mock(Catalog.class);
     Table table = Mockito.mock(Table.class);
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
 
     Mockito.when(table.properties()).thenReturn(ImmutableMap.of("location", "gs://bucket/1"));
     Mockito.when(catalog.provider()).thenReturn("hive");
@@ -234,6 +239,8 @@ class TestAuthorizationUtils {
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
 
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(
@@ -246,5 +253,40 @@ class TestAuthorizationUtils {
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.TABLE);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("gs://bucket/1", locations.get(0));
+  }
+
+  @Test
+  void testGetSchemaTypeMetadataObjectLocation() throws IllegalAccessException {
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    SchemaDispatcher schemaDispatcher = Mockito.mock(SchemaDispatcher.class);
+    CatalogDispatcher catalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Schema schema = Mockito.mock(Schema.class);
+
+    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", ""));
+    Mockito.when(schema.name()).thenReturn("testSchema");
+    Mockito.when(catalog.properties()).thenReturn(ImmutableMap.of("location", "catalogLocation"));
+    Mockito.when(catalog.provider()).thenReturn("fileset");
+    Mockito.when(catalog.type()).thenReturn(FILESET);
+    Mockito.when(schemaDispatcher.loadSchema(Mockito.any())).thenReturn(schema);
+    Mockito.when(catalogDispatcher.loadCatalog(Mockito.any())).thenReturn(catalog);
+
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogDispatcher", catalogDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("catalogLocation/testSchema", locations.get(0));
+
+    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", "schemaLocation"));
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("schemaLocation", locations.get(0));
   }
 }

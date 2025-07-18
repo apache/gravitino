@@ -26,7 +26,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -70,7 +70,7 @@ public class TopicHookDispatcher implements TopicDispatcher {
     Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
 
     // Set the creator as the owner of the topic.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.namespace().level(0),

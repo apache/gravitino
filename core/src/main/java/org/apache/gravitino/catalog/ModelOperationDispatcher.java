@@ -35,6 +35,7 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -209,6 +210,34 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
                         }),
                 NoSuchModelException.class,
                 ModelVersionAliasesAlreadyExistException.class));
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithModelOps(m -> m.getModelVersionUri(ident, version, uriName)),
+                NoSuchModelVersionException.class,
+                NoSuchModelVersionURINameException.class));
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () ->
+            doWithCatalog(
+                getCatalogIdentifier(ident),
+                c -> c.doWithModelOps(m -> m.getModelVersionUri(ident, alias, uriName)),
+                NoSuchModelVersionException.class,
+                NoSuchModelVersionURINameException.class));
   }
 
   @Override
