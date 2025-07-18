@@ -470,7 +470,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       throws IOException {
 
     osw.write(LineUtil.getSpaces(minPadding));
-    if (str.length() < maxLength) {
+    if (LineUtil.getDisplayWidth(str) < maxLength) {
       int leftPadding =
           align == Column.HorizontalAlign.LEFT
               ? 0
