@@ -167,8 +167,6 @@ public class GravitinoInterceptionService implements InterceptionService {
                 "User '%s' is not authorized to perform operation '%s' on metadata '%s'",
                 currentUser, methodName, accessMetadataName.name());
       }
-
-      // Create response without stack trace for security
       return Utils.forbidden(contextualMessage, null);
     }
 
