@@ -60,6 +60,9 @@ dependencies {
   implementation(libs.jackson.databind)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jcasbin) {
+    exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
+  }
   implementation(libs.metrics.jersey2)
   implementation(libs.mybatis)
   implementation(libs.ognl)

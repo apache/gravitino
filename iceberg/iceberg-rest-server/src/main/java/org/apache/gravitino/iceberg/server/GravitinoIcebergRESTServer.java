@@ -48,6 +48,7 @@ public class GravitinoIcebergRESTServer {
   private void initialize() {
     gravitinoEnv.initializeBaseComponents(serverConfig);
     if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+      serverConfig.set(Configs.ENTITY_STORE_GC_ENABLED, false);
       gravitinoEnv.initEntityStore();
       GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
     }

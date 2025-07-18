@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -33,6 +34,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Assertions;
@@ -125,5 +127,17 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     gravitinoMetalake.createRole(roleName, new HashMap<>(), securableObjects);
 
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+
+    User user = gravitinoMetalake.getUser(NORMAL_USER);
+    Assertions.assertNotNull(user);
+
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(Arrays.asList(CATALOG_NAME, schema), MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    Optional<Owner> owner =
+        gravitinoMetalake.getOwner(
+            MetadataObjects.of(Arrays.asList(CATALOG_NAME, schema), MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(owner.isPresent());
   }
 }

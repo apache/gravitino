@@ -123,19 +123,7 @@ public class IcebergAuthorizationIT extends BaseIT {
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",
-            ImmutableMap.of(
-                IcebergConstants.URI,
-                getPGUri(),
-                IcebergConstants.CATALOG_BACKEND,
-                "jdbc",
-                IcebergConstants.GRAVITINO_JDBC_DRIVER,
-                "org.postgresql.Driver",
-                IcebergConstants.GRAVITINO_JDBC_USER,
-                getPGUser(),
-                IcebergConstants.GRAVITINO_JDBC_PASSWORD,
-                getPGPassword(),
-                IcebergConstants.WAREHOUSE,
-                "file:///tmp/"));
+            getJDBCCatalogBackendConfig());
   }
 
   private void startGravitinoServerWithoutIcebergREST() throws Exception {
@@ -215,11 +203,14 @@ public class IcebergAuthorizationIT extends BaseIT {
   }
 
   private Map<String, String> getIcebergCatalogConfig() {
-    // get entity store configurations
+    // add entity store configurations
     Map<String, String> configs = new HashMap<>(customConfigs);
+    // add jdbc catalog backend configs
+    getJDBCCatalogBackendConfig()
+        .forEach((k, v) -> configs.put(GRAVITINO_ICEBERG_REST_PREFIX + k, v));
+    // add dynamic config provider configs
     configs.putAll(
         ImmutableMap.of(
-            // dynamic config related configurations
             GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
             IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
             GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_URI,
@@ -227,8 +218,24 @@ public class IcebergAuthorizationIT extends BaseIT {
             GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE,
             METALAKE_NAME,
             GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_SIMPLE_USERNAME,
-            NORMAL_USER));
+            SUPER_USER));
     return configs;
+  }
+
+  private Map<String, String> getJDBCCatalogBackendConfig() {
+    return ImmutableMap.of(
+        IcebergConstants.URI,
+        getPGUri(),
+        IcebergConstants.CATALOG_BACKEND,
+        "jdbc",
+        IcebergConstants.GRAVITINO_JDBC_DRIVER,
+        "org.postgresql.Driver",
+        IcebergConstants.GRAVITINO_JDBC_USER,
+        getPGUser(),
+        IcebergConstants.GRAVITINO_JDBC_PASSWORD,
+        getPGPassword(),
+        IcebergConstants.WAREHOUSE,
+        "file:///tmp/");
   }
 
   private String getPGUri() {
