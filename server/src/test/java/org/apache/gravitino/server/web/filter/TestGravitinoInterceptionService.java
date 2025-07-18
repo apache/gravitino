@@ -53,6 +53,7 @@ public class TestGravitinoInterceptionService {
       principalUtilsMocked
           .when(PrincipalUtils::getCurrentPrincipal)
           .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
       MethodInvocation methodInvocation = mock(MethodInvocation.class);
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
@@ -75,8 +76,51 @@ public class TestGravitinoInterceptionService {
       when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake2"});
       Response response2 = (Response) methodInterceptor.invoke(methodInvocation);
       assertEquals(
-          "Can not access metadata {testMetalake2}.",
+          "User 'tester' is not authorized to perform operation 'testMethod' on metadata 'testMetalake2'",
           ((ErrorResponse) response2.getEntity()).getMessage());
+    }
+  }
+
+  @Test
+  public void testSystemInternalErrorHandling() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+
+      // Mock an exception during authorization
+      when(mockedProvider.getGravitinoAuthorizer())
+          .thenThrow(new RuntimeException("Database connection failed"));
+
+      GravitinoInterceptionService gravitinoInterceptionService =
+          new GravitinoInterceptionService();
+      Class<TestOperations> testOperationsClass = TestOperations.class;
+      Method[] methods = testOperationsClass.getMethods();
+      Method testMethod = methods[0];
+      List<MethodInterceptor> methodInterceptors =
+          gravitinoInterceptionService.getMethodInterceptors(testMethod);
+      MethodInterceptor methodInterceptor = methodInterceptors.get(0);
+
+      // Test system internal error
+      when(methodInvocation.getMethod()).thenReturn(testMethod);
+      when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
+      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+
+      // Verify the system internal error message
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertEquals(
+          "Authorization failed due to system internal error. Please contact administrator.",
+          errorResponse.getMessage());
+
+      // Verify correct HTTP status
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
     }
   }
 
