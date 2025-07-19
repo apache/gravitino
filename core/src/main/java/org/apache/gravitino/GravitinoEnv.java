@@ -76,6 +76,8 @@ import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metalake.MetalakeNormalizeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
+import org.apache.gravitino.policy.PolicyDispatcher;
+import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -119,6 +121,8 @@ public class GravitinoEnv {
   private CredentialOperationDispatcher credentialOperationDispatcher;
 
   private TagDispatcher tagDispatcher;
+
+  private PolicyDispatcher policyDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
 
@@ -342,6 +346,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the AuditLogManager associated with the Gravitino environment.
+   *
+   * @return The AuditLogManager instance.
+   */
+  public PolicyDispatcher policyDispatcher() {
+    return policyDispatcher;
+  }
+
+  /**
    * Get the Owner dispatcher associated with the Gravitino environment.
    *
    * @return The OwnerManager instance.
@@ -545,5 +558,7 @@ public class GravitinoEnv {
 
     // Create and initialize Tag related modules
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
+    // todo: support policy event dispatcher
+    this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
   }
 }
