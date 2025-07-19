@@ -47,7 +47,7 @@ public class ModelVersionInfo {
    */
   public ModelVersionInfo(ModelVersion modelVersion) {
     this(
-        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, modelVersion.uri()),
+        modelVersion.uris(),
         modelVersion.comment(),
         modelVersion.properties(),
         modelVersion.aliases(),
