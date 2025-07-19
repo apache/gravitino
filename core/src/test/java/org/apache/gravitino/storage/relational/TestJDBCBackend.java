@@ -47,6 +47,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
@@ -1385,6 +1386,70 @@ public class TestJDBCBackend {
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }
+  }
+
+  protected Integer countAllStats(Long metalakeId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d", metalakeId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected Integer countActiveStats(Long metalakeId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM statistic_meta WHERE metalake_id = %d AND deleted_at = 0",
+                    metalakeId))) {
+      if (rs1.next()) {
+        return rs1.getInt(1);
+      } else {
+        throw new RuntimeException("Doesn't contain data");
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected Integer testStats(Long metalakeId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement1 = connection.createStatement();
+        ResultSet rs1 =
+            statement1.executeQuery(
+                String.format(
+                    "SELECT * FROM statistic_meta WHERE metalake_id = %d AND deleted_at = 0",
+                    metalakeId))) {
+      ResultSetMetaData metaData = rs1.getMetaData();
+      int columnCount = metaData.getColumnCount();
+      while (rs1.next()) {
+        for (int index = 0; index < columnCount; index++) {
+          String columnName = metaData.getColumnName(index + 1);
+          Object value = rs1.getObject(index + 1);
+          System.out.printf("Column: %s, Value: %s%n", columnName, value);
+        }
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+    return 1;
   }
 
   protected Integer countAllTagRel(Long tagId) {
