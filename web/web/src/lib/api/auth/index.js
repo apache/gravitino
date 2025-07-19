@@ -18,6 +18,7 @@
  */
 
 import { defHttp } from '@/lib/utils/axios'
+import { ContentTypeEnum } from '@/lib/enums/httpEnum'
 
 export const getAuthConfigsApi = () => {
   return defHttp.get({
@@ -29,7 +30,10 @@ export const loginApi = (url, params) => {
   return defHttp.post(
     {
       url,
-      params
+      data: params,
+      headers: {
+        'Content-Type': ContentTypeEnum.FORM_URLENCODED
+      }
     },
     { withToken: false }
   )
