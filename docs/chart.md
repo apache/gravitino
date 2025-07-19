@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Helm Chart"
+title: "Helm Chart"
 slug: /chart
 keyword: chart
 license: "This software is licensed under the Apache License version 2."
