@@ -18,12 +18,13 @@
  */
 package org.apache.gravitino.iceberg.server;
 
-import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.RESTService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,12 +34,12 @@ public class GravitinoIcebergRESTServer {
 
   public static final String CONF_FILE = "gravitino-iceberg-rest-server.conf";
 
-  private final Config serverConfig;
+  private final ServerConfig serverConfig;
 
   private RESTService icebergRESTService;
   private GravitinoEnv gravitinoEnv;
 
-  public GravitinoIcebergRESTServer(Config config) {
+  public GravitinoIcebergRESTServer(ServerConfig config) {
     this.serverConfig = config;
     this.gravitinoEnv = GravitinoEnv.getInstance();
     this.icebergRESTService = new RESTService();
@@ -46,6 +47,11 @@ public class GravitinoIcebergRESTServer {
 
   private void initialize() {
     gravitinoEnv.initializeBaseComponents(serverConfig);
+    if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+      serverConfig.set(Configs.ENTITY_STORE_GC_ENABLED, false);
+      gravitinoEnv.initEntityStore();
+      GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
+    }
     icebergRESTService.serviceInit(
         serverConfig.getConfigsWithPrefix(IcebergConfig.ICEBERG_CONFIG_PREFIX));
     ServerAuthenticator.getInstance().initialize(serverConfig);

@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -48,6 +49,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.integration.test.MiniGravitino;
@@ -112,6 +114,7 @@ public class BaseIT {
   protected String serverUri;
 
   protected String originConfig;
+  private Optional<String> entityStoreBackend = Optional.empty();
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -158,9 +161,14 @@ public class BaseIT {
       String serverPath = ITUtils.joinPath(gravitinoHome, "libs");
       String icebergCatalogPath =
           ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs");
-      DownloaderUtils.downloadFile(DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+      String icebergRESTServerPath = ITUtils.joinPath(gravitinoHome, "iceberg-rest-server", "libs");
       DownloaderUtils.downloadFile(
-          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath);
+          DOWNLOAD_MYSQL_JDBC_DRIVER_URL, serverPath, icebergCatalogPath, icebergRESTServerPath);
+      DownloaderUtils.downloadFile(
+          DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL,
+          serverPath,
+          icebergCatalogPath,
+          icebergRESTServerPath);
     } else {
       Path icebergLibsPath =
           Paths.get(gravitinoHome, "catalogs", "catalog-lakehouse-iceberg", "build", "libs");
@@ -271,7 +279,7 @@ public class BaseIT {
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
-    if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    if ("MySQL".equalsIgnoreCase(getEntityStoreBackend())) {
       // Start MySQL docker instance.
       String jdbcURL = startAndInitMySQLBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -281,7 +289,7 @@ public class BaseIT {
           Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
-    } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    } else if ("PostgreSQL".equalsIgnoreCase(getEntityStoreBackend())) {
       // Start PostgreSQL docker instance.
       String pgJdbcUrl = startAndInitPGBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -303,6 +311,12 @@ public class BaseIT {
 
     serverConfig = new ServerConfig();
     customConfigs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), file.getAbsolutePath());
+    if (ignoreIcebergRestService) {
+      customConfigs.put(
+          AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+              + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+          "");
+    }
     if (testMode != null && testMode.equals(ITUtils.EMBEDDED_TEST_MODE)) {
       MiniGravitinoContext context =
           new MiniGravitinoContext(customConfigs, ignoreIcebergRestService);
@@ -364,7 +378,7 @@ public class BaseIT {
       miniGravitino.stop();
     } else {
       GravitinoITUtils.stopGravitinoServer();
-      recoverGravitinoServerConfig();
+      // recoverGravitinoServerConfig();
     }
     if (client != null) {
       client.close();
@@ -461,5 +475,22 @@ public class BaseIT {
     } catch (Exception e) {
       throw new IllegalStateException("Failed to set environment variable", e);
     }
+  }
+
+  protected String getIcebergRestServiceUri() {
+    JettyServerConfig jettyServerConfig =
+        JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
+    return String.format(
+        "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
+  }
+
+  // MySQL or PostgreSQL
+  protected void setEntityStoreBackend(String backend) {
+    entityStoreBackend = Optional.of(backend);
+  }
+
+  private String getEntityStoreBackend() {
+    String backend = System.getenv("jdbcBackend");
+    return entityStoreBackend.orElse(backend);
   }
 }

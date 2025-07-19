@@ -52,13 +52,20 @@ dependencies {
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
   implementation(libs.caffeine)
+  implementation(libs.commons.dbcp2)
   implementation(libs.commons.lang3)
+  implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.databind)
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
+  implementation(libs.jcasbin) {
+    exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
+  }
   implementation(libs.metrics.jersey2)
+  implementation(libs.mybatis)
+  implementation(libs.ognl)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
@@ -69,6 +76,7 @@ dependencies {
   testImplementation(project(":bundles:gcp", configuration = "shadow"))
   testImplementation(project(":bundles:azure", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
 
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
@@ -98,9 +106,11 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
