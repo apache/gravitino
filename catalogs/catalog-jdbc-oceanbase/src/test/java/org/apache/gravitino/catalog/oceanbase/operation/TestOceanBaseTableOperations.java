@@ -461,7 +461,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -545,7 +545,7 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_3")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .withComment("timestamp")
             .withDefaultValue(Literals.timestampLiteral(LocalDateTime.parse("2013-01-01T00:00:00")))
@@ -626,13 +626,13 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     columns.add(
         JdbcColumn.builder()
             .withName("col_8")
-            .withType(Types.TimeType.get())
+            .withType(Types.TimeType.of(0))
             .withNullable(false)
             .build());
     columns.add(
         JdbcColumn.builder()
             .withName("col_9")
-            .withType(Types.TimestampType.withoutTimeZone())
+            .withType(Types.TimestampType.withoutTimeZone(0))
             .withNullable(false)
             .build());
     columns.add(
@@ -1042,5 +1042,95 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = OceanBaseTableOperations.deleteIndexDefinition(load, deleteIndex3);
     Assertions.assertEquals("DROP INDEX `uk_2`", sql);
+  }
+
+  @Test
+  public void testCalculateDatetimePrecision() {
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATE", 10, 0),
+        "DATE type should return 0 precision");
+
+    Assertions.assertEquals(
+        1,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIME", 10, 0),
+        "TIME type should return 0 precision");
+
+    Assertions.assertEquals(
+        3,
+        TABLE_OPERATIONS.calculateDatetimePrecision("TIMESTAMP", 23, 0),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        6,
+        TABLE_OPERATIONS.calculateDatetimePrecision("DATETIME", 26, 0),
+        "TIMESTAMP type should return 0 precision");
+
+    Assertions.assertEquals(
+        9,
+        TABLE_OPERATIONS.calculateDatetimePrecision("timestamp", 29, 0),
+        "Lower case type name should work");
+
+    Assertions.assertNull(
+        TABLE_OPERATIONS.calculateDatetimePrecision("VARCHAR", 50, 0),
+        "Non-datetime type should return 0 precision");
+  }
+
+  @Test
+  public void testCalculateDatetimePrecisionWithUnsupportedDriverVersion() {
+    OceanBaseTableOperations operationsWithOldDriver =
+        new OceanBaseTableOperations() {
+          @Override
+          protected String getMySQLDriverVersion() {
+            return "mysql-connector-java-8.0.11 (Revision: a0ca826f5cdf51a98356fdfb1bf251eb042f80bf)";
+          }
+
+          @Override
+          public boolean isMySQLDriverVersionSupported(String driverVersion) {
+            return false;
+          }
+        };
+
+    Assertions.assertNull(
+        operationsWithOldDriver.calculateDatetimePrecision("TIMESTAMP", 26, 0),
+        "TIMESTAMP type should return null for unsupported driver version");
+
+    Assertions.assertNull(
+        operationsWithOldDriver.calculateDatetimePrecision("DATETIME", 26, 0),
+        "DATETIME type should return null for unsupported driver version");
+
+    Assertions.assertNull(
+        operationsWithOldDriver.calculateDatetimePrecision("TIME", 16, 0),
+        "TIME type should return null for unsupported driver version");
+  }
+
+  @Test
+  public void testCalculateDatetimePrecisionWithOceanBaseDriver() {
+    OceanBaseTableOperations operationsWithOceanBaseDriver =
+        new OceanBaseTableOperations() {
+          @Override
+          protected String getMySQLDriverVersion() {
+            return "com.oceanbase.jdbc.Driver-1.0.0";
+          }
+
+          @Override
+          public boolean isMySQLDriverVersionSupported(String driverVersion) {
+            return true;
+          }
+        };
+
+    Assertions.assertEquals(
+        3,
+        operationsWithOceanBaseDriver.calculateDatetimePrecision("TIMESTAMP", 23, 0),
+        "TIMESTAMP type should return precision for OceanBase driver");
+
+    Assertions.assertEquals(
+        6,
+        operationsWithOceanBaseDriver.calculateDatetimePrecision("DATETIME", 26, 0),
+        "DATETIME type should return precision for OceanBase driver");
+
+    Assertions.assertEquals(
+        1,
+        operationsWithOceanBaseDriver.calculateDatetimePrecision("TIME", 10, 0),
+        "TIME type should return precision for OceanBase driver");
   }
 }

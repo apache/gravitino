@@ -90,24 +90,24 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Table column types
 
-| Gravitino Type | PostgreSQL Type |
-|----------------|-----------------|
-| `Boolean`      | `Bool`          |
-| `Short`        | `Int2`          |
-| `Integer`      | `Int4`          |
-| `Long`         | `Int8`          |
-| `Float`        | `Float4`        |
-| `Double`       | `Float8`        |
-| `String`       | `Text`          |
-| `Date`         | `Date`          |
-| `Time`         | `Time`          |
-| `Timestamp`    | `Timestamp`     |
-| `Timestamp_tz` | `Timestamptz`   |
-| `Decimal`      | `Numeric`       |
-| `VarChar`      | `Varchar`       |
-| `FixedChar`    | `Bpchar`        |
-| `Binary`       | `Bytea`         |
-| `List`         | `Array`         |
+| Gravitino Type    | PostgreSQL Type  |
+|-------------------|------------------|
+| `Boolean`         | `Bool`           |
+| `Short`           | `Int2`           |
+| `Integer`         | `Int4`           |
+| `Long`            | `Int8`           |
+| `Float`           | `Float4`         |
+| `Double`          | `Float8`         |
+| `String`          | `Text`           |
+| `Date`            | `Date`           |
+| `Time(p)`         | `Time(p)`        |
+| `Timestamp(p)`    | `Timestamp(p)`   |
+| `Timestamp_tz(p)` | `Timestamptz(p)` |
+| `Decimal`         | `Numeric`        |
+| `VarChar`         | `Varchar`        |
+| `FixedChar`       | `Bpchar`         |
+| `Binary`          | `Bytea`          |
+| `List`            | `Array`          |
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
