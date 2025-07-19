@@ -41,6 +41,11 @@ import org.apache.commons.lang3.StringUtils;
  *   <li>arguments
  *   <li>environments
  * </ul>
+ *
+ * <p>executable is the path to the executable that will be run, it should be an absolute path that
+ * can be accessed by the Gravitino server, current Gravitino can support executables in the local
+ * file system, or on the web server (e.g., HTTP or HTTPS, FTP). Distributed file systems like HDFS
+ * or S3 will be supported in the future.
  */
 public abstract class JobTemplate {
 
