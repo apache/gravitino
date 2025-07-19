@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.gravitino.catalog.starrocks.utils;
 
 import com.google.common.collect.ImmutableList;
@@ -34,7 +52,8 @@ public class StarRocksUtils {
       Pattern.compile(
           "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?\\s*(BUCKETS\\s+(\\d+|AUTO))?");
 
-  private static final Pattern COMMENT_PATTERN = Pattern.compile("COMMENT\\s*\"(.*)\"");
+  private static final Pattern TABLE_COMMENT_PATTERN =
+      Pattern.compile("COMMENT\\s*\"([^\\(]+?)\\s*\\(From Gravitino,.*\\)\"");
 
   private static final String LIST_PARTITION = "LIST";
   private static final String RANGE_PARTITION = "RANGE";
@@ -137,7 +156,7 @@ public class StarRocksUtils {
   }
 
   public static String extractTableCommentFromSql(String createTableSql) {
-    Matcher matcher = COMMENT_PATTERN.matcher(createTableSql.trim());
+    Matcher matcher = TABLE_COMMENT_PATTERN.matcher(createTableSql.trim());
     if (matcher.find()) {
       return matcher.group(1);
     }
@@ -175,16 +194,11 @@ public class StarRocksUtils {
 
   private static String generateRangePartitionValues(RangePartition rangePartition) {
     Literal<?> upper = rangePartition.upper();
-    Literal<?> lower = rangePartition.lower();
     String partitionValues;
-    if (Literals.NULL.equals(upper) && Literals.NULL.equals(lower)) {
+    if (Literals.NULL.equals(upper)) {
       partitionValues = "LESS THAN MAXVALUE";
-    } else if (Literals.NULL.equals(lower)) {
-      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
-    } else if (Literals.NULL.equals(upper)) {
-      partitionValues = String.format("[(\"%s\"), (MAXVALUE))", lower.value());
     } else {
-      partitionValues = String.format("[(\"%s\"), (\"%s\"))", lower.value(), upper.value());
+      partitionValues = String.format("LESS THAN (\"%s\")", upper.value());
     }
     return partitionValues;
   }

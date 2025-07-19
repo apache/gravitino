@@ -41,6 +41,7 @@ public class StarRocksExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_TABLE_EXISTS = 1050;
   static final int CODE_DATABASE_NOT_EXISTS = 1008;
   static final int CODE_UNKNOWN_DATABASE = 1049;
+  static final int CODE_UNKNOWN_DATABASE_2 = 5501;
   static final int CODE_NO_SUCH_TABLE = 1051;
   static final int CODE_UNAUTHORIZED = 1045;
   static final int CODE_NO_SUCH_COLUMN = 1054;
@@ -96,6 +97,7 @@ public class StarRocksExceptionConverter extends JdbcExceptionConverter {
         return new TableAlreadyExistsException(se, se.getMessage());
       case CODE_DATABASE_NOT_EXISTS:
       case CODE_UNKNOWN_DATABASE:
+      case CODE_UNKNOWN_DATABASE_2:
         return new NoSuchSchemaException(se, se.getMessage());
       case CODE_NO_SUCH_TABLE:
         return new NoSuchTableException(se, se.getMessage());

@@ -83,7 +83,7 @@ public class DataSourceUtils {
     basicDataSource.setDriverClassName(driverClassName);
     String userName = jdbcConfig.getUsername();
     basicDataSource.setUsername(userName);
-    String password = jdbcConfig.getPassword();
+    String password = "";
     basicDataSource.setPassword(password);
     basicDataSource.setMaxTotal(jdbcConfig.getPoolMaxSize());
     basicDataSource.setMinIdle(jdbcConfig.getPoolMinSize());

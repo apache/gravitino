@@ -327,14 +327,14 @@ public class StarRocksTableOperations extends JdbcTableOperations {
         Arrays.stream(columns).map(JdbcColumn::name).collect(Collectors.toSet());
 
     if (partitioning[0] instanceof Transforms.RangeTransform) {
-      // We do not support multi-column range partitioning in StarRocks for now
+      // We do not support multi-column range partitioning in doris for now
       Transforms.RangeTransform rangePartition = (Transforms.RangeTransform) partitioning[0];
       partitionSqlBuilder = generateRangePartitionSql(rangePartition, columnNames);
     } else if (partitioning[0] instanceof Transforms.ListTransform) {
       Transforms.ListTransform listPartition = (Transforms.ListTransform) partitioning[0];
       partitionSqlBuilder = generateListPartitionSql(listPartition, columnNames);
     } else {
-      throw new IllegalArgumentException("Unsupported partition type of StarRocks");
+      throw new IllegalArgumentException("Unsupported partition type of Doris");
     }
 
     sqlBuilder.append(partitionSqlBuilder);
@@ -343,8 +343,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
   private static StringBuilder generateRangePartitionSql(
       Transforms.RangeTransform rangePartition, Set<String> columnNames) {
     Preconditions.checkArgument(
-        rangePartition.fieldName().length == 1,
-        "StarRocks partition does not support nested field");
+        rangePartition.fieldName().length == 1, "Doris partition does not support nested field");
     Preconditions.checkArgument(
         columnNames.contains(rangePartition.fieldName()[0]),
         "The partition field must be one of the columns");
@@ -374,7 +373,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     String[][] filedNames = listPartition.fieldNames();
     for (String[] filedName : filedNames) {
       Preconditions.checkArgument(
-          filedName.length == 1, "StarRocks partition does not support nested field");
+          filedName.length == 1, "Doris partition does not support nested field");
       Preconditions.checkArgument(
           columnNames.contains(filedName[0]), "The partition field must be one of the columns");
 

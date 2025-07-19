@@ -65,7 +65,7 @@ public abstract class TestJdbc {
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), CONTAINER.getDriverClassName());
     properties.put(JdbcConfig.JDBC_URL.getKey(), CONTAINER.getJdbcUrl());
     properties.put(JdbcConfig.USERNAME.getKey(), CONTAINER.getUsername());
-    properties.put(JdbcConfig.PASSWORD.getKey(), CONTAINER.getPassword());
+    properties.put(JdbcConfig.PASSWORD.getKey(), "");
     DATA_SOURCE = DataSourceUtils.createDataSource(properties);
   }
 
