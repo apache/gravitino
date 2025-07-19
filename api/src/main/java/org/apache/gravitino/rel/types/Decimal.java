@@ -127,7 +127,9 @@ public class Decimal {
       return false;
     }
     Decimal decimal = (Decimal) o;
-    return scale == decimal.scale && Objects.equals(value, decimal.value);
+    return scale == decimal.scale
+        && precision == decimal.precision
+        && Objects.equals(value, decimal.value);
   }
 
   @Override
