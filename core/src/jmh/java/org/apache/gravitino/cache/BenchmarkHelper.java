@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.cache;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.TestUtil;
@@ -90,6 +92,30 @@ public class BenchmarkHelper {
     List<K> keys = new ArrayList<>(map.keySet());
 
     return keys.get(random.nextInt(keys.size()));
+  }
+
+  /**
+   * Returns the {@link NameIdentifier} of the entity based on its type.
+   *
+   * @param entity The {@link Entity} instance.
+   * @return The {@link NameIdentifier} of the entity
+   */
+  public static NameIdentifier getIdentFromEntity(Entity entity) {
+    validateEntityHasIdentifier(entity);
+    HasIdentifier hasIdentifier = (HasIdentifier) entity;
+
+    return hasIdentifier.nameIdentifier();
+  }
+
+  /**
+   * Checks if the entity is of type {@link HasIdentifier}.
+   *
+   * @param entity The {@link Entity} instance to check.
+   */
+  public static void validateEntityHasIdentifier(Entity entity) {
+    Preconditions.checkArgument(entity != null, "Entity cannot be null");
+    Preconditions.checkArgument(
+        entity instanceof HasIdentifier, "Unsupported EntityType: " + entity.type());
   }
 
   private static List<Entity> getUserList(RoleEntity roleEntity, int userCnt) {
