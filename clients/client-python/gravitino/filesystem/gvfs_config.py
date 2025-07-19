@@ -73,3 +73,6 @@ class GVFSConfig:
 
     # The configuration key for whether to enable credential vending. The default is false.
     GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING = "enable_credential_vending"
+
+    # The configuration key for the timeout of the client request.
+    GVFS_FILESYSTEM_CLIENT_REQUEST_TIMEOUT = "client_request_timeout"

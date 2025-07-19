@@ -95,6 +95,25 @@ class TestLocalFilesystem(unittest.TestCase):
         headers = fs._operations._client._rest_client.request_headers
         self.assertEqual(headers["k1"], "v1")
 
+    def test_request_timeout(self, *mock_methods):
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090",
+            metalake_name="metalake_demo",
+            skip_instance_cache=True,
+        )
+        self.assertEqual(fs._operations._client._rest_client.timeout, 10)
+
+        options = {
+            f"{GVFSConfig.GVFS_FILESYSTEM_CLIENT_REQUEST_TIMEOUT}": 60,
+        }
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090",
+            metalake_name="metalake_demo",
+            options=options,
+            skip_instance_cache=True,
+        )
+        self.assertEqual(fs._operations._client._rest_client.timeout, 60)
+
     def test_cache(self, *mock_methods):
         fileset_storage_location = f"{self._fileset_dir}/test_cache"
         fileset_virtual_location = "fileset/fileset_catalog/tmp/test_cache"
