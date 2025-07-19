@@ -73,21 +73,21 @@ public class ParseType {
   }
 
   private static Type toListType(String datatype) {
-    Pattern pattern = Pattern.compile("^list\\((.+)\\)$");
+    Pattern pattern = Pattern.compile("^list\\s*\\(\\s*(.+?)\\s*\\)$");
     Matcher matcher = pattern.matcher(datatype);
     if (matcher.matches()) {
-      Type elementType = toBasicType(matcher.group(1));
+      Type elementType = toBasicType(matcher.group(1).trim());
       return Types.ListType.of(elementType, false);
     }
     throw new IllegalArgumentException("Malformed list type: " + datatype);
   }
 
   private static Type toMapType(String datatype) {
-    Pattern pattern = Pattern.compile("^map\\((.+),(.+)\\)$");
+    Pattern pattern = Pattern.compile("^map\\s*\\(\\s*(.+?)\\s*,\\s*(.+?)\\s*\\)$");
     Matcher matcher = pattern.matcher(datatype);
     if (matcher.matches()) {
-      Type keyType = toBasicType(matcher.group(1));
-      Type valueType = toBasicType(matcher.group(2));
+      Type keyType = toBasicType(matcher.group(1).trim());
+      Type valueType = toBasicType(matcher.group(2).trim());
       return Types.MapType.of(keyType, valueType, false);
     }
     throw new IllegalArgumentException("Malformed map type: " + datatype);

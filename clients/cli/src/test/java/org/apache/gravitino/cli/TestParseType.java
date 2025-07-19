@@ -100,4 +100,22 @@ public class TestParseType {
     assertThrows(IllegalArgumentException.class, () -> ParseType.toType("varchar(-10)"));
     assertThrows(IllegalArgumentException.class, () -> ParseType.toType("decimal(10,abc)"));
   }
+
+  @Test
+  public void testParseTypeListWithSpaces() {
+    Type type = ParseType.toType("list( integer )");
+    assertThat(type, instanceOf(Types.ListType.class));
+    Type elementType = ((Types.ListType) type).elementType();
+    assertThat(elementType, instanceOf(Types.IntegerType.class));
+  }
+
+  @Test
+  public void testParseTypeMapWithSpaces() {
+    Type type = ParseType.toType("map( string , integer )");
+    assertThat(type, instanceOf(Types.MapType.class));
+    Type keyType = ((Types.MapType) type).keyType();
+    Type valueType = ((Types.MapType) type).valueType();
+    assertThat(keyType, instanceOf(Types.StringType.class));
+    assertThat(valueType, instanceOf(Types.IntegerType.class));
+  }
 }
