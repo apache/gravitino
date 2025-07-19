@@ -132,18 +132,17 @@ public class HTTPClient implements RESTClient {
    * @return The response body as a string.
    * @throws RESTException If an error occurs during conversion of the response body to a string.
    */
-  private String extractResponseBodyAsString(CloseableHttpResponse response) {
+  
+private String extractResponseBodyAsString(CloseableHttpResponse response) {
     try {
-      if (response.getEntity() == null) {
-        return null;
-      }
-
-      // EntityUtils.toString returns null when HttpEntity.getContent returns null.
-      return EntityUtils.toString(response.getEntity(), "UTF-8");
+        if (response.getEntity() == null) {
+            return null;
+        }
+        return EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
     } catch (IOException | ParseException e) {
-      throw new RESTException(e, "Failed to convert HTTP response body to string");
+        throw new RESTException(e, "Failed to convert HTTP response body to string");
     }
-  }
+}
 
   /**
    * Checks if the response indicates a successful response.
