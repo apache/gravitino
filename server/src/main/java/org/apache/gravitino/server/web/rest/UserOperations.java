@@ -20,6 +20,8 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -31,8 +33,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
@@ -40,8 +45,12 @@ import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +76,11 @@ public class UserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-user", absolute = true)
-  public Response getUser(@PathParam("metalake") String metalake, @PathParam("user") String user) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || USER::SELF")
+  public Response getUser(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("user") @AuthorizationMetadata(type = Entity.EntityType.USER) String user) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -92,9 +105,26 @@ public class UserOperations {
           httpRequest,
           () -> {
             if (verbose) {
-              return Utils.ok(
-                  new UserListResponse(
-                      DTOConverters.toDTOs(accessControlManager.listUsers(metalake))));
+              User[] users = accessControlManager.listUsers(metalake);
+              users =
+                  Arrays.stream(users)
+                      .filter(
+                          user -> {
+                            NameIdentifier[] nameIdentifiers =
+                                new NameIdentifier[] {
+                                  NameIdentifierUtil.ofUser(metalake, user.name())
+                                };
+                            return MetadataFilterHelper.filterByExpression(
+                                        metalake,
+                                        "METALAKE::OWNER || USER::SELF",
+                                        Entity.EntityType.USER,
+                                        nameIdentifiers)
+                                    .length
+                                > 0;
+                          })
+                      .collect(Collectors.toList())
+                      .toArray(new User[0]);
+              return Utils.ok(new UserListResponse(DTOConverters.toDTOs(users)));
             } else {
               return Utils.ok(new NameListResponse(accessControlManager.listUserNames(metalake)));
             }
@@ -108,7 +138,11 @@ public class UserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-user", absolute = true)
-  public Response addUser(@PathParam("metalake") String metalake, UserAddRequest request) {
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_USERS")
+  public Response addUser(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      UserAddRequest request) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -130,8 +164,11 @@ public class UserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-user", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_USERS")
   public Response removeUser(
-      @PathParam("metalake") String metalake, @PathParam("user") String user) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("user") String user) {
     try {
       return Utils.doAs(
           httpRequest,

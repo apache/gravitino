@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
@@ -33,6 +34,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
@@ -40,6 +42,7 @@ import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -100,6 +103,11 @@ public class OwnerOperations {
       @PathParam("fullName") String fullName,
       OwnerSetRequest request) {
     try {
+      GravitinoAuthorizer gravitinoAuthorizer =
+          GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+      Preconditions.checkState(
+          gravitinoAuthorizer.hasSetOwnerPermission(metalake, metadataObjectType, fullName),
+          "Current can not set owner.");
       MetadataObject object =
           MetadataObjects.parse(
               fullName, MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT)));

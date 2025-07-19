@@ -39,7 +39,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
@@ -157,7 +156,7 @@ public class MetalakeOperations {
   @ResponseMetered(name = "load-metalake", absolute = true)
   @AuthorizationExpression(expression = "METALAKE_USER")
   public Response loadMetalake(
-      @PathParam("name") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName) {
     LOG.info("Received load metalake request for metalake: {}", metalakeName);
     try {
@@ -183,7 +182,7 @@ public class MetalakeOperations {
   @ResponseMetered(name = "set-metalake", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER")
   public Response setMetalake(
-      @PathParam("name") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       MetalakeSetRequest request) {
     LOG.info("Received set request for metalake: {}", metalakeName);
@@ -218,7 +217,7 @@ public class MetalakeOperations {
   @ResponseMetered(name = "alter-metalake", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER")
   public Response alterMetalake(
-      @PathParam("name") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       MetalakeUpdatesRequest updatesRequest) {
     LOG.info("Received alter metalake request for metalake: {}", metalakeName);
@@ -251,7 +250,7 @@ public class MetalakeOperations {
   @ResponseMetered(name = "drop-metalake", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER")
   public Response dropMetalake(
-      @PathParam("name") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       @DefaultValue("false") @QueryParam("force") boolean force) {
     LOG.info("Received drop metalake request for metalake: {}", metalakeName);

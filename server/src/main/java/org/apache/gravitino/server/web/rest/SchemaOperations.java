@@ -112,10 +112,9 @@ public class SchemaOperations {
       expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response createSchema(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       SchemaCreateRequest request) {
     LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
     try {
@@ -147,12 +146,10 @@ public class SchemaOperations {
       expression = loadSchemaAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response loadSchema(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA)
-          String schema) {
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
     LOG.info("Received load schema request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
@@ -179,11 +176,10 @@ public class SchemaOperations {
       expression = "ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response alterSchema(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       SchemaUpdatesRequest request) {
     LOG.info("Received alter schema request: {}.{}.{}", metalake, catalog, schema);
     try {
@@ -216,11 +212,10 @@ public class SchemaOperations {
       expression = "ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response dropSchema(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @DefaultValue("false") @QueryParam("cascade") boolean cascade) {
     LOG.info("Received drop schema request: {}.{}.{}", metalake, catalog, schema);
     try {

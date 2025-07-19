@@ -29,6 +29,7 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -86,7 +87,7 @@ public class TestGravitinoInterceptionService {
         expression = "METALAKE::USE_CATALOG || METALAKE::OWNER",
         accessMetadataType = MetadataObject.Type.METALAKE)
     public Response testMethod(
-        @AuthorizationMetadata(type = MetadataObject.Type.METALAKE) String metalake) {
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake) {
       return Utils.ok("ok");
     }
   }

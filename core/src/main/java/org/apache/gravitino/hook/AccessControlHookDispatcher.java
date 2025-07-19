@@ -21,6 +21,7 @@ package org.apache.gravitino.hook;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -43,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -51,6 +53,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * only delegates access control operations to the underlying access control dispatcher but also
  * executes some hook operations before or after the underlying operations.
  */
+@Slf4j
 public class AccessControlHookDispatcher implements AccessControlDispatcher {
   private final AccessControlDispatcher dispatcher;
 
@@ -178,7 +181,17 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
 
   @Override
   public boolean deleteRole(String metalake, String role) throws NoSuchMetalakeException {
-    return dispatcher.deleteRole(metalake, role);
+    Role oldRole = null;
+    try {
+      oldRole = getRole(metalake, role);
+    } catch (NoSuchRoleException e) {
+      log.debug(e.getMessage());
+    }
+    boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
+    if (oldRole != null) {
+      notifyRoleUserRelChange(((RoleEntity) oldRole).id());
+    }
+    return resultOfDeleteRole;
   }
 
   @Override
@@ -223,6 +236,13 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer != null) {
       gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
+    }
+  }
+
+  private static void notifyRoleUserRelChange(Long role) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.handleRolePrivilegeChange(role);
     }
   }
 }

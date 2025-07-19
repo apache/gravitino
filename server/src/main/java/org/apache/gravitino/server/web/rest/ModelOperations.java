@@ -124,12 +124,11 @@ public class ModelOperations {
       expression = loadModelAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModel(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model) {
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model) {
     LOG.info("Received get model request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
 
@@ -158,11 +157,10 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_MODEL",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerModel(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       ModelRegisterRequest request) {
     LOG.info(
         "Received register model request: {}.{}.{}.{}",
@@ -204,12 +202,11 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModel(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model) {
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model) {
     LOG.info("Received delete model request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
 
@@ -314,12 +311,11 @@ public class ModelOperations {
       expression = loadModelAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersion(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       @PathParam("version") int version) {
     LOG.info(
         "Received get model version request: {}.{}.{}.{}.{}",
@@ -354,12 +350,11 @@ public class ModelOperations {
       expression = loadModelAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response getModelVersionByAlias(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       @PathParam("alias") String alias) {
     LOG.info(
         "Received get model version alias request: {}.{}.{}.{}.{}",
@@ -397,12 +392,11 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL && ANY_CREATE_MODEL_VERSION)",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response linkModelVersion(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       ModelVersionLinkRequest request) {
     LOG.info("Received link model version request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -440,12 +434,11 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModelVersion(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       @PathParam("version") int version) {
     LOG.info(
         "Received delete model version request: {}.{}.{}.{}.{}",
@@ -488,12 +481,11 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModelVersionByAlias(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       @PathParam("alias") String alias) {
     LOG.info(
         "Received delete model version by alias request: {}.{}.{}.{}.{}",
@@ -537,12 +529,11 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModelVersion(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       @PathParam("version") int version,
       ModelVersionUpdatesRequest request) {
     LOG.info(
@@ -591,12 +582,11 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModelVersionByAlias(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       @PathParam("alias") String alias,
       ModelVersionUpdatesRequest request) {
     LOG.info(
@@ -644,12 +634,11 @@ public class ModelOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModel(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("model") @AuthorizationMetadata(type = MetadataObject.Type.MODEL) String model,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       ModelUpdatesRequest request) {
     LOG.info("Received alter model request: {}.{}.{}.{}", metalake, catalog, schema, model);
     try {

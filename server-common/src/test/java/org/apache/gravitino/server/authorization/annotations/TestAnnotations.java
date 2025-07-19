@@ -21,6 +21,7 @@ package org.apache.gravitino.server.authorization.annotations;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Assertions;
@@ -32,13 +33,13 @@ public class TestAnnotations {
   static class TestResourceAnnotationClass {
 
     public void methodWithAnnotatedParam(
-        @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table) {
+        @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table) {
       // dummy method
     }
 
     public void listSchemas(
-        @AuthorizationMetadata(type = MetadataObject.Type.METALAKE) String metalake,
-        @AuthorizationMetadata(type = MetadataObject.Type.CATALOG) String catalog) {
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog) {
       // dummy method
     }
   }
@@ -98,7 +99,7 @@ public class TestAnnotations {
             .getParameters()[0];
     AuthorizationMetadata annotation = argument.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(annotation);
-    Assertions.assertEquals(MetadataObject.Type.TABLE, annotation.type());
+    Assertions.assertEquals(Entity.EntityType.TABLE, annotation.type());
   }
 
   @Test
@@ -112,12 +113,12 @@ public class TestAnnotations {
     AuthorizationMetadata metalakeAnnotation =
         argumentMetalake.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(metalakeAnnotation);
-    Assertions.assertEquals(MetadataObject.Type.METALAKE, metalakeAnnotation.type());
+    Assertions.assertEquals(Entity.EntityType.METALAKE, metalakeAnnotation.type());
 
     Parameter argumentCatalog = arguments[1];
     AuthorizationMetadata catalogAnnotation =
         argumentCatalog.getAnnotation(AuthorizationMetadata.class);
     Assertions.assertNotNull(catalogAnnotation);
-    Assertions.assertEquals(MetadataObject.Type.CATALOG, catalogAnnotation.type());
+    Assertions.assertEquals(Entity.EntityType.CATALOG, catalogAnnotation.type());
   }
 }

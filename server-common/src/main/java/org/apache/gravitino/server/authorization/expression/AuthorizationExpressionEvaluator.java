@@ -18,7 +18,9 @@
 package org.apache.gravitino.server.authorization.expression;
 
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import ognl.Ognl;
 import ognl.OgnlContext;
@@ -62,10 +64,13 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put("principal", currentPrincipal);
     ognlContext.put("authorizer", gravitinoAuthorizer);
     metadataNames.forEach(
-        (metadataType, metadataName) -> {
-          MetadataObject metadataObject =
-              NameIdentifierUtil.toMetadataObject(metadataName, metadataType);
-          ognlContext.put(metadataType.name(), metadataObject);
+        (type, entityNameIdent) -> {
+          if (isMetadataType(type)) {
+            MetadataObject metadataObject =
+                NameIdentifierUtil.toMetadataObject(entityNameIdent, type);
+            ognlContext.put(type.name(), metadataObject);
+          }
+          ognlContext.put(type.name() + "_NAME_IDENT", entityNameIdent);
         });
     NameIdentifier nameIdentifier = metadataNames.get(Entity.EntityType.METALAKE);
     ognlContext.put(
@@ -76,5 +81,10 @@ public class AuthorizationExpressionEvaluator {
     } catch (OgnlException e) {
       throw new RuntimeException("ognl evaluate error", e);
     }
+  }
+
+  private static boolean isMetadataType(Entity.EntityType type) {
+    return Arrays.stream(MetadataObject.Type.values())
+        .anyMatch(e -> Objects.equals(e.name(), type.name()));
   }
 }

@@ -114,11 +114,10 @@ public class TopicOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TOPIC",
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTopic(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TopicCreateRequest request) {
     LOG.info("Received create topic request: {}.{}.{}", metalake, catalog, schema);
     try {
@@ -160,12 +159,11 @@ public class TopicOperations {
       expression = loadTopicsAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response loadTopic(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("topic") @AuthorizationMetadata(type = MetadataObject.Type.TOPIC) String topic) {
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("topic") @AuthorizationMetadata(type = Entity.EntityType.TOPIC) String topic) {
     LOG.info(
         "Received load topic request for topic: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
@@ -196,12 +194,11 @@ public class TopicOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_PRODUCE_TOPIC)",
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response alterTopic(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("topic") @AuthorizationMetadata(type = MetadataObject.Type.TOPIC) String topic,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("topic") @AuthorizationMetadata(type = Entity.EntityType.TOPIC) String topic,
       TopicUpdatesRequest request) {
     LOG.info("Received alter topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
@@ -238,12 +235,11 @@ public class TopicOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TOPIC::OWNER",
       accessMetadataType = MetadataObject.Type.TOPIC)
   public Response dropTopic(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("topic") @AuthorizationMetadata(type = MetadataObject.Type.TOPIC) String topic) {
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("topic") @AuthorizationMetadata(type = Entity.EntityType.TOPIC) String topic) {
     LOG.info("Received drop topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
     try {
       return Utils.doAs(

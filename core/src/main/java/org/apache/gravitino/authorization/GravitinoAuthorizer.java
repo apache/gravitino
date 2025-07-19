@@ -70,6 +70,18 @@ public interface GravitinoAuthorizer extends Closeable {
   }
 
   /**
+   * Determine whether the user accessing is oneself, or whether the group being accessed contains
+   * oneself.
+   *
+   * @param type user or group
+   * @param nameIdentifier name of user or group
+   * @return authorization result
+   */
+  default boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+    return true;
+  }
+
+  /**
    * Determine whether the user is the metalake user
    *
    * @param metalake metalake
@@ -78,6 +90,17 @@ public interface GravitinoAuthorizer extends Closeable {
   default boolean isMetalakeUser(String metalake) {
     return true;
   };
+
+  /**
+   * Determine whether the user can set owner
+   *
+   * @param type metadata type
+   * @param fullName metadata full name
+   * @return authorization result
+   */
+  default boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+    return true;
+  }
 
   /**
    * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in
