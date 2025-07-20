@@ -159,8 +159,8 @@ public class GravitinoInterceptionService implements InterceptionService {
       if (StringUtils.isNotBlank(errorMessage)) {
         contextualMessage =
             String.format(
-                "User '%s' is not authorized to perform operation '%s': %s",
-                currentUser, methodName, errorMessage);
+                "User '%s' is not authorized to perform operation '%s' on metadata '%s': %s",
+                currentUser, methodName, accessMetadataName.name(), errorMessage);
       } else {
         contextualMessage =
             String.format(
