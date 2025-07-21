@@ -85,13 +85,74 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 /**
- * Benchmark base class for testing EntityStore implementations using JMH.
+ * Benchmark base class for evaluating {@code EntityStorage} performance using JMH.
  *
- * <p>This abstract class provides a configurable setup for benchmarking relational entity store
- * operations, such as put, get, and insertRelation. It uses H2 as an embedded JDBC backend and
- * generates random metadata entities (models, users, topics, etc.) to simulate real-world usage.
+ * <p>This abstract class provides a reusable setup for benchmarking relational entity store
+ * implementations. It uses an embedded H2 backend and generates randomized metadata entities (e.g.,
+ * models, users, topics) to simulate realistic usage patterns. Subclasses should implement specific
+ * {@code @Benchmark} methods to test operations such as {@code put}, {@code get}, {@code contains},
+ * and {@code insertRelation}.
  *
- * <p>Subclasses should implement JMH `@Benchmark` methods to benchmark desired operations.
+ * <p>Benchmark operations include:
+ *
+ * <ul>
+ *   <li>{@code benchmarkContains} — test for entity existence
+ *   <li>{@code benchmarkGet} — test for entity retrieval
+ *   <li>{@code benchmarkGetWithRelation} — test for listing entities with relations
+ * </ul>
+ *
+ * <p>Environment:
+ *
+ * <ul>
+ *   <li>CPU: Apple M2 Pro
+ *   <li>Memory: 16 GB
+ *   <li>OS: macOS Ventura 15.5
+ *   <li>JVM: OpenJDK 17.0.15
+ *   <li>JMH: 1.37
+ *   <li>Backend: H2
+ * </ul>
+ *
+ * <p>Benchmark configuration:
+ *
+ * <ul>
+ *   <li>{@code @BenchmarkMode}: Throughput and AverageTime
+ *   <li>{@code @State}: Scope.Thread
+ *   <li>{@code @Fork}: 1
+ *   <li>{@code @Warmup}: 5 iterations
+ *   <li>{@code @Measurement}: 10 iterations
+ *   <li>Gradle config:
+ *       <pre>{@code
+ * jmh {
+ *   warmupIterations = 5
+ *   iterations = 10
+ *   fork = 1
+ *   threads = 10
+ *   resultFormat = "csv"
+ *   resultsFile = file("$buildDir/reports/jmh/results.csv")
+ * }
+ *
+ * }</pre>
+ * </ul>
+ *
+ * <p>Two cache modes are benchmarked:
+ *
+ * <ol>
+ *   <li><strong>With cache enabled</strong>: throughput up to ~10⁶ ops/sec
+ *   <li><strong>With cache disabled</strong>: throughput around ~10⁴ ops/sec
+ * </ol>
+ *
+ * <p>A mixed benchmark is also included to simulate real workloads, consisting of:
+ *
+ * <ul>
+ *   <li>60% {@code get}
+ *   <li>30% {@code listRelation}
+ *   <li>10% {@code contains}
+ * </ul>
+ *
+ * <p><strong>Note:</strong> If your machine has fewer than 10 CPU cores, benchmark results may
+ * vary.
+ *
+ * <p>Related PR: https://github.com/apache/gravitino/issues/7546
  */
 @BenchmarkMode({Mode.Throughput, Mode.AverageTime})
 @OutputTimeUnit(TimeUnit.SECONDS)
