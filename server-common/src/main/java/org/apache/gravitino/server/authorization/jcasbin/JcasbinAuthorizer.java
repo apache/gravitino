@@ -50,6 +50,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
+import org.casbin.jcasbin.main.SyncedEnforcer;
 import org.casbin.jcasbin.model.Model;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +79,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       Model model = new Model();
       model.loadModelFromText(modelData);
-      enforcer = new Enforcer(model, new GravitinoAdapter());
+      enforcer = new SyncedEnforcer(model, new GravitinoAdapter());
       Config config = GravitinoEnv.getInstance().config();
       if (config != null) {
         serviceAdmins.addAll(config.get(Configs.SERVICE_ADMINS));
