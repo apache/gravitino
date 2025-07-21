@@ -39,7 +39,7 @@ public class DownloaderUtils {
 
     URL url = new URL(fileUrl);
     URLConnection connection = url.openConnection();
-    String fileName = getFileName(url);
+    String fileName = getFileName(url.getPath());
     String destinationDirectory = destinationDirectories[0];
     Path destinationPath = Paths.get(destinationDirectory, fileName);
     File file = new File(destinationPath.toString());
