@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.cli.commands;
 
-import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
-
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
@@ -74,17 +71,8 @@ public class CreateFileset extends Command {
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, fileset);
-    boolean managed = properties.get("managed").equals("true");
-    String unknownLocation = properties.get("location");
-
-    Map<String, String> storageLocationsWithPrefix =
-        MapUtils.getPrefixMap(properties, "location-", true);
-    Map<String, String> storageLocations =
-        ImmutableMap.<String, String>builder()
-            .put(LOCATION_NAME_UNKNOWN, unknownLocation)
-            .putAll(storageLocationsWithPrefix)
-            .build();
-    properties.remove("location");
+    boolean managed = "true".equals(properties.get("managed"));
+    Map<String, String> storageLocations = MapUtils.getPrefixMap(properties, "location-", true);
     Map<String, String> propertiesWithoutLocation =
         MapUtils.getMapWithoutPrefix(properties, "location-");
 
@@ -110,5 +98,14 @@ public class CreateFileset extends Command {
     }
 
     printInformation(fileset + " created");
+  }
+
+  @Override
+  public Command validate() {
+    if (!properties.containsKey("managed")) {
+      exitWithError("Missing property 'managed'");
+    }
+
+    return this;
   }
 }
