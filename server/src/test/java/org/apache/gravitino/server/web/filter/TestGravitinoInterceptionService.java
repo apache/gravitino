@@ -31,6 +31,7 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
@@ -120,7 +121,26 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
+    public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+      return true;
+    }
+
+    @Override
+    public boolean isMetalakeUser(String metalake) {
+      return true;
+    }
+
+    @Override
+    public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+      return true;
+    }
+
+    @Override
     public void handleRolePrivilegeChange(Long roleId) {}
+
+    @Override
+    public void handleMetadataOwnerChange(
+        String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {}
 
     @Override
     public void close() throws IOException {}
