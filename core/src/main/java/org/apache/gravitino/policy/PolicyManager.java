@@ -22,6 +22,7 @@ package org.apache.gravitino.policy;
 import java.util.Set;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
@@ -34,10 +35,9 @@ public class PolicyManager implements PolicyDispatcher {
 
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
-  private final SupportsPolicyOperations supportsPolicyOperations;
 
   public PolicyManager(IdGenerator idGenerator, EntityStore entityStore) {
-    if (!(entityStore instanceof SupportsPolicyOperations)) {
+    if (!(entityStore instanceof SupportsRelationOperations)) {
       String errorMsg =
           "PolicyManager cannot run with entity store that does not support policy operations, "
               + "please configure the entity store to use relational entity store and restart the Gravitino server";
@@ -45,7 +45,6 @@ public class PolicyManager implements PolicyDispatcher {
       throw new RuntimeException(errorMsg);
     }
 
-    this.supportsPolicyOperations = entityStore.policyOperations();
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
   }
