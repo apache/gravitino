@@ -64,6 +64,28 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
+fun useHighVersionJDK(project: Project): Boolean {
+  val name = project.name.lowercase()
+  val path = project.path.lowercase()
+
+  println("name = @$name@")
+  println("path = @$path@")
+
+  if (name == "catalog-common" || name == "catalog-fileset" || name == "hadoop-common") {
+    return false
+  }
+
+  if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
+    return true
+  }
+
+  if (name in listOf("server", "server-common", "authorizations", "lineage")) {
+    return true
+  }
+
+  return false
+}
+
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
   throw GradleException(
     "The Gravitino Gradle toolchain currently does not support building with " +
@@ -76,7 +98,7 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
-project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
+project.extra["extraJvmArgs"] = if (!useHighVersionJDK(getProject())) {
   listOf()
 } else {
   listOf(
@@ -284,8 +306,17 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
+      } else if (useHighVersionJDK(getProject())) {
+        println("17project name = ${project.name}")
+        println("17project path = ${project.path}")
+        languageVersion.set(JavaLanguageVersion.of(17))
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
       } else {
-        languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
+        println("8project name = ${project.name}")
+        println("8project path = ${project.path}")
+        // languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
+        languageVersion.set(JavaLanguageVersion.of(8))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
       }
