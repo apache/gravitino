@@ -30,16 +30,20 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
  * metadata authorization.
  */
 public abstract class BaseMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(BaseMetadataAuthorizationMethodInterceptor.class);
 
   abstract Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
       Parameter[] parameters, Object[] args);
@@ -73,23 +77,51 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
           NameIdentifier accessMetadataName =
               metadataContext.get(Entity.EntityType.valueOf(type.name()));
           String errorMessage = expressionAnnotation.errorMessage();
-          return buildNoAuthResponse(errorMessage, accessMetadataName);
+          String currentUser = PrincipalUtils.getCurrentUserName();
+          String methodName = method.getName();
+
+          LOG.warn(
+              "Authorization failed - User: {}, Operation: {}, Metadata: {}, Expression: {}",
+              currentUser,
+              methodName,
+              accessMetadataName,
+              expression);
+
+          return buildNoAuthResponse(errorMessage, accessMetadataName, currentUser, methodName);
         }
       }
       return methodInvocation.proceed();
     } catch (Exception ex) {
-      return Utils.forbidden("Can not access metadata. Cause by: " + ex.getMessage(), ex);
+      String currentUser = PrincipalUtils.getCurrentUserName();
+      String methodName = methodInvocation.getMethod().getName();
+
+      LOG.error(
+          "System internal error during authorization - User: {}, Operation: {}",
+          currentUser,
+          methodName,
+          ex);
+      return Utils.forbidden(
+          "Authorization failed due to system internal error. Please contact administrator.", null);
     }
   }
 
-  private Response buildNoAuthResponse(String errorMessage, NameIdentifier accessMetadataName) {
+  private Response buildNoAuthResponse(
+      String errorMessage,
+      NameIdentifier accessMetadataName,
+      String currentUser,
+      String methodName) {
+    String contextualMessage;
     if (StringUtils.isNotBlank(errorMessage)) {
-      return Utils.forbidden(
-          errorMessage,
-          new ForbiddenException("Can not access metadata, cause by: %s", errorMessage));
+      contextualMessage =
+          String.format(
+              "User '%s' is not authorized to perform operation '%s' on metadata '%s': %s",
+              currentUser, methodName, accessMetadataName.name(), errorMessage);
+    } else {
+      contextualMessage =
+          String.format(
+              "User '%s' is not authorized to perform operation '%s' on metadata '%s'",
+              currentUser, methodName, accessMetadataName.name());
     }
-    return Utils.forbidden(
-        String.format("Can not access metadata {%s}.", accessMetadataName.name()),
-        new ForbiddenException("Can not access metadata {%s}.", accessMetadataName));
+    return Utils.forbidden(contextualMessage, null);
   }
 }
