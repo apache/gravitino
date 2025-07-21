@@ -30,6 +30,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 
 /** Help Apache Gravitino connector access TableMetadata from Gravitino client. */
@@ -45,6 +46,7 @@ public class GravitinoTable {
   private SortOrder[] sortOrders = new SortOrder[0];
   private Transform[] partitioning = new Transform[0];
   private Distribution distribution = Distributions.NONE;
+  private Index[] indexes = new Index[0];
 
   /**
    * Constructs a new GravitinoTable with the specified schema name, table name, and table metadata.
@@ -69,6 +71,7 @@ public class GravitinoTable {
     sortOrders = tableMetadata.sortOrder();
     partitioning = tableMetadata.partitioning();
     distribution = tableMetadata.distribution();
+    indexes = tableMetadata.index();
   }
 
   /**
@@ -232,6 +235,15 @@ public class GravitinoTable {
   }
 
   /**
+   * Sets the indexes of the table.
+   *
+   * @param indexes the indexes
+   */
+  public void setIndexes(Index[] indexes) {
+    this.indexes = indexes;
+  }
+
+  /**
    * Retrieves the sort orders of the table.
    *
    * @return the sort orders
@@ -256,5 +268,14 @@ public class GravitinoTable {
    */
   public Distribution getDistribution() {
     return distribution;
+  }
+
+  /**
+   * Retrieves the indexes of the table.
+   *
+   * @return the indexes
+   */
+  public Index[] getIndexes() {
+    return indexes;
   }
 }
