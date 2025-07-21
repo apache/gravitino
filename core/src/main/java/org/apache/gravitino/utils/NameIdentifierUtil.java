@@ -280,6 +280,28 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the job template {@link NameIdentifier} with the given metalake and job template name.
+   *
+   * @param metalake The metalake name
+   * @param jobTemplateName The job template name
+   * @return The created job template {@link NameIdentifier}
+   */
+  public static NameIdentifier ofJobTemplate(String metalake, String jobTemplateName) {
+    return NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake), jobTemplateName);
+  }
+
+  /**
+   * Create the job {@link NameIdentifier} with the given metalake and job name.
+   *
+   * @param metalake The metalake name
+   * @param jobName The job name
+   * @return The created job {@link NameIdentifier}
+   */
+  public static NameIdentifier ofJob(String metalake, String jobName) {
+    return NameIdentifier.of(NamespaceUtil.ofJob(metalake), jobName);
+  }
+
+  /**
    * Try to get the catalog {@link NameIdentifier} from the given {@link NameIdentifier}.
    *
    * @param ident The {@link NameIdentifier} to check.
