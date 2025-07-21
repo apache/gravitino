@@ -24,6 +24,9 @@ package org.apache.gravitino.job;
  */
 public interface JobHandle {
 
+  /** The prefix for job IDs, every job ID returned from Gravitino will be like job-uuid */
+  String JOB_ID_PREFIX = "job-";
+
   /** The status of the job. */
   enum Status {
 
