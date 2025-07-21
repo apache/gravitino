@@ -124,7 +124,6 @@ public class BaseIT {
   protected String serverUri;
 
   protected String originConfig;
-  private Optional<String> entityStoreBackend = Optional.empty();
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -300,7 +299,7 @@ public class BaseIT {
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
-    if ("MySQL".equalsIgnoreCase(getEntityStoreBackend())) {
+    if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start MySQL docker instance.
       String jdbcURL = startAndInitMySQLBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -310,7 +309,7 @@ public class BaseIT {
           Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
-    } else if ("PostgreSQL".equalsIgnoreCase(getEntityStoreBackend())) {
+    } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
       // Start PostgreSQL docker instance.
       String pgJdbcUrl = startAndInitPGBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -599,15 +598,5 @@ public class BaseIT {
         JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
     return String.format(
         "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
-  }
-
-  // MySQL or PostgreSQL
-  protected void setEntityStoreBackend(String backend) {
-    entityStoreBackend = Optional.of(backend);
-  }
-
-  private String getEntityStoreBackend() {
-    String backend = System.getenv("jdbcBackend");
-    return entityStoreBackend.orElse(backend);
   }
 }

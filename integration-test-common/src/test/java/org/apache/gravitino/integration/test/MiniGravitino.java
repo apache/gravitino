@@ -234,9 +234,10 @@ public class MiniGravitino {
   private void customizeConfigFile(String configTempFileName, String configFileName)
       throws IOException {
     Map<String, String> configMap = new HashMap<>();
+    String gravitinoServerPort = String.valueOf(RESTUtils.findAvailablePort(2000, 3000));
     configMap.put(
         GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
-        String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
+        gravitinoServerPort);
 
     configMap.putAll(getIcebergRestServiceConfigs());
     configMap.putAll(context.customConfig);

@@ -35,7 +35,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -86,7 +85,7 @@ public class IcebergAuthorizationIT extends BaseIT {
   public void startIntegrationTest() throws Exception {
     startGravitinoServerWithoutIcebergREST();
     initMetalakeAndCatalog();
-    startStandAloneIcebergRESTServer();
+    // startStandAloneIcebergRESTServer();
     initSparkEnv();
   }
 
@@ -123,11 +122,16 @@ public class IcebergAuthorizationIT extends BaseIT {
             Catalog.Type.RELATIONAL,
             "lakehouse-iceberg",
             "comment",
-            getJDBCCatalogBackendConfig());
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "file:///tmp"));
   }
 
   private void startGravitinoServerWithoutIcebergREST() throws Exception {
-    setEntityStoreBackend("PostgreSQL");
+    // setEntityStoreBackend("PostgreSQL");
+    ignoreIcebergRestService = false;
     // Enable authorization
     customConfigs.putAll(
         ImmutableMap.of(
@@ -142,10 +146,16 @@ public class IcebergAuthorizationIT extends BaseIT {
             Configs.AUTHORIZATION_IMPL.getKey(),
             JcasbinAuthorizer.class.getCanonicalName(),
             Configs.CACHE_ENABLED.getKey(),
-            "false",
-            AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
-                + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
-            ""));
+            "false"));
+    // add dynamic config provider configs
+    customConfigs.putAll(
+        ImmutableMap.of(
+            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
+            IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
+            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE,
+            METALAKE_NAME,
+            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_SIMPLE_USERNAME,
+            SUPER_USER));
     super.startIntegrationTest();
   }
 
@@ -166,12 +176,6 @@ public class IcebergAuthorizationIT extends BaseIT {
     MetadataObject catalogObject =
         MetadataObjects.of(Arrays.asList(CATALOG_NAME), MetadataObject.Type.CATALOG);
     metalakeClientWithAllPrivilege.setOwner(catalogObject, SUPER_USER, Owner.Type.USER);
-  }
-
-  private void startStandAloneIcebergRESTServer() throws Exception {
-    icebergRESTServerManager = IcebergRESTServerManager.create();
-    icebergRESTServerManager.registerCustomConfigs(getIcebergCatalogConfig());
-    icebergRESTServerManager.startIcebergRESTServer();
   }
 
   private int getServerPort() {
@@ -208,17 +212,7 @@ public class IcebergAuthorizationIT extends BaseIT {
     // add jdbc catalog backend configs
     getJDBCCatalogBackendConfig()
         .forEach((k, v) -> configs.put(GRAVITINO_ICEBERG_REST_PREFIX + k, v));
-    // add dynamic config provider configs
-    configs.putAll(
-        ImmutableMap.of(
-            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
-            IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
-            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_URI,
-            serverUri,
-            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE,
-            METALAKE_NAME,
-            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_SIMPLE_USERNAME,
-            SUPER_USER));
+
     return configs;
   }
 
