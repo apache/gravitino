@@ -79,11 +79,24 @@ fun useHighVersionJDK(project: Project): Boolean {
     return true
   }
 
-  if (name in listOf("server", "server-common", "authorizations", "lineage")) {
+  if (name in listOf("server", "authorizations", "lineage")) {
     return true
   }
 
   return false
+}
+
+fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
+  val testMode = project.properties["testMode"] as? String ?: "embedded"
+  if (testMode == "embedded") {
+    return JavaLanguageVersion.of(17)
+  }
+
+  if (useHighVersionJDK(project)) {
+    return JavaLanguageVersion.of(17)
+  }
+
+  return JavaLanguageVersion.of(extra["jdkVersion"].toString())
 }
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
@@ -223,8 +236,8 @@ allprojects {
       val jdbcDatabase = project.properties["jdbcBackend"] as? String ?: "h2"
       param.environment("jdbcBackend", jdbcDatabase)
 
-      // val testMode = project.properties["testMode"] as? String ?: "embedded"
-      val testMode = "deploy"
+      val testMode = project.properties["testMode"] as? String ?: "embedded"
+      // val testMode = "deploy"
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
@@ -308,16 +321,15 @@ subprojects {
         }
         languageVersion.set(JavaLanguageVersion.of(17))
       } else if (useHighVersionJDK(getProject())) {
-        println("17project name = ${project.name}")
-        println("17project path = ${project.path}")
+        // println("17project name = ${project.name}")
+        // println("17project path = ${project.path}")
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
       } else {
-        println("8project name = ${project.name}")
-        println("8project path = ${project.path}")
-        // languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
-        languageVersion.set(JavaLanguageVersion.of(8))
+        // println("8project name = ${project.name}")
+        // println("8project path = ${project.path}")
+        languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
       }
@@ -348,6 +360,13 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    // val compiler = javaCompiler.get()
+    // val jvmVersion = compiler.metadata.languageVersion
+
+    // println("""
+    //            |📦 编译信息: ${project.path}
+    //            |   JVM 版本: $jvmVersion
+    //            """.trimMargin())
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
     options.errorprone.disable(
@@ -508,6 +527,17 @@ subprojects {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)
     }
+
+    javaLauncher.set(
+      javaToolchains.launcherFor {
+        languageVersion.set(getJdkVersionForTest(project))
+      }
+    )
+
+    val launcher = javaLauncher.get()
+
+    println("\n=== [${project.path}] 测试JDK信息 ===")
+    println("测试JDK版本: ${launcher.metadata.languageVersion}")
 
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL

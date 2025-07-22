@@ -30,7 +30,8 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
-  testImplementation(project(":server"))
+
+  // testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)

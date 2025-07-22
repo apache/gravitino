@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
+import static org.apache.gravitino.server.ServerConfig.GRAVITINO_WEBSERVER_CONF_PREFIX;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -85,7 +85,7 @@ public class CheckCurrentUserIT extends BaseIT {
             KafkaContainer.DEFAULT_BROKER_PORT);
 
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, GRAVITINO_WEBSERVER_CONF_PREFIX);
 
     String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
     System.setProperty("user.name", "test");

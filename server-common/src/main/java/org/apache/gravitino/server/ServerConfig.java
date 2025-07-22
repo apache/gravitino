@@ -27,6 +27,8 @@ import org.apache.gravitino.config.ConfigEntry;
 
 public class ServerConfig extends Config {
 
+  public static final String GRAVITINO_WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";
+
   public static final ConfigEntry<Integer> SERVER_SHUTDOWN_TIMEOUT =
       new ConfigBuilder("gravitino.server.shutdown.timeout")
           .doc("The stop idle timeout(millis) of the Gravitino Server")

@@ -72,8 +72,6 @@ public class GravitinoServer extends ResourceConfig {
 
   public static final String CONF_FILE = "gravitino.conf";
 
-  public static final String WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";
-
   public static final String SERVER_NAME = "Gravitino-webserver";
 
   private final ServerConfig serverConfig;
@@ -95,7 +93,7 @@ public class GravitinoServer extends ResourceConfig {
     gravitinoEnv.initializeFullComponents(serverConfig);
 
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, ServerConfig.GRAVITINO_WEBSERVER_CONF_PREFIX);
     server.initialize(jettyServerConfig, SERVER_NAME, true /* shouldEnableUI */);
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
