@@ -236,7 +236,7 @@ public class IcebergAuthorizationIT extends BaseIT {
   }
 
   protected Set<String> listTableNames(String database) {
-    return convertToStringSet(sql("SHOW TABLES in ", database), 1);
+    return convertToStringSet(sql("SHOW TABLES in %s", database), 1);
   }
 
   @FormatMethod
