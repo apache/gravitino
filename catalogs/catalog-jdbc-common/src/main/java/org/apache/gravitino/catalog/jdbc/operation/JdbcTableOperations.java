@@ -704,8 +704,8 @@ public abstract class JdbcTableOperations implements TableOperation {
    * drivers (like OceanBase): Assume they support accurate precision calculation
    *
    * <p>MySQL Connector/J 8.0.16 fixed the wrong handling of temporal type precision in the
-   * DatabaseMetaDataUsingInfoSchema interface, where getColumns() method returned wrong results
-   * for the COLUMN_SIZE column. Prior versions had errors in temporal type precision handling.
+   * DatabaseMetaDataUsingInfoSchema interface, where getColumns() method returned wrong results for
+   * the COLUMN_SIZE column. Prior versions had errors in temporal type precision handling.
    *
    * @param driverVersion the driver version string to check
    * @return true if the driver version supports accurate precision calculation, false otherwise
