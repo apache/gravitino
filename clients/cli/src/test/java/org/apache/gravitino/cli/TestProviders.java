@@ -19,11 +19,13 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.Catalog;
 import org.junit.jupiter.api.Test;
 
 public class TestProviders {
@@ -41,6 +43,7 @@ public class TestProviders {
     assertTrue(Providers.isValidProvider(Providers.HUDI), "HUDI should be a valid entity");
     assertTrue(
         Providers.isValidProvider(Providers.OCEANBASE), "OCEANBASE should be a valid entity");
+    assertTrue(Providers.isValidProvider(Providers.MODEL), "MODEL should be a valid entity");
   }
 
   @Test
@@ -79,6 +82,7 @@ public class TestProviders {
     assertNotNull(Providers.internal(Providers.PAIMON), "Internal string should not be null");
     assertNotNull(Providers.internal(Providers.HUDI), "Internal string should not be null");
     assertNotNull(Providers.internal(Providers.OCEANBASE), "Internal string should not be null");
+    assertNotNull(Providers.internal(Providers.MODEL), "Internal string should not be null");
   }
 
   @Test
@@ -101,6 +105,7 @@ public class TestProviders {
     assertNotNull(Providers.catalogType(Providers.PAIMON), "Catalog type should not be null");
     assertNotNull(Providers.catalogType(Providers.HUDI), "Catalog type should not be null");
     assertNotNull(Providers.catalogType(Providers.OCEANBASE), "Catalog type should not be null");
+    assertNotNull(Providers.catalogType(Providers.MODEL), "Catalog type should not be null");
   }
 
   @Test
@@ -109,5 +114,19 @@ public class TestProviders {
         IllegalArgumentException.class,
         () -> Providers.catalogType("unknown"),
         "Expected an IllegalArgumentException for an unknown provider");
+  }
+
+  @Test
+  public void modelProviderInternal() {
+    assertEquals(
+        "model", Providers.internal(Providers.MODEL), "MODEL internal should return 'model'");
+  }
+
+  @Test
+  public void modelProviderCatalogType() {
+    assertEquals(
+        Catalog.Type.MODEL,
+        Providers.catalogType(Providers.MODEL),
+        "MODEL catalog type should be MODEL");
   }
 }

@@ -43,6 +43,10 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
+  implementation(libs.jcasbin) {
+    exclude(group = "com.fasterxml.jackson.core", module = "jackson-databind")
+  }
+  implementation(libs.ognl)
   implementation(libs.prometheus.servlet)
 
   testImplementation(libs.commons.io)

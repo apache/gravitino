@@ -16,13 +16,14 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Union
 
 from dataclasses_json.core import Json
 
+from gravitino.api.expressions.expression import Expression
 from gravitino.api.types.types import Type
 
-GravitinoTypeT = TypeVar("GravitinoTypeT", bound=Type)
+GravitinoTypeT = TypeVar("GravitinoTypeT", bound=Union[Expression, Type])
 
 
 class JsonSerializable(ABC, Generic[GravitinoTypeT]):

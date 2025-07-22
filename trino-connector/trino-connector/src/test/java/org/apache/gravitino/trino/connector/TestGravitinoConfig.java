@@ -61,4 +61,27 @@ public class TestGravitinoConfig {
       }
     }
   }
+
+  @Test
+  public void testGravitinoConfigWithSkipTrinoVersionValidation() {
+    String gravitinoUrl = "http://127.0.0.1:8000";
+    String metalake = "user_001";
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of("gravitino.uri", gravitinoUrl, "gravitino.metalake", metalake);
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    assertEquals(config.isSkipTrinoVersionValidation(), false);
+
+    ImmutableMap<String, String> configMapWithSkipValidation =
+        ImmutableMap.of(
+            "gravitino.uri",
+            gravitinoUrl,
+            "gravitino.metalake",
+            metalake,
+            "gravitino.trino.skip-version-validation",
+            "true");
+    GravitinoConfig configWithSkipValidation = new GravitinoConfig(configMapWithSkipValidation);
+
+    assertEquals(configWithSkipValidation.isSkipTrinoVersionValidation(), true);
+  }
 }

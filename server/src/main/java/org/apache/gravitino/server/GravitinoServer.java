@@ -19,8 +19,10 @@
 package org.apache.gravitino.server;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Properties;
+import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
@@ -39,6 +41,7 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.web.ConfigServlet;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
@@ -46,11 +49,13 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
+import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -95,6 +100,8 @@ public class GravitinoServer extends ResourceConfig {
 
     ServerAuthenticator.getInstance().initialize(serverConfig);
 
+    GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
+
     lineageService.initialize(
         new LineageConfig(serverConfig.getConfigsWithPrefix(LineageConfig.LINEAGE_CONFIG_PREFIX)));
 
@@ -118,6 +125,11 @@ public class GravitinoServer extends ResourceConfig {
         new AbstractBinder() {
           @Override
           protected void configure() {
+            if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+              bind(GravitinoInterceptionService.class)
+                  .to(InterceptionService.class)
+                  .in(Singleton.class);
+            }
             bind(gravitinoEnv.metalakeDispatcher()).to(MetalakeDispatcher.class).ranked(1);
             bind(gravitinoEnv.catalogDispatcher()).to(CatalogDispatcher.class).ranked(1);
             bind(gravitinoEnv.schemaDispatcher()).to(SchemaDispatcher.class).ranked(1);
@@ -169,7 +181,8 @@ public class GravitinoServer extends ResourceConfig {
     server.join();
   }
 
-  public void stop() {
+  public void stop() throws IOException {
+    GravitinoAuthorizerProvider.getInstance().close();
     server.stop();
     gravitinoEnv.shutdown();
     if (lineageService != null) {

@@ -294,6 +294,13 @@ public class Configs {
           .booleanConf()
           .createWithDefault(false);
 
+  public static final ConfigEntry<String> AUTHORIZATION_IMPL =
+      new ConfigBuilder("gravitino.authorization.impl")
+          .doc("Metadata authorization implementation")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault("org.apache.gravitino.server.authorization.PassThroughAuthorizer");
+
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =
       new ConfigBuilder("gravitino.authorization.serviceAdmins")
           .doc("The admins of Gravitino service")
@@ -408,4 +415,11 @@ public class Configs {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("caffeine");
+
+  public static final ConfigEntry<String> JOB_STAGING_DIR =
+      new ConfigBuilder("gravitino.job.stagingDir")
+          .doc("Directory for managing staging files when running jobs.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault("/tmp/gravitino/jobs/staging");
 }

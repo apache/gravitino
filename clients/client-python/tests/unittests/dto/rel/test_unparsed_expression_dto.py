@@ -25,7 +25,9 @@ from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpres
 class TestUnparsedExpressionDTO(unittest.TestCase):
     def setUp(self) -> None:
         self._dtos = [
-            UnparsedExpressionDTO(unparsed_expression=f"unparsed_expression_{idx}")
+            UnparsedExpressionDTO.builder()
+            .with_unparsed_expression(unparsed_expression=f"unparsed_expression_{idx}")
+            .build()
             for idx in range(3)
         ]
 
@@ -41,9 +43,15 @@ class TestUnparsedExpressionDTO(unittest.TestCase):
 
     def test_equality(self):
         dto = self._dtos[0]
-        similar_dto = UnparsedExpressionDTO(unparsed_expression="unparsed_expression_0")
-        another_dto = UnparsedExpressionDTO(
-            unparsed_expression="another_unparsed_expression"
+        similar_dto = (
+            UnparsedExpressionDTO.builder()
+            .with_unparsed_expression(unparsed_expression="unparsed_expression_0")
+            .build()
+        )
+        another_dto = (
+            UnparsedExpressionDTO.builder()
+            .with_unparsed_expression(unparsed_expression="another_unparsed_expression")
+            .build()
         )
 
         self.assertTrue(dto == similar_dto)

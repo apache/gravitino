@@ -71,7 +71,7 @@ public interface PolicyOperations {
    * @throws PolicyAlreadyExistsException If the policy already exists.
    */
   Policy createPolicy(
-      String name, String type, String comment, boolean enabled, Policy.Content content)
+      String name, String type, String comment, boolean enabled, PolicyContent content)
       throws PolicyAlreadyExistsException;
 
   /**
@@ -103,7 +103,7 @@ public interface PolicyOperations {
       boolean exclusive,
       boolean inheritable,
       Set<MetadataObject.Type> supportedObjectTypes,
-      Policy.Content content)
+      PolicyContent content)
       throws PolicyAlreadyExistsException;
 
   /**

@@ -18,9 +18,7 @@
  */
 package org.apache.gravitino;
 
-import com.google.common.collect.ImmutableList;
 import java.io.Serializable;
-import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 
@@ -55,75 +53,33 @@ public interface Entity extends Serializable {
   /** The tag schema name in the system catalog. */
   String TAG_SCHEMA_NAME = "tag";
 
+  /** The policy schema name in the system catalog. */
+  String POLICY_SCHEMA_NAME = "policy";
+
+  String JOB_TEMPLATE_SCHEMA_NAME = "job_template";
+
+  String JOB_SCHEMA_NAME = "job";
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {
-    METALAKE("ml", 0),
-    CATALOG("ca", 1),
-    SCHEMA("sc", 2),
-    TABLE("ta", 3),
-    COLUMN("co", 4),
-    FILESET("fi", 5),
-    TOPIC("to", 6),
-    USER("us", 7),
-    GROUP("gr", 8),
-    ROLE("ro", 9),
-    TAG("ta", 10),
-    MODEL("mo", 11),
-    MODEL_VERSION("mv", 12),
-
-    AUDIT("au", 65534);
-
-    // Short name can be used to identify the entity type in the logs, persistent storage, etc.
-    private final String shortName;
-    private final int index;
-
-    EntityType(String shortName, int index) {
-      this.shortName = shortName;
-      this.index = index;
-    }
-
-    public static EntityType fromShortName(String shortName) {
-      for (EntityType entityType : EntityType.values()) {
-        if (entityType.shortName.equals(shortName)) {
-          return entityType;
-        }
-      }
-      throw new IllegalArgumentException("Unknown entity type: " + shortName);
-    }
-
-    /**
-     * Returns the parent entity types of the given entity type. The parent entity types are the
-     * entity types that are higher in the hierarchy than the given entity type. For example, the
-     * parent entity types of a table are metalake, catalog, and schema. (Sequence: root to leaf)
-     *
-     * @param entityType The entity type for which to get the parent entity types.
-     * @return The parent entity types of the given entity type.
-     */
-    public static List<EntityType> getParentEntityTypes(EntityType entityType) {
-      switch (entityType) {
-        case METALAKE:
-          return ImmutableList.of();
-        case CATALOG:
-          return ImmutableList.of(METALAKE);
-        case SCHEMA:
-          return ImmutableList.of(METALAKE, CATALOG);
-        case TABLE:
-        case FILESET:
-        case TOPIC:
-        case MODEL:
-        case USER:
-        case GROUP:
-        case ROLE:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
-        case COLUMN:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA, TABLE);
-        case MODEL_VERSION:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA, MODEL);
-        default:
-          throw new IllegalArgumentException("Unknown entity type: " + entityType);
-      }
-    }
+    METALAKE,
+    CATALOG,
+    SCHEMA,
+    TABLE,
+    COLUMN,
+    FILESET,
+    TOPIC,
+    USER,
+    GROUP,
+    ROLE,
+    TAG,
+    MODEL,
+    MODEL_VERSION,
+    POLICY,
+    JOB_TEMPLATE,
+    JOB,
+    AUDIT;
   }
 
   /**
