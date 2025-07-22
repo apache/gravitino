@@ -55,10 +55,17 @@ spec:
         image: {{ include "gravitino.image" . }}
         imagePullPolicy: "{{ .Values.image.pullPolicy }}"
         command:
-        - sh
+        - /bin/bash
         - -c
         - |
           cp -r /root/gravitino/scripts/*  /tmp/scripts/
+          /root/gravitino/bin/gravitino.sh run > /dev/null 2>&1 &
+          while ! /root/gravitino/bin/gcli.sh -s; do
+              echo "Waiting for Gravitino to be ready..."
+              sleep 2
+          done
+          VERSION=$(/root/gravitino/bin/gcli.sh -s  | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          echo $VERSION > /tmp/scripts/version.txt
         resources:
           {{- toYaml .Values.initResources | nindent 10 }}
         volumeMounts:
@@ -76,24 +83,22 @@ spec:
               echo "Waiting for MySQL to be ready..."
               sleep 2
             done
+            VERSION=$(cat /scripts/version.txt)
             if [ -z "$VERSION" ]; then
               echo "ERROR:Please set VERSION"
               exit 1
             fi
             dir="/scripts/mysql"
-            schema_file="$dir/schema-$VERSION-mysql.sql"
+            schema_file=$(ls $dir/schema-*-mysql.sql | sort -V | awk -F'[-]' '$2 <= '$VERSION' {print $0}' | tail -n 1)
             if [ ! -f "$schema_file" ]; then
               echo "ERROR:Failed to find schema file $schema_file"
               exit 1
             fi
-            upgrade_files=($(ls $dir/upgrade-*-to-$VERSION-mysql.sql 2>/dev/null))
-            if [ ${#upgrade_files[@]} -eq 0 ]; then
-              echo "ERROR:Failed to find upgrade to $VERSION file"
+            upgrade_file=$(ls $dir/upgrade-*-to-*-mysql.sql | sort -V | awk -F'[-]' '$4 <= '$VERSION' {print $0}' | tail -n 1)
+            if [ ! -f "$upgrade_file" ]; then
+              echo "ERROR:Failed to find upgrade file $upgrade_file"
               exit 1
-            elif [ ${#upgrade_files[@]} -gt 1 ]; then
-              echo "WARN:Find multiple upgrade to $VERSION files,use the first: ${upgrade_files[0]}"
             fi
-            upgrade_file="${upgrade_files[0]}"
             echo "Schema file: $schema_file"
             echo "Upgrade file: $upgrade_file"
             if ! mysql -h {{ .Release.Name }}-mysql -u root -D gravitino <"$upgrade_file"; then
@@ -109,8 +114,6 @@ spec:
               secretKeyRef:
                 name: {{ .Release.Name }}-mysql
                 key: mysql-root-password
-          - name: VERSION
-            value: "{{ .Values.mysql.sqlScriptVersion }}"
         volumeMounts:
           - mountPath: /scripts
             name: scripts-emptydir
