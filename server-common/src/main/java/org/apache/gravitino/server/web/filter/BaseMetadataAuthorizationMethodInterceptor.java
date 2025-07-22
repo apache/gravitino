@@ -91,7 +91,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         }
       }
       return methodInvocation.proceed();
-    } catch (Exception ex) {
+    } catch (Throwable t) {
       String currentUser = PrincipalUtils.getCurrentUserName();
       String methodName = methodInvocation.getMethod().getName();
 
@@ -99,7 +99,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
           "System internal error during authorization - User: {}, Operation: {}",
           currentUser,
           methodName,
-          ex);
+          t);
       return Utils.forbidden(
           "Authorization failed due to system internal error. Please contact administrator.", null);
     }

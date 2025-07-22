@@ -38,11 +38,8 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchUserException;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
-import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -76,7 +73,6 @@ public class IcebergAuthorizationIT extends BaseIT {
   protected GravitinoMetalake metalakeClientWithAllPrivilege;
 
   private SparkSession sparkSession;
-  private IcebergRESTServerManager icebergRESTServerManager;
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergAuthorizationIT.class);
 
@@ -123,20 +119,28 @@ public class IcebergAuthorizationIT extends BaseIT {
             "lakehouse-iceberg",
             "comment",
             ImmutableMap.of(
+                IcebergConstants.URI,
+                getPGUri(),
                 IcebergConstants.CATALOG_BACKEND,
-                "memory",
+                "jdbc",
+                IcebergConstants.GRAVITINO_JDBC_DRIVER,
+                "org.postgresql.Driver",
+                IcebergConstants.GRAVITINO_JDBC_USER,
+                getPGUser(),
+                IcebergConstants.GRAVITINO_JDBC_PASSWORD,
+                getPGPassword(),
                 IcebergConstants.WAREHOUSE,
-                "file:///tmp"));
+                "file:///tmp/"));
   }
 
   private void startGravitinoServerWithoutIcebergREST() throws Exception {
-    // setEntityStoreBackend("PostgreSQL");
+    setJDBCBackend("PostgreSQL");
     ignoreIcebergRestService = false;
     // Enable authorization
     customConfigs.putAll(
         ImmutableMap.of(
             "gravitino.authorization.serviceAdmins",
-            SUPER_USER,
+            SUPER_USER + "," + NORMAL_USER,
             "gravitino.authenticators",
             "simple",
             "SimpleAuthUserName",
@@ -178,15 +182,8 @@ public class IcebergAuthorizationIT extends BaseIT {
     metalakeClientWithAllPrivilege.setOwner(catalogObject, SUPER_USER, Owner.Type.USER);
   }
 
-  private int getServerPort() {
-    JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(
-            icebergRESTServerManager.getServerConfig(), IcebergConfig.ICEBERG_CONFIG_PREFIX);
-    return jettyServerConfig.getHttpPort();
-  }
-
   private void initSparkEnv() {
-    String icebergRESTUri = String.format("http://127.0.0.1:%d/iceberg/", getServerPort());
+    String icebergRESTUri = getIcebergRestServiceUri();
     LOG.info("Iceberg REST uri: {}", icebergRESTUri);
     SparkConf sparkConf =
         new SparkConf()

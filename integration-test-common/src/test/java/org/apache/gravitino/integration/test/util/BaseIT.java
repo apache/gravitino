@@ -42,6 +42,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -123,6 +124,8 @@ public class BaseIT {
   protected String serverUri;
 
   protected String originConfig;
+
+  private Optional<String> JDBCBackend;
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
@@ -298,7 +301,7 @@ public class BaseIT {
 
     LOG.info("Running Gravitino Server in {} mode", testMode);
 
-    if ("MySQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    if ("MySQL".equalsIgnoreCase(getJDBCBackend())) {
       // Start MySQL docker instance.
       String jdbcURL = startAndInitMySQLBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -308,7 +311,7 @@ public class BaseIT {
           Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER_KEY, "com.mysql.cj.jdbc.Driver");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER_KEY, "root");
       customConfigs.put(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY, "root");
-    } else if ("PostgreSQL".equalsIgnoreCase(System.getenv("jdbcBackend"))) {
+    } else if ("PostgreSQL".equalsIgnoreCase(getJDBCBackend())) {
       // Start PostgreSQL docker instance.
       String pgJdbcUrl = startAndInitPGBackend();
       customConfigs.put(Configs.ENTITY_STORE_KEY, "relational");
@@ -597,5 +600,17 @@ public class BaseIT {
         JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
     return String.format(
         "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
+  }
+
+  protected void setJDBCBackend(String backend) {
+    this.JDBCBackend = Optional.of(backend);
+  }
+
+  protected String getJDBCBackend() {
+    return JDBCBackend.orElseGet(
+        () -> {
+          String jdbcBackend = System.getenv("jdbcBackend");
+          return jdbcBackend == null ? "" : jdbcBackend;
+        });
   }
 }
