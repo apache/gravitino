@@ -121,7 +121,6 @@ public class GravitinoEnv {
   private TagDispatcher tagDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
-  public AccessControlDispatcher accessManager;
 
   private IdGenerator idGenerator;
 
@@ -404,8 +403,6 @@ public class GravitinoEnv {
         entityStore.close();
       } catch (Exception e) {
         LOG.warn("Failed to close EntityStore.", e);
-      } finally {
-        entityStore = null;
       }
     }
 
@@ -449,16 +446,10 @@ public class GravitinoEnv {
     auditLogManager.init(config, eventListenerManager);
   }
 
-  public void initEntityStore() {
-    if (entityStore == null) {
-      this.entityStore = EntityStoreFactory.createEntityStore(config);
-      entityStore.initialize(config);
-    }
-  }
-
   private void initGravitinoServerComponents() {
     // Initialize EntityStore
-    initEntityStore();
+    this.entityStore = EntityStoreFactory.createEntityStore(config);
+    entityStore.initialize(config);
 
     // create and initialize a random id generator
     this.idGenerator = new RandomIdGenerator();
@@ -534,9 +525,10 @@ public class GravitinoEnv {
     // Create and initialize access control related modules
     boolean enableAuthorization = config.get(Configs.ENABLE_AUTHORIZATION);
     if (enableAuthorization) {
-      this.accessManager = new AccessControlManager(entityStore, new RandomIdGenerator(), config);
+      AccessControlManager accessControlManager =
+          new AccessControlManager(entityStore, idGenerator, config);
       AccessControlHookDispatcher accessControlHookDispatcher =
-          new AccessControlHookDispatcher(accessManager);
+          new AccessControlHookDispatcher(accessControlManager);
       this.accessControlDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
       OwnerDispatcher ownerManager = new OwnerManager(entityStore);

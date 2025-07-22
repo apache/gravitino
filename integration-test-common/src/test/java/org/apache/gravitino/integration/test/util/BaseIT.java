@@ -401,7 +401,7 @@ public class BaseIT {
       miniGravitino.stop();
     } else {
       GravitinoITUtils.stopGravitinoServer();
-      // recoverGravitinoServerConfig();
+      recoverGravitinoServerConfig();
     }
     if (client != null) {
       client.close();

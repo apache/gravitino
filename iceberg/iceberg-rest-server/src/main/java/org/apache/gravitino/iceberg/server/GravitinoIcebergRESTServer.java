@@ -18,13 +18,13 @@
  */
 package org.apache.gravitino.iceberg.server;
 
+import com.google.common.base.Preconditions;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.iceberg.RESTService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,11 +47,6 @@ public class GravitinoIcebergRESTServer {
 
   private void initialize() {
     gravitinoEnv.initializeBaseComponents(serverConfig);
-    if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
-      serverConfig.set(Configs.ENTITY_STORE_GC_ENABLED, false);
-      gravitinoEnv.initEntityStore();
-      GravitinoAuthorizerProvider.getInstance().initialize(serverConfig);
-    }
     icebergRESTService.serviceInit(
         serverConfig.getConfigsWithPrefix(IcebergConfig.ICEBERG_CONFIG_PREFIX));
     ServerAuthenticator.getInstance().initialize(serverConfig);
@@ -75,6 +70,9 @@ public class GravitinoIcebergRESTServer {
     LOG.info("Starting Gravitino Iceberg REST Server");
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = ServerConfig.loadConfig(confPath, CONF_FILE);
+    Preconditions.checkArgument(
+        serverConfig.get(Configs.ENABLE_AUTHORIZATION),
+        "Iceberg REST server standalone mode doesn't support authorization.");
     GravitinoIcebergRESTServer icebergRESTServer = new GravitinoIcebergRESTServer(serverConfig);
     icebergRESTServer.initialize();
 

@@ -57,9 +57,6 @@ public class Configs {
   public static final String ENTITY_RELATIONAL_JDBC_BACKEND_STORAGE_PATH_KEY =
       "gravitino.entity.store.relational.storagePath";
 
-  public static final String ENTITY_RELATIONAL_JDBC_BACKEND_GC_ENABLED =
-      "gravitino.entity.store.relational.gc.enabled";
-
   public static final Long DEFAULT_DELETE_AFTER_TIME = 604800000L; // 7 days
 
   // Config for data keep time after soft deletion, in milliseconds.
@@ -353,14 +350,6 @@ public class Configs {
           .stringConf()
           .toSequence()
           .createWithDefault(Collections.emptyList());
-
-  // Whether to enable cache store
-  public static final ConfigEntry<Boolean> ENTITY_STORE_GC_ENABLED =
-      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_GC_ENABLED)
-          .doc("Whether to enable the GC for Entity store.")
-          .version(ConfigConstants.VERSION_1_0_0)
-          .booleanConf()
-          .createWithDefault(true);
 
   // Whether to enable cache store
   public static final ConfigEntry<Boolean> CACHE_ENABLED =
