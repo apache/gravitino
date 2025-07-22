@@ -161,7 +161,7 @@ public class RelationalEntityStore
   @Override
   public void close() throws IOException {
     cache.clear();
-    if(garbageCollector != null) {
+    if (garbageCollector != null) {
       garbageCollector.close();
     }
     backend.close();

@@ -176,11 +176,11 @@ public class Configs {
           .createWithDefault(DEFAULT_RELATIONAL_JDBC_BACKEND_PATH);
 
   public static final ConfigEntry<Boolean> ENTITY_STORE_GC_ENABLED =
-          new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_GC_ENABLED)
-                  .doc("Whether to enable the GC for Entity store.")
-                  .version(ConfigConstants.VERSION_1_0_0)
-                  .booleanConf()
-                  .createWithDefault(true);
+      new ConfigBuilder(ENTITY_RELATIONAL_JDBC_BACKEND_GC_ENABLED)
+          .doc("Whether to enable the GC for Entity store.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .booleanConf()
+          .createWithDefault(true);
 
   public static final ConfigEntry<Long> CATALOG_CACHE_EVICTION_INTERVAL_MS =
       new ConfigBuilder("gravitino.catalog.cache.evictionIntervalMs")
