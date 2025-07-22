@@ -63,8 +63,10 @@ public class RelationalEntityStore
   @Override
   public void initialize(Config config) throws RuntimeException {
     this.backend = createRelationalEntityBackend(config);
-    this.garbageCollector = new RelationalGarbageCollector(backend, config);
-    this.garbageCollector.start();
+    if (config.get(Configs.ENTITY_STORE_GC_ENABLED)) {
+      this.garbageCollector = new RelationalGarbageCollector(backend, config);
+      this.garbageCollector.start();
+    }
     this.cache =
         config.get(Configs.CACHE_ENABLED)
             ? CacheFactory.getEntityCache(config)
@@ -159,7 +161,9 @@ public class RelationalEntityStore
   @Override
   public void close() throws IOException {
     cache.clear();
-    garbageCollector.close();
+    if(garbageCollector != null) {
+      garbageCollector.close();
+    }
     backend.close();
   }
 
