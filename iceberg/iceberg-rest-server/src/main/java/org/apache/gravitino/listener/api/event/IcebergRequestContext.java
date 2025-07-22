@@ -21,6 +21,8 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -61,7 +63,17 @@ public class IcebergRequestContext {
     this.remoteHostName = httpRequest.getRemoteHost();
     this.httpHeaders = IcebergRestUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
-    this.userName = PrincipalUtils.getCurrentUserName();
+
+    // Get the authenticated principal from the HTTP request attribute
+    // This is set by the AuthenticationFilter and matches the behavior in Utils.doAs()
+    UserPrincipal principal =
+        (UserPrincipal)
+            httpRequest.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME);
+    if (principal == null) {
+      this.userName = PrincipalUtils.getCurrentUserName();
+    } else {
+      this.userName = principal.getName();
+    }
     this.requestCredentialVending = requestCredentialVending;
   }
 
