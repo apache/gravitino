@@ -117,7 +117,7 @@ public class RESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            if (authorizationContext.authorizationEnabled()) {
+            if (authorizationContext.isAuthorizationEnabled()) {
               bind(IcebergRESTAuthInterceptionService.class)
                   .to(InterceptionService.class)
                   .in(Singleton.class);

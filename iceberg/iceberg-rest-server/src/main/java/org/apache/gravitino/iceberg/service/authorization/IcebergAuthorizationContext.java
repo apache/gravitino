@@ -55,7 +55,7 @@ public class IcebergAuthorizationContext {
     return InstanceHolder.INSTANCE;
   }
 
-  public boolean authorizationEnabled() {
+  public boolean isAuthorizationEnabled() {
     return isAuthorizationEnabled;
   }
 

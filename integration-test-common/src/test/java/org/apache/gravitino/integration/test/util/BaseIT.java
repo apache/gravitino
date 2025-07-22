@@ -125,6 +125,7 @@ public class BaseIT {
 
   protected String originConfig;
 
+  // Supports specifying the JDBC backend by the test.
   private Optional<String> JDBCBackend = Optional.empty();
 
   public int getGravitinoServerPort() {

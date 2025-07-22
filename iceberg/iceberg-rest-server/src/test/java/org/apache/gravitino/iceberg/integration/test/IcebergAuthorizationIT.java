@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Catalog;
@@ -51,11 +52,11 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 /**
- * This is starts a Gravitino server to create metalake, catalogs and starts a standalone Iceberg
- * REST server to do the Authorization. There are two users: SUPER_USER is the owner of metalake,
- * has all privileges while NORMAL_USER is the user for Spark SQL, doesn't have privileges by
- * default. You could use Spark SQL to try to do the operation and use Gravitino client to grant
- * privilege or verify the Spark SQL result.
+ * This IT starts a Gravitino server with Iceberg REST server in the auxiliary mode, we could create
+ * metalake, catalogs in Gravitino server and do the authorization with Iceberg REST server. There
+ * are two users: SUPER_USER is the owner of metalake, has all privileges while NORMAL_USER is the
+ * user for Spark SQL, doesn't have privileges by default. You could use Spark SQL to try to do the
+ * operation and use Gravitino client to grant privilege or check the test result.
  */
 public class IcebergAuthorizationIT extends BaseIT {
 
@@ -65,7 +66,7 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   protected static final String SUPER_USER = "super";
 
-  // Iceberg doesn't support passing simple username for low version
+  // Iceberg doesn't support passing simple username for Iceberg 1.6
   // todo: use a valid username after using Iceberg 1.9
   protected static final String NORMAL_USER = AuthConstants.ANONYMOUS_USER;
 
@@ -79,9 +80,8 @@ public class IcebergAuthorizationIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    startGravitinoServerWithoutIcebergREST();
+    startGravitinoServerWithIcebergREST();
     initMetalakeAndCatalog();
-    // startStandAloneIcebergRESTServer();
     initSparkEnv();
   }
 
@@ -133,7 +133,7 @@ public class IcebergAuthorizationIT extends BaseIT {
                 "file:///tmp/"));
   }
 
-  private void startGravitinoServerWithoutIcebergREST() throws Exception {
+  private void startGravitinoServerWithIcebergREST() throws Exception {
     setJDBCBackend("PostgreSQL");
     ignoreIcebergRestService = false;
     // Enable authorization
@@ -203,16 +203,6 @@ public class IcebergAuthorizationIT extends BaseIT {
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }
 
-  private Map<String, String> getIcebergCatalogConfig() {
-    // add entity store configurations
-    Map<String, String> configs = new HashMap<>(customConfigs);
-    // add jdbc catalog backend configs
-    getJDBCCatalogBackendConfig()
-        .forEach((k, v) -> configs.put(GRAVITINO_ICEBERG_REST_PREFIX + k, v));
-
-    return configs;
-  }
-
   private Map<String, String> getJDBCCatalogBackendConfig() {
     return ImmutableMap.of(
         IcebergConstants.URI,
@@ -241,8 +231,12 @@ public class IcebergAuthorizationIT extends BaseIT {
     return customConfigs.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD_KEY);
   }
 
-  protected Map<String, String> etTableInfo(String tableName) {
+  protected Map<String, String> getTableInfo(String tableName) {
     return convertToStringMap(sql("desc table extended %s", tableName));
+  }
+
+  protected Set<String> listTableNames(String database) {
+    return convertToStringSet(sql("SHOW TABLES in " + database), 1);
   }
 
   @FormatMethod
@@ -254,7 +248,11 @@ public class IcebergAuthorizationIT extends BaseIT {
     return rowsToJava(rows);
   }
 
-  protected List<Object[]> rowsToJava(List<Row> rows) {
+  private static Set<String> convertToStringSet(List<Object[]> objects, int index) {
+    return objects.stream().map(row -> String.valueOf(row[index])).collect(Collectors.toSet());
+  }
+
+  private List<Object[]> rowsToJava(List<Row> rows) {
     return rows.stream().map(this::toJava).collect(Collectors.toList());
   }
 

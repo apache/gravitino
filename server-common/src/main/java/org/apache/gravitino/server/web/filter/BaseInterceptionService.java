@@ -27,11 +27,7 @@ import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
 import org.glassfish.hk2.api.InterceptionService;
 
-/**
- * GravitinoInterceptionService defines a method interceptor for REST interfaces to create dynamic
- * proxies. It implements metadata authorization when invoking REST API methods. It needs to be
- * registered in the hk2 bean container when the gravitino server starts.
- */
+/** BaseInterceptionService defines some common logic for InterceptionService. */
 public abstract class BaseInterceptionService implements InterceptionService {
 
   @Override

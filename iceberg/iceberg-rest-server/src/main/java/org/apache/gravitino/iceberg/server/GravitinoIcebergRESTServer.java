@@ -71,7 +71,7 @@ public class GravitinoIcebergRESTServer {
     String confPath = System.getenv("GRAVITINO_TEST") == null ? "" : args[0];
     ServerConfig serverConfig = ServerConfig.loadConfig(confPath, CONF_FILE);
     Preconditions.checkArgument(
-        serverConfig.get(Configs.ENABLE_AUTHORIZATION),
+        !serverConfig.get(Configs.ENABLE_AUTHORIZATION),
         "Iceberg REST server standalone mode doesn't support authorization.");
     GravitinoIcebergRESTServer icebergRESTServer = new GravitinoIcebergRESTServer(serverConfig);
     icebergRESTServer.initialize();

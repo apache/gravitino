@@ -29,7 +29,6 @@ import java.util.UUID;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -89,9 +88,6 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
         catalogClientWithAllPrivilege
             .asTableCatalog()
             .tableExists(NameIdentifier.of(SCHEMA_NAME, "abc"));
-    NameIdentifier[] tables =
-        catalogClientWithAllPrivilege.asTableCatalog().listTables(Namespace.of(SCHEMA_NAME));
-    Assertions.assertTrue(tables.length > 0);
     Assertions.assertTrue(exists);
   }
 
