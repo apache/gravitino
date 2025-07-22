@@ -20,9 +20,11 @@ package org.apache.gravitino.stats;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 
 /** SupportsPartitionStatistics provides methods to list and update statistics for partitions. */
+@Unstable
 interface SupportsPartitionStatistics {
 
   /**
@@ -42,7 +44,7 @@ interface SupportsPartitionStatistics {
    *     names to their values
    * @throws UnmodifiableStatisticException if any of the statistics to be updated are unmodifiable
    */
-  void updateStatistics(Map<String, StatisticValue<?>> statistics)
+  void updateStatistics(Map<String, Map<String, StatisticValue<?>>> statistics)
       throws UnmodifiableStatisticException;
 
   /**
