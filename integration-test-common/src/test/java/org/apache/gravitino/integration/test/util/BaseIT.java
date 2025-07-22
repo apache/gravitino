@@ -125,7 +125,7 @@ public class BaseIT {
 
   protected String originConfig;
 
-  private Optional<String> JDBCBackend;
+  private Optional<String> JDBCBackend = Optional.empty();
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
