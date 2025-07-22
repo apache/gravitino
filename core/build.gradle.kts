@@ -41,6 +41,7 @@ dependencies {
   implementation(libs.concurrent.trees)
   implementation(libs.guava)
   implementation(libs.h2db)
+  implementation(libs.lance)
   implementation(libs.mybatis)
 
   annotationProcessor(libs.lombok)
