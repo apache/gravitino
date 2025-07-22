@@ -20,6 +20,7 @@ package org.apache.gravitino.meta;
 
 import static org.mockito.Mockito.mock;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.HashMap;
@@ -28,12 +29,14 @@ import java.util.Set;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.EntityCombinedFileset;
 import org.apache.gravitino.catalog.EntityCombinedModel;
+import org.apache.gravitino.catalog.EntityCombinedModelVersion;
 import org.apache.gravitino.catalog.EntityCombinedSchema;
 import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.EntityCombinedTopic;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -65,6 +68,7 @@ public class TestEntityCombinedObject {
   private final Table originTable = mockTable();
   private final Fileset originFileset = mockFileset();
   private final Model originModel = mockModel();
+  private final ModelVersion originModelVersion = mockModelVersion();
 
   @Test
   public void testSchema() {
@@ -136,6 +140,21 @@ public class TestEntityCombinedObject {
     Assertions.assertEquals(originModel.auditInfo(), entityCombinedModel.auditInfo());
   }
 
+  @Test
+  public void testModelVersion() {
+    EntityCombinedModelVersion entityCombinedModelVersion =
+        EntityCombinedModelVersion.of(originModelVersion).withHiddenProperties(hiddenProperties);
+    Assertions.assertEquals(originModelVersion.comment(), entityCombinedModelVersion.comment());
+    Map<String, String> filterProp = new HashMap<>(originModelVersion.properties());
+    filterProp.remove("k3");
+    filterProp.remove(null);
+    filterProp.remove("k5");
+    Assertions.assertEquals(filterProp, entityCombinedModelVersion.properties());
+    Assertions.assertEquals(originModelVersion.auditInfo(), entityCombinedModelVersion.auditInfo());
+    Assertions.assertEquals(originModelVersion.version(), entityCombinedModelVersion.version());
+    Assertions.assertEquals(originModelVersion.uris(), entityCombinedModelVersion.uris());
+  }
+
   private Schema mockSchema() {
     Schema mockSchema = mock(Schema.class);
     Mockito.when(mockSchema.name()).thenReturn("testSchema");
@@ -179,5 +198,15 @@ public class TestEntityCombinedObject {
     Mockito.when(mockModel.auditInfo()).thenReturn(auditInfo);
     Mockito.when(mockModel.properties()).thenReturn(entityProperties);
     return mockModel;
+  }
+
+  private ModelVersion mockModelVersion() {
+    ModelVersion mockModelVersion = mock(ModelVersion.class);
+    Mockito.when(mockModelVersion.version()).thenReturn(1);
+    Mockito.when(mockModelVersion.comment()).thenReturn("test model version comment");
+    Mockito.when(mockModelVersion.auditInfo()).thenReturn(auditInfo);
+    Mockito.when(mockModelVersion.properties()).thenReturn(entityProperties);
+    Mockito.when(mockModelVersion.uris()).thenReturn(ImmutableMap.of("n1", "u1", "n2", "u2"));
+    return mockModelVersion;
   }
 }
