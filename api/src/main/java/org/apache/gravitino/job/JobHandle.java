@@ -43,7 +43,7 @@ public interface JobHandle {
     SUCCEEDED,
 
     /** The job is being cancelled. */
-    CANCELING,
+    CANCELLING,
 
     /** The job has been cancelled. */
     CANCELLED;

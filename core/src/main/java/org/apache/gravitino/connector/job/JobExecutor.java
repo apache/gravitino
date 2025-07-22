@@ -70,10 +70,10 @@ public interface JobExecutor extends Closeable {
 
   /**
    * Cancel a job by its unique identifier. The job runner should stop the job if it is currently
-   * running. If the job is already completed, it should return directory without any error. If the
+   * running. If the job is already completed, it should return directly without any error. If the
    * job does not exist, it should throw a {@link NoSuchJobException}.
    *
-   * <p>This method should not block on the job cancellation, it should return immediately, and
+   * <p>This method should not be blocked on the job cancellation, it should return immediately, and
    * Gravitino can further query the job status to check if the job is cancelled successfully.
    *
    * @param jobId The unique identifier of the job to cancel.

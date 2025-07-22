@@ -349,7 +349,7 @@ public class JobManager implements JobOperationDispatcher, Closeable {
             .withId(jobEntity.id())
             .withJobExecutionId(jobEntity.jobExecutionId())
             .withJobTemplateName(jobEntity.jobTemplateName())
-            .withStatus(JobHandle.Status.CANCELING)
+            .withStatus(JobHandle.Status.CANCELLING)
             .withNamespace(jobEntity.namespace())
             .withAuditInfo(
                 AuditInfo.builder()

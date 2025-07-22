@@ -313,7 +313,7 @@ public class TestJobManager {
 
     // Delete job template that is in use
     Lists.newArrayList(
-            JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELING)
+            JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING)
         .forEach(
             status -> {
               doReturn(Lists.newArrayList(newJobEntity("shell_job", status)))
@@ -488,7 +488,7 @@ public class TestJobManager {
     // Cancel an existing job
     JobEntity cancelledJob = jobManager.cancelJob(metalake, job.name());
     Assertions.assertEquals(job.jobExecutionId(), cancelledJob.jobExecutionId());
-    Assertions.assertEquals(JobHandle.Status.CANCELING, cancelledJob.status());
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, cancelledJob.status());
 
     // Test cancel a nonexistent job
     when(jobManager.getJob(metalake, "non_existent"))
