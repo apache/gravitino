@@ -131,7 +131,7 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
-    public boolean isMetadataOwnerOrParentOwner(String metalake, String type, String fullName) {
+    public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
       return true;
     }
 

@@ -93,7 +93,7 @@ public interface GravitinoAuthorizer extends Closeable {
    * @param fullName metadata full name
    * @return authorization result
    */
-  boolean isMetadataOwnerOrParentOwner(String metalake, String type, String fullName);
+  boolean hasSetOwnerPermission(String metalake, String type, String fullName);
 
   /**
    * Determine whether the user can grant or revoke privilege for metadata

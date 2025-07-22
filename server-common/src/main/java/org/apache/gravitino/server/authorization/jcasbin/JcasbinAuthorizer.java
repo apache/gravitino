@@ -156,7 +156,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isMetadataOwnerOrParentOwner(String metalake, String type, String fullName) {
+  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
@@ -212,10 +212,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     MetadataObject metalakeMetadataObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
-    return authorize(currentPrincipal, metalake, metalakeMetadataObject, Privilege.Name.USE_CATALOG)
-        || authorize(
+    return authorize(
             currentPrincipal, metalake, metalakeMetadataObject, Privilege.Name.MANAGE_GRANTS)
-        || isMetadataOwnerOrParentOwner(metalake, type, fullName);
+        || hasSetOwnerPermission(metalake, type, fullName);
   }
 
   @Override
