@@ -20,7 +20,11 @@ package org.apache.gravitino.catalog.lakehouse.paimon.ops;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
+import java.lang.reflect.Field;
+import java.util.IdentityHashMap;
 import lombok.Getter;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.paimon.catalog.Catalog;
 
 @Getter
@@ -40,6 +44,41 @@ public class PaimonBackendCatalogWrapper {
     }
     if (closeableResource != null) {
       closeableResource.close();
+    }
+
+    clearClassLoaderReferences();
+
+    Field statisticsCleanerField =
+        FieldUtils.getField(FileSystem.Statistics.class, "STATS_DATA_CLEANER", true);
+    Object statisticsCleaner = statisticsCleanerField.get(null);
+    if (statisticsCleaner != null) {
+      ((Thread) statisticsCleaner).interrupt();
+      ((Thread) statisticsCleaner).setContextClassLoader(null);
+      ((Thread) statisticsCleaner).join();
+    }
+
+    FileSystem.closeAll();
+  }
+
+  public static void clearClassLoaderReferences() {
+    try {
+      Class<?> shutdownHooks = Class.forName("java.lang.ApplicationShutdownHooks");
+      Field hooksField = shutdownHooks.getDeclaredField("hooks");
+      hooksField.setAccessible(true);
+
+      IdentityHashMap<Thread, Thread> hooks =
+          (IdentityHashMap<Thread, Thread>) hooksField.get(null);
+
+      hooks
+          .entrySet()
+          .removeIf(
+              entry -> {
+                Thread thread = entry.getKey();
+                return thread.getContextClassLoader()
+                    == PaimonBackendCatalogWrapper.class.getClassLoader();
+              });
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to clean shutdown hooks", e);
     }
   }
 }

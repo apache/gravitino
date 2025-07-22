@@ -129,8 +129,32 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private boolean disableFSOps;
 
+  private final ScheduledThreadPoolExecutor scheduler;
+  private final Cache<NameIdentifier, FileSystem> fileSystemCache;
+
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
+    scheduler =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("file-system-cache-for-fileset" + "-%d")
+                .build());
+
+    this.fileSystemCache =
+        Caffeine.newBuilder()
+            .expireAfterAccess(1000 * 60 * 60 /* 1 hour */, TimeUnit.MILLISECONDS)
+            .removalListener(
+                (ignored, value, cause) -> {
+                  try {
+                    ((FileSystem) value).close();
+                  } catch (IOException e) {
+                    LOG.warn("Failed to close FileSystem instance in cache", e);
+                  }
+                })
+            .scheduler(Scheduler.forScheduledExecutorService(scheduler))
+            .build();
   }
 
   public FilesetCatalogOperations() {
@@ -242,9 +266,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     String actualPath = getFileLocation(filesetIdent, subPath, locationName);
-    Path formalizedPath = formalizePath(new Path(actualPath), conf);
 
-    FileSystem fs = getFileSystem(formalizedPath, conf);
+    FileSystem fileSystem = getFileSystemWithCache(new Path(actualPath), conf, filesetIdent);
+    Path formalizedPath =
+        new Path(actualPath).makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
+
+    FileSystem fs = getFileSystemWithCache(formalizedPath, conf, filesetIdent);
     if (!fs.exists(formalizedPath)) {
       throw new IllegalArgumentException(
           String.format(
@@ -367,10 +394,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       try {
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-          Path formalizePath = formalizePath(entry.getValue(), conf);
-          filesetPathsBuilder.put(entry.getKey(), formalizePath);
 
-          FileSystem fs = getFileSystem(formalizePath, conf);
+          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), conf, ident);
+          Path formalizePath =
+              entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
+
+          filesetPathsBuilder.put(entry.getKey(), formalizePath);
+          FileSystem fs = getFileSystemWithCache(formalizePath, conf, ident);
           if (!fs.exists(formalizePath)) {
             if (!fs.mkdirs(formalizePath)) {
               throw new RuntimeException(
@@ -536,7 +566,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         storageLocations.forEach(
             (locationName, location) -> {
               try {
-                FileSystem fs = getFileSystem(location, conf);
+                FileSystem fs = getFileSystemWithCache(location, conf, ident);
                 if (fs.exists(location)) {
                   if (!fs.delete(location, true)) {
                     LOG.warn(
@@ -613,7 +643,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               + "file location may be a wrong path. Please avoid using Fileset to manage a single"
               + " file path.");
     } else {
-      isSingleFile = checkSingleFile(fileset, targetLocationName);
+      isSingleFile = checkSingleFile(fileset, targetLocationName, ident);
     }
 
     // if the storage location is a single file, it cannot have sub path to access.
@@ -692,7 +722,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         (locationName, schemaPath) -> {
           if (schemaPath != null && !containsPlaceholder(schemaPath.toString())) {
             try {
-              FileSystem fs = getFileSystem(schemaPath, conf);
+              FileSystem fs = getFileSystemWithCache(schemaPath, conf, ident);
               if (!fs.exists(schemaPath)) {
                 if (!fs.mkdirs(schemaPath)) {
                   // Fail the operation when failed to create the schema path.
@@ -797,7 +827,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                           (locationName, location) -> {
                             try {
                               Path filesetPath = new Path(location);
-                              FileSystem fs = getFileSystem(filesetPath, conf);
+                              FileSystem fs = getFileSystemWithCache(filesetPath, conf, ident);
                               if (fs.exists(filesetPath)) {
                                 if (!fs.delete(filesetPath, true)) {
                                   LOG.warn(
@@ -827,7 +857,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         schemaPaths.forEach(
             (locationName, schemaPath) -> {
               try {
-                FileSystem fs = getFileSystem(schemaPath, conf);
+                FileSystem fs = getFileSystemWithCache(schemaPath, conf, ident);
                 if (fs.exists(schemaPath)) {
                   FileStatus[] statuses = fs.listStatus(schemaPath);
                   if (statuses.length == 0) {
@@ -896,6 +926,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public void close() throws IOException {
     // do nothing
+    if (scheduler != null) {
+      scheduler.shutdownNow();
+    }
+
+    if (fileSystemCache != null) {
+      fileSystemCache.cleanUp();
+    }
   }
 
   private Cache<NameIdentifier, FilesetImpl> initializeFilesetCache(Map<String, String> config) {
@@ -1248,10 +1285,25 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         && !CallerContext.CallerContextHolder.get().context().isEmpty();
   }
 
-  private boolean checkSingleFile(Fileset fileset, String locationName) {
+  private FileSystem getFileSystemWithCache(
+      Path path, Map<String, String> conf, NameIdentifier identifier) {
+    return fileSystemCache.get(
+        identifier,
+        cacheKey -> {
+          try {
+            return getFileSystem(path, conf);
+          } catch (IOException e) {
+            throw new GravitinoRuntimeException(
+                e, "Failed to get FileSystem for fileset: %s", identifier);
+          }
+        });
+  }
+
+  private boolean checkSingleFile(Fileset fileset, String locationName, NameIdentifier identifier) {
     try {
       Path locationPath = new Path(fileset.storageLocations().get(locationName));
-      return getFileSystem(locationPath, conf).getFileStatus(locationPath).isFile();
+      FileSystem fileSystem = getFileSystemWithCache(locationPath, conf, identifier);
+      return fileSystem.getFileStatus(locationPath).isFile();
     } catch (FileNotFoundException e) {
       // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
       return false;
