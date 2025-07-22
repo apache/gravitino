@@ -78,7 +78,8 @@ public class CredentialPropertyUtils {
         || credential instanceof S3SecretKeyCredential
         || credential instanceof OSSTokenCredential
         || credential instanceof OSSSecretKeyCredential
-        || credential instanceof AzureAccountKeyCredential) {
+        || credential instanceof AzureAccountKeyCredential
+        || credential instanceof AwsIrsaCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
 
