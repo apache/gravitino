@@ -129,8 +129,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private boolean disableFSOps;
 
-  private final ScheduledThreadPoolExecutor scheduler;
-  private final Cache<NameIdentifier, FileSystem> fileSystemCache;
+  @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
+  @VisibleForTesting Cache<NameIdentifier, FileSystem> fileSystemCache;
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
