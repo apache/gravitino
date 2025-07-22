@@ -156,7 +156,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+  public boolean isMetadataOwnerOrParentOwner(String metalake, String type, String fullName) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     MetadataObject metalakeObject =
         MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
@@ -169,11 +169,53 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         MetadataObjects.of(Arrays.asList(fullName.split("\\.")), metadataType);
     do {
       if (isOwner(currentPrincipal, metalake, metadataObject)) {
+        MetadataObject.Type tempType = metadataObject.type();
+        if (tempType == MetadataObject.Type.SCHEMA) {
+          // schema owner need use catalog privilege
+          boolean hasCatalogUseCatalog =
+              authorize(
+                  currentPrincipal,
+                  metalake,
+                  MetadataObjects.parent(metadataObject),
+                  Privilege.Name.USE_CATALOG);
+          boolean hasMetalakeUseCatalog =
+              authorize(currentPrincipal, metalake, metalakeObject, Privilege.Name.USE_CATALOG);
+          return hasCatalogUseCatalog || hasMetalakeUseCatalog;
+        }
+        if (tempType == MetadataObject.Type.TABLE
+            || tempType == MetadataObject.Type.TOPIC
+            || tempType == MetadataObject.Type.FILESET
+            || tempType == MetadataObject.Type.MODEL) {
+          // table owner need use_catalog and use_schema privileges
+          boolean hasMetalakeUseSchema =
+              authorize(currentPrincipal, metalake, metalakeObject, Privilege.Name.USE_SCHEMA);
+          MetadataObject schemaObject = MetadataObjects.parent(metadataObject);
+          boolean hasCatalogUseSchema =
+              authorize(
+                  currentPrincipal,
+                  metalake,
+                  MetadataObjects.parent(schemaObject),
+                  Privilege.Name.USE_SCHEMA);
+          boolean hasSchemaUseSchema =
+              authorize(currentPrincipal, metalake, schemaObject, Privilege.Name.USE_SCHEMA);
+          return hasMetalakeUseSchema || hasCatalogUseSchema || hasSchemaUseSchema;
+        }
         return true;
       }
       // metadata parent owner can set owner.
     } while ((metadataObject = MetadataObjects.parent(metadataObject)) != null);
     return false;
+  }
+
+  @Override
+  public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject metalakeMetadataObject =
+        MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
+    return authorize(currentPrincipal, metalake, metalakeMetadataObject, Privilege.Name.USE_CATALOG)
+        || authorize(
+            currentPrincipal, metalake, metalakeMetadataObject, Privilege.Name.MANAGE_GRANTS)
+        || isMetadataOwnerOrParentOwner(metalake, type, fullName);
   }
 
   @Override

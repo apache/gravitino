@@ -88,11 +88,22 @@ public interface GravitinoAuthorizer extends Closeable {
   /**
    * Determine whether the user can set owner
    *
+   * @param metalake metalake
    * @param type metadata type
    * @param fullName metadata full name
    * @return authorization result
    */
-  boolean hasSetOwnerPermission(String metalake, String type, String fullName);
+  boolean isMetadataOwnerOrParentOwner(String metalake, String type, String fullName);
+
+  /**
+   * Determine whether the user can grant or revoke privilege for metadata
+   *
+   * @param metalake metalake
+   * @param type metadata type
+   * @param fullName metadata full name
+   * @return authorization result
+   */
+  boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName);
 
   /**
    * When the permissions of a role change, it is necessary to notify the GravitinoAuthorizer in

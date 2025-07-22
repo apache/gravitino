@@ -82,7 +82,12 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+  public boolean isMetadataOwnerOrParentOwner(String metalake, String type, String fullName) {
+    return true;
+  }
+
+  @Override
+  public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
     return true;
   }
 

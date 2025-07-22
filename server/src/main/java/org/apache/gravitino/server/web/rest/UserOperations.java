@@ -76,7 +76,7 @@ public class UserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-user", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER || USER::SELF")
+  @AuthorizationExpression(expression = "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF")
   public Response getUser(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -116,7 +116,7 @@ public class UserOperations {
                                 };
                             return MetadataFilterHelper.filterByExpression(
                                         metalake,
-                                        "METALAKE::OWNER || USER::SELF",
+                                        "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF",
                                         Entity.EntityType.USER,
                                         nameIdentifiers)
                                     .length

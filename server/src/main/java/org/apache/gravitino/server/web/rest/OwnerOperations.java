@@ -106,8 +106,8 @@ public class OwnerOperations {
       GravitinoAuthorizer gravitinoAuthorizer =
           GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
       Preconditions.checkState(
-          gravitinoAuthorizer.hasSetOwnerPermission(metalake, metadataObjectType, fullName),
-          "Current can not set owner.");
+          gravitinoAuthorizer.isMetadataOwnerOrParentOwner(metalake, metadataObjectType, fullName),
+          "Current user can not set owner.");
       MetadataObject object =
           MetadataObjects.parse(
               fullName, MetadataObject.Type.valueOf(metadataObjectType.toUpperCase(Locale.ROOT)));

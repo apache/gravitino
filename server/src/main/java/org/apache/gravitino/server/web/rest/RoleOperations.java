@@ -95,7 +95,7 @@ public class RoleOperations {
                               new NameIdentifier[] {NameIdentifierUtil.ofRole(metalake, role)};
                           return MetadataFilterHelper.filterByExpression(
                                       metalake,
-                                      "METALAKE::OWNER || ROLE::SELF",
+                                      "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF",
                                       Entity.EntityType.ROLE,
                                       nameIdentifiers)
                                   .length
@@ -115,7 +115,7 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-role", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER || ROLE::SELF")
+  @AuthorizationExpression(expression = "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF")
   public Response getRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -207,11 +207,11 @@ public class RoleOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "delete-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-role", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER")
+  @AuthorizationExpression(expression = "METALAKE::OWNER || ROLE::OWNER")
   public Response deleteRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("role") String role) {
+      @PathParam("role") @AuthorizationMetadata(type = Entity.EntityType.ROLE) String role) {
     try {
       return Utils.doAs(
           httpRequest,

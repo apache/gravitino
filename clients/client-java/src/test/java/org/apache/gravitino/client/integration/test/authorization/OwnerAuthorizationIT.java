@@ -18,14 +18,12 @@
 package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
@@ -33,8 +31,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -43,10 +39,14 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   private static final String CATALOG = "catalog";
@@ -72,16 +72,9 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createCatalog(CATALOG, Catalog.Type.RELATIONAL, "hive", "comment", properties)
         .asSchemas()
         .createSchema(SCHEMA, "test", new HashMap<>());
-    List<SecurableObject> securableObjects = new ArrayList<>();
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    SecurableObject catalogObject =
-        SecurableObjects.ofCatalog(CATALOG, ImmutableList.of(Privileges.UseCatalog.allow()));
-    securableObjects.add(catalogObject);
-    gravitinoMetalake.createRole(role, new HashMap<>(), securableObjects);
+    gravitinoMetalake.createRole(role, new HashMap<>(), Collections.emptyList());
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(role), NORMAL_USER);
-    // normal user can load the catalog but not the schema
-    Catalog catalogLoadByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
-    assertEquals(CATALOG, catalogLoadByNormalUser.name());
     client.loadMetalake(METALAKE).addUser(TEMP_USER);
     TableCatalog tableCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     tableCatalog.createTable(
@@ -99,6 +92,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
+  @Order(1)
   public void testSetTableOwnerByMetalakeOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.setOwner(
@@ -124,6 +118,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
+  @Order(2)
   public void testSetTableOwnerByCatalogOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.setOwner(
@@ -169,6 +164,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   @Test
+  @Order(3)
   public void testSetTableOwnerBySchemaOwner() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.setOwner(
@@ -197,6 +193,21 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         NORMAL_USER,
         Owner.Type.USER);
     // normal user can set owner
+    assertThrows(
+        "Current user can not set owner",
+        RuntimeException.class,
+        () -> {
+          // NORMAL_USER has not USE_CATALOG
+          gravitinoMetalakeLoadByNormalUser.setOwner(
+              MetadataObjects.of(
+                  ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+              NORMAL_USER,
+              Owner.Type.USER);
+        });
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
+        ImmutableList.of(Privileges.UseCatalog.allow()));
     gravitinoMetalakeLoadByNormalUser.setOwner(
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
         NORMAL_USER,
@@ -241,10 +252,24 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
         NORMAL_USER,
         Owner.Type.USER);
-    // normal user can set owner
+    assertThrows(
+        "Current user can not set owner",
+        RuntimeException.class,
+        () -> {
+          // NORMAL_USER has not USE_SCHEMA
+          gravitinoMetalakeLoadByNormalUser.setOwner(
+              MetadataObjects.of(
+                  ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+              NORMAL_USER,
+              Owner.Type.USER);
+        });
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
+        ImmutableList.of(Privileges.UseSchema.allow()));
     gravitinoMetalakeLoadByNormalUser.setOwner(
         MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
-        TEMP_USER,
+        NORMAL_USER,
         Owner.Type.USER);
 
     // reset owner
