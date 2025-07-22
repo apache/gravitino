@@ -116,27 +116,27 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table column types
 
-| Gravitino Type    | OceanBase Type      |
-|-------------------|---------------------|
-| `Byte`            | `Tinyint`           |
-| `Byte(false)`     | `Tinyint Unsigned`  |
-| `Short`           | `Smallint`          |
-| `Short(false)`    | `Smallint Unsigned` |
-| `Integer`         | `Int`               |
-| `Integer(false)`  | `Int Unsigned`      |
-| `Long`            | `Bigint`            |
-| `Long(false)`     | `Bigint Unsigned`   | 
-| `Float`           | `Float`             |
-| `Double`          | `Double`            |
-| `String`          | `Text`              |
-| `Date`            | `Date`              |
-| `Time(p)`         | `Time(p)`           |
-| `Timestamp_tz(p)` | `Timestamp(p)`      |
-| `Timestamp(p)`    | `Datetime(p)`       |
-| `Decimal`         | `Decimal`           |
-| `VarChar`         | `VarChar`           |
-| `FixedChar`       | `FixedChar`         |
-| `Binary`          | `Binary`            |
+| Gravitino Type      | OceanBase Type      |
+|---------------------|---------------------|
+| `Byte`              | `Tinyint`           |
+| `Byte(false)`       | `Tinyint Unsigned`  |
+| `Short`             | `Smallint`          |
+| `Short(false)`      | `Smallint Unsigned` |
+| `Integer`           | `Int`               |
+| `Integer(false)`    | `Int Unsigned`      |
+| `Long`              | `Bigint`            |
+| `Long(false)`       | `Bigint Unsigned`   | 
+| `Float`             | `Float`             |
+| `Double`            | `Double`            |
+| `String`            | `Text`              |
+| `Date`              | `Date`              |
+| `Time[(p)]`         | `Time[(p)]`         |
+| `Timestamp_tz[(p)]` | `Timestamp[(p)]`    |
+| `Timestamp[(p)]`    | `Datetime[(p)]`     |
+| `Decimal`           | `Decimal`           |
+| `VarChar`           | `VarChar`           |
+| `FixedChar`         | `FixedChar`         |
+| `Binary`            | `Binary`            |
 
 :::info
 OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.

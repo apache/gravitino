@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
@@ -701,8 +703,14 @@ public abstract class JdbcTableOperations implements TableOperation {
    * driver: Only versions &gt;= 8.0.16 return accurate columnSize for datetime precision. For other
    * drivers (like OceanBase): Assume they support accurate precision calculation
    *
+   * <p>MySQL Connector/J 8.0.16 fixed the wrong handling of temporal type precision in the
+   * DatabaseMetaDataUsingInfoSchema interface, where getColumns() method returned wrong results
+   * for the COLUMN_SIZE column. Prior versions had errors in temporal type precision handling.
+   *
    * @param driverVersion the driver version string to check
    * @return true if the driver version supports accurate precision calculation, false otherwise
+   * @see <a href="https://dev.mysql.com/doc/relnotes/connector-j/en/news-8-0-16.html">MySQL
+   *     Connector/J 8.0.16 Release Notes</a>
    */
   public boolean isMySQLDriverVersionSupported(String driverVersion) {
     if (StringUtils.isBlank(driverVersion)) {
@@ -719,8 +727,8 @@ public abstract class JdbcTableOperations implements TableOperation {
 
     // Extract version from driver string like "mysql-connector-java-8.0.19 (Revision: ...)"
     String versionPattern = "mysql-connector-java-(\\d+\\.\\d+\\.\\d+)";
-    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(versionPattern);
-    java.util.regex.Matcher matcher = pattern.matcher(driverVersion);
+    Pattern pattern = Pattern.compile(versionPattern);
+    Matcher matcher = pattern.matcher(driverVersion);
 
     if (matcher.find()) {
       String versionStr = matcher.group(1);

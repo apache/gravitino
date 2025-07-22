@@ -244,9 +244,9 @@ If you doesn't specify distribution expressions, the table distribution will be 
 | `Double`          | `Double`                    |
 | `String`          | `String`                    |
 | `Date`            | `Date`                      |
-| `Time[6]`         | `Time`                      |
-| `Timestamp[6]`    | `TimestampType withZone`    |
-| `Timestamp_tz[6]` | `TimestampType withoutZone` |
+| `Time(6)`         | `Time`                      |
+| `Timestamp(6)`    | `TimestampType withZone`    |
+| `Timestamp_tz(6)` | `TimestampType withoutZone` |
 | `Decimal`         | `Decimal`                   |
 | `Fixed`           | `Fixed`                     |
 | `Binary`          | `Binary`                    |

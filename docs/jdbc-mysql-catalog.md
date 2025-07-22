@@ -80,7 +80,6 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
-- `mysql-connector-java-8.0.26` (default in Gravitino integration tests)
 
 ### Catalog operations
 
@@ -115,28 +114,28 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table column types
 
-| Gravitino Type     | MySQL Type          |
-|--------------------|---------------------|
-| `Byte`             | `Tinyint`           |
-| `Unsigned Byte`    | `Tinyint Unsigned`  |
-| `Short`            | `Smallint`          |
-| `Unsigned Short`   | `Smallint Unsigned` |
-| `Integer`          | `Int`               |
-| `Unsigned Integer` | `Int Unsigned`      |
-| `Long`             | `Bigint`            |
-| `Unsigned Long`    | `Bigint Unsigned`   |
-| `Float`            | `Float`             |
-| `Double`           | `Double`            |
-| `String`           | `Text`              |
-| `Date`             | `Date`              |
-| `Time(p)`          | `Time(p)`           |
-| `Timestamp_tz(p)`  | `Timestamp(p)`      |
-| `Timestamp(p)`     | `Datetime(p)`       |
-| `Decimal`          | `Decimal`           |
-| `VarChar`          | `VarChar`           |
-| `FixedChar`        | `FixedChar`         |
-| `Binary`           | `Binary`            |
-| `BOOLEAN`          | `BIT`               |
+| Gravitino Type       | MySQL Type          |
+|----------------------|---------------------|
+| `Byte`               | `Tinyint`           |
+| `Unsigned Byte`      | `Tinyint Unsigned`  |
+| `Short`              | `Smallint`          |
+| `Unsigned Short`     | `Smallint Unsigned` |
+| `Integer`            | `Int`               |
+| `Unsigned Integer`   | `Int Unsigned`      |
+| `Long`               | `Bigint`            |
+| `Unsigned Long`      | `Bigint Unsigned`   |
+| `Float`              | `Float`             |
+| `Double`             | `Double`            |
+| `String`             | `Text`              |
+| `Date`               | `Date`              |
+| `Time[(p)]`          | `Time[(p)]`         |
+| `Timestamp_tz[(p)]`  | `Timestamp(p)`      |
+| `Timestamp[(p)]`     | `Datetime[(p)]`     |
+| `Decimal`            | `Decimal`           |
+| `VarChar`            | `VarChar`           |
+| `FixedChar`          | `FixedChar`         |
+| `Binary`             | `Binary`            |
+| `BOOLEAN`            | `BIT`               |
 
 :::info
 MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
