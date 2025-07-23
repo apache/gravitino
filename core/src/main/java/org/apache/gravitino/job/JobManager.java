@@ -335,10 +335,12 @@ public class JobManager implements JobOperationDispatcher, Closeable {
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
     JobEntity jobEntity = getJob(metalake, jobId);
 
-    if (jobEntity.status() == JobHandle.Status.CANCELLED
+    if (jobEntity.status() == JobHandle.Status.CANCELING
+        || jobEntity.status() == JobHandle.Status.CANCELLED
         || jobEntity.status() == JobHandle.Status.SUCCEEDED
         || jobEntity.status() == JobHandle.Status.FAILED) {
-      // If the job is already cancelled, succeeded, or failed, we do not need to cancel it again.
+      // If the job is already cancelling, cancelled, succeeded, or failed, we do not need to cancel
+      // it again.
       return jobEntity;
     }
 
@@ -350,6 +352,8 @@ public class JobManager implements JobOperationDispatcher, Closeable {
           String.format("Failed to cancel job with ID %s under metalake %s", jobId, metalake), e);
     }
 
+    // TODO(jerry). Implement a background thread to monitor the job status and update it. Also,
+    //  we should delete the finished job entities after a certain period of time.
     // Update the job status to CANCELING
     JobEntity newJobEntity =
         JobEntity.builder()
@@ -366,15 +370,20 @@ public class JobManager implements JobOperationDispatcher, Closeable {
                     .withLastModifiedTime(Instant.now())
                     .build())
             .build();
-
-    try {
-      // Update the job entity in the entity store
-      entityStore.put(newJobEntity, true /* overwrite */);
-      return newJobEntity;
-    } catch (IOException e) {
-      throw new RuntimeException(
-          String.format("Failed to update job entity %s to CANCELING status", newJobEntity), e);
-    }
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifierUtil.ofJob(metalake, jobId),
+        LockType.WRITE,
+        () -> {
+          try {
+            // Update the job entity in the entity store
+            entityStore.put(newJobEntity, true /* overwrite */);
+            return newJobEntity;
+          } catch (IOException e) {
+            throw new RuntimeException(
+                String.format("Failed to update job entity %s to CANCELING status", newJobEntity),
+                e);
+          }
+        });
   }
 
   @Override
