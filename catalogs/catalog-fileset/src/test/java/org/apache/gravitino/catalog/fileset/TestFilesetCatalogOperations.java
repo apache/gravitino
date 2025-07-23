@@ -1430,6 +1430,7 @@ public class TestFilesetCatalogOperations {
 
     try (FilesetCatalogOperations mockOps = Mockito.mock(FilesetCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
+      mockOps.conf = Maps.newHashMap();
       mockOps.scheduler = new ScheduledThreadPoolExecutor(1);
       mockOps.fileSystemCache =
           Caffeine.newBuilder()

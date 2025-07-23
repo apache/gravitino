@@ -119,7 +119,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting Map<String, Path> catalogStorageLocations;
 
-  private Map<String, String> conf;
+  @VisibleForTesting Map<String, String> conf;
 
   private CatalogInfo catalogInfo;
 
