@@ -188,7 +188,7 @@ public class PermissionOperations {
   @ResponseMetered(name = "grant-privilege-to-role", absolute = true)
   @AuthorizationExpression(
       expression = CAN_OPERATE_METADATA_PRIVILEGE,
-      errorMessage = "Current user can not grant privilege to role")
+      errorMessage = "Current user can not grant privilege to role.")
   public Response grantPrivilegeToRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

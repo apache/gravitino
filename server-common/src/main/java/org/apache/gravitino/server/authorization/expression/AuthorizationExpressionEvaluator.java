@@ -19,6 +19,7 @@ package org.apache.gravitino.server.authorization.expression;
 
 import java.security.Principal;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -54,6 +55,18 @@ public class AuthorizationExpressionEvaluator {
    * IDs.
    *
    * @param metadataNames key-metadata type, value-metadata NameIdentifier
+   * @return authorization result
+   */
+  public boolean evaluate(Map<Entity.EntityType, NameIdentifier> metadataNames) {
+    return evaluate(metadataNames, new HashMap<>());
+  }
+
+  /**
+   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of metadata
+   * IDs.
+   *
+   * @param metadataNames key-metadata type, value-metadata NameIdentifier
+   * @param pathParams params from request path
    * @return authorization result
    */
   public boolean evaluate(
