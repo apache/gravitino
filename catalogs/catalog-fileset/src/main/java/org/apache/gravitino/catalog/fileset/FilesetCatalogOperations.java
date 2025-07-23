@@ -130,7 +130,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private boolean disableFSOps;
 
   @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
-  @VisibleForTesting Cache<NameIdentifier, FileSystem> fileSystemCache;
+  @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
@@ -155,6 +155,29 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 })
             .scheduler(Scheduler.forScheduledExecutorService(scheduler))
             .build();
+  }
+
+  static class FileSystemCacheKey {
+    private final NameIdentifier ident;
+    private final Map<String, String> conf;
+
+    FileSystemCacheKey(NameIdentifier ident, Map<String, String> conf) {
+      this.ident = ident;
+      this.conf = conf;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof FileSystemCacheKey)) return false;
+      FileSystemCacheKey that = (FileSystemCacheKey) o;
+      return ident.equals(that.ident) && conf.equals(that.conf);
+    }
+
+    @Override
+    public int hashCode() {
+      return 31 * ident.hashCode() + conf.hashCode();
+    }
   }
 
   public FilesetCatalogOperations() {
@@ -1288,7 +1311,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private FileSystem getFileSystemWithCache(
       Path path, Map<String, String> conf, NameIdentifier identifier) {
     return fileSystemCache.get(
-        identifier,
+        new FileSystemCacheKey(identifier, conf),
         cacheKey -> {
           try {
             return getFileSystem(path, conf);

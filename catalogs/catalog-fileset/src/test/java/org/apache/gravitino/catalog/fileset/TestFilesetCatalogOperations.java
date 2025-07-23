@@ -1439,7 +1439,7 @@ public class TestFilesetCatalogOperations {
                     try {
                       ((FileSystem) value).close();
                     } catch (IOException e) {
-                      // Ingore
+                      // Ignore
                     }
                   })
               .scheduler(Scheduler.forScheduledExecutorService(mockOps.scheduler))
