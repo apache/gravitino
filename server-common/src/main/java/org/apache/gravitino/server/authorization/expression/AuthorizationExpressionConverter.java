@@ -36,6 +36,20 @@ public class AuthorizationExpressionConverter {
   public static final Pattern ANY_PATTERN = Pattern.compile("ANY\\(([^)]+)\\)");
 
   /**
+   * This authorization expression will invoke the `hasMetadataPrivilegePermission` method of
+   * `GravitinoAuthorizer` to perform the access control check, and return the result of the
+   * authorization.
+   */
+  public static final String CAN_OPERATE_METADATA_PRIVILEGE = "CAN_OPERATE_METADATA_PRIVILEGE";
+
+  /**
+   * This authorization expression will invoke the `hasSetOwnerPermission` method of
+   * `GravitinoAuthorizer` to perform the access control check, and return the result of the
+   * authorization.
+   */
+  public static final String CAN_SET_OWNER = "CAN_SET_OWNER";
+
+  /**
    * The EXPRESSION_CACHE caches the result of converting authorization expressions into an OGNL
    * expression.
    */
@@ -175,6 +189,14 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_WRITE_FILESET", "(ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");
+    expression =
+        expression.replaceAll(
+            CAN_SET_OWNER,
+            "authorizer.hasSetOwnerPermission(p_metalake,p_metadataObjectType,p_fullName)");
+    expression =
+        expression.replaceAll(
+            CAN_OPERATE_METADATA_PRIVILEGE,
+            "authorizer.hasMetadataPrivilegePermission(p_metalake,p_metadataObjectType,p_fullName)");
     return expression;
   }
 }

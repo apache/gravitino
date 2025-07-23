@@ -95,7 +95,7 @@ public class MetadataFilterHelper {
             metaDataName -> {
               Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
                   spiltMetadataNames(metalake, entityType, metaDataName);
-              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
+              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap, new HashMap<>());
             })
         .toArray(NameIdentifier[]::new);
   }

@@ -18,9 +18,10 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.CAN_OPERATE_METADATA_PRIVILEGE;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.base.Preconditions;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
@@ -47,7 +48,6 @@ import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -186,6 +186,9 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "grant-privilege-to-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "grant-privilege-to-role", absolute = true)
+  @AuthorizationExpression(
+      expression = CAN_OPERATE_METADATA_PRIVILEGE,
+      errorMessage = "Current user can not grant privilege to role")
   public Response grantPrivilegeToRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -194,11 +197,6 @@ public class PermissionOperations {
       @PathParam("fullName") String fullName,
       PrivilegeGrantRequest privilegeGrantRequest) {
     try {
-      Preconditions.checkArgument(
-          GravitinoAuthorizerProvider.getInstance()
-              .getGravitinoAuthorizer()
-              .hasMetadataPrivilegePermission(metalake, type, metalake),
-          "Current user can not grant privilege to role");
       MetadataObject object =
           MetadataObjects.parse(
               fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
@@ -235,6 +233,9 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "revoke-privilege-from-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "revoke-privilege-from-role", absolute = true)
+  @AuthorizationExpression(
+      expression = CAN_OPERATE_METADATA_PRIVILEGE,
+      errorMessage = "Current user can not revoke privilege from role.")
   public Response revokePrivilegeFromRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -243,11 +244,6 @@ public class PermissionOperations {
       @PathParam("fullName") String fullName,
       PrivilegeRevokeRequest privilegeRevokeRequest) {
     try {
-      Preconditions.checkArgument(
-          GravitinoAuthorizerProvider.getInstance()
-              .getGravitinoAuthorizer()
-              .hasMetadataPrivilegePermission(metalake, type, metalake),
-          "Current user can not revoke privilege to role.");
       MetadataObject object =
           MetadataObjects.parse(
               fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
