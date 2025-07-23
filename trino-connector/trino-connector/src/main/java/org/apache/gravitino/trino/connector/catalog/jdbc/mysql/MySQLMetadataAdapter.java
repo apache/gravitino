@@ -18,18 +18,28 @@
  */
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_PRIMARY_KEY;
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_UNIQUE_KEY;
+
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
+import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.logging.log4j.util.Strings;
 
 /** Transforming Apache Gravitino MySQL metadata to Trino. */
 public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -90,6 +100,56 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
     }
 
     return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+  }
+
+  @Override
+  public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
+    SchemaTableName schemaTableName =
+        new SchemaTableName(gravitinoTable.getSchemaName(), gravitinoTable.getName());
+    ArrayList<ColumnMetadata> columnMetadataList = new ArrayList<>();
+    for (GravitinoColumn column : gravitinoTable.getColumns()) {
+      columnMetadataList.add(getColumnMetadata(column));
+    }
+
+    Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
+
+    ImmutableMap.Builder<String, Object> propertiesBuilder = ImmutableMap.builder();
+    propertiesBuilder.putAll(properties);
+
+    Index[] indexes = gravitinoTable.getIndexes();
+    if (ArrayUtils.isNotEmpty(indexes)) {
+      List<String> primaryKeys = new ArrayList<>();
+      List<String> uniqueKeys = new ArrayList<>();
+      for (int i = 0; i < indexes.length; i++) {
+        Index index = indexes[i];
+        switch (index.type()) {
+          case PRIMARY_KEY:
+            Arrays.stream(index.fieldNames())
+                .flatMap(Arrays::stream)
+                .forEach(col -> primaryKeys.add(col));
+            break;
+
+          case UNIQUE_KEY:
+            List<String> columns =
+                Arrays.stream(index.fieldNames())
+                    .flatMap(Arrays::stream)
+                    .collect(Collectors.toUnmodifiableList());
+            uniqueKeys.add(String.format("%s:%s", index.name(), Strings.join(columns, ',')));
+            break;
+        }
+      }
+      if (!primaryKeys.isEmpty()) {
+        propertiesBuilder.put(TABLE_PRIMARY_KEY, primaryKeys);
+      }
+      if (!uniqueKeys.isEmpty()) {
+        propertiesBuilder.put(TABLE_UNIQUE_KEY, uniqueKeys);
+      }
+    }
+    return new ConnectorTableMetadata(
+        schemaTableName,
+        columnMetadataList,
+        propertiesBuilder.build(),
+        Optional.ofNullable(gravitinoTable.getComment()));
   }
 
   @Override

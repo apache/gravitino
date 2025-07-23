@@ -118,12 +118,12 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    dispatcher.linkModelVersion(normalizeCaseSensitive(ident), uri, aliases, comment, properties);
+    dispatcher.linkModelVersion(normalizeCaseSensitive(ident), uris, aliases, comment, properties);
   }
 
   @Override

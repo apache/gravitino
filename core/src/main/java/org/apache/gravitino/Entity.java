@@ -18,9 +18,7 @@
  */
 package org.apache.gravitino;
 
-import com.google.common.collect.ImmutableList;
 import java.io.Serializable;
-import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 
@@ -58,6 +56,10 @@ public interface Entity extends Serializable {
   /** The policy schema name in the system catalog. */
   String POLICY_SCHEMA_NAME = "policy";
 
+  String JOB_TEMPLATE_SCHEMA_NAME = "job_template";
+
+  String JOB_SCHEMA_NAME = "job";
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {
@@ -75,40 +77,9 @@ public interface Entity extends Serializable {
     MODEL,
     MODEL_VERSION,
     POLICY,
+    JOB_TEMPLATE,
+    JOB,
     AUDIT;
-
-    /**
-     * Returns the parent entity types of the given entity type. The parent entity types are the
-     * entity types that are higher in the hierarchy than the given entity type. For example, the
-     * parent entity types of a table are metalake, catalog, and schema. (Sequence: root to leaf)
-     *
-     * @param entityType The entity type for which to get the parent entity types.
-     * @return The parent entity types of the given entity type.
-     */
-    public static List<EntityType> getParentEntityTypes(EntityType entityType) {
-      switch (entityType) {
-        case METALAKE:
-          return ImmutableList.of();
-        case CATALOG:
-          return ImmutableList.of(METALAKE);
-        case SCHEMA:
-          return ImmutableList.of(METALAKE, CATALOG);
-        case TABLE:
-        case FILESET:
-        case TOPIC:
-        case MODEL:
-        case USER:
-        case GROUP:
-        case ROLE:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA);
-        case COLUMN:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA, TABLE);
-        case MODEL_VERSION:
-          return ImmutableList.of(METALAKE, CATALOG, SCHEMA, MODEL);
-        default:
-          throw new IllegalArgumentException("Unknown entity type: " + entityType);
-      }
-    }
   }
 
   /**
