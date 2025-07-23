@@ -96,6 +96,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
@@ -160,23 +161,39 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   static class FileSystemCacheKey {
     private final NameIdentifier ident;
     private final Map<String, String> conf;
+    private final String currentUser;
 
     FileSystemCacheKey(NameIdentifier ident, Map<String, String> conf) {
       this.ident = ident;
       this.conf = conf;
+
+      try {
+        this.currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to get current user", e);
+      }
     }
 
     @Override
     public boolean equals(Object o) {
-      if (this == o) return true;
-      if (!(o instanceof FileSystemCacheKey)) return false;
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof FileSystemCacheKey)) {
+        return false;
+      }
       FileSystemCacheKey that = (FileSystemCacheKey) o;
-      return ident.equals(that.ident) && conf.equals(that.conf);
+      return ident.equals(that.ident)
+          && conf.equals(that.conf)
+          && currentUser.equals(that.currentUser);
     }
 
     @Override
     public int hashCode() {
-      return 31 * ident.hashCode() + conf.hashCode();
+      int result = ident.hashCode();
+      result = 31 * result + conf.hashCode();
+      result = 31 * result + currentUser.hashCode();
+      return result;
     }
   }
 
