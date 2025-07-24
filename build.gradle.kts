@@ -71,27 +71,7 @@ gradle.taskGraph.whenReady {
   println("HA Is test = $hasTest")
 }
 
-fun useHighVersionJDK(project: Project): Boolean {
-  val name = project.name.lowercase()
-  val path = project.path.lowercase()
 
-  println("name = @$name@")
-  println("path = @$path@")
-
-  if (name == "catalog-common" || name == "catalog-fileset" || name == "hadoop-common") {
-    return false
-  }
-
-  if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
-    return true
-  }
-
-  if (name in listOf("server", "authorizations", "lineage")) {
-    return true
-  }
-
-  return false
-}
 
 fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
   val testMode = project.properties["testMode"] as? String ?: "embedded"
@@ -162,6 +142,32 @@ project.extra["extraJvmArgs"] = if (!useHighVersionJDK(getProject())) {
 
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
+
+fun useHighVersionJDK(project: Project): Boolean {
+  val name = project.name.lowercase()
+  val path = project.path.lowercase()
+
+  // println("name = @$name@")
+  println("path = @$path@")
+
+  if (name == "catalog-common" || name == "catalog-fileset" || name == "hadoop-common") {
+    return false
+  }
+
+  if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
+    return true
+  }
+
+  if (name in listOf("server", "authorizations", "lineage")) {
+    return true
+  }
+
+  if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true ) {
+    return true
+  }
+
+  return false
+}
 
 licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
@@ -590,15 +596,17 @@ subprojects {
     sign(publishing.publications)
   }
 
+  /*
   tasks.compileTestJava {
       java {
         toolchain {
           // languageVersion.set(getJdkVersionForTest(project))
           // sourceCompatibility = JavaVersion.VERSION_17
-          targetCompatibility = JavaVersion.VERSION_11
+          // targetCompatibility = JavaVersion.VERSION_11
         }
       }
   }
+  */
 
   tasks.configureEach<Test> {
     if (project.name != "server-common") {
@@ -606,22 +614,22 @@ subprojects {
       initTest(this)
     }
 
-    javaToolchains {
-      compilerFor {
-        languageVersion.set(getJdkVersionForTest(project))
-      }
-    }
+    // javaToolchains {
+    //   compilerFor {
+    //     languageVersion.set(getJdkVersionForTest(project))
+    //   }
+    // }
 
-    javaLauncher.set(
-      javaToolchains.launcherFor {
-        languageVersion.set(getJdkVersionForTest(project))
-      }
-    )
+    // javaLauncher.set(
+    //   javaToolchains.launcherFor {
+    //     languageVersion.set(getJdkVersionForTest(project))
+    //   }
+    // )
 
-    val launcher = javaLauncher.get()
+    // val launcher = javaLauncher.get()
 
-    println("\n=== [${project.path}] 测试JDK信息 ===")
-    println("测试JDK版本: ${launcher.metadata.languageVersion}")
+    // println("\n=== [${project.path}] 测试JDK信息 ===")
+    // println("测试JDK版本: ${launcher.metadata.languageVersion}")
 
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL
