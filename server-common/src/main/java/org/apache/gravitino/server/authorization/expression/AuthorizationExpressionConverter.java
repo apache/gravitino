@@ -69,6 +69,13 @@ public class AuthorizationExpressionConverter {
             if (AuthConstants.OWNER.equals(privilegeOrOwner)) {
               replacement =
                   String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", metadataType);
+            } else if (privilegeOrOwner.startsWith("DENY_")) {
+              String privilege = privilegeOrOwner.substring(5);
+              replacement =
+                  String.format(
+                      "authorizer.deny(principal,METALAKE_NAME,%s,"
+                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                      metadataType, privilege);
             } else {
               replacement =
                   String.format(
@@ -136,7 +143,9 @@ public class AuthorizationExpressionConverter {
         expression.replaceAll("ANY_CREATE_SCHEMA", "(ANY(CREATE_SCHEMA, METALAKE, CATALOG))");
     expression =
         expression.replaceAll(
-            "ANY_SELECT_TABLE", "(ANY(SELECT_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+            "ANY_SELECT_TABLE",
+            "((ANY(SELECT_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) "
+                + "&& !(ANY(DENY_SELECT_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) )");
     expression =
         expression.replaceAll(
             "ANY_MODIFY_TABLE", "(ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");

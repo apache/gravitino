@@ -180,7 +180,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String privilege,
       boolean checkAllow) {
     if (checkAllow) {
-      enforcer.enforce(
+      return enforcer.enforce(
           String.valueOf(userId),
           String.valueOf(metadataObject.type()),
           String.valueOf(metadataId),
@@ -191,11 +191,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         String.valueOf(metadataObject.type()),
         String.valueOf(metadataId),
         privilege);
-  }
-
-  private boolean loadPrivilegeAndAuthorize(
-      String username, String metalake, MetadataObject metadataObject, String privilege) {
-    return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege, true);
   }
 
   private boolean loadPrivilegeAndAuthorize(
@@ -297,21 +292,20 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     for (SecurableObject securableObject : securableObjects) {
       for (Privilege privilege : securableObject.privileges()) {
         Privilege.Condition condition = privilege.condition();
-        if ("allow".equalsIgnoreCase(condition.name())) {
-          enforcer.addPolicy(
-              String.valueOf(roleEntity.id()),
-              securableObject.type().name(),
-              String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
-              privilege.name().name().toUpperCase(),
-              condition.name().toLowerCase());
-        } else if ("deny".equalsIgnoreCase(condition.name())) {
+        if ("deny".equalsIgnoreCase(condition.name())) {
           denyEnforcer.addPolicy(
               String.valueOf(roleEntity.id()),
               securableObject.type().name(),
               String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
               privilege.name().name().toUpperCase(),
-              condition.name().toLowerCase());
+              "allow");
         }
+        enforcer.addPolicy(
+            String.valueOf(roleEntity.id()),
+            securableObject.type().name(),
+            String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
+            privilege.name().name().toUpperCase(),
+            condition.name().toLowerCase());
       }
     }
   }
