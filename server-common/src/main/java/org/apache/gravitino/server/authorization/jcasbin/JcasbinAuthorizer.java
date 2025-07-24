@@ -99,8 +99,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
-    return authorizeInternal(principal, metalake, metadataObject, privilege.name(), true)
-        && !deny(principal, metalake, metadataObject, privilege);
+    return authorizeInternal(principal, metalake, metadataObject, privilege.name(), true);
   }
 
   @Override
