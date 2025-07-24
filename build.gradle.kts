@@ -64,6 +64,13 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
+gradle.taskGraph.whenReady {
+  var hasTest = allTasks.any { task ->
+    task is Test
+  }
+  println("HA Is test = $hasTest")
+}
+
 fun useHighVersionJDK(project: Project): Boolean {
   val name = project.name.lowercase()
   val path = project.path.lowercase()
@@ -99,6 +106,18 @@ fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
   return JavaLanguageVersion.of(extra["jdkVersion"].toString())
 }
 
+fun getJdkVersionForTest2(project: Project): JavaVersion {
+  val testMode = project.properties["testMode"] as? String ?: "embedded"
+  if (testMode == "embedded") {
+    return JavaVersion.VERSION_17
+  }
+
+  if (useHighVersionJDK(project)) {
+    return JavaVersion.VERSION_17
+  }
+  return JavaVersion.toVersion(extra["jdkVersion"].toString())
+}
+
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
   throw GradleException(
     "The Gravitino Gradle toolchain currently does not support building with " +
@@ -110,6 +129,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
+rootProject.extra["isTestModeEmbedded"] = project.properties["testMode"] as? String ?: "embedded" == "embedded"
 
 project.extra["extraJvmArgs"] = if (!useHighVersionJDK(getProject())) {
   listOf()
@@ -153,6 +173,10 @@ allprojects {
   // Gravitino Python client project didn't need to apply the Spotless plugin
   if (project.name == "client-python") {
     return@allprojects
+  }
+
+  afterEvaluate {
+    println("$name 配置完成")
   }
 
   apply(plugin = "com.diffplug.spotless")
@@ -237,7 +261,9 @@ allprojects {
       param.environment("jdbcBackend", jdbcDatabase)
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
-      // val testMode = "deploy"
+      var isTestModeEmbedded = testMode == "embedded"
+      rootProject.extra["isTestModeEmbedded"] = isTestModeEmbedded
+      println("Test mode: $testMode, $isTestModeEmbedded")
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
@@ -307,6 +333,48 @@ subprojects {
   repositories {
     mavenCentral()
     mavenLocal()
+  }
+
+  // 添加模块级任务
+  tasks.register("printJvmVersions") {
+    group = "help"
+    description = "打印本模块的 JVM 版本信息"
+
+    doLast {
+
+      tasks.withType<JavaCompile>().forEach(){
+        task -> println("""
+            |=== ${project.name} JVM 版本信息 ===
+            |    ${task.name}
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: ${task.javaCompiler?.get()?.metadata?.languageVersion?.asInt()?: "未配置"}""")
+      }
+
+      // 获取编译 JVM 版本
+      val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取测试 JVM 版本
+      val testJvmVersion = tasks.withType<Test>().firstOrNull()?.javaLauncher?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取目标 JVM 版本
+      val targetJvmVersion = (java.targetCompatibility?.majorVersion ?: "未配置")
+
+      // 获取源码兼容性版本
+      val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "未配置")
+
+      // 打印结果
+      println("""
+            |=== ${project.name} JVM 版本信息 ===
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: $compileJvmVersion
+            |🧪 测试 JVM 版本: $testJvmVersion
+            |🎯 目标 JVM 版本: $targetJvmVersion
+            |📝 源码兼容版本: $sourceJvmVersion
+            |==================================
+            """.trimMargin())
+    }
   }
 
   java {
@@ -522,10 +590,26 @@ subprojects {
     sign(publishing.publications)
   }
 
+  tasks.compileTestJava {
+      java {
+        toolchain {
+          // languageVersion.set(getJdkVersionForTest(project))
+          // sourceCompatibility = JavaVersion.VERSION_17
+          targetCompatibility = JavaVersion.VERSION_11
+        }
+      }
+  }
+
   tasks.configureEach<Test> {
     if (project.name != "server-common") {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)
+    }
+
+    javaToolchains {
+      compilerFor {
+        languageVersion.set(getJdkVersionForTest(project))
+      }
     }
 
     javaLauncher.set(
