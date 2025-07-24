@@ -406,7 +406,7 @@ public class JobManager implements JobOperationDispatcher, Closeable {
     if (content.jobType() == JobTemplate.JobType.SHELL) {
       List<String> scripts = fetchFilesFromUri(content.scripts(), stagingDir, TIMEOUT_IN_MS);
 
-      return new ShellJobTemplate.Builder()
+      return ShellJobTemplate.builder()
           .withName(name)
           .withComment(comment)
           .withExecutable(executable)
@@ -430,7 +430,7 @@ public class JobManager implements JobOperationDispatcher, Closeable {
                       entry -> replacePlaceholder(entry.getKey(), jobConf),
                       entry -> replacePlaceholder(entry.getValue(), jobConf)));
 
-      return new SparkJobTemplate.Builder()
+      return SparkJobTemplate.builder()
           .withName(name)
           .withComment(comment)
           .withExecutable(executable)

@@ -531,7 +531,7 @@ public class TestJobManager {
 
   private static JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
     ShellJobTemplate shellJobTemplate =
-        new ShellJobTemplate.Builder()
+        ShellJobTemplate.builder()
             .withName(name)
             .withComment(comment)
             .withExecutable("/bin/echo")
@@ -550,7 +550,7 @@ public class TestJobManager {
 
   private static JobTemplateEntity newSparkJobTemplateEntity(String name, String comment) {
     SparkJobTemplate sparkJobTemplate =
-        new SparkJobTemplate.Builder()
+        SparkJobTemplate.builder()
             .withName(name)
             .withComment(comment)
             .withClassName("org.apache.spark.examples.SparkPi")

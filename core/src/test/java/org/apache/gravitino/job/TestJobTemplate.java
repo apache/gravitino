@@ -169,7 +169,7 @@ public class TestJobTemplate {
     File testScript2 = Files.createTempFile(tempDir.toPath(), "testScript2", ".sh").toFile();
 
     ShellJobTemplate shellJobTemplate =
-        new ShellJobTemplate.Builder()
+        ShellJobTemplate.builder()
             .withName("testShellJob")
             .withComment("This is a test shell job template")
             .withExecutable("/bin/echo")
@@ -234,7 +234,7 @@ public class TestJobTemplate {
     File archive1 = Files.createTempFile(tempDir.toPath(), "testArchive1", ".zip").toFile();
 
     SparkJobTemplate sparkJobTemplate =
-        new SparkJobTemplate.Builder()
+        SparkJobTemplate.builder()
             .withName("testSparkJob")
             .withComment("This is a test Spark job template")
             .withExecutable(executable.toURI().toString())
