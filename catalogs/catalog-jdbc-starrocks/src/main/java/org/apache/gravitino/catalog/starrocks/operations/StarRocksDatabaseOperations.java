@@ -19,34 +19,87 @@
 package org.apache.gravitino.catalog.starrocks.operations;
 
 import com.google.common.collect.ImmutableSet;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
+import org.apache.gravitino.catalog.starrocks.utils.StarRocksUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Database operations for StarRocks. */
 public class StarRocksDatabaseOperations extends JdbcDatabaseOperations {
+
+  private static final Logger LOG = LoggerFactory.getLogger(StarRocksDatabaseOperations.class);
+
   @Override
   public String generateCreateDatabaseSql(
       String databaseName, String comment, Map<String, String> properties) {
-    throw new NotImplementedException("To be implemented in the future");
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder.append(String.format("CREATE DATABASE `%s`", databaseName));
+
+    // Append properties
+    sqlBuilder.append("\n");
+    sqlBuilder.append(StarRocksUtils.generatePropertiesSql(properties));
+
+    String ddl = sqlBuilder.toString();
+    LOG.info("Generated create database:{} sql: {}", databaseName, ddl);
+    return ddl;
   }
 
   @Override
   public String generateDropDatabaseSql(String databaseName, boolean cascade) {
-    throw new NotImplementedException("To be implemented in the future");
+    StringBuilder sqlBuilder = new StringBuilder();
+    sqlBuilder.append(String.format("DROP DATABASE `%s`", databaseName));
+    if (cascade) {
+      sqlBuilder.append(" FORCE");
+      return sqlBuilder.toString();
+    }
+    String query = String.format("SHOW TABLES IN `%s`", databaseName);
+    try (final Connection connection = this.dataSource.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(query)) {
+      if (resultSet.next()) {
+        throw new IllegalStateException(
+            String.format(
+                "Database %s is not empty, the value of cascade should be true.", databaseName));
+      }
+    } catch (SQLException sqlException) {
+      throw this.exceptionMapper.toGravitinoException(sqlException);
+    }
+    return sqlBuilder.toString();
   }
 
   @Override
   public JdbcSchema load(String databaseName) throws NoSuchSchemaException {
-    throw new NotImplementedException("To be implemented in the future");
+    List<String> allDatabases = listDatabases();
+    String dbName =
+        allDatabases.stream()
+            .filter(db -> db.equals(databaseName))
+            .findFirst()
+            .orElseThrow(
+                () -> new NoSuchSchemaException("Database %s could not be found", databaseName));
+    // StarRocks support set properties, but can't get them after setting
+    // https://docs.starrocks.io/docs/3.3/sql-reference/sql-statements/Database/SHOW_CREATE_DATABASE/
+    return JdbcSchema.builder()
+        .withName(dbName)
+        .withComment("")
+        .withProperties(Collections.emptyMap())
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
   }
 
   @Override
   protected boolean supportSchemaComment() {
-    return true;
+    return false;
   }
 
   @Override
