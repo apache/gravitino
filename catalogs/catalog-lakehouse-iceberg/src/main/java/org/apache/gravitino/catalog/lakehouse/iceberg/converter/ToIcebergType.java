@@ -122,6 +122,8 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
     } else if (primitive instanceof org.apache.gravitino.rel.types.Types.TimeType) {
       org.apache.gravitino.rel.types.Types.TimeType timeType =
           (org.apache.gravitino.rel.types.Types.TimeType) primitive;
+      // Iceberg only supports microsecond precision (6) for time type up to version 1.9.x
+      // See: https://iceberg.apache.org/docs/1.9.1/schemas/
       if (!timeType.hasPrecisionSet() || timeType.precision() == 6) {
         return Types.TimeType.get();
       } else {
@@ -132,6 +134,9 @@ public class ToIcebergType extends ToIcebergTypeVisitor<Type> {
     } else if (primitive instanceof org.apache.gravitino.rel.types.Types.TimestampType) {
       org.apache.gravitino.rel.types.Types.TimestampType timestampType =
           (org.apache.gravitino.rel.types.Types.TimestampType) primitive;
+      // Iceberg only supports microsecond precision (6) for timestamp/timestamptz types up to
+      // version 1.9.x
+      // See: https://iceberg.apache.org/docs/1.9.1/schemas/
       if (!timestampType.hasPrecisionSet() || timestampType.precision() == 6) {
         if (timestampType.hasTimeZone()) {
           return Types.TimestampType.withZone();
