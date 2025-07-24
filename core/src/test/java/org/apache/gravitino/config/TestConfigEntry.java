@@ -176,4 +176,11 @@ public class TestConfigEntry {
     List<String> result = conf.strToSeq("", s -> s);
     Assertions.assertTrue(result.isEmpty());
   }
+
+  @Test
+  public void testStrToSeqNullValue() {
+    ConfigEntry<String> conf = new ConfigBuilder("gravitino.test.seq").stringConf().create();
+    List<String> result = conf.strToSeq(null, s -> s);
+    Assertions.assertTrue(result.isEmpty());
+  }
 }
