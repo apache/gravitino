@@ -1377,8 +1377,8 @@ public class TestFilesetCatalogOperations {
       CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
       CallerContext.CallerContextHolder.set(callerContext);
 
-      Assertions.assertThrows(
-          GravitinoRuntimeException.class, () -> ops.getFileLocation(filesetIdent, subPath));
+      // We have removed the check for single file in getFileLocation method.
+      Assertions.assertDoesNotThrow(() -> ops.getFileLocation(filesetIdent, subPath));
     } finally {
       CallerContext.CallerContextHolder.remove();
     }
