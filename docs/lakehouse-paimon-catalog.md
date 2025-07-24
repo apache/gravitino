@@ -155,28 +155,28 @@ Paimon Table primary key constraint should not be same with partition fields, th
 
 ### Table column types
 
-| Gravitino Type              | Apache Paimon Type           |
-|-----------------------------|------------------------------|
-| `Struct`                    | `Row`                        |
-| `Map`                       | `Map`                        |
-| `List`                      | `Array`                      |
-| `Boolean`                   | `Boolean`                    |
-| `Byte`                      | `TinyInt`                    |
-| `Short`                     | `SmallInt`                   |
-| `Integer`                   | `Int`                        |
-| `Long`                      | `BigInt`                     |
-| `Float`                     | `Float`                      |
-| `Double`                    | `Double`                     |
-| `Decimal`                   | `Decimal`                    |
-| `String`                    | `VarChar(Integer.MAX_VALUE)` |
-| `VarChar`                   | `VarChar`                    |
-| `FixedChar`                 | `Char`                       |
-| `Date`                      | `Date`                       |
-| `Time`                      | `Time`                       |
-| `TimestampType withZone`    | `LocalZonedTimestamp`        |
-| `TimestampType withoutZone` | `Timestamp`                  |
-| `Fixed`                     | `Binary`                     |
-| `Binary`                    | `VarBinary`                  |
+| Gravitino Type    | Apache Paimon Type           |
+|-------------------|------------------------------|
+| `Struct`          | `Row`                        |
+| `Map`             | `Map`                        |
+| `List`            | `Array`                      |
+| `Boolean`         | `Boolean`                    |
+| `Byte`            | `TinyInt`                    |
+| `Short`           | `SmallInt`                   |
+| `Integer`         | `Int`                        |
+| `Long`            | `BigInt`                     |
+| `Float`           | `Float`                      |
+| `Double`          | `Double`                     |
+| `Decimal`         | `Decimal`                    |
+| `String`          | `VarChar(Integer.MAX_VALUE)` |
+| `VarChar`         | `VarChar`                    |
+| `FixedChar`       | `Char`                       |
+| `Date`            | `Date`                       |
+| `Time(p)`         | `Time(p)`                    |
+| `Timestamp(p)`    | `LocalZonedTimestamp(p)`     |
+| `Timestamp_tz(p)` | `Timestamp(p)`               |
+| `Fixed`           | `Binary`                     |
+| `Binary`          | `VarBinary`                  |
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.

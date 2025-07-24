@@ -669,4 +669,43 @@ public class MysqlTableOperations extends JdbcTableOperations {
       }
     }
   }
+
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    String upperTypeName = typeName.toUpperCase();
+
+    // Check driver version compatibility first
+    boolean isDatetimeType =
+        "TIME".equals(upperTypeName)
+            || "TIMESTAMP".equals(upperTypeName)
+            || "DATETIME".equals(upperTypeName);
+
+    if (isDatetimeType) {
+      String driverVersion = getMySQLDriverVersion();
+      if (driverVersion != null && !isMySQLDriverVersionSupported(driverVersion)) {
+        LOG.warn(
+            "MySQL driver version {} is below 8.0.16, columnSize may not be accurate for precision calculation. "
+                + "Returning null for {} type precision. Driver version: {}",
+            driverVersion,
+            upperTypeName,
+            driverVersion);
+        return null;
+      }
+    }
+
+    switch (upperTypeName) {
+      case "TIME":
+        // TIME format: 'HH:MM:SS' (8 chars) + decimal point + precision
+        return columnSize >= TIME_FORMAT_WITH_DOT.length()
+            ? columnSize - TIME_FORMAT_WITH_DOT.length()
+            : 0;
+      case "TIMESTAMP":
+      case "DATETIME":
+        // TIMESTAMP/DATETIME format: 'YYYY-MM-DD HH:MM:SS' (19 chars) + decimal point + precision
+        return columnSize >= DATETIME_FORMAT_WITH_DOT.length()
+            ? columnSize - DATETIME_FORMAT_WITH_DOT.length()
+            : 0;
+    }
+    return null;
+  }
 }
