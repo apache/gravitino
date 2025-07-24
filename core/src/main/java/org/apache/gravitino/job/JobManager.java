@@ -278,7 +278,14 @@ public class JobManager implements JobOperationDispatcher, Closeable {
     // Create staging directory.
     // TODO(jerry). The job staging directory will be deleted using a background thread.
     long jobId = idGenerator.nextId();
-    File jobStagingDir = new File(stagingDir, JobHandle.JOB_ID_PREFIX + jobId);
+    String jobStagingPath =
+        stagingDir.getAbsolutePath()
+            + File.separator
+            + metalake
+            + File.separator
+            + JobHandle.JOB_ID_PREFIX
+            + jobId;
+    File jobStagingDir = new File(jobStagingPath);
     if (!jobStagingDir.mkdirs()) {
       throw new RuntimeException(
           String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId));
