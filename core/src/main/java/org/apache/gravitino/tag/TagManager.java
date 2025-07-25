@@ -245,6 +245,7 @@ public class TagManager implements TagDispatcher {
         LockType.READ,
         () -> {
           try {
+            checkMetalake(NameIdentifier.of(metalake), entityStore);
             return supportsTagOperations
                 .listAssociatedTagsForMetadataObject(entityIdent, entityType)
                 .toArray(new Tag[0]);
@@ -271,6 +272,7 @@ public class TagManager implements TagDispatcher {
         LockType.READ,
         () -> {
           try {
+            checkMetalake(NameIdentifier.of(metalake), entityStore);
             return supportsTagOperations.getTagForMetadataObject(entityIdent, entityType, tagIdent);
           } catch (NoSuchEntityException e) {
             if (e.getMessage().contains("No such tag entity")) {

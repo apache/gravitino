@@ -225,6 +225,17 @@ public class RelationalEntityStore
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> E getEntityByRelation(
+      Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier entityIdent)
+      throws IOException, NoSuchEntityException {
+    // todo: support cache
+    return backend.getEntityByRelation(relType, srcIdentifier, srcType, entityIdent);
+  }
+
+  @Override
   public void insertRelation(
       SupportsRelationOperations.Type relType,
       NameIdentifier srcIdentifier,
@@ -235,5 +246,18 @@ public class RelationalEntityStore
       throws IOException {
     cache.invalidate(srcIdentifier, srcType, relType);
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
+      Type relType,
+      NameIdentifier entityIdentifier,
+      Entity.EntityType entityType,
+      NameIdentifier[] entitiesToAdd,
+      NameIdentifier[] entitiesToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    cache.invalidate(entityIdentifier, entityType, relType);
+    return backend.updateEntityRelations(
+        relType, entityIdentifier, entityType, entitiesToAdd, entitiesToRemove);
   }
 }
