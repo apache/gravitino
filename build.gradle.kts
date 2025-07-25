@@ -71,33 +71,6 @@ gradle.taskGraph.whenReady {
   println("HA Is test = $hasTest")
 }
 
-
-
-fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
-  val testMode = project.properties["testMode"] as? String ?: "embedded"
-  if (testMode == "embedded") {
-    return JavaLanguageVersion.of(17)
-  }
-
-  if (useHighVersionJDK(project)) {
-    return JavaLanguageVersion.of(17)
-  }
-
-  return JavaLanguageVersion.of(extra["jdkVersion"].toString())
-}
-
-fun getJdkVersionForTest2(project: Project): JavaVersion {
-  val testMode = project.properties["testMode"] as? String ?: "embedded"
-  if (testMode == "embedded") {
-    return JavaVersion.VERSION_17
-  }
-
-  if (useHighVersionJDK(project)) {
-    return JavaVersion.VERSION_17
-  }
-  return JavaVersion.toVersion(extra["jdkVersion"].toString())
-}
-
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
   throw GradleException(
     "The Gravitino Gradle toolchain currently does not support building with " +
@@ -162,7 +135,7 @@ fun useHighVersionJDK(project: Project): Boolean {
     return true
   }
 
-  if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true ) {
+  if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true) {
     return true
   }
 
@@ -348,12 +321,15 @@ subprojects {
 
     doLast {
 
-      tasks.withType<JavaCompile>().forEach(){
-        task -> println("""
+      tasks.withType<JavaCompile>().forEach() {
+          task ->
+        println(
+          """
             |=== ${project.name} JVM 版本信息 ===
             |    ${task.name}
             |📦 模块路径: ${project.path}
-            |🔧 编译 JVM 版本: ${task.javaCompiler?.get()?.metadata?.languageVersion?.asInt()?: "未配置"}""")
+            |🔧 编译 JVM 版本: ${task.javaCompiler?.get()?.metadata?.languageVersion?.asInt() ?: "未配置"}"""
+        )
       }
 
       // 获取编译 JVM 版本
@@ -371,7 +347,8 @@ subprojects {
       val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "未配置")
 
       // 打印结果
-      println("""
+      println(
+        """
             |=== ${project.name} JVM 版本信息 ===
             |📦 模块路径: ${project.path}
             |🔧 编译 JVM 版本: $compileJvmVersion
@@ -379,7 +356,8 @@ subprojects {
             |🎯 目标 JVM 版本: $targetJvmVersion
             |📝 源码兼容版本: $sourceJvmVersion
             |==================================
-            """.trimMargin())
+        """.trimMargin()
+      )
     }
   }
 
