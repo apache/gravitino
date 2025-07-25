@@ -150,7 +150,7 @@ public class CatalogOperations {
       expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNER",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response createCatalog(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
     LOG.info("Received create catalog request for metalake: {}", metalake);
@@ -184,7 +184,7 @@ public class CatalogOperations {
   @Timed(name = "test-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "test-connection", absolute = true)
   public Response testConnection(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
     LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
@@ -221,9 +221,9 @@ public class CatalogOperations {
       expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response setCatalog(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName,
       CatalogSetRequest request) {
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
@@ -267,9 +267,9 @@ public class CatalogOperations {
       expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response loadCatalog(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName) {
     LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
@@ -294,9 +294,9 @@ public class CatalogOperations {
       expression = "ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response alterCatalog(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName,
       CatalogUpdatesRequest request) {
     LOG.info("Received alter catalog request for catalog: {}.{}", metalakeName, catalogName);
@@ -331,9 +331,9 @@ public class CatalogOperations {
       expression = "ANY(OWNER, METALAKE, CATALOG)",
       accessMetadataType = MetadataObject.Type.CATALOG)
   public Response dropCatalog(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName,
       @DefaultValue("false") @QueryParam("force") boolean force) {
     LOG.info("Received drop catalog request for catalog: {}.{}", metalakeName, catalogName);
