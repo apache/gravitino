@@ -64,6 +64,13 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
+gradle.taskGraph.whenReady {
+  var hasTest = allTasks.any { task ->
+    task is Test
+  }
+  println("HA Is test = $hasTest")
+}
+
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
   throw GradleException(
     "The Gravitino Gradle toolchain currently does not support building with " +
@@ -75,8 +82,9 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
+rootProject.extra["isTestModeEmbedded"] = project.properties["testMode"] as? String ?: "embedded" == "embedded"
 
-project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
+project.extra["extraJvmArgs"] = if (!useHighVersionJDK(getProject())) {
   listOf()
 } else {
   listOf(
@@ -108,6 +116,32 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
 
+fun useHighVersionJDK(project: Project): Boolean {
+  val name = project.name.lowercase()
+  val path = project.path.lowercase()
+
+  // println("name = @$name@")
+  println("path = @$path@")
+
+  if (name == "catalog-common" || name == "catalog-fileset" || name == "hadoop-common") {
+    return false
+  }
+
+  if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
+    return true
+  }
+
+  if (name in listOf("server", "authorizations", "lineage")) {
+    return true
+  }
+
+  if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true) {
+    return true
+  }
+
+  return false
+}
+
 licenseReport {
   renderers = arrayOf<ReportRenderer>(InventoryHtmlReportRenderer("report.html", "Backend"))
   filters = arrayOf<DependencyFilter>(LicenseBundleNormalizer())
@@ -118,6 +152,10 @@ allprojects {
   // Gravitino Python client project didn't need to apply the Spotless plugin
   if (project.name == "client-python") {
     return@allprojects
+  }
+
+  afterEvaluate {
+    println("$name 配置完成")
   }
 
   apply(plugin = "com.diffplug.spotless")
@@ -202,6 +240,9 @@ allprojects {
       param.environment("jdbcBackend", jdbcDatabase)
 
       val testMode = project.properties["testMode"] as? String ?: "embedded"
+      var isTestModeEmbedded = testMode == "embedded"
+      rootProject.extra["isTestModeEmbedded"] = isTestModeEmbedded
+      println("Test mode: $testMode, $isTestModeEmbedded")
       param.systemProperty("gravitino.log.path", "build/${project.name}-integration-test.log")
       project.delete("build/${project.name}-integration-test.log")
       if (testMode == "deploy") {
@@ -273,6 +314,53 @@ subprojects {
     mavenLocal()
   }
 
+  // 添加模块级任务
+  tasks.register("printJvmVersions") {
+    group = "help"
+    description = "打印本模块的 JVM 版本信息"
+
+    doLast {
+
+      tasks.withType<JavaCompile>().forEach() {
+          task ->
+        println(
+          """
+            |=== ${project.name} JVM 版本信息 ===
+            |    ${task.name}
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: ${task.javaCompiler?.get()?.metadata?.languageVersion?.asInt() ?: "未配置"}"""
+        )
+      }
+
+      // 获取编译 JVM 版本
+      val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取测试 JVM 版本
+      val testJvmVersion = tasks.withType<Test>().firstOrNull()?.javaLauncher?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取目标 JVM 版本
+      val targetJvmVersion = (java.targetCompatibility?.majorVersion ?: "未配置")
+
+      // 获取源码兼容性版本
+      val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "未配置")
+
+      // 打印结果
+      println(
+        """
+            |=== ${project.name} JVM 版本信息 ===
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: $compileJvmVersion
+            |🧪 测试 JVM 版本: $testJvmVersion
+            |🎯 目标 JVM 版本: $targetJvmVersion
+            |📝 源码兼容版本: $sourceJvmVersion
+            |==================================
+        """.trimMargin()
+      )
+    }
+  }
+
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -284,7 +372,15 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
+      } else if (useHighVersionJDK(getProject())) {
+        // println("17project name = ${project.name}")
+        // println("17project path = ${project.path}")
+        languageVersion.set(JavaLanguageVersion.of(17))
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
       } else {
+        // println("8project name = ${project.name}")
+        // println("8project path = ${project.path}")
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -316,6 +412,13 @@ subprojects {
   }
 
   tasks.withType<JavaCompile>().configureEach {
+    // val compiler = javaCompiler.get()
+    // val jvmVersion = compiler.metadata.languageVersion
+
+    // println("""
+    //            |📦 编译信息: ${project.path}
+    //            |   JVM 版本: $jvmVersion
+    //            """.trimMargin())
     options.errorprone.isEnabled.set(true)
     options.errorprone.disableWarningsInGeneratedCode.set(true)
     options.errorprone.disable(
@@ -471,11 +574,40 @@ subprojects {
     sign(publishing.publications)
   }
 
+  /*
+  tasks.compileTestJava {
+      java {
+        toolchain {
+          // languageVersion.set(getJdkVersionForTest(project))
+          // sourceCompatibility = JavaVersion.VERSION_17
+          // targetCompatibility = JavaVersion.VERSION_11
+        }
+      }
+  }
+  */
+
   tasks.configureEach<Test> {
     if (project.name != "server-common") {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)
     }
+
+    // javaToolchains {
+    //   compilerFor {
+    //     languageVersion.set(getJdkVersionForTest(project))
+    //   }
+    // }
+
+    // javaLauncher.set(
+    //   javaToolchains.launcherFor {
+    //     languageVersion.set(getJdkVersionForTest(project))
+    //   }
+    // )
+
+    // val launcher = javaLauncher.get()
+
+    // println("\n=== [${project.path}] 测试JDK信息 ===")
+    // println("测试JDK版本: ${launcher.metadata.languageVersion}")
 
     testLogging {
       exceptionFormat = TestExceptionFormat.FULL

@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog.hive.integration.test;
 
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.IMPERSONATION_ENABLE;
 import static org.apache.gravitino.catalog.hive.HiveCatalogPropertiesMetadata.METASTORE_URIS;
-import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
+import static org.apache.gravitino.server.ServerConfig.GRAVITINO_WEBSERVER_CONF_PREFIX;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -121,7 +121,7 @@ public class ProxyCatalogHiveIT extends BaseIT {
             HiveContainer.HDFS_DEFAULTFS_PORT));
     hdfs = FileSystem.get(conf);
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, GRAVITINO_WEBSERVER_CONF_PREFIX);
 
     String uri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
     System.setProperty("user.name", "test");

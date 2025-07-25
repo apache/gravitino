@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-description = "catalog-lakehouse-iceberg"
+description = "catalog-lakehouse-hudi"
 
 plugins {
   `maven-publish`

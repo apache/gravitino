@@ -62,6 +62,8 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
 
   // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
   testImplementation(project(":bundles:aliyun-bundle"))

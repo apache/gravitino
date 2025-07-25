@@ -1,26 +1,23 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ *  Licensed to the Apache Software Foundation (ASF) under one
+ *  or more contributor license agreements.  See the NOTICE file
+ *  distributed with this work for additional information
+ *  regarding copyright ownership.  The ASF licenses this file
+ *  to you under the Apache License, Version 2.0 (the
+ *  "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
  */
 
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
-
-import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD;
-import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -105,8 +102,11 @@ public class TestMultipleJDBCLoad extends BaseIT {
     icebergPgConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
     icebergPgConf.put(
         IcebergConfig.JDBC_DRIVER.getKey(), postgreSQLContainer.getDriverClassName(TEST_DB_NAME));
-    icebergPgConf.put(GRAVITINO_JDBC_USER, postgreSQLContainer.getUsername());
-    icebergPgConf.put(GRAVITINO_JDBC_PASSWORD, postgreSQLContainer.getPassword());
+    icebergPgConf.put(
+        IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER, postgreSQLContainer.getUsername());
+    icebergPgConf.put(
+        IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD,
+        postgreSQLContainer.getPassword());
 
     Catalog postgreSqlCatalog =
         metalake.createCatalog(
@@ -124,8 +124,10 @@ public class TestMultipleJDBCLoad extends BaseIT {
     icebergMysqlConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
     icebergMysqlConf.put(
         IcebergConfig.JDBC_DRIVER.getKey(), mySQLContainer.getDriverClassName(TEST_DB_NAME));
-    icebergMysqlConf.put(GRAVITINO_JDBC_USER, mySQLContainer.getUsername());
-    icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, "wrong_password");
+    icebergMysqlConf.put(
+        IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_USER, mySQLContainer.getUsername());
+    icebergMysqlConf.put(
+        IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, "wrong_password");
     String mysqlCatalogName = RandomNameUtils.genRandomName("it_iceberg_mysql");
 
     // test wrong password
@@ -142,7 +144,8 @@ public class TestMultipleJDBCLoad extends BaseIT {
     Assertions.assertTrue(exception.getMessage().contains("Access denied for user"));
 
     // test correct password
-    icebergMysqlConf.put(GRAVITINO_JDBC_PASSWORD, mySQLContainer.getPassword());
+    icebergMysqlConf.put(
+        IcebergCatalogPropertiesMetadata.GRAVITINO_JDBC_PASSWORD, mySQLContainer.getPassword());
     Catalog mysqlCatalog =
         metalake.createCatalog(
             mysqlCatalogName,

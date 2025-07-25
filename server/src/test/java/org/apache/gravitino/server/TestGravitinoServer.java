@@ -50,7 +50,8 @@ public class TestGravitinoServer {
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.loadFromMap(
         ImmutableMap.of(
-            GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+            ServerConfig.GRAVITINO_WEBSERVER_CONF_PREFIX
+                + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
             String.valueOf(RESTUtils.findAvailablePort(5000, 6000))),
         t -> true);
 

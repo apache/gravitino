@@ -32,6 +32,7 @@ import org.apache.iceberg.types.Types.StringType;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 // Used to override registerTable
+@SuppressWarnings("deprecation")
 public class CatalogWrapperForTest extends CatalogWrapperForREST {
   public CatalogWrapperForTest(String catalogName, IcebergConfig icebergConfig) {
     super(catalogName, icebergConfig);

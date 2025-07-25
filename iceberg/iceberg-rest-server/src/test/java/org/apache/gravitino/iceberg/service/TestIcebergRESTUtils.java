@@ -30,6 +30,7 @@ import org.apache.iceberg.types.Types.StringType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergRESTUtils {
 
   @Test
