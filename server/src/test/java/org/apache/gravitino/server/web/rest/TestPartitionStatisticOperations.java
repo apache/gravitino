@@ -18,25 +18,6 @@
  */
 package org.apache.gravitino.server.web.rest;
 
-public enum OperationType {
-  LIST,
-  CREATE,
-  LOAD,
-  ALTER,
-  DROP,
-  ENABLE,
-  DISABLE,
-  /** This is a special operation type that is used to get a partition from a table. */
-  GET,
-  ADD,
-  REMOVE,
-  DELETE,
-  GRANT,
-  REVOKE,
-  ASSOCIATE,
-  SET,
-  REGISTER, // An operation to register a model
-  LIST_VERSIONS, // An operation to list versions of a model
-  LINK,// An operation to link a version to a model
-  UPDATE
+public class TestPartitionStatisticOperations {
+
 }
