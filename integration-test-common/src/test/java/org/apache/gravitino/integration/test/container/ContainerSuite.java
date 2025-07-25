@@ -66,7 +66,7 @@ public class ContainerSuite implements Closeable {
   private static volatile DorisContainer dorisContainer;
   private static volatile HiveContainer kerberosHiveContainer;
   private static volatile HiveContainer sqlBaseHiveContainer;
-
+  private static volatile StarRocksContainer starRocksContainer;
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
@@ -480,6 +480,27 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  public void startStarRocksContainer() {
+    if (starRocksContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (starRocksContainer == null) {
+          initIfNecessary();
+          // Start StarRocks container
+          StarRocksContainer.Builder starRocksBuilder =
+              StarRocksContainer.builder().withNetwork(network);
+          StarRocksContainer container = closer.register(starRocksBuilder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start StarRocks container", e);
+            throw new RuntimeException("Failed to start StarRocks container", e);
+          }
+          starRocksContainer = container;
+        }
+      }
+    }
+  }
+
   public GravitinoLocalStackContainer getLocalStackContainer() {
     return gravitinoLocalStackContainer;
   }
@@ -554,6 +575,10 @@ public class ContainerSuite implements Closeable {
 
   public MySQLContainer getMySQLVersion5Container() {
     return mySQLVersion5Container;
+  }
+
+  public StarRocksContainer getStarRocksContainer() {
+    return starRocksContainer;
   }
 
   public PostgreSQLContainer getPostgreSQLContainer() throws NoSuchElementException {
