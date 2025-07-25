@@ -119,11 +119,10 @@ public class TableOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response createTable(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TableCreateRequest request) {
     LOG.info(
         "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
@@ -168,12 +167,11 @@ public class TableOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("table") @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table) {
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table) {
     LOG.info(
         "Received load table request for table: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
@@ -203,12 +201,11 @@ public class TableOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("table") @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       TableUpdatesRequest request) {
     LOG.info("Received alter table request: {}.{}.{}.{}", metalake, catalog, schema, table);
     try {
@@ -244,12 +241,11 @@ public class TableOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("table") @AuthorizationMetadata(type = MetadataObject.Type.TABLE) String table,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       @QueryParam("purge") @DefaultValue("false") boolean purge) {
     LOG.info(
         "Received {} table request: {}.{}.{}.{}",
