@@ -171,7 +171,8 @@ public class CatalogConnectorMetadata {
           table.getProperties(),
           table.getPartitioning(),
           table.getDistribution(),
-          table.getSortOrders());
+          table.getSortOrders(),
+          table.getIndexes());
     } catch (NoSuchSchemaException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_SCHEMA_NOT_EXISTS, SCHEMA_DOES_NOT_EXIST_MSG, e);
