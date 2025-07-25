@@ -36,7 +36,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -604,24 +603,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           "Location name %s does not exist in fileset %s", targetLocationName, ident);
     }
 
-    boolean isSingleFile = false;
-    if (disableFSOps) {
-      LOG.warn(
-          "Filesystem operations are disabled in the server side, we cannot check if the "
-              + "storage location mounts to a directory or single file, we assume it is a directory"
-              + "(in most of the cases). If it happens to be a single file, then the generated "
-              + "file location may be a wrong path. Please avoid using Fileset to manage a single"
-              + " file path.");
-    } else {
-      isSingleFile = checkSingleFile(fileset, targetLocationName);
-    }
-
-    // if the storage location is a single file, it cannot have sub path to access.
-    if (isSingleFile && StringUtils.isNotBlank(processedSubPath)) {
-      throw new GravitinoRuntimeException(
-          "Sub path should always be blank, because the fileset only mounts a single file.");
-    }
-
     // do checks for some data operations.
     if (hasCallerContext()) {
       Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
@@ -639,10 +620,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           case RENAME:
             // Fileset only mounts a single file, the storage location of the fileset cannot be
             // renamed; Otherwise the metadata in the Gravitino server may be inconsistent.
-            if (isSingleFile) {
-              throw new GravitinoRuntimeException(
-                  "Cannot rename the fileset: %s which only mounts to a single file.", ident);
-            }
             // if the sub path is blank, it cannot be renamed,
             // otherwise the metadata in the Gravitino server may be inconsistent.
             if (StringUtils.isBlank(processedSubPath)
@@ -660,7 +637,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     String fileLocation;
     // 1. if the storage location is a single file, we pass the storage location directly
     // 2. if the processed sub path is blank, we pass the storage location directly
-    if (isSingleFile || StringUtils.isBlank(processedSubPath)) {
+    if (StringUtils.isBlank(processedSubPath)) {
       fileLocation = fileset.storageLocations().get(targetLocationName);
     } else {
       // the processed sub path always starts with "/" if it is not blank,
@@ -1246,23 +1223,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     return CallerContext.CallerContextHolder.get() != null
         && CallerContext.CallerContextHolder.get().context() != null
         && !CallerContext.CallerContextHolder.get().context().isEmpty();
-  }
-
-  private boolean checkSingleFile(Fileset fileset, String locationName) {
-    try {
-      Path locationPath = new Path(fileset.storageLocations().get(locationName));
-      return getFileSystem(locationPath, conf).getFileStatus(locationPath).isFile();
-    } catch (FileNotFoundException e) {
-      // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
-      return false;
-    } catch (IOException e) {
-      throw new GravitinoRuntimeException(
-          e,
-          "Exception occurs when checking whether fileset: %s "
-              + "mounts a single file with location name: %s",
-          fileset.name(),
-          locationName);
-    }
   }
 
   private String buildGVFSFilePath(
