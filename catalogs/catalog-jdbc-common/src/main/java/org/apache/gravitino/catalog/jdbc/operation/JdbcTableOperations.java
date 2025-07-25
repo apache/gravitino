@@ -332,7 +332,7 @@ public abstract class JdbcTableOperations implements TableOperation {
   protected void purgeTable(String databaseName, String tableName) {
     LOG.info("Attempting to purge table {} from database {}", tableName, databaseName);
     try (Connection connection = getConnection(databaseName)) {
-      JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(tableName));
+      JdbcConnectorUtils.executeUpdate(connection, generatePurgeTableSql(databaseName, tableName));
       LOG.info("Purge table {} from database {}", tableName, databaseName);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
@@ -497,6 +497,10 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected abstract String generatePurgeTableSql(String tableName);
+
+  protected String generatePurgeTableSql(String databaseName, String tableName) {
+    return generatePurgeTableSql(tableName);
+  }
 
   protected abstract String generateAlterTableSql(
       String databaseName, String tableName, TableChange... changes);
