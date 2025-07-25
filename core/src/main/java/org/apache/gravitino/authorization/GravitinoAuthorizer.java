@@ -50,6 +50,12 @@ public interface GravitinoAuthorizer extends Closeable {
       MetadataObject metadataObject,
       Privilege.Name privilege);
 
+  boolean deny(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      Privilege.Name privilege);
+
   /**
    * Determine whether the user is the Owner of a certain metadata object.
    *
