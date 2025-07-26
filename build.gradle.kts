@@ -146,10 +146,7 @@ fun getJdkHome(version: Int): Provider<File> {
     languageVersion.set(JavaLanguageVersion.of(version))
   }.map { it.metadata.installationPath.asFile }
 }
-
-val jdk11Home = getJdkHome(11).get()
 val jdk17Home = getJdkHome(17).get()
-println("JDK11: $jdk11Home, JDK17: $jdk17Home")
 
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
@@ -206,8 +203,6 @@ allprojects {
     param.doFirst {
       param.jvmArgs(project.property("extraJvmArgs") as List<*>)
 
-
-
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
       param.environment("IT_PROJECT_DIR", project.buildDir.path)
@@ -218,6 +213,7 @@ allprojects {
       }
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
+      param.environment("JDK17_HOME", jdk17Home)
 
       // Gravitino CI Docker image
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
