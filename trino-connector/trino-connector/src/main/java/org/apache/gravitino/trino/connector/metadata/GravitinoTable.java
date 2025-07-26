@@ -99,6 +99,32 @@ public class GravitinoTable {
 
   /**
    * Constructs a new GravitinoTable with the specified schema name, table name, columns, comment,
+   * properties and indexes.
+   *
+   * @param schemaName the schema name
+   * @param tableName the table name
+   * @param columns the columns
+   * @param comment the comment
+   * @param properties the properties
+   * @param indexes the indexes
+   */
+  public GravitinoTable(
+      String schemaName,
+      String tableName,
+      List<GravitinoColumn> columns,
+      String comment,
+      Map<String, String> properties,
+      Index[] indexes) {
+    this.schemaName = schemaName;
+    this.tableName = tableName;
+    this.columns = columns;
+    this.comment = comment;
+    this.properties = properties;
+    this.indexes = indexes;
+  }
+
+  /**
+   * Constructs a new GravitinoTable with the specified schema name, table name, columns, comment,
    * and properties.
    *
    * @param schemaName the schema name

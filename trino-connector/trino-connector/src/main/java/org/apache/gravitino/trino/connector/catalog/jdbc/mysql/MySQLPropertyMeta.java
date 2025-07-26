@@ -22,11 +22,18 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 import static io.trino.spi.session.PropertyMetadata.booleanProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
 import static io.trino.spi.type.VarcharType.VARCHAR;
+import static java.util.Objects.requireNonNull;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import io.trino.jdbc.$internal.guava.collect.ImmutableMap;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.type.ArrayType;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
 
 /**
@@ -78,5 +85,41 @@ public class MySQLPropertyMeta implements HasPropertyMeta {
   @Override
   public List<PropertyMetadata<?>> getColumnPropertyMetadata() {
     return COLUMN_PROPERTY_META;
+  }
+
+  /**
+   * Extract primary key from table properties
+   *
+   * @param tableProperties table properties
+   * @return primary key list
+   */
+  public static Set<String> getPrimaryKey(Map<String, Object> tableProperties) {
+    requireNonNull(tableProperties, "tableProperties is null");
+    return ImmutableSet.copyOf((List<String>) tableProperties.get(TABLE_PRIMARY_KEY));
+  }
+
+  /**
+   * Extract unique key from table properties
+   *
+   * @param tableProperties table properties
+   * @return unique key list
+   */
+  public static Map<String, Set<String>> getUniqueKey(Map<String, Object> tableProperties) {
+    requireNonNull(tableProperties, "tableProperties is null");
+    List<String> uniqueKeyList = (List<String>) tableProperties.get(TABLE_UNIQUE_KEY);
+    ImmutableMap.Builder<String, Set<String>> uniqueKeyMapBuilder = ImmutableMap.builder();
+    Splitter uniqueKeyDefSplitter = Splitter.on(':').trimResults().omitEmptyStrings();
+    Splitter columnSplitter = Splitter.on(',').trimResults().omitEmptyStrings();
+
+    for (String uniqueKeyDef : uniqueKeyList) {
+      List<String> uniqueKeyDefSplit = uniqueKeyDefSplitter.splitToList(uniqueKeyDef);
+      Preconditions.checkArgument(
+          uniqueKeyDefSplit.size() == 2, "Invalid unique key define: %s", uniqueKeyDef);
+      uniqueKeyMapBuilder.put(
+          uniqueKeyDefSplit.get(0),
+          ImmutableSet.copyOf(columnSplitter.splitToList(uniqueKeyDefSplit.get(1))));
+    }
+
+    return uniqueKeyMapBuilder.build();
   }
 }
