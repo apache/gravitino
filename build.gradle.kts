@@ -75,6 +75,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
+rootProject.extra["isTestModeEmbedded"] = project.properties["testMode"] as? String ?: "embedded" == "embedded"
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
@@ -103,6 +104,32 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
     "--add-opens", "java.base/sun.util.calendar=ALL-UNNAMED",
     "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
   )
+}
+
+fun useHighVersionJDK(project: Project): Boolean {
+  val name = project.name.lowercase()
+  val path = project.path.lowercase()
+
+  println("name = @$name@")
+  println("path = @$path@")
+
+  if (name == "catalog-common" || name == "catalog-fileset" || name == "hadoop-common") {
+    return false
+  }
+
+  if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
+    return true
+  }
+
+  if (name in listOf("server", "authorizations", "lineage")) {
+    return true
+  }
+
+  if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true) {
+    return true
+  }
+
+  return false
 }
 
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
@@ -284,6 +311,12 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
+      } else if (useHighVersionJDK(getProject())) {
+        // println("17project name = ${project.name}")
+        // println("17project path = ${project.path}")
+        languageVersion.set(JavaLanguageVersion.of(17))
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
         sourceCompatibility = JavaVersion.VERSION_1_8
