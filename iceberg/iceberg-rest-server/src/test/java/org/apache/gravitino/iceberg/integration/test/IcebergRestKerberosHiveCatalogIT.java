@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.integration.test;
 
 import java.io.File;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
@@ -81,7 +82,7 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
       System.setProperty("java.security.krb5.realm", "HADOOPKRB");
       System.setProperty("java.security.krb5.kdc", ip);
 
-      sun.security.krb5.Config.refresh();
+      refreshKerberosConfig();
       resetDefaultRealm();
 
       // Give cli@HADOOPKRB permission to access the hdfs
@@ -156,5 +157,21 @@ public class IcebergRestKerberosHiveCatalogIT extends IcebergRESTHiveCatalogIT {
             : System.getProperty(ITUtils.TEST_MODE);
 
     return Objects.equals(mode, ITUtils.EMBEDDED_TEST_MODE);
+  }
+
+  private static void refreshKerberosConfig() {
+    Class<?> classRef;
+    try {
+      if (System.getProperty("java.vendor").contains("IBM")) {
+        classRef = Class.forName("com.ibm.security.krb5.internal.Config");
+      } else {
+        classRef = Class.forName("sun.security.krb5.Config");
+      }
+
+      Method refershMethod = classRef.getMethod("refresh");
+      refershMethod.invoke(null);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

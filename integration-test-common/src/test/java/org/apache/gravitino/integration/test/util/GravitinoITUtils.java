@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.integration.test.util;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class GravitinoITUtils {
   public static final Logger LOG = LoggerFactory.getLogger(GravitinoITUtils.class);
@@ -34,6 +37,9 @@ public class GravitinoITUtils {
 
   public static void startGravitinoServer() {
     String gravitinoStartShell = System.getenv("GRAVITINO_HOME") + "/bin/gravitino.sh";
+    // Gravitino server could only start with JDK17
+    String jdk17Home = System.getenv("JDK17_HOME");
+    Preconditions.checkArgument(StringUtils.isNotBlank(jdk17Home), "JDK17_HOME is not set");
 
     String krb5Path = System.getProperty("java.security.krb5.conf");
     if (krb5Path != null) {
@@ -54,13 +60,19 @@ public class GravitinoITUtils {
         tmp.setExecutable(true);
         LOG.info("modifiedGravitinoStartShell content: \n{}", content);
         CommandExecutor.executeCommandLocalHost(
-            modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
+            modifiedGravitinoStartShell + " start",
+            false,
+            ProcessData.TypesOfData.OUTPUT,
+            ImmutableMap.of("JAVA_HOME", jdk17Home));
       } catch (Exception e) {
         LOG.error("Can replace /etc/krb5.conf with real kerberos configuration", e);
       }
     } else {
       CommandExecutor.executeCommandLocalHost(
-          gravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
+          gravitinoStartShell + " start",
+          false,
+          ProcessData.TypesOfData.OUTPUT,
+          ImmutableMap.of("JAVA_HOME", jdk17Home));
     }
     // wait for server to start.
     sleep(3000, false);

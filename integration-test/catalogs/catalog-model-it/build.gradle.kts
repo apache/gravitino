@@ -16,58 +16,51 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+description = "catalog-model-it"
+
 plugins {
   `maven-publish`
   id("java")
   id("idea")
 }
 
-dependencies {
-  implementation(libs.commons.cli.new)
-  implementation(libs.commons.csv)
-  implementation(libs.guava)
-  implementation(libs.slf4j.api)
-  implementation(libs.slf4j.simple)
-  implementation(project(":api"))
-  implementation(project(":clients:client-java"))
-  implementation(project(":common"))
+val isTestModeEmbedded = rootProject.extra["isTestModeEmbedded"] as Boolean
 
+dependencies {
+  testImplementation(project(":api")) {
+    exclude(group = "*")
+  }
+  testImplementation(project(":catalogs:catalog-common")) {
+    exclude(group = "*")
+  }
+  testImplementation(project(":common")) {
+    exclude(group = "*")
+  }
+  testImplementation(project(":core")) {
+    exclude(group = "*")
+  }
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  if (isTestModeEmbedded) {
+    testImplementation(project(":server"))
+  }
+  testImplementation(project(":server-common"))
+
+  testImplementation(libs.bundles.log4j)
+  testImplementation(libs.commons.io)
+  testImplementation(libs.commons.lang3)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
+  testImplementation(libs.mysql.driver)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
-  testImplementation(libs.mysql.driver)
+  testImplementation(libs.guava)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
 
-  testImplementation(project(":core")) {
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation(project(":server-common")) {
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation(project(":integration-test-common", "testArtifacts"))
   testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-tasks.build {
-  dependsOn("javadoc")
-}
-
-tasks.clean {
-  delete("target")
-  delete("tmp")
-}
-
-tasks.jar {
-  manifest {
-    attributes["Main-Class"] = "org.apache.gravitino.cli.Main"
-  }
-  val dependencies = configurations
-    .runtimeClasspath
-    .get()
-    .map(::zipTree)
-  from(dependencies)
-  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 tasks.test {
@@ -77,6 +70,6 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
-    dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
+    dependsOn(":catalogs:catalog-model:jar")
   }
 }

@@ -80,7 +80,7 @@ public class MetalakeIT extends BaseIT {
     client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
     metaLakes = client.listMetalakes();
     assertEquals(1, metaLakes.length);
-    assertEquals(metaLakes[0].name(), metalakeNameA);
+    Assertions.assertEquals(metaLakes[0].name(), metalakeNameA);
 
     // two metalakes
     client.createMetalake(metalakeNameB, "metalake B comment", Collections.emptyMap());
@@ -98,8 +98,8 @@ public class MetalakeIT extends BaseIT {
     // metalake exists
     client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
     GravitinoMetalake metaLakeA = client.loadMetalake(metalakeNameA);
-    assertEquals(metaLakeA.name(), metalakeNameA);
-    assertEquals("true", metaLakeA.properties().get(PROPERTY_IN_USE));
+    Assertions.assertEquals(metaLakeA.name(), metalakeNameA);
+    Assertions.assertEquals("true", metaLakeA.properties().get(PROPERTY_IN_USE));
 
     // metalake does not exist
     NameIdentifier noexist = NameIdentifier.of(metalakeNameB);
@@ -124,14 +124,14 @@ public class MetalakeIT extends BaseIT {
           MetalakeChange.rename(newName), MetalakeChange.updateComment("new metalake comment")
         };
     GravitinoMetalake metaLake = client.alterMetalake(metalakeNameA, changes);
-    assertEquals(newName, metaLake.name());
-    assertEquals("new metalake comment", metaLake.comment());
-    assertEquals(AuthConstants.ANONYMOUS_USER, metaLake.auditInfo().creator());
+    Assertions.assertEquals(newName, metaLake.name());
+    Assertions.assertEquals("new metalake comment", metaLake.comment());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, metaLake.auditInfo().creator());
 
     // Reload metadata via new name to check if the changes are applied
     GravitinoMetalake newMetalake = client.loadMetalake(newName);
-    assertEquals(newName, newMetalake.name());
-    assertEquals("new metalake comment", newMetalake.comment());
+    Assertions.assertEquals(newName, newMetalake.name());
+    Assertions.assertEquals("new metalake comment", newMetalake.comment());
 
     // Old name does not exist
     NameIdentifier old = NameIdentifier.of(metalakeNameA);
@@ -159,10 +159,10 @@ public class MetalakeIT extends BaseIT {
   public void testCreateMetalake() {
     client.createMetalake(metalakeNameA, "metalake A comment", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(metalakeNameA);
-    assertEquals(metalakeNameA, metalake.name());
-    assertEquals("metalake A comment", metalake.comment());
-    assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
-    assertEquals("true", metalake.properties().get(PROPERTY_IN_USE));
+    Assertions.assertEquals(metalakeNameA, metalake.name());
+    Assertions.assertEquals("metalake A comment", metalake.comment());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
+    Assertions.assertEquals("true", metalake.properties().get(PROPERTY_IN_USE));
 
     // Test metalake name already exists
     Map<String, String> emptyMap = Collections.emptyMap();
@@ -178,9 +178,9 @@ public class MetalakeIT extends BaseIT {
   public void testCreateMetalakeWithChinese() {
     client.createMetalake(metalakeNameA, "这是中文comment", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(metalakeNameA);
-    assertEquals(metalakeNameA, metalake.name());
-    assertEquals("这是中文comment", metalake.comment());
-    assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
+    Assertions.assertEquals(metalakeNameA, metalake.name());
+    Assertions.assertEquals("这是中文comment", metalake.comment());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, metalake.auditInfo().creator());
 
     // Test metalake name already exists
     Map<String, String> emptyMap = Collections.emptyMap();
@@ -213,13 +213,13 @@ public class MetalakeIT extends BaseIT {
   public void testUpdateMetalakeWithNullableComment() {
     client.createMetalake(metalakeNameA, null, Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(metalakeNameA);
-    assertEquals(metalakeNameA, metalake.name());
-    assertEquals(null, metalake.comment());
+    Assertions.assertEquals(metalakeNameA, metalake.name());
+    Assertions.assertEquals(null, metalake.comment());
 
     MetalakeChange[] changes =
         new MetalakeChange[] {MetalakeChange.updateComment("new metalake comment")};
     GravitinoMetalake updatedMetalake = client.alterMetalake(metalakeNameA, changes);
-    assertEquals("new metalake comment", updatedMetalake.comment());
+    Assertions.assertEquals("new metalake comment", updatedMetalake.comment());
 
     GravitinoMetalake updateNullComment =
         client.alterMetalake(metalakeNameA, MetalakeChange.updateComment(null));

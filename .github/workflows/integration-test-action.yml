@@ -1,6 +1,6 @@
-name: Backend Integration Test Action
+name: New Integration Test Action
 
-# run backend integration test
+# run integration test
 on:
   workflow_call:
     inputs:
@@ -53,21 +53,10 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Backend Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
+      - name: Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
         run: >
-          ./gradlew test -PskipTests -PtestMode=${{ inputs.test-mode }} -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
-          -x :web:web:test -x :web:integration-test:test -x :clients:client-python:test -x :flink-connector:flink:test -x :spark-connector:spark-common:test 
-          -x :spark-connector:spark-3.3:test -x :spark-connector:spark-3.4:test -x :spark-connector:spark-3.5:test 
-          -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
-          -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test
-          -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test 
-          -x :integration-test:test -x :catalogs:catalog-fileset:test
-
-      - name: Test catalog fileset
-        if: ${{ inputs.test-mode == 'deploy' }}
-        run: |
-          ./gradlew :catalogs:catalog-fileset:test -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
+          ./gradlew :integration-test:test -PtestMode=${{ inputs.test-mode }} -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4
@@ -79,6 +68,6 @@ jobs:
             iceberg/iceberg-rest-server/build/*.log
             distribution/package/logs/*.out
             distribution/package/logs/*.log
-            catalogs/**/*.log
-            catalogs/**/*.tar
+            integration-test/**/**/*.log
+            integration-test/**/**/*.tar
             distribution/**/*.log

@@ -16,64 +16,59 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+description = "client-java-it"
 
 plugins {
+  `maven-publish`
   id("java")
+  id("idea")
 }
 
-repositories {
-  mavenCentral()
-}
+val isTestModeEmbedded = rootProject.extra["isTestModeEmbedded"] as Boolean
 
 dependencies {
+  testCompileOnly(libs.lombok)
+  testAnnotationProcessor(libs.lombok)
+
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  if (isTestModeEmbedded) {
+    testImplementation(project(":server"))
+  }
   testImplementation(project(":server-common"))
-  testImplementation(libs.bundles.jetty)
+
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
-  testImplementation(libs.bundles.log4j)
-  testImplementation(libs.commons.cli)
   testImplementation(libs.commons.lang3)
-  testImplementation(libs.commons.io)
-  testImplementation(libs.guava)
-  testImplementation(libs.httpclient5)
+  testImplementation(libs.hadoop3.client)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.minikdc)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockserver.netty)
+  testImplementation(libs.mockserver.client.java)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.testcontainers.postgresql)
-  testImplementation(libs.ranger.intg) {
-    exclude("org.apache.hadoop", "hadoop-common")
-    exclude("org.apache.hive", "hive-storage-api")
-    exclude("org.apache.lucene")
-    exclude("org.apache.solr")
-    exclude("org.apache.kafka")
-    exclude("org.elasticsearch")
-    exclude("org.elasticsearch.client")
-    exclude("org.elasticsearch.plugin")
-    exclude("org.apache.hadoop", "hadoop-common")
-  }
-  testImplementation(libs.hadoop3.client.api)
-  testImplementation(libs.hadoop3.client.runtime)
 
-  testImplementation(platform("org.junit:junit-bom:5.9.1"))
-  testImplementation("org.junit.jupiter:junit-jupiter")
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.test {
-  useJUnitPlatform()
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  } else {
+    dependsOn(":catalogs:catalog-fileset:jar", ":catalogs:catalog-fileset:runtimeJars")
+    dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
+    dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
+  }
 }
 
-val testJar by tasks.registering(Jar::class) {
-  archiveClassifier.set("tests")
-  from(sourceSets["test"].output)
-}
-
-configurations {
-  create("testArtifacts")
-}
-
-artifacts {
-  add("testArtifacts", testJar)
+tasks.clean {
+  delete("target")
+  delete("tmp")
 }

@@ -16,20 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.filesystem.hadoop.integration.test;
 
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.condition.DisabledIf;
+tasks.all {
+    enabled = false
+}
 
-@Tag("gravitino-docker-test")
-@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
-public class GravitinoVirtualFilesystemWithFSOpsDisabledIT extends GravitinoVirtualFileSystemIT {
-
-  @BeforeAll
-  @Override
-  public void startUp() throws Exception {
-    properties.put("disable-filesystem-ops", "true");
-    super.startUp();
-  }
+tasks.named<Test>("test") {
+    subprojects.forEach { sub ->
+        dependsOn(sub.tasks.named("test"))
+    }
 }

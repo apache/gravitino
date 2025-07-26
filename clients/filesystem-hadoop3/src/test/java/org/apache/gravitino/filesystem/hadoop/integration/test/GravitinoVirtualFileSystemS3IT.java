@@ -38,11 +38,13 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoVirtualFileSystemS3IT.class);
 

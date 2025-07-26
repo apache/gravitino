@@ -29,7 +29,9 @@ import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
 
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class TableFormatOutputIT extends BaseIT {
   private String gravitinoUrl;
 
