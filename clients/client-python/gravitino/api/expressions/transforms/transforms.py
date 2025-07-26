@@ -1,0 +1,91 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+from typing import List, Union, overload
+
+from gravitino.api.expressions.expression import Expression
+from gravitino.api.expressions.named_reference import NamedReference
+from gravitino.api.expressions.transforms.transform import Transform
+
+
+class Transforms(Transform):
+    """Helper methods to create logical transforms to pass into Apache Gravitino."""
+
+    EMPTY_TRANSFORM: List[Transform] = []
+    """An empty array of transforms."""
+    NAME_OF_IDENTITY: str = "identity"
+    """The name of the identity transform."""
+    NAME_OF_YEAR: str = "year"
+    """The name of the year transform. The year transform returns the year of the input value."""
+    NAME_OF_MONTH: str = "month"
+    """The name of the month transform. The month transform returns the month of the input value."""
+    NAME_OF_DAY: str = "day"
+    """The name of the day transform. The day transform returns the day of the input value."""
+    NAME_OF_HOUR: str = "hour"
+    """The name of the hour transform. The hour transform returns the hour of the input value."""
+    NAME_OF_BUCKET: str = "bucket"
+    """The name of the bucket transform. The bucket transform returns the bucket of the input value."""
+    NAME_OF_TRUNCATE: str = "truncate"
+    """The name of the truncate transform. The truncate transform returns the truncated value of the"""
+    NAME_OF_LIST: str = "list"
+    """The name of the list transform. The list transform includes multiple fields in a list."""
+    NAME_OF_RANGE: str = "range"
+    """The name of the range transform. The range transform returns the range of the input value."""
+
+    @staticmethod
+    @overload
+    def identity(field_name: List[str]) -> "IdentityTransform": ...
+
+    @staticmethod
+    @overload
+    def identity(field_name: str) -> "IdentityTransform": ...
+
+    @staticmethod
+    def identity(field_name: Union[str, List[str]]) -> "IdentityTransform":
+        """Create a transform that returns the input value.
+
+        Args:
+            field_name (List[str]):
+                The field name(s) to transform. Can be a list of field names or a single field name.
+        Returns:
+            IdentityTransform: The created transform
+        """
+
+        return IdentityTransform(
+            NamedReference.field(
+                [field_name] if isinstance(field_name, str) else field_name
+            )
+        )
+
+
+class IdentityTransform(Transforms):
+    """A transform that returns the input value."""
+
+    def __init__(self, ref: NamedReference):
+        self.ref = ref
+
+    def name(self) -> str:
+        return Transforms.NAME_OF_IDENTITY
+
+    def arguments(self) -> List[Expression]:
+        return [self.ref]
+
+    def __eq__(self, other):
+        return isinstance(other, IdentityTransform) and self.ref == other.ref
+
+    def __hash__(self):
+        return hash(self.ref)
