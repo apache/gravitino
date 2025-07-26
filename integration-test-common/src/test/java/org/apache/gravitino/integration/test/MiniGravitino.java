@@ -47,7 +47,6 @@ import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.KerberosProviderHelper;
 import org.apache.gravitino.integration.test.util.OAuthMockDataProvider;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.slf4j.Logger;
@@ -93,7 +92,7 @@ public class MiniGravitino {
     // Generate random Gravitino Server port and backend storage path, avoiding conflicts
     customizeConfigFile(
         ITUtils.joinPath(gravitinoRootDir, "conf", "gravitino.conf.template"),
-        ITUtils.joinPath(mockConfDir.getAbsolutePath(), GravitinoServer.CONF_FILE));
+        ITUtils.joinPath(mockConfDir.getAbsolutePath(), ITUtils.GRAVITINO_CONF_FILE));
 
     Files.copy(
         Paths.get(ITUtils.joinPath(gravitinoRootDir, "conf", "gravitino-env.sh.template")),
@@ -114,7 +113,7 @@ public class MiniGravitino {
 
     // Initialize the REST client
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, ITUtils.GRAVITINO_WEBSERVER_CONF_PREFIX);
     this.host = jettyServerConfig.getHost();
     this.port = jettyServerConfig.getHttpPort();
     String URI = String.format("http://%s:%d", host, port);
@@ -145,10 +144,12 @@ public class MiniGravitino {
         executor.submit(
             () -> {
               try {
-                GravitinoServer.main(
-                    new String[] {
-                      ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf")
-                    });
+                String configPath =
+                    ITUtils.joinPath(mockConfDir.getAbsolutePath(), "gravitino.conf");
+                String[] args = new String[] {configPath};
+                Class<?> gravitinoServerClass =
+                    Class.forName("org.apache.gravitino.server.GravitinoServer");
+                gravitinoServerClass.getMethod("main", String[].class).invoke(null, (Object) args);
               } catch (Exception e) {
                 LOG.error("Exception in startup MiniGravitino Server ", e);
                 throw new RuntimeException(e);
@@ -235,7 +236,7 @@ public class MiniGravitino {
       throws IOException {
     Map<String, String> configMap = new HashMap<>();
     configMap.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        ITUtils.GRAVITINO_WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
         String.valueOf(RESTUtils.findAvailablePort(2000, 3000)));
 
     configMap.putAll(getIcebergRestServiceConfigs());

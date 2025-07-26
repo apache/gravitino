@@ -31,6 +31,8 @@ pythonPlugin {
   pythonVersion.set(project.rootProject.extra["pythonVersion"].toString())
 }
 
+var jdk17Home = rootProject.extra["jdk17Home"]
+
 fun deleteCacheDir(targetDir: String) {
   project.fileTree(project.projectDir).matching {
     include("**/$targetDir/**")
@@ -79,7 +81,10 @@ fun waitForServerIsReady(host: String = "http://localhost", port: Int = 8090, ti
 }
 
 fun gravitinoServer(operation: String) {
-    val process = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation).start()
+    val processBuilder = ProcessBuilder("${project.rootDir.path}/distribution/package/bin/gravitino.sh", operation)
+    var env = processBuilder.environment();
+    env["JAVA_HOME"] = jdk17Home.toString()
+    var process = processBuilder.start()
     val exitCode = process.waitFor()
     if (exitCode == 0) {
       val currentContext = process.inputStream.bufferedReader().readText()

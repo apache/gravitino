@@ -46,9 +46,8 @@ jobs:
 
       - name: Flink Integration Test
         id: integrationTest
-        # run embedded mode and deploy mode integration tests
+        # run deploy mode integration tests
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
           ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
