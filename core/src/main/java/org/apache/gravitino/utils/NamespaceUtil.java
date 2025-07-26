@@ -83,6 +83,16 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for policy.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for policy
+   */
+  public static Namespace ofPolicy(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.POLICY_SCHEMA_NAME);
+  }
+
+  /**
    * Create a namespace for user.
    *
    * @param metalake The metalake name
@@ -173,6 +183,27 @@ public class NamespaceUtil {
   public static Namespace ofModelVersion(
       String metalake, String catalog, String schema, String model) {
     return Namespace.of(metalake, catalog, schema, model);
+  }
+
+  /**
+   * Create a namespace for job template.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for job template
+   */
+  public static Namespace ofJobTemplate(String metalake) {
+    return Namespace.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.JOB_TEMPLATE_SCHEMA_NAME);
+  }
+
+  /**
+   * Create a namespace for job.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for job
+   */
+  public static Namespace ofJob(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.JOB_SCHEMA_NAME);
   }
 
   /**

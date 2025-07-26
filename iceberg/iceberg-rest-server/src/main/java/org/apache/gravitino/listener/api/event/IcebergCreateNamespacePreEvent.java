@@ -25,7 +25,8 @@ import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
 /** Represent a pre event before creating Iceberg namespace. */
 @DeveloperApi
-public class IcebergCreateNamespacePreEvent extends IcebergNamespacePreEvent {
+public class IcebergCreateNamespacePreEvent extends IcebergNamespacePreEvent
+    implements SupportsChangingPreEvent {
   private final CreateNamespaceRequest createNamespaceRequest;
 
   public IcebergCreateNamespacePreEvent(

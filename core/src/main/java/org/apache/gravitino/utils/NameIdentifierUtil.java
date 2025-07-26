@@ -20,8 +20,6 @@ package org.apache.gravitino.utils;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.errorprone.annotations.FormatMethod;
-import com.google.errorprone.annotations.FormatString;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,7 +31,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
-import org.apache.gravitino.exceptions.IllegalNamespaceException;
 
 /**
  * A name identifier is a sequence of names separated by dots. It's used to identify a metalake, a
@@ -102,6 +99,17 @@ public class NameIdentifierUtil {
    */
   public static NameIdentifier ofTag(String metalake, String tagName) {
     return NameIdentifier.of(NamespaceUtil.ofTag(metalake), tagName);
+  }
+
+  /**
+   * Create the policy {@link NameIdentifier} with the given metalake and policy name.
+   *
+   * @param metalake The metalake name
+   * @param policyName The policy name
+   * @return the created policy {@link NameIdentifier}
+   */
+  public static NameIdentifier ofPolicy(String metalake, String policyName) {
+    return NameIdentifier.of(NamespaceUtil.ofPolicy(metalake), policyName);
   }
 
   /**
@@ -272,6 +280,28 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the job template {@link NameIdentifier} with the given metalake and job template name.
+   *
+   * @param metalake The metalake name
+   * @param jobTemplateName The job template name
+   * @return The created job template {@link NameIdentifier}
+   */
+  public static NameIdentifier ofJobTemplate(String metalake, String jobTemplateName) {
+    return NameIdentifier.of(NamespaceUtil.ofJobTemplate(metalake), jobTemplateName);
+  }
+
+  /**
+   * Create the job {@link NameIdentifier} with the given metalake and job name.
+   *
+   * @param metalake The metalake name
+   * @param jobName The job name
+   * @return The created job {@link NameIdentifier}
+   */
+  public static NameIdentifier ofJob(String metalake, String jobName) {
+    return NameIdentifier.of(NamespaceUtil.ofJob(metalake), jobName);
+  }
+
+  /**
    * Try to get the catalog {@link NameIdentifier} from the given {@link NameIdentifier}.
    *
    * @param ident The {@link NameIdentifier} to check.
@@ -426,20 +456,6 @@ public class NameIdentifierUtil {
   public static void checkModelVersion(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Model version identifier must not be null");
     NamespaceUtil.checkModelVersion(ident.namespace());
-  }
-
-  /**
-   * Check the given condition is true. Throw an {@link IllegalNamespaceException} if it's not.
-   *
-   * @param expression The expression to check.
-   * @param message The message to throw.
-   * @param args The arguments to the message.
-   */
-  @FormatMethod
-  public static void check(boolean expression, @FormatString String message, Object... args) {
-    if (!expression) {
-      throw new IllegalNamespaceException(message, args);
-    }
   }
 
   /**

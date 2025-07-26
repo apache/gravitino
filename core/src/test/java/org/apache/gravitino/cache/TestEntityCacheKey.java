@@ -35,7 +35,7 @@ public class TestEntityCacheKey {
     EntityCacheKey key =
         EntityCacheKey.of(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
-    Assertions.assertEquals("metalake.system.role.role1:ro:ROLE_GROUP_REL", key.toString());
+    Assertions.assertEquals("metalake.system.role.role1:ROLE:ROLE_GROUP_REL", key.toString());
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "system", "role", "role1"), key.identifier());
     Assertions.assertEquals(Entity.EntityType.ROLE, key.entityType());
@@ -43,7 +43,7 @@ public class TestEntityCacheKey {
 
     // test Store Entity
     EntityCacheKey key2 = EntityCacheKey.of(ident, Entity.EntityType.ROLE, null);
-    Assertions.assertEquals("metalake.system.role.role1:ro", key2.toString());
+    Assertions.assertEquals("metalake.system.role.role1:ROLE", key2.toString());
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "system", "role", "role1"), key2.identifier());
     Assertions.assertEquals(Entity.EntityType.ROLE, key2.entityType());
@@ -137,7 +137,7 @@ public class TestEntityCacheKey {
 
     EntityCacheKey key = EntityCacheKey.of(ident, type);
 
-    Assertions.assertEquals("metalake.system.user.user1:us", key.toString());
+    Assertions.assertEquals("metalake.system.user.user1:USER", key.toString());
   }
 
   @Test
@@ -148,6 +148,6 @@ public class TestEntityCacheKey {
 
     EntityCacheKey key = EntityCacheKey.of(ident, type, relationType);
 
-    Assertions.assertEquals("metalake.system.user.user1:us:ROLE_USER_REL", key.toString());
+    Assertions.assertEquals("metalake.system.user.user1:USER:ROLE_USER_REL", key.toString());
   }
 }
