@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from typing import List
 
 from gravitino.api.expressions.expression import Expression
+from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.partitions.partition import Partition
 from gravitino.api.expressions.partitions.partitions import Partitions
 
@@ -61,3 +62,32 @@ class Transform(Expression, ABC):
 
     def children(self) -> List[Expression]:
         return self.arguments()
+
+
+class SingleFieldTransform(Transform):
+    """Base class for transforms on a single field."""
+
+    def __init__(self, ref: NamedReference):
+        self.ref = ref
+
+    def field_name(self) -> List[str]:
+        """Gets the referenced field name as a list of string parts.
+
+        Returns:
+            List[str]: The referenced field name as an array of String parts.
+        """
+        return self.ref.field_name()
+
+    def references(self) -> List[NamedReference]:
+        return [self.ref]
+
+    def arguments(self) -> List[Expression]:
+        return [self.ref]
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SingleFieldTransform):
+            return False
+        return self.ref == other.ref
+
+    def __hash__(self) -> int:
+        return hash(self.ref)
