@@ -18,17 +18,11 @@
  */
 import de.undercouch.gradle.tasks.download.Download
 import de.undercouch.gradle.tasks.download.Verify
-import io.github.piyushroshan.python.VenvTask
 import java.net.HttpURLConnection
 import java.net.URL
 
 plugins {
-  id("io.github.piyushroshan.python-gradle-miniforge-plugin") version "1.0.0"
   id("de.undercouch.download") version "5.6.0"
-}
-
-pythonPlugin {
-  pythonVersion.set(project.rootProject.extra["pythonVersion"].toString())
 }
 
 fun deleteCacheDir(targetDir: String) {
@@ -156,34 +150,44 @@ val hadoopPackName = "hadoop-${hadoopVersion}.tar.gz"
 val hadoopDirName = "hadoop-${hadoopVersion}"
 val hadoopDownloadUrl = "https://archive.apache.org/dist/hadoop/core/hadoop-${hadoopVersion}/${hadoopPackName}"
 tasks {
-  val pipInstall by registering(VenvTask::class) {
-    venvExec = "pip"
-    args = listOf("install", "-e", ".[dev]")
+  val checkUv by registering(Exec::class) {
+    commandLine("uv", "--version")
+    doFirst {
+      println("Checking uv installation...")
+    }
+    doLast {
+      println("uv is available")
+    }
   }
 
-  val black by registering(VenvTask::class) {
-    dependsOn(pipInstall)
-    venvExec = "black"
-    args = listOf("./gravitino", "./tests", "./scripts")
+  val uvSync by registering(Exec::class) {
+    dependsOn(checkUv)
+    commandLine("uv", "sync", "--dev")
+    workingDir = projectDir
   }
 
-  val pylint by registering(VenvTask::class) {
-    dependsOn(pipInstall)
+  val black by registering(Exec::class) {
+    dependsOn(uvSync)
+    commandLine("uv", "run", "black", "./gravitino", "./tests", "./scripts")
+    workingDir = projectDir
+  }
+
+  val pylint by registering(Exec::class) {
+    dependsOn(uvSync)
     mustRunAfter(black)
-    venvExec = "pylint"
-    args = listOf("./gravitino", "./tests", "./scripts")
+    commandLine("uv", "run", "pylint", "./gravitino", "./tests", "./scripts")
+    workingDir = projectDir
   }
 
-  val integrationCoverageReport by registering(VenvTask::class){
-    venvExec = "coverage"
-    args = listOf("html")
+  val integrationCoverageReport by registering(Exec::class){
+    commandLine("uv", "run", "coverage", "html")
     workingDir = projectDir.resolve("./tests/integration")
   }
 
-  val build by registering(VenvTask::class) {
+  val build by registering(Exec::class) {
     dependsOn(pylint)
-    venvExec = "python"
-    args = listOf("scripts/generate_version.py")
+    commandLine("uv", "run", "python", "scripts/generate_version.py")
+    workingDir = projectDir
   }
 
   val downloadHadoopPack by registering(Download::class) {
@@ -200,13 +204,12 @@ tasks {
     checksum("3455bb57e4b4906bbea67b58cca78fa8")
   }
 
-  val integrationTest by registering(VenvTask::class) {
+  val integrationTest by registering(Exec::class) {
     doFirst {
       gravitinoServer("start")
     }
 
-    venvExec = "coverage"
-    args = listOf("run", "--branch", "-m", "unittest")
+    commandLine("uv", "run", "coverage", "run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
     val dockerTest = project.rootProject.extra["dockerTest"] as? Boolean ?: false
     val envMap = mapOf<String, Any>().toMutableMap()
@@ -237,15 +240,13 @@ tasks {
     finalizedBy(integrationCoverageReport)
   }
 
-  val unitCoverageReport by registering(VenvTask::class){
-    venvExec = "coverage"
-    args = listOf("html")
+  val unitCoverageReport by registering(Exec::class){
+    commandLine("uv", "run", "coverage", "html")
     workingDir = projectDir.resolve("./tests/unittests")
   }
 
-  val unitTests by registering(VenvTask::class) {
-    venvExec = "coverage"
-    args = listOf("run", "--branch", "-m", "unittest")
+  val unitTests by registering(Exec::class) {
+    commandLine("uv", "run", "coverage", "run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/unittests")
 
     environment = mapOf(
@@ -257,12 +258,12 @@ tasks {
     finalizedBy(unitCoverageReport)
   }
 
-  val test by registering(VenvTask::class) {
+  val test by registering {
     val skipUTs = project.hasProperty("skipTests")
     val skipITs = project.hasProperty("skipITs")
     val skipAllTests = skipUTs && skipITs
     if (!skipAllTests) {
-      dependsOn(pipInstall, pylint)
+      dependsOn(uvSync, pylint)
       if (!skipUTs) {
         dependsOn(unitTests)
       }
@@ -272,13 +273,12 @@ tasks {
     }
   }
 
-  val doc by registering(VenvTask::class) {
+  val doc by registering(Exec::class) {
     workingDir = projectDir.resolve("./docs")
-    venvExec = "make"
-    args = listOf("html")
+    commandLine("make", "html")
   }
 
-  val distribution by registering(VenvTask::class) {
+  val distribution by registering(Exec::class) {
     dependsOn(build)
     doFirst {
       delete("README.md")
@@ -292,8 +292,8 @@ tasks {
       }
     }
 
-    venvExec = "python"
-    args = listOf("setup.py", "sdist")
+    commandLine("uv", "run", "python", "setup.py", "sdist")
+    workingDir = projectDir
 
     doLast {
       delete("README.md")
@@ -301,11 +301,11 @@ tasks {
   }
 
   // Deploy to https://pypi.org/project/gravitino/
-  val deploy by registering(VenvTask::class) {
+  val deploy by registering(Exec::class) {
     dependsOn(distribution)
     val twine_password = System.getenv("TWINE_PASSWORD")
-    venvExec = "twine"
-    args = listOf("upload", "dist/*", "-p${twine_password}")
+    commandLine("uv", "run", "twine", "upload", "dist/*", "-p${twine_password}")
+    workingDir = projectDir
   }
 
   val clean by registering(Delete::class) {
@@ -330,6 +330,6 @@ tasks {
     it.name.endsWith("envSetup")
   }.all {
     // add install package and code formatting before any tasks
-    finalizedBy(pipInstall, black, pylint, build)
+    finalizedBy(uvSync, black, pylint, build)
   }
 }
