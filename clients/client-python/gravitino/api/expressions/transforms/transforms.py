@@ -71,6 +71,31 @@ class Transforms(Transform):
             )
         )
 
+    @staticmethod
+    @overload
+    def year(field_name: List[str]) -> "YearTransform": ...
+
+    @staticmethod
+    @overload
+    def year(field_name: str) -> "YearTransform": ...
+
+    @staticmethod
+    def year(field_name: Union[str, List[str]]) -> "YearTransform":
+        """Create a transform that returns the input value.
+
+        Args:
+            field_name (List[str]):
+                The field name(s) to transform. Can be a list of field names or a single field name.
+        Returns:
+            YearTransform: The created transform
+        """
+
+        return YearTransform(
+            NamedReference.field(
+                [field_name] if isinstance(field_name, str) else field_name
+            )
+        )
+
 
 class IdentityTransform(Transforms):
     """A transform that returns the input value."""
@@ -86,6 +111,28 @@ class IdentityTransform(Transforms):
 
     def __eq__(self, other):
         return isinstance(other, IdentityTransform) and self.ref == other.ref
+
+    def __hash__(self):
+        return hash(self.ref)
+
+
+class YearTransform(Transforms):
+    """A transform that returns the year of the input value."""
+
+    def __init__(self, ref: NamedReference):
+        self.ref = ref
+
+    def name(self) -> str:
+        return Transforms.NAME_OF_YEAR
+
+    def children(self) -> List[Expression]:
+        return [self.ref]
+
+    def arguments(self) -> List[Expression]:
+        return [self.ref]
+
+    def __eq__(self, other):
+        return isinstance(other, YearTransform) and self.ref == other.ref
 
     def __hash__(self):
         return hash(self.ref)
