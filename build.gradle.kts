@@ -132,6 +132,25 @@ fun useHighVersionJDK(project: Project): Boolean {
   return false
 }
 
+fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
+  if (rootProject.extra["isTestModeEmbedded"] == true) {
+    return JavaLanguageVersion.of(17)
+  }
+
+  return JavaLanguageVersion.of(extra["jdkVersion"].toString())
+}
+
+val toolchainService: JavaToolchainService = extensions.getByType()
+fun getJdkHome(version: Int): Provider<File> {
+  return toolchainService.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(version))
+  }.map { it.metadata.installationPath.asFile }
+}
+
+val jdk11Home = getJdkHome(11).get()
+val jdk17Home = getJdkHome(17).get()
+println("JDK11: $jdk11Home, JDK17: $jdk17Home")
+
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
 
@@ -186,6 +205,8 @@ allprojects {
   val setTestEnvironment: (Test) -> Unit = { param ->
     param.doFirst {
       param.jvmArgs(project.property("extraJvmArgs") as List<*>)
+
+
 
       // Default use MiniGravitino to run integration tests
       param.environment("GRAVITINO_ROOT_DIR", project.rootDir.path)
@@ -298,6 +319,52 @@ subprojects {
   repositories {
     mavenCentral()
     mavenLocal()
+  }
+
+  tasks.register("printJvmVersions") {
+    group = "help"
+    description = "打印本模块的 JVM 版本信息"
+
+    doLast {
+
+      tasks.withType<JavaCompile>().forEach() {
+          task ->
+        println(
+          """
+            |=== ${project.name} JVM 版本信息 ===
+            |    ${task.name}
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: ${task.javaCompiler?.get()?.metadata?.languageVersion?.asInt() ?: "未配置"}"""
+        )
+      }
+
+      // 获取编译 JVM 版本
+      val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取测试 JVM 版本
+      val testJvmVersion = tasks.withType<Test>().firstOrNull()?.javaLauncher?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取目标 JVM 版本
+      val targetJvmVersion = (java.targetCompatibility?.majorVersion ?: "未配置")
+
+      // 获取源码兼容性版本
+      val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "未配置")
+
+      // 打印结果
+      println(
+        """
+            |=== ${project.name} JVM 版本信息 ===
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: $compileJvmVersion
+            |🧪 测试 JVM 版本: $testJvmVersion
+            |🎯 目标 JVM 版本: $targetJvmVersion
+            |📝 源码兼容版本: $sourceJvmVersion
+            |==================================
+        """.trimMargin()
+      )
+    }
   }
 
   java {
@@ -505,6 +572,12 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    javaLauncher.set(
+      javaToolchains.launcherFor {
+        languageVersion.set(getJdkVersionForTest(project))
+      }
+    )
+
     if (project.name != "server-common") {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)
