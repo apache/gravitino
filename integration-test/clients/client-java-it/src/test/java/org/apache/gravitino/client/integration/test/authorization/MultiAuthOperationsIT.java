@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.client.integration.test.authorization;
 
-import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 import static org.apache.gravitino.server.authentication.KerberosConfig.KEYTAB;
 import static org.apache.gravitino.server.authentication.KerberosConfig.PRINCIPAL;
 import static org.apache.hadoop.minikdc.MiniKdc.MAX_TICKET_LIFETIME;
@@ -94,7 +93,7 @@ public class MultiAuthOperationsIT extends BaseIT {
             .build();
 
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, ITUtils.GRAVITINO_WEBSERVER_CONF_PREFIX);
     serverUri = "http://localhost:" + jettyServerConfig.getHttpPort();
     kerberosClient =
         GravitinoAdminClient.builder(serverUri)

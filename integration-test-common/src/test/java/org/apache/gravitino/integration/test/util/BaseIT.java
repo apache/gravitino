@@ -21,7 +21,6 @@ package org.apache.gravitino.integration.test.util;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CATALOG_POSTGRESQL_IT;
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_JDBC_BACKEND;
-import static org.apache.gravitino.server.GravitinoServer.WEBSERVER_CONF_PREFIX;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
@@ -60,7 +59,6 @@ import org.apache.gravitino.integration.test.MiniGravitinoContext;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
-import org.apache.gravitino.server.GravitinoServer;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -125,7 +123,7 @@ public class BaseIT {
 
   public int getGravitinoServerPort() {
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, ITUtils.GRAVITINO_WEBSERVER_CONF_PREFIX);
     return jettyServerConfig.getHttpPort();
   }
 
@@ -135,7 +133,7 @@ public class BaseIT {
 
   private void rewriteGravitinoServerConfig() throws IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
+    Path configPath = Paths.get(gravitinoHome, "conf", ITUtils.GRAVITINO_CONF_FILE);
     if (originConfig == null) {
       originConfig = FileUtils.readFileToString(configPath.toFile(), StandardCharsets.UTF_8);
     }
@@ -144,7 +142,7 @@ public class BaseIT {
       return;
     }
 
-    String tmpFileName = GravitinoServer.CONF_FILE + ".tmp";
+    String tmpFileName = ITUtils.GRAVITINO_CONF_FILE + ".tmp";
     Path tmpPath = Paths.get(gravitinoHome, "conf", tmpFileName);
     Files.deleteIfExists(tmpPath);
 
@@ -154,7 +152,7 @@ public class BaseIT {
 
   private void recoverGravitinoServerConfig() throws IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    Path configPath = Paths.get(gravitinoHome, "conf", GravitinoServer.CONF_FILE);
+    Path configPath = Paths.get(gravitinoHome, "conf", ITUtils.GRAVITINO_CONF_FILE);
 
     if (originConfig != null) {
       Files.deleteIfExists(configPath);
@@ -337,14 +335,14 @@ public class BaseIT {
       serverConfig = miniGravitino.getServerConfig();
     } else {
       rewriteGravitinoServerConfig();
-      serverConfig.loadFromFile(GravitinoServer.CONF_FILE);
+      serverConfig.loadFromFile(ITUtils.GRAVITINO_CONF_FILE);
 
       setupJdbcDrivers();
 
       GravitinoITUtils.startGravitinoServer();
 
       JettyServerConfig jettyServerConfig =
-          JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+          JettyServerConfig.fromConfig(serverConfig, ITUtils.GRAVITINO_WEBSERVER_CONF_PREFIX);
       String checkServerUrl =
           "http://"
               + jettyServerConfig.getHost()
@@ -358,7 +356,7 @@ public class BaseIT {
     }
 
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+        JettyServerConfig.fromConfig(serverConfig, ITUtils.GRAVITINO_WEBSERVER_CONF_PREFIX);
 
     serverUri = "http://" + jettyServerConfig.getHost() + ":" + jettyServerConfig.getHttpPort();
 

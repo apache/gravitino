@@ -75,6 +75,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
+rootProject.extra["isTestModeEmbedded"] = project.properties["testMode"] as? String ?: "embedded" == "embedded"
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
   listOf()
@@ -104,6 +105,48 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
     "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
   )
 }
+
+fun useHighVersionJDK(project: Project): Boolean {
+  val name = project.name.lowercase()
+  val path = project.path.lowercase()
+
+  println("name = @$name@")
+  println("path = @$path@")
+
+  if (name == "catalog-common" || name == "catalog-fileset" || name == "hadoop-common") {
+    return false
+  }
+
+  if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
+    return true
+  }
+
+  if (name in listOf("server", "authorizations", "lineage")) {
+    return true
+  }
+
+  if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true) {
+    return true
+  }
+
+  return false
+}
+
+fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
+  if (rootProject.extra["isTestModeEmbedded"] == true) {
+    return JavaLanguageVersion.of(17)
+  }
+
+  return JavaLanguageVersion.of(extra["jdkVersion"].toString())
+}
+
+val toolchainService: JavaToolchainService = extensions.getByType()
+fun getJdkHome(version: Int): Provider<File> {
+  return toolchainService.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(version))
+  }.map { it.metadata.installationPath.asFile }
+}
+val jdk17Home = getJdkHome(17).get()
 
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
@@ -170,6 +213,7 @@ allprojects {
       }
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
+      param.environment("JDK17_HOME", jdk17Home)
 
       // Gravitino CI Docker image
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
@@ -273,6 +317,52 @@ subprojects {
     mavenLocal()
   }
 
+  tasks.register("printJvmVersions") {
+    group = "help"
+    description = "打印本模块的 JVM 版本信息"
+
+    doLast {
+
+      tasks.withType<JavaCompile>().forEach() {
+          task ->
+        println(
+          """
+            |=== ${project.name} JVM 版本信息 ===
+            |    ${task.name}
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: ${task.javaCompiler?.get()?.metadata?.languageVersion?.asInt() ?: "未配置"}"""
+        )
+      }
+
+      // 获取编译 JVM 版本
+      val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取测试 JVM 版本
+      val testJvmVersion = tasks.withType<Test>().firstOrNull()?.javaLauncher?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "未配置"
+
+      // 获取目标 JVM 版本
+      val targetJvmVersion = (java.targetCompatibility?.majorVersion ?: "未配置")
+
+      // 获取源码兼容性版本
+      val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "未配置")
+
+      // 打印结果
+      println(
+        """
+            |=== ${project.name} JVM 版本信息 ===
+            |📦 模块路径: ${project.path}
+            |🔧 编译 JVM 版本: $compileJvmVersion
+            |🧪 测试 JVM 版本: $testJvmVersion
+            |🎯 目标 JVM 版本: $targetJvmVersion
+            |📝 源码兼容版本: $sourceJvmVersion
+            |==================================
+        """.trimMargin()
+      )
+    }
+  }
+
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -284,6 +374,12 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
+      } else if (useHighVersionJDK(getProject())) {
+        // println("17project name = ${project.name}")
+        // println("17project path = ${project.path}")
+        languageVersion.set(JavaLanguageVersion.of(17))
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -472,6 +568,12 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    javaLauncher.set(
+      javaToolchains.launcherFor {
+        languageVersion.set(getJdkVersionForTest(project))
+      }
+    )
+
     if (project.name != "server-common") {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)
