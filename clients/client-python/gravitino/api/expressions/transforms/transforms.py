@@ -19,7 +19,10 @@ from typing import List, Union, overload
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.named_reference import NamedReference
-from gravitino.api.expressions.transforms.transform import Transform
+from gravitino.api.expressions.transforms.transform import (
+    SingleFieldTransform,
+    Transform,
+)
 
 
 class Transforms(Transform):
@@ -146,6 +149,31 @@ class Transforms(Transform):
             )
         )
 
+    @staticmethod
+    @overload
+    def hour(field_name: List[str]) -> "HourTransform": ...
+
+    @staticmethod
+    @overload
+    def hour(field_name: str) -> "HourTransform": ...
+
+    @staticmethod
+    def hour(field_name: Union[str, List[str]]) -> "HourTransform":
+        """Create a transform that returns the input value.
+
+        Args:
+            field_name (List[str]):
+                The field name(s) to transform. Can be a list of field names or a single field name.
+        Returns:
+            HourTransform: The created transform
+        """
+
+        return HourTransform(
+            NamedReference.field(
+                [field_name] if isinstance(field_name, str) else field_name
+            )
+        )
+
 
 class IdentityTransform(Transforms):
     """A transform that returns the input value."""
@@ -227,6 +255,19 @@ class DayTransform(Transforms):
 
     def __eq__(self, other):
         return isinstance(other, DayTransform) and self.ref == other.ref
+
+    def __hash__(self):
+        return hash(self.ref)
+
+
+class HourTransform(SingleFieldTransform):
+    """A transform that returns the hour of the input value."""
+
+    def name(self) -> str:
+        return Transforms.NAME_OF_HOUR
+
+    def __eq__(self, other):
+        return isinstance(other, HourTransform) and self.ref == other.ref
 
     def __hash__(self):
         return hash(self.ref)
