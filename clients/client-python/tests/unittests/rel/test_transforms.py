@@ -21,24 +21,39 @@ from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.transforms.transforms import (
     IdentityTransform,
     Transforms,
+    YearTransform,
 )
 
 
 class TestTransforms(unittest.TestCase):
-    def test_identity_transform(self):
+    @classmethod
+    def setUpClass(cls):
+        cls._temporal_transforms = {
+            IdentityTransform: Transforms.identity,
+            YearTransform: Transforms.year,
+        }
+
+        cls._transform_names = {
+            IdentityTransform: Transforms.NAME_OF_IDENTITY,
+            YearTransform: Transforms.NAME_OF_YEAR,
+        }
+
+    def test_temporal_transforms(self):
         field_name = "dummy_field"
-        ident_trans_str = Transforms.identity(field_name=field_name)
-        ident_trans_list = Transforms.identity(field_name=[field_name])
-        ident_dict = {ident_trans_str: 1, ident_trans_list: 2}
+        for trans_cls, trans_func in self._temporal_transforms.items():
+            trans_from_str = trans_func(field_name=field_name)
+            trans_from_list = trans_func(field_name=[field_name])
+            trans_dict = {trans_from_str: 1, trans_from_list: 2}
 
-        self.assertIsInstance(ident_trans_str, IdentityTransform)
-        self.assertIsInstance(ident_trans_list, IdentityTransform)
+            self.assertIsInstance(trans_from_str, trans_cls)
+            self.assertIsInstance(trans_from_list, trans_cls)
 
-        self.assertEqual(ident_trans_str.name(), Transforms.NAME_OF_IDENTITY)
-        self.assertEqual(
-            ident_trans_str.arguments(), [NamedReference.field([field_name])]
-        )
+            self.assertEqual(trans_from_str.name(), self._transform_names[trans_cls])
+            self.assertEqual(
+                trans_from_str.arguments(), [NamedReference.field([field_name])]
+            )
 
-        self.assertEqual(ident_trans_str, ident_trans_list)
-        self.assertEqual(len(ident_dict), 1)
-        self.assertEqual(ident_dict[ident_trans_str], 2)
+            self.assertEqual(trans_from_str, trans_from_list)
+            self.assertFalse(trans_from_str == field_name)
+            self.assertEqual(len(trans_dict), 1)
+            self.assertEqual(trans_dict[trans_from_str], 2)
