@@ -121,6 +121,31 @@ class Transforms(Transform):
             )
         )
 
+    @staticmethod
+    @overload
+    def day(field_name: List[str]) -> "DayTransform": ...
+
+    @staticmethod
+    @overload
+    def day(field_name: str) -> "DayTransform": ...
+
+    @staticmethod
+    def day(field_name: Union[str, List[str]]) -> "DayTransform":
+        """Create a transform that returns the input value.
+
+        Args:
+            field_name (List[str]):
+                The field name(s) to transform. Can be a list of field names or a single field name.
+        Returns:
+            DayTransform: The created transform
+        """
+
+        return DayTransform(
+            NamedReference.field(
+                [field_name] if isinstance(field_name, str) else field_name
+            )
+        )
+
 
 class IdentityTransform(Transforms):
     """A transform that returns the input value."""
@@ -180,6 +205,28 @@ class MonthTransform(Transforms):
 
     def __eq__(self, other):
         return isinstance(other, MonthTransform) and self.ref == other.ref
+
+    def __hash__(self):
+        return hash(self.ref)
+
+
+class DayTransform(Transforms):
+    """A transform that returns the day of the input value."""
+
+    def __init__(self, ref: NamedReference):
+        self.ref = ref
+
+    def name(self) -> str:
+        return Transforms.NAME_OF_DAY
+
+    def children(self) -> List[Expression]:
+        return [self.ref]
+
+    def arguments(self) -> List[Expression]:
+        return [self.ref]
+
+    def __eq__(self, other):
+        return isinstance(other, DayTransform) and self.ref == other.ref
 
     def __hash__(self):
         return hash(self.ref)
