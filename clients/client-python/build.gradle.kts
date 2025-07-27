@@ -188,6 +188,11 @@ tasks {
     dependsOn(pylint)
     commandLine("uv", "run", "python", "scripts/generate_version.py")
     workingDir = projectDir
+    environment = mapOf(
+      // Set the PYTHONPATH to the client-python directory, make sure the scripts can import the
+      // modules from the client-python directory.
+      "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
+    )
   }
 
   val downloadHadoopPack by registering(Download::class) {
