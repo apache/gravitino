@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import List, Union, overload
+from typing import ClassVar, List, Union, overload
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.literals.literal import Literal
@@ -30,25 +30,25 @@ from gravitino.api.expressions.transforms.transform import (
 class Transforms(Transform):
     """Helper methods to create logical transforms to pass into Apache Gravitino."""
 
-    EMPTY_TRANSFORM: List[Transform] = []
+    EMPTY_TRANSFORM: ClassVar[List[Transform]] = []
     """An empty array of transforms."""
-    NAME_OF_IDENTITY: str = "identity"
+    NAME_OF_IDENTITY: ClassVar[str] = "identity"
     """The name of the identity transform."""
-    NAME_OF_YEAR: str = "year"
+    NAME_OF_YEAR: ClassVar[str] = "year"
     """The name of the year transform. The year transform returns the year of the input value."""
-    NAME_OF_MONTH: str = "month"
+    NAME_OF_MONTH: ClassVar[str] = "month"
     """The name of the month transform. The month transform returns the month of the input value."""
-    NAME_OF_DAY: str = "day"
+    NAME_OF_DAY: ClassVar[str] = "day"
     """The name of the day transform. The day transform returns the day of the input value."""
-    NAME_OF_HOUR: str = "hour"
+    NAME_OF_HOUR: ClassVar[str] = "hour"
     """The name of the hour transform. The hour transform returns the hour of the input value."""
-    NAME_OF_BUCKET: str = "bucket"
+    NAME_OF_BUCKET: ClassVar[str] = "bucket"
     """The name of the bucket transform. The bucket transform returns the bucket of the input value."""
-    NAME_OF_TRUNCATE: str = "truncate"
+    NAME_OF_TRUNCATE: ClassVar[str] = "truncate"
     """The name of the truncate transform. The truncate transform returns the truncated value of the"""
-    NAME_OF_LIST: str = "list"
+    NAME_OF_LIST: ClassVar[str] = "list"
     """The name of the list transform. The list transform includes multiple fields in a list."""
-    NAME_OF_RANGE: str = "range"
+    NAME_OF_RANGE: ClassVar[str] = "range"
     """The name of the range transform. The range transform returns the range of the input value."""
 
     @staticmethod
