@@ -279,8 +279,14 @@ tasks {
   }
 
   val doc by registering(Exec::class) {
+    dependsOn(uvSync)
     workingDir = projectDir.resolve("./docs")
-    commandLine("make", "html")
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+    if (isWindows) {
+      commandLine("cmd", "/c", "set PYTHONPATH=${project.rootDir.path}/clients/client-python && uv run make html")
+    } else {
+      commandLine("/bin/sh", "-c", "PYTHONPATH=${project.rootDir.path}/clients/client-python uv run make html")
+    }
   }
 
   val distribution by registering(Exec::class) {
