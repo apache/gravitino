@@ -17,7 +17,6 @@
 
 from typing import List, Union, overload
 
-from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.transforms.transform import (
     SingleFieldTransform,
@@ -175,17 +174,11 @@ class Transforms(Transform):
         )
 
 
-class IdentityTransform(Transforms):
+class IdentityTransform(SingleFieldTransform):
     """A transform that returns the input value."""
-
-    def __init__(self, ref: NamedReference):
-        self.ref = ref
 
     def name(self) -> str:
         return Transforms.NAME_OF_IDENTITY
-
-    def arguments(self) -> List[Expression]:
-        return [self.ref]
 
     def __eq__(self, other):
         return isinstance(other, IdentityTransform) and self.ref == other.ref
@@ -194,20 +187,11 @@ class IdentityTransform(Transforms):
         return hash(self.ref)
 
 
-class YearTransform(Transforms):
+class YearTransform(SingleFieldTransform):
     """A transform that returns the year of the input value."""
-
-    def __init__(self, ref: NamedReference):
-        self.ref = ref
 
     def name(self) -> str:
         return Transforms.NAME_OF_YEAR
-
-    def children(self) -> List[Expression]:
-        return [self.ref]
-
-    def arguments(self) -> List[Expression]:
-        return [self.ref]
 
     def __eq__(self, other):
         return isinstance(other, YearTransform) and self.ref == other.ref
@@ -216,20 +200,11 @@ class YearTransform(Transforms):
         return hash(self.ref)
 
 
-class MonthTransform(Transforms):
+class MonthTransform(SingleFieldTransform):
     """A transform that returns the month of the input value."""
-
-    def __init__(self, ref: NamedReference):
-        self.ref = ref
 
     def name(self) -> str:
         return Transforms.NAME_OF_MONTH
-
-    def children(self) -> List[Expression]:
-        return [self.ref]
-
-    def arguments(self) -> List[Expression]:
-        return [self.ref]
 
     def __eq__(self, other):
         return isinstance(other, MonthTransform) and self.ref == other.ref
@@ -238,20 +213,11 @@ class MonthTransform(Transforms):
         return hash(self.ref)
 
 
-class DayTransform(Transforms):
+class DayTransform(SingleFieldTransform):
     """A transform that returns the day of the input value."""
-
-    def __init__(self, ref: NamedReference):
-        self.ref = ref
 
     def name(self) -> str:
         return Transforms.NAME_OF_DAY
-
-    def children(self) -> List[Expression]:
-        return [self.ref]
-
-    def arguments(self) -> List[Expression]:
-        return [self.ref]
 
     def __eq__(self, other):
         return isinstance(other, DayTransform) and self.ref == other.ref
