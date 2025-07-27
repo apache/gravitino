@@ -50,24 +50,24 @@ class Transforms(Transform):
 
     @staticmethod
     @overload
-    def identity(field_name: List[str]) -> "IdentityTransform": ...
+    def identity(field_name: List[str]) -> "Transforms.IdentityTransform": ...
 
     @staticmethod
     @overload
-    def identity(field_name: str) -> "IdentityTransform": ...
+    def identity(field_name: str) -> "Transforms.IdentityTransform": ...
 
     @staticmethod
-    def identity(field_name: Union[str, List[str]]) -> "IdentityTransform":
+    def identity(field_name: Union[str, List[str]]) -> "Transforms.IdentityTransform":
         """Create a transform that returns the input value.
 
         Args:
             field_name (List[str]):
                 The field name(s) to transform. Can be a list of field names or a single field name.
         Returns:
-            IdentityTransform: The created transform
+            Transforms.IdentityTransform: The created transform
         """
 
-        return IdentityTransform(
+        return Transforms.IdentityTransform(
             NamedReference.field(
                 [field_name] if isinstance(field_name, str) else field_name
             )
@@ -75,24 +75,24 @@ class Transforms(Transform):
 
     @staticmethod
     @overload
-    def year(field_name: List[str]) -> "YearTransform": ...
+    def year(field_name: List[str]) -> "Transforms.YearTransform": ...
 
     @staticmethod
     @overload
-    def year(field_name: str) -> "YearTransform": ...
+    def year(field_name: str) -> "Transforms.YearTransform": ...
 
     @staticmethod
-    def year(field_name: Union[str, List[str]]) -> "YearTransform":
+    def year(field_name: Union[str, List[str]]) -> "Transforms.YearTransform":
         """Create a transform that returns the input value.
 
         Args:
             field_name (List[str]):
                 The field name(s) to transform. Can be a list of field names or a single field name.
         Returns:
-            YearTransform: The created transform
+            Transforms.YearTransform: The created transform
         """
 
-        return YearTransform(
+        return Transforms.YearTransform(
             NamedReference.field(
                 [field_name] if isinstance(field_name, str) else field_name
             )
@@ -100,14 +100,14 @@ class Transforms(Transform):
 
     @staticmethod
     @overload
-    def month(field_name: List[str]) -> "MonthTransform": ...
+    def month(field_name: List[str]) -> "Transforms.MonthTransform": ...
 
     @staticmethod
     @overload
-    def month(field_name: str) -> "MonthTransform": ...
+    def month(field_name: str) -> "Transforms.MonthTransform": ...
 
     @staticmethod
-    def month(field_name: Union[str, List[str]]) -> "MonthTransform":
+    def month(field_name: Union[str, List[str]]) -> "Transforms.MonthTransform":
         """Create a transform that returns the input value.
 
         Args:
@@ -117,7 +117,7 @@ class Transforms(Transform):
             MonthTransform: The created transform
         """
 
-        return MonthTransform(
+        return Transforms.MonthTransform(
             NamedReference.field(
                 [field_name] if isinstance(field_name, str) else field_name
             )
@@ -125,14 +125,14 @@ class Transforms(Transform):
 
     @staticmethod
     @overload
-    def day(field_name: List[str]) -> "DayTransform": ...
+    def day(field_name: List[str]) -> "Transforms.DayTransform": ...
 
     @staticmethod
     @overload
-    def day(field_name: str) -> "DayTransform": ...
+    def day(field_name: str) -> "Transforms.DayTransform": ...
 
     @staticmethod
-    def day(field_name: Union[str, List[str]]) -> "DayTransform":
+    def day(field_name: Union[str, List[str]]) -> "Transforms.DayTransform":
         """Create a transform that returns the input value.
 
         Args:
@@ -142,7 +142,7 @@ class Transforms(Transform):
             DayTransform: The created transform
         """
 
-        return DayTransform(
+        return Transforms.DayTransform(
             NamedReference.field(
                 [field_name] if isinstance(field_name, str) else field_name
             )
@@ -150,90 +150,90 @@ class Transforms(Transform):
 
     @staticmethod
     @overload
-    def hour(field_name: List[str]) -> "HourTransform": ...
+    def hour(field_name: List[str]) -> "Transforms.HourTransform": ...
 
     @staticmethod
     @overload
-    def hour(field_name: str) -> "HourTransform": ...
+    def hour(field_name: str) -> "Transforms.HourTransform": ...
 
     @staticmethod
-    def hour(field_name: Union[str, List[str]]) -> "HourTransform":
+    def hour(field_name: Union[str, List[str]]) -> "Transforms.HourTransform":
         """Create a transform that returns the input value.
 
         Args:
             field_name (List[str]):
                 The field name(s) to transform. Can be a list of field names or a single field name.
         Returns:
-            HourTransform: The created transform
+            Transforms.HourTransform: The created transform
         """
 
-        return HourTransform(
+        return Transforms.HourTransform(
             NamedReference.field(
                 [field_name] if isinstance(field_name, str) else field_name
             )
         )
 
+    class IdentityTransform(SingleFieldTransform):
+        """A transform that returns the input value."""
 
-class IdentityTransform(SingleFieldTransform):
-    """A transform that returns the input value."""
+        def name(self) -> str:
+            return Transforms.NAME_OF_IDENTITY
 
-    def name(self) -> str:
-        return Transforms.NAME_OF_IDENTITY
+        def __eq__(self, other):
+            return (
+                isinstance(other, Transforms.IdentityTransform)
+                and self.ref == other.ref
+            )
 
-    def __eq__(self, other):
-        return isinstance(other, IdentityTransform) and self.ref == other.ref
+        def __hash__(self):
+            return hash(self.ref)
 
-    def __hash__(self):
-        return hash(self.ref)
+    class YearTransform(SingleFieldTransform):
+        """A transform that returns the year of the input value."""
 
+        def name(self) -> str:
+            return Transforms.NAME_OF_YEAR
 
-class YearTransform(SingleFieldTransform):
-    """A transform that returns the year of the input value."""
+        def __eq__(self, other):
+            return isinstance(other, Transforms.YearTransform) and self.ref == other.ref
 
-    def name(self) -> str:
-        return Transforms.NAME_OF_YEAR
+        def __hash__(self):
+            return hash(self.ref)
 
-    def __eq__(self, other):
-        return isinstance(other, YearTransform) and self.ref == other.ref
+    class MonthTransform(SingleFieldTransform):
+        """A transform that returns the month of the input value."""
 
-    def __hash__(self):
-        return hash(self.ref)
+        def name(self) -> str:
+            return Transforms.NAME_OF_MONTH
 
+        def __eq__(self, other):
+            return (
+                isinstance(other, Transforms.MonthTransform) and self.ref == other.ref
+            )
 
-class MonthTransform(SingleFieldTransform):
-    """A transform that returns the month of the input value."""
+        def __hash__(self):
+            return hash(self.ref)
 
-    def name(self) -> str:
-        return Transforms.NAME_OF_MONTH
+    class DayTransform(SingleFieldTransform):
+        """A transform that returns the day of the input value."""
 
-    def __eq__(self, other):
-        return isinstance(other, MonthTransform) and self.ref == other.ref
+        def name(self) -> str:
+            return Transforms.NAME_OF_DAY
 
-    def __hash__(self):
-        return hash(self.ref)
+        def __eq__(self, other):
+            return isinstance(other, Transforms.DayTransform) and self.ref == other.ref
 
+        def __hash__(self):
+            return hash(self.ref)
 
-class DayTransform(SingleFieldTransform):
-    """A transform that returns the day of the input value."""
+    class HourTransform(SingleFieldTransform):
+        """A transform that returns the hour of the input value."""
 
-    def name(self) -> str:
-        return Transforms.NAME_OF_DAY
+        def name(self) -> str:
+            return Transforms.NAME_OF_HOUR
 
-    def __eq__(self, other):
-        return isinstance(other, DayTransform) and self.ref == other.ref
+        def __eq__(self, other):
+            return isinstance(other, Transforms.HourTransform) and self.ref == other.ref
 
-    def __hash__(self):
-        return hash(self.ref)
-
-
-class HourTransform(SingleFieldTransform):
-    """A transform that returns the hour of the input value."""
-
-    def name(self) -> str:
-        return Transforms.NAME_OF_HOUR
-
-    def __eq__(self, other):
-        return isinstance(other, HourTransform) and self.ref == other.ref
-
-    def __hash__(self):
-        return hash(self.ref)
+        def __hash__(self):
+            return hash(self.ref)
