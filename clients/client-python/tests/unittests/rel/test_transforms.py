@@ -19,6 +19,7 @@ import unittest
 
 from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.transforms.transforms import (
+    DayTransform,
     IdentityTransform,
     MonthTransform,
     Transforms,
@@ -33,12 +34,14 @@ class TestTransforms(unittest.TestCase):
             IdentityTransform: Transforms.identity,
             YearTransform: Transforms.year,
             MonthTransform: Transforms.month,
+            DayTransform: Transforms.day,
         }
 
         cls._transform_names = {
             IdentityTransform: Transforms.NAME_OF_IDENTITY,
             YearTransform: Transforms.NAME_OF_YEAR,
             MonthTransform: Transforms.NAME_OF_MONTH,
+            DayTransform: Transforms.NAME_OF_DAY,
         }
 
     def test_temporal_transforms(self):
