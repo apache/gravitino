@@ -17,6 +17,9 @@
 
 from typing import List, Union, overload
 
+from gravitino.api.expressions.expression import Expression
+from gravitino.api.expressions.literals.literal import Literal
+from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.transforms.transform import (
     SingleFieldTransform,
@@ -173,6 +176,15 @@ class Transforms(Transform):
             )
         )
 
+    @staticmethod
+    def bucket(
+        num_buckets: int, *field_names: List[str]
+    ) -> "Transforms.BucketTransform":
+        return Transforms.BucketTransform(
+            num_buckets=Literals.integer_literal(value=num_buckets),
+            fields=[NamedReference.field(names) for names in field_names],
+        )
+
     class IdentityTransform(SingleFieldTransform):
         """A transform that returns the input value."""
 
@@ -237,3 +249,34 @@ class Transforms(Transform):
 
         def __hash__(self):
             return hash(self.ref)
+
+    class BucketTransform(Transform):
+        """A transform that returns the bucket of the input value."""
+
+        def __init__(self, num_buckets: Literal[int], fields: List[NamedReference]):
+            self.num_buckets_ = num_buckets
+            self.fields = fields
+
+        def name(self) -> str:
+            return Transforms.NAME_OF_BUCKET
+
+        def num_buckets(self) -> int:
+            return self.num_buckets_.value()
+
+        def field_names(self) -> List[List[str]]:
+            return [field.field_name() for field in self.fields]
+
+        def arguments(self) -> List[Expression]:
+            return [self.num_buckets_, *self.fields]
+
+        def __eq__(self, other):
+            if self is other:
+                return True
+            return (
+                isinstance(other, Transforms.BucketTransform)
+                and self.num_buckets_ == other.num_buckets_
+                and self.fields == other.fields
+            )
+
+        def __hash__(self):
+            return hash((self.num_buckets_, *self.fields))
