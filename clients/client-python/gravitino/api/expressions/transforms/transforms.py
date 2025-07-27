@@ -96,6 +96,31 @@ class Transforms(Transform):
             )
         )
 
+    @staticmethod
+    @overload
+    def month(field_name: List[str]) -> "MonthTransform": ...
+
+    @staticmethod
+    @overload
+    def month(field_name: str) -> "MonthTransform": ...
+
+    @staticmethod
+    def month(field_name: Union[str, List[str]]) -> "MonthTransform":
+        """Create a transform that returns the input value.
+
+        Args:
+            field_name (List[str]):
+                The field name(s) to transform. Can be a list of field names or a single field name.
+        Returns:
+            MonthTransform: The created transform
+        """
+
+        return MonthTransform(
+            NamedReference.field(
+                [field_name] if isinstance(field_name, str) else field_name
+            )
+        )
+
 
 class IdentityTransform(Transforms):
     """A transform that returns the input value."""
@@ -133,6 +158,28 @@ class YearTransform(Transforms):
 
     def __eq__(self, other):
         return isinstance(other, YearTransform) and self.ref == other.ref
+
+    def __hash__(self):
+        return hash(self.ref)
+
+
+class MonthTransform(Transforms):
+    """A transform that returns the month of the input value."""
+
+    def __init__(self, ref: NamedReference):
+        self.ref = ref
+
+    def name(self) -> str:
+        return Transforms.NAME_OF_MONTH
+
+    def children(self) -> List[Expression]:
+        return [self.ref]
+
+    def arguments(self) -> List[Expression]:
+        return [self.ref]
+
+    def __eq__(self, other):
+        return isinstance(other, MonthTransform) and self.ref == other.ref
 
     def __hash__(self):
         return hash(self.ref)
