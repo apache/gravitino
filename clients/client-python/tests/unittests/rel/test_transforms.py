@@ -17,6 +17,7 @@
 
 import unittest
 
+from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.transforms.transforms import Transforms
 
@@ -59,3 +60,27 @@ class TestTransforms(unittest.TestCase):
             self.assertFalse(trans_from_str == field_name)
             self.assertEqual(len(trans_dict), 1)
             self.assertEqual(trans_dict[trans_from_str], 2)
+
+    def test_bucket_transform(self):
+        field_names = [["dummy_field"], [f"dummy_field_{i}" for i in range(2)]]
+        num_buckets = 10
+        bucket_transform = Transforms.bucket(num_buckets, *field_names)
+        twin_bucket_transform = Transforms.bucket(num_buckets, *field_names)
+        bucket_trans_dict = {
+            bucket_transform: 1,
+            twin_bucket_transform: 2,
+        }
+
+        self.assertIsInstance(bucket_transform, Transforms.BucketTransform)
+        self.assertEqual(bucket_transform.name(), Transforms.NAME_OF_BUCKET)
+        self.assertEqual(bucket_transform.num_buckets(), num_buckets)
+        self.assertListEqual(bucket_transform.field_names(), field_names)
+        self.assertListEqual(
+            bucket_transform.arguments(),
+            [Literals.integer_literal(num_buckets), *bucket_transform.fields],
+        )
+        self.assertEqual(bucket_transform, bucket_transform)
+        self.assertIsNot(bucket_transform, twin_bucket_transform)
+        self.assertEqual(bucket_transform, twin_bucket_transform)
+        self.assertEqual(len(bucket_trans_dict), 1)
+        self.assertEqual(bucket_trans_dict[bucket_transform], 2)
