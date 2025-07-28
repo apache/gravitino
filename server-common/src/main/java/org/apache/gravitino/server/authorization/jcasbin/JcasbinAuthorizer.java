@@ -61,7 +61,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
   /** Jcasbin enforcer is used for metadata authorization. */
-  private Enforcer enforcer;
+  private Enforcer allowEnforcer;
 
   /** Jcasbin deny enforcer is used for metadata authorization. */
   private Enforcer denyEnforcer;
@@ -76,8 +76,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public void initialize() {
-    enforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_deny_model.conf"), new GravitinoAdapter());
+    allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
+    denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     Config config = GravitinoEnv.getInstance().config();
     if (config != null) {
       serviceAdmins.addAll(config.get(Configs.SERVICE_ADMINS));
@@ -90,7 +90,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Preconditions.checkNotNull(modelStream, "Jcasbin model file can not found.");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
-      enforcer = new SyncedEnforcer(model, new GravitinoAdapter());
+      allowEnforcer = new SyncedEnforcer(model, new GravitinoAdapter());
       Config config = GravitinoEnv.getInstance().config();
       if (config != null) {
         serviceAdmins.addAll(config.get(Configs.SERVICE_ADMINS));
@@ -167,7 +167,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         UserEntity userEntity = getUserEntity(currentUserName, metalake);
         Long userId = userEntity.id();
         loadRolePrivilege(metalake, currentUserName, userId);
-        return enforcer.hasRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+        return allowEnforcer.hasRoleForUser(String.valueOf(userId), String.valueOf(roleId));
       } catch (Exception e) {
         LOG.warn("can not get user id or role id.", e);
         return false;
@@ -241,7 +241,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void handleRolePrivilegeChange(Long roleId) {
     loadedRoles.remove(roleId);
-    enforcer.deleteRole(String.valueOf(roleId));
+    allowEnforcer.deleteRole(String.valueOf(roleId));
   }
 
   @Override
@@ -256,7 +256,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             String.valueOf(metadataId),
             AuthConstants.OWNER,
             "allow");
-    enforcer.removePolicy(policy);
+    allowEnforcer.removePolicy(policy);
   }
 
   @Override
@@ -279,7 +279,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String privilege,
       boolean checkAllow) {
     if (checkAllow) {
-      return enforcer.enforce(
+      return allowEnforcer.enforce(
           String.valueOf(userId),
           String.valueOf(metadataObject.type()),
           String.valueOf(metadataId),
@@ -337,30 +337,30 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private void loadRolePrivilege(String metalake, String username, Long userId) throws IOException {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
-      List<RoleEntity> entities =
-              entityStore
-                      .relationOperations()
-                      .listEntitiesByRelation(
-                              SupportsRelationOperations.Type.ROLE_USER_REL,
-                              userNameIdentifier,
-                              Entity.EntityType.USER);
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
+    List<RoleEntity> entities =
+        entityStore
+            .relationOperations()
+            .listEntitiesByRelation(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                userNameIdentifier,
+                Entity.EntityType.USER);
 
-      for (RoleEntity role : entities) {
-          Long roleId = role.id();
-          role =
-                  entityStore.get(
-                          NameIdentifierUtil.ofRole(metalake, role.name()),
-                          Entity.EntityType.ROLE,
-                          RoleEntity.class);
-          if (loadedRoles.contains(roleId)) {
-              continue;
-          }
-          enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-          loadPolicyByRoleEntity(role);
-          loadedRoles.add(roleId);
+    for (RoleEntity role : entities) {
+      Long roleId = role.id();
+      role =
+          entityStore.get(
+              NameIdentifierUtil.ofRole(metalake, role.name()),
+              Entity.EntityType.ROLE,
+              RoleEntity.class);
+      if (loadedRoles.contains(roleId)) {
+        continue;
       }
+      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      loadPolicyByRoleEntity(role);
+      loadedRoles.add(roleId);
+    }
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
@@ -384,7 +384,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   String.valueOf(metadataId),
                   AuthConstants.OWNER,
                   "allow");
-          enforcer.addPolicy(policy);
+          allowEnforcer.addPolicy(policy);
         }
       }
     } catch (IOException e) {
@@ -405,9 +405,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               securableObject.type().name(),
               String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
               privilege.name().name().toUpperCase(),
-              "allow");
+              "deny");
         }
-        enforcer.addPolicy(
+        allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
             securableObject.type().name(),
             String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),

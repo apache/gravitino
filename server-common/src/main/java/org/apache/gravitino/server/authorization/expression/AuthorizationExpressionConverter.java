@@ -49,6 +49,8 @@ public class AuthorizationExpressionConverter {
    */
   public static final String CAN_SET_OWNER = "CAN_SET_OWNER";
 
+  private static final String DENY_PREFIX = "DENY_";
+
   /**
    * The EXPRESSION_CACHE caches the result of converting authorization expressions into an OGNL
    * expression.
@@ -81,26 +83,27 @@ public class AuthorizationExpressionConverter {
             String privilegeOrExpression = matcher.group(2);
             String replacement;
             if (AuthConstants.OWNER.equals(privilegeOrExpression)) {
-              replacement =
-                  String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", type);
-            } else if (privilegeOrExpression.startsWith("DENY_")) {
+              replacement = String.format("authorizer.isOwner(principal,METALAKE_NAME,%s)", type);
+            } else if (privilegeOrExpression.startsWith(DENY_PREFIX)) {
               String privilege = privilegeOrExpression.substring(5);
-                replacement =
-                        String.format(
-                                "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
-                                type, privilege);
-            }else if (AuthConstants.SELF.equals(privilegeOrExpression)) {
-                replacement =
-                        String.format(
-                                "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
-                                type, type);
+              replacement =
+                  String.format(
+                      "authorizer.deny(principal,METALAKE_NAME,%s,"
+                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                      type, privilege);
+            } else if (AuthConstants.SELF.equals(privilegeOrExpression)) {
+              replacement =
+                  String.format(
+                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
+                      type, type);
             } else {
-                replacement =
-                        String.format(
-                                "authorizer.authorize(principal,METALAKE_NAME,%s,"
-                                        + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
-                                type, privilegeOrExpression);
+              replacement =
+                  String.format(
+                      "authorizer.authorize(principal,METALAKE_NAME,%s,"
+                          + "@org.apache.gravitino.authorization.Privilege\\$Name@%s)",
+                      type, privilegeOrExpression);
             }
+
             matcher.appendReplacement(result, replacement);
           }
           matcher.appendTail(result);
