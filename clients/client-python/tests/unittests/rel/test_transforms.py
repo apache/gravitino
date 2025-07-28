@@ -84,3 +84,28 @@ class TestTransforms(unittest.TestCase):
         self.assertEqual(bucket_transform, twin_bucket_transform)
         self.assertEqual(len(bucket_trans_dict), 1)
         self.assertEqual(bucket_trans_dict[bucket_transform], 2)
+
+    def test_truncate_transform(self):
+        field_name = "dummy_field"
+        width = 10
+        truncate_transform_str = Transforms.truncate(width, field_name)
+        truncate_transform_list = Transforms.truncate(width, [field_name])
+        truncate_trans_dict = {
+            truncate_transform_str: 1,
+            truncate_transform_list: 2,
+        }
+
+        self.assertIsInstance(truncate_transform_str, Transforms.TruncateTransform)
+        self.assertIsInstance(truncate_transform_list, Transforms.TruncateTransform)
+        self.assertEqual(truncate_transform_str.name(), Transforms.NAME_OF_TRUNCATE)
+        self.assertEqual(truncate_transform_str.width(), width)
+        self.assertListEqual(truncate_transform_str.field_name(), [field_name])
+        self.assertListEqual(
+            truncate_transform_str.arguments(),
+            [Literals.integer_literal(width), truncate_transform_str.field],
+        )
+        self.assertEqual(truncate_transform_str, truncate_transform_str)
+        self.assertIsNot(truncate_transform_str, truncate_transform_list)
+        self.assertEqual(truncate_transform_str, truncate_transform_list)
+        self.assertEqual(len(truncate_trans_dict), 1)
+        self.assertEqual(truncate_trans_dict[truncate_transform_str], 2)
