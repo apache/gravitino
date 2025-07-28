@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.IOUtils;
@@ -34,6 +36,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
@@ -87,6 +90,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Preconditions.checkNotNull(modelStream, "Jcasbin model file can not found.");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
+      enforcer = new SyncedEnforcer(model, new GravitinoAdapter());
+      Config config = GravitinoEnv.getInstance().config();
+      if (config != null) {
+        serviceAdmins.addAll(config.get(Configs.SERVICE_ADMINS));
+      }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -136,6 +144,98 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       LOG.warn("Can not get user {} in metalake {}", currentUserName, metalake, e);
       return false;
     }
+  }
+
+  @Override
+  public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+    String metalake = nameIdentifier.namespace().level(0);
+    String currentUserName = PrincipalUtils.getCurrentUserName();
+    if (Entity.EntityType.USER == type) {
+      return Objects.equals(nameIdentifier.name(), currentUserName);
+    } else if (Entity.EntityType.ROLE == type) {
+      try {
+        Long roleId =
+            MetadataIdConverter.getID(
+                MetadataObjects.of(
+                    String.join(
+                        ".",
+                        nameIdentifier.namespace().level(1),
+                        nameIdentifier.namespace().level(2)),
+                    nameIdentifier.name(),
+                    MetadataObject.Type.ROLE),
+                metalake);
+        UserEntity userEntity = getUserEntity(currentUserName, metalake);
+        Long userId = userEntity.id();
+        loadRolePrivilege(metalake, currentUserName, userId);
+        return enforcer.hasRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      } catch (Exception e) {
+        LOG.warn("can not get user id or role id.", e);
+        return false;
+      }
+    }
+    throw new UnsupportedOperationException("Unsupported Entity Type.");
+  }
+
+  @Override
+  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject metalakeObject =
+        MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
+    // metalake owner can set owner in metalake.
+    if (isOwner(currentPrincipal, metalake, metalakeObject)) {
+      return true;
+    }
+    MetadataObject.Type metadataType = MetadataObject.Type.valueOf(type.toUpperCase());
+    MetadataObject metadataObject =
+        MetadataObjects.of(Arrays.asList(fullName.split("\\.")), metadataType);
+    do {
+      if (isOwner(currentPrincipal, metalake, metadataObject)) {
+        MetadataObject.Type tempType = metadataObject.type();
+        if (tempType == MetadataObject.Type.SCHEMA) {
+          // schema owner need use catalog privilege
+          boolean hasCatalogUseCatalog =
+              authorize(
+                  currentPrincipal,
+                  metalake,
+                  MetadataObjects.parent(metadataObject),
+                  Privilege.Name.USE_CATALOG);
+          boolean hasMetalakeUseCatalog =
+              authorize(currentPrincipal, metalake, metalakeObject, Privilege.Name.USE_CATALOG);
+          return hasCatalogUseCatalog || hasMetalakeUseCatalog;
+        }
+        if (tempType == MetadataObject.Type.TABLE
+            || tempType == MetadataObject.Type.TOPIC
+            || tempType == MetadataObject.Type.FILESET
+            || tempType == MetadataObject.Type.MODEL) {
+          // table owner need use_catalog and use_schema privileges
+          boolean hasMetalakeUseSchema =
+              authorize(currentPrincipal, metalake, metalakeObject, Privilege.Name.USE_SCHEMA);
+          MetadataObject schemaObject = MetadataObjects.parent(metadataObject);
+          boolean hasCatalogUseSchema =
+              authorize(
+                  currentPrincipal,
+                  metalake,
+                  MetadataObjects.parent(schemaObject),
+                  Privilege.Name.USE_SCHEMA);
+          boolean hasSchemaUseSchema =
+              authorize(currentPrincipal, metalake, schemaObject, Privilege.Name.USE_SCHEMA);
+          return hasMetalakeUseSchema || hasCatalogUseSchema || hasSchemaUseSchema;
+        }
+        return true;
+      }
+      // metadata parent owner can set owner.
+    } while ((metadataObject = MetadataObjects.parent(metadataObject)) != null);
+    return false;
+  }
+
+  @Override
+  public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject metalakeMetadataObject =
+        MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
+    return authorize(
+            currentPrincipal, metalake, metalakeMetadataObject, Privilege.Name.MANAGE_GRANTS)
+        || hasSetOwnerPermission(metalake, type, fullName);
   }
 
   @Override
@@ -201,12 +301,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     Long metadataId;
     Long userId;
     try {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      UserEntity userEntity =
-          entityStore.get(
-              NameIdentifierUtil.ofUser(metalake, username),
-              Entity.EntityType.USER,
-              UserEntity.class);
+      UserEntity userEntity = getUserEntity(username, metalake);
       userId = userEntity.id();
       metadataId = MetadataIdConverter.getID(metadataObject, metalake);
     } catch (Exception e) {
@@ -217,6 +312,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return authorizeByJcasbin(userId, metadataObject, metadataId, privilege, checkAllow);
   }
 
+  private static UserEntity getUserEntity(String username, String metalake) throws IOException {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    UserEntity userEntity =
+        entityStore.get(
+            NameIdentifierUtil.ofUser(metalake, username),
+            Entity.EntityType.USER,
+            UserEntity.class);
+    return userEntity;
+  }
+
   private void loadPrivilege(
       String metalake,
       String username,
@@ -224,35 +329,38 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       Long metadataObjectId) {
     try {
-      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-      NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
-      List<RoleEntity> entities =
-          entityStore
-              .relationOperations()
-              .listEntitiesByRelation(
-                  SupportsRelationOperations.Type.ROLE_USER_REL,
-                  userNameIdentifier,
-                  Entity.EntityType.USER);
-
-      for (RoleEntity role : entities) {
-        Long roleId = role.id();
-        role =
-            entityStore.get(
-                NameIdentifierUtil.ofRole(metalake, role.name()),
-                Entity.EntityType.ROLE,
-                RoleEntity.class);
-        if (loadedRoles.contains(roleId)) {
-          continue;
-        }
-        enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-        denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-        loadPolicyByRoleEntity(role);
-        loadedRoles.add(roleId);
-      }
+      loadRolePrivilege(metalake, username, userId);
       loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
     }
+  }
+
+  private void loadRolePrivilege(String metalake, String username, Long userId) throws IOException {
+      EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+      NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
+      List<RoleEntity> entities =
+              entityStore
+                      .relationOperations()
+                      .listEntitiesByRelation(
+                              SupportsRelationOperations.Type.ROLE_USER_REL,
+                              userNameIdentifier,
+                              Entity.EntityType.USER);
+
+      for (RoleEntity role : entities) {
+          Long roleId = role.id();
+          role =
+                  entityStore.get(
+                          NameIdentifierUtil.ofRole(metalake, role.name()),
+                          Entity.EntityType.ROLE,
+                          RoleEntity.class);
+          if (loadedRoles.contains(roleId)) {
+              continue;
+          }
+          enforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+          loadPolicyByRoleEntity(role);
+          loadedRoles.add(roleId);
+      }
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
