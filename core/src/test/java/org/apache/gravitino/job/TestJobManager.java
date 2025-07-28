@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.job;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -28,6 +30,7 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
@@ -41,6 +44,8 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -52,6 +57,8 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metalake.MetalakeManager;
+import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterAll;
@@ -78,6 +85,8 @@ public class TestJobManager {
 
   private static MockedStatic<MetalakeManager> mockedMetalake;
 
+  private static JobExecutor jobExecutor;
+
   @BeforeAll
   public static void setUp() throws IllegalAccessException {
     config = new Config(false) {};
@@ -86,10 +95,13 @@ public class TestJobManager {
     config.set(Configs.JOB_STAGING_DIR, testStagingDir);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
-    entityStore = Mockito.mock(EntityStore.class);
 
-    JobManager jm = new JobManager(config, entityStore);
+    entityStore = Mockito.mock(EntityStore.class);
+    jobExecutor = Mockito.mock(JobExecutor.class);
+    IdGenerator idGenerator = new RandomIdGenerator();
+    JobManager jm = new JobManager(config, entityStore, idGenerator, jobExecutor);
     jobManager = Mockito.spy(jm);
+
     mockedMetalake = mockStatic(MetalakeManager.class);
   }
 
@@ -106,6 +118,7 @@ public class TestJobManager {
     // Reset the mocked static methods after each test
     mockedMetalake.reset();
     Mockito.reset(entityStore);
+    Mockito.reset(jobManager);
   }
 
   @Test
@@ -275,6 +288,10 @@ public class TestJobManager {
             NameIdentifierUtil.ofJobTemplate(metalake, shellJobTemplate.name()),
             Entity.EntityType.JOB_TEMPLATE);
 
+    doReturn(Collections.emptyList())
+        .when(jobManager)
+        .listJobs(metalake, Optional.of(shellJobTemplate.name()));
+
     // Delete an existing job template
     Assertions.assertTrue(() -> jobManager.deleteJobTemplate(metalake, "shell_job"));
 
@@ -293,6 +310,30 @@ public class TestJobManager {
         .delete(NameIdentifierUtil.ofJobTemplate(metalake, "job"), Entity.EntityType.JOB_TEMPLATE);
     Assertions.assertThrows(
         RuntimeException.class, () -> jobManager.deleteJobTemplate(metalake, "job"));
+
+    // Delete job template that is in use
+    Lists.newArrayList(
+            JobHandle.Status.QUEUED, JobHandle.Status.STARTED, JobHandle.Status.CANCELLING)
+        .forEach(
+            status -> {
+              doReturn(Lists.newArrayList(newJobEntity("shell_job", status)))
+                  .when(jobManager)
+                  .listJobs(metalake, Optional.of(shellJobTemplate.name()));
+              Assertions.assertThrows(
+                  InUseException.class, () -> jobManager.deleteJobTemplate(metalake, "shell_job"));
+            });
+
+    // Delete job template that is not in use
+    Lists.newArrayList(
+            JobHandle.Status.CANCELLED, JobHandle.Status.FAILED, JobHandle.Status.SUCCEEDED)
+        .forEach(
+            status -> {
+              doReturn(Lists.newArrayList(newJobEntity("shell_job", status)))
+                  .when(jobManager)
+                  .listJobs(metalake, Optional.of(shellJobTemplate.name()));
+              Assertions.assertDoesNotThrow(
+                  () -> jobManager.deleteJobTemplate(metalake, "shell_job"));
+            });
   }
 
   @Test
@@ -305,8 +346,8 @@ public class TestJobManager {
         newShellJobTemplateEntity("shell_job", "A shell job template");
     when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
 
-    JobEntity job1 = newJobEntity("shell_job");
-    JobEntity job2 = newJobEntity("spark_job");
+    JobEntity job1 = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    JobEntity job2 = newJobEntity("spark_job", JobHandle.Status.QUEUED);
 
     SupportsRelationOperations supportsRelationOperations =
         Mockito.mock(SupportsRelationOperations.class);
@@ -356,7 +397,7 @@ public class TestJobManager {
         .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
         .thenAnswer(a -> null);
 
-    JobEntity job = newJobEntity("shell_job");
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
     when(entityStore.get(
             NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB, JobEntity.class))
         .thenReturn(job);
@@ -385,9 +426,112 @@ public class TestJobManager {
     Assertions.assertThrows(RuntimeException.class, () -> jobManager.getJob(metalake, "job"));
   }
 
+  @Test
+  public void testRunJob() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobTemplateEntity shellJobTemplate =
+        newShellJobTemplateEntity("shell_job", "A shell job template");
+    when(jobManager.getJobTemplate(metalake, shellJobTemplate.name())).thenReturn(shellJobTemplate);
+
+    String jobExecutionId = "job_execution_id_for_test";
+    when(jobExecutor.submitJob(any())).thenReturn(jobExecutionId);
+
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    JobEntity jobEntity = jobManager.runJob(metalake, "shell_job", Collections.emptyMap());
+
+    Assertions.assertEquals(jobExecutionId, jobEntity.jobExecutionId());
+    Assertions.assertEquals("shell_job", jobEntity.jobTemplateName());
+    Assertions.assertEquals(JobHandle.Status.QUEUED, jobEntity.status());
+
+    // Test when job template does not exist
+    when(jobManager.getJobTemplate(metalake, "non_existent"))
+        .thenThrow(new NoSuchJobTemplateException("Job template does not exist"));
+
+    Exception e =
+        Assertions.assertThrows(
+            NoSuchJobTemplateException.class,
+            () -> jobManager.runJob(metalake, "non_existent", Collections.emptyMap()));
+    Assertions.assertEquals("Job template does not exist", e.getMessage());
+
+    // Test when job executor fails
+    doThrow(new RuntimeException("Job executor error")).when(jobExecutor).submitJob(any());
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
+
+    // Test when entity store fails
+    doThrow(new IOException("Entity store error"))
+        .when(entityStore)
+        .put(any(JobEntity.class), anyBoolean());
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> jobManager.runJob(metalake, "shell_job", Collections.emptyMap()));
+  }
+
+  @Test
+  public void testCancelJob() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    when(jobManager.getJob(metalake, job.name())).thenReturn(job);
+    doNothing().when(jobExecutor).cancelJob(job.jobExecutionId());
+    doNothing().when(entityStore).put(any(JobEntity.class), anyBoolean());
+
+    // Cancel an existing job
+    JobEntity cancelledJob = jobManager.cancelJob(metalake, job.name());
+    Assertions.assertEquals(job.jobExecutionId(), cancelledJob.jobExecutionId());
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, cancelledJob.status());
+
+    // Test cancel a nonexistent job
+    when(jobManager.getJob(metalake, "non_existent"))
+        .thenThrow(new NoSuchJobException("Job does not exist"));
+
+    Exception e =
+        Assertions.assertThrows(
+            NoSuchJobException.class, () -> jobManager.cancelJob(metalake, "non_existent"));
+    Assertions.assertEquals("Job does not exist", e.getMessage());
+
+    // Test cancelling a finished job
+    Lists.newArrayList(
+            JobHandle.Status.CANCELLED, JobHandle.Status.FAILED, JobHandle.Status.SUCCEEDED)
+        .forEach(
+            status -> {
+              JobEntity finishedJob = newJobEntity("shell_job", status);
+              when(jobManager.getJob(metalake, finishedJob.name())).thenReturn(finishedJob);
+
+              JobEntity cancelledFinishedJob = jobManager.cancelJob(metalake, finishedJob.name());
+              Assertions.assertEquals(
+                  finishedJob.jobExecutionId(), cancelledFinishedJob.jobExecutionId());
+              Assertions.assertEquals(status, cancelledFinishedJob.status());
+            });
+
+    // Test job executor failed to cancel the job
+    doThrow(new RuntimeException("Job executor error"))
+        .when(jobExecutor)
+        .cancelJob(job.jobExecutionId());
+    Assertions.assertThrows(
+        RuntimeException.class, () -> jobManager.cancelJob(metalake, job.name()));
+
+    // Test when entity store failed to update the job status
+    doThrow(new IOException("Entity store error"))
+        .when(entityStore)
+        .put(any(JobEntity.class), anyBoolean());
+
+    Assertions.assertThrows(
+        RuntimeException.class, () -> jobManager.cancelJob(metalake, job.name()));
+  }
+
   private static JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
     ShellJobTemplate shellJobTemplate =
-        new ShellJobTemplate.Builder()
+        ShellJobTemplate.builder()
             .withName(name)
             .withComment(comment)
             .withExecutable("/bin/echo")
@@ -406,11 +550,11 @@ public class TestJobManager {
 
   private static JobTemplateEntity newSparkJobTemplateEntity(String name, String comment) {
     SparkJobTemplate sparkJobTemplate =
-        new SparkJobTemplate.Builder()
+        SparkJobTemplate.builder()
             .withName(name)
             .withComment(comment)
             .withClassName("org.apache.spark.examples.SparkPi")
-            .withExecutable("local:///path/to/spark-examples.jar")
+            .withExecutable("file:/path/to/spark-examples.jar")
             .build();
 
     Random rand = new Random();
@@ -424,13 +568,14 @@ public class TestJobManager {
         .build();
   }
 
-  private static JobEntity newJobEntity(String templateName) {
+  private static JobEntity newJobEntity(String templateName, JobHandle.Status status) {
     Random rand = new Random();
     return JobEntity.builder()
         .withId(rand.nextLong())
+        .withJobExecutionId(rand.nextLong() + "")
         .withNamespace(NamespaceUtil.ofJob(metalake))
         .withJobTemplateName(templateName)
-        .withStatus(JobHandle.Status.QUEUED)
+        .withStatus(status)
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
