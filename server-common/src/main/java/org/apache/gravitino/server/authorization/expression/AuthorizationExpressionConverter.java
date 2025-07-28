@@ -157,11 +157,21 @@ public class AuthorizationExpressionConverter {
   public static String replaceAnyPrivilege(String expression) {
     expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
     expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
-    expression = expression.replaceAll("ANY_USE_CATALOG", "(ANY(USE_CATALOG, METALAKE, CATALOG))");
     expression =
-        expression.replaceAll("ANY_USE_SCHEMA", "(ANY(USE_SCHEMA, METALAKE, CATALOG, SCHEMA))");
+        expression.replaceAll(
+            "ANY_USE_CATALOG",
+            "((ANY(USE_CATALOG, METALAKE, CATALOG)) && "
+                + "!(ANY(DENY_USE_CATALOG, METALAKE, CATALOG)))");
     expression =
-        expression.replaceAll("ANY_CREATE_SCHEMA", "(ANY(CREATE_SCHEMA, METALAKE, CATALOG))");
+        expression.replaceAll(
+            "ANY_USE_SCHEMA",
+            "((ANY(USE_SCHEMA, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_USE_SCHEMA, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_SCHEMA",
+            "((ANY(CREATE_SCHEMA, METALAKE, CATALOG)) "
+                + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG)))");
     expression =
         expression.replaceAll(
             "ANY_SELECT_TABLE",
@@ -169,38 +179,65 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_SELECT_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) )");
     expression =
         expression.replaceAll(
-            "ANY_MODIFY_TABLE", "(ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+            "ANY_MODIFY_TABLE",
+            "((ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) "
+                + "&& !(ANY(DENY_MODIFY_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");
     expression =
         expression.replaceAll(
-            "ANY_CREATE_TABLE", "(ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE))");
+            "ANY_CREATE_TABLE",
+            "((ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) "
+                + "&& !(ANY(DENY_CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");
+    expression =
+        expression.replaceAll(
+            "ANY_CREATE_FILESET",
+            "((ANY(CREATE_FILESET, METALAKE, CATALOG, SCHEMA, TABLE)) "
+                + "&& !(ANY(DENY_CREATE_FILESET, METALAKE, CATALOG, SCHEMA, TABLE)))");
     expression =
         expression.replaceAll(
             "SCHEMA_OWNER_WITH_USE_CATALOG",
-            "SCHEMA::OWNER && (ANY(USE_CATALOG, METALAKE, CATALOG))");
+            "SCHEMA::OWNER && "
+                + "((ANY(USE_CATALOG, METALAKE, CATALOG)) && "
+                + "!(ANY(DENY_USE_CATALOG, METALAKE, CATALOG)))");
     expression =
         expression.replaceAll(
-            "ANY_USE_MODEL", "(ANY(USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL))");
+            "ANY_USE_MODEL",
+            "((ANY(USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)) && "
+                + "!(ANY(DENY_USE_MODEL, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_MODEL_VERSION",
-            "(ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL))");
-    expression =
-        expression.replaceAll("ANY_CREATE_MODEL", "(ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA))");
-    expression =
-        expression.replaceAll(
-            "ANY_CREATE_TOPIC", "(ANY(CREATE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))");
+            "((ANY(CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)) "
+                + "&& !(ANY(DENY_CREATE_MODEL_VERSION, METALAKE, CATALOG, SCHEMA, MODEL)))");
     expression =
         expression.replaceAll(
-            "ANY_PRODUCE_TOPIC", "(ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))");
+            "ANY_CREATE_MODEL",
+            "((ANY(CREATE_MODEL, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_MODEL, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
-            "ANY_CONSUME_TOPIC", "(ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))");
+            "ANY_CREATE_TOPIC",
+            "((ANY(CREATE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC)) "
+                + "&& !(ANY(DENY_CREATE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC)))");
     expression =
         expression.replaceAll(
-            "ANY_READ_FILESET", "(ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");
+            "ANY_PRODUCE_TOPIC",
+            "((ANY(PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))"
+                + "&& !(ANY(DENY_PRODUCE_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC)))");
     expression =
         expression.replaceAll(
-            "ANY_WRITE_FILESET", "(ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))");
+            "ANY_CONSUME_TOPIC",
+            "((ANY(CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC))"
+                + "&& !(ANY(DENY_CONSUME_TOPIC, METALAKE, CATALOG, SCHEMA, TOPIC)))");
+    expression =
+        expression.replaceAll(
+            "ANY_READ_FILESET",
+            "((ANY(READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
+                + "&& !(ANY(DENY_READ_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
+    expression =
+        expression.replaceAll(
+            "ANY_WRITE_FILESET",
+            "((ANY(WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET))"
+                + "&& !(ANY(DENY_WRITE_FILESET, METALAKE, CATALOG, SCHEMA, FILESET)))");
     expression =
         expression.replaceAll(
             CAN_SET_OWNER,
