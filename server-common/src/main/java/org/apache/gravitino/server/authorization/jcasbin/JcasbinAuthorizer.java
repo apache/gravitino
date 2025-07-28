@@ -242,6 +242,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleRolePrivilegeChange(Long roleId) {
     loadedRoles.remove(roleId);
     allowEnforcer.deleteRole(String.valueOf(roleId));
+    denyEnforcer.deleteRole(String.valueOf(roleId));
   }
 
   @Override
