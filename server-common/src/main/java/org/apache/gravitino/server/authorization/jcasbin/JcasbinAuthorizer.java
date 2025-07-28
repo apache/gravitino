@@ -90,11 +90,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Preconditions.checkNotNull(modelStream, "Jcasbin model file can not found.");
       String modelData = IOUtils.toString(modelStream, StandardCharsets.UTF_8);
       model.loadModelFromText(modelData);
-      allowEnforcer = new SyncedEnforcer(model, new GravitinoAdapter());
-      Config config = GravitinoEnv.getInstance().config();
-      if (config != null) {
-        serviceAdmins.addAll(config.get(Configs.SERVICE_ADMINS));
-      }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
