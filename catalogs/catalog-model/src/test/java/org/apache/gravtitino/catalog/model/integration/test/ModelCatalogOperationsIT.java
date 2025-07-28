@@ -331,6 +331,45 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
+  public void testLinkAndListModelVersionInfos() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri1", new String[] {"alias1"}, "comment1", null);
+
+    ModelVersion[] modelVersions =
+        gravitinoCatalog.asModelCatalog().listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(1, modelVersions.length);
+    Assertions.assertEquals(0, modelVersions[0].version());
+    Assertions.assertEquals("uri1", modelVersions[0].uri());
+    Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersions[0].aliases());
+    Assertions.assertEquals("comment1", modelVersions[0].comment());
+    Assertions.assertEquals(Collections.emptyMap(), modelVersions[0].properties());
+    Assertions.assertTrue(
+        gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, "alias1"));
+
+    // Test list model versions info of non-existent model
+    NameIdentifier nonExistentModelIdent = NameIdentifier.of(schemaName, "non_existent_model");
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> gravitinoCatalog.asModelCatalog().listModelVersionInfos(nonExistentModelIdent));
+
+    // Test list model versions info of non-existent schema
+    NameIdentifier nonExistentSchemaIdent = NameIdentifier.of("non_existent_schema", modelName);
+    Assertions.assertThrows(
+        NoSuchModelException.class,
+        () -> gravitinoCatalog.asModelCatalog().listModelVersionInfos(nonExistentSchemaIdent));
+
+    // Test delete and list model versions info
+    Assertions.assertTrue(gravitinoCatalog.asModelCatalog().deleteModelVersion(modelIdent, 0));
+    ModelVersion[] modelVersionsAfterDelete =
+        gravitinoCatalog.asModelCatalog().listModelVersionInfos(modelIdent);
+    Assertions.assertEquals(0, modelVersionsAfterDelete.length);
+  }
+
+  @Test
   void testLinkAndUpdateModelVersionComment() {
     String modelName = RandomNameUtils.genRandomName("model1");
     Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
@@ -423,6 +462,15 @@ public class ModelCatalogOperationsIT extends BaseIT {
             gravitinoCatalog
                 .asModelCatalog()
                 .alterModel(NameIdentifier.of(schemaName, null), updateName));
+
+    // reload model and check name
+    Model reloadedModel =
+        gravitinoCatalog
+            .asModelCatalog()
+            .getModel(NameIdentifier.of(modelIdent.namespace(), newName));
+    Assertions.assertEquals(newName, reloadedModel.name());
+    Assertions.assertEquals(createdModel.properties(), reloadedModel.properties());
+    Assertions.assertEquals(createdModel.comment(), reloadedModel.comment());
   }
 
   @Test
@@ -444,6 +492,13 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertNotEquals(createdModel.properties(), alteredModel.properties());
     Assertions.assertEquals(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+
+    // reload model and check properties
+    Model reloadedModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
+    Assertions.assertEquals(modelName, reloadedModel.name());
+    Assertions.assertNotEquals(createdModel.properties(), reloadedModel.properties());
+    Assertions.assertEquals(newProperties, reloadedModel.properties());
+    Assertions.assertEquals(createdModel.comment(), reloadedModel.comment());
   }
 
   @Test
@@ -462,6 +517,12 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+
+    // reload model and check properties
+    Model reloadedModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
+    Assertions.assertEquals(modelName, reloadedModel.name());
+    Assertions.assertEquals(newProperties, reloadedModel.properties());
+    Assertions.assertEquals(createdModel.comment(), reloadedModel.comment());
   }
 
   @Test
@@ -480,6 +541,12 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertEquals(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
+
+    // reload model and check properties
+    Model reloadedModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
+    Assertions.assertEquals(modelName, reloadedModel.name());
+    Assertions.assertEquals(newProperties, reloadedModel.properties());
+    Assertions.assertEquals(createdModel.comment(), reloadedModel.comment());
   }
 
   @Test
@@ -498,6 +565,12 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(createdModel.name(), alteredModel.name());
     Assertions.assertEquals(createdModel.properties(), alteredModel.properties());
     Assertions.assertEquals(newComment, alteredModel.comment());
+
+    // reload model and check comment
+    Model reloadedModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
+    Assertions.assertEquals(createdModel.name(), reloadedModel.name());
+    Assertions.assertEquals(createdModel.properties(), reloadedModel.properties());
+    Assertions.assertEquals(newComment, reloadedModel.comment());
   }
 
   @Test
@@ -535,6 +608,16 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
     Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+
+    // reload model version and check properties
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
   }
 
   @Test
@@ -573,6 +656,16 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
     Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+
+    // reload model version and check properties
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, aliases[0]);
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
   }
 
   @Test
@@ -609,6 +702,16 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
+
+    // reload model version and check uri
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(newUri, reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
   }
 
   @Test
@@ -648,6 +751,16 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
     Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
+
+    // reload model version and check uri
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, aliases[0]);
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(newUri, reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
   }
 
   @Test
@@ -681,6 +794,16 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
     Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+
+    // reload model version and check properties
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
   }
 
   @Test
@@ -715,6 +838,114 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
     Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+
+    // reload model version and check properties
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, aliases[0]);
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
+  }
+
+  @Test
+  void testLinkAndUpdateModelVersionAliases() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1", "alias2"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", aliases, "comment", properties);
+
+    ModelVersion modelVersion = gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals("uri", modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals("comment", modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange change =
+        ModelVersionChange.updateAliases(
+            new String[] {"alias1", "alias3"}, new String[] {"alias1", "alias2"});
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, 0, change);
+    String[] newAliases = {"alias1", "alias3"};
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
+    Assertions.assertArrayEquals(newAliases, updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
+
+    // reload model version and check aliases
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, 0);
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(newAliases, reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
+  }
+
+  @Test
+  void testLinkAndUpdateModelVersionAliasesByAlias() {
+    String modelName = RandomNameUtils.genRandomName("model1");
+    String[] aliases = {"alias1", "alias2"};
+    Map<String, String> properties = ImmutableMap.of("key1", "val1", "key2", "val2");
+    NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);
+
+    gravitinoCatalog.asModelCatalog().registerModel(modelIdent, null, null);
+
+    gravitinoCatalog
+        .asModelCatalog()
+        .linkModelVersion(modelIdent, "uri", aliases, "comment", properties);
+
+    ModelVersion modelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias1");
+
+    Assertions.assertEquals(0, modelVersion.version());
+    Assertions.assertEquals("uri", modelVersion.uri());
+    Assertions.assertArrayEquals(aliases, modelVersion.aliases());
+    Assertions.assertEquals("comment", modelVersion.comment());
+    Assertions.assertEquals(properties, modelVersion.properties());
+
+    ModelVersionChange change =
+        ModelVersionChange.updateAliases(
+            new String[] {"alias1", "alias3"}, new String[] {"alias1", "alias2"});
+    ModelVersion updatedModelVersion =
+        gravitinoCatalog.asModelCatalog().alterModelVersion(modelIdent, "alias1", change);
+    String[] newAliases = {"alias1", "alias3"};
+
+    Assertions.assertEquals(modelVersion.version(), updatedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
+    Assertions.assertArrayEquals(newAliases, updatedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), updatedModelVersion.properties());
+
+    // reload model version and check aliases
+    Assertions.assertThrows(
+        NoSuchModelVersionException.class,
+        () -> gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias2"));
+    Assertions.assertDoesNotThrow(
+        () -> gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias1"));
+    Assertions.assertDoesNotThrow(
+        () -> gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias3"));
+    ModelVersion reloadedModelVersion =
+        gravitinoCatalog.asModelCatalog().getModelVersion(modelIdent, "alias3");
+
+    Assertions.assertEquals(modelVersion.version(), reloadedModelVersion.version());
+    Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
+    Assertions.assertArrayEquals(newAliases, reloadedModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), reloadedModelVersion.properties());
   }
 
   private void createMetalake() {

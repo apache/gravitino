@@ -36,14 +36,19 @@ public interface SupportsRelationOperations {
     /** Role and user relationship */
     ROLE_USER_REL,
     /** Role and group relationship */
-    ROLE_GROUP_REL
+    ROLE_GROUP_REL,
+    /** Job template and job relationship */
+    JOB_TEMPLATE_JOB_REL,
+    /** Policy and metadata object relationship */
+    POLICY_METADATA_OBJECT_REL,
   }
 
   /**
    * List the entities according to a given entity in a specific relation.
    *
+   * @param <E> The type of entities returned.
    * @param relType The type of relation.
-   * @param nameIdentifier The given entity identifier
+   * @param nameIdentifier The given entity identifier.
    * @param identType The given entity type.
    * @return The list of entities
    * @throws IOException When occurs storage issues, it will throw IOException.
@@ -56,6 +61,7 @@ public interface SupportsRelationOperations {
   /**
    * List the entities according to a given entity in a specific relation.
    *
+   * @param <E> the type of entities returned.
    * @param relType The type of relation.
    * @param nameIdentifier The given entity identifier
    * @param identType The given entity type.

@@ -151,6 +151,7 @@ public class IsolatedClassLoader implements Closeable {
     try {
       if (classLoader != null) {
         classLoader.close();
+        classLoader = null;
       }
     } catch (Exception e) {
       LOG.warn("Failed to close classloader", e);
@@ -172,7 +173,7 @@ public class IsolatedClassLoader implements Closeable {
       try {
         return clazz == null ? doLoadClass(name, resolve) : clazz;
       } catch (Exception e) {
-        throw new ClassNotFoundException("Class no found " + name, e);
+        throw new ClassNotFoundException("Class not found " + name, e);
       }
     }
 
@@ -206,7 +207,7 @@ public class IsolatedClassLoader implements Closeable {
     }
   }
 
-  private synchronized URLClassLoader classLoader() throws Exception {
+  private synchronized URLClassLoader classLoader() {
     if (classLoader != null) {
       return classLoader;
     }
@@ -247,6 +248,8 @@ public class IsolatedClassLoader implements Closeable {
             || name.startsWith("org.apache.gravitino.catalog.postgresql.")
             || name.startsWith("org.apache.gravitino.catalog.doris.")
             || name.startsWith("org.apache.gravitino.catalog.hadoop.")
+            || name.startsWith("org.apache.gravitino.catalog.fileset.")
+            || name.startsWith("org.apache.gravitino.catalog.model.")
             || name.startsWith("org.apache.gravitino.catalog.kafka."));
   }
 

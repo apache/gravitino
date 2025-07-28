@@ -85,6 +85,10 @@ class NoSuchModelVersionException(NotFoundException):
     """An exception thrown when a model version is not found."""
 
 
+class NoSuchModelVersionURINameException(NotFoundException):
+    """An exception thrown when a URI name of a model version is not found."""
+
+
 class AlreadyExistsException(GravitinoRuntimeException):
     """Base exception thrown when an entity or resource already exists."""
 
@@ -171,3 +175,15 @@ class NoSuchTagException(NotFoundException):
 
 class TagAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a tag with specified name already associated to a metadata object."""
+
+
+class JobTemplateAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a job template with specified name already exists."""
+
+
+class NoSuchJobTemplateException(NotFoundException):
+    """An exception thrown when a job template with specified name is not found."""
+
+
+class NoSuchJobException(NotFoundException):
+    """An exception thrown when a job with specified name is not found."""

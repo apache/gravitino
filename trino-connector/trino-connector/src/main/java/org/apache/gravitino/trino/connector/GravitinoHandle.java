@@ -29,6 +29,7 @@ import org.apache.gravitino.trino.connector.util.json.JsonCodec;
 
 /** this interface for GravitinoXXXHande to communicate with Trino */
 interface GravitinoHandle<T> {
+  /** The key used for handle string in JSON serialization */
   String HANDLE_STRING = "handleString";
 
   /**
@@ -45,16 +46,34 @@ interface GravitinoHandle<T> {
    */
   public T getInternalHandle();
 
+  /**
+   * Unwrap a handle
+   *
+   * @param handle the handle
+   * @return the unwrapped handle
+   */
   public static <T> T unWrap(T handle) {
     return ((GravitinoHandle<T>) handle).getInternalHandle();
   }
 
+  /**
+   * Unwrap a list of handles
+   *
+   * @param handles the list of handles
+   * @return the unwrapped list of handles
+   */
   public static <T> List<T> unWrap(List<T> handles) {
     return handles.stream()
         .map(handle -> (((GravitinoHandle<T>) handle).getInternalHandle()))
         .collect(Collectors.toList());
   }
 
+  /**
+   * Unwrap a map of handles
+   *
+   * @param handleMap the map of handles
+   * @return the unwrapped map of handles
+   */
   public static <T> Map<String, T> unWrap(Map<String, T> handleMap) {
     return handleMap.entrySet().stream()
         .collect(
@@ -62,21 +81,49 @@ interface GravitinoHandle<T> {
                 Map.Entry::getKey, e -> ((GravitinoHandle<T>) e.getValue()).getInternalHandle()));
   }
 
+  /**
+   * A wrapper class for handling serialization and deserialization of Gravitino handles.
+   *
+   * @param <T> The type of handle being wrapped
+   */
   class HandleWrapper<T> {
+    /** The wrapped handle instance */
     private final T handle;
+
+    /** Cached JSON string representation of the handle */
     private String valueString;
+
+    /** The class type of the handle */
     private final Class<T> clazz;
 
+    /**
+     * Constructs a new HandleWrapper with a null handle.
+     *
+     * @param clazz The class type of the handle
+     */
     public HandleWrapper(Class<T> clazz) {
       this.handle = null;
       this.clazz = clazz;
     }
 
+    /**
+     * Constructs a new HandleWrapper with the specified handle.
+     *
+     * @param handle The handle to wrap
+     * @throws NullPointerException if handle is null
+     */
     public HandleWrapper(T handle) {
       this.handle = Objects.requireNonNull(handle, "handle is not null");
       clazz = (Class<T>) handle.getClass();
     }
 
+    /**
+     * Creates a new HandleWrapper by deserializing from a JSON string.
+     *
+     * @param valueString The JSON string to deserialize
+     * @return A new HandleWrapper instance
+     * @throws TrinoException if deserialization fails
+     */
     public HandleWrapper<T> fromJson(String valueString) {
       try {
         T newHandle =
@@ -87,6 +134,12 @@ interface GravitinoHandle<T> {
       }
     }
 
+    /**
+     * Serializes the wrapped handle to a JSON string.
+     *
+     * @return The JSON string representation of the handle
+     * @throws TrinoException if serialization fails
+     */
     public String toJson() {
       if (valueString == null) {
         try {
@@ -101,6 +154,11 @@ interface GravitinoHandle<T> {
       return valueString;
     }
 
+    /**
+     * Gets the wrapped handle instance.
+     *
+     * @return The wrapped handle
+     */
     public T getHandle() {
       return handle;
     }

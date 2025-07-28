@@ -1,0 +1,48 @@
+"CREATE TABLE gt_mysql.gt_mysql_test_all_type.demo (
+   id bigint NOT NULL,
+   tiny_col tinyint,
+   tiny_unsigned_col smallint,
+   small_col smallint,
+   small_unsigned_col integer,
+   medium_col integer,
+   medium_unsigned_col integer,
+   int_col integer,
+   int_unsigned_col bigint,
+   bigint_col bigint,
+   bigint_unsigned_col decimal(20, 0),
+   float_col real,
+   float_unsigned_col real,
+   double_col double,
+   double_unsigned_col double,
+   decimal_col decimal(12, 6),
+   decimal_unsigned_col decimal(12, 6),
+   char_col char(10),
+   varchar_col varchar(255),
+   tinytext_col varchar,
+   text_col varchar,
+   mediumtext_col varchar,
+   longtext_col varchar,
+   date_col date,
+   time_col time(0),
+   datetime_col timestamp(0),
+   timestamp_col timestamp(0) with time zone,
+   year_col date,
+   json_col json,
+   enum_col varchar,
+   set_col varchar,
+   binary_col varbinary,
+   varbinary_col varbinary,
+   tinyblob_col varbinary,
+   blob_col varbinary,
+   mediumblob_col varbinary,
+   longblob_col varbinary,
+   point_col varbinary,
+   geometry_col varbinary
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['id']
+)"
+
+"1","100","100","500","500","10000","10000","200000","200000","200000","200000","123.45","123.45","9876.5432","9876.5432","123456.789000","123456.789000","abc       ","abc","abc","abc","abc","abc","2025-07-04","14:30:00","2025-07-04 14:30:00","2025-07-04 14:30:00 UTC","2025-01-01","{""x"":1,""y"":2}","green","read,write","a1 b2 c3 d4 00 00 00 00 00 00 00 00 00 00 00 00","a1 b2","12 34 56","ab cd ef","12 34 56 78 90","a1 b2 c3 d4 e5","00 00 00 00 01 01 00 00 00 00 00 00 00 00 00 24 40 00 00 00 00 00 00 34 40","00 00 00 00 01 02 00 00 00 02 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 24 40 00 00 00 00 00 00 24 40"

@@ -26,10 +26,10 @@ import os
 import sys
 import re
 
-sys.path.insert(0, os.path.abspath('../..'))
-
 from gravitino.constants.version import SETUP_FILE
 from gravitino.exceptions.base import GravitinoRuntimeException
+
+sys.path.insert(0, os.path.abspath("../.."))
 
 VERSION_PATTERN = r"version\s*=\s*['\"]([^'\"]+)['\"]"
 AUTHOR_PATTERN = r"author\s*=\s*['\"]([^'\"]+)['\"]"
@@ -43,15 +43,15 @@ with open(SETUP_FILE, "r", encoding="utf-8") as f:
         project_version = version_group.group(1)
     else:
         raise GravitinoRuntimeException("Can't find valid author info in setup.py")
-    
+
     author_group = re.search(AUTHOR_PATTERN, setup_content)
     if author_group is not None:
         project_author = author_group.group(1)
     else:
         raise GravitinoRuntimeException("Can't find valid author info in setup.py")
 
-project = 'Apache Gravitino Python Client'
-copyright = '2024, Apache Software Foundation'
+project = "Apache Gravitino Python Client"
+copyright = "2024, Apache Software Foundation"
 author = project_author
 release = project_version
 
@@ -60,15 +60,15 @@ release = project_version
 
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
 ]
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'furo'
-html_static_path = ['_static']
+html_theme = "furo"
+html_static_path = ["_static"]

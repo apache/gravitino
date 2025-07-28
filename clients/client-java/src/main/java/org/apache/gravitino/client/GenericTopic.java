@@ -53,7 +53,7 @@ class GenericTopic implements Topic, SupportsTags, SupportsRoles {
 
   @Override
   public Audit auditInfo() {
-    return null;
+    return topicDTO.auditInfo();
   }
 
   @Override

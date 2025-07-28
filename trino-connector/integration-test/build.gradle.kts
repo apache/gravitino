@@ -109,9 +109,9 @@ tasks.test {
         }
 
         if (invalidGravitinoJars!!.isNotEmpty()) {
-          val message = "Found mismatched versions of gravitino jars in trino-connector/build/libs:\n" +
+          val message = "Mismatched Gravitino JAR versions found in trino-connector/build/libs:\n" +
             "${invalidGravitinoJars.joinToString(", ") { it.name }}\n" +
-            "The current version of the project is $version. Please clean the project and rebuild it."
+            "The expected project version is $version. Please clean and rebuild the project."
           throw GradleException(message)
         }
       }

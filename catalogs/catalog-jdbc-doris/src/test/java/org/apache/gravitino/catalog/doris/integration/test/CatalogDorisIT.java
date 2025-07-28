@@ -61,6 +61,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -876,12 +877,17 @@ public class CatalogDorisIT extends BaseIT {
 
   @Test
   void testTableWithTimeStampColumn() {
-    // create a table
     String tableName = GravitinoITUtils.genRandomName("test_table_with_timestamp_column");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     Column[] columns = createColumns();
     columns =
-        ArrayUtils.add(columns, Column.of("timestamp_col", Types.TimestampType.withoutTimeZone()));
+        ArrayUtils.addAll(
+            columns,
+            Column.of("datetime_col", Types.TimestampType.withoutTimeZone()),
+            Column.of("datetime_col_0", Types.TimestampType.withoutTimeZone(0)),
+            Column.of("datetime_col_1", Types.TimestampType.withoutTimeZone(1)),
+            Column.of("datetime_col_3", Types.TimestampType.withoutTimeZone(3)),
+            Column.of("datetime_col_6", Types.TimestampType.withoutTimeZone(6)));
     Distribution distribution = createDistribution();
     Index[] indexes =
         new Index[] {
@@ -899,15 +905,35 @@ public class CatalogDorisIT extends BaseIT {
         null,
         indexes);
 
-    // load table
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
-    Column timestampColumn =
-        Arrays.stream(loadTable.columns())
-            .filter(c -> "timestamp_col".equals(c.name()))
-            .findFirst()
-            .get();
 
-    Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), timestampColumn.dataType());
+    // Verify datetime type precisions
+    Column[] datetimeColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("datetime_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(5, datetimeColumns.length);
+
+    for (Column column : datetimeColumns) {
+      switch (column.name()) {
+        case "datetime_col":
+        case "datetime_col_0":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_col_1":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(1), column.dataType());
+          break;
+        case "datetime_col_3":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
+          break;
+        case "datetime_col_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected datetime column: " + column.name());
+      }
+    }
   }
 
   @Test
@@ -1003,5 +1029,36 @@ public class CatalogDorisIT extends BaseIT {
 
       tableCatalog.dropTable(tableIdentifier);
     }
+  }
+
+  @Test
+  void testAllDistributionWithAuto() {
+    Distribution distribution =
+        Distributions.auto(Strategy.HASH, NamedReference.field(DORIS_COL_NAME1));
+
+    String tableName = GravitinoITUtils.genRandomName("test_distribution_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    Index[] indexes = Indexes.EMPTY_INDEXES;
+    Map<String, String> properties = createTableProperties();
+    Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        partitioning,
+        distribution,
+        null,
+        indexes);
+    // load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    Assertions.assertEquals(distribution.strategy(), loadTable.distribution().strategy());
+    Assertions.assertEquals(distribution.number(), loadTable.distribution().number());
+    Assertions.assertArrayEquals(
+        distribution.expressions(), loadTable.distribution().expressions());
+    tableCatalog.dropTable(tableIdentifier);
   }
 }

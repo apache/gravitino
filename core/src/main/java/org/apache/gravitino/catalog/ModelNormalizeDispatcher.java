@@ -31,6 +31,7 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelChange;
@@ -88,6 +89,11 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   }
 
   @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    return dispatcher.listModelVersionInfos(normalizeCaseSensitive(ident));
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     return dispatcher.getModelVersion(normalizeCaseSensitive(ident), version);
@@ -112,12 +118,24 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    dispatcher.linkModelVersion(normalizeCaseSensitive(ident), uri, aliases, comment, properties);
+    dispatcher.linkModelVersion(normalizeCaseSensitive(ident), uris, aliases, comment, properties);
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    return dispatcher.getModelVersionUri(normalizeCaseSensitive(ident), version, uriName);
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    return dispatcher.getModelVersionUri(normalizeCaseSensitive(ident), alias, uriName);
   }
 
   @Override

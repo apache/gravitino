@@ -440,6 +440,51 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("comment", updated_model_version.comment())
         self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
 
+    def test_link_update_model_version_aliases(self):
+        model_name = f"model_it_model{str(randint(0, 1000))}"
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        aliases = ["alias1", "alias2"]
+        comment = "comment"
+        properties = {"k1": "v1", "k2": "v2"}
+        self._catalog.as_model_catalog().register_model(
+            model_ident, comment, properties
+        )
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri",
+            aliases=aliases,
+            comment="comment",
+            properties={"k1": "v1", "k2": "v2"},
+        )
+
+        original_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+
+        self.assertEqual(0, original_model_version.version())
+        self.assertEqual("uri", original_model_version.uri())
+        self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
+        self.assertEqual("comment", original_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+
+        # todo
+        changes = [
+            ModelVersionChange.update_aliases(
+                ["alias2", "alias3"],
+                ["alias1", "alias2"],
+            )
+        ]
+        self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
+
+        updated_model_version = self._catalog.as_model_catalog().get_model_version(
+            model_ident, 0
+        )
+        self.assertEqual(0, updated_model_version.version())
+        self.assertEqual("uri", updated_model_version.uri())
+        self.assertEqual(["alias2", "alias3"], updated_model_version.aliases())
+        self.assertEqual("comment", updated_model_version.comment())
+        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+
     def test_link_get_model_version(self):
         model_name = "model_it_model" + str(randint(0, 1000))
         model_ident = NameIdentifier.of(self._schema_name, model_name)
@@ -578,6 +623,42 @@ class TestModelCatalog(IntegrationTestEnv):
         # Test list model versions for non-existent model
         with self.assertRaises(NoSuchModelException):
             self._catalog.as_model_catalog().list_model_versions(
+                NameIdentifier.of(self._schema_name, "non_existent_model")
+            )
+
+    def test_link_list_model_version_infos(self):
+        model_name = "model_it_model" + str(randint(0, 1000))
+        model_ident = NameIdentifier.of(self._schema_name, model_name)
+        self._catalog.as_model_catalog().register_model(model_ident, "comment", {})
+
+        self._catalog.as_model_catalog().link_model_version(
+            model_ident,
+            uri="uri1",
+            aliases=["alias1", "alias2"],
+            comment="comment",
+            properties={"k1": "v1", "k2": "v2"},
+        )
+
+        model_versions = self._catalog.as_model_catalog().list_model_version_infos(
+            model_ident
+        )
+        self.assertEqual(1, len(model_versions))
+        self.assertEqual(model_versions[0].version(), 0)
+        self.assertEqual(model_versions[0].uri(), "uri1")
+        self.assertEqual(model_versions[0].comment(), "comment")
+        self.assertEqual(model_versions[0].aliases(), ["alias1", "alias2"])
+        self.assertEqual(model_versions[0].properties(), {"k1": "v1", "k2": "v2"})
+
+        self.assertTrue(
+            self._catalog.as_model_catalog().delete_model_version(model_ident, 0)
+        )
+        model_versions = self._catalog.as_model_catalog().list_model_version_infos(
+            model_ident
+        )
+        self.assertEqual(0, len(model_versions))
+
+        with self.assertRaises(NoSuchModelException):
+            self._catalog.as_model_catalog().list_model_version_infos(
                 NameIdentifier.of(self._schema_name, "non_existent_model")
             )
 

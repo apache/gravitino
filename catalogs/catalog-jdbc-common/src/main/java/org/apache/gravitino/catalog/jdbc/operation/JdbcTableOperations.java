@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
@@ -66,6 +68,8 @@ public abstract class JdbcTableOperations implements TableOperation {
 
   public static final String COMMENT = "COMMENT";
   public static final String SPACE = " ";
+  public static final String TIME_FORMAT_WITH_DOT = "HH:MM:SS.";
+  public static final String DATETIME_FORMAT_WITH_DOT = "YYYY-MM-DD HH:MM:SS.";
 
   public static final String MODIFY_COLUMN = "MODIFY COLUMN ";
   public static final String AFTER = "AFTER ";
@@ -156,7 +160,10 @@ public abstract class JdbcTableOperations implements TableOperation {
    * not found, it will throw a NoSuchTableException.
    *
    * @param tablesResult The result set of the table
+   * @param databaseName The name of the database.
+   * @param tableName The name of the table.
    * @return The builder of the table to be returned
+   * @throws SQLException if a database access error occurs.
    */
   protected JdbcTable.Builder getTableBuilder(
       ResultSet tablesResult, String databaseName, String tableName) throws SQLException {
@@ -246,7 +253,7 @@ public abstract class JdbcTableOperations implements TableOperation {
    * @param connection jdbc connection
    * @param tableName table name
    * @return Returns all table properties values.
-   * @throws SQLException
+   * @throws SQLException if a database access error occurs
    */
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
@@ -365,9 +372,10 @@ public abstract class JdbcTableOperations implements TableOperation {
    * from the JDBC driver, like the table comment in MySQL of the 5.7 version.
    *
    * @param connection jdbc connection
+   * @param databaseName The name of the database
    * @param tableName table name
    * @param jdbcTableBuilder The builder of the table to be returned
-   * @throws SQLException
+   * @throws SQLException if a database access error occurs
    */
   protected void correctJdbcTableFields(
       Connection connection,
@@ -468,6 +476,10 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param oldTableName The original table name
+   * @param newTableName The new table name
+   * @return The SQL statement to rename a table
    */
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
     return String.format("RENAME TABLE `%s` TO `%s`", oldTableName, newTableName);
@@ -476,6 +488,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param tableName The name of the table to be dropped
+   * @return The SQL statement to drop a table
    */
   protected String generateDropTableSql(String tableName) {
     return String.format("DROP TABLE `%s`", tableName);
@@ -489,6 +504,11 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param databaseName The name of the database
+   * @param tableName The name of the table
+   * @param lazyLoadCreateTable The pre-loaded table object, if available
+   * @return The resulting JdbcTable object
    */
   protected JdbcTable getOrCreateTable(
       String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
@@ -549,6 +569,9 @@ public abstract class JdbcTableOperations implements TableOperation {
   /**
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
+   *
+   * @param fieldNames The 2D array of index field names
+   * @return A comma-separated string of index field names
    */
   protected static String getIndexFieldStr(String[][] fieldNames) {
     return Arrays.stream(fieldNames)
@@ -588,10 +611,15 @@ public abstract class JdbcTableOperations implements TableOperation {
   }
 
   protected JdbcColumn.Builder getBasicJdbcColumnInfo(ResultSet column) throws SQLException {
-    JdbcTypeConverter.JdbcTypeBean typeBean =
-        new JdbcTypeConverter.JdbcTypeBean(column.getString("TYPE_NAME"));
-    typeBean.setColumnSize(column.getInt("COLUMN_SIZE"));
-    typeBean.setScale(column.getInt("DECIMAL_DIGITS"));
+    String typeName = column.getString("TYPE_NAME");
+    int columnSize = column.getInt("COLUMN_SIZE");
+    int scale = column.getInt("DECIMAL_DIGITS");
+    JdbcTypeConverter.JdbcTypeBean typeBean = new JdbcTypeConverter.JdbcTypeBean(typeName);
+    typeBean.setColumnSize(columnSize);
+    typeBean.setScale(scale);
+    Integer datetimePrecision = calculateDatetimePrecision(typeName, columnSize, scale);
+    typeBean.setDatetimePrecision(datetimePrecision);
+
     String comment = column.getString("REMARKS");
     boolean nullable = column.getBoolean("NULLABLE");
 
@@ -606,5 +634,124 @@ public abstract class JdbcTableOperations implements TableOperation {
         .withComment(StringUtils.isEmpty(comment) ? null : comment)
         .withNullable(nullable)
         .withDefaultValue(defaultValue);
+  }
+
+  /**
+   * Calculate the precision for time/datetime/timestamp types.
+   *
+   * <p>This method provides a default behavior returning null for catalogs that do not implement
+   * this method. Developers should override this method when their database supports precision
+   * specification for datetime types.
+   *
+   * <p><strong>When to return null:</strong>
+   *
+   * <ul>
+   *   <li>When the database does not support precision for datetime types
+   *   <li>When the driver version is incompatible (e.g., MySQL driver &lt; 8.0.16)
+   *   <li>When the type is not a datetime type (TIME, TIMESTAMP, DATETIME)
+   *   <li>When the precision cannot be accurately calculated from the provided parameters
+   * </ul>
+   *
+   * <p><strong>When to return non-null:</strong>
+   *
+   * <ul>
+   *   <li>When the database supports precision for datetime types and the driver version is
+   *       compatible
+   *   <li>When the precision can be accurately calculated from columnSize (e.g., columnSize -
+   *       format_length)
+   *   <li>For TIME types: return columnSize - 8 (for 'HH:MM:SS' format)
+   *   <li>For TIMESTAMP/DATETIME types: return columnSize - 19 (for 'YYYY-MM-DD HH:MM:SS' format)
+   * </ul>
+   *
+   * <p><strong>Examples:</strong>
+   *
+   * <ul>
+   *   <li>TIME(3) with columnSize=11: return 3 (11-8)
+   *   <li>TIMESTAMP(6) with columnSize=25: return 6 (25-19)
+   *   <li>DATETIME(0) with columnSize=19: return 0 (19-19)
+   * </ul>
+   *
+   * @param typeName the type name from database (e.g., "TIME", "TIMESTAMP", "DATETIME")
+   * @param columnSize the column size from database (total length including format and precision)
+   * @param scale the scale from database (usually 0 for datetime types)
+   * @return the precision of the time/datetime/timestamp type, or null if not supported/calculable
+   */
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    return null;
+  }
+
+  /**
+   * Get MySQL driver version from DatabaseMetaData
+   *
+   * @return the driver version string, or null if not available
+   */
+  protected String getMySQLDriverVersion() {
+    try {
+      if (dataSource != null) {
+        try (Connection connection = dataSource.getConnection()) {
+          return connection.getMetaData().getDriverVersion();
+        }
+      }
+    } catch (SQLException e) {
+      LOG.debug("Failed to get driver version", e);
+    }
+    return null;
+  }
+
+  /**
+   * Check if driver version supports accurate columnSize for precision calculation. For MySQL
+   * driver: Only versions &gt;= 8.0.16 return accurate columnSize for datetime precision. For other
+   * drivers (like OceanBase): Assume they support accurate precision calculation
+   *
+   * <p>MySQL Connector/J 8.0.16 fixed the wrong handling of temporal type precision in the
+   * DatabaseMetaDataUsingInfoSchema interface, where getColumns() method returned wrong results for
+   * the COLUMN_SIZE column. Prior versions had errors in temporal type precision handling.
+   *
+   * @param driverVersion the driver version string to check
+   * @return true if the driver version supports accurate precision calculation, false otherwise
+   * @see <a href="https://dev.mysql.com/doc/relnotes/connector-j/en/news-8-0-16.html">MySQL
+   *     Connector/J 8.0.16 Release Notes</a>
+   */
+  public boolean isMySQLDriverVersionSupported(String driverVersion) {
+    if (StringUtils.isBlank(driverVersion)) {
+      return false;
+    }
+
+    // For non-MySQL drivers, assume they support accurate precision calculation
+    if (!driverVersion.startsWith("mysql-connector-java-")) {
+      LOG.debug(
+          "Non-MySQL driver detected: {}. Assuming it supports accurate precision calculation.",
+          driverVersion);
+      return true;
+    }
+
+    // Extract version from driver string like "mysql-connector-java-8.0.19 (Revision: ...)"
+    String versionPattern = "mysql-connector-java-(\\d+\\.\\d+\\.\\d+)";
+    Pattern pattern = Pattern.compile(versionPattern);
+    Matcher matcher = pattern.matcher(driverVersion);
+
+    if (matcher.find()) {
+      String versionStr = matcher.group(1);
+      try {
+        String[] parts = versionStr.split("\\.");
+        int major = Integer.parseInt(parts[0]);
+        int minor = Integer.parseInt(parts[1]);
+        int patch = Integer.parseInt(parts[2]);
+
+        // Check if version >= 8.0.16
+        if (major > 8) {
+          return true;
+        } else if (major == 8 && minor > 0) {
+          return true;
+        } else {
+          return major == 8 && minor == 0 && patch >= 16;
+        }
+      } catch (NumberFormatException e) {
+        LOG.debug("Failed to parse driver version: {}", versionStr, e);
+        return false;
+      }
+    }
+
+    return false;
   }
 }

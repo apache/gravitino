@@ -23,15 +23,19 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -62,6 +66,7 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -793,6 +798,18 @@ public class TestCatalogOperations
   }
 
   @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    if (!models.containsKey(ident)) {
+      throw new NoSuchModelException("Model %s does not exist", ident);
+    }
+
+    return modelVersions.entrySet().stream()
+        .filter(e -> e.getKey().getLeft().equals(ident))
+        .map(e -> e.getValue())
+        .toArray(ModelVersion[]::new);
+  }
+
+  @Override
   public ModelVersion getModelVersion(NameIdentifier ident, int version)
       throws NoSuchModelVersionException {
     if (!models.containsKey(ident)) {
@@ -831,7 +848,7 @@ public class TestCatalogOperations
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
@@ -839,6 +856,19 @@ public class TestCatalogOperations
     if (!models.containsKey(ident)) {
       throw new NoSuchModelException("Model %s does not exist", ident);
     }
+
+    if (uris == null || uris.isEmpty()) {
+      throw new IllegalArgumentException("Uri must be set for model version");
+    }
+    uris.forEach(
+        (name, uri) -> {
+          if (StringUtils.isBlank(name)) {
+            throw new IllegalArgumentException("URI name must not be blank");
+          }
+          if (StringUtils.isBlank(uri)) {
+            throw new IllegalArgumentException("URI must not be blank for name: " + name);
+          }
+        });
 
     String[] aliasArray = aliases != null ? aliases : new String[0];
     for (String alias : aliasArray) {
@@ -855,7 +885,7 @@ public class TestCatalogOperations
             .withVersion(version)
             .withAliases(aliases)
             .withComment(comment)
-            .withUri(uri)
+            .withUris(uris)
             .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
@@ -877,6 +907,22 @@ public class TestCatalogOperations
             .withAuditInfo(model.auditInfo())
             .build();
     models.put(ident, updatedModel);
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    Model model = getModel(ident);
+    ModelVersion modelVersion = getModelVersion(ident, alias);
+    return internalGetModelVersionUri(model, modelVersion, uriName);
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    Model model = getModel(ident);
+    ModelVersion modelVersion = getModelVersion(ident, version);
+    return internalGetModelVersionUri(model, modelVersion, uriName);
   }
 
   @Override
@@ -1028,6 +1074,44 @@ public class TestCatalogOperations
     return internalUpdateModelVersion(ident, version, changes);
   }
 
+  private String internalGetModelVersionUri(
+      Model model, ModelVersion modelVersion, String uriName) {
+    Map<String, String> uris = modelVersion.uris();
+    // If the uriName is not null, get from the uris directly
+    if (uriName != null) {
+      return getUriByName(uris, uriName);
+    }
+
+    // If there is only one uri of the model version, use it
+    if (uris.size() == 1) {
+      return uris.values().iterator().next();
+    }
+
+    // If the uri name is null, try to get the default uri name from the model version properties
+    Map<String, String> modelVersionProperties = modelVersion.properties();
+    if (modelVersionProperties.containsKey(ModelVersion.PROPERTY_DEFAULT_URI_NAME)) {
+      String defaultUriName = modelVersionProperties.get(ModelVersion.PROPERTY_DEFAULT_URI_NAME);
+      return getUriByName(uris, defaultUriName);
+    }
+
+    // If the default uri name is not set for the model version, try to get the default uri name
+    // from the model properties
+    Map<String, String> modelProperties = model.properties();
+    if (modelProperties.containsKey(ModelVersion.PROPERTY_DEFAULT_URI_NAME)) {
+      String defaultUriName = modelProperties.get(ModelVersion.PROPERTY_DEFAULT_URI_NAME);
+      return getUriByName(uris, defaultUriName);
+    }
+
+    throw new IllegalArgumentException("Either uri name of default uri name should be provided");
+  }
+
+  private String getUriByName(Map<String, String> uris, String uriName) {
+    if (!uris.containsKey(uriName)) {
+      throw new NoSuchModelVersionURINameException("URI name %s does not exist", uriName);
+    }
+    return uris.get(uriName);
+  }
+
   private ModelVersion internalUpdateModelVersion(
       NameIdentifier ident, int version, ModelVersionChange... changes)
       throws NoSuchModelException, NoSuchModelVersionException, IllegalArgumentException {
@@ -1064,6 +1148,18 @@ public class TestCatalogOperations
         ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) change;
         newProps.put(setProperty.property(), setProperty.value());
 
+      } else if (change instanceof ModelVersionChange.UpdateAliases) {
+        ModelVersionChange.UpdateAliases updateAliasesChange =
+            (ModelVersionChange.UpdateAliases) change;
+
+        Set<String> addTmpSet = updateAliasesChange.aliasesToAdd();
+        Set<String> deleteTmpSet = updateAliasesChange.aliasesToRemove();
+        Set<String> aliasToAdd = Sets.difference(addTmpSet, deleteTmpSet).immutableCopy();
+        Set<String> aliasToDelete = Sets.difference(deleteTmpSet, addTmpSet).immutableCopy();
+
+        newAliases = doDeleteAlias(newAliases, aliasToDelete);
+        newAliases = doSetAlias(newAliases, aliasToAdd);
+
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
         newUri = updateUriChange.newUri();
@@ -1079,11 +1175,15 @@ public class TestCatalogOperations
             .withComment(newComment)
             .withProperties(newProps)
             .withAuditInfo(updatedAuditInfo)
-            .withUri(newUri)
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, newUri))
             .withAliases(newAliases)
             .build();
 
     modelVersions.put(versionPair, updatedModelVersion);
+
+    Arrays.stream(newAliases)
+        .map(alias -> Pair.of(ident, alias))
+        .forEach(pair -> modelAliasToVersion.put(pair, newVersion));
     return updatedModelVersion;
   }
 
@@ -1283,5 +1383,25 @@ public class TestCatalogOperations
         .map(TestColumn.class::cast)
         .sorted(Comparator.comparingInt(TestColumn::position))
         .toArray(TestColumn[]::new);
+  }
+
+  private String[] doDeleteAlias(String[] entityAliases, Set<String> aliasToDelete) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    aliasList.removeAll(aliasToDelete);
+
+    return aliasList.toArray(new String[0]);
+  }
+
+  private String[] doSetAlias(String[] entityAliases, Set<String> aliasToAdd) {
+    List<String> aliasList = new ArrayList<>(Arrays.asList(entityAliases));
+    Set<String> aliasSet = new HashSet<>(aliasList);
+
+    for (String alias : aliasToAdd) {
+      if (aliasSet.add(alias)) {
+        aliasList.add(alias);
+      }
+    }
+
+    return aliasList.toArray(new String[0]);
   }
 }

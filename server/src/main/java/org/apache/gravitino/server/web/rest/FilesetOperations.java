@@ -23,6 +23,9 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.ImmutableMap;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,6 +34,7 @@ import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -40,6 +44,9 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
@@ -49,13 +56,18 @@ import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.FileInfoListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -69,6 +81,11 @@ public class FilesetOperations {
 
   private final FilesetDispatcher dispatcher;
 
+  private static final String loadFilesetAuthorizationExpression =
+      "ANY(OWNER, METALAKE, CATALOG) || "
+          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)";
+
   @Context private HttpServletRequest httpRequest;
 
   @Inject
@@ -81,9 +98,11 @@ public class FilesetOperations {
   @Timed(name = "list-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-fileset", absolute = true)
   public Response listFilesets(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+
     try {
       LOG.info("Received list filesets request for schema: {}.{}.{}", metalake, catalog, schema);
       return Utils.doAs(
@@ -91,6 +110,12 @@ public class FilesetOperations {
           () -> {
             Namespace filesetNS = NamespaceUtil.ofFileset(metalake, catalog, schema);
             NameIdentifier[] idents = dispatcher.listFilesets(filesetNS);
+            idents =
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    loadFilesetAuthorizationExpression,
+                    Entity.EntityType.FILESET,
+                    idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
                 "List {} filesets under schema: {}.{}.{}",
@@ -110,10 +135,17 @@ public class FilesetOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-fileset", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && SCHEMA::CREATE_FILESET",
+      accessMetadataType = MetadataObject.Type.FILESET)
   public Response createFileset(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FilesetCreateRequest request) {
     LOG.info(
         "Received create fileset request: {}.{}.{}.{}",
@@ -161,11 +193,16 @@ public class FilesetOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-fileset", absolute = true)
+  @AuthorizationExpression(
+      expression = loadFilesetAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.FILESET)
   public Response loadFileset(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("fileset") String fileset) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET)
+          String fileset) {
     LOG.info("Received load fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(
@@ -182,16 +219,73 @@ public class FilesetOperations {
     }
   }
 
+  @GET
+  @Path("{fileset}/files")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-fileset-files." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-fileset-files", absolute = true)
+  public Response listFiles(
+      @PathParam("metalake") String metalake,
+      @PathParam("catalog") String catalog,
+      @PathParam("schema") String schema,
+      @PathParam("fileset") String fileset,
+      @QueryParam("sub_path") @DefaultValue("/") String subPath,
+      @QueryParam("location_name") String locationName)
+      throws UnsupportedEncodingException {
+    LOG.info(
+        "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",
+        metalake,
+        catalog,
+        schema,
+        fileset,
+        subPath,
+        locationName);
+
+    final String decodedSubPath =
+        StringUtils.isNotBlank(subPath)
+            ? URLDecoder.decode(subPath, StandardCharsets.UTF_8.name())
+            : subPath;
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier filesetIdent =
+                NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
+            FileInfo[] files = dispatcher.listFiles(filesetIdent, locationName, decodedSubPath);
+            Response response = Utils.ok(new FileInfoListResponse(DTOConverters.toDTO(files)));
+            LOG.info(
+                "Files listed for fileset: {}.{}.{}.{}, subPath: {}, locationName:{}",
+                metalake,
+                catalog,
+                schema,
+                fileset,
+                subPath,
+                locationName);
+            return response;
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
+    }
+  }
+
   @PUT
   @Path("{fileset}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-fileset", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)",
+      accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("fileset") String fileset,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       FilesetUpdatesRequest request) {
     LOG.info("Received alter fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
@@ -220,11 +314,19 @@ public class FilesetOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-fileset", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "ANY(OWNER, METALAKE, CATALOG) || "
+              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER",
+      accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("fileset") String fileset) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET)
+          String fileset) {
     LOG.info("Received drop fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(
@@ -251,11 +353,15 @@ public class FilesetOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-file-location." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-file-location", absolute = true)
+  @AuthorizationExpression(
+      expression = loadFilesetAuthorizationExpression,
+      accessMetadataType = MetadataObject.Type.FILESET)
   public Response getFileLocation(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("fileset") String fileset,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @NotNull String subPath,
       @QueryParam("location_name") String locationName) {
     LOG.info(

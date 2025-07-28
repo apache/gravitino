@@ -29,25 +29,37 @@ import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
+/** Gravitino config. */
 public class GravitinoConfig {
 
   // Trino config keys
+  /** The Trino discovery URI. */
   private static final String TRINO_DISCOVERY_URI = "discovery.uri";
+  /** The Trino catalog config directory. */
   private static final String TRINO_CATALOG_CONFIG_DIR = "catalog.config-dir";
+  /** The Trino plugin bundles. */
   public static final String TRINO_PLUGIN_BUNDLES = "plugin.bundles";
+  /** The Trino catalog store. */
   public static final String TRINO_CATALOG_STORE = "catalog.store";
+  /** The Trino catalog management. */
   public static final String TRINO_CATALOG_MANAGEMENT = "catalog.management";
 
   // Trino config default value
+  /** The Trino catalog config directory default value. */
   private static final String TRINO_CATALOG_CONFIG_DIR_DEFAULT_VALUE = "etc/catalog";
+  /** The Trino catalog store default value. */
   public static final String TRINO_CATALOG_STORE_DEFAULT_VALUE = "file";
+  /** The Trino catalog management default value. */
   public static final String TRINO_CATALOG_MANAGEMENT_DEFAULT_VALUE = "static";
 
   // The Trino configuration of etc/config.properties
+  /** The Trino configuration. */
   public static final TrinoConfig trinoConfig = new TrinoConfig();
 
   // Gravitino config keys
+  /** The Gravitino dynamic connector. */
   public static final String GRAVITINO_DYNAMIC_CONNECTOR = "__gravitino.dynamic.connector";
+  /** The Gravitino dynamic connector catalog config. */
   public static final String GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG =
       "__gravitino.dynamic.connector.catalog.config";
 
@@ -62,10 +74,21 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_METALAKE =
       new ConfigEntry("gravitino.metalake", "The metalake name for used", "", true);
 
+  /** @deprecated Please use {@code gravitino.use-single-metalake} instead. */
+  @Deprecated
+  @SuppressWarnings("UnusedVariable")
   private static final ConfigEntry GRAVITINO_SIMPLIFY_CATALOG_NAMES =
       new ConfigEntry(
           "gravitino.simplify-catalog-names",
-          "Omit metalake prefix for catalog names",
+          "Omit metalake prefix for catalog names, is deprecated, use gravitino.use-single-metalake instead",
+          "true",
+          false);
+
+  private static final ConfigEntry GRAVITINO_SINGLE_METALAKE_MODE =
+      new ConfigEntry(
+          "gravitino.use-single-metalake",
+          "If true, only one metalake is supported in this connector; identify the catalog by <catalog_name>. "
+              + "If false, multiple metalakes are supported; identify the catalog by <metalake_name>.<catalog_name>.",
           "true",
           false);
 
@@ -89,6 +112,26 @@ public class GravitinoConfig {
   private static final ConfigEntry TRINO_JDBC_PASSWORD =
       new ConfigEntry("trino.jdbc.password", "The jdbc user password of Trino", "", false);
 
+  private static final ConfigEntry GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND =
+      new ConfigEntry(
+          "gravitino.metadata.refresh-interval-seconds",
+          "The interval in seconds to refresh the metadata from Gravitino server",
+          "10",
+          false);
+
+  private static final ConfigEntry GRAVITINO_TRINO_SKIP_VERSION_VALIDATION =
+      new ConfigEntry(
+          "gravitino.trino.skip-version-validation",
+          "The property to specify whether skip Trino version validation or not. Note there may be compatiablity problem if true.",
+          "false",
+          false);
+
+  /**
+   * Constructs a new GravitinoConfig with the specified configuration.
+   *
+   * @param requiredConfig The map of configuration key-value pairs
+   * @throws TrinoException if required configuration is missing
+   */
   public GravitinoConfig(Map<String, String> requiredConfig) {
     config = requiredConfig;
     for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
@@ -106,18 +149,33 @@ public class GravitinoConfig {
     }
   }
 
+  /**
+   * Retrieves the URI of the gravitino web server.
+   *
+   * @return the URI of the gravitino web server
+   */
   public String getURI() {
     return config.getOrDefault(GRAVITINO_URI.key, GRAVITINO_URI.defaultValue);
   }
 
+  /**
+   * Retrieves the metalake name for used.
+   *
+   * @return the metalake name for used
+   */
   public String getMetalake() {
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
   }
 
-  public boolean simplifyCatalogNames() {
+  /**
+   * Retrieves the single metalake mode.
+   *
+   * @return the single metalake mode
+   */
+  public boolean singleMetalakeMode() {
     return Boolean.parseBoolean(
         config.getOrDefault(
-            GRAVITINO_SIMPLIFY_CATALOG_NAMES.key, GRAVITINO_SIMPLIFY_CATALOG_NAMES.defaultValue));
+            GRAVITINO_SINGLE_METALAKE_MODE.key, GRAVITINO_SINGLE_METALAKE_MODE.defaultValue));
   }
 
   boolean isDynamicConnector() {
@@ -131,10 +189,20 @@ public class GravitinoConfig {
     return config.getOrDefault(GRAVITINO_DYNAMIC_CONNECTOR, "false").equals("true");
   }
 
+  /**
+   * Retrieves the catalog config.
+   *
+   * @return the catalog config
+   */
   public String getCatalogConfig() {
     return config.get(GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG);
   }
 
+  /**
+   * Retrieves the Trino JDBC URI.
+   *
+   * @return the Trino JDBC URI
+   */
   public String getTrinoJdbcURI() {
     String uriString = "";
     if (config.containsKey(TRINO_DISCOVERY_URI)) {
@@ -152,11 +220,21 @@ public class GravitinoConfig {
     }
   }
 
+  /**
+   * Retrieves the region.
+   *
+   * @return the region
+   */
   public String getRegion() {
     return config.getOrDefault(
         GRAVITINO_CLOUD_REGION_CODE.key, GRAVITINO_CLOUD_REGION_CODE.defaultValue);
   }
 
+  /**
+   * Retrieves the catalog config directory.
+   *
+   * @return the catalog config directory
+   */
   public String getCatalogConfigDirectory() {
     if (config.containsKey(TRINO_CATALOG_CONFIG_DIR)) {
       return config.get(TRINO_CATALOG_CONFIG_DIR);
@@ -166,20 +244,40 @@ public class GravitinoConfig {
     }
   }
 
+  /**
+   * Retrieves the Trino user.
+   *
+   * @return the Trino user
+   */
   public String getTrinoUser() {
     return config.getOrDefault(TRINO_JDBC_USER.key, TRINO_JDBC_USER.defaultValue);
   }
 
+  /**
+   * Retrieves the Trino password.
+   *
+   * @return the Trino password
+   */
   public String getTrinoPassword() {
     return config.getOrDefault(TRINO_JDBC_PASSWORD.key, TRINO_JDBC_PASSWORD.defaultValue);
   }
 
+  /**
+   * Retrieves the catalog connector factory class name.
+   *
+   * @return the catalog connector factory class name
+   */
   public String getCatalogConnectorFactoryClassName() {
     return config.getOrDefault(
         GRAVITINO_CATALOG_CONNECTOR_FACTORY_CLASS_NAME.key,
         GRAVITINO_CATALOG_CONNECTOR_FACTORY_CLASS_NAME.defaultValue);
   }
 
+  /**
+   * Converts the config to a catalog config.
+   *
+   * @return the catalog config
+   */
   public String toCatalogConfig() {
     List<String> stringList = new ArrayList<>();
     for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
@@ -191,12 +289,46 @@ public class GravitinoConfig {
     return StringUtils.join(stringList, ',');
   }
 
+  /**
+   * Retrieves the metadata refresh interval in seconds.
+   *
+   * @return the metadata refresh interval in seconds
+   */
+  public String getMetadataRefreshIntervalSecond() {
+    return config.getOrDefault(
+        GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND.key,
+        GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND.defaultValue);
+  }
+
+  /**
+   * Whether skip Trino version validation or not.
+   *
+   * @return whether skip Trino version validation or not
+   */
+  public Boolean isSkipTrinoVersionValidation() {
+    return Boolean.parseBoolean(
+        config.getOrDefault(
+            GRAVITINO_TRINO_SKIP_VERSION_VALIDATION.key,
+            GRAVITINO_TRINO_SKIP_VERSION_VALIDATION.defaultValue));
+  }
+
   static class ConfigEntry {
     final String key;
+
     final String description;
+
     final String defaultValue;
+
     final boolean isRequired;
 
+    /**
+     * Constructs a new ConfigEntry.
+     *
+     * @param key The configuration key
+     * @param description The description of the configuration parameter
+     * @param defaultValue The default value of the configuration parameter
+     * @param isRequired Whether this configuration parameter is required
+     */
     ConfigEntry(String key, String description, String defaultValue, boolean isRequired) {
       this.key = key;
       this.description = description;
@@ -207,10 +339,13 @@ public class GravitinoConfig {
     }
   }
 
+  /** Class that handles Trino-specific configuration properties. */
   static class TrinoConfig {
 
+    /** The properties loaded from Trino configuration file */
     private final Properties properties;
 
+    /** Constructs a new TrinoConfig and loads properties from the configuration file. */
     public TrinoConfig() {
       this.properties = new Properties();
       try {
@@ -246,15 +381,34 @@ public class GravitinoConfig {
       }
     }
 
+    /**
+     * Gets a property value for the specified key.
+     *
+     * @param key The property key
+     * @return The property value
+     */
     String getProperty(String key) {
       return properties.getProperty(key);
     }
 
+    /**
+     * Gets a property value for the specified key, or returns the default value if not found.
+     *
+     * @param key The property key
+     * @param defaultValue The default value to return if the key is not found
+     * @return The property value or default value
+     */
     String getProperty(String key, String defaultValue) {
 
       return properties.getProperty(key, defaultValue);
     }
 
+    /**
+     * Checks if the properties contain the specified key.
+     *
+     * @param key The property key to check
+     * @return true if the key exists, false otherwise
+     */
     boolean contains(String key) {
       return properties.containsKey(key);
     }

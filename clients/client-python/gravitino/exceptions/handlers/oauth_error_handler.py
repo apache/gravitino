@@ -28,9 +28,7 @@ INVALID_SCOPE_ERROR = "invalid_scope"
 
 
 class OAuthErrorHandler(RestErrorHandler):
-
     def handle(self, error_response: OAuth2ErrorResponse):
-
         error_message = error_response.message()
         exception_type = error_response.type()
 

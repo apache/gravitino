@@ -71,4 +71,15 @@ public class TestAuditInfo {
     Assertions.assertNull(auditInfo2.lastModifier());
     Assertions.assertNull(auditInfo2.lastModifiedTime());
   }
+
+  @Test
+  public void testBuilderReuseDoesNotAffectBuiltInstance() {
+    AuditInfo.Builder builder = AuditInfo.builder().withCreator("first");
+    AuditInfo first = builder.build();
+    builder.withCreator("second");
+    AuditInfo second = builder.build();
+
+    Assertions.assertEquals("first", first.creator());
+    Assertions.assertEquals("second", second.creator());
+  }
 }

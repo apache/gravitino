@@ -661,6 +661,16 @@ cat <<EOF >model.json
     {
       "@type": "removeProperty",
       "property": "key"
+    },
+    {
+      "@type": "updateAliases",
+      "aliasesToAdd": [
+          "alias1",
+          "alias2"
+      ],
+      "aliasesToRemove": [
+          "alias3"
+      ]
     }
   ]
 }
@@ -690,7 +700,8 @@ ModelVersionChange[] changes = {
      ModelVersionChange.updateComment("Updated comment of model version"),
      ModelVersionChange.updateUri("new_uri"),
      ModelVersionChange.setProperty("key", "value"),
-     ModelVersionChange.removeProperty("key")
+     ModelVersionChange.removeProperty("key"),
+     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
  };
 
 // Apply changes
@@ -718,6 +729,7 @@ changes = (
     ModelVersionChange.update_uri("new_uri"),
     ModelVersionChange.set_property("k2", "v2"),
     ModelVersionChange.remove_property("k1"),
+    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
 )
 
 # Apply changes
@@ -731,12 +743,13 @@ updated_model = model_catalog.alter_model_version(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
-|---------------------|------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | `ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
+| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
+|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
+| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
 
 :::note
 - Multiple modifications can be applied in a single request.
@@ -774,6 +787,16 @@ cat <<EOF >model.json
     {
       "@type": "removeProperty",
       "property": "key"
+    },
+    {
+      "@type": "updateAliases",
+      "aliasesToAdd": [
+          "alias1",
+          "alias2"
+      ],
+      "aliasesToRemove": [
+          "alias3"
+      ]
     }
   ]
 }
@@ -803,7 +826,8 @@ ModelVersionChange[] changes = {
      ModelVersionChange.updateComment("Updated comment of model version"),
      ModelVersionChange.updateUri("new_uri"),
      ModelVersionChange.setProperty("key", "value"),
-     ModelVersionChange.removeProperty("key")
+     ModelVersionChange.removeProperty("key"),
+     ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})
  };
 
 // Apply changes
@@ -831,6 +855,7 @@ changes = (
     ModelVersionChange.update_uri("new_uri"),
     ModelVersionChange.set_property("k2", "v2"),
     ModelVersionChange.remove_property("k1"),
+    ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])
 )
 
 # Apply changes
@@ -844,12 +869,13 @@ updated_model = model_catalog.alter_model_version_by_alias(
 
 #### Supported modifications
 
-| Operation           | JSON Example                                               | Java Method                                       | Python Method                                      |
-|---------------------|------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------|
-| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                | `ModelVersionChange.updateUri("new_uri")`         | `ModelVersionChange.update_uri("new_uri")`         |
-| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`     | `ModelVersionChange.updateComment("new_comment")` | `ModelVersionChange.update_comment("new_comment")` |
-| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}` | `ModelVersionChange.setProperty("key", "value")`  | `ModelVersionChange.set_property("key", "value")`  |
-| **Remove property** | `{"@type":"removeProperty","property":"key"}`              | `ModelVersionChange.removeProperty("key")`        | `ModelVersionChange.remove_property("key")`        |
+| Operation           | JSON Example                                                                                   | Java Method                                                                                    | Python Method                                                         |
+|---------------------|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| **Update uri**      | `{"@type":"updateUri","newName":"new_uri"}`                                                    | `ModelVersionChange.updateUri("new_uri")`                                                      | `ModelVersionChange.update_uri("new_uri")`                            |
+| **Update comment**  | `{"@type":"updateComment","newComment":"new_comment"}`                                         | `ModelVersionChange.updateComment("new_comment")`                                              | `ModelVersionChange.update_comment("new_comment")`                    |
+| **Set property**    | `{"@type":"setProperty","property":"key","value":"value"}`                                     | `ModelVersionChange.setProperty("key", "value")`                                               | `ModelVersionChange.set_property("key", "value")`                     |
+| **Remove property** | `{"@type":"removeProperty","property":"key"}`                                                  | `ModelVersionChange.removeProperty("key")`                                                     | `ModelVersionChange.remove_property("key")`                           |
+| **Update Aliases**  | `{"@type": "updateAliases","aliasesToAdd": ["alias1","alias2"],"aliasesToRemove": ["alias3"]}` | `ModelVersionChange.updateAliases(new String[] {"alias1", "alias2"}, new String[] {"alias3"})` | `ModelVersionChange.update_aliases(["alias1", "alias2"], ["alias3"])` |
 
 
 :::note
@@ -970,6 +996,45 @@ gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090",
 
 catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
 model_versions: List[int] = catalog.as_model_catalog().list_model_versions(model_ident=NameIdentifier.of("model_schema", "example_model"))
+```
+
+</TabItem>
+</Tabs>
+
+### List all versions' information in a model
+
+You can list all versions' information in a model by sending a `GET` request to the `/api/metalakes/
+{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions?detail=true` endpoint
+or by using the Gravitino Java/Python client. The following is an example of listing all the
+versions' information in a model:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+http://localhost:8090/api/metalakes/example/catalogs/model_catalog/schemas/model_schema/models/example_model/versions?detail=true
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// ...
+Catalog catalog = gravitinoClient.loadCatalog("model_catalog");
+ModelVersion[] versions = catalog.asModelCatalog().listModelVersionInfos(NameIdentifier.of("model_schema", "example_model"));
+// ...
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
+
+catalog: Catalog = gravitino_client.load_catalog(name="model_catalog")
+model_versions: List[ModelVersion] = catalog.as_model_catalog().list_model_version_infos(model_ident=NameIdentifier.of("model_schema", "example_model"))
 ```
 
 </TabItem>

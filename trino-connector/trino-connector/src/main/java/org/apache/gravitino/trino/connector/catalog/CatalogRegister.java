@@ -63,13 +63,22 @@ public class CatalogRegister {
   private void checkTrinoSpiVersion(ConnectorContext context) {
     this.trinoVersion = context.getSpiVersion();
 
-    int version = Integer.parseInt(context.getSpiVersion());
+    int version = Integer.parseInt(trinoVersion);
+
     if (version < MIN_SUPPORT_TRINO_SPI_VERSION || version > MAX_SUPPORT_TRINO_SPI_VERSION) {
-      String errmsg =
-          String.format(
-              "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d",
-              trinoVersion, MIN_SUPPORT_TRINO_SPI_VERSION, MAX_SUPPORT_TRINO_SPI_VERSION);
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      Boolean skipTrinoVersionValidation = config.isSkipTrinoVersionValidation();
+      if (!skipTrinoVersionValidation) {
+        String errmsg =
+            String.format(
+                "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d."
+                    + "Maybe you can set gravitino.trino.skip-version-validation to skip version validation.",
+                trinoVersion, MIN_SUPPORT_TRINO_SPI_VERSION, MAX_SUPPORT_TRINO_SPI_VERSION);
+        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      } else {
+        LOG.warn(
+            "The version %s has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
+            trinoVersion);
+      }
     }
 
     isCoordinator = context.getNodeManager().getCurrentNode().isCoordinator();
@@ -77,14 +86,14 @@ public class CatalogRegister {
 
   private void checkSupportCatalogNameWithMetalake(
       ConnectorContext context, GravitinoConfig config) {
-    if (!config.simplifyCatalogNames()) {
+    if (!config.singleMetalakeMode()) {
       int version = Integer.parseInt(context.getSpiVersion());
       if (version < MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION) {
-        String errmsg =
-            String.format(
-                "Trino-%s does not support catalog name with dots, The minimal required version is Trino-%d",
-                trinoVersion, MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
-        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+        LOG.warn(
+            "Trino-{} does not support catalog name with dots, The minimal required version is Trino-{}."
+                + "Some errors may occur when using the USE <CATALOG>.<SCHEMA> statement in Trino",
+            trinoVersion,
+            MIN_SUPPORT_CATALOG_NAME_WITH_METALAKE_TRINO_SPI_VERSION);
       }
     }
   }
@@ -108,6 +117,14 @@ public class CatalogRegister {
     }
   }
 
+  /**
+   * Initializes the catalog register with the specified Trino connector context and Gravitino
+   * configuration.
+   *
+   * @param context the Trino connector context
+   * @param config the Gravitino configuration
+   * @throws Exception if the catalog register fails to initialize
+   */
   public void init(ConnectorContext context, GravitinoConfig config) throws Exception {
     this.config = config;
     checkTrinoSpiVersion(context);
@@ -149,10 +166,16 @@ public class CatalogRegister {
         config.toCatalogConfig());
   }
 
-  private String generateDropCatalogCommand(String name) throws Exception {
+  private String generateDropCatalogCommand(String name) {
     return String.format("DROP CATALOG %s", name);
   }
 
+  /**
+   * Registers a new catalog with the specified name and Gravitino catalog.
+   *
+   * @param name the name of the catalog
+   * @param catalog the Gravitino catalog
+   */
   public void registerCatalog(String name, GravitinoCatalog catalog) {
     try {
       String catalogFileName = String.format("%s/%s.properties", catalogStoreDirectory, name);
@@ -242,6 +265,11 @@ public class CatalogRegister {
     }
   }
 
+  /**
+   * Unregisters a catalog with the specified name.
+   *
+   * @param name the name of the catalog
+   */
   public void unregisterCatalog(String name) {
     try {
       if (!checkCatalogExist(name)) {
@@ -258,6 +286,7 @@ public class CatalogRegister {
     }
   }
 
+  /** Closes the catalog register. */
   public void close() {
     try {
       if (connection != null) {

@@ -22,7 +22,6 @@ from gravitino.dto.model_version_dto import ModelVersionDTO
 
 
 class GenericModelVersion(ModelVersion):
-
     _model_version_dto: ModelVersionDTO
     """The model version DTO object."""
 
@@ -40,6 +39,9 @@ class GenericModelVersion(ModelVersion):
 
     def uri(self) -> str:
         return self._model_version_dto.uri()
+
+    def uris(self) -> Dict[str, str]:
+        return self._model_version_dto.uris()
 
     def properties(self) -> Dict[str, str]:
         return self._model_version_dto.properties()

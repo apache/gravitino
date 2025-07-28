@@ -83,6 +83,7 @@ public class CatalogUtils {
    * Loads {@link Catalog} instance with given {@link PaimonConfig} with kerberos auth.
    *
    * @param paimonConfig The Paimon configuration.
+   * @param configuration The Hadoop configuration for Kerberos
    * @return The {@link Catalog} instance of catalog backend.
    */
   public static Catalog loadCatalogBackendWithKerberosAuth(

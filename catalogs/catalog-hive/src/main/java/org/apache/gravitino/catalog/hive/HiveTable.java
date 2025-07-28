@@ -143,6 +143,7 @@ public class HiveTable extends BaseTable {
   /**
    * Converts this HiveTable to its corresponding Table in the Hive Metastore.
    *
+   * @param tablePropertiesMetadata metadata for configuring the Hive Metastore table
    * @return The converted Table.
    */
   public Table toHiveTable(PropertiesMetadata tablePropertiesMetadata) {

@@ -90,7 +90,6 @@ class TestFilesetCatalog(IntegrationTestEnv):
         self.clean_test_data()
 
     def clean_test_data(self):
-
         self.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=self.metalake_name
         )
@@ -154,7 +153,7 @@ class TestFilesetCatalog(IntegrationTestEnv):
         catalog = self.gravitino_client.create_catalog(
             name=self.catalog_name,
             catalog_type=Catalog.Type.FILESET,
-            provider=self.catalog_provider,
+            provider=None,
             comment="",
             properties={self.catalog_location_prop: "/tmp/test1"},
         )

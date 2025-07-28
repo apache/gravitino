@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -27,6 +28,7 @@ import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.listener.api.event.AlterModelEvent;
 import org.apache.gravitino.listener.api.event.AlterModelFailureEvent;
@@ -46,6 +48,9 @@ import org.apache.gravitino.listener.api.event.GetModelPreEvent;
 import org.apache.gravitino.listener.api.event.GetModelVersionEvent;
 import org.apache.gravitino.listener.api.event.GetModelVersionFailureEvent;
 import org.apache.gravitino.listener.api.event.GetModelVersionPreEvent;
+import org.apache.gravitino.listener.api.event.GetModelVersionUriEvent;
+import org.apache.gravitino.listener.api.event.GetModelVersionUriFailureEvent;
+import org.apache.gravitino.listener.api.event.GetModelVersionUriPreEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionFailureEvent;
 import org.apache.gravitino.listener.api.event.LinkModelVersionPreEvent;
@@ -53,6 +58,7 @@ import org.apache.gravitino.listener.api.event.ListModelEvent;
 import org.apache.gravitino.listener.api.event.ListModelFailureEvent;
 import org.apache.gravitino.listener.api.event.ListModelPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionFailureEvent;
+import org.apache.gravitino.listener.api.event.ListModelVersionInfosEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionPreEvent;
 import org.apache.gravitino.listener.api.event.ListModelVersionsEvent;
 import org.apache.gravitino.listener.api.event.RegisterAndLinkModelEvent;
@@ -116,7 +122,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public Model registerModel(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
@@ -124,7 +130,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
           ModelVersionAliasesAlreadyExistException {
     ModelInfo registerModelRequest = new ModelInfo(ident.name(), properties, comment);
     ModelVersionInfo linkModelVersionRequest =
-        new ModelVersionInfo(uri, comment, properties, aliases);
+        new ModelVersionInfo(uris, comment, properties, aliases, null);
     String user = PrincipalUtils.getCurrentUserName();
     RegisterAndLinkModelPreEvent registerAndLinkModelPreEvent =
         new RegisterAndLinkModelPreEvent(
@@ -132,9 +138,9 @@ public class ModelEventDispatcher implements ModelDispatcher {
 
     eventBus.dispatchEvent(registerAndLinkModelPreEvent);
     try {
-      Model registeredModel = dispatcher.registerModel(ident, uri, aliases, comment, properties);
+      Model registeredModel = dispatcher.registerModel(ident, uris, aliases, comment, properties);
       ModelInfo registeredModelInfo = new ModelInfo(registeredModel);
-      eventBus.dispatchEvent(new RegisterAndLinkModelEvent(user, ident, registeredModelInfo, uri));
+      eventBus.dispatchEvent(new RegisterAndLinkModelEvent(user, ident, registeredModelInfo, uris));
       return registeredModel;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -197,17 +203,18 @@ public class ModelEventDispatcher implements ModelDispatcher {
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
       throws NoSuchModelException, ModelVersionAliasesAlreadyExistException {
-    ModelVersionInfo linkModelRequest = new ModelVersionInfo(uri, comment, properties, aliases);
+    ModelVersionInfo linkModelRequest =
+        new ModelVersionInfo(uris, comment, properties, aliases, null);
     String user = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new LinkModelVersionPreEvent(user, ident, linkModelRequest));
     try {
-      dispatcher.linkModelVersion(ident, uri, aliases, comment, properties);
+      dispatcher.linkModelVersion(ident, uris, aliases, comment, properties);
       eventBus.dispatchEvent(new LinkModelVersionEvent(user, ident, linkModelRequest));
     } catch (Exception e) {
       eventBus.dispatchEvent(new LinkModelVersionFailureEvent(user, ident, e, linkModelRequest));
@@ -248,6 +255,40 @@ public class ModelEventDispatcher implements ModelDispatcher {
       return modelVersion;
     } catch (Exception e) {
       eventBus.dispatchEvent(new GetModelVersionFailureEvent(user, ident, e, alias, null));
+      throw e;
+    }
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetModelVersionUriPreEvent(user, ident, alias, null, uriName));
+    try {
+      String uri = dispatcher.getModelVersionUri(ident, alias, uriName);
+      eventBus.dispatchEvent(new GetModelVersionUriEvent(user, ident, alias, null, uriName, uri));
+      return uri;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new GetModelVersionUriFailureEvent(user, ident, e, alias, null, uriName));
+      throw e;
+    }
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetModelVersionUriPreEvent(user, ident, null, version, uriName));
+    try {
+      String uri = dispatcher.getModelVersionUri(ident, version, uriName);
+      eventBus.dispatchEvent(new GetModelVersionUriEvent(user, ident, null, version, uriName, uri));
+      return uri;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new GetModelVersionUriFailureEvent(user, ident, e, null, version, uriName));
       throw e;
     }
   }
@@ -359,6 +400,24 @@ public class ModelEventDispatcher implements ModelDispatcher {
       int[] versions = dispatcher.listModelVersions(ident);
       eventBus.dispatchEvent(new ListModelVersionsEvent(user, ident, versions));
       return versions;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListModelVersionFailureEvent(user, ident, e));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public ModelVersion[] listModelVersionInfos(NameIdentifier ident) throws NoSuchModelException {
+    String user = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListModelVersionPreEvent(user, ident));
+    try {
+      ModelVersion[] modelVersions = dispatcher.listModelVersionInfos(ident);
+      ModelVersionInfo[] modelVersionInfos =
+          Arrays.stream(modelVersions).map(ModelVersionInfo::new).toArray(ModelVersionInfo[]::new);
+      eventBus.dispatchEvent(new ListModelVersionInfosEvent(user, ident, modelVersionInfos));
+      return modelVersions;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListModelVersionFailureEvent(user, ident, e));
       throw e;

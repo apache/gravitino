@@ -32,7 +32,6 @@ from gravitino.api.credential.azure_account_key_credential import (
 
 
 class TestCredentialFactory(unittest.TestCase):
-
     def test_s3_token_credential(self):
         s3_credential_info = {
             S3TokenCredential._SESSION_ACCESS_KEY_ID: "access_key",

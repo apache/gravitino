@@ -50,7 +50,7 @@ def s3_with_credential_is_configured():
 @unittest.skipUnless(s3_with_credential_is_configured(), "S3 is not configured.")
 class TestGvfsWithS3Credential(TestGvfsWithS3):
     # Before running this test, please set the make sure aws-bundle-x.jar has been
-    # copy to the $GRAVITINO_HOME/catalogs/hadoop/libs/ directory
+    # copy to the $GRAVITINO_HOME/catalogs/fileset/libs/ directory
     s3_access_key = os.environ.get("S3_STS_ACCESS_KEY_ID")
     s3_secret_key = os.environ.get("S3_STS_SECRET_ACCESS_KEY")
     s3_endpoint = os.environ.get("S3_STS_ENDPOINT")
@@ -112,6 +112,32 @@ class TestGvfsWithS3Credential(TestGvfsWithS3):
             properties=cls.fileset_properties,
         )
 
+        cls.multiple_locations_fileset_storage_location: str = (
+            f"s3a://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        cls.multiple_locations_fileset_storage_location1: str = (
+            f"s3a://{cls.bucket_name}/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}_1"
+        )
+        cls.multiple_locations_fileset_gvfs_location = (
+            f"gvfs://fileset/{cls.catalog_name}/{cls.schema_name}/"
+            f"{cls.multiple_locations_fileset_name}"
+        )
+        catalog.as_fileset_catalog().create_multiple_location_fileset(
+            ident=cls.multiple_locations_fileset_ident,
+            fileset_type=Fileset.Type.MANAGED,
+            comment=cls.fileset_comment,
+            storage_locations={
+                "default": cls.multiple_locations_fileset_storage_location,
+                "location1": cls.multiple_locations_fileset_storage_location1,
+            },
+            properties={
+                Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "default",
+                **cls.fileset_properties,
+            },
+        )
+
         cls.fs = S3FileSystem(
             key=cls.s3_access_key,
             secret=cls.s3_secret_key,
@@ -134,8 +160,7 @@ class TestGvfsWithS3Credential(TestGvfsWithS3):
         # it actually takes no effect.
         self.check_mkdir(mkdir_dir, mkdir_actual_dir, fs)
 
-        with self.assertRaises(ValueError):
-            fs.mkdir(mkdir_dir, create_parents=True)
+        fs.mkdir(mkdir_dir, create_parents=True)
         self.assertFalse(fs.exists(mkdir_dir))
 
     def test_makedirs(self):

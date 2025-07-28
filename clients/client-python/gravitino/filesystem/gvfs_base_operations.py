@@ -377,9 +377,11 @@ class BaseGVFSOperations(ABC):
         fileset = catalog.as_fileset_catalog().load_fileset(
             NameIdentifier.of(fileset_ident.namespace().level(2), fileset_ident.name())
         )
-        target_location_name = location_name or fileset.properties().get(
-            fileset.PROPERTY_DEFAULT_LOCATION_NAME
-        ) or fileset.LOCATION_NAME_UNKNOWN
+        target_location_name = (
+            location_name
+            or fileset.properties().get(fileset.PROPERTY_DEFAULT_LOCATION_NAME)
+            or fileset.LOCATION_NAME_UNKNOWN
+        )
         actual_location = fileset.storage_locations().get(target_location_name)
         if actual_location is None:
             raise NoSuchLocationNameException(

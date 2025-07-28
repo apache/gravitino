@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class TestSimpleAuthClient(IntegrationTestEnv, TestCommonAuth):
-
     def setUp(self):
         os.environ["GRAVITINO_USER"] = self.creator
         self.gravitino_admin_client = GravitinoAdminClient(

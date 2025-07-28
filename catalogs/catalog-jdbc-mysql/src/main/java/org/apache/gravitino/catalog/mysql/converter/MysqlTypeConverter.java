@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.mysql.converter;
 
+import java.util.Optional;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -37,6 +38,7 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
   static final String FLOAT = "float";
   static final String DOUBLE = "double";
   static final String DECIMAL = "decimal";
+  static final String DECIMAL_UNSIGNED = "decimal unsigned";
   static final String CHAR = "char";
   static final String BINARY = "binary";
   static final String DATETIME = "datetime";
@@ -72,15 +74,22 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case TIME:
-        return Types.TimeType.get();
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimeType::of)
+            .orElseGet(Types.TimeType::get);
         // MySQL converts TIMESTAMP values from the current time zone to UTC for storage, and back
         // from UTC to the current time zone for retrieval. (This does not occur for other types
         // such as DATETIME.) see more details:
         // https://dev.mysql.com/doc/refman/8.0/en/datetime.html
       case TIMESTAMP:
-        return Types.TimestampType.withTimeZone();
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimestampType::withTimeZone)
+            .orElseGet(Types.TimestampType::withTimeZone);
       case DATETIME:
-        return Types.TimestampType.withoutTimeZone();
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimestampType::withoutTimeZone)
+            .orElseGet(Types.TimestampType::withoutTimeZone);
+      case DECIMAL_UNSIGNED:
       case DECIMAL:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
@@ -136,7 +145,11 @@ public class MysqlTypeConverter extends JdbcTypeConverter {
       // MySQL converts TIMESTAMP values from the current time zone to UTC for storage, and back
       // from UTC to the current time zone for retrieval. (This does not occur for other types
       // such as DATETIME.) see more details: https://dev.mysql.com/doc/refman/8.0/en/datetime.html
-      return ((Types.TimestampType) type).hasTimeZone() ? TIMESTAMP : DATETIME;
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      String baseType = timestampType.hasTimeZone() ? TIMESTAMP : DATETIME;
+      return timestampType.hasPrecisionSet()
+          ? String.format("%s(%d)", baseType, timestampType.precision())
+          : baseType;
     } else if (type instanceof Types.DecimalType) {
       return type.simpleString();
     } else if (type instanceof Types.VarCharType) {

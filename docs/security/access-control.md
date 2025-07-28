@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Apache Gravitino(incubating) is a technical data catalog that uses a unified metadata paradigm to manage multiple data sources while still allowing multiple engines like Spark, Trino, and Flink, or Python to connect to these data sources for data processing through Gravitino.
+Apache Gravitino is a technical data catalog that uses a unified metadata paradigm to manage multiple data sources while still allowing multiple engines like Spark, Trino, and Flink, or Python to connect to these data sources for data processing through Gravitino.
 
 Because each underlying data source will have its own access control system, it can be difficult to plug in data engines with the intent of querying multiple of these data at once.
 This is especially important for data governance practitioners who have to worry about data access restrictions and data compliance issues, but this is streamlined through Gravitino.
@@ -56,7 +56,7 @@ More information you can see the [Authorization push down](authorization-pushdow
 As mentioned above, Gravitino uses Ownership to control the privileges of securable object in the management category and uses Role to control access securable objects,
 so when a user performs a specific operation on a specified resource,
 Gravitino will perform a composite authentication on the Ownership and Role to which the securable object belongs.
-When a user has more than one Role, Gravitino will use the user's current Role for authentication, and the user can switch the current Role to access a different securable object.
+When a user has more than one Role, Gravitino will use the user's all the Roles for authentication.
 
 ### Role
 
@@ -101,6 +101,7 @@ The metadata object that supports ownership is as follows:
 | Topic                |
 | Fileset              |
 | Role                 |
+| Model                |
 
 ### User
 Users are generally granted one or multiple Roles, and users have different operating privileges depending on their Role.
@@ -113,7 +114,7 @@ This process allows all users belonging to that user group to have the access co
 
 Metadata objects are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
 `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `ROLE`, `METALAKE`. A metadata object is combined by a `type` and a
-comma-separated `name`. For example, a `CATAGLOG` object has a name "catalog1" with type
+comma-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
 "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
 object has a name "catalog1.schema1.table1" with type "TABLE". A `METALAKE` object has a name "metalake1".
 

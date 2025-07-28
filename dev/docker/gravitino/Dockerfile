@@ -26,4 +26,6 @@ COPY packages/gravitino /root/gravitino
 EXPOSE 8090
 EXPOSE 9001
 
-ENTRYPOINT ["/bin/bash", "/root/gravitino/bin/gravitino.sh", "start"]
+RUN chmod +x /root/gravitino/bin/start-gravitino.sh
+
+ENTRYPOINT ["/bin/bash", "/root/gravitino/bin/start-gravitino.sh"]

@@ -200,7 +200,7 @@ public class MetalakeDTO implements Metalake {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(name, comment, audit);
+    return Objects.hashCode(name, comment, audit, properties);
   }
 
   /** @return the builder for creating a new instance of MetalakeDTO. */

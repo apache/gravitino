@@ -35,13 +35,13 @@ public abstract class VList implements java.io.Serializable {
   @Setter protected int resultSize;
   /** Sort type. Either desc or asc. */
   @Setter protected String sortType;
-  /** Comma seperated list of the fields for sorting. */
+  /** Comma separated list of the fields for sorting. */
   @Setter protected String sortBy;
 
   protected long queryTimeMS = System.currentTimeMillis();
 
   /** Default constructor. This will set all the attributes to default value. */
-  public VList() {}
+  protected VList() {}
 
   public abstract int getListSize();
 

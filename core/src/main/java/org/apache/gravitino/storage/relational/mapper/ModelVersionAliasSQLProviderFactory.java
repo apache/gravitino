@@ -103,4 +103,9 @@ public class ModelVersionAliasSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteModelVersionAliasRelsByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String updateModelVersionAliasRel(
+      @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs) {
+    return getProvider().updateModelVersionAliasRel(modelVersionAliasRelPOs);
+  }
 }

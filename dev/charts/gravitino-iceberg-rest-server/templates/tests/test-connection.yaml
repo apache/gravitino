@@ -1,0 +1,62 @@
+{{- /*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  */}}
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "gravitino-iceberg-rest-server.fullname" . }}-test-connection
+  namespace: {{ include "gravitino-iceberg-rest-server.namespace" . }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: hook-succeeded
+spec:
+  containers:
+    - name: test-connection
+      image: curlimages/curl:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          max_attempts=30
+          attempt=0
+          success=false
+
+          while [ $attempt -lt $max_attempts ]; do
+            response=$(curl -X GET -H "Content-Type: application/json" http://${SERVICE_NAME}:${SERVICE_PORT}/iceberg/v1/config)
+            if echo "$response" | grep -q "{\"defaults\":{},\"overrides\":{}}"; then
+              success=true
+              break
+            else
+              echo "Attempt $((attempt + 1)) failed..."
+              sleep 1
+            fi
+              attempt=$((attempt + 1))
+          done
+
+          if [ "$success" = true ]; then
+            exit 0
+          else
+            exit 1
+          fi
+      env:
+        - name: SERVICE_NAME
+          value: "{{ .Values.service.name }}"
+        - name: SERVICE_PORT
+          value: "{{ .Values.service.port }}"
+  restartPolicy: Never

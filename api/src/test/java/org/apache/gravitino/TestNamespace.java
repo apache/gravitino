@@ -46,4 +46,19 @@ public class TestNamespace {
     Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.of("a", null, "c"));
     Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.of("a", "", "c"));
   }
+
+  @Test
+  public void testFromString() {
+    Assertions.assertEquals(Namespace.empty(), Namespace.fromString(""));
+    Assertions.assertEquals(Namespace.of("a", "b"), Namespace.fromString("a.b"));
+    Assertions.assertEquals(Namespace.of("a"), Namespace.fromString("a"));
+  }
+
+  @Test
+  public void testFromStringInvalidArgs() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString(".a"));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString("a."));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString("a..b"));
+  }
 }

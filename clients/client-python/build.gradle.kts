@@ -147,7 +147,7 @@ fun generatePypiProjectHomePage() {
     val readmeFile = file("README.md")
     readmeFile.writeText(contentUpdateImage)
   } catch (e: Exception) {
-    throw GradleException("client-python README.md file not generated!")
+    throw GradleException("Failed to generate client-python/README.md.")
   }
 }
 
@@ -285,7 +285,6 @@ tasks {
       generatePypiProjectHomePage()
       delete("dist")
       copy {
-        from("${project.rootDir}/DISCLAIMER.txt") { into("./") }
         into("${project.rootDir}/clients/client-python")
         rename { fileName ->
           fileName.replace(".bin", "")
@@ -298,7 +297,6 @@ tasks {
 
     doLast {
       delete("README.md")
-      delete("DISCLAIMER.txt")
     }
   }
 

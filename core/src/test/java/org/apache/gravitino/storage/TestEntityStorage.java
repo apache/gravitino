@@ -55,6 +55,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -85,6 +86,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.RelationalBackend;
@@ -139,6 +141,14 @@ public class TestEntityStorage {
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
+    // Fix cache config for test
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(true);
+    Mockito.when(config.get(Configs.CACHE_MAX_ENTRIES)).thenReturn(10_000);
+    Mockito.when(config.get(Configs.CACHE_EXPIRATION_TIME)).thenReturn(3_600_000L);
+    Mockito.when(config.get(Configs.CACHE_WEIGHER_ENABLED)).thenReturn(true);
+    Mockito.when(config.get(Configs.CACHE_STATS_ENABLED)).thenReturn(false);
+    Mockito.when(config.get(Configs.CACHE_IMPLEMENTATION)).thenReturn("caffeine");
+
     BaseIT baseIT = new BaseIT();
 
     try {
@@ -303,7 +313,7 @@ public class TestEntityStorage {
           TestJDBCBackend.createModelVersionEntity(
               model1.nameIdentifier(),
               0,
-              "model_path",
+              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
               ImmutableList.of("alias1", "alias2"),
               null,
               null,
@@ -696,7 +706,7 @@ public class TestEntityStorage {
           TestJDBCBackend.createModelVersionEntity(
               model1.nameIdentifier(),
               0,
-              "model_path",
+              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
               ImmutableList.of("alias1", "alias2"),
               null,
               null,
@@ -736,7 +746,7 @@ public class TestEntityStorage {
           TestJDBCBackend.createModelVersionEntity(
               model1InSchema2.nameIdentifier(),
               0,
-              "model_path",
+              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
               ImmutableList.of("alias1", "alias2"),
               null,
               null,

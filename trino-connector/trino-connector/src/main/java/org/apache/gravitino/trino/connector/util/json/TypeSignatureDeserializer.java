@@ -25,8 +25,16 @@ import java.util.Set;
  * refactoring to call the key method to handle Type serialization
  */
 public final class TypeSignatureDeserializer extends FromStringDeserializer<TypeSignature> {
+  /** Method to parse type signatures using reflection. */
   private final Method parseTypeSignatureMethod;
 
+  /**
+   * Constructs a new TypeSignatureDeserializer.
+   *
+   * @param classLoader the class loader to use for loading the type signature translator class
+   * @throws RuntimeException if the type signature translator class cannot be loaded or the parse
+   *     method cannot be found
+   */
   public TypeSignatureDeserializer(ClassLoader classLoader) {
     super(TypeSignature.class);
     try {

@@ -371,7 +371,7 @@ class S3StorageHandler(StorageHandler):
         return None
 
     def _get_last_modified(self, entry: Dict):
-        return entry["LastModified"]
+        return entry["LastModified"] if "LastModified" in entry else None
 
 
 class GCSStorageHandler(StorageHandler):
@@ -534,7 +534,7 @@ class OSSStorageHandler(StorageHandler):
         )
 
     def _get_last_modified(self, entry: Dict):
-        return entry["LastModified"]
+        return entry["LastModified"] if "LastModified" in entry else None
 
     def _get_actual_prefix(
         self,
@@ -706,9 +706,9 @@ storage_handlers: Dict[StorageType, StorageHandler] = {
     StorageType.LOCAL: LOCA_HANDLER,
     StorageType.HDFS: HDFS_HANDLER,
     StorageType.GCS: GCS_HANDLER,
-    StorageType.S3A: S3StorageHandler,
-    StorageType.OSS: OSSSecretKeyCredential,
-    StorageType.ABS: AzureAccountKeyCredential,
+    StorageType.S3A: S3_HANDLER,
+    StorageType.OSS: OSS_HANDLER,
+    StorageType.ABS: ABS_HANDLER,
 }
 
 

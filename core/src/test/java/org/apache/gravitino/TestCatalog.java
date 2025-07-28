@@ -191,4 +191,9 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   public PropertiesMetadata modelPropertiesMetadata() throws UnsupportedOperationException {
     return BASE_PROPERTIES_METADATA;
   }
+
+  @Override
+  public PropertiesMetadata modelVersionPropertiesMetadata() throws UnsupportedOperationException {
+    return BASE_PROPERTIES_METADATA;
+  }
 }

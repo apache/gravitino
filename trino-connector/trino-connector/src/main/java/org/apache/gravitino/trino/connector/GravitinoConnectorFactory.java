@@ -41,9 +41,11 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFac
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Gravitino connector factory. */
 public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
+  /** The default connector name. */
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   @SuppressWarnings("UnusedVariable")
@@ -56,6 +58,11 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     return DEFAULT_CONNECTOR_NAME;
   }
 
+  /**
+   * Retrieves the catalog connector manager.
+   *
+   * @return the catalog connector manager
+   */
   @VisibleForTesting
   public CatalogConnectorManager getCatalogConnectorManager() {
     return catalogConnectorManager;
@@ -108,12 +115,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
-      if (config.simplifyCatalogNames() && !catalogConnectorManager.getUsedMetalakes().isEmpty()) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
-            "Multiple metalakes are not supported when setting gravitino.simplify-catalog-names = true");
-      }
-      catalogConnectorManager.addMetalake(metalake);
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
       return new GravitinoSystemConnector(gravitinoStoredProcedureFactory);

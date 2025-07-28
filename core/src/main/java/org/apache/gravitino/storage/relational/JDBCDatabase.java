@@ -27,7 +27,7 @@ public interface JDBCDatabase extends Closeable {
    * Initializes the Relational database environment with the provided configuration.
    *
    * @param config The configuration for the database backend.
-   * @throws RuntimeException
+   * @throws RuntimeException if any other error occurs during setup
    */
   void initialize(Config config);
 }

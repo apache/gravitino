@@ -138,6 +138,10 @@ public abstract class SparkUtilIT extends BaseIT {
     return SparkTableInfo.create(table.table());
   }
 
+  protected List<Object[]> getTablePartitions(String tableName) {
+    return sql("SHOW PARTITIONS " + tableName);
+  }
+
   protected void dropTableIfExists(String tableName) {
     sql("DROP TABLE IF EXISTS " + tableName);
   }

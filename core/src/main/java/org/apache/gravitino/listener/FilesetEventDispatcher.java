@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -29,6 +30,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.listener.api.event.AlterFilesetEvent;
@@ -43,6 +45,9 @@ import org.apache.gravitino.listener.api.event.DropFilesetPreEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationPreEvent;
+import org.apache.gravitino.listener.api.event.ListFilesEvent;
+import org.apache.gravitino.listener.api.event.ListFilesFailureEvent;
+import org.apache.gravitino.listener.api.event.ListFilesPreEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.ListFilesetPreEvent;
@@ -77,6 +82,24 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     } catch (Exception e) {
       eventBus.dispatchEvent(
           new ListFilesetFailureEvent(PrincipalUtils.getCurrentUserName(), namespace, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
+      throws NoSuchFilesetException, IOException {
+    eventBus.dispatchEvent(
+        new ListFilesPreEvent(PrincipalUtils.getCurrentUserName(), ident, locationName, subPath));
+    try {
+      FileInfo[] fileInfos = dispatcher.listFiles(ident, locationName, subPath);
+      eventBus.dispatchEvent(
+          new ListFilesEvent(PrincipalUtils.getCurrentUserName(), ident, locationName, subPath));
+      return fileInfos;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListFilesFailureEvent(
+              PrincipalUtils.getCurrentUserName(), ident, locationName, subPath, e));
       throw e;
     }
   }

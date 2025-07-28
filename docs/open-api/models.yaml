@@ -161,9 +161,22 @@ paths:
         - model
       summary: List model versions
       operationId: listModelVersions
+      parameters:
+        - $ref: "#/components/parameters/details"
       responses:
         "200":
-          $ref: "#/components/responses/ModelVersionListResponse"
+          description: Returns the list of model version objects if {details} is true, otherwise returns the list of model version numbers
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ModelVersionListResponse"
+                  - $ref: "#/components/schemas/ModelVersionInfoListResponse"
+              examples:
+                ModelVersionListResponse:
+                  $ref: "#/components/examples/ModelVersionListResponse"
+                ModelVersionInfoListResponse:
+                  $ref: "#/components/examples/ModelVersionInfoListResponse"
         "404":
           description: Not Found - The target model does not exist
           content:
@@ -173,36 +186,6 @@ paths:
               examples:
                 NoSuchModelException:
                   $ref: "#/components/examples/NoSuchModelException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-
-    put:
-      tags:
-        - model
-      summary: Update model version
-      operationId: updateModelVersions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
-      responses:
-        "200":
-          $ref: "#/components/responses/ModelVersionResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The target model or model version does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchModelException:
-                  $ref: "#/components/examples/NoSuchModelException"
-                NoSuchModelVersionException:
-                  $ref: "#/components/examples/NoSuchModelVersionException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -284,6 +267,35 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    put:
+      tags:
+        - model
+      summary: Update model version
+      operationId: updateModelVersions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model or model version does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/models/{model}/aliases/{alias}:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -301,7 +313,7 @@ paths:
         "200":
           $ref: "#/components/responses/ModelVersionResponse"
         "404":
-          description: Not Found - The target model version does not exist
+          description: Not Found - The target model version does not exist.
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -325,6 +337,35 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+    put:
+      tags:
+        - model
+      summary: Update model version by alias
+      operationId: updateModelVersionsByAlias
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionUpdatesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModelVersionResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The target model or model version does not exist.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchModelException:
+                  $ref: "#/components/examples/NoSuchModelException"
+                NoSuchModelVersionException:
+                  $ref: "#/components/examples/NoSuchModelVersionException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
   parameters:
     version:
@@ -341,6 +382,14 @@ components:
       description: The alias of the model version
       schema:
         type: string
+    details:
+      name: details
+      in: query
+      description: Include detailed information about the model versions
+      required: false
+      schema:
+        type: boolean
+        default: false
 
   schemas:
     Model:
@@ -570,6 +619,7 @@ components:
         - $ref: "#/components/schemas/SetModelVersionPropertyRequest"
         - $ref: "#/components/schemas/RemoveModelVersionPropertyRequest"
         - $ref: "#/components/schemas/UpdateModelVersionUriRequest"
+        - $ref: "#/components/schemas/UpdateModelVersionAliasesRequest"
       discriminator:
         propertyName: "@type"
         mapping:
@@ -577,6 +627,7 @@ components:
           setProperty: "#/components/schemas/SetModelVersionPropertyRequest"
           removeProperty: "#/components/schemas/RemoveModelVersionPropertyRequest"
           updateUri: "#/components/schemas/UpdateModelVersionUriRequest"
+          updateAliases: "#/components/schemas/UpdateModelVersionAliasesRequest"
 
     UpdateModelVersionCommentRequest:
       type: object
@@ -657,6 +708,65 @@ components:
         "newUri": "s3://path/to/model"
       }
 
+    UpdateModelVersionAliasesRequest:
+      type: object
+      required:
+        - "@type"
+        - aliasesToAdd
+        - aliasesToRemove
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - updateAliases
+        aliasesToAdd:
+          type: array
+          description: The aliases to add
+          nullable: true
+          items:
+            type: string
+        aliasesToRemove:
+          type: array
+          description: The aliases to remove
+          nullable: true
+          items:
+            type: string
+      example: {
+        "@type": "updateAliases",
+        "aliasesToAdd": ["alias1", "alias2"],
+        "aliasesToRemove": ["alias3", "alias4"]
+      }
+
+    ModelVersionListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        versions:
+          type: array
+          description: The list of model versions
+          items:
+            format: int32
+
+    ModelVersionInfoListResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        infos:
+          type: array
+          description: The list of model version objects
+          items:
+            $ref: "#/components/schemas/ModelVersion"
 
   responses:
     ModelResponse:
@@ -677,27 +787,7 @@ components:
           examples:
             ModelResponse:
               $ref: "#/components/examples/ModelResponse"
-    ModelVersionListResponse:
-      description: The response of model version list
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                description: Status code of the response
-                enum:
-                  - 0
-              versions:
-                type: array
-                description: The list of model versions
-                items:
-                  format: int32
-          examples:
-            ModelVersionListResponse:
-              $ref: "#/components/examples/ModelVersionListResponse"
+
     ModelVersionResponse:
       description: The response of model version object
       content:
@@ -763,6 +853,29 @@ components:
       value: {
         "code": 0,
         "versions": [0, 1, 2]
+      }
+
+    ModelVersionInfoListResponse:
+      value: {
+        "code": 0,
+        "infos": [
+          {
+            "uri": "hdfs://path/to/model",
+            "version": 0,
+            "aliases": ["alias1", "alias2"],
+            "comment": "This is a comment",
+            "properties": {
+              "key1": "value1",
+              "key2": "value2"
+            },
+            "audit": {
+              "creator": "user1",
+              "createTime": "2021-01-01T00:00:00Z",
+              "lastModifier": "user1",
+              "lastModifiedTime": "2021-01-01T00:00:00Z"
+            }
+          }
+        ]
       }
 
     ModelVersionResponse:

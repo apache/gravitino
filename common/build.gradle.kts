@@ -121,7 +121,7 @@ tasks {
     doFirst() {
       writeProjectPropertiesFile()
       if (!file(propertiesFile).exists()) {
-        throw GradleException("$propertiesFile file not generated!")
+        throw GradleException("Failed to generate $propertiesFile.")
       }
     }
 

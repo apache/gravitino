@@ -100,14 +100,13 @@ public class TableColumnMetaService {
   boolean deleteColumnsByTableId(Long tableId) {
     // deleteColumns will be done in deleteTable transaction, so we don't do commit here.
     Integer result =
-        SessionUtils.doWithCommitAndFetchResult(
+        SessionUtils.doWithoutCommitAndFetchResult(
             TableColumnMapper.class, mapper -> mapper.softDeleteColumnsByTableId(tableId));
     return result > 0;
   }
 
   public int deleteColumnsByLegacyTimeline(Long legacyTimeline, int limit) {
-    // deleteColumns will be done in the outside transaction, so we don't do commit here.
-    return SessionUtils.doWithoutCommitAndFetchResult(
+    return SessionUtils.doWithCommitAndFetchResult(
         TableColumnMapper.class,
         mapper -> mapper.deleteColumnPOsByLegacyTimeline(legacyTimeline, limit));
   }

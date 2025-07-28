@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.CAN_SET_OWNER;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Locale;
@@ -34,13 +36,14 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -48,7 +51,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 @Path("/metalakes/{metalake}/owners")
 public class OwnerOperations {
 
-  private final OwnerManager ownerManager;
+  private final OwnerDispatcher ownerDispatcher;
 
   @Context private HttpServletRequest httpRequest;
 
@@ -56,7 +59,7 @@ public class OwnerOperations {
     // Because ownerManager may be null when Gravitino doesn't enable authorization,
     // and Jersey injection doesn't support null value. So OwnerOperations chooses to retrieve
     // ownerManager from GravitinoEnv instead of injection here.
-    this.ownerManager = GravitinoEnv.getInstance().ownerManager();
+    this.ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
   }
 
   @GET
@@ -76,7 +79,7 @@ public class OwnerOperations {
           httpRequest,
           () -> {
             MetadataObjectUtil.checkMetadataObject(metalake, object);
-            Optional<Owner> owner = ownerManager.getOwner(metalake, object);
+            Optional<Owner> owner = ownerDispatcher.getOwner(metalake, object);
             if (owner.isPresent()) {
               return Utils.ok(new OwnerResponse(DTOConverters.toDTO(owner.get())));
             } else {
@@ -94,6 +97,7 @@ public class OwnerOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "set-object-owner." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-object-owner", absolute = true)
+  @AuthorizationExpression(expression = CAN_SET_OWNER)
   public Response setOwnerForObject(
       @PathParam("metalake") String metalake,
       @PathParam("metadataObjectType") String metadataObjectType,
@@ -109,7 +113,7 @@ public class OwnerOperations {
           () -> {
             request.validate();
             MetadataObjectUtil.checkMetadataObject(metalake, object);
-            ownerManager.setOwner(metalake, object, request.getName(), request.getType());
+            ownerDispatcher.setOwner(metalake, object, request.getName(), request.getType());
             return Utils.ok(new SetResponse(true));
           });
     } catch (Exception e) {

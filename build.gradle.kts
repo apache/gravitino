@@ -50,8 +50,8 @@ plugins {
     alias(libs.plugins.spotless)
   } else {
     throw GradleException(
-      "Gravitino Gradle toolchain current doesn't support " +
-        "Java version: ${JavaVersion.current()}. Please use JDK8 to 17."
+      "The Gravitino Gradle toolchain currently does not support " +
+        "Java version ${JavaVersion.current()}. Please use JDK versions 8 through 17."
     )
   }
 
@@ -66,14 +66,14 @@ plugins {
 
 if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
   throw GradleException(
-    "Gravitino current doesn't support building with " +
-      "Java version: ${extra["jdkVersion"]}. Please use JDK8, 11 or 17."
+    "The Gravitino Gradle toolchain currently does not support building with " +
+      "Java version ${extra["jdkVersion"]}. Please use JDK versions 8, 11 or 17."
   )
 }
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
-  throw GradleException("Found unsupported Scala version: $scalaVersion")
+  throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
 project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
@@ -172,12 +172,11 @@ allprojects {
       param.environment("PROJECT_VERSION", project.version)
 
       // Gravitino CI Docker image
-      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.18")
-      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
+      param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.6")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
       param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "unknowntpo/gravitino-playground:ranger-ranger-trino-plugin@sha256:698f47724dd651c31f82e2da4281c45837fad66b2c85b0003e8591bb1e0d1d16")
-
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
 
@@ -214,9 +213,11 @@ allprojects {
         param.environment("GRAVITINO_WAR", project.rootDir.path + "/web/web/dist/")
         param.systemProperty("testMode", "embedded")
       } else {
-        throw GradleException("Gravitino integration tests only support [-PtestMode=embedded] or [-PtestMode=deploy] mode!")
+        throw GradleException(
+          "Gravitino integration tests are only compatible with the modes " +
+            "[-PtestMode=embedded] or [-PtestMode=deploy]."
+        )
       }
-
       param.useJUnitPlatform()
       val skipUTs = project.hasProperty("skipTests")
       if (skipUTs) {
@@ -539,8 +540,6 @@ tasks.rat {
     "**/LICENSE.*",
     "**/NOTICE.*",
     "**/trino-ci-testset",
-    "DISCLAIMER.txt",
-    "DISCLAIMER_WIP.txt",
     "ROADMAP.md",
     "clients/cli/src/main/resources/*.txt",
     "clients/client-python/.pytest_cache/*",
@@ -558,6 +557,7 @@ tasks.rat {
     "dev/docker/**/*.conf",
     "dev/docker/kerberos-hive/kadm5.acl",
     "docs/**/*.md",
+    "gradle/wrapper/gradle-wrapper.properties",
     "lineage/src/test/java/org/apache/gravitino/lineage/source/TestLineageOperations.java",
     "spark-connector/spark-common/src/test/resources/**",
     "web/web/.**",
@@ -639,7 +639,6 @@ tasks {
         from(projectDir.file("LICENSE.bin")) { into("package") }
         from(projectDir.file("NOTICE.bin")) { into("package") }
         from(projectDir.file("README.md")) { into("package") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("package") }
         from(projectDir.dir("web/web/licenses")) { into("package/web/licenses") }
         from(projectDir.dir("web/web/LICENSE.bin")) { into("package/web") }
         from(projectDir.dir("web/web/NOTICE.bin")) { into("package/web") }
@@ -692,7 +691,6 @@ tasks {
         from(projectDir.file("LICENSE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("NOTICE.rest")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-iceberg-rest-server") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("${rootProject.name}-iceberg-rest-server") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".rest", "")
@@ -711,7 +709,6 @@ tasks {
         from(projectDir.file("LICENSE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("NOTICE.trino")) { into("${rootProject.name}-trino-connector") }
         from(projectDir.file("README.md")) { into("${rootProject.name}-trino-connector") }
-        from(projectDir.file("DISCLAIMER.txt")) { into("${rootProject.name}-trino-connector") }
         into(outputDir)
         rename { fileName ->
           fileName.replace(".trino", "")
@@ -854,9 +851,11 @@ tasks {
         it.parent?.name != "bundles"
       ) {
         dependsOn("${it.name}:build")
-        from("${it.name}/build/libs")
+        from("${it.name}/build/libs") {
+          include("*.jar")
+          exclude("*-jcstress.jar", "*-jmh.jar")
+        }
         into("distribution/package/libs")
-        include("*.jar")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
       }
     }
@@ -864,12 +863,13 @@ tasks {
 
   register("copyCatalogLibAndConfigs", Copy::class) {
     dependsOn(
-      ":catalogs:catalog-hadoop:copyLibAndConfig",
+      ":catalogs:catalog-fileset:copyLibAndConfig",
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-starrocks:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",

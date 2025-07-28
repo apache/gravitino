@@ -26,6 +26,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.tag.Tag;
 
 public class LineUtil {
   // This expression is primarily used to match characters that have a display width of
@@ -34,6 +35,7 @@ public class LineUtil {
       Pattern.compile(
           "[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6]");
   public static final String EMPTY_DEFAULT_VALUE = "";
+  public static final String NULL_DEFAULT_VALUE = "N/A";
   public static final String EMPTY_STRING_TYPE_DEFAULT_VALUE = "''";
 
   /**
@@ -190,5 +192,15 @@ public class LineUtil {
    */
   public static String getComment(org.apache.gravitino.rel.Column column) {
     return column.comment() == null ? "N/A" : column.comment();
+  }
+
+  /**
+   * Get the comment of a tag. If the tag does not have a comment, return "N/A".
+   *
+   * @param tag the tag to get.
+   * @return the comment of the tag.
+   */
+  static String getComment(Tag tag) {
+    return tag.comment() == null ? "N/A" : tag.comment();
   }
 }

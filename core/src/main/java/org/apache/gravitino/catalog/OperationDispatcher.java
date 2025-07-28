@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.apache.gravitino.catalog.CatalogManager.checkCatalogInUse;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
@@ -65,7 +64,7 @@ public abstract class OperationDispatcher {
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
    */
-  public OperationDispatcher(
+  protected OperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
     this.catalogManager = catalogManager;
     this.store = store;
@@ -79,33 +78,33 @@ public abstract class OperationDispatcher {
       NameIdentifier catalogIdent = getCatalogIdentifier(tableIdent);
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
       return c.doWithPartitionOps(tableIdent, fn);
-    } catch (Throwable throwable) {
-      if (ex.isInstance(throwable)) {
-        throw ex.cast(throwable);
+    } catch (Exception exception) {
+      if (ex.isInstance(exception)) {
+        throw ex.cast(exception);
       }
-      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
-        throw (RuntimeException) throwable;
+      if (RuntimeException.class.isAssignableFrom(exception.getClass())) {
+        throw (RuntimeException) exception;
       }
-      throw new RuntimeException(throwable);
+      throw new RuntimeException(exception);
     }
   }
 
   protected <R, E extends Throwable> R doWithCatalog(
       NameIdentifier ident, ThrowableFunction<CatalogManager.CatalogWrapper, R> fn, Class<E> ex)
       throws E {
-    checkCatalogInUse(store, ident);
+    catalogManager.checkCatalogInUse(store, ident);
 
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
-    } catch (Throwable throwable) {
-      if (ex.isInstance(throwable)) {
-        throw ex.cast(throwable);
+    } catch (Exception exception) {
+      if (ex.isInstance(exception)) {
+        throw ex.cast(exception);
       }
-      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
-        throw (RuntimeException) throwable;
+      if (RuntimeException.class.isAssignableFrom(exception.getClass())) {
+        throw (RuntimeException) exception;
       }
-      throw new RuntimeException(throwable);
+      throw new RuntimeException(exception);
     }
   }
 
@@ -115,22 +114,22 @@ public abstract class OperationDispatcher {
       Class<E1> ex1,
       Class<E2> ex2)
       throws E1, E2 {
-    checkCatalogInUse(store, ident);
+    catalogManager.checkCatalogInUse(store, ident);
 
     try {
       CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(ident);
       return fn.apply(c);
-    } catch (Throwable throwable) {
-      if (ex1.isInstance(throwable)) {
-        throw ex1.cast(throwable);
-      } else if (ex2.isInstance(throwable)) {
-        throw ex2.cast(throwable);
+    } catch (Exception exception) {
+      if (ex1.isInstance(exception)) {
+        throw ex1.cast(exception);
+      } else if (ex2.isInstance(exception)) {
+        throw ex2.cast(exception);
       }
-      if (RuntimeException.class.isAssignableFrom(throwable.getClass())) {
-        throw (RuntimeException) throwable;
+      if (RuntimeException.class.isAssignableFrom(exception.getClass())) {
+        throw (RuntimeException) exception;
       }
 
-      throw new RuntimeException(throwable);
+      throw new RuntimeException(exception);
     }
   }
 

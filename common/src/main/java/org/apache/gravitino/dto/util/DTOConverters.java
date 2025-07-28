@@ -49,6 +49,7 @@ import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.credential.CredentialDTO;
+import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
@@ -80,6 +81,7 @@ import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
+import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
@@ -619,6 +621,26 @@ public class DTOConverters {
   }
 
   /**
+   * Converts array of FileInfo to array of FileInfoDTO.
+   *
+   * @param files The FileInfo array to convert.
+   * @return The converted FileInfoDTO array.
+   */
+  public static FileInfoDTO[] toDTO(FileInfo[] files) {
+    return Arrays.stream(files)
+        .map(
+            file ->
+                FileInfoDTO.builder()
+                    .name(file.name())
+                    .isDir(file.isDir())
+                    .size(file.size())
+                    .lastModified(file.lastModified())
+                    .path(file.path())
+                    .build())
+        .toArray(FileInfoDTO[]::new);
+  }
+
+  /**
    * Converts a Topic to a TopicDTO.
    *
    * @param topic The topic to be converted.
@@ -664,6 +686,19 @@ public class DTOConverters {
         .withProperties(modelVersion.properties())
         .withAudit(toDTO(modelVersion.auditInfo()))
         .build();
+  }
+
+  /**
+   * Converts an array of ModelVersions to an array of ModelVersionDTOs.
+   *
+   * @param modelVersions The modelVersions to be converted.
+   * @return The array of ModelVersionDTOs.
+   */
+  public static ModelVersionDTO[] toDTOs(ModelVersion[] modelVersions) {
+    if (ArrayUtils.isEmpty(modelVersions)) {
+      return new ModelVersionDTO[0];
+    }
+    return Arrays.stream(modelVersions).map(DTOConverters::toDTO).toArray(ModelVersionDTO[]::new);
   }
 
   /**

@@ -149,4 +149,20 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String updateModelVersionAliasRel(
+      @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs) {
+    return "<script>"
+        + "INSERT INTO "
+        + ModelVersionAliasRelMapper.TABLE_NAME
+        + " (model_id, model_version, model_version_alias, deleted_at)"
+        + " VALUES "
+        + " <foreach collection='modelVersionAliasRel' item='item' separator=','>"
+        + " (#{item.modelId},"
+        + " #{item.modelVersion},"
+        + " #{item.modelVersionAlias},"
+        + " #{item.deletedAt})"
+        + " </foreach>"
+        + "</script>";
+  }
 }

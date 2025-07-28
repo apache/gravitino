@@ -39,6 +39,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -212,12 +213,16 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
     catalogProperties.put(IcebergConfig.CATALOG_BACKEND.getKey(), TYPE);
     catalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
-    catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    if (!"rest".equalsIgnoreCase(TYPE)) {
+      catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    }
     catalogProperties.put(IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
 
     Map<String, String> icebergCatalogProperties = Maps.newHashMap();
     icebergCatalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
-    icebergCatalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    if (!"rest".equalsIgnoreCase(TYPE)) {
+      icebergCatalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
+    }
     icebergCatalogProperties.put(
         IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
 
@@ -574,12 +579,12 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
     Table loadTable = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertEquals("iceberg_column_1", loadTable.columns()[0].name());
-    Assertions.assertEquals(Types.TimestampType.withTimeZone(), loadTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.TimestampType.withTimeZone(6), loadTable.columns()[0].dataType());
     Assertions.assertEquals("col_1_comment", loadTable.columns()[0].comment());
 
     Assertions.assertEquals("iceberg_column_2", loadTable.columns()[1].name());
     Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(), loadTable.columns()[1].dataType());
+        Types.TimestampType.withoutTimeZone(6), loadTable.columns()[1].dataType());
     Assertions.assertEquals("col_2_comment", loadTable.columns()[1].comment());
 
     org.apache.iceberg.Table table =
@@ -1297,6 +1302,232 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         loadTable);
 
     Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+  }
+
+  @Test
+  void testTimeTypePrecision() {
+    String tableName = GravitinoITUtils.genRandomName("test_time_precision");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    columns =
+        ArrayUtils.addAll(
+            columns,
+            // time type - only support precision 6 (microsecond) or no precision
+            Column.of("time_col", Types.TimeType.get()),
+            Column.of("time_col_6", Types.TimeType.of(6)),
+            // timestamptz type (with timezone) - only support precision 6 (microsecond) or no
+            // precision
+            Column.of("timestamptz_col", Types.TimestampType.withTimeZone()),
+            Column.of("timestamptz_col_6", Types.TimestampType.withTimeZone(6)),
+            // timestamp type (without timezone) - only support precision 6 (microsecond) or no
+            // precision
+            Column.of("timestamp_col", Types.TimestampType.withoutTimeZone()),
+            Column.of("timestamp_col_6", Types.TimestampType.withoutTimeZone(6)));
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    // Verify time type precisions
+    Column[] timeColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("time_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(2, timeColumns.length);
+    for (Column column : timeColumns) {
+      switch (column.name()) {
+        case "time_col":
+        case "time_col_6":
+          Assertions.assertEquals(Types.TimeType.of(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected time column: " + column.name());
+      }
+    }
+
+    // Verify timestamptz type precisions (with timezone)
+    Column[] timestamptzColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("timestamptz_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(2, timestamptzColumns.length);
+    for (Column column : timestamptzColumns) {
+      switch (column.name()) {
+        case "timestamptz_col":
+        case "timestamptz_col_6":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected timestamptz column: " + column.name());
+      }
+    }
+
+    // Verify timestamp type precisions (without timezone)
+    Column[] timestampColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("timestamp_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(2, timestampColumns.length);
+    for (Column column : timestampColumns) {
+      switch (column.name()) {
+        case "timestamp_col":
+        case "timestamp_col_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected timestamp column: " + column.name());
+      }
+    }
+
+    // Verify Iceberg schema type conversion
+    org.apache.iceberg.Table icebergTable =
+        icebergCatalog.loadTable(
+            TableIdentifier.of(
+                IcebergCatalogWrapperHelper.getIcebergNamespace(schemaName), tableName));
+    org.apache.iceberg.Schema schema = icebergTable.schema();
+
+    // Verify field types in Iceberg schema
+    for (org.apache.iceberg.types.Types.NestedField field : schema.columns()) {
+      String fieldName = field.name();
+      org.apache.iceberg.types.Type fieldType = field.type();
+
+      if (fieldName.startsWith("time_col")) {
+        Assertions.assertInstanceOf(
+            org.apache.iceberg.types.Types.TimeType.class,
+            fieldType,
+            String.format(
+                "Field %s should be TimeType but was %s",
+                fieldName, fieldType.getClass().getSimpleName()));
+      } else {
+        String format =
+            String.format(
+                "Field %s should be TimestampType but was %s",
+                fieldName, fieldType.getClass().getSimpleName());
+        if (fieldName.startsWith("timestamptz_col")) {
+          Assertions.assertInstanceOf(
+              org.apache.iceberg.types.Types.TimestampType.class, fieldType, format);
+          org.apache.iceberg.types.Types.TimestampType tsType =
+              (org.apache.iceberg.types.Types.TimestampType) fieldType;
+          Assertions.assertTrue(tsType.shouldAdjustToUTC(), "Timestamptz should adjust to UTC");
+        } else if (fieldName.startsWith("timestamp_col")) {
+          Assertions.assertInstanceOf(
+              org.apache.iceberg.types.Types.TimestampType.class, fieldType, format);
+          org.apache.iceberg.types.Types.TimestampType tsType =
+              (org.apache.iceberg.types.Types.TimestampType) fieldType;
+          Assertions.assertFalse(tsType.shouldAdjustToUTC(), "Timestamp should not adjust to UTC");
+        }
+      }
+    }
+
+    Assertions.assertDoesNotThrow(() -> tableCatalog.dropTable(tableIdentifier));
+  }
+
+  @Test
+  void testTimeTypePrecisionValidation() {
+    String tableName = GravitinoITUtils.genRandomName("test_time_precision_validation");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+
+    // Test unsupported time precision
+    Column[] unsupportedTimeColumns = {
+      Column.of("time_col_0", Types.TimeType.of(0)),
+      Column.of("time_col_1", Types.TimeType.of(1)),
+      Column.of("time_col_3", Types.TimeType.of(3)),
+      Column.of("time_col_9", Types.TimeType.of(9))
+    };
+
+    // Test unsupported timestamptz precision (with timezone)
+    Column[] unsupportedTimestamptzColumns = {
+      Column.of("timestamptz_col_0", Types.TimestampType.withTimeZone(0)),
+      Column.of("timestamptz_col_1", Types.TimestampType.withTimeZone(1)),
+      Column.of("timestamptz_col_3", Types.TimestampType.withTimeZone(3)),
+      Column.of("timestamptz_col_9", Types.TimestampType.withTimeZone(9))
+    };
+
+    // Test unsupported timestamp precision (without timezone)
+    Column[] unsupportedTimestampColumns = {
+      Column.of("timestamp_col_0", Types.TimestampType.withoutTimeZone(0)),
+      Column.of("timestamp_col_1", Types.TimestampType.withoutTimeZone(1)),
+      Column.of("timestamp_col_3", Types.TimestampType.withoutTimeZone(3)),
+      Column.of("timestamp_col_9", Types.TimestampType.withoutTimeZone(9))
+    };
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Test time precision validation
+    for (Column column : unsupportedTimeColumns) {
+      Column[] testColumns = ArrayUtils.addAll(columns, column);
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tableCatalog.createTable(
+                      tableIdentifier,
+                      testColumns,
+                      table_comment,
+                      createProperties(),
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.NONE,
+                      new SortOrder[0]));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("Iceberg only supports microsecond precision (6) for time type"));
+    }
+
+    // Test timestamptz precision validation (with timezone)
+    for (Column column : unsupportedTimestamptzColumns) {
+      Column[] testColumns = ArrayUtils.addAll(columns, column);
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tableCatalog.createTable(
+                      tableIdentifier,
+                      testColumns,
+                      table_comment,
+                      createProperties(),
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.NONE,
+                      new SortOrder[0]));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("Iceberg only supports microsecond precision (6) for timestamptz type"));
+    }
+
+    // Test timestamp precision validation (without timezone)
+    for (Column column : unsupportedTimestampColumns) {
+      Column[] testColumns = ArrayUtils.addAll(columns, column);
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tableCatalog.createTable(
+                      tableIdentifier,
+                      testColumns,
+                      table_comment,
+                      createProperties(),
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.NONE,
+                      new SortOrder[0]));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("Iceberg only supports microsecond precision (6) for timestamp type"));
+    }
   }
 
   protected static void assertionsTableInfo(

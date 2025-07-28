@@ -51,7 +51,7 @@ contains the following code snippets:
 4. Initialize Gravitino admin client and create a Gravitino metalake.
 5. Initialize Gravitino client and list metalakes.
 6. Create a Gravitino `Catalog` and special `type` is `Catalog.Type.FILESET` and `provider` is
-   [hadoop](./hadoop-catalog.md)
+   [fileset](./fileset-catalog.md)
 7. Create a Gravitino `Schema` with the `location` pointed to a HDFS path, and use `hdfs client` to
    check if the schema location is successfully created in HDFS.
 8. Create a `Fileset` with `type` is [Fileset.Type.MANAGED](./manage-fileset-metadata-using-gravitino.md#fileset-operations),
@@ -197,10 +197,3 @@ Process finished with exit code 0
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](https://github.com/apache/gravitino/blob/main/LICENSE) for the details.
 
-## ASF Incubator disclaimer
-
-Apache Gravitino is an effort undergoing incubation at The Apache Software Foundation (ASF), sponsored by the Apache Incubator. 
-Incubation is required of all newly accepted projects until a further review indicates that the infrastructure, communications, 
-and decision making process have stabilized in a manner consistent with other successful ASF projects. 
-While incubation status is not necessarily a reflection of the completeness or stability of the code, 
-it does indicate that the project has yet to be fully endorsed by the ASF.

@@ -22,7 +22,6 @@ from gravitino.dto.model_dto import ModelDTO
 
 
 class GenericModel(Model):
-
     _model_dto: ModelDTO
     """The model DTO object."""
 
