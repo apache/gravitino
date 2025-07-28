@@ -180,6 +180,15 @@ class Transforms(Transform):
     def bucket(
         num_buckets: int, *field_names: List[str]
     ) -> "Transforms.BucketTransform":
+        """Create a transform that returns the bucket of the input value.
+
+        Args:
+            num_buckets (int): The number of buckets to use
+            *field_names (List[str]): The field names to transform
+
+        Returns:
+            Transforms.BucketTransform: The created transform
+        """
         return Transforms.BucketTransform(
             num_buckets=Literals.integer_literal(value=num_buckets),
             fields=[NamedReference.field(names) for names in field_names],
@@ -199,6 +208,15 @@ class Transforms(Transform):
     def truncate(
         width: int, field_name: Union[str, List[str]]
     ) -> "Transforms.TruncateTransform":
+        """Create a transform that returns the truncated value of the input value with the given width.
+
+        Args:
+            width (int): The width to truncate to
+            field_name (Union[str, List[str]]): The column/field name to transform
+
+        Returns:
+            Transforms.TruncateTransform: The created transform
+        """
         return Transforms.TruncateTransform(
             width=Literals.integer_literal(value=width),
             field=NamedReference.field(
