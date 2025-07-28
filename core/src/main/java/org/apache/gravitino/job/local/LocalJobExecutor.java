@@ -195,7 +195,7 @@ public class LocalJobExecutor implements JobExecutor {
           process.destroy();
         }
         LOG.info("Job {} is cancelling while running", jobId);
-        jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELING, UNEXPIRED_TIME_IN_MS));
+        jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLING, UNEXPIRED_TIME_IN_MS));
       }
     }
   }
@@ -256,7 +256,7 @@ public class LocalJobExecutor implements JobExecutor {
         } else {
           synchronized (lock) {
             JobHandle.Status oldStatus = jobStatus.get(jobId).getLeft();
-            if (oldStatus == JobHandle.Status.CANCELING) {
+            if (oldStatus == JobHandle.Status.CANCELLING) {
               LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
               jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLED, System.currentTimeMillis()));
             } else if (oldStatus == JobHandle.Status.STARTED) {
