@@ -176,7 +176,8 @@ allprojects {
       param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.5")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_TRINO_DOCKER_IMAGE", "apache/gravitino-ci:trino-0.1.6")
-      param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "apache/gravitino-ci:ranger-0.1.1")
+      param.environment("GRAVITINO_CI_RANGER_DOCKER_IMAGE", "unknowntpo/gravitino-playground:ranger-ranger-trino-plugin@sha256:698f47724dd651c31f82e2da4281c45837fad66b2c85b0003e8591bb1e0d1d16")
+
       param.environment("GRAVITINO_CI_KAFKA_DOCKER_IMAGE", "apache/kafka:3.7.0")
       param.environment("GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", "localstack/localstack:latest")
 
