@@ -82,12 +82,11 @@ public class TagManager implements TagDispatcher {
   }
 
   public Tag[] listTagsInfo(String metalake) {
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(NamespaceUtil.ofTag(metalake).levels()),
         LockType.READ,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           try {
             return entityStore
                 .list(NamespaceUtil.ofTag(metalake), TagEntity.class, Entity.EntityType.TAG)
@@ -103,13 +102,12 @@ public class TagManager implements TagDispatcher {
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
       throws TagAlreadyExistsException {
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
 
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofTag(metalake).levels()),
+        NameIdentifierUtil.ofTag(metalake, name),
         LockType.WRITE,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           TagEntity tagEntity =
               TagEntity.builder()
                   .withId(idGenerator.nextId())
@@ -138,12 +136,11 @@ public class TagManager implements TagDispatcher {
   }
 
   public Tag getTag(String metalake, String name) throws NoSuchTagException {
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofTag(metalake, name),
         LockType.READ,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           try {
             return entityStore.get(
                 NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG, TagEntity.class);
@@ -159,12 +156,11 @@ public class TagManager implements TagDispatcher {
 
   public Tag alterTag(String metalake, String name, TagChange... changes)
       throws NoSuchTagException, IllegalArgumentException {
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofTag(metalake).levels()),
+        NameIdentifierUtil.ofTag(metalake, name),
         LockType.WRITE,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           try {
             return entityStore.update(
                 NameIdentifierUtil.ofTag(metalake, name),
@@ -185,12 +181,11 @@ public class TagManager implements TagDispatcher {
   }
 
   public boolean deleteTag(String metalake, String name) {
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofTag(metalake).levels()),
+        NameIdentifierUtil.ofTag(metalake, name),
         LockType.WRITE,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           try {
             return entityStore.delete(
                 NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
@@ -204,12 +199,11 @@ public class TagManager implements TagDispatcher {
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name)
       throws NoSuchTagException {
     NameIdentifier tagId = NameIdentifierUtil.ofTag(metalake, name);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
         tagId,
         LockType.READ,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           try {
             if (!entityStore.exists(tagId, Entity.EntityType.TAG)) {
               throw new NoSuchTagException(

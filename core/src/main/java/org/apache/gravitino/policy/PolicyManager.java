@@ -74,12 +74,11 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public Policy[] listPolicyInfos(String metalake) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
+    checkMetalake(metalakeIdent, entityStore);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
         LockType.READ,
         () -> {
-          checkMetalake(metalakeIdent, entityStore);
-
           try {
             return entityStore
                 .list(
@@ -94,12 +93,11 @@ public class PolicyManager implements PolicyDispatcher {
 
   @Override
   public Policy getPolicy(String metalake, String policyName) throws NoSuchPolicyException {
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.READ,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           try {
             return entityStore.get(
                 NameIdentifierUtil.ofPolicy(metalake, policyName),
@@ -128,12 +126,11 @@ public class PolicyManager implements PolicyDispatcher {
       PolicyContent content)
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
+    checkMetalake(metalakeIdent, entityStore);
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
+        NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, entityStore);
-
           PolicyEntity policyEntity =
               PolicyEntity.builder()
                   .withId(idGenerator.nextId())
@@ -169,12 +166,11 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public Policy alterPolicy(String metalake, String policyName, PolicyChange... changes) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
+    checkMetalake(metalakeIdent, entityStore);
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
+        NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, entityStore);
-
           try {
             return entityStore.update(
                 NameIdentifierUtil.ofPolicy(metalake, policyName),
@@ -211,12 +207,11 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public boolean deletePolicy(String metalake, String policyName) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
+    checkMetalake(metalakeIdent, entityStore);
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
+        NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, entityStore);
-
           try {
             return entityStore.delete(
                 NameIdentifierUtil.ofPolicy(metalake, policyName), Entity.EntityType.POLICY);
@@ -261,7 +256,7 @@ public class PolicyManager implements PolicyDispatcher {
       String metalake, String policyName, boolean expectedEnabledState) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
+        NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
         () -> {
           checkMetalake(metalakeIdent, entityStore);
