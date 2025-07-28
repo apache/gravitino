@@ -19,53 +19,52 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.rest.RESTRequest;
 
-import java.util.List;
-import java.util.Map;
-
-/**
- * Request to drop partition statistics.
- */
+/** Request to drop partition statistics. */
 @Getter
 @EqualsAndHashCode
 @ToString
 public class PartitionStatsDropRequest implements RESTRequest {
 
-    @JsonProperty("partition_statistics")
-    private Map<String, List<String>> partitionStatistics;
+  @JsonProperty("partition_statistics")
+  private Map<String, List<String>> partitionStatistics;
 
-    /**
-     * Creates a new PartitionStatsDropRequest.
-     *
-     * @param partitionStatistics The partition statistics to drop.
-     */
-    public PartitionStatsDropRequest(Map<String, List<String>> partitionStatistics) {
-        this.partitionStatistics = partitionStatistics;
+  /**
+   * Creates a new PartitionStatsDropRequest.
+   *
+   * @param partitionStatistics The partition statistics to drop.
+   */
+  public PartitionStatsDropRequest(Map<String, List<String>> partitionStatistics) {
+    this.partitionStatistics = partitionStatistics;
+  }
+
+  /** This is the constructor that is used by Jackson deserializer */
+  public PartitionStatsDropRequest() {
+    this.partitionStatistics = null;
+  }
+
+  /**
+   * Validates the request.
+   *
+   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   */
+  @Override
+  public void validate() throws IllegalArgumentException {
+    if (partitionStatistics == null || partitionStatistics.isEmpty()) {
+      throw new IllegalArgumentException("Partition statistics to drop cannot be null or empty.");
     }
-
-    /** This is the constructor that is used by Jackson deserializer */
-    public PartitionStatsDropRequest() {
-        this.partitionStatistics = null;
-    }
-
-    /**
-     * Validates the request.
-     *
-     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
-     */
-    @Override
-    public void validate() throws IllegalArgumentException {
-        if (partitionStatistics == null || partitionStatistics.isEmpty()) {
-            throw new IllegalArgumentException("Partition statistics to drop cannot be null or empty.");
-        }
-        partitionStatistics.forEach((partition, stats) -> {
-            if (stats == null || stats.isEmpty()) {
-                throw new IllegalArgumentException("Statistics for partition " + partition + " cannot be null or empty.");
-            }
+    partitionStatistics.forEach(
+        (partition, stats) -> {
+          if (stats == null || stats.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Statistics for partition " + partition + " cannot be null or empty.");
+          }
         });
-    }
+  }
 }

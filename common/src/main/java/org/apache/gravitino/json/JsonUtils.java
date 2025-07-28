@@ -1413,15 +1413,49 @@ public class JsonUtils {
   public static class StatisticValueDeserializer extends JsonDeserializer<StatisticValue> {
     @Override
     public StatisticValue<?> deserialize(JsonParser p, DeserializationContext ctxt)
-            throws IOException {
+        throws IOException {
       JsonNode node = p.getCodec().readTree(p);
       return getStatisticValue(node);
     }
   }
 
+  public static class NestedMapSerializer extends JsonSerializer<Map<String, StatisticValue<?>>> {
+    @Override
+    public void serialize(
+        Map<String, StatisticValue<?>> value, JsonGenerator gen, SerializerProvider provider)
+        throws IOException {
+      gen.writeStartObject();
+      for (Map.Entry<String, StatisticValue<?>> entry : value.entrySet()) {
+        gen.writeFieldName(entry.getKey());
+        JsonUtils.StatisticValueSerializer serializer = new JsonUtils.StatisticValueSerializer();
+        serializer.serialize(entry.getValue(), gen, provider);
+      }
+      gen.writeEndObject();
+    }
+  }
+
+  public static class NestedMapDeserializer
+      extends JsonDeserializer<Map<String, StatisticValue<?>>> {
+    @Override
+    public Map<String, StatisticValue<?>> deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      Map<String, StatisticValue<?>> map = Maps.newHashMap();
+      Iterator<Map.Entry<String, JsonNode>> iterator = node.fields();
+      while (iterator.hasNext()) {
+        Map.Entry<String, JsonNode> entry = iterator.next();
+        StatisticValue<?> value = getStatisticValue(entry.getValue());
+        if (value != null) {
+          map.put(entry.getKey(), value);
+        }
+      }
+      return map;
+    }
+  }
+
   private static StatisticValue<?> getStatisticValue(JsonNode node) throws IOException {
     Preconditions.checkArgument(
-            node != null && !node.isNull(), "Cannot parse statistic value from invalid JSON: %s", node);
+        node != null && !node.isNull(), "Cannot parse statistic value from invalid JSON: %s", node);
     if (node.isIntegralNumber()) {
       return StatisticValues.longValue(node.asLong());
     } else if (node.isFloatingPointNumber()) {
@@ -1444,22 +1478,22 @@ public class JsonUtils {
       ObjectNode objectNode = (ObjectNode) node;
       Map<String, StatisticValue<?>> map = Maps.newHashMap();
       objectNode
-              .fields()
-              .forEachRemaining(
-                      entry -> {
-                        try {
-                          StatisticValue<?> value = getStatisticValue(entry.getValue());
-                          if (value != null) {
-                            map.put(entry.getKey(), value);
-                          }
-                        } catch (IOException e) {
-                          throw new RuntimeException(e);
-                        }
-                      });
+          .fields()
+          .forEachRemaining(
+              entry -> {
+                try {
+                  StatisticValue<?> value = getStatisticValue(entry.getValue());
+                  if (value != null) {
+                    map.put(entry.getKey(), value);
+                  }
+                } catch (IOException e) {
+                  throw new RuntimeException(e);
+                }
+              });
       return StatisticValues.objectValue(map);
     } else {
       throw new UnsupportedEncodingException(
-              String.format("Don't support json node type %s", node.getNodeType()));
+          String.format("Don't support json node type %s", node.getNodeType()));
     }
   }
 
@@ -1468,7 +1502,7 @@ public class JsonUtils {
 
     @Override
     public void serialize(StatisticValue value, JsonGenerator gen, SerializerProvider serializers)
-            throws IOException {
+        throws IOException {
       if (value.dataType().name() == Type.Name.BOOLEAN) {
         gen.writeBoolean((Boolean) value.value());
       } else if (value.dataType().name() == Type.Name.STRING) {
@@ -1486,7 +1520,7 @@ public class JsonUtils {
       } else if (value.dataType().name() == Type.Name.STRUCT) {
         gen.writeStartObject();
         for (Map.Entry<String, StatisticValue<?>> entry :
-                ((Map<String, StatisticValue<?>>) value.value()).entrySet()) {
+            ((Map<String, StatisticValue<?>>) value.value()).entrySet()) {
           gen.writeFieldName(entry.getKey());
           serialize(entry.getValue(), gen, serializers);
         }

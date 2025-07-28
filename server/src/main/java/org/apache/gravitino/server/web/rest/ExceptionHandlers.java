@@ -170,11 +170,12 @@ public class ExceptionHandlers {
     return RolePermissionOperationHandler.INSTANCE.handle(type, name, parent, e);
   }
 
-  public static Response handlePartitionStatsException(OperationType type, String name, String parent, Exception e) {
+  public static Response handlePartitionStatsException(
+      OperationType type, String name, String parent, Exception e) {
     return PartitionStatsExceptionHandler.INSTANCE.handle(type, name, parent, e);
   }
 
-    private static class PartitionExceptionHandler extends BaseExceptionHandler {
+  private static class PartitionExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new PartitionExceptionHandler();
 
@@ -778,34 +779,34 @@ public class ExceptionHandlers {
     }
   }
 
-    private static class PartitionStatsExceptionHandler extends BaseExceptionHandler {
+  private static class PartitionStatsExceptionHandler extends BaseExceptionHandler {
 
-        private static final ExceptionHandler INSTANCE = new PartitionStatsExceptionHandler();
+    private static final ExceptionHandler INSTANCE = new PartitionStatsExceptionHandler();
 
-        private static String getPartitionStatsErrorMsg(
-            String partition, String operation, String table, String reason) {
-        return String.format(
-            "Failed to operate partition stats%s operation [%s] of table [%s], reason [%s]",
-            partition, operation, table, reason);
-        }
-
-        @Override
-        public Response handle(OperationType op, String partition, String table, Exception e) {
-        String formatted = StringUtil.isBlank(partition) ? "" : " [" + partition + "]";
-        String errorMsg = getPartitionStatsErrorMsg(formatted, op.name(), table, getErrorMsg(e));
-        LOG.warn(errorMsg, e);
-
-        if (e instanceof IllegalArgumentException) {
-            return Utils.illegalArguments(errorMsg, e);
-
-        } else if (e instanceof NotFoundException) {
-            return Utils.notFound(errorMsg, e);
-
-        } else {
-            return super.handle(op, partition, table, e);
-        }
-        }
+    private static String getPartitionStatsErrorMsg(
+        String partition, String operation, String table, String reason) {
+      return String.format(
+          "Failed to operate partition stats%s operation [%s] of table [%s], reason [%s]",
+          partition, operation, table, reason);
     }
+
+    @Override
+    public Response handle(OperationType op, String partition, String table, Exception e) {
+      String formatted = StringUtil.isBlank(partition) ? "" : " [" + partition + "]";
+      String errorMsg = getPartitionStatsErrorMsg(formatted, op.name(), table, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else {
+        return super.handle(op, partition, table, e);
+      }
+    }
+  }
 
   @VisibleForTesting
   static class BaseExceptionHandler extends ExceptionHandler {

@@ -20,49 +20,47 @@ package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.List;
+import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.gravitino.stats.Statistic;
+import org.apache.gravitino.dto.stats.StatisticDTO;
 
-import java.util.List;
-import java.util.Map;
-
-/**
- * Represents a response for updating partition statistics.
- */
+/** Represents a response for updating partition statistics. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
 public class PartitionStatsUpdateResponse extends BaseResponse {
 
-    @JsonProperty("statistics")
-    private Map<String, List<Statistic>> statistics;
+  @JsonProperty("statistics")
+  private Map<String, List<StatisticDTO>> statistics;
 
-    /**
-     * Creates a new PartitionStatsUpdateResponse.
-     *
-     * @param statistics The updated statistics for the partition.
-     */
-    public PartitionStatsUpdateResponse(Map<String, List<Statistic>> statistics) {
-        super(0);
-        this.statistics = statistics;
-    }
+  /**
+   * Creates a new PartitionStatsUpdateResponse.
+   *
+   * @param statistics The updated statistics for the partition.
+   */
+  public PartitionStatsUpdateResponse(Map<String, List<StatisticDTO>> statistics) {
+    super(0);
+    this.statistics = statistics;
+  }
 
-    /** This is the constructor that is used by Jackson deserializer */
-    public PartitionStatsUpdateResponse() {
-        super();
-        this.statistics = null;
-    }
+  /** This is the constructor that is used by Jackson deserializer */
+  public PartitionStatsUpdateResponse() {
+    super();
+    this.statistics = null;
+  }
 
-    /**
-     * Validates the response.
-     *
-     * @throws IllegalArgumentException If the response is invalid, this exception is thrown.
-     */
-    @Override
-    public void validate() throws IllegalArgumentException {
-        super.validate();
-        Preconditions.checkArgument(statistics != null && !statistics.isEmpty(), "Statistics cannot be empty");
-    }
+  /**
+   * Validates the response.
+   *
+   * @throws IllegalArgumentException If the response is invalid, this exception is thrown.
+   */
+  @Override
+  public void validate() throws IllegalArgumentException {
+    super.validate();
+    Preconditions.checkArgument(
+        statistics != null && !statistics.isEmpty(), "Statistics cannot be empty");
+  }
 }

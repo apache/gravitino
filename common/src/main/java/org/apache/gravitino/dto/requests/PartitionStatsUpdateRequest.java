@@ -19,52 +19,57 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.stats.StatisticValue;
 
-import java.util.Map;
-
-/** Represents a request to update partition statistics.
-    */
+/** Represents a request to update partition statistics. */
 @Getter
 @EqualsAndHashCode
 @ToString
 public class PartitionStatsUpdateRequest implements RESTRequest {
 
-    @JsonProperty("updates")
-    private final Map<String, Map<String, StatisticValue<?>>> updates;
+  @JsonProperty("updates")
+  @JsonSerialize(contentUsing = JsonUtils.NestedMapSerializer.class)
+  @JsonDeserialize(contentUsing = JsonUtils.NestedMapDeserializer.class)
+  private final Map<String, Map<String, StatisticValue<?>>> updates;
 
-    /**
-     * Creates a new PartitionStatsUpdateRequest.
-     *
-     * @param updates The updates to apply to the partition statistics.
-     */
-    public PartitionStatsUpdateRequest(Map<String, Map<String, StatisticValue<?>>> updates) {
-        this.updates = updates;
+  /**
+   * Creates a new PartitionStatsUpdateRequest.
+   *
+   * @param updates The updates to apply to the partition statistics.
+   */
+  public PartitionStatsUpdateRequest(Map<String, Map<String, StatisticValue<?>>> updates) {
+    this.updates = updates;
+  }
+
+  /** Default constructor for PartitionStatsUpdateRequest. (Used for Jackson deserialization.) */
+  public PartitionStatsUpdateRequest() {
+    this.updates = null;
+  }
+
+  /**
+   * Validates the request.
+   *
+   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   */
+  @Override
+  public void validate() throws IllegalArgumentException {
+    if (updates == null || updates.isEmpty()) {
+      throw new IllegalArgumentException("Updates map cannot be null or empty");
     }
-
-    /** Default constructor for PartitionStatsUpdateRequest. (Used for Jackson deserialization.) */
-    public PartitionStatsUpdateRequest() {
-        this.updates = null;
-    }
-
-    /**
-     * Validates the request.
-     *
-     * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
-     */
-    @Override
-    public void validate() throws IllegalArgumentException {
-        if (updates == null || updates.isEmpty()) {
-            throw new IllegalArgumentException("Updates map cannot be null or empty");
-        }
-        updates.forEach((partition, stats) -> {
-            if (stats == null || stats.isEmpty()) {
-                throw new IllegalArgumentException("Statistics for partition " + partition + " cannot be null or empty");
-            }
+    updates.forEach(
+        (partition, stats) -> {
+          if (stats == null || stats.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Statistics for partition " + partition + " cannot be null or empty");
+          }
         });
-    }
+  }
 }

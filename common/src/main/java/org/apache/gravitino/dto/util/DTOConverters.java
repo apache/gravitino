@@ -79,6 +79,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.file.FileInfo;
@@ -818,15 +819,15 @@ public class DTOConverters {
     }
 
     return Arrays.stream(statistics)
-            .map(
-                    statistic ->
-                            StatisticDTO.builder()
-                                    .withName(statistic.name())
-                                    .withValue(statistic.value())
-                                    .withModifiable(statistic.modifiable())
-                                    .withReserved(statistic.reserved())
-                                    .build())
-            .toArray(StatisticDTO[]::new);
+        .map(
+            statistic ->
+                StatisticDTO.builder()
+                    .withName(statistic.name())
+                    .withValue(statistic.value())
+                    .withModifiable(statistic.modifiable())
+                    .withReserved(statistic.reserved())
+                    .build())
+        .toArray(StatisticDTO[]::new);
   }
 
   /**
