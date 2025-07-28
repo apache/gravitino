@@ -76,4 +76,52 @@ public class MapUtils {
   public static Map<String, String> unmodifiableMap(Map<String, String> m) {
     return Collections.unmodifiableMap(m);
   }
+
+  /**
+   * Extract an integer value from the properties map with provided key. If provided key not exist
+   * in the properties map, it will return default value.
+   *
+   * @param properties input map
+   * @param property provided key
+   * @param defaultValue default value
+   * @return integer value from the properties map with provided key.
+   */
+  public static int propertyAsInt(
+      Map<String, String> properties, String property, int defaultValue) {
+    String value = properties.get(property);
+    if (value != null) {
+      try {
+        return Integer.parseInt(value);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "%s in %s is invalid. %s", value, property, "The value must be an integer number"));
+      }
+    }
+    return defaultValue;
+  }
+
+  /**
+   * Extract a long value from the properties map with provided key. If provided key not exist in
+   * the properties map, it will return default value.
+   *
+   * @param properties input map
+   * @param property provided key
+   * @param defaultValue default value
+   * @return long value from the properties map with provided key.
+   */
+  public static long propertyAsLong(
+      Map<String, String> properties, String property, long defaultValue) {
+    String value = properties.get(property);
+    if (value != null) {
+      try {
+        return Long.parseLong(value);
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "%s in %s is invalid. %s", value, property, "The value must be a long number"));
+      }
+    }
+    return defaultValue;
+  }
 }
