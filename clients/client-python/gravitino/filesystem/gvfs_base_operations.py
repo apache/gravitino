@@ -87,6 +87,7 @@ class BaseGVFSOperations(ABC):
     ):
         self._metalake = metalake_name
         self._options = options
+        self._register_custom_storage_handlers()
 
         request_headers = (
             None
@@ -132,6 +133,14 @@ class BaseGVFSOperations(ABC):
             )
         )
         self._current_location_name = self._init_current_location_name()
+
+    def _register_custom_storage_handlers(self):
+        """Register custom storage handler providers from configuration."""
+        try:
+            from gravitino.filesystem.gvfs_storage_handler import register_storage_handler_providers
+            register_storage_handler_providers(self._options)
+        except Exception as e:
+                logger.warning(f"Failed to register custom storage handlers: {str(e)}")
 
     @property
     def current_location_name(self):
