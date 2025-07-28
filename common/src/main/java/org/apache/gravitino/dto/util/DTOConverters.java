@@ -108,6 +108,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
 
 /** Utility class for converting between DTOs and domain objects. */
@@ -803,6 +804,29 @@ public class DTOConverters {
       return new GroupDTO[0];
     }
     return Arrays.stream(groups).map(DTOConverters::toDTO).toArray(GroupDTO[]::new);
+  }
+
+  /**
+   * Converts an array of statistics to an array of StatisticDTOs.
+   *
+   * @param statistics The statistics to be converted.
+   * @return The array of StatisticDTOs.
+   */
+  public static StatisticDTO[] toDTOs(Statistic[] statistics) {
+    if (ArrayUtils.isEmpty(statistics)) {
+      return new StatisticDTO[0];
+    }
+
+    return Arrays.stream(statistics)
+            .map(
+                    statistic ->
+                            StatisticDTO.builder()
+                                    .withName(statistic.name())
+                                    .withValue(statistic.value())
+                                    .withModifiable(statistic.modifiable())
+                                    .withReserved(statistic.reserved())
+                                    .build())
+            .toArray(StatisticDTO[]::new);
   }
 
   /**
