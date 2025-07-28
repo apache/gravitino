@@ -185,6 +185,27 @@ class Transforms(Transform):
             fields=[NamedReference.field(names) for names in field_names],
         )
 
+    @staticmethod
+    @overload
+    def truncate(
+        width: int, field_name: List[str]
+    ) -> "Transforms.TruncateTransform": ...
+
+    @staticmethod
+    @overload
+    def truncate(width: int, field_name: str) -> "Transforms.TruncateTransform": ...
+
+    @staticmethod
+    def truncate(
+        width: int, field_name: Union[str, List[str]]
+    ) -> "Transforms.TruncateTransform":
+        return Transforms.TruncateTransform(
+            width=Literals.integer_literal(value=width),
+            field=NamedReference.field(
+                [field_name] if isinstance(field_name, str) else field_name
+            ),
+        )
+
     class IdentityTransform(SingleFieldTransform):
         """A transform that returns the input value."""
 
@@ -280,3 +301,46 @@ class Transforms(Transform):
 
         def __hash__(self):
             return hash((self.num_buckets_, *self.fields))
+
+    class TruncateTransform(Transform):
+        """A transform that returns the truncated value of the input value with the given width."""
+
+        def __init__(self, width: Literal[int], field: NamedReference):
+            self.width_ = width
+            self.field = field
+
+        def name(self) -> str:
+            return Transforms.NAME_OF_TRUNCATE
+
+        def width(self) -> int:
+            """Gets the width to truncate to.
+
+            Returns:
+                int: The width to truncate to.
+            """
+
+            return self.width_.value()
+
+        def field_name(self) -> List[str]:
+            """Gets the field name to transform.
+
+            Returns:
+                List[str]: The field name to transform.
+            """
+
+            return self.field.field_name()
+
+        def arguments(self) -> List[Expression]:
+            return [self.width_, self.field]
+
+        def __eq__(self, other):
+            if self is other:
+                return True
+            return (
+                isinstance(other, Transforms.TruncateTransform)
+                and self.width_ == other.width_
+                and self.field == other.field
+            )
+
+        def __hash__(self):
+            return hash((self.width_, self.field))
