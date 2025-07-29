@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.client;
 
-import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.hc.core5.http.HttpStatus.SC_FORBIDDEN;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
@@ -32,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.AuditDTO;
-import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
@@ -44,7 +42,6 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.stats.StatisticValueDTO;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
-import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.stats.Statistic;
@@ -62,10 +59,8 @@ public class TestSupportsStatistics extends TestBase {
   private static final String CATALOG_NAME = "catalog1";
   private static final String SCHEMA_NAME = "schema1";
   private static final String TABLE_NAME = "table1";
-  private static final String FILESET_NAME = "fileset1";
 
   private static Table relationalTable;
-  private static Fileset genericFileset;
 
   @BeforeAll
   public static void setUp() throws Exception {
@@ -89,21 +84,6 @@ public class TestSupportsStatistics extends TestBase {
                 .withAudit(AuditDTO.builder().withCreator("test").build())
                 .build(),
             client.restClient());
-
-    genericFileset =
-        new GenericFileset(
-            FilesetDTO.builder()
-                .name(FILESET_NAME)
-                .comment("comment1")
-                .type(Fileset.Type.MANAGED)
-                .storageLocations(
-                    Collections.singletonMap(
-                        LOCATION_NAME_UNKNOWN, "hdfs://localhost:9000/user/test"))
-                .properties(Collections.emptyMap())
-                .audit(AuditDTO.builder().withCreator("test").build())
-                .build(),
-            client.restClient(),
-            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME));
   }
 
   @Test
@@ -112,28 +92,13 @@ public class TestSupportsStatistics extends TestBase {
   }
 
   @Test
-  public void testListStatisticsForFileset() throws JsonProcessingException {
-    testListStatistics((SupportsStatistics) genericFileset, getFilesetStatisticsPath());
-  }
-
-  @Test
   public void testUpdateStatisticsForTable() throws JsonProcessingException {
     testUpdateStatistics((SupportsStatistics) relationalTable, getTableStatisticsPath());
   }
 
   @Test
-  public void testUpdateStatisticsForFileset() throws JsonProcessingException {
-    testUpdateStatistics((SupportsStatistics) genericFileset, getFilesetStatisticsPath());
-  }
-
-  @Test
   public void testDropStatisticsForTable() throws JsonProcessingException {
     testDropStatistics((SupportsStatistics) relationalTable, getTableStatisticsPath());
-  }
-
-  @Test
-  public void testDropStatisticsForFileset() throws JsonProcessingException {
-    testDropStatistics((SupportsStatistics) genericFileset, getFilesetStatisticsPath());
   }
 
   private void testListStatistics(SupportsStatistics supportsStatistics, String path)
@@ -302,11 +267,5 @@ public class TestSupportsStatistics extends TestBase {
     return String.format(
         "/api/metalakes/%s/catalogs/%s/schemas/%s/tables/%s/statistics",
         METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, TABLE_NAME);
-  }
-
-  private String getFilesetStatisticsPath() {
-    return String.format(
-        "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/statistics",
-        METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, FILESET_NAME);
   }
 }

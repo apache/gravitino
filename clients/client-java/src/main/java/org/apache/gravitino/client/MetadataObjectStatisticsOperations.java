@@ -37,8 +37,8 @@ import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.SupportsStatistics;
 
 /**
- * The implementation of {@link SupportsStatistics}. This interface will be composited into table,
- * partition and fileset to provide statistics operations for these metadata objects.
+ * The implementation of {@link SupportsStatistics}. This interface will be composited into table to
+ * provide statistics operations for table metadata objects.
  */
 class MetadataObjectStatisticsOperations implements SupportsStatistics {
 
@@ -55,34 +55,21 @@ class MetadataObjectStatisticsOperations implements SupportsStatistics {
     // Build the REST API path based on the metadata object type
     String fullName = metadataObject.fullName();
 
-    // For different object types, the path pattern is different
-    switch (metadataObject.type()) {
-      case TABLE:
-        // For table:
-        // api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/statistics
-        String[] parts = fullName.split("\\.");
-        Preconditions.checkArgument(parts.length == 3, "Invalid table full name: " + fullName);
-        // fullName format is catalog.schema.table, we need schema and table
-        this.statisticsRequestPath =
-            String.format(
-                "api/metalakes/%s/catalogs/%s/schemas/%s/tables/%s/statistics",
-                metalakeName, catalogName, parts[1], parts[2]);
-        break;
-      case FILESET:
-        // For fileset:
-        // api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/statistics
-        parts = fullName.split("\\.");
-        Preconditions.checkArgument(parts.length == 3, "Invalid fileset full name: " + fullName);
-        // fullName format is catalog.schema.fileset, we need schema and fileset
-        this.statisticsRequestPath =
-            String.format(
-                "api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/statistics",
-                metalakeName, catalogName, parts[1], parts[2]);
-        break;
-      default:
-        throw new IllegalArgumentException(
-            "Statistics are not supported for object type: " + metadataObject.type());
+    // Currently only TABLE type is supported
+    if (metadataObject.type() != MetadataObject.Type.TABLE) {
+      throw new IllegalArgumentException(
+          "Statistics are only supported for TABLE object type, but got: " + metadataObject.type());
     }
+
+    // For table:
+    // api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/statistics
+    String[] parts = fullName.split("\\.");
+    Preconditions.checkArgument(parts.length == 3, "Invalid table full name: " + fullName);
+    // fullName format is catalog.schema.table, we need schema and table
+    this.statisticsRequestPath =
+        String.format(
+            "api/metalakes/%s/catalogs/%s/schemas/%s/tables/%s/statistics",
+            metalakeName, catalogName, parts[1], parts[2]);
   }
 
   @Override
