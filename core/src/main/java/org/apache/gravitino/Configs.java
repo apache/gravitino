@@ -28,6 +28,7 @@ import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
+import org.apache.gravitino.storage.file.stats.LancePartitionStatisticFileFactory;
 
 public class Configs {
 
@@ -413,4 +414,18 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .createWithDefault("/tmp/gravitino/jobs/staging");
+
+  public static final ConfigEntry<String> PARTITION_STATS_FILE_FACTORY_CLASS_NAME =
+      new ConfigBuilder("gravitino.stats.partition.fileFactoryClassName")
+          .doc("The partition stats file factory class.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault(LancePartitionStatisticFileFactory.class.getCanonicalName());
+
+  public static final ConfigEntry<String> PARTITION_STATS_FILE_LOCATION =
+      new ConfigBuilder("gravitino.stats.partition.location")
+          .doc("The partition stats file location.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .stringConf()
+          .createWithDefault("/tmp");
 }

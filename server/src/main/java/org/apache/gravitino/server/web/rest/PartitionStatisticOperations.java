@@ -213,5 +213,4 @@ public class PartitionStatisticOperations {
           OperationType.DROP, partitions, table, e);
     }
   }
-
 }

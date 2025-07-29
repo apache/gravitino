@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.file.stats;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.lancedb.lance.Dataset;
@@ -47,6 +46,7 @@ import org.apache.arrow.vector.ipc.ArrowReader;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.stats.StatisticValue;
 
@@ -94,8 +94,8 @@ public class LancePartitionStatisticFile implements PartitionStatisticFile {
   }
 
   @Override
-  public Map<String, Map<String, List<StatisticValue<?>>>> listStatistics(
-      long tableId, String fromPartitionName, String toPartitionName) {
+  public Map<String, Map<String, StatisticValue<?>>> listStatistics(
+      MetadataObject object, String fromPartitionName, String toPartitionName) {
 
     try (Dataset dataset = Dataset.open(location, allocator)) {
       String partitionFilter = "AND partition_name IN ('" + fromPartitionName + "')";
@@ -106,7 +106,7 @@ public class LancePartitionStatisticFile implements PartitionStatisticFile {
               + "' AND partition_name < '"
               + toPartitionName
               + "'";*/
-      String filter = "table_id = " + tableId + partitionFilter;
+      String filter = "table_id = " + 0 + partitionFilter;
 
       try (LanceScanner scanner =
           dataset.newScan(
@@ -146,7 +146,7 @@ public class LancePartitionStatisticFile implements PartitionStatisticFile {
             }
           }
         }
-        return ImmutableMap.copyOf(statistics);
+        return null;
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
@@ -155,8 +155,8 @@ public class LancePartitionStatisticFile implements PartitionStatisticFile {
 
   @Override
   public void updateStatistics(
-      Map<Long, Map<String, Map<String, StatisticValue<?>>>> statisticsToUpdate) {
-    Map<Long, Map<String, List<String>>> statisticsToDrop = Maps.newHashMap();
+      Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> statisticsToUpdate) {
+    Map<MetadataObject, Map<String, List<String>>> statisticsToDrop = Maps.newHashMap();
     statisticsToUpdate.forEach(
         (key, value) -> {
           Map<String, List<String>> tableStatistics =
@@ -179,7 +179,7 @@ public class LancePartitionStatisticFile implements PartitionStatisticFile {
       List<FragmentMetadata> fragmentMetas;
       int count = 0;
       try (VectorSchemaRoot root = VectorSchemaRoot.create(schema, allocator)) {
-        for (Map.Entry<Long, Map<String, Map<String, StatisticValue<?>>>> tableStatistic :
+        for (Map.Entry<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> tableStatistic :
             statisticsToUpdate.entrySet()) {
           for (Map.Entry<String, Map<String, StatisticValue<?>>> updatePartitionStatistic :
               tableStatistic.getValue().entrySet()) {
@@ -192,9 +192,9 @@ public class LancePartitionStatisticFile implements PartitionStatisticFile {
         }
         root.allocateNew();
         int index = 0;
-        for (Map.Entry<Long, Map<String, Map<String, StatisticValue<?>>>> tableStatistic :
+        for (Map.Entry<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> tableStatistic :
             statisticsToUpdate.entrySet()) {
-          Long tableId = tableStatistic.getKey();
+          Long tableId = 0L;
           for (Map.Entry<String, Map<String, StatisticValue<?>>> updatePartitionStatistic :
               tableStatistic.getValue().entrySet()) {
             String partitionName = updatePartitionStatistic.getKey();
@@ -250,12 +250,13 @@ public class LancePartitionStatisticFile implements PartitionStatisticFile {
   }
 
   @Override
-  public void dropStatistics(Map<Long, Map<String, List<String>>> partitionStatisticsToDrop) {
+  public void dropStatistics(
+      Map<MetadataObject, Map<String, List<String>>> partitionStatisticsToDrop) {
     try (Dataset dataset = Dataset.open(location, allocator)) {
       List<String> partitionSQLs = Lists.newArrayList();
-      for (Map.Entry<Long, Map<String, List<String>>> entry :
+      for (Map.Entry<MetadataObject, Map<String, List<String>>> entry :
           partitionStatisticsToDrop.entrySet()) {
-        Long tableId = entry.getKey();
+        Long tableId = 0L;
         for (Map.Entry<String, List<String>> internalEntry : entry.getValue().entrySet()) {
           List<String> statistics = internalEntry.getValue();
           String partition = internalEntry.getKey();

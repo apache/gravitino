@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.file.stats;
 import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.stats.StatisticValue;
 
 public interface PartitionStatisticFile extends Closeable {
@@ -29,10 +30,11 @@ public interface PartitionStatisticFile extends Closeable {
 
   String format();
 
-  Map<String, Map<String, List<StatisticValue<?>>>> listStatistics(
-      long tableId, String fromPartitionName, String toPartitionName);
+  Map<String, Map<String, StatisticValue<?>>> listStatistics(
+      MetadataObject metadataObject, String fromPartitionName, String toPartitionName);
 
-  void updateStatistics(Map<Long, Map<String, Map<String, StatisticValue<?>>>> statisticsToUpdate);
+  void updateStatistics(
+      Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>> statisticsToUpdate);
 
-  void dropStatistics(Map<Long, Map<String, List<String>>> partitionStatisticsToDrop);
+  void dropStatistics(Map<MetadataObject, Map<String, List<String>>> partitionStatisticsToDrop);
 }

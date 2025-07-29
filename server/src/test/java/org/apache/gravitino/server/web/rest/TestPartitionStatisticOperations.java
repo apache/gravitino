@@ -66,8 +66,7 @@ import org.mockito.Mockito;
 
 public class TestPartitionStatisticOperations extends JerseyTest {
 
-  private PartitionStatisticManager manager =
-      mock(PartitionStatisticManager.class);
+  private PartitionStatisticManager manager = mock(PartitionStatisticManager.class);
 
   private final String metalake = "metalake1";
 
@@ -110,9 +109,7 @@ public class TestPartitionStatisticOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(manager)
-                .to(PartitionStatisticManager.class)
-                .ranked(2);
+            bind(manager).to(PartitionStatisticManager.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
