@@ -211,19 +211,19 @@ and `USE_SCHEMA` privileges on its parent schema.
 
 ### Topic privileges
 
-| Name          | Supports Securable Object        | Operation                                 |
-|---------------|----------------------------------|-------------------------------------------|
-| CREATE_TOPIC  | Metalake, Catalog, Schema        | Create a topic                            |
-| PRODUCE_TOPIC | Metalake, Catalog, Schema, Topic | Produce a topic (including alter a topic) |
-| CONSUME_TOPIC | Metalake, Catalog, Schema, Topic | Consume a topic                           |
+| Name          | Supports Securable Object        | Operation                                             |
+|---------------|----------------------------------|-------------------------------------------------------|
+| CREATE_TOPIC  | Metalake, Catalog, Schema        | Create a topic                                        |
+| PRODUCE_TOPIC | Metalake, Catalog, Schema, Topic | Consume and produce a topic (including alter a topic) |
+| CONSUME_TOPIC | Metalake, Catalog, Schema, Topic | Consume a topic                                       |
 
 ### Fileset privileges
 
-| Name           | Supports Securable Object          | Operation                                   |
-|----------------|------------------------------------|---------------------------------------------|
-| CREATE_FILESET | Metalake, Catalog, Schema          | Create a fileset                            |
-| WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Write a fileset (including alter a fileset) |
-| READ_FILESET   | Metalake, Catalog, Schema, Fileset | read a fileset                              |
+| Name           | Supports Securable Object          | Operation                                            |
+|----------------|------------------------------------|------------------------------------------------------|
+| CREATE_FILESET | Metalake, Catalog, Schema          | Create a fileset                                     |
+| WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Read and write a fileset (including alter a fileset) |
+| READ_FILESET   | Metalake, Catalog, Schema, Fileset | Read a fileset                                       |
 
 ### Model privileges
 
