@@ -145,3 +145,35 @@ class TestTransforms(unittest.TestCase):
             self.assertEqual(apply_transform, twin_apply_transform)
             self.assertEqual(len(apply_trans_dict), 1)
             self.assertEqual(apply_trans_dict[apply_transform], 2)
+
+    def test_list_transform(self):
+        list_transform = Transforms.list(["createTime"], ["city"])
+        list_transform_with_assignments = Transforms.list(
+            ["createTime", "city"], assignments=[]
+        )
+        trans_dict = {
+            list_transform: 1,
+            list_transform_with_assignments: 2,
+        }
+        self.assertIsInstance(list_transform, Transforms.ListTransform)
+        self.assertIsInstance(list_transform_with_assignments, Transforms.ListTransform)
+        self.assertEqual(list_transform.name(), Transforms.NAME_OF_LIST)
+        self.assertListEqual(
+            list_transform.arguments(),
+            [
+                NamedReference.field(field_name=field_name)
+                for field_name in list_transform.field_names()
+            ],
+        )
+        self.assertListEqual(list_transform.field_names(), [["createTime"], ["city"]])
+        self.assertListEqual(
+            list_transform_with_assignments.field_names(), [["createTime", "city"]]
+        )
+        self.assertListEqual(list_transform.assignments(), [])
+        self.assertListEqual(
+            list_transform.assignments(), list_transform_with_assignments.assignments()
+        )
+        self.assertNotEqual(list_transform, list_transform_with_assignments)
+        self.assertEqual(len(trans_dict), 2)
+        self.assertEqual(trans_dict[list_transform], 1)
+        self.assertEqual(trans_dict[list_transform_with_assignments], 2)
