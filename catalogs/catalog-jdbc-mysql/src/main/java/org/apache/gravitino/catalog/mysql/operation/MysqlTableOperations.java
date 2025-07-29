@@ -652,7 +652,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         Arrays.stream(columns).collect(Collectors.toMap(JdbcColumn::name, c -> c));
     for (Index index : indexes) {
       if (index.type() == Index.IndexType.UNIQUE_KEY) {
-        // the column in the unique index must be not null
+        // the auto increment column in the unique index must be not null
         for (String[] colNames : index.fieldNames()) {
           JdbcColumn column = columnMap.get(colNames[0]);
           Preconditions.checkArgument(
@@ -661,10 +661,25 @@ public class MysqlTableOperations extends JdbcTableOperations {
               colNames[0],
               index.name());
           Preconditions.checkArgument(
-              !column.nullable(),
-              "Column %s in the unique index %s must be a not null column",
+              !(column.autoIncrement() && column.nullable()),
+              "Auto increment column %s in the unique index %s must be a not null column",
               colNames[0],
               index.name());
+        }
+      }
+
+      if (index.type() == Index.IndexType.PRIMARY_KEY) {
+        // the column in the primary key must be not null
+        for (String[] colNames : index.fieldNames()) {
+          JdbcColumn column = columnMap.get(colNames[0]);
+          Preconditions.checkArgument(
+              column != null,
+              "Column %s in the primary key does not exist in the table",
+              colNames[0]);
+          Preconditions.checkArgument(
+              !column.nullable(),
+              "Column %s in the primary key must be a not null column",
+              colNames[0]);
         }
       }
     }
