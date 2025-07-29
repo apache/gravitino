@@ -209,6 +209,9 @@ and `USE_SCHEMA` privileges on its parent schema.
 | MODIFY_TABLE | Metalake, Catalog, Schema, Table  | Select data from a data, write data to a table or modify the table schema |
 | SELECT_TABLE | Metalake, Catalog, Schema, Table  | Select data from a table                                                  |
 
+DENY `MODIFY_TABLE` won't deny the `SELECT_TABLE` operation if the user has the privilege to `ALLOW SELECT_TABLE` on the table.
+DENY `SELECT_TABLE` won‘t deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
+
 ### Topic privileges
 
 | Name          | Supports Securable Object        | Operation                                             |
@@ -217,6 +220,9 @@ and `USE_SCHEMA` privileges on its parent schema.
 | PRODUCE_TOPIC | Metalake, Catalog, Schema, Topic | Consume and produce a topic (including alter a topic) |
 | CONSUME_TOPIC | Metalake, Catalog, Schema, Topic | Consume a topic                                       |
 
+DENY `PRODUCE_TOPIC` won't deny the `COMSUME_TOPIC` operation if the user has the privilege to `ALLOW CONSUME_TOPIC` on the topic.
+DENY `CONSUME_TOPIC` won‘t deny the `PRODUCE_TOPIC` operation if the user has the privilege `ALLOW PRODUCE_TOPIC` on the topic.
+
 ### Fileset privileges
 
 | Name           | Supports Securable Object          | Operation                                            |
@@ -224,6 +230,9 @@ and `USE_SCHEMA` privileges on its parent schema.
 | CREATE_FILESET | Metalake, Catalog, Schema          | Create a fileset                                     |
 | WRITE_FILESET  | Metalake, Catalog, Schema, Fileset | Read and write a fileset (including alter a fileset) |
 | READ_FILESET   | Metalake, Catalog, Schema, Fileset | Read a fileset                                       |
+
+DENY `READ_FILESET` won't deny the `WRITE_FILESET` operation if the user has the privilege to `ALLOW WRITE_FILESET` on the fileset.
+DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has the privilege `ALLOW READ_FILESET` on the fileset.
 
 ### Model privileges
 
