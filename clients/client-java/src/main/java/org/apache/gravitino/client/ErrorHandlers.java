@@ -37,6 +37,7 @@ import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
@@ -78,6 +79,7 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 
 /**
@@ -249,12 +251,21 @@ public class ErrorHandlers {
   }
 
   /**
+<<<<<<< HEAD
    * Creates an error handler specific to job and job template operations.
    *
    * @return A Consumer representing the job error handler.
    */
   public static Consumer<ErrorResponse> jobErrorHandler() {
     return JobErrorHandler.INSTANCE;
+=======
+   * Creates an error handler specific to Statistics operations.
+   *
+   * @return A Consumer representing the Statistics error handler.
+   */
+  public static Consumer<ErrorResponse> statisticsErrorHandler() {
+    return StatisticsErrorHandler.INSTANCE;
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
   }
 
   private ErrorHandlers() {}
@@ -1137,6 +1148,7 @@ public class ErrorHandlers {
     }
   }
 
+<<<<<<< HEAD
   /** Error handler specific to job and job template operations. */
   @SuppressWarnings("FormatStringAnnotation")
   private static class JobErrorHandler extends RestErrorHandler {
@@ -1183,6 +1195,59 @@ public class ErrorHandlers {
 
         case ErrorConstants.IN_USE_CODE:
           throw new InUseException(errorMsg);
+=======
+  /** Error handler specific to Statistics operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class StatisticsErrorHandler extends RestErrorHandler {
+
+    private static final StatisticsErrorHandler INSTANCE = new StatisticsErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          if (errorResponse.getType().equals(IllegalStatisticNameException.class.getSimpleName())) {
+            throw new IllegalStatisticNameException(errorMessage);
+          } else {
+            throw new IllegalArgumentException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchTableException.class.getSimpleName())) {
+            throw new NoSuchTableException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchFilesetException.class.getSimpleName())) {
+            throw new NoSuchFilesetException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          if (errorResponse
+              .getType()
+              .equals(UnmodifiableStatisticException.class.getSimpleName())) {
+            throw new UnmodifiableStatisticException(errorMessage);
+          } else {
+            throw new ForbiddenException(errorMessage);
+          }
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
 
         default:
           super.accept(errorResponse);

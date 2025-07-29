@@ -32,18 +32,28 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 public class StatisticListResponse extends BaseResponse {
 
   @JsonProperty("statistics")
+<<<<<<< HEAD
   private StatisticDTO[] statistics;
 
   /**
    * Constructor for StatisticsListResponse.
    *
    * @param statistics Array of StatisticDTO objects representing the statistics.
+=======
+  private final StatisticDTO[] statistics;
+
+  /**
+   * Constructor for StatisticListResponse.
+   *
+   * @param statistics The array of statistics.
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
    */
   public StatisticListResponse(StatisticDTO[] statistics) {
     super(0);
     this.statistics = statistics;
   }
 
+<<<<<<< HEAD
   /** Default constructor for StatisticsListResponse (used by Jackson deserializer). */
   public StatisticListResponse() {
     this(null);
@@ -57,5 +67,32 @@ public class StatisticListResponse extends BaseResponse {
       Preconditions.checkArgument(statistic != null, "\"statistic\" must not be null");
       statistic.validate();
     }
+=======
+  /** Default constructor for StatisticListResponse (used by Jackson deserializer). */
+  public StatisticListResponse() {
+    super();
+    this.statistics = null;
+  }
+
+  /**
+   * Validates the response data.
+   *
+   * @throws IllegalArgumentException If the response data is invalid.
+   */
+  @Override
+  public void validate() throws IllegalArgumentException {
+    super.validate();
+    Preconditions.checkArgument(statistics != null, "statistics field is required");
+  }
+
+  /**
+   * Creates a new StatisticListResponse with the given statistics.
+   *
+   * @param statistics The statistics to include in the response.
+   * @return A new StatisticListResponse.
+   */
+  public static StatisticListResponse ok(StatisticDTO... statistics) {
+    return new StatisticListResponse(statistics);
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
   }
 }

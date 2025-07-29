@@ -34,21 +34,35 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.file.Fileset;
+<<<<<<< HEAD
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
+=======
+import org.apache.gravitino.stats.Statistic;
+import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.SupportsStatistics;
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic fileset. */
 class GenericFileset
+<<<<<<< HEAD
     implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials, SupportsPolicies {
+=======
+    implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials, SupportsStatistics {
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
 
   private final FilesetDTO filesetDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectCredentialOperations objectCredentialOperations;
+<<<<<<< HEAD
   private final MetadataObjectPolicyOperations objectPolicyOperations;
+=======
+  private final MetadataObjectStatisticsOperations objectStatisticsOperations;
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
     this.filesetDTO = filesetDTO;
@@ -61,8 +75,14 @@ class GenericFileset
         new MetadataObjectRoleOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(filesetNs.level(0), filesetObject, restClient);
+<<<<<<< HEAD
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(filesetNs.level(0), filesetObject, restClient);
+=======
+    this.objectStatisticsOperations =
+        new MetadataObjectStatisticsOperations(
+            filesetNs.level(0), filesetNs.level(1), filesetObject, restClient);
+>>>>>>> dc6f26d92 ([#7274] feat(client-java): Support statistics http client config for gravitino client)
   }
 
   @Override
@@ -183,5 +203,20 @@ class GenericFileset
   @Override
   public int hashCode() {
     return filesetDTO.hashCode();
+  }
+
+  @Override
+  public List<Statistic> listStatistics() {
+    return objectStatisticsOperations.listStatistics();
+  }
+
+  @Override
+  public List<Statistic> updateStatistics(Map<String, StatisticValue<?>> statistics) {
+    return objectStatisticsOperations.updateStatistics(statistics);
+  }
+
+  @Override
+  public boolean dropStatistics(List<String> statistics) {
+    return objectStatisticsOperations.dropStatistics(statistics);
   }
 }
