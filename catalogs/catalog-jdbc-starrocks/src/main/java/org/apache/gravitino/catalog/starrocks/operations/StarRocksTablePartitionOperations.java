@@ -154,7 +154,8 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
         RangePartition rangePartition = (RangePartition) partition;
         partitionSqlFragment = StarRocksUtils.generatePartitionSqlFragment(rangePartition);
 
-        // The partition properties actually cannot be passed into Doris, we just return an empty
+        // The partition properties actually cannot be passed into StarRocks, we just return an
+        // empty
         // map instead.
         added =
             Partitions.range(
