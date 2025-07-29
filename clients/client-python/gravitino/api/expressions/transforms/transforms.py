@@ -23,6 +23,7 @@ from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.expressions.partitions.list_partition import ListPartition
 from gravitino.api.expressions.partitions.partition import Partition
+from gravitino.api.expressions.partitions.range_partition import RangePartition
 from gravitino.api.expressions.transforms.transform import (
     SingleFieldTransform,
     Transform,
@@ -263,6 +264,26 @@ class Transforms(Transform):
             assignments=[] if assignments is None else assignments,
         )
 
+    @staticmethod
+    def range(
+        field_name: List[str], assignments: Optional[List[RangePartition]] = None
+    ) -> "Transforms.RangeTransform":
+        """Create a transform that returns the range of the input value with preassigned range partitions.
+
+        Args:
+            field_name (List[str]):
+                The field name to transform
+            assignments (Optional[List[RangePartition]], optional):
+                The preassigned range partitions. Defaults to `None`.
+
+        Returns:
+            Transforms.RangeTransform: The created transform
+        """
+        return Transforms.RangeTransform(
+            field=NamedReference.field(field_name=field_name),
+            assignments=[] if assignments is None else assignments,
+        )
+
     class IdentityTransform(SingleFieldTransform):
         """A transform that returns the input value."""
 
@@ -462,3 +483,40 @@ class Transforms(Transform):
 
         def __hash__(self) -> int:
             return hash(tuple(self._fields))
+
+    class RangeTransform(Transform):
+        """A transform that returns the range of the input value."""
+
+        def __init__(
+            self,
+            field: NamedReference,
+            assignments: Optional[List[RangePartition]] = None,
+        ):
+            self._field = field
+            self._assignments = [] if assignments is None else assignments
+
+        def name(self) -> str:
+            return Transforms.NAME_OF_RANGE
+
+        def field_name(self) -> List[str]:
+            """Gets the field name to transform.
+
+            Returns:
+                List[str]: The field name to transform.
+            """
+
+            return self._field.field_name()
+
+        def arguments(self) -> List[Expression]:
+            return [self._field]
+
+        def assignments(self) -> List[Partition]:
+            return self._assignments
+
+        def __eq__(self, other):
+            if not isinstance(other, Transforms.RangeTransform):
+                return False
+            return self is other or self.field_name() == other.field_name()
+
+        def __hash__(self):
+            return hash(self._field)
