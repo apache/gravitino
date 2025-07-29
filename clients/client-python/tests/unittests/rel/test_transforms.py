@@ -177,3 +177,35 @@ class TestTransforms(unittest.TestCase):
         self.assertEqual(len(trans_dict), 2)
         self.assertEqual(trans_dict[list_transform], 1)
         self.assertEqual(trans_dict[list_transform_with_assignments], 2)
+
+    def test_range_transform(self):
+        range_transform = Transforms.range(["createTime"])
+        range_transform_with_assignments = Transforms.range(
+            ["createTime", "city"], assignments=[]
+        )
+        trans_dict = {
+            range_transform: 1,
+            range_transform_with_assignments: 2,
+        }
+        self.assertIsInstance(range_transform, Transforms.RangeTransform)
+        self.assertIsInstance(
+            range_transform_with_assignments, Transforms.RangeTransform
+        )
+        self.assertEqual(range_transform.name(), Transforms.NAME_OF_RANGE)
+        self.assertListEqual(
+            range_transform.arguments(),
+            [NamedReference.field(field_name=range_transform.field_name())],
+        )
+        self.assertListEqual(range_transform.field_name(), ["createTime"])
+        self.assertListEqual(
+            range_transform_with_assignments.field_name(), ["createTime", "city"]
+        )
+        self.assertListEqual(range_transform.assignments(), [])
+        self.assertListEqual(
+            range_transform.assignments(),
+            range_transform_with_assignments.assignments(),
+        )
+        self.assertNotEqual(range_transform, range_transform_with_assignments)
+        self.assertEqual(len(trans_dict), 2)
+        self.assertEqual(trans_dict[range_transform], 1)
+        self.assertEqual(trans_dict[range_transform_with_assignments], 2)
