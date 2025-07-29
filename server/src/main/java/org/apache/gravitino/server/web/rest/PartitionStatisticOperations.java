@@ -49,6 +49,7 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.stats.PartitionStatisticManager;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticValue;
 import org.slf4j.Logger;
@@ -213,27 +214,4 @@ public class PartitionStatisticOperations {
     }
   }
 
-  public static class PartitionStatisticManager {
-    boolean dropPartitionStatistics(
-        String metalake,
-        MetadataObject metadataObject,
-        Map<String, List<String>> partitionStatistics) {
-      return true;
-    }
-
-    void updatePartitionStatistics(
-        String metalake,
-        MetadataObject metadataObject,
-        Map<String, Map<String, StatisticValue<?>>> partitionStatistics) {
-      return;
-    }
-
-    Map<String, List<Statistic>> listPartitionStatistics(
-        String metalake,
-        MetadataObject metadataObject,
-        String fromPartitionName,
-        String toPartitionName) {
-      return null;
-    }
-  }
 }

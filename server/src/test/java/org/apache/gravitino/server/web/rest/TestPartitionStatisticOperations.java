@@ -51,6 +51,7 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.stats.PartitionStatisticManager;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
@@ -65,8 +66,8 @@ import org.mockito.Mockito;
 
 public class TestPartitionStatisticOperations extends JerseyTest {
 
-  private PartitionStatisticOperations.PartitionStatisticManager manager =
-      mock(PartitionStatisticOperations.PartitionStatisticManager.class);
+  private PartitionStatisticManager manager =
+      mock(PartitionStatisticManager.class);
 
   private final String metalake = "metalake1";
 
@@ -110,7 +111,7 @@ public class TestPartitionStatisticOperations extends JerseyTest {
           @Override
           protected void configure() {
             bind(manager)
-                .to(PartitionStatisticOperations.PartitionStatisticManager.class)
+                .to(PartitionStatisticManager.class)
                 .ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
