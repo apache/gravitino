@@ -77,7 +77,9 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
         tmp.setExecutable(true);
         LOG.info("modifiedGravitinoStartShell content: \n{}", content);
         CommandExecutor.executeCommandLocalHost(
-            modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT,
+            modifiedGravitinoStartShell + " start",
+            false,
+            ProcessData.TypesOfData.OUTPUT,
             ImmutableMap.of("JAVA_HOME", jdk17Home));
       } catch (Exception e) {
         LOG.error("Can replace /etc/krb5.conf with real kerberos configuration", e);
