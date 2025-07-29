@@ -59,12 +59,7 @@ spec:
         - -c
         - |
           cp -r /root/gravitino/scripts/*  /tmp/scripts/
-          /root/gravitino/bin/gravitino.sh run > /dev/null 2>&1 &
-          while ! /root/gravitino/bin/gcli.sh -s; do
-              echo "Waiting for Gravitino to be ready..."
-              sleep 2
-          done
-          VERSION=$(/root/gravitino/bin/gcli.sh -s  | grep -oP '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          VERSION=$(ls /root/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
           echo $VERSION > /tmp/scripts/version.txt
         resources:
           {{- toYaml .Values.initResources | nindent 10 }}
