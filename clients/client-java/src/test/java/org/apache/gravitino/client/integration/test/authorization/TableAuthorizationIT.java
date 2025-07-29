@@ -197,7 +197,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         RuntimeException.class,
         () -> {
-          tableCatalogNormalUser.loadTable(NameIdentifier.of(CATALOG, SCHEMA, "table1"));
+          tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
         });
   }
 

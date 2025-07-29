@@ -251,7 +251,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             String.valueOf(metadataObject.type()),
             String.valueOf(metadataId),
             AuthConstants.OWNER,
-            "allow");
+            AuthConstants.ALLOW);
     allowEnforcer.removePolicy(policy);
   }
 
@@ -379,7 +379,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   String.valueOf(metadataObject.type()),
                   String.valueOf(metadataId),
                   AuthConstants.OWNER,
-                  "allow");
+                  AuthConstants.ALLOW);
           allowEnforcer.addPolicy(policy);
         }
       }
@@ -395,13 +395,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     for (SecurableObject securableObject : securableObjects) {
       for (Privilege privilege : securableObject.privileges()) {
         Privilege.Condition condition = privilege.condition();
-        if ("deny".equalsIgnoreCase(condition.name())) {
+        if (AuthConstants.DENY.equalsIgnoreCase(condition.name())) {
           denyEnforcer.addPolicy(
               String.valueOf(roleEntity.id()),
               securableObject.type().name(),
               String.valueOf(MetadataIdConverter.getID(securableObject, metalake)),
               privilege.name().name().toUpperCase(),
-              "deny");
+              AuthConstants.ALLOW);
         }
         allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
