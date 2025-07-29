@@ -19,6 +19,7 @@
 package org.apache.gravitino.integration.test.util;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -26,7 +27,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class GravitinoITUtils {
   public static final Logger LOG = LoggerFactory.getLogger(GravitinoITUtils.class);

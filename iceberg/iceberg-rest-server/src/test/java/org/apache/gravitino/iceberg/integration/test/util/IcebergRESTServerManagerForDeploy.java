@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.integration.test.util;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -30,7 +31,6 @@ import org.apache.gravitino.integration.test.util.CommandExecutor;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ProcessData;
 import org.apache.gravitino.integration.test.util.ProcessData.TypesOfData;
-import org.testcontainers.shaded.com.google.common.collect.ImmutableMap;
 
 public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager {
 
@@ -55,6 +55,7 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
         SQLITE_DRIVER_DOWNLOAD_URL,
         Paths.get(icebergRESTServerHome.toString(), "iceberg-rest-server", "libs").toString());
 
+    String jdk17Home = System.getenv("JDK17_HOME");
     String gravitinoRestStartShell = icebergRESTServerHome.toString() + "/bin/" + SCRIPT_NAME;
     String krb5Path = System.getProperty("java.security.krb5.conf");
     if (krb5Path != null) {
@@ -76,7 +77,8 @@ public class IcebergRESTServerManagerForDeploy extends IcebergRESTServerManager 
         tmp.setExecutable(true);
         LOG.info("modifiedGravitinoStartShell content: \n{}", content);
         CommandExecutor.executeCommandLocalHost(
-            modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT);
+            modifiedGravitinoStartShell + " start", false, ProcessData.TypesOfData.OUTPUT,
+            ImmutableMap.of("JAVA_HOME", jdk17Home));
       } catch (Exception e) {
         LOG.error("Can replace /etc/krb5.conf with real kerberos configuration", e);
       }

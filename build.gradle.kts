@@ -106,7 +106,7 @@ project.extra["extraJvmArgs"] = if (getJdkVersionForTest(project) != JavaLanguag
   )
 }
 
-fun useHighVersionJDK(project: Project): Boolean {
+fun useJDK17(project: Project): Boolean {
   val name = project.name.lowercase()
   val path = project.path.lowercase()
 
@@ -366,7 +366,7 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (useHighVersionJDK(getProject())) {
+      } else if (useJDK17(getProject())) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
