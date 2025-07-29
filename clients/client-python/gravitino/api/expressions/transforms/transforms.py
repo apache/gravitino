@@ -15,12 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import ClassVar, List, Union, overload
+from typing import ClassVar, List, Optional, Union, overload
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.expressions.literals.literal import Literal
 from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.named_reference import NamedReference
+from gravitino.api.expressions.partitions.list_partition import ListPartition
+from gravitino.api.expressions.partitions.partition import Partition
 from gravitino.api.expressions.transforms.transform import (
     SingleFieldTransform,
     Transform,
@@ -238,6 +240,29 @@ class Transforms(Transform):
 
         return Transforms.ApplyTransform(name=name, arguments=arguments)
 
+    @staticmethod
+    def list(
+        *field_names: List[str], assignments: Optional[List[ListPartition]] = None
+    ) -> "Transforms.ListTransform":
+        """Create a transform that includes multiple fields in a list.
+
+        Args:
+            *fields (List[NamedReference]):
+                The fields to include in the list
+            assignments (Optional[List[ListPartition]]):
+                The preassigned list partitions
+
+        Returns:
+            Transforms.ListTransform: The created transform
+        """
+        return Transforms.ListTransform(
+            fields=[
+                NamedReference.field(field_name=field_name)
+                for field_name in field_names
+            ],
+            assignments=[] if assignments is None else assignments,
+        )
+
     class IdentityTransform(SingleFieldTransform):
         """A transform that returns the input value."""
 
@@ -401,3 +426,39 @@ class Transforms(Transform):
 
         def __hash__(self):
             return 31 * hash(self.name_) + hash(tuple(self.arguments_))
+
+    class ListTransform(Transform):
+        """A transform that includes multiple fields in a list."""
+
+        def __init__(
+            self,
+            fields: List[NamedReference],
+            assignments: Optional[List[ListPartition]] = None,
+        ):
+            self._fields = fields
+            self._assignments = [] if assignments is None else assignments
+
+        def field_names(self) -> List[List[str]]:
+            """Gets the field names to include in the list.
+
+            Returns:
+                List[List[str]]: The field names to include in the list.
+            """
+            return [field.field_name() for field in self._fields]
+
+        def name(self) -> str:
+            return Transforms.NAME_OF_LIST
+
+        def arguments(self) -> List[Expression]:
+            return self._fields
+
+        def assignments(self) -> List[Partition]:
+            return self._assignments
+
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, Transforms.ListTransform):
+                return False
+            return self is value or self._fields == value.arguments()
+
+        def __hash__(self) -> int:
+            return hash(tuple(self._fields))
