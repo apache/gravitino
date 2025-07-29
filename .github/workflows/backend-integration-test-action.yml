@@ -67,7 +67,7 @@ jobs:
       - name: Test catalog fileset
         if: ${{ inputs.test-mode == 'deploy' }}
         run: |
-          ./gradlew :catalogs:catalog-fileset:test -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
+          ./gradlew :catalogs:catalog-fileset:test -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PtestMode=deploy
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4

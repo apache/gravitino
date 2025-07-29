@@ -110,7 +110,7 @@ fun useHighVersionJDK(project: Project): Boolean {
   val name = project.name.lowercase()
   val path = project.path.lowercase()
 
-  // bundles module rely on catalog-fileset modules
+  // bundles module rely on catalog-fileset module
   if (name == "catalog-common" || name == "hadoop-common" || name == "catalog-fileset") {
     return false
   }
@@ -123,7 +123,7 @@ fun useHighVersionJDK(project: Project): Boolean {
     return true
   }
 
-  if (name in listOf("server", "authorizations", "lineage")) {
+  if (name in listOf("server", "lineage")) {
     return true
   }
 
