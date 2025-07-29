@@ -224,6 +224,20 @@ class Transforms(Transform):
             ),
         )
 
+    @staticmethod
+    def apply(name: str, arguments: List[Expression]) -> "Transforms.ApplyTransform":
+        """Create a transform that applies a function to the input value.
+
+        Args:
+            name (str): The name of the function to apply
+            arguments (List[Expression]): he arguments to the function
+
+        Returns:
+            Transforms.ApplyTransform: The created transform
+        """
+
+        return Transforms.ApplyTransform(name=name, arguments=arguments)
+
     class IdentityTransform(SingleFieldTransform):
         """A transform that returns the input value."""
 
@@ -362,3 +376,28 @@ class Transforms(Transform):
 
         def __hash__(self):
             return hash((self.width_, self.field))
+
+    class ApplyTransform(Transform):
+        """A transform that applies a function to the input value."""
+
+        def __init__(self, name: str, arguments: List[Expression]):
+            self.name_ = name
+            self.arguments_ = arguments
+
+        def name(self) -> str:
+            return self.name_
+
+        def arguments(self) -> List[Expression]:
+            return self.arguments_
+
+        def __eq__(self, other):
+            if self is other:
+                return True
+            return (
+                isinstance(other, Transforms.ApplyTransform)
+                and self.name_ == other.name_
+                and self.arguments_ == other.arguments_
+            )
+
+        def __hash__(self):
+            return 31 * hash(self.name_) + hash(tuple(self.arguments_))
