@@ -354,6 +354,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         continue;
       }
       allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
       loadPolicyByRoleEntity(role);
       loadedRoles.add(roleId);
     }
