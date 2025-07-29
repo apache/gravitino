@@ -16,6 +16,8 @@
 # under the License.
 
 import unittest
+from datetime import date, time
+from itertools import combinations
 
 from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.named_reference import NamedReference
@@ -39,6 +41,17 @@ class TestTransforms(unittest.TestCase):
             Transforms.MonthTransform: Transforms.NAME_OF_MONTH,
             Transforms.DayTransform: Transforms.NAME_OF_DAY,
             Transforms.HourTransform: Transforms.NAME_OF_HOUR,
+        }
+
+        cls._sample_literals = {
+            Literals.integer_literal(value=1),
+            Literals.float_literal(value=1.0),
+            Literals.string_literal(value="dummy_string"),
+            Literals.boolean_literal(value=True),
+            Literals.byte_literal(value="dummy_byte"),
+            Literals.date_literal(value=date(year=2025, month=7, day=29)),
+            Literals.time_literal(value=time(hour=10, minute=30, second=0)),
+            Literals.long_literal(value=1),
         }
 
     def test_temporal_transforms(self):
@@ -109,3 +122,26 @@ class TestTransforms(unittest.TestCase):
         self.assertEqual(truncate_transform_str, truncate_transform_list)
         self.assertEqual(len(truncate_trans_dict), 1)
         self.assertEqual(truncate_trans_dict[truncate_transform_str], 2)
+
+    def test_apply_transform(self):
+        name = "dummy_function"
+        num_args = 2
+        for comb in combinations(self._sample_literals, num_args):
+            arguments = list(comb)
+            apply_transform = Transforms.apply(name=name, arguments=arguments)
+            twin_apply_transform = Transforms.apply(name=name, arguments=arguments)
+            apply_trans_dict = {
+                apply_transform: 1,
+                twin_apply_transform: 2,
+            }
+
+            self.assertIsInstance(apply_transform, Transforms.ApplyTransform)
+            self.assertIsInstance(twin_apply_transform, Transforms.ApplyTransform)
+            self.assertEqual(apply_transform.name(), name)
+            self.assertListEqual(apply_transform.arguments(), arguments)
+
+            self.assertEqual(apply_transform, apply_transform)
+            self.assertIsNot(apply_transform, twin_apply_transform)
+            self.assertEqual(apply_transform, twin_apply_transform)
+            self.assertEqual(len(apply_trans_dict), 1)
+            self.assertEqual(apply_trans_dict[apply_transform], 2)
