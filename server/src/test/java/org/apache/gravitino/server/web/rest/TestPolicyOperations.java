@@ -37,6 +37,8 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
@@ -45,6 +47,7 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
@@ -103,8 +106,7 @@ public class TestPolicyOperations extends JerseyTest {
           @Override
           protected void configure() {
             bind(policyManager).to(PolicyDispatcher.class).ranked(2);
-            bindFactory(TestPolicyOperations.MockServletRequestFactory.class)
-                .to(HttpServletRequest.class);
+            bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
 
@@ -605,6 +607,80 @@ public class TestPolicyOperations extends JerseyTest {
     ErrorResponse errorResp1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @Test
+  public void testListMetadataObjectForPolicy() {
+    MetadataObject[] objects =
+        new MetadataObject[] {
+          MetadataObjects.parse("object1", MetadataObject.Type.CATALOG),
+          MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA),
+          MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE),
+        };
+
+    when(policyManager.listMetadataObjectsForPolicy(metalake, "policy1")).thenReturn(objects);
+
+    Response response =
+        target(policyPath(metalake))
+            .path("policy1")
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
+
+    MetadataObjectListResponse objectListResponse =
+        response.readEntity(MetadataObjectListResponse.class);
+    Assertions.assertEquals(0, objectListResponse.getCode());
+
+    MetadataObject[] respObjects = objectListResponse.getMetadataObjects();
+    Assertions.assertEquals(objects.length, respObjects.length);
+
+    for (int i = 0; i < objects.length; i++) {
+      Assertions.assertEquals(objects[i].type(), respObjects[i].type());
+      Assertions.assertEquals(objects[i].fullName(), respObjects[i].fullName());
+    }
+
+    // Test throw NoSuchPolicyException
+    doThrow(new NoSuchPolicyException("mock error"))
+        .when(policyManager)
+        .listMetadataObjectsForPolicy(metalake, "policy1");
+
+    Response response1 =
+        target(policyPath(metalake))
+            .path("policy1")
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response1.getStatus());
+
+    ErrorResponse errorResponse = response1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(NoSuchPolicyException.class.getSimpleName(), errorResponse.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(policyManager)
+        .listMetadataObjectsForPolicy(any(), any());
+
+    Response response2 =
+        target(policyPath(metalake))
+            .path("policy1")
+            .path("objects")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response2.getStatus());
+
+    ErrorResponse errorResponse1 = response2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
   private String policyPath(String metalake) {

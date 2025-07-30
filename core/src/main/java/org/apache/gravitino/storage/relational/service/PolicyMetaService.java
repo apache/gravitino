@@ -22,8 +22,12 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -33,6 +37,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.meta.DummyEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
@@ -84,6 +89,24 @@ public class PolicyMetaService {
 
       PolicyPO.Builder builder = PolicyPO.builder().withMetalakeId(metalakeId);
       PolicyPO policyPO = POConverters.initializePolicyPOWithVersion(policyEntity, builder);
+
+      List<PolicyPO> diffPolicyPOs = getDiffPolicyPOsByMetalakeIdAndPolicy(metalakeId, policyPO);
+      if (!diffPolicyPOs.isEmpty()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Policy '%s' has inconsistent immutable attributes with existing policy '%s' of the same type '%s'. "
+                    + "expected: exclusive=%s, inheritable=%s, supportedObjectTypes=%s; "
+                    + "but got: exclusive=%s, inheritable=%s, supportedObjectTypes=%s.",
+                policyPO.getPolicyName(),
+                diffPolicyPOs.get(0).getPolicyName(),
+                policyPO.getPolicyType(),
+                diffPolicyPOs.get(0).isExclusive(),
+                diffPolicyPOs.get(0).isInheritable(),
+                diffPolicyPOs.get(0).getSupportedObjectTypes(),
+                policyPO.isExclusive(),
+                policyPO.isInheritable(),
+                policyPO.getSupportedObjectTypes()));
+      }
 
       // insert both policy meta table and policy version table
       SessionUtils.doMultipleWithCommit(
@@ -302,7 +325,9 @@ public class PolicyMetaService {
               ? Collections.emptyList()
               : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToAdd);
 
-      // Check if the policies to add all support the metadata object type.
+      // Check if the policies to add all support the metadata object type and
+      // the exclusivity for same type policies to add.
+      Map<String, String> exclusivePolicies = new HashMap<>();
       policyPOsToAdd.forEach(
           policyPO -> {
             PolicyEntity policy =
@@ -313,11 +338,45 @@ public class PolicyMetaService {
                       "Cannot associate policies for unsupported metadata object type %s, expected: %s.",
                       objectType, policy.supportedObjectTypes()));
             }
+
+            if (policy.exclusive()) {
+              Preconditions.checkArgument(
+                  exclusivePolicies.putIfAbsent(policy.policyType(), policy.name()) == null,
+                  "Cannot associate multiple exclusive policies of the same type: %s, policies: %s, %s.",
+                  policy.policyType(),
+                  policy.name(),
+                  exclusivePolicies.get(policy.policyType()));
+            }
+          });
+
+      // Check the exclusivity for existing policies associated with the metadata object.
+      List<PolicyEntity> existingPolicyPOs = listPoliciesForMetadataObject(objectIdent, objectType);
+      List<String> policyNamesToRemove =
+          Arrays.stream(policiesToRemove).map(NameIdentifier::name).collect(Collectors.toList());
+      Set<String> policyNamesToRemoveSet = new HashSet<>(policyNamesToRemove);
+      Set<String> policyNamesToAddSet = new HashSet<>(policyNamesToAdd);
+      existingPolicyPOs.forEach(
+          existingPolicyPO -> {
+            if (policyNamesToAddSet.contains(existingPolicyPO.policyType())) {
+              throw new PolicyAlreadyAssociatedException(
+                  "Failed to associate policies for metadata object due to some policies %s already "
+                      + "associated to the metadata object %s",
+                  existingPolicyPO.name(), metadataObject.fullName());
+            }
+
+            if (exclusivePolicies.containsKey(existingPolicyPO.policyType())
+                && !policyNamesToRemoveSet.contains(existingPolicyPO.name())) {
+              throw new PolicyAlreadyAssociatedException(
+                  "Exclusive policy %s of type %s is already associated with the metadata object %s, "
+                      + "cannot associate another policy of the same type: %s.",
+                  existingPolicyPO.name(),
+                  existingPolicyPO.policyType(),
+                  metadataObject.fullName(),
+                  exclusivePolicies.get(existingPolicyPO.policyType()));
+            }
           });
 
       // Fetch all the policies need to remove from the metadata object.
-      List<String> policyNamesToRemove =
-          Arrays.stream(policiesToRemove).map(NameIdentifier::name).collect(Collectors.toList());
       List<PolicyPO> policyPOsToRemove =
           policyNamesToRemove.isEmpty()
               ? Collections.emptyList()
@@ -442,5 +501,11 @@ public class PolicyMetaService {
     return SessionUtils.getWithoutCommit(
         PolicyMetaMapper.class,
         mapper -> mapper.listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames));
+  }
+
+  private List<PolicyPO> getDiffPolicyPOsByMetalakeIdAndPolicy(Long metalakeId, PolicyPO policyPO) {
+    return SessionUtils.getWithoutCommit(
+        PolicyMetaMapper.class,
+        mapper -> mapper.listDiffPolicyPOsByMetalakeIdAndPolicy(metalakeId, policyPO));
   }
 }
