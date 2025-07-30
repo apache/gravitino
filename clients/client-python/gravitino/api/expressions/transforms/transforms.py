@@ -290,13 +290,13 @@ class Transforms(Transform):
         def name(self) -> str:
             return Transforms.NAME_OF_IDENTITY
 
-        def __eq__(self, other):
+        def __eq__(self, value: object) -> bool:
             return (
-                isinstance(other, Transforms.IdentityTransform)
-                and self.ref == other.ref
+                isinstance(value, Transforms.IdentityTransform)
+                and self.ref == value.ref
             )
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash(self.ref)
 
     class YearTransform(SingleFieldTransform):
@@ -305,10 +305,10 @@ class Transforms(Transform):
         def name(self) -> str:
             return Transforms.NAME_OF_YEAR
 
-        def __eq__(self, other):
-            return isinstance(other, Transforms.YearTransform) and self.ref == other.ref
+        def __eq__(self, value: object) -> bool:
+            return isinstance(value, Transforms.YearTransform) and self.ref == value.ref
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash(self.ref)
 
     class MonthTransform(SingleFieldTransform):
@@ -317,12 +317,12 @@ class Transforms(Transform):
         def name(self) -> str:
             return Transforms.NAME_OF_MONTH
 
-        def __eq__(self, other):
+        def __eq__(self, value: object) -> bool:
             return (
-                isinstance(other, Transforms.MonthTransform) and self.ref == other.ref
+                isinstance(value, Transforms.MonthTransform) and self.ref == value.ref
             )
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash(self.ref)
 
     class DayTransform(SingleFieldTransform):
@@ -331,10 +331,10 @@ class Transforms(Transform):
         def name(self) -> str:
             return Transforms.NAME_OF_DAY
 
-        def __eq__(self, other):
-            return isinstance(other, Transforms.DayTransform) and self.ref == other.ref
+        def __eq__(self, value: object) -> bool:
+            return isinstance(value, Transforms.DayTransform) and self.ref == value.ref
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash(self.ref)
 
     class HourTransform(SingleFieldTransform):
@@ -343,10 +343,10 @@ class Transforms(Transform):
         def name(self) -> str:
             return Transforms.NAME_OF_HOUR
 
-        def __eq__(self, other):
-            return isinstance(other, Transforms.HourTransform) and self.ref == other.ref
+        def __eq__(self, value: object) -> bool:
+            return isinstance(value, Transforms.HourTransform) and self.ref == value.ref
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash(self.ref)
 
     class BucketTransform(Transform):
@@ -368,16 +368,16 @@ class Transforms(Transform):
         def arguments(self) -> List[Expression]:
             return [self.num_buckets_, *self.fields]
 
-        def __eq__(self, other):
-            if self is other:
+        def __eq__(self, value: object) -> bool:
+            if self is value:
                 return True
             return (
-                isinstance(other, Transforms.BucketTransform)
-                and self.num_buckets_ == other.num_buckets_
-                and self.fields == other.fields
+                isinstance(value, Transforms.BucketTransform)
+                and self.num_buckets_ == value.num_buckets_
+                and self.fields == value.fields
             )
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash((self.num_buckets_, *self.fields))
 
     class TruncateTransform(Transform):
@@ -411,16 +411,16 @@ class Transforms(Transform):
         def arguments(self) -> List[Expression]:
             return [self.width_, self.field]
 
-        def __eq__(self, other):
-            if self is other:
+        def __eq__(self, value: object) -> bool:
+            if self is value:
                 return True
             return (
-                isinstance(other, Transforms.TruncateTransform)
-                and self.width_ == other.width_
-                and self.field == other.field
+                isinstance(value, Transforms.TruncateTransform)
+                and self.width_ == value.width_
+                and self.field == value.field
             )
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash((self.width_, self.field))
 
     class ApplyTransform(Transform):
@@ -436,16 +436,16 @@ class Transforms(Transform):
         def arguments(self) -> List[Expression]:
             return self.arguments_
 
-        def __eq__(self, other):
-            if self is other:
+        def __eq__(self, value: object) -> bool:
+            if self is value:
                 return True
             return (
-                isinstance(other, Transforms.ApplyTransform)
-                and self.name_ == other.name_
-                and self.arguments_ == other.arguments_
+                isinstance(value, Transforms.ApplyTransform)
+                and self.name_ == value.name_
+                and self.arguments_ == value.arguments_
             )
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return 31 * hash(self.name_) + hash(tuple(self.arguments_))
 
     class ListTransform(Transform):
@@ -513,10 +513,10 @@ class Transforms(Transform):
         def assignments(self) -> List[Partition]:
             return self._assignments
 
-        def __eq__(self, other):
-            if not isinstance(other, Transforms.RangeTransform):
+        def __eq__(self, value: object) -> bool:
+            if not isinstance(value, Transforms.RangeTransform):
                 return False
-            return self is other or self.field_name() == other.field_name()
+            return self is value or self.field_name() == value.field_name()
 
-        def __hash__(self):
+        def __hash__(self) -> int:
             return hash(self._field)
