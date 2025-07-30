@@ -143,6 +143,9 @@ public class GravitinoServer extends ResourceConfig {
                 .ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
+            bind(gravitinoEnv.jobOperationDispatcher())
+                .to(org.apache.gravitino.job.JobOperationDispatcher.class)
+                .ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);

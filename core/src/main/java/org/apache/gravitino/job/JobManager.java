@@ -22,7 +22,6 @@ package org.apache.gravitino.job;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -60,7 +59,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
-public class JobManager implements JobOperationDispatcher, Closeable {
+public class JobManager implements JobOperationDispatcher {
 
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([\\w.-]+)\\}\\}");
 

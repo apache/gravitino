@@ -29,6 +29,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.InUseException;
+import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
@@ -131,6 +132,11 @@ public class ExceptionHandlers {
   public static Response handleModelException(
       OperationType op, String model, String schema, Exception e) {
     return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
+  }
+
+  public static Response handleJobTemplateException(
+      OperationType op, String jobTemplate, String metalake, Exception e) {
+    return JobTemplateExceptionHandler.INSTANCE.handle(op, jobTemplate, metalake, e);
   }
 
   public static Response handleTestConnectionException(Exception e) {
@@ -770,6 +776,47 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, model, schema, e);
+      }
+    }
+  }
+
+  private static class JobTemplateExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new JobTemplateExceptionHandler();
+
+    private static String getJobTemplateErrorMsg(
+        String jobTemplate, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate job template(s)%s operation [%s] under object [%s], reason [%s]",
+          jobTemplate, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String jobTemplate, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(jobTemplate) ? "" : " [" + jobTemplate + "]";
+      String errorMsg = getJobTemplateErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof JobTemplateAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof InUseException) {
+        return Utils.inUse(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else {
+        return super.handle(op, jobTemplate, parent, e);
       }
     }
   }

@@ -58,6 +58,8 @@ import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.job.JobManager;
+import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
@@ -137,6 +139,8 @@ public class GravitinoEnv {
   private EventListenerManager eventListenerManager;
 
   private AuditLogManager auditLogManager;
+
+  private JobOperationDispatcher jobOperationDispatcher;
 
   private EventBus eventBus;
   private OwnerDispatcher ownerDispatcher;
@@ -399,6 +403,16 @@ public class GravitinoEnv {
     return gravitinoAuthorizer;
   }
 
+  /**
+   * Get the AuditLogManager associated with the Gravitino environment.
+   *
+   * @return The AuditLogManager instance.
+   */
+  public JobOperationDispatcher jobOperationDispatcher() {
+    Preconditions.checkArgument(jobOperationDispatcher != null, "GravitinoEnv is not initialized.");
+    return jobOperationDispatcher;
+  }
+
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
@@ -441,6 +455,15 @@ public class GravitinoEnv {
 
     if (metalakeManager != null) {
       metalakeManager.close();
+    }
+
+    if (jobOperationDispatcher != null) {
+      try {
+        jobOperationDispatcher.close();
+        jobOperationDispatcher = null;
+      } catch (Exception e) {
+        LOG.warn("Failed to close JobOperationDispatcher", e);
+      }
     }
 
     LOG.info("Gravitino Environment is shut down.");
@@ -560,5 +583,7 @@ public class GravitinoEnv {
     this.tagDispatcher = new TagEventDispatcher(eventBus, new TagManager(idGenerator, entityStore));
     // todo: support policy event dispatcher
     this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
+
+    this.jobOperationDispatcher = new JobManager(config, entityStore, idGenerator);
   }
 }
