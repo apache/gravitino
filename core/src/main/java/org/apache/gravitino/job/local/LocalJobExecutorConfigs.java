@@ -31,7 +31,7 @@ public class LocalJobExecutorConfigs {
 
   public static final String MAX_RUNNING_JOBS = "maxRunningJobs";
   public static final int DEFAULT_MAX_RUNNING_JOBS =
-      Math.min(Runtime.getRuntime().availableProcessors() / 2, 10);
+      Math.max(1, Math.min(Runtime.getRuntime().availableProcessors() / 2, 10));
 
   public static final String JOB_STATUS_KEEP_TIME_MS = "jobStatusKeepTimeInMs";
   public static final long DEFAULT_JOB_STATUS_KEEP_TIME_MS = 60 * 60 * 1000; // 1 hour

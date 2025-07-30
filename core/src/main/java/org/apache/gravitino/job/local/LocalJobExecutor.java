@@ -69,7 +69,7 @@ public class LocalJobExecutor implements JobExecutor {
   private Map<String, Pair<JobHandle.Status, Long>> jobStatus;
   private final Object lock = new Object();
 
-  private long jobStatusKeepTimInMs;
+  private long jobStatusKeepTimeInMs;
   private ScheduledExecutorService jobStatusCleanupExecutor;
 
   private volatile boolean finished = false;
@@ -124,16 +124,16 @@ public class LocalJobExecutor implements JobExecutor {
 
     this.jobStatus = Maps.newHashMap();
 
-    this.jobStatusKeepTimInMs =
+    this.jobStatusKeepTimeInMs =
         configs.containsKey(JOB_STATUS_KEEP_TIME_MS)
             ? Long.parseLong(configs.get(JOB_STATUS_KEEP_TIME_MS))
             : DEFAULT_JOB_STATUS_KEEP_TIME_MS;
     Preconditions.checkArgument(
-        jobStatusKeepTimInMs > 0,
+        jobStatusKeepTimeInMs > 0,
         "Job status keep time must be greater than 0, but got: %s",
-        jobStatusKeepTimInMs);
+        jobStatusKeepTimeInMs);
 
-    long jobStatusCleanupIntervalInMs = jobStatusKeepTimInMs / 10;
+    long jobStatusCleanupIntervalInMs = jobStatusKeepTimeInMs / 10;
     this.jobStatusCleanupExecutor =
         Executors.newSingleThreadScheduledExecutor(
             runnable -> {
@@ -314,7 +314,7 @@ public class LocalJobExecutor implements JobExecutor {
           .removeIf(
               entry ->
                   entry.getValue().getRight() != UNEXPIRED_TIME_IN_MS
-                      && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimInMs);
+                      && (currentTime - entry.getValue().getRight()) >= jobStatusKeepTimeInMs);
     }
   }
 }
