@@ -103,7 +103,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       Privilege.Name privilege) {
     return allowInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, privilege.name(), true);
+        principal, metalake, metadataObject, privilege.name());
   }
 
   @Override
@@ -113,13 +113,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       Privilege.Name privilege) {
     return denyInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, privilege.name(), false);
+        principal, metalake, metadataObject, privilege.name());
   }
 
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
     return allowInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, AuthConstants.OWNER, true);
+        principal, metalake, metadataObject, AuthConstants.OWNER);
   }
 
   @Override
@@ -270,11 +270,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
 
     private boolean authorizeInternal(
-        Principal principal,
-        String metalake,
-        MetadataObject metadataObject,
-        String privilege,
-        boolean checkAllow) {
+        Principal principal, String metalake, MetadataObject metadataObject, String privilege) {
       String username = principal.getName();
       return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
     }
