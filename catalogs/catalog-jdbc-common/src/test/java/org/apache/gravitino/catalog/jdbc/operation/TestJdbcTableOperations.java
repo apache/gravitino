@@ -211,6 +211,40 @@ public class TestJdbcTableOperations {
         JDBC_TABLE_OPERATIONS.drop(DATABASE_NAME, newName), "table should be non-existent");
   }
 
+  @Test
+  public void testDriverVersionParsing() {
+    // Test supported MySQL versions
+    Assertions.assertTrue(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-8.0.16"));
+    Assertions.assertTrue(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-8.0.19"));
+    Assertions.assertTrue(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-8.1.0"));
+    Assertions.assertTrue(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-9.0.0"));
+
+    // Test unsupported MySQL versions
+    Assertions.assertFalse(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-8.0.15"));
+    Assertions.assertFalse(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-8.0.11"));
+    Assertions.assertFalse(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-5.1.24"));
+
+    // Test invalid MySQL formats
+    Assertions.assertFalse(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("mysql-connector-java-invalid"));
+    Assertions.assertFalse(JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported(""));
+    Assertions.assertFalse(JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported(null));
+
+    // Test non-MySQL drivers (should be supported)
+    Assertions.assertTrue(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("com.oceanbase.jdbc.Driver"));
+    Assertions.assertTrue(
+        JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("org.postgresql.Driver"));
+    Assertions.assertTrue(JDBC_TABLE_OPERATIONS.isMySQLDriverVersionSupported("org.sqlite.JDBC"));
+  }
+
   private static JdbcColumn[] generateRandomColumn(int minSize, int maxSize) {
     Random r = new Random();
     String prefixColName = "col_";

@@ -47,6 +47,9 @@ public final class AuthConstants {
   /** OWNER. */
   public static final String OWNER = "OWNER";
 
+  /** SELF authorization expression. */
+  public static final String SELF = "SELF";
+
   /**
    * The default name of the attribute that stores the authenticated principal in the request.
    *
