@@ -230,7 +230,7 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
    *  Confirm that `Client authentication` `Standard flow` `Direct access grants` `Service accounts roles` is enabled.
    *  Click *Next*
    *  Set *Valid redirect URIs* to `http://localhost:8090/*`
-   *  Set *Web origins* to `http://localhost:8090/*`
+   *  Set *Web origins* to `http://localhost:8090`
    *  Click *Save*.
    *  Click *Credentials* tab page, get `Client Secret`. 
 

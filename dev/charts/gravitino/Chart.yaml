@@ -23,6 +23,11 @@ home: https://gravitino.apache.org
 annotations:
   licenses: Apache-2.0
 dependencies:
+  - name: common
+    repository: https://charts.bitnami.com/bitnami
+    tags:
+      - bitnami-common
+    version: 2.19.2
   - condition: mysql.enabled
     name: mysql
     repository: https://charts.bitnami.com/bitnami
