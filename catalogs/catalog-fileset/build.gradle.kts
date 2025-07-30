@@ -71,7 +71,6 @@ dependencies {
   testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.gcs)

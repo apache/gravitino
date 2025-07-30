@@ -73,9 +73,6 @@ dependencies {
   testImplementation(project(":common")) {
     exclude("org.apache.logging.log4j")
   }
-  testImplementation(project(":server")) {
-    exclude("org.apache.logging.log4j")
-  }
   testImplementation(project(":server-common")) {
     exclude("org.apache.logging.log4j")
   }

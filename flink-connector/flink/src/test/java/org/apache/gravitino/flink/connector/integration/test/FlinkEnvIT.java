@@ -48,9 +48,11 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public abstract class FlinkEnvIT extends BaseIT {
   private static final Logger LOG = LoggerFactory.getLogger(FlinkEnvIT.class);
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();

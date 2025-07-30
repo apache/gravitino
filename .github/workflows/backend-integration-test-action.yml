@@ -62,6 +62,12 @@ jobs:
           -x :spark-connector:spark-runtime-3.3:test -x :spark-connector:spark-runtime-3.4:test -x :spark-connector:spark-runtime-3.5:test
           -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test
           -x :authorizations:authorization-chain:test -x :authorizations:authorization-ranger:test 
+          -x :integration-test:test -x :catalogs:catalog-fileset:test
+
+      - name: Test catalog fileset
+        if: ${{ inputs.test-mode == 'deploy' }}
+        run: |
+          ./gradlew :catalogs:catalog-fileset:test -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false -PtestMode=deploy
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4

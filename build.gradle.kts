@@ -76,7 +76,10 @@ if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
-project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
+rootProject.extra["isTestModeEmbedded"] = project.properties["testMode"] as? String ?: "embedded" == "embedded"
+var JAVA_17 = JavaLanguageVersion.of(17)
+
+project.extra["extraJvmArgs"] = if (getJdkVersionForTest(project) != JAVA_17) {
   listOf()
 } else {
   listOf(
@@ -104,6 +107,53 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
     "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
   )
 }
+
+fun useJDK17(project: Project): Boolean {
+  val name = project.name.lowercase()
+  val path = project.path.lowercase()
+
+  // bundles module rely on catalog-fileset module
+  if (name == "catalog-common" || name == "hadoop-common" || name == "catalog-fileset") {
+    return false
+  }
+
+  if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
+    return true
+  }
+
+  if (path == ":trino-connector:integration-test" || path == ":web:integration-test") {
+    return true
+  }
+
+  if (name in listOf("server", "lineage")) {
+    return true
+  }
+
+  // All ITs could only run embedded mode in JDK17
+  if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true) {
+    return true
+  }
+
+  return false
+}
+
+// Use JDK 17 for embedded mode, use the JDK from `jdkVersion` for deploy mode
+fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
+  if (rootProject.extra["isTestModeEmbedded"] == true) {
+    return JAVA_17
+  }
+
+  return JavaLanguageVersion.of(extra["jdkVersion"].toString())
+}
+
+val toolchainService: JavaToolchainService = extensions.getByType()
+fun getJdkHome(version: Int): Provider<File> {
+  return toolchainService.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(version))
+  }.map { it.metadata.installationPath.asFile }
+}
+val jdk17Home = getJdkHome(17).get()
+rootProject.extra["jdk17Home"] = jdk17Home
 
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
@@ -170,6 +220,7 @@ allprojects {
       }
       param.environment("HADOOP_HOME", "/tmp")
       param.environment("PROJECT_VERSION", project.version)
+      param.environment("JDK17_HOME", jdk17Home)
 
       // Gravitino CI Docker image
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
@@ -273,6 +324,39 @@ subprojects {
     mavenLocal()
   }
 
+  tasks.register("printJvm") {
+    group = "help"
+    description = "print JVM information"
+
+    doLast {
+
+      val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "undefined"
+
+      val testJvmVersion = tasks.withType<Test>().firstOrNull()?.javaLauncher?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "undefined"
+
+      val testJvmArgs = tasks.withType<Test>().firstOrNull()?.jvmArgs ?: listOf()
+
+      val targetJvmVersion = (java.targetCompatibility?.majorVersion ?: "undefined")
+
+      val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "undefined")
+
+      println(
+        """
+            |=== ${project.name} JVM information===
+            | project path: ${project.path}
+            | JVM for compile: $compileJvmVersion
+            | JVM for test: $testJvmVersion
+            | JVM test args: $testJvmArgs
+            | target JVM version: $targetJvmVersion
+            | source JVM version: $sourceJvmVersion
+            |==================================
+        """.trimMargin()
+      )
+    }
+  }
+
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -283,7 +367,11 @@ subprojects {
         if (OperatingSystem.current().isMacOsX) {
           vendor.set(JvmVendorSpec.AMAZON)
         }
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JAVA_17)
+      } else if (useJDK17(getProject())) {
+        languageVersion.set(JAVA_17)
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -472,6 +560,12 @@ subprojects {
   }
 
   tasks.configureEach<Test> {
+    javaLauncher.set(
+      javaToolchains.launcherFor {
+        languageVersion.set(getJdkVersionForTest(project))
+      }
+    )
+
     if (project.name != "server-common") {
       val initTest = project.extra.get("initTestParam") as (Test) -> Unit
       initTest(this)

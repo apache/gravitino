@@ -1,6 +1,6 @@
-name: Flink Integration Test Action
+name: New Integration Test Action
 
-# run flink integration test
+# run integration test
 on:
   workflow_call:
     inputs:
@@ -12,12 +12,20 @@ on:
         required: true
         description: 'Java version'
         type: string
+      backend:
+        required: true
+        description: 'Backend storage for Gravitino'
+        type: string
+      test-mode:
+        required: true
+        description: 'run on embedded or deploy mode'
+        type: string
 
 jobs:
   start-runner:
-    name: JDK${{ inputs.java-version }}
+    name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
@@ -37,6 +45,7 @@ jobs:
           dev/ci/check_commands.sh
 
       - name: Package Gravitino
+        if: ${{ inputs.test-mode == 'deploy' }}
         run: |
           ./gradlew compileDistribution -x test -PjdkVersion=${{ inputs.java-version }}
 
@@ -44,22 +53,21 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Flink Integration Test
+      - name: Integration Test (JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }})
         id: integrationTest
-        # run deploy mode integration tests
-        run: |
-          ./gradlew -PskipTests -PtestMode=deploy -PjdkVersion=${{ inputs.java-version }} -PskipDockerTests=false :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+        run: >
+          ./gradlew :integration-test:test -PtestMode=${{ inputs.test-mode }} -PjdkVersion=${{ inputs.java-version }} -PjdbcBackend=${{ inputs.backend }} -PskipDockerTests=false
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v4
         if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
-          name: flink-connector-integrate-test-reports-${{ inputs.java-version }}
+          name: integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}-${{ inputs.backend }}
           path: |
             build/reports
-            flink-connector/flink/build/*.log
-            flink-connector/flink/build/*.tar
-            distribution/package/logs/gravitino-server.out
-            distribution/package/logs/gravitino-server.log
-            catalogs/**/*.log
-            catalogs/**/*.tar
+            iceberg/iceberg-rest-server/build/*.log
+            distribution/package/logs/*.out
+            distribution/package/logs/*.log
+            integration-test/**/**/*.log
+            integration-test/**/**/*.tar
+            distribution/**/*.log

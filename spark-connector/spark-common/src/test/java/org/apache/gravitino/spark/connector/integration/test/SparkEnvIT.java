@@ -42,10 +42,12 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.condition.DisabledIf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Setup Hive, Gravitino, Spark, Metalake environment to execute SparkSQL. */
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public abstract class SparkEnvIT extends SparkUtilIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(SparkEnvIT.class);

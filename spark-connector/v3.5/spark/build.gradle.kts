@@ -53,12 +53,6 @@ dependencies {
   testImplementation(project(":api")) {
     exclude("org.apache.logging.log4j")
   }
-  testImplementation(project(":catalogs:catalog-jdbc-common")) {
-    exclude("org.apache.logging.log4j")
-  }
-  testImplementation(project(":catalogs:hive-metastore-common")) {
-    exclude("*")
-  }
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
@@ -72,10 +66,6 @@ dependencies {
     exclude("org.slf4j")
   }
   testImplementation(project(":integration-test-common", "testArtifacts")) {
-    exclude("org.apache.logging.log4j")
-    exclude("org.slf4j")
-  }
-  testImplementation(project(":server")) {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
   }

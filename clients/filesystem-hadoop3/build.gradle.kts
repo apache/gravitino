@@ -44,7 +44,6 @@ dependencies {
   testImplementation(project(":core"))
   testImplementation(project(":catalogs:catalog-fileset"))
   testImplementation(project(":common"))
-  testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
