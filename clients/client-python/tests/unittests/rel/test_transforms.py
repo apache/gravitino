@@ -21,6 +21,7 @@ from itertools import combinations
 
 from gravitino.api.expressions.literals.literals import Literals
 from gravitino.api.expressions.named_reference import NamedReference
+from gravitino.api.expressions.partitions.partitions import Partitions
 from gravitino.api.expressions.transforms.transforms import Transforms
 
 
@@ -56,6 +57,7 @@ class TestTransforms(unittest.TestCase):
 
     def test_temporal_transforms(self):
         field_name = "dummy_field"
+        ref = NamedReference.field([field_name])
         for trans_cls, trans_func in self._temporal_transforms.items():
             trans_from_str = trans_func(field_name=field_name)
             trans_from_list = trans_func(field_name=[field_name])
@@ -65,9 +67,11 @@ class TestTransforms(unittest.TestCase):
             self.assertIsInstance(trans_from_list, trans_cls)
 
             self.assertEqual(trans_from_str.name(), self._transform_names[trans_cls])
-            self.assertEqual(
-                trans_from_str.arguments(), [NamedReference.field([field_name])]
-            )
+            self.assertEqual(trans_from_str.arguments(), [ref])
+            self.assertEqual(trans_from_str.assignments(), Partitions.EMPTY_PARTITIONS)
+            self.assertEqual(trans_from_str.children(), trans_from_str.arguments())
+            self.assertEqual(trans_from_str.field_name(), [field_name])
+            self.assertEqual(trans_from_str.references(), [ref])
 
             self.assertEqual(trans_from_str, trans_from_list)
             self.assertFalse(trans_from_str == field_name)
@@ -174,6 +178,7 @@ class TestTransforms(unittest.TestCase):
             list_transform.assignments(), list_transform_with_assignments.assignments()
         )
         self.assertNotEqual(list_transform, list_transform_with_assignments)
+        self.assertFalse(list_transform == "")
         self.assertEqual(len(trans_dict), 2)
         self.assertEqual(trans_dict[list_transform], 1)
         self.assertEqual(trans_dict[list_transform_with_assignments], 2)
@@ -206,6 +211,7 @@ class TestTransforms(unittest.TestCase):
             range_transform_with_assignments.assignments(),
         )
         self.assertNotEqual(range_transform, range_transform_with_assignments)
+        self.assertFalse(range_transform == "")
         self.assertEqual(len(trans_dict), 2)
         self.assertEqual(trans_dict[range_transform], 1)
         self.assertEqual(trans_dict[range_transform_with_assignments], 2)
