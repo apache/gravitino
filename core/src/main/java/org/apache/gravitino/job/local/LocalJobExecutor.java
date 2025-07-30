@@ -217,7 +217,7 @@ public class LocalJobExecutor implements JobExecutor {
   public void close() throws IOException {
     // Mark the executor as finished to stop processing jobs
     this.finished = true;
-    jobExecutorService.shutdownNow();
+    jobPollingExecutorService.shutdownNow();
 
     if (!waitingQueue.isEmpty()) {
       LOG.warn(
@@ -225,8 +225,6 @@ public class LocalJobExecutor implements JobExecutor {
           waitingQueue.size());
       waitingQueue.clear();
     }
-
-    jobPollingExecutorService.shutdownNow();
 
     // Stop the running jobs
     runningProcesses.forEach(
@@ -236,6 +234,8 @@ public class LocalJobExecutor implements JobExecutor {
           }
         });
     runningProcesses.clear();
+
+    jobExecutorService.shutdownNow();
 
     // Stop the job status cleanup executor
     jobStatusCleanupExecutor.shutdownNow();
@@ -280,10 +280,8 @@ public class LocalJobExecutor implements JobExecutor {
       LOG.error("Error while executing job", e);
       // If an error occurs, we should mark the job as failed
       synchronized (lock) {
-        if (jobPair != null) {
-          String jobId = jobPair.getLeft();
-          jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
-        }
+        String jobId = jobPair.getLeft();
+        jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
       }
     }
   }
