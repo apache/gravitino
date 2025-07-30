@@ -290,26 +290,11 @@ class Transforms(Transform):
         def name(self) -> str:
             return Transforms.NAME_OF_IDENTITY
 
-        def __eq__(self, value: object) -> bool:
-            return (
-                isinstance(value, Transforms.IdentityTransform)
-                and self.ref == value.ref
-            )
-
-        def __hash__(self) -> int:
-            return hash(self.ref)
-
     class YearTransform(SingleFieldTransform):
         """A transform that returns the year of the input value."""
 
         def name(self) -> str:
             return Transforms.NAME_OF_YEAR
-
-        def __eq__(self, value: object) -> bool:
-            return isinstance(value, Transforms.YearTransform) and self.ref == value.ref
-
-        def __hash__(self) -> int:
-            return hash(self.ref)
 
     class MonthTransform(SingleFieldTransform):
         """A transform that returns the month of the input value."""
@@ -317,37 +302,17 @@ class Transforms(Transform):
         def name(self) -> str:
             return Transforms.NAME_OF_MONTH
 
-        def __eq__(self, value: object) -> bool:
-            return (
-                isinstance(value, Transforms.MonthTransform) and self.ref == value.ref
-            )
-
-        def __hash__(self) -> int:
-            return hash(self.ref)
-
     class DayTransform(SingleFieldTransform):
         """A transform that returns the day of the input value."""
 
         def name(self) -> str:
             return Transforms.NAME_OF_DAY
 
-        def __eq__(self, value: object) -> bool:
-            return isinstance(value, Transforms.DayTransform) and self.ref == value.ref
-
-        def __hash__(self) -> int:
-            return hash(self.ref)
-
     class HourTransform(SingleFieldTransform):
         """A transform that returns the hour of the input value."""
 
         def name(self) -> str:
             return Transforms.NAME_OF_HOUR
-
-        def __eq__(self, value: object) -> bool:
-            return isinstance(value, Transforms.HourTransform) and self.ref == value.ref
-
-        def __hash__(self) -> int:
-            return hash(self.ref)
 
     class BucketTransform(Transform):
         """A transform that returns the bucket of the input value."""
