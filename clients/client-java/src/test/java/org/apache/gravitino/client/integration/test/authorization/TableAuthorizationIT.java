@@ -186,9 +186,19 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         role,
-        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA), MetadataObject.Type.SCHEMA),
         ImmutableList.of(Privileges.SelectTable.allow()));
     tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
+    gravitinoMetalake.grantPrivilegesToRole(
+        role,
+        MetadataObjects.of(ImmutableList.of(CATALOG, SCHEMA, "table1"), MetadataObject.Type.TABLE),
+        ImmutableList.of(Privileges.SelectTable.deny()));
+    assertThrows(
+        String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
+        RuntimeException.class,
+        () -> {
+          tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
+        });
   }
 
   @Test

@@ -155,6 +155,15 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
+    public boolean deny(
+        Principal principal,
+        String metalake,
+        MetadataObject metadataObject,
+        Privilege.Name privilege) {
+      return false;
+    }
+
+    @Override
     public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
       return false;
     }
