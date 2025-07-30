@@ -63,6 +63,12 @@ public class TestCatalogAuthorizationExpression {
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::CREATE_CATALOG")));
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("METALAKE::USE_CATALOG", "CATALOG::DENY_USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("METALAKE::DENY_USE_CATALOG", "CATALOG::USE_CATALOG")));
   }
 
   @Test
@@ -80,6 +86,12 @@ public class TestCatalogAuthorizationExpression {
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
     assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::CREATE_CATALOG")));
     assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("METALAKE::USE_CATALOG", "CATALOG::DENY_USE_CATALOG")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("METALAKE::DENY_USE_CATALOG", "CATALOG::USE_CATALOG")));
   }
 
   @Test
