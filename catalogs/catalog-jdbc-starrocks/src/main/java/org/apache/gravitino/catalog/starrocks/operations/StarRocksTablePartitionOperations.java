@@ -58,10 +58,8 @@ public final class StarRocksTablePartitionOperations extends JdbcTablePartitionO
   private static final Logger log =
       LoggerFactory.getLogger(StarRocksTablePartitionOperations.class);
 
-  @SuppressWarnings("unused")
   private final JdbcExceptionConverter exceptionConverter;
 
-  @SuppressWarnings("unused")
   private final JdbcTypeConverter typeConverter;
 
   public StarRocksTablePartitionOperations(
