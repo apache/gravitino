@@ -30,8 +30,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -66,7 +64,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   /** Jcasbin deny enforcer is used for metadata authorization. */
   private Enforcer denyEnforcer;
 
-  private final Set<String> serviceAdmins = ConcurrentHashMap.newKeySet();
+  /** allow internal authorizer */
+  private InternalAuthorizer allowInternalAuthorizer;
+
+  /** deny internal authorizer */
+  private InternalAuthorizer denyInternalAuthorizer;
 
   /**
    * loadedRoles is used to cache roles that have loaded permissions. When the permissions of a role
@@ -77,11 +79,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void initialize() {
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
+    allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
-    Config config = GravitinoEnv.getInstance().config();
-    if (config != null) {
-      serviceAdmins.addAll(config.get(Configs.SERVICE_ADMINS));
-    }
+    denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
   }
 
   private Model getModel(String modelFilePath) {
@@ -102,7 +102,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
-    return authorizeInternal(principal, metalake, metadataObject, privilege.name(), true);
+    return allowInternalAuthorizer.authorizeInternal(
+        principal, metalake, metadataObject, privilege.name(), true);
   }
 
   @Override
@@ -111,12 +112,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
-    return authorizeInternal(principal, metalake, metadataObject, privilege.name(), false);
+    return denyInternalAuthorizer.authorizeInternal(
+        principal, metalake, metadataObject, privilege.name(), false);
   }
 
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
-    return authorizeInternal(principal, metalake, metadataObject, AuthConstants.OWNER, true);
+    return allowInternalAuthorizer.authorizeInternal(
+        principal, metalake, metadataObject, AuthConstants.OWNER, true);
   }
 
   @Override
@@ -258,54 +261,48 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void close() throws IOException {}
 
-  private boolean authorizeInternal(
-      Principal principal,
-      String metalake,
-      MetadataObject metadataObject,
-      String privilege,
-      boolean checkAllow) {
-    String username = principal.getName();
-    return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege, checkAllow);
-  }
+  private class InternalAuthorizer {
 
-  private boolean authorizeByJcasbin(
-      Long userId,
-      MetadataObject metadataObject,
-      Long metadataId,
-      String privilege,
-      boolean checkAllow) {
-    if (checkAllow) {
-      return allowEnforcer.enforce(
+    Enforcer enforcer;
+
+    public InternalAuthorizer(Enforcer enforcer) {
+      this.enforcer = enforcer;
+    }
+
+    private boolean authorizeInternal(
+        Principal principal,
+        String metalake,
+        MetadataObject metadataObject,
+        String privilege,
+        boolean checkAllow) {
+      String username = principal.getName();
+      return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
+    }
+
+    private boolean loadPrivilegeAndAuthorize(
+        String username, String metalake, MetadataObject metadataObject, String privilege) {
+      Long metadataId;
+      Long userId;
+      try {
+        UserEntity userEntity = getUserEntity(username, metalake);
+        userId = userEntity.id();
+        metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+      } catch (Exception e) {
+        LOG.debug("Can not get entity id", e);
+        return false;
+      }
+      loadPrivilege(metalake, username, userId, metadataObject, metadataId);
+      return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
+    }
+
+    private boolean authorizeByJcasbin(
+        Long userId, MetadataObject metadataObject, Long metadataId, String privilege) {
+      return enforcer.enforce(
           String.valueOf(userId),
           String.valueOf(metadataObject.type()),
           String.valueOf(metadataId),
           privilege);
     }
-    return denyEnforcer.enforce(
-        String.valueOf(userId),
-        String.valueOf(metadataObject.type()),
-        String.valueOf(metadataId),
-        privilege);
-  }
-
-  private boolean loadPrivilegeAndAuthorize(
-      String username,
-      String metalake,
-      MetadataObject metadataObject,
-      String privilege,
-      boolean checkAllow) {
-    Long metadataId;
-    Long userId;
-    try {
-      UserEntity userEntity = getUserEntity(username, metalake);
-      userId = userEntity.id();
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    } catch (Exception e) {
-      LOG.debug("Can not get entity id", e);
-      return false;
-    }
-    loadPrivilege(metalake, username, userId, metadataObject, metadataId);
-    return authorizeByJcasbin(userId, metadataObject, metadataId, privilege, checkAllow);
   }
 
   private static UserEntity getUserEntity(String username, String metalake) throws IOException {
