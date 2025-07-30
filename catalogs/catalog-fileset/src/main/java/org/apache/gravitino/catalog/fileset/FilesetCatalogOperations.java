@@ -161,11 +161,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   static class FileSystemCacheKey {
     private final NameIdentifier ident;
     private final Map<String, String> conf;
+    private final String pathPrefix;
     private final String currentUser;
 
-    FileSystemCacheKey(NameIdentifier ident, Map<String, String> conf) {
+    FileSystemCacheKey(NameIdentifier ident, Map<String, String> conf, String pathPrefix) {
       this.ident = ident;
       this.conf = conf;
+      this.pathPrefix = pathPrefix;
 
       try {
         this.currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
@@ -185,6 +187,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return ident.equals(that.ident)
           && conf.equals(that.conf)
+          && pathPrefix.equals(that.pathPrefix)
           && currentUser.equals(that.currentUser);
     }
 
@@ -193,6 +196,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       int result = ident.hashCode();
       result = 31 * result + conf.hashCode();
       result = 31 * result + currentUser.hashCode();
+      result = 31 * result + pathPrefix.hashCode();
       return result;
     }
   }
@@ -1327,8 +1331,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private FileSystem getFileSystemWithCache(
       Path path, Map<String, String> conf, NameIdentifier identifier) {
+    String pathString = path.toString();
+    // extract the prefix of the path to use as the cache key
+    String prefix = extractPrefix(pathString);
     return fileSystemCache.get(
-        new FileSystemCacheKey(identifier, conf),
+        new FileSystemCacheKey(identifier, conf, prefix),
         cacheKey -> {
           try {
             return getFileSystem(path, conf);
@@ -1337,6 +1344,36 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 e, "Failed to get FileSystem for fileset: %s", identifier);
           }
         });
+  }
+
+  /**
+   * Extracts the prefix from the given path. The prefix is defined as the scheme and the first
+   * slash after the scheme.
+   *
+   * @param path the path from which to extract the prefix.
+   * @return the prefix of the path, or an empty string if the path is null or empty.
+   */
+  @VisibleForTesting
+  static String extractPrefix(String path) {
+    if (path == null || path.isEmpty()) {
+      return "";
+    }
+
+    if (path.startsWith("file://")) {
+      return "file:///";
+    }
+
+    int protocolEnd = path.indexOf("://");
+    if (protocolEnd == -1) {
+      return path;
+    }
+
+    int firstSlash = path.indexOf('/', protocolEnd + 3);
+    if (firstSlash == -1) {
+      return path + "/";
+    }
+
+    return path.substring(0, firstSlash + 1);
   }
 
   private boolean checkSingleFile(Fileset fileset, String locationName, NameIdentifier identifier) {

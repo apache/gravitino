@@ -1805,6 +1805,24 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @ParameterizedTest
+  @MethodSource("pathPrefixArguments")
+  void testPathPrefix(String path, String prefix) {
+    Assertions.assertEquals(prefix, FilesetCatalogOperations.extractPrefix(path));
+  }
+
+  private static Stream<Arguments> pathPrefixArguments() {
+    return Stream.of(
+        Arguments.of("hdfs://localhost:9000/user1", "hdfs://localhost:9000/"),
+        Arguments.of("/user1/path/to/file", "/user1/path/to/file"),
+        Arguments.of("file:///user1", "file:///"),
+        Arguments.of("s3://bucket/path/to/file", "s3://bucket/"),
+        Arguments.of("gs://bucket/path/to/file", "gs://bucket/"),
+        Arguments.of("s3a://bucket/path/to/file", "s3a://bucket/"),
+        Arguments.of("oss://bucket/path/to/file", "oss://bucket/"),
+        Arguments.of("adfss://bucket:xxx/user1/", "adfss://bucket:xxx/"));
+  }
+
   private static Stream<Arguments> multipleLocationsArguments() {
     return Stream.of(
         // Honor the catalog location
