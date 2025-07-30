@@ -16,17 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.file.stats;
+package org.apache.gravitino.storage.external.stats;
 
-import java.io.IOException;
 import java.util.Map;
-import org.apache.gravitino.MetadataObject;
 
-public interface PartitionStatisticFileFactory {
-  PartitionStatisticFile open(
-      String metalake,
-      MetadataObject metadataObject,
-      String location,
-      Map<String, String> properties)
-      throws IOException;
+/** Factory interface for creating instances of {@link PartitionStatisticStorage}. */
+public interface PartitionStatisticStorageFactory {
+
+  /**
+   * Creates an instance of {@link PartitionStatisticStorage} for the specified metalake and
+   * metadata object. Different metadata objects have different storages.
+   *
+   * @param metalake the name of the metalake
+   * @param properties additional properties for the storage configuration
+   * @return an instance of {@link PartitionStatisticStorage}
+   */
+  PartitionStatisticStorage open(String metalake, Map<String, String> properties);
 }
