@@ -30,7 +30,7 @@ public class PartitionRange {
   /**
    * Creates a PartitionRange which only has upper bound partition name.
    *
-   * @param upperPartitionName the upper partition name
+   * @param upperPartitionName the upper partition name, exclusive.
    * @return a PartitionRange with the upper partition name.
    */
   public static PartitionRange lessThan(String upperPartitionName) {
@@ -42,10 +42,10 @@ public class PartitionRange {
   /**
    * Creates a PartitionRange which only has lower bound partition name.
    *
-   * @param lowerPartitionName the lower partition name
+   * @param lowerPartitionName the lower partition name, inclusive.
    * @return a PartitionRange with the lower partition name.
    */
-  public static PartitionRange greaterThan(String lowerPartitionName) {
+  public static PartitionRange greaterThanOrEqual(String lowerPartitionName) {
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.lowerPartitionName = Optional.of(lowerPartitionName);
     return partitionRange;
