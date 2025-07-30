@@ -52,6 +52,34 @@ Before using the OceanBase Catalog, you must download the corresponding JDBC dri
 Gravitino doesn't package the JDBC driver for OceanBase due to licensing issues.
 :::
 
+### Driver Version Compatibility
+
+The OceanBase catalog includes driver version compatibility checks for datetime precision calculation:
+
+- **MySQL Connector/J versions >= 8.0.16**: Full support for datetime precision calculation
+- **MySQL Connector/J versions < 8.0.16**: Limited support - datetime precision calculation returns `null` with a warning log
+
+This limitation affects the following datetime types:
+- `TIME(p)` - time precision
+- `TIMESTAMP(p)` - timestamp precision  
+- `DATETIME(p)` - datetime precision
+
+When using an unsupported driver version, the system will:
+1. Continue to work normally with default precision (0)
+2. Log a warning message indicating the driver version limitation
+3. Return `null` for precision calculations to avoid incorrect results
+
+**Example warning log:**
+```
+WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, 
+columnSize may not be accurate for precision calculation. 
+Returning null for TIMESTAMP type precision. Driver version: mysql-connector-java-8.0.11
+```
+
+**Recommended driver versions:**
+- `mysql-connector-java-8.0.16` or higher
+- `com.oceanbase.jdbc.Driver` (OceanBase official driver)
+
 ### Catalog operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -88,29 +116,30 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table column types
 
-| Gravitino Type    | OceanBase Type      |
-|-------------------|---------------------|
-| `Byte`            | `Tinyint`           |
-| `Byte(false)`     | `Tinyint Unsigned`  |
-| `Short`           | `Smallint`          |
-| `Short(false)`    | `Smallint Unsigned` |
-| `Integer`         | `Int`               |
-| `Integer(false)`  | `Int Unsigned`      |
-| `Long`            | `Bigint`            |
-| `Long(false)`     | `Bigint Unsigned`   | 
-| `Float`           | `Float`             |
-| `Double`          | `Double`            |
-| `String`          | `Text`              |
-| `Date`            | `Date`              |
-| `Time`            | `Time`              |
-| `Timestamp`       | `Timestamp`         |
-| `Decimal`         | `Decimal`           |
-| `VarChar`         | `VarChar`           |
-| `FixedChar`       | `FixedChar`         |
-| `Binary`          | `Binary`            |
+| Gravitino Type      | OceanBase Type      |
+|---------------------|---------------------|
+| `Byte`              | `Tinyint`           |
+| `Byte(false)`       | `Tinyint Unsigned`  |
+| `Short`             | `Smallint`          |
+| `Short(false)`      | `Smallint Unsigned` |
+| `Integer`           | `Int`               |
+| `Integer(false)`    | `Int Unsigned`      |
+| `Long`              | `Bigint`            |
+| `Long(false)`       | `Bigint Unsigned`   | 
+| `Float`             | `Float`             |
+| `Double`            | `Double`            |
+| `String`            | `Text`              |
+| `Date`              | `Date`              |
+| `Time[(p)]`         | `Time[(p)]`         |
+| `Timestamp_tz[(p)]` | `Timestamp[(p)]`    |
+| `Timestamp[(p)]`    | `Datetime[(p)]`     |
+| `Decimal`           | `Decimal`           |
+| `VarChar`           | `VarChar`           |
+| `FixedChar`         | `FixedChar`         |
+| `Binary`            | `Binary`            |
 
 :::info
-OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 

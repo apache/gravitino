@@ -736,4 +736,18 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
     DatabaseMetaData metaData = connection.getMetaData();
     return metaData.getColumns(database, schema, tableName, null);
   }
+
+  @Override
+  public Integer calculateDatetimePrecision(String typeName, int columnSize, int scale) {
+    String upperTypeName = typeName.toUpperCase();
+    switch (upperTypeName) {
+      case "TIME":
+      case "TIMETZ":
+      case "TIMESTAMP":
+      case "TIMESTAMPTZ":
+        return Math.max(scale, 0);
+      default:
+        return null;
+    }
+  }
 }
