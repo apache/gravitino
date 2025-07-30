@@ -75,9 +75,11 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
-rootProject.extra["isTestModeEmbedded"] = project.properties["testMode"] as? String ?: "embedded" == "embedded"
 
-project.extra["extraJvmArgs"] = if (getJdkVersionForTest(project) != JavaLanguageVersion.of(17)) {
+rootProject.extra["isTestModeEmbedded"] = project.properties["testMode"] as? String ?: "embedded" == "embedded"
+var JAVA_17 = JavaLanguageVersion.of(17)
+
+project.extra["extraJvmArgs"] = if (getJdkVersionForTest(project) != JAVA_17) {
   listOf()
 } else {
   listOf(
@@ -138,7 +140,7 @@ fun useJDK17(project: Project): Boolean {
 // Use JDK 17 for embedded mode, use the JDK from `jdkVersion` for deploy mode
 fun getJdkVersionForTest(project: Project): JavaLanguageVersion {
   if (rootProject.extra["isTestModeEmbedded"] == true) {
-    return JavaLanguageVersion.of(17)
+    return JAVA_17
   }
 
   return JavaLanguageVersion.of(extra["jdkVersion"].toString())
@@ -365,9 +367,9 @@ subprojects {
         if (OperatingSystem.current().isMacOsX) {
           vendor.set(JvmVendorSpec.AMAZON)
         }
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JAVA_17)
       } else if (useJDK17(getProject())) {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JAVA_17)
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
       } else {
