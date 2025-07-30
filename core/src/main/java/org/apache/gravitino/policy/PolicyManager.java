@@ -255,11 +255,11 @@ public class PolicyManager implements PolicyDispatcher {
   private void changePolicyEnabledState(
       String metalake, String policyName, boolean expectedEnabledState) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
+    checkMetalake(metalakeIdent, entityStore);
     TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofPolicy(metalake, policyName),
         LockType.WRITE,
         () -> {
-          checkMetalake(metalakeIdent, entityStore);
           if (policyEnabled(metalake, policyName) == expectedEnabledState) {
             return null;
           }
