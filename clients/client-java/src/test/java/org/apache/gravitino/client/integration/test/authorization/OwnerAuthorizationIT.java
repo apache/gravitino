@@ -278,4 +278,28 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         USER,
         Owner.Type.USER);
   }
+
+  @Test
+  public void testSetRoleOwner() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    String tempRole = "tempRole";
+    String tempUser = "tempUser";
+    gravitinoMetalake.addUser(tempUser);
+    gravitinoMetalake.createRole(tempRole, Collections.EMPTY_MAP, Collections.emptyList());
+    // normal user can not set owner
+    GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
+    assertThrows(
+        "Current user can not set owner",
+        RuntimeException.class,
+        () -> {
+          gravitinoMetalakeLoadByNormalUser.setOwner(
+              MetadataObjects.of(ImmutableList.of(tempRole), MetadataObject.Type.ROLE),
+              tempUser,
+              Owner.Type.USER);
+        });
+    gravitinoMetalake.setOwner(
+        MetadataObjects.of(ImmutableList.of(tempRole), MetadataObject.Type.ROLE),
+        tempUser,
+        Owner.Type.USER);
+  }
 }
