@@ -182,11 +182,9 @@ public class PolicyManager implements PolicyDispatcher {
                 "Policy with name %s under metalake %s does not exist", policyName, metalake);
           } catch (EntityAlreadyExistsException e) {
             throw new RuntimeException(
-                "Policy with name "
-                    + policyName
-                    + " under metalake "
-                    + metalake
-                    + " already exists");
+                String.format(
+                    "Trying to alter policy %s under metalake %s, but the new name already exists",
+                    policyName, metalake));
           } catch (IOException ioe) {
             LOG.error("Failed to alter policy {} under metalake {}", policyName, metalake, ioe);
             throw new RuntimeException(ioe);

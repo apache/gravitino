@@ -172,7 +172,9 @@ public class TagManager implements TagDispatcher {
                 "Tag with name %s under metalake %s does not exist", name, metalake);
           } catch (EntityAlreadyExistsException e) {
             throw new RuntimeException(
-                "Tag with name " + name + " under metalake " + metalake + " already exists");
+                String.format(
+                    "Trying to alter tag %s under metalake %s, but the new name already exists",
+                    name, metalake));
           } catch (IOException ioe) {
             LOG.error("Failed to alter tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
