@@ -37,6 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.connector.job.JobExecutor;
@@ -59,6 +60,8 @@ public class LocalJobExecutor implements JobExecutor {
   private BlockingQueue<Pair<String, JobTemplate>> waitingQueue;
 
   private ExecutorService jobExecutorService;
+
+  private ExecutorService jobPollingExecutorService;
 
   // The job status map to keep track of the status of each job. In the meantime, the job status
   // will be stored in the entity store, so we will clean the finished, cancelled and failed jobs
@@ -88,6 +91,16 @@ public class LocalJobExecutor implements JobExecutor {
 
     this.waitingQueue = new LinkedBlockingQueue<>(waitingQueueSize);
 
+    this.jobPollingExecutorService =
+        Executors.newSingleThreadExecutor(
+            runnable -> {
+              Thread thread = new Thread(runnable);
+              thread.setName("LocalJobPollingExecutor-" + thread.getId());
+              thread.setDaemon(true);
+              return thread;
+            });
+    jobPollingExecutorService.submit(this::pollJob);
+
     int maxRunningJobs =
         configs.containsKey(MAX_RUNNING_JOBS)
             ? Integer.parseInt(configs.get(MAX_RUNNING_JOBS))
@@ -96,18 +109,18 @@ public class LocalJobExecutor implements JobExecutor {
         maxRunningJobs > 0, "Max running jobs must be greater than 0, but got: %s", maxRunningJobs);
 
     this.jobExecutorService =
-        Executors.newFixedThreadPool(
+        new ThreadPoolExecutor(
+            0,
             maxRunningJobs,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(),
             runnable -> {
               Thread thread = new Thread(runnable);
               thread.setName("LocalJobExecutor-" + thread.getId());
               thread.setDaemon(true);
               return thread;
             });
-    // Start the job executor service to run jobs
-    for (int i = 0; i < maxRunningJobs; i++) {
-      jobExecutorService.submit(this::runJob);
-    }
 
     this.jobStatus = Maps.newHashMap();
 
@@ -133,7 +146,7 @@ public class LocalJobExecutor implements JobExecutor {
         this::cleanupJobStatus,
         jobStatusCleanupIntervalInMs,
         jobStatusCleanupIntervalInMs,
-        java.util.concurrent.TimeUnit.MILLISECONDS);
+        TimeUnit.MILLISECONDS);
 
     this.runningProcesses = Maps.newConcurrentMap();
   }
@@ -210,7 +223,10 @@ public class LocalJobExecutor implements JobExecutor {
       LOG.warn(
           "There are still {} jobs in the waiting queue, they will not be processed.",
           waitingQueue.size());
+      waitingQueue.clear();
     }
+
+    jobPollingExecutorService.shutdownNow();
 
     // Stop the running jobs
     runningProcesses.forEach(
@@ -226,60 +242,66 @@ public class LocalJobExecutor implements JobExecutor {
     jobStatus.clear();
   }
 
-  public void runJob() {
+  public void runJob(Pair<String, JobTemplate> jobPair) {
+    try {
+      String jobId = jobPair.getLeft();
+      JobTemplate jobTemplate = jobPair.getRight();
+      synchronized (lock) {
+        jobStatus.put(jobId, Pair.of(JobHandle.Status.STARTED, UNEXPIRED_TIME_IN_MS));
+      }
+
+      LocalProcessBuilder processBuilder = LocalProcessBuilder.create(jobTemplate, configs);
+      Process process = processBuilder.start();
+      runningProcesses.put(jobId, process);
+
+      LOG.info("Starting job: {}", jobId);
+      int exitCode = process.waitFor();
+      if (exitCode == 0) {
+        LOG.info("Job {} completed successfully", jobId);
+        synchronized (lock) {
+          jobStatus.put(jobId, Pair.of(JobHandle.Status.SUCCEEDED, System.currentTimeMillis()));
+        }
+      } else {
+        synchronized (lock) {
+          JobHandle.Status oldStatus = jobStatus.get(jobId).getLeft();
+          if (oldStatus == JobHandle.Status.CANCELLING) {
+            LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
+            jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLED, System.currentTimeMillis()));
+          } else if (oldStatus == JobHandle.Status.STARTED) {
+            LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
+            jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
+          }
+        }
+      }
+
+      runningProcesses.remove(jobId);
+
+    } catch (Exception e) {
+      LOG.error("Error while executing job", e);
+      // If an error occurs, we should mark the job as failed
+      synchronized (lock) {
+        if (jobPair != null) {
+          String jobId = jobPair.getLeft();
+          jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
+        }
+      }
+    }
+  }
+
+  public void pollJob() {
     while (!finished) {
-      Pair<String, JobTemplate> jobPair = null;
       try {
-        jobPair = waitingQueue.poll(3000, TimeUnit.MILLISECONDS);
+        Pair<String, JobTemplate> jobPair = waitingQueue.poll(3000, TimeUnit.MILLISECONDS);
         if (jobPair == null) {
           // If no job is available, continue to the next iteration
           continue;
         }
 
-        String jobId = jobPair.getLeft();
-        JobTemplate jobTemplate = jobPair.getRight();
-        synchronized (lock) {
-          jobStatus.put(jobId, Pair.of(JobHandle.Status.STARTED, UNEXPIRED_TIME_IN_MS));
-        }
-
-        LocalProcessBuilder processBuilder = LocalProcessBuilder.create(jobTemplate, configs);
-        Process process = processBuilder.start();
-        runningProcesses.put(jobId, process);
-
-        LOG.info("Starting job: {}", jobId);
-        int exitCode = process.waitFor();
-        if (exitCode == 0) {
-          LOG.info("Job {} completed successfully", jobId);
-          synchronized (lock) {
-            jobStatus.put(jobId, Pair.of(JobHandle.Status.SUCCEEDED, System.currentTimeMillis()));
-          }
-        } else {
-          synchronized (lock) {
-            JobHandle.Status oldStatus = jobStatus.get(jobId).getLeft();
-            if (oldStatus == JobHandle.Status.CANCELLING) {
-              LOG.info("Job {} was cancelled while running with exit code: {}", jobId, exitCode);
-              jobStatus.put(jobId, Pair.of(JobHandle.Status.CANCELLED, System.currentTimeMillis()));
-            } else if (oldStatus == JobHandle.Status.STARTED) {
-              LOG.warn("Job {} failed after starting with exit code: {}", jobId, exitCode);
-              jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
-            }
-          }
-        }
-
-        runningProcesses.remove(jobId);
+        jobExecutorService.submit(() -> runJob(jobPair));
 
       } catch (InterruptedException e) {
-        LOG.warn("Job execution interrupted", e);
+        LOG.warn("Polling job interrupted", e);
         finished = true;
-      } catch (Exception e) {
-        LOG.error("Error while executing job", e);
-        // If an error occurs, we should mark the job as failed
-        synchronized (lock) {
-          if (jobPair != null) {
-            String jobId = jobPair.getLeft();
-            jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
-          }
-        }
       }
     }
   }
