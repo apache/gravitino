@@ -62,7 +62,7 @@ public class StarRocksColumnDefaultValueConverter extends JdbcColumnDefaultValue
       if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
-      // The parsing of Doris expressions is complex, so we are not currently undertaking the
+      // The parsing of StarRocks expressions is complex, so we are not currently undertaking the
       // parsing.
       return UnparsedExpression.of(columnDefaultValue);
     }
