@@ -285,7 +285,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     String tempRole = "tempRole";
     String tempUser = "tempUser";
     gravitinoMetalake.addUser(tempUser);
-    gravitinoMetalake.createRole(tempRole, Collections.EMPTY_MAP, Collections.emptyList());
+    gravitinoMetalake.createRole(tempRole, new HashMap<>(), Collections.emptyList());
     // normal user can not set owner
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
@@ -301,5 +301,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         MetadataObjects.of(ImmutableList.of(tempRole), MetadataObject.Type.ROLE),
         tempUser,
         Owner.Type.USER);
+    // reset
+    gravitinoMetalake.deleteRole(tempRole);
   }
 }
