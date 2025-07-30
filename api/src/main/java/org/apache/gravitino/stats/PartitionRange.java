@@ -45,7 +45,7 @@ public class PartitionRange {
    * @param lowerPartitionName the lower partition name, inclusive.
    * @return a PartitionRange with the lower partition name.
    */
-  public static PartitionRange greaterThanOrEqual(String lowerPartitionName) {
+  public static PartitionRange greaterOrEqual(String lowerPartitionName) {
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.lowerPartitionName = Optional.of(lowerPartitionName);
     return partitionRange;
