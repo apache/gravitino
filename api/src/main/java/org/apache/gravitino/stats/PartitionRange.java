@@ -54,8 +54,8 @@ public class PartitionRange {
   /**
    * Creates a PartitionRange which has both lower and upper partition names.
    *
-   * @param lowerPartitionName the lower partition name
-   * @param upperPartitionName the upper partition name
+   * @param lowerPartitionName the lower partition name, inclusive.
+   * @param upperPartitionName the upper partition name, exclusive.
    * @return a PartitionRange with both lower and upper partition names.
    */
   public static PartitionRange between(String lowerPartitionName, String upperPartitionName) {
@@ -83,5 +83,14 @@ public class PartitionRange {
    */
   public Optional<String> upperPartitionName() {
     return upperPartitionName;
+  }
+
+  /**
+   * Returns a comparator for comparing partitions within this range.
+   *
+   * @return a PartitionComparator that can be used to compare partitions.
+   */
+  public PartitionComparator comparator() {
+    return PartitionComparator.defaultComparator();
   }
 }

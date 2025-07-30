@@ -19,7 +19,6 @@
 package org.apache.gravitino.stats;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 
@@ -31,30 +30,34 @@ interface SupportsPartitionStatistics {
    * Lists statistics for partitions from one partition name to another partition name.
    *
    * @param range the range of partitions to list statistics for, which can be defined by.
-   * @return a map where the key is the partition name and the value is a list of statistics
+   * @return a list of PartitionStatistics, where each PartitionStatistics contains the partition
+   *     name and a list of statistics applicable to that partition.
    */
-  Map<String, List<Statistic>> listStatistics(PartitionRange range);
+  List<PartitionStatistics> listStatistics(PartitionRange range);
 
   /**
    * Updates statistics with the provided values. If the statistic exists, it will be updated with
    * the new value. If the statistic does not exist, it will be created. If the statistic is
    * unmodifiable, it will throw an UnmodifiableStatisticException.
    *
-   * @param statistics a map where the key is the partition name and the value is a map of statistic
-   *     names to their values
+   * @param statisticsToUpdate a list of PartitionUpdateStatistics, where each
+   *     PartitionUpdateStatistics contains the partition name and a map of statistic names to their
+   *     values to be updated.
+   * @return a list of updated PartitionStatistics, where each PartitionStatistics contains the
+   *     partition name and a list of statistics applicable to that partition.
    * @throws UnmodifiableStatisticException if any of the statistics to be updated are unmodifiable
    */
-  void updateStatistics(Map<String, Map<String, StatisticValue<?>>> statistics)
+  List<PartitionStatistics> updateStatistics(List<PartitionUpdateStatistics> statisticsToUpdate)
       throws UnmodifiableStatisticException;
 
   /**
    * Drops statistics for the specified partitions. If the statistic is unmodifiable, it will throw
    * an UnmodifiableStatisticException.
    *
-   * @param droppedStatistics a map where the key is the partition name and the value is a list of
-   *     statistic names to be dropped
+   * @param statisticsToDrop a list of PartitionDropStatistics, where each PartitionDropStatistics
+   * @return true if the statistics were successfully dropped.
    * @throws UnmodifiableStatisticException if any of the statistics to be dropped are unmodifiable
    */
-  void dropStatistics(Map<String, List<String>> droppedStatistics)
+  boolean dropStatistics(List<PartitionDropStatistics> statisticsToDrop)
       throws UnmodifiableStatisticException;
 }
