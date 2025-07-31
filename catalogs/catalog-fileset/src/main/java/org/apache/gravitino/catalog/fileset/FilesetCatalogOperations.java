@@ -144,7 +144,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
     this.fileSystemCache =
         Caffeine.newBuilder()
-            .expireAfterAccess(1000 * 60 * 60 /* 1 hour */, TimeUnit.MILLISECONDS)
+            .expireAfterAccess(1, TimeUnit.HOURS)
             .removalListener(
                 (ignored, value, cause) -> {
                   try {
