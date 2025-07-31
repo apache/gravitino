@@ -171,7 +171,7 @@ public interface ModelVersionChange {
      * Generates a hash code for this {@link UpdateComment} instance. The hash code is based on the
      * new comment of the model.
      *
-     * @return A hash code value for this model renaming operation.
+     * @return A hash code value for this comment update operation.
      */
     @Override
     public int hashCode() {
@@ -388,7 +388,7 @@ public interface ModelVersionChange {
      * Generates a hash code for this UpdateUri instance. The hash code is based on the new uri and
      * its name of the model version.
      *
-     * @return A hash code value for this model renaming operation.
+     * @return A hash code value for this URI update operation.
      */
     @Override
     public int hashCode() {
@@ -461,7 +461,7 @@ public interface ModelVersionChange {
      * Generates a hash code for this AddUri instance. The hash code is based on the uri and its
      * name of the model.
      *
-     * @return A hash code value for this model renaming operation.
+     * @return A hash code value for this URI addition operation.
      */
     @Override
     public int hashCode() {
@@ -522,7 +522,7 @@ public interface ModelVersionChange {
      * Generates a hash code for this RemoveUri instance. The hash code is based on the uri and its
      * name of the model.
      *
-     * @return A hash code value for this model renaming operation.
+     * @return A hash code value for this URI removal operation.
      */
     @Override
     public int hashCode() {
