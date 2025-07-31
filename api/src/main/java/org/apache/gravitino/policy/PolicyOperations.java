@@ -70,9 +70,20 @@ public interface PolicyOperations {
    * @return The created policy.
    * @throws PolicyAlreadyExistsException If the policy already exists.
    */
-  Policy createPolicy(
+  default Policy createPolicy(
       String name, String type, String comment, boolean enabled, PolicyContent content)
-      throws PolicyAlreadyExistsException;
+      throws PolicyAlreadyExistsException {
+    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(type);
+    return createPolicy(
+        name,
+        type,
+        comment,
+        enabled,
+        builtInType.exclusive(),
+        builtInType.inheritable(),
+        builtInType.supportedObjectTypes(),
+        content);
+  }
 
   /**
    * Create a new policy under a metalake.

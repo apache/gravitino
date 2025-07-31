@@ -21,15 +21,17 @@ package org.apache.gravitino.dto.policy;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyContent;
 
 /** Represents a Policy Data Transfer Object (DTO). */
 @EqualsAndHashCode
@@ -119,7 +121,7 @@ public class PolicyDTO implements Policy {
   }
 
   @Override
-  public PolicyContent content() {
+  public PolicyContentDTO content() {
     return content;
   }
 
@@ -253,6 +255,15 @@ public class PolicyDTO implements Policy {
 
     /** @return The constructed Policy DTO. */
     public PolicyDTO build() {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(policyDTO.name), "policy name cannot be null or empty");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(policyDTO.policyType), "policy type cannot be null or empty");
+      Preconditions.checkArgument(policyDTO.content != null, "policy content cannot be null");
+      Preconditions.checkArgument(
+          CollectionUtils.isNotEmpty(policyDTO.supportedObjectTypes),
+          "supported objectTypes cannot be null or empty");
+      policyDTO.content.validate();
       return policyDTO;
     }
   }

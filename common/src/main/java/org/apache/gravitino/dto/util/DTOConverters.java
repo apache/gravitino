@@ -565,6 +565,14 @@ public class DTOConverters {
    * @return The policy content DTO.
    */
   public static PolicyContentDTO toDTO(PolicyContent policyContent, Policy.BuiltInType policyTyp) {
+    if (policyContent == null) {
+      return null;
+    }
+
+    if (policyContent instanceof PolicyContentDTO) {
+      return (PolicyContentDTO) policyContent;
+    }
+
     switch (policyTyp) {
       case CUSTOM:
         PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;

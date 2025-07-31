@@ -73,6 +73,9 @@ public class TestPolicyDTO {
         PolicyDTO.builder()
             .withName("policy_test")
             .withComment("policy comment")
+            .withPolicyType("my_compaction")
+            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
+            .withContent(customContent)
             .withAudit(audit)
             .withInherited(Optional.empty())
             .build();
@@ -86,6 +89,9 @@ public class TestPolicyDTO {
         PolicyDTO.builder()
             .withName("policy_test")
             .withComment("policy comment")
+            .withPolicyType("my_compaction")
+            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
+            .withContent(customContent)
             .withAudit(audit)
             .withInherited(Optional.of(false))
             .build();
@@ -98,6 +104,9 @@ public class TestPolicyDTO {
         PolicyDTO.builder()
             .withName("policy_test")
             .withComment("policy comment")
+            .withPolicyType("my_compaction")
+            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
+            .withContent(customContent)
             .withAudit(audit)
             .withInherited(Optional.of(true))
             .build();
