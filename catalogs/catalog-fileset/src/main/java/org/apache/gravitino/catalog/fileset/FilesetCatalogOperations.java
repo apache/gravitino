@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.CACHE_VALUE_NOT_SET;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
@@ -975,44 +974,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     if (fileSystemCache != null) {
+      fileSystemCache
+          .asMap()
+          .forEach(
+              (k, v) -> {
+                try {
+                  v.close();
+                } catch (IOException e) {
+                  LOG.warn("Failed to close FileSystem instance in cache", e);
+                }
+              });
       fileSystemCache.cleanUp();
     }
-  }
-
-  private Cache<NameIdentifier, FilesetImpl> initializeFilesetCache(Map<String, String> config) {
-    Caffeine<Object, Object> cacheBuilder =
-        Caffeine.newBuilder()
-            .removalListener(
-                (k, v, c) -> LOG.info("Evicting fileset {} from cache due to {}", k, c))
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("fileset-cleaner-%d")
-                            .build())));
-
-    Long cacheEvictionIntervalInMs =
-        (Long)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(
-                    config, FilesetCatalogPropertiesMetadata.FILESET_CACHE_EVICTION_INTERVAL_MS);
-    if (cacheEvictionIntervalInMs != CACHE_VALUE_NOT_SET) {
-      cacheBuilder.expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS);
-    }
-
-    Long cacheMaxSize =
-        (Long)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(config, FilesetCatalogPropertiesMetadata.FILESET_CACHE_MAX_SIZE);
-    if (cacheMaxSize != CACHE_VALUE_NOT_SET) {
-      cacheBuilder.maximumSize(cacheMaxSize);
-    }
-
-    return cacheBuilder.build();
   }
 
   private void validateLocationHierarchy(
@@ -1329,7 +1302,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         && !CallerContext.CallerContextHolder.get().context().isEmpty();
   }
 
-  private FileSystem getFileSystemWithCache(
+  @VisibleForTesting
+  FileSystem getFileSystemWithCache(
       Path path, Map<String, String> conf, NameIdentifier identifier) {
     String pathString = path.toString();
     // extract the prefix of the path to use as the cache key
@@ -1354,12 +1328,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
    * @return the prefix of the path, or an empty string if the path is null or empty.
    */
   @VisibleForTesting
-  static String extractPrefix(String path) {
+  String extractPrefix(String path) {
     if (path == null || path.isEmpty()) {
       return "";
     }
 
-    if (path.startsWith("file://")) {
+    if (path.startsWith("file:/")) {
       return "file:///";
     }
 

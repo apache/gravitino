@@ -1452,9 +1452,22 @@ public class TestFilesetCatalogOperations {
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
       when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
+      when(mockOps.extractPrefix(Mockito.anyString())).thenCallRealMethod();
+      when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any(), Mockito.any()))
+          .thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
           String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
+
+      FileSystem fs1 =
+          mockOps.getFileSystemWithCache(
+              new Path("file:///dir1/subdir/file1"), mockOps.getConf(), filesetIdent);
+
+      FileSystem fs2 =
+          mockOps.getFileSystemWithCache(
+              new Path("file:///dir1/subdir/file2"), mockOps.getConf(), filesetIdent);
+
+      Assertions.assertSame(fs1, fs2);
     }
   }
 
@@ -1808,7 +1821,10 @@ public class TestFilesetCatalogOperations {
   @ParameterizedTest
   @MethodSource("pathPrefixArguments")
   void testPathPrefix(String path, String prefix) {
-    Assertions.assertEquals(prefix, FilesetCatalogOperations.extractPrefix(path));
+    FilesetCatalogOperations filesetCatalogOperations =
+        Mockito.mock(FilesetCatalogOperations.class);
+    when(filesetCatalogOperations.extractPrefix(Mockito.anyString())).thenCallRealMethod();
+    Assertions.assertEquals(prefix, filesetCatalogOperations.extractPrefix(path));
   }
 
   private static Stream<Arguments> pathPrefixArguments() {
