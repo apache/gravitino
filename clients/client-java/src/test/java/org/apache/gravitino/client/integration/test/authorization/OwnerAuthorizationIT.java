@@ -297,7 +297,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
               tempUser,
               Owner.Type.USER);
         });
-    gravitinoMetalakeLoadByNormalUser.setOwner(
+    gravitinoMetalake.setOwner(
         MetadataObjects.of(ImmutableList.of(tempRole), MetadataObject.Type.ROLE),
         tempUser,
         Owner.Type.USER);
