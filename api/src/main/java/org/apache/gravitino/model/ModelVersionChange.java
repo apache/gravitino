@@ -94,12 +94,12 @@ public interface ModelVersionChange {
   /**
    * Create a ModelVersionChange for adding the uri of a model version.
    *
-   * @param uri The uri to be added for the model version.
    * @param uriName The name of the uri to be added for the model version.
+   * @param uri The uri to be added for the model version.
    * @return A new ModelVersionChange instance for adding the uri of a model version.
    */
-  static ModelVersionChange addUri(String uri, String uriName) {
-    return new ModelVersionChange.AddUri(uri, uriName);
+  static ModelVersionChange addUri(String uriName, String uri) {
+    return new ModelVersionChange.AddUri(uriName, uri);
   }
 
   /**
