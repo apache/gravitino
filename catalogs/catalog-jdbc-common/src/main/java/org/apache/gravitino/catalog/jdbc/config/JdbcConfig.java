@@ -20,6 +20,7 @@
 package org.apache.gravitino.catalog.jdbc.config;
 
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -65,7 +66,7 @@ public class JdbcConfig extends Config {
           .doc("The password of the Jdbc connection")
           .version(ConfigConstants.VERSION_0_3_0)
           .stringConf()
-          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .checkValue(Objects::nonNull, ConfigConstants.NOT_NULL_ERROR_MSG)
           .create();
 
   public static final ConfigEntry<Integer> POOL_MIN_SIZE =
