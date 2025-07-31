@@ -85,6 +85,7 @@ Gravitino currently supports the following catalogs:
 * [**Paimon catalog**](./lakehouse-paimon-catalog.md)
 * [**PostgreSQL catalog**](./jdbc-postgresql-catalog.md)
 * [**OceanBase catalog**](./jdbc-oceanbase-catalog.md)
+* [**StarRocks catalog**](./jdbc-starrocks-catalog.md)
 
 **Fileset catalogs:**
 
