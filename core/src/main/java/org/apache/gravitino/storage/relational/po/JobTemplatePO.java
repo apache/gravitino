@@ -86,6 +86,11 @@ public class JobTemplatePO {
     this.deletedAt = deletedAt;
   }
 
+  public static class JobTemplatePOBuilder {
+    // Builder class for JobTemplatePO
+    // Lombok will generate the builder methods based on the fields defined in JobTemplatePO
+  }
+
   public static JobTemplatePO initializeJobTemplatePO(
       JobTemplateEntity jobTemplateEntity, JobTemplatePOBuilder builder) {
     try {

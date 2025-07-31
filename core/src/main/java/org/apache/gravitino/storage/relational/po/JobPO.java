@@ -93,6 +93,11 @@ public class JobPO {
     this.deletedAt = deletedAt;
   }
 
+  public static class JobPOBuilder {
+    // Builder class for JobPO
+    // Lombok will generate the builder methods based on the fields defined in JobPO
+  }
+
   public static JobPO initializeJobPO(JobEntity jobEntity, JobPOBuilder builder) {
     // We should not keep the terminated job entities in the database forever, so we set the
     // current time as the finished timestamp if the job is in a terminal state,
