@@ -27,6 +27,9 @@ from gravitino.api.expressions.expression import Expression
 from gravitino.api.types.json_serdes.type_serdes import TypeSerdes
 from gravitino.api.types.type import Type
 from gravitino.api.types.types import Types
+from gravitino.dto.rel.expressions.json_serdes.column_default_value_serdes import (
+    ColumnDefaultValueSerdes,
+)
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.utils.precondition import Precondition
 
@@ -50,13 +53,12 @@ class ColumnDTO(Column, DataClassJsonMixin):
     _comment: str = field(metadata=config(field_name="comment"))
     """The comment associated with the column."""
 
-    # TODO: We shall specify encoder/decoder in the future PR. They're now dummy serdes.
     _default_value: Optional[Union[Expression, List[Expression]]] = field(
         default_factory=lambda: Column.DEFAULT_VALUE_NOT_SET,
         metadata=config(
             field_name="defaultValue",
-            encoder=lambda _: None,
-            decoder=lambda _: Column.DEFAULT_VALUE_NOT_SET,
+            encoder=ColumnDefaultValueSerdes.serialize,
+            decoder=ColumnDefaultValueSerdes.deserialize,
             exclude=lambda value: value is None
             or value is Column.DEFAULT_VALUE_NOT_SET,
         ),

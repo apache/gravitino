@@ -20,6 +20,8 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -38,6 +40,8 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -52,6 +56,9 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataFilterHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -66,6 +73,9 @@ public class CatalogOperations {
   private static final Logger LOG = LoggerFactory.getLogger(CatalogOperations.class);
 
   private final CatalogDispatcher catalogDispatcher;
+
+  private static final String loadCatalogAuthorizationExpression =
+      "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
   @Context private HttpServletRequest httpRequest;
 
@@ -93,11 +103,35 @@ public class CatalogOperations {
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             if (verbose) {
               Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
+              catalogs =
+                  Arrays.stream(catalogs)
+                      .filter(
+                          catalog -> {
+                            NameIdentifier[] nameIdentifiers =
+                                new NameIdentifier[] {
+                                  NameIdentifierUtil.ofCatalog(metalake, catalog.name())
+                                };
+                            return MetadataFilterHelper.filterByExpression(
+                                        metalake,
+                                        loadCatalogAuthorizationExpression,
+                                        Entity.EntityType.CATALOG,
+                                        nameIdentifiers)
+                                    .length
+                                > 0;
+                          })
+                      .collect(Collectors.toList())
+                      .toArray(new Catalog[0]);
               Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
               LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
               return response;
             } else {
               NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
+              idents =
+                  MetadataFilterHelper.filterByExpression(
+                      metalake,
+                      loadCatalogAuthorizationExpression,
+                      Entity.EntityType.CATALOG,
+                      idents);
               Response response = Utils.ok(new EntityListResponse(idents));
               LOG.info("List {} catalogs under metalake: {}", idents.length, metalake);
               return response;
@@ -112,8 +146,13 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-catalog", absolute = true)
+  @AuthorizationExpression(
+      expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNER",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response createCatalog(
-      @PathParam("metalake") String metalake, CatalogCreateRequest request) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      CatalogCreateRequest request) {
     LOG.info("Received create catalog request for metalake: {}", metalake);
     try {
       return Utils.doAs(
@@ -145,7 +184,9 @@ public class CatalogOperations {
   @Timed(name = "test-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "test-connection", absolute = true)
   public Response testConnection(
-      @PathParam("metalake") String metalake, CatalogCreateRequest request) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      CatalogCreateRequest request) {
     LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
     try {
       return Utils.doAs(
@@ -176,9 +217,14 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "set-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-catalog", absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response setCatalog(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalogName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName,
       CatalogSetRequest request) {
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
     try {
@@ -217,8 +263,14 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-catalog", absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response loadCatalog(
-      @PathParam("metalake") String metalakeName, @PathParam("catalog") String catalogName) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalakeName,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName) {
     LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
@@ -238,9 +290,14 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-catalog", absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response alterCatalog(
-      @PathParam("metalake") String metalakeName,
-      @PathParam("catalog") String catalogName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalakeName,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName,
       CatalogUpdatesRequest request) {
     LOG.info("Received alter catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
@@ -270,9 +327,14 @@ public class CatalogOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-catalog." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-catalog", absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
   public Response dropCatalog(
-      @PathParam("metalake") String metalakeName,
-      @PathParam("catalog") String catalogName,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalakeName,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName,
       @DefaultValue("false") @QueryParam("force") boolean force) {
     LOG.info("Received drop catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
@@ -284,7 +346,6 @@ public class CatalogOperations {
             if (!dropped) {
               LOG.warn("Failed to drop catalog {} under metalake {}", catalogName, metalakeName);
             }
-
             Response response = Utils.ok(new DropResponse(dropped));
             LOG.info("Catalog dropped: {}.{}", metalakeName, catalogName);
             return response;

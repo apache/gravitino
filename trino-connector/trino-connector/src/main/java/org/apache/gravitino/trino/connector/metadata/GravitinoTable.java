@@ -30,6 +30,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 
 /** Help Apache Gravitino connector access TableMetadata from Gravitino client. */
@@ -45,6 +46,7 @@ public class GravitinoTable {
   private SortOrder[] sortOrders = new SortOrder[0];
   private Transform[] partitioning = new Transform[0];
   private Distribution distribution = Distributions.NONE;
+  private Index[] indexes = new Index[0];
 
   /**
    * Constructs a new GravitinoTable with the specified schema name, table name, and table metadata.
@@ -69,6 +71,7 @@ public class GravitinoTable {
     sortOrders = tableMetadata.sortOrder();
     partitioning = tableMetadata.partitioning();
     distribution = tableMetadata.distribution();
+    indexes = tableMetadata.index();
   }
 
   /**
@@ -87,11 +90,33 @@ public class GravitinoTable {
       List<GravitinoColumn> columns,
       String comment,
       Map<String, String> properties) {
+    this(schemaName, tableName, columns, comment, properties, new Index[0]);
+  }
+
+  /**
+   * Constructs a new GravitinoTable with the specified schema name, table name, columns, comment,
+   * properties and indexes.
+   *
+   * @param schemaName the schema name
+   * @param tableName the table name
+   * @param columns the columns
+   * @param comment the comment
+   * @param properties the properties
+   * @param indexes the indexes
+   */
+  public GravitinoTable(
+      String schemaName,
+      String tableName,
+      List<GravitinoColumn> columns,
+      String comment,
+      Map<String, String> properties,
+      Index[] indexes) {
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.columns = columns;
     this.comment = comment;
     this.properties = properties;
+    this.indexes = indexes;
   }
 
   /**
@@ -232,6 +257,15 @@ public class GravitinoTable {
   }
 
   /**
+   * Sets the indexes of the table.
+   *
+   * @param indexes the indexes
+   */
+  public void setIndexes(Index[] indexes) {
+    this.indexes = indexes;
+  }
+
+  /**
    * Retrieves the sort orders of the table.
    *
    * @return the sort orders
@@ -256,5 +290,14 @@ public class GravitinoTable {
    */
   public Distribution getDistribution() {
     return distribution;
+  }
+
+  /**
+   * Retrieves the indexes of the table.
+   *
+   * @return the indexes
+   */
+  public Index[] getIndexes() {
+    return indexes;
   }
 }

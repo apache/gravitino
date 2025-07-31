@@ -29,7 +29,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -87,9 +87,9 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
     try {
       // Set the creator as the owner of the catalog.
-      OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
-      if (ownerManager != null) {
-        ownerManager.setOwner(
+      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerDispatcher != null) {
+        ownerDispatcher.setOwner(
             ident.namespace().level(0),
             NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.CATALOG),
             PrincipalUtils.getCurrentUserName(),

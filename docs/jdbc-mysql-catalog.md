@@ -54,6 +54,33 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
 :::
 
+### Driver Version Compatibility
+
+The MySQL catalog includes driver version compatibility checks for datetime precision calculation:
+
+- **MySQL Connector/J versions >= 8.0.16**: Full support for datetime precision calculation
+- **MySQL Connector/J versions < 8.0.16**: Limited support - datetime precision calculation returns `null` with a warning log
+
+This limitation affects the following datetime types:
+- `TIME(p)` - time precision
+- `TIMESTAMP(p)` - timestamp precision  
+- `DATETIME(p)` - datetime precision
+
+When using an unsupported driver version, the system will:
+1. Continue to work normally with default precision (0)
+2. Log a warning message indicating the driver version limitation
+3. Return `null` for precision calculations to avoid incorrect results
+
+**Example warning log:**
+```
+WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, 
+columnSize may not be accurate for precision calculation. 
+Returning null for TIMESTAMP type precision. Driver version: mysql-connector-java-8.0.11
+```
+
+**Recommended driver versions:**
+- `mysql-connector-java-8.0.16` or higher
+
 ### Catalog operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -87,30 +114,31 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table column types
 
-| Gravitino Type     | MySQL Type          |
-|--------------------|---------------------|
-| `Byte`             | `Tinyint`           |
-| `Unsigned Byte`    | `Tinyint Unsigned`  |
-| `Short`            | `Smallint`          |
-| `Unsigned Short`   | `Smallint Unsigned` |
-| `Integer`          | `Int`               |
-| `Unsigned Integer` | `Int Unsigned`      |
-| `Long`             | `Bigint`            |
-| `Unsigned Long`    | `Bigint Unsigned`   |
-| `Float`            | `Float`             |
-| `Double`           | `Double`            |
-| `String`           | `Text`              |
-| `Date`             | `Date`              |
-| `Time`             | `Time`              |
-| `Timestamp`        | `Timestamp`         |
-| `Decimal`          | `Decimal`           |
-| `VarChar`          | `VarChar`           |
-| `FixedChar`        | `FixedChar`         |
-| `Binary`           | `Binary`            |
-| `BOOLEAN`          | `BIT`               |
+| Gravitino Type       | MySQL Type          |
+|----------------------|---------------------|
+| `Byte`               | `Tinyint`           |
+| `Unsigned Byte`      | `Tinyint Unsigned`  |
+| `Short`              | `Smallint`          |
+| `Unsigned Short`     | `Smallint Unsigned` |
+| `Integer`            | `Int`               |
+| `Unsigned Integer`   | `Int Unsigned`      |
+| `Long`               | `Bigint`            |
+| `Unsigned Long`      | `Bigint Unsigned`   |
+| `Float`              | `Float`             |
+| `Double`             | `Double`            |
+| `String`             | `Text`              |
+| `Date`               | `Date`              |
+| `Time[(p)]`          | `Time[(p)]`         |
+| `Timestamp_tz[(p)]`  | `Timestamp(p)`      |
+| `Timestamp[(p)]`     | `Datetime[(p)]`     |
+| `Decimal`            | `Decimal`           |
+| `VarChar`            | `VarChar`           |
+| `FixedChar`          | `FixedChar`         |
+| `Binary`             | `Binary`            |
+| `BOOLEAN`            | `BIT`               |
 
 :::info
-MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
+MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 

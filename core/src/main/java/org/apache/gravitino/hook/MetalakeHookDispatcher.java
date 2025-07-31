@@ -27,7 +27,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -72,9 +72,9 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
     }
 
     // Set the creator as owner of the metalake.
-    OwnerManager ownerManager = GravitinoEnv.getInstance().ownerManager();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerDispatcher != null) {
+      ownerDispatcher.setOwner(
           ident.name(),
           NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.METALAKE),
           PrincipalUtils.getCurrentUserName(),

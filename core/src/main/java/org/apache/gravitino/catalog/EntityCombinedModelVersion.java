@@ -76,8 +76,8 @@ public final class EntityCombinedModelVersion implements ModelVersion {
   }
 
   @Override
-  public String uri() {
-    return modelVersion.uri();
+  public Map<String, String> uris() {
+    return modelVersion.uris();
   }
 
   @Override

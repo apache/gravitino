@@ -21,6 +21,7 @@ package org.apache.gravitino.auth;
 
 /** Constants used for authentication. */
 public final class AuthConstants {
+
   private AuthConstants() {}
 
   /** The HTTP header used to pass the authentication token. */
@@ -43,6 +44,18 @@ public final class AuthConstants {
 
   /** The default username used for anonymous access. */
   public static final String ANONYMOUS_USER = "anonymous";
+
+  /** OWNER. */
+  public static final String OWNER = "OWNER";
+
+  /** SELF authorization expression. */
+  public static final String SELF = "SELF";
+
+  /** deny. */
+  public static final String DENY = "deny";
+
+  /** allow. */
+  public static final String ALLOW = "allow";
 
   /**
    * The default name of the attribute that stores the authenticated principal in the request.

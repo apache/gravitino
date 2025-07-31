@@ -58,7 +58,7 @@ public abstract class OAuth2TokenProvider implements AuthDataProvider {
     if (accessToken == null) {
       return null;
     }
-    return (AuthConstants.AUTHORIZATION_BEARER_HEADER + getAccessToken())
+    return (AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken)
         .getBytes(StandardCharsets.UTF_8);
   }
 

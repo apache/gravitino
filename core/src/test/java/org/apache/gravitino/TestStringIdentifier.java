@@ -175,6 +175,11 @@ public class TestStringIdentifier {
     // Test comment where there is no space between Gravitino prefix and id
     String comment4 = "This is a comment (From Gravitino, DO NOT EDIT:gravitino.v1.uid123123)";
     Assertions.assertNull(StringIdentifier.fromComment(comment4));
+
+    // Test comment with trailing characters after the id
+    String commentWithExtra = commentWithId + " extra)";
+    StringIdentifier idFromCommentExtra = StringIdentifier.fromComment(commentWithExtra);
+    Assertions.assertEquals(stringId.id(), idFromCommentExtra.id());
   }
 
   @Test

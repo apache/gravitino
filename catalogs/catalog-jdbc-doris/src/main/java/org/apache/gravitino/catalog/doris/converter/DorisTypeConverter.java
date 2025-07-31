@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.doris.converter;
 
+import java.util.Optional;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -58,7 +59,9 @@ public class DorisTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case DATETIME:
-        return Types.TimestampType.withoutTimeZone();
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimestampType::withoutTimeZone)
+            .orElseGet(Types.TimestampType::withoutTimeZone);
       case CHAR:
         return Types.FixedCharType.of(typeBean.getColumnSize());
       case VARCHAR:
@@ -97,7 +100,10 @@ public class DorisTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.DateType) {
       return DATE;
     } else if (type instanceof Types.TimestampType) {
-      return DATETIME;
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      return timestampType.hasPrecisionSet()
+          ? String.format("%s(%d)", DATETIME, timestampType.precision())
+          : DATETIME;
     } else if (type instanceof Types.VarCharType) {
       int length = ((Types.VarCharType) type).length();
       if (length < 1 || length > 65533) {

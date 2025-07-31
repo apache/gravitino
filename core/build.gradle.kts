@@ -105,7 +105,7 @@ jmh {
   warmupIterations = 5
   iterations = 10
   fork = 1
-  threads = 4
+  threads = 10
   resultFormat = "csv"
   resultsFile = file("$buildDir/reports/jmh/results.csv")
 }

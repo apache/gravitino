@@ -53,6 +53,11 @@ public class DummyEventListener implements EventListenerPlugin {
     postEvents.add(event);
   }
 
+  public void clear() {
+    postEvents.clear();
+    preEvents.clear();
+  }
+
   @Override
   public SupportsChangingPreEvent transformPreEvent(
       SupportsChangingPreEvent supportsChangingPreEvent) {
