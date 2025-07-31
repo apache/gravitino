@@ -335,7 +335,7 @@ public class JobManager implements JobOperationDispatcher, Closeable {
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
     JobEntity jobEntity = getJob(metalake, jobId);
 
-    if (jobEntity.status() == JobHandle.Status.CANCELING
+    if (jobEntity.status() == JobHandle.Status.CANCELLING
         || jobEntity.status() == JobHandle.Status.CANCELLED
         || jobEntity.status() == JobHandle.Status.SUCCEEDED
         || jobEntity.status() == JobHandle.Status.FAILED) {

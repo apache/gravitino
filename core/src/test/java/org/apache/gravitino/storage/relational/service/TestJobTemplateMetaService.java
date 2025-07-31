@@ -211,7 +211,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
 
   static JobTemplateEntity newShellJobTemplateEntity(String name, String comment, String metalake) {
     ShellJobTemplate shellJobTemplate =
-        new ShellJobTemplate.Builder()
+        ShellJobTemplate.builder()
             .withName(name)
             .withComment(comment)
             .withExecutable("/bin/echo")
@@ -228,7 +228,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
 
   static JobTemplateEntity newSparkJobTemplateEntity(String name, String comment, String metalake) {
     SparkJobTemplate sparkJobTemplate =
-        new SparkJobTemplate.Builder()
+        SparkJobTemplate.builder()
             .withName(name)
             .withComment(comment)
             .withClassName("org.apache.spark.examples.SparkPi")

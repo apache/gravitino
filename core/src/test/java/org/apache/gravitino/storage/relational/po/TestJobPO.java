@@ -37,7 +37,7 @@ public class TestJobPO {
   @Test
   public void testJobTemplatePO() {
     JobTemplate shellJobTemplate =
-        new ShellJobTemplate.Builder()
+        ShellJobTemplate.builder()
             .withName("shell-job-template")
             .withComment("This is a shell job template")
             .withExecutable("/bin/echo")
@@ -74,7 +74,7 @@ public class TestJobPO {
         shellTemplateEntity.auditInfo().creator(), resultEntity.auditInfo().creator());
 
     JobTemplate sparkJobTemplate =
-        new SparkJobTemplate.Builder()
+        SparkJobTemplate.builder()
             .withName("spark-job-template")
             .withComment("This is a spark job template")
             .withExecutable("/path/to/spark-demo.jar")
