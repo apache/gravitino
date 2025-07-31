@@ -273,6 +273,68 @@ subprojects {
     mavenLocal()
   }
 
+  fun CompatibleWithJDK8(project: Project): Boolean {
+    val name = project.name.lowercase()
+    val path = project.path.lowercase()
+
+    // bundles module rely on catalog-fileset module
+    if (name == "catalog-common" || name == "hadoop-common" || name == "catalog-fileset") {
+      return true
+    }
+
+    if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
+      return false
+    }
+
+    if (path == ":trino-connector:integration-test" || path == ":web:integration-test") {
+      return false
+    }
+
+    if (name in listOf("server", "lineage")) {
+      return false
+    }
+
+    // All ITs could only run embedded mode in JDK17
+    if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true) {
+      return false
+    }
+
+    return true
+  }
+
+  tasks.register("printJvm") {
+    group = "help"
+    description = "print JVM information"
+
+    doLast {
+
+      val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "undefined"
+
+      val testJvmVersion = tasks.withType<Test>().firstOrNull()?.javaLauncher?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "undefined"
+
+      val testJvmArgs = tasks.withType<Test>().firstOrNull()?.jvmArgs ?: listOf()
+
+      val targetJvmVersion = (java.targetCompatibility?.majorVersion ?: "undefined")
+
+      val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "undefined")
+
+      println(
+        """
+              |=== ${project.name} JVM information===
+              | project path: ${project.path}
+              | JVM for compile: $compileJvmVersion
+              | JVM for test: $testJvmVersion
+              | JVM test args: $testJvmArgs
+              | target JVM version: $targetJvmVersion
+              | source JVM version: $sourceJvmVersion
+              |==================================
+        """.trimMargin()
+      )
+    }
+  }
+
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
@@ -284,10 +346,12 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
-      } else {
-        languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
+      } else if (CompatibleWithJDK8(project)) {
+        languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+      } else {
+        languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
   }
