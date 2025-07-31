@@ -1593,11 +1593,10 @@ public class POConverters {
           .withMetalakeId(oldModelVersionPO.getMetalakeId())
           .withCatalogId(oldModelVersionPO.getCatalogId())
           .withSchemaId(oldModelVersionPO.getSchemaId())
-          // TODO The modelVersionUriName and modelVersionUri here are not actually used.
-          // They are only used for occupying positions to avoid verification failures. They will
-          // be removed when the model version with multiple URIs is supported to be modified later
-          .withModelVersionUriName("uriName")
-          .withModelVersionUri("uri")
+          // The modelVersionUriName and modelVersionUri here are not actually used.
+          // They are only used for occupying positions to avoid verification failures.
+          .withModelVersionUriName(oldModelVersionPO.getModelVersionUriName())
+          .withModelVersionUri(oldModelVersionPO.getModelVersionUri())
           .withModelVersion(oldModelVersionPO.getModelVersion())
           .withModelVersionComment(newModelVersion.comment())
           .withModelVersionProperties(
