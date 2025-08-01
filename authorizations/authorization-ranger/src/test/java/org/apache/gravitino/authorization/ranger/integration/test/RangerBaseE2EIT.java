@@ -31,6 +31,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.MetalakeChange;
@@ -133,6 +134,14 @@ public abstract class RangerBaseE2EIT extends BaseIT {
             .replace("__REPLACE__RANGER_ADMIN_URL", RangerITEnv.RANGER_ADMIN_URL)
             .replace("__REPLACE__RANGER_HIVE_REPO_NAME", RangerITEnv.RANGER_HIVE_REPO_NAME);
     FileUtils.writeStringToFile(new File(xmlPath), templateContext, StandardCharsets.UTF_8);
+  }
+
+  @Override
+  public void startIntegrationTest() throws Exception {
+    customConfigs.put(
+        Configs.AUTHORIZATION_IMPL.getKey(),
+        "org.apache.gravitino.server.authorization.PassThroughAuthorizer");
+    super.startIntegrationTest();
   }
 
   protected void cleanIT() {

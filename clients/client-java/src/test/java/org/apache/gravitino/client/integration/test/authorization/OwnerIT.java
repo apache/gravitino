@@ -65,6 +65,9 @@ public class OwnerIT extends BaseIT {
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(true));
     configs.put(Configs.SERVICE_ADMINS.getKey(), AuthConstants.ANONYMOUS_USER);
+    configs.put(
+        Configs.AUTHORIZATION_IMPL.getKey(),
+        "org.apache.gravitino.server.authorization.PassThroughAuthorizer");
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 
