@@ -31,6 +31,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -65,6 +66,14 @@ public class UserAuthorizationIT extends BaseRestApiAuthorizationIT {
           "user1",
         },
         usersLoadByUser1);
+    String[] usernames = client.loadMetalake(METALAKE).listUserNames();
+    Assertions.assertArrayEquals(new String[] {USER, NORMAL_USER, "user1", "user2"}, usernames);
+    String[] usernamesLoadByUser1 = getClientByUser("user1").loadMetalake(METALAKE).listUserNames();
+    Assertions.assertArrayEquals(
+        new String[] {
+          "user1",
+        },
+        usernamesLoadByUser1);
   }
 
   @Test
