@@ -18,11 +18,19 @@
  */
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
+import static io.trino.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+import static java.lang.String.format;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_PRIMARY_KEY;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_UNIQUE_KEY;
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.getPrimaryKey;
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.getUniqueKey;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
@@ -32,10 +40,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
@@ -80,11 +90,19 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
     String tableName = tableMetadata.getTableSchema().getTable().getTableName();
     String schemaName = tableMetadata.getTableSchema().getTable().getSchemaName();
     String comment = tableMetadata.getComment().orElse("");
-    Map<String, String> properties = toGravitinoTableProperties(tableMetadata.getProperties());
+    Map<String, Object> tableProperties = tableMetadata.getProperties();
+    Map<String, String> properties = toGravitinoTableProperties(tableProperties);
+
+    Set<String> primaryKeyList = getPrimaryKey(tableProperties);
+    Map<String, Set<String>> uniqueKeyMap = getUniqueKey(tableProperties);
 
     List<GravitinoColumn> columns = new ArrayList<>();
+    ImmutableSet.Builder<String> columnNamesBuilder = ImmutableSet.builder();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
+      if (primaryKeyList.contains(column.getName()) && column.isNullable()) {
+        throw new TrinoException(NOT_SUPPORTED, "Primary key must be NOT NULL in MySQL");
+      }
       boolean autoIncrement =
           (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
 
@@ -97,9 +115,63 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
               column.isNullable(),
               autoIncrement,
               column.getProperties()));
+      columnNamesBuilder.add(column.getName());
     }
 
-    return new GravitinoTable(schemaName, tableName, columns, comment, properties);
+    Index[] indexes = buildIndexes(primaryKeyList, uniqueKeyMap, columnNamesBuilder.build());
+
+    return new GravitinoTable(schemaName, tableName, columns, comment, properties, indexes);
+  }
+
+  private static Index[] buildIndexes(
+      Set<String> primaryKeyList, Map<String, Set<String>> uniqueKeyMap, Set<String> columnNames) {
+    ImmutableList.Builder<Index> builder = ImmutableList.builder();
+    if (!primaryKeyList.isEmpty()) {
+      builder.add(convertPrimaryKey(primaryKeyList, columnNames));
+    }
+
+    if (!uniqueKeyMap.isEmpty()) {
+      builder.addAll(convertUniqueKey(uniqueKeyMap, columnNames));
+    }
+
+    List<Index> indexList = builder.build();
+    return indexList.toArray(new Index[indexList.size()]);
+  }
+
+  private static Index convertPrimaryKey(Set<String> primaryKeys, Set<String> columnNames) {
+    for (String primaryKeyColumn : primaryKeys) {
+      if (!columnNames.contains(primaryKeyColumn)) {
+        throw new TrinoException(
+            INVALID_TABLE_PROPERTY,
+            format(
+                "Column '%s' specified in property '%s' doesn't exist in table",
+                primaryKeyColumn, TABLE_PRIMARY_KEY));
+      }
+    }
+    return Indexes.createMysqlPrimaryKey(convertIndexFieldNames(primaryKeys));
+  }
+
+  private static List<Index> convertUniqueKey(
+      Map<String, Set<String>> uniqueKeys, Set<String> columnNames) {
+    ImmutableList.Builder<Index> builder = ImmutableList.builder();
+    for (String uniqueKey : uniqueKeys.keySet()) {
+      Set<String> uniqueKeyColumns = uniqueKeys.get(uniqueKey);
+      for (String uniqueKeyColumn : uniqueKeyColumns) {
+        if (!columnNames.contains(uniqueKeyColumn)) {
+          throw new TrinoException(
+              INVALID_TABLE_PROPERTY,
+              format(
+                  "Column '%s' specified in property '%s' doesn't exist in table",
+                  uniqueKeyColumn, TABLE_UNIQUE_KEY));
+        }
+      }
+      builder.add(Indexes.unique(uniqueKey, convertIndexFieldNames(uniqueKeyColumns)));
+    }
+    return builder.build();
+  }
+
+  private static String[][] convertIndexFieldNames(Set<String> fieldNames) {
+    return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
   }
 
   @Override
