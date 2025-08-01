@@ -126,7 +126,24 @@ public class UserOperations {
                       .toArray(new User[0]);
               return Utils.ok(new UserListResponse(DTOConverters.toDTOs(users)));
             } else {
-              return Utils.ok(new NameListResponse(accessControlManager.listUserNames(metalake)));
+              String[] users = accessControlManager.listUserNames(metalake);
+              users =
+                  Arrays.stream(users)
+                      .filter(
+                          user -> {
+                            NameIdentifier[] nameIdentifiers =
+                                new NameIdentifier[] {NameIdentifierUtil.ofUser(metalake, user)};
+                            return MetadataFilterHelper.filterByExpression(
+                                        metalake,
+                                        "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF",
+                                        Entity.EntityType.USER,
+                                        nameIdentifiers)
+                                    .length
+                                > 0;
+                          })
+                      .collect(Collectors.toList())
+                      .toArray(new String[0]);
+              return Utils.ok(new NameListResponse(users));
             }
           });
     } catch (Exception e) {
