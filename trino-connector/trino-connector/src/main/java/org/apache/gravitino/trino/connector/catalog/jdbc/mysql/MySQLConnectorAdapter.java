@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
-import static java.util.Collections.emptyList;
-
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +58,8 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
     // TODO yuhui Need to improve schema table and column properties
-    return new MySQLMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());
+    return new MySQLMetadataAdapter(
+        getSchemaProperties(), getTableProperties(), getColumnProperties());
   }
 
   @Override

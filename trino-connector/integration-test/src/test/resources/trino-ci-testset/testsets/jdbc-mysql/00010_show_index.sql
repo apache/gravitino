@@ -1,8 +1,8 @@
 CREATE SCHEMA gt_mysql.gt_mysql_test_index;
 
 CREATE TABLE gt_mysql.gt_mysql_test_index.demo_with_one_primary_key (
-   key1 integer NOT NULL,
-   col1 integer
+   key1 integer NOT NULL WITH (auto_increment=true),
+   col1 integer WITH (default = 1)
 )
 COMMENT ''
 WITH (
