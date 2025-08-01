@@ -57,7 +57,6 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.utility.MountableFile;
-import sun.security.krb5.KrbException;
 
 @Tag("gravitino-docker-test")
 public class HadoopUserAuthenticationIT extends BaseIT {
@@ -135,7 +134,7 @@ public class HadoopUserAuthenticationIT extends BaseIT {
     System.clearProperty("sun.security.krb5.debug");
   }
 
-  private static void prepareKerberosConfig() throws IOException, KrbException {
+  private static void prepareKerberosConfig() throws IOException {
     // Keytab of the Gravitino SDK client
     kerberosHiveContainer
         .getContainer()
