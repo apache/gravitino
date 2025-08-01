@@ -307,7 +307,7 @@ public class TestPolicyOperations extends JerseyTest {
             true,
             true,
             SUPPORTS_ALL_OBJECT_TYPES,
-            toDTO(content, Policy.BuiltInType.CUSTOM));
+            toDTO(content));
     Response resp =
         target(policyPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -466,8 +466,7 @@ public class TestPolicyOperations extends JerseyTest {
         new PolicyUpdateRequest[] {
           new PolicyUpdateRequest.RenamePolicyRequest("new_policy1"),
           new PolicyUpdateRequest.UpdatePolicyCommentRequest("new policy1 comment"),
-          new PolicyUpdateRequest.UpdatePolicyContentRequest(
-              "my_compaction", toDTO(content, Policy.BuiltInType.CUSTOM))
+          new PolicyUpdateRequest.UpdatePolicyContentRequest("my_compaction", toDTO(content))
         };
     PolicyUpdatesRequest request = new PolicyUpdatesRequest(Lists.newArrayList(requests));
     Response resp =

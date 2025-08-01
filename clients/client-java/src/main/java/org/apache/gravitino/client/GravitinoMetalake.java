@@ -667,7 +667,7 @@ public class GravitinoMetalake extends MetalakeDTO
             exclusive,
             inheritable,
             supportedObjectTypes,
-            toDTO(content, Policy.BuiltInType.fromPolicyType(type)));
+            toDTO(content));
     req.validate();
 
     PolicyResponse resp =
