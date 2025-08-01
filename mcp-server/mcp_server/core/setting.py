@@ -1,14 +1,14 @@
 class Setting:
     def __init__(self, metalake_name: str, uri: str, mode: str):
-        self.metalake_name = metalake_name
-        self.uri = uri
-        self.mode = mode
+        self._metalake_name = metalake_name
+        self._uri = uri
+        self._mode = mode
 
     def metalake(self):
-        return self.metalake_name
+        return self._metalake_name
 
     def uri(self):
-        return self.uri
+        return self._uri
 
     def mode(self):
-        return self.mode
+        return self._mode

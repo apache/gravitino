@@ -2,14 +2,14 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from core.context import GravitinoContext
-from core.setting import Setting
+from mcp_server.core.context import GravitinoContext
+from mcp_server.core.setting import Setting
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import (LoggingMiddleware,
                                                StructuredLoggingMiddleware)
 from fastmcp.server.middleware.timing import TimingMiddleware
-from tools import load_tools
+from mcp_server.tools import load_tools
 
 
 def create_lifespan_manager(gravitino_context: GravitinoContext):

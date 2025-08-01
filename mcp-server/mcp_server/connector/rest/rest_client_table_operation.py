@@ -1,10 +1,10 @@
-from connector import GravitinoTableOperation
+from mcp_server.connector import TableOperation
 from httpx import Client
 
 from .utils import get_json_from_response
 
 
-class RESTClientTableOperation(GravitinoTableOperation):
+class RESTClientTableOperation(TableOperation):
 
     def __init__(self, metalake_name: str, rest_client: Client):
         self.metalake_name = metalake_name

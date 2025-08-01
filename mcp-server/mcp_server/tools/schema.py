@@ -1,5 +1,3 @@
-import logging
-
 from fastmcp import Context, FastMCP
 
 

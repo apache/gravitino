@@ -1,4 +1,7 @@
-from connector.catalog_operation import CatalogOperation
-from connector.gravitino_operation import GravitinoOperation
-from connector.schema_operation import SchemaOperation
-from connector.table_operation import TableOperation
+from mcp_server.connector.catalog_operation import CatalogOperation
+from mcp_server.connector.gravitino_operation import GravitinoOperation
+from mcp_server.connector.schema_operation import SchemaOperation
+from mcp_server.connector.table_operation import TableOperation
+
+from mcp_server.connector.rest.rest_client_operation import RESTClientOperation
+from mcp_server.connector.factory import ConnectorFactory

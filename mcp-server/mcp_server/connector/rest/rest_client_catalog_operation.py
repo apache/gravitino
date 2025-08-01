@@ -1,7 +1,6 @@
-import logging
 
-from connector import CatalogOperation
-from connector.rest.utils import get_json_from_response
+from mcp_server.connector import CatalogOperation
+from mcp_server.connector.rest.utils import get_json_from_response
 from httpx import Client
 
 
