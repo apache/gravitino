@@ -273,6 +273,14 @@ subprojects {
     mavenLocal()
   }
 
+  if (project.hasProperty("release8")) {
+    version = "jdk8-" + version
+  }
+
+  tasks.withType<Jar>().configureEach {
+    archiveVersion.set(project.version.toString())
+  }
+
 /*
   fun CompatibleWithJDK8(project: Project): Boolean {
     val name = project.name.lowercase()
