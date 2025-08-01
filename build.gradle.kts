@@ -273,6 +273,7 @@ subprojects {
     mavenLocal()
   }
 
+/*
   fun CompatibleWithJDK8(project: Project): Boolean {
     val name = project.name.lowercase()
     val path = project.path.lowercase()
@@ -301,6 +302,7 @@ subprojects {
 
     return true
   }
+  */
 
   tasks.register("printJvm") {
     group = "help"
@@ -341,12 +343,13 @@ subprojects {
       // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
       // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
       // Trino-connector on macOS.
+      val isRelease8 = project.hasProperty("release8")
       if (project.name == "trino-connector") {
         if (OperatingSystem.current().isMacOsX) {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (CompatibleWithJDK8(project)) {
+      } else if (isRelease8) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
