@@ -74,8 +74,6 @@ public class PolicyCreateRequest implements RESTRequest {
   @JsonProperty("supportedObjectTypes")
   private final Set<MetadataObject.Type> supportedObjectTypes;
 
-  private final Policy.BuiltInType builtInType;
-
   /**
    * Creates a new PolicyCreateRequest.
    *
@@ -105,7 +103,6 @@ public class PolicyCreateRequest implements RESTRequest {
     this.inheritable = inheritable;
     this.supportedObjectTypes = supportedObjectTypes;
     this.policyContent = content;
-    this.builtInType = Policy.BuiltInType.fromPolicyType(type);
   }
 
   /** This is the constructor that is used by Jackson deserializer */
@@ -118,7 +115,6 @@ public class PolicyCreateRequest implements RESTRequest {
     this.inheritable = null;
     this.supportedObjectTypes = null;
     this.policyContent = null;
-    this.builtInType = null;
   }
 
   /**
@@ -133,6 +129,7 @@ public class PolicyCreateRequest implements RESTRequest {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(policyType), "\"policyType\" is required and cannot be empty");
 
+    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
     if (builtInType != Policy.BuiltInType.CUSTOM) {
       if (exclusive != null) {
         Preconditions.checkArgument(

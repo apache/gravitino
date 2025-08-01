@@ -23,9 +23,9 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -34,7 +34,6 @@ import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.policy.Policy;
 
 /** Represents a Policy Data Transfer Object (DTO). */
-@EqualsAndHashCode
 @ToString
 public class PolicyDTO implements Policy {
 
@@ -79,6 +78,35 @@ public class PolicyDTO implements Policy {
   private AuditDTO audit;
 
   private PolicyDTO() {}
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof PolicyDTO)) return false;
+    PolicyDTO policyDTO = (PolicyDTO) o;
+    return enabled == policyDTO.enabled
+        && exclusive == policyDTO.exclusive
+        && inheritable == policyDTO.inheritable
+        && Objects.equals(name, policyDTO.name)
+        && Objects.equals(comment, policyDTO.comment)
+        && Objects.equals(policyType, policyDTO.policyType)
+        && Objects.equals(supportedObjectTypes, policyDTO.supportedObjectTypes)
+        && Objects.equals(content, policyDTO.content)
+        && Objects.equals(audit, policyDTO.audit);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        name,
+        comment,
+        policyType,
+        enabled,
+        exclusive,
+        inheritable,
+        supportedObjectTypes,
+        content,
+        audit);
+  }
 
   /** @return a new builder for constructing a PolicyDTO. */
   public static Builder builder() {

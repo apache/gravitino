@@ -24,6 +24,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -80,6 +81,14 @@ public interface Model extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Model does not support tag operations.");
+  }
+
+  /**
+   * @return The {@link SupportsPolicies} if the model supports policy operations.
+   * @throws UnsupportedOperationException If the model does not support policy operations.
+   */
+  default SupportsPolicies supportsPolicies() {
+    throw new UnsupportedOperationException("Model does not support policy operations.");
   }
 
   /**

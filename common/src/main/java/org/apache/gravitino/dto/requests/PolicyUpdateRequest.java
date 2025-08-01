@@ -30,7 +30,6 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
-import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rest.RESTRequest;
 
@@ -57,10 +56,10 @@ public interface PolicyUpdateRequest extends RESTRequest {
 
   /** The policy update request for renaming a policy. */
   @EqualsAndHashCode
+  @Getter
   @ToString
   class RenamePolicyRequest implements PolicyUpdateRequest {
 
-    @Getter
     @JsonProperty("newName")
     private final String newName;
 
@@ -92,9 +91,9 @@ public interface PolicyUpdateRequest extends RESTRequest {
   /** The policy update request for updating a policy comment. */
   @EqualsAndHashCode
   @ToString
+  @Getter
   class UpdatePolicyCommentRequest implements PolicyUpdateRequest {
 
-    @Getter
     @JsonProperty("newComment")
     private final String newComment;
 
@@ -124,14 +123,13 @@ public interface PolicyUpdateRequest extends RESTRequest {
 
   /** The policy update request for updating a policy content. */
   @EqualsAndHashCode
+  @Getter
   @ToString
   class UpdatePolicyContentRequest implements PolicyUpdateRequest {
 
-    @Getter
     @JsonProperty("policyType")
     private final String policyType;
 
-    @Getter
     @JsonProperty("newContent")
     @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
@@ -165,8 +163,7 @@ public interface PolicyUpdateRequest extends RESTRequest {
 
     @Override
     public PolicyChange policyChange() {
-      return PolicyChange.updateContent(
-          policyType, fromDTO(newContent, Policy.BuiltInType.fromPolicyType(policyType)));
+      return PolicyChange.updateContent(policyType, fromDTO(newContent));
     }
 
     @Override

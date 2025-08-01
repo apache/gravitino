@@ -131,7 +131,8 @@ public class PolicyOperations {
           () -> {
             request.validate();
             Policy policy =
-                request.getBuiltInType() == Policy.BuiltInType.CUSTOM
+                Policy.BuiltInType.fromPolicyType(request.getPolicyType())
+                        == Policy.BuiltInType.CUSTOM
                     ? policyDispatcher.createPolicy(
                         metalake,
                         request.getName(),
@@ -141,14 +142,14 @@ public class PolicyOperations {
                         request.getExclusive(),
                         request.getInheritable(),
                         request.getSupportedObjectTypes(),
-                        fromDTO(request.getPolicyContent(), request.getBuiltInType()))
+                        fromDTO(request.getPolicyContent()))
                     : policyDispatcher.createPolicy(
                         metalake,
                         request.getName(),
                         request.getPolicyType(),
                         request.getComment(),
                         request.getEnabled(),
-                        fromDTO(request.getPolicyContent(), request.getBuiltInType()));
+                        fromDTO(request.getPolicyContent()));
 
             LOG.info("Created policy: {} under metalake: {}", policy.name(), metalake);
             return Utils.ok(new PolicyResponse(DTOConverters.toDTO(policy, Optional.empty())));
