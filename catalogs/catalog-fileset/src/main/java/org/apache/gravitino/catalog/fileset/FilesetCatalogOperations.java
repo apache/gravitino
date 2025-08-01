@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.CACHE_VALUE_NOT_SET;
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
@@ -96,6 +95,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.slf4j.Logger;
@@ -119,7 +119,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting Map<String, Path> catalogStorageLocations;
 
-  private Map<String, String> conf;
+  @VisibleForTesting Map<String, String> conf;
 
   private CatalogInfo catalogInfo;
 
@@ -129,8 +129,71 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private boolean disableFSOps;
 
+  @VisibleForTesting ScheduledThreadPoolExecutor scheduler;
+  @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
+
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
+    scheduler =
+        new ScheduledThreadPoolExecutor(
+            1,
+            new ThreadFactoryBuilder()
+                .setDaemon(true)
+                .setNameFormat("file-system-cache-for-fileset" + "-%d")
+                .build());
+
+    this.fileSystemCache =
+        Caffeine.newBuilder()
+            .expireAfterAccess(1, TimeUnit.HOURS)
+            .removalListener(
+                (ignored, value, cause) -> {
+                  try {
+                    ((FileSystem) value).close();
+                  } catch (IOException e) {
+                    LOG.warn("Failed to close FileSystem instance in cache", e);
+                  }
+                })
+            .scheduler(Scheduler.forScheduledExecutorService(scheduler))
+            .build();
+  }
+
+  static class FileSystemCacheKey {
+    private final Map<String, String> conf;
+    private final String pathPrefix;
+    private final String currentUser;
+
+    FileSystemCacheKey(Map<String, String> conf, String pathPrefix) {
+      this.conf = conf;
+      this.pathPrefix = pathPrefix;
+
+      try {
+        this.currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to get current user", e);
+      }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof FileSystemCacheKey)) {
+        return false;
+      }
+      FileSystemCacheKey that = (FileSystemCacheKey) o;
+      return conf.equals(that.conf)
+          && pathPrefix.equals(that.pathPrefix)
+          && currentUser.equals(that.currentUser);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = conf.hashCode();
+      result = 31 * result + currentUser.hashCode();
+      result = 31 * result + pathPrefix.hashCode();
+      return result;
+    }
   }
 
   public FilesetCatalogOperations() {
@@ -242,9 +305,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     String actualPath = getFileLocation(filesetIdent, subPath, locationName);
-    Path formalizedPath = formalizePath(new Path(actualPath), conf);
 
-    FileSystem fs = getFileSystem(formalizedPath, conf);
+    FileSystem fileSystem = getFileSystemWithCache(new Path(actualPath), conf);
+    Path formalizedPath =
+        new Path(actualPath).makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
+
+    FileSystem fs = getFileSystemWithCache(formalizedPath, conf);
     if (!fs.exists(formalizedPath)) {
       throw new IllegalArgumentException(
           String.format(
@@ -367,10 +433,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       try {
         // formalize the path to avoid path without scheme, uri, authority, etc.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
-          Path formalizePath = formalizePath(entry.getValue(), conf);
-          filesetPathsBuilder.put(entry.getKey(), formalizePath);
 
-          FileSystem fs = getFileSystem(formalizePath, conf);
+          FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), conf);
+          Path formalizePath =
+              entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
+
+          filesetPathsBuilder.put(entry.getKey(), formalizePath);
+          FileSystem fs = getFileSystemWithCache(formalizePath, conf);
           if (!fs.exists(formalizePath)) {
             if (!fs.mkdirs(formalizePath)) {
               throw new RuntimeException(
@@ -536,7 +605,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         storageLocations.forEach(
             (locationName, location) -> {
               try {
-                FileSystem fs = getFileSystem(location, conf);
+                FileSystem fs = getFileSystemWithCache(location, conf);
                 if (fs.exists(location)) {
                   if (!fs.delete(location, true)) {
                     LOG.warn(
@@ -692,7 +761,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         (locationName, schemaPath) -> {
           if (schemaPath != null && !containsPlaceholder(schemaPath.toString())) {
             try {
-              FileSystem fs = getFileSystem(schemaPath, conf);
+              FileSystem fs = getFileSystemWithCache(schemaPath, conf);
               if (!fs.exists(schemaPath)) {
                 if (!fs.mkdirs(schemaPath)) {
                   // Fail the operation when failed to create the schema path.
@@ -797,7 +866,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                           (locationName, location) -> {
                             try {
                               Path filesetPath = new Path(location);
-                              FileSystem fs = getFileSystem(filesetPath, conf);
+                              FileSystem fs = getFileSystemWithCache(filesetPath, conf);
                               if (fs.exists(filesetPath)) {
                                 if (!fs.delete(filesetPath, true)) {
                                   LOG.warn(
@@ -827,7 +896,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         schemaPaths.forEach(
             (locationName, schemaPath) -> {
               try {
-                FileSystem fs = getFileSystem(schemaPath, conf);
+                FileSystem fs = getFileSystemWithCache(schemaPath, conf);
                 if (fs.exists(schemaPath)) {
                   FileStatus[] statuses = fs.listStatus(schemaPath);
                   if (statuses.length == 0) {
@@ -896,42 +965,23 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public void close() throws IOException {
     // do nothing
-  }
-
-  private Cache<NameIdentifier, FilesetImpl> initializeFilesetCache(Map<String, String> config) {
-    Caffeine<Object, Object> cacheBuilder =
-        Caffeine.newBuilder()
-            .removalListener(
-                (k, v, c) -> LOG.info("Evicting fileset {} from cache due to {}", k, c))
-            .scheduler(
-                Scheduler.forScheduledExecutorService(
-                    new ScheduledThreadPoolExecutor(
-                        1,
-                        new ThreadFactoryBuilder()
-                            .setDaemon(true)
-                            .setNameFormat("fileset-cleaner-%d")
-                            .build())));
-
-    Long cacheEvictionIntervalInMs =
-        (Long)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(
-                    config, FilesetCatalogPropertiesMetadata.FILESET_CACHE_EVICTION_INTERVAL_MS);
-    if (cacheEvictionIntervalInMs != CACHE_VALUE_NOT_SET) {
-      cacheBuilder.expireAfterAccess(cacheEvictionIntervalInMs, TimeUnit.MILLISECONDS);
+    if (scheduler != null) {
+      scheduler.shutdownNow();
     }
 
-    Long cacheMaxSize =
-        (Long)
-            propertiesMetadata
-                .catalogPropertiesMetadata()
-                .getOrDefault(config, FilesetCatalogPropertiesMetadata.FILESET_CACHE_MAX_SIZE);
-    if (cacheMaxSize != CACHE_VALUE_NOT_SET) {
-      cacheBuilder.maximumSize(cacheMaxSize);
+    if (fileSystemCache != null) {
+      fileSystemCache
+          .asMap()
+          .forEach(
+              (k, v) -> {
+                try {
+                  v.close();
+                } catch (IOException e) {
+                  LOG.warn("Failed to close FileSystem instance in cache", e);
+                }
+              });
+      fileSystemCache.cleanUp();
     }
-
-    return cacheBuilder.build();
   }
 
   private void validateLocationHierarchy(
@@ -1248,10 +1298,59 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         && !CallerContext.CallerContextHolder.get().context().isEmpty();
   }
 
+  @VisibleForTesting
+  FileSystem getFileSystemWithCache(Path path, Map<String, String> conf) {
+    String pathString = path.toString();
+    // extract the prefix of the path to use as the cache key
+    String prefix = extractPrefix(pathString);
+    return fileSystemCache.get(
+        new FileSystemCacheKey(conf, prefix),
+        cacheKey -> {
+          try {
+            return getFileSystem(path, conf);
+          } catch (IOException e) {
+            throw new GravitinoRuntimeException(
+                e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
+          }
+        });
+  }
+
+  /**
+   * Extracts the prefix from the given path. The prefix is defined as the scheme and the first
+   * slash after the scheme.
+   *
+   * @param path the path from which to extract the prefix.
+   * @return the prefix of the path, or an empty string if the path is null or empty.
+   */
+  @VisibleForTesting
+  String extractPrefix(String path) {
+    if (path == null || path.isEmpty()) {
+      return "";
+    }
+
+    if (path.startsWith("file:/")) {
+      return "file:///";
+    }
+
+    String protocolSlash = "://";
+    int protocolStart = path.indexOf(protocolSlash);
+    if (protocolStart == -1) {
+      return path;
+    }
+
+    int firstSlash = path.indexOf('/', protocolStart + protocolSlash.length());
+    if (firstSlash == -1) {
+      return path + "/";
+    }
+
+    return path.substring(0, firstSlash + 1);
+  }
+
   private boolean checkSingleFile(Fileset fileset, String locationName) {
     try {
       Path locationPath = new Path(fileset.storageLocations().get(locationName));
-      return getFileSystem(locationPath, conf).getFileStatus(locationPath).isFile();
+      FileSystem fileSystem = getFileSystemWithCache(locationPath, conf);
+      return fileSystem.getFileStatus(locationPath).isFile();
     } catch (FileNotFoundException e) {
       // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
       return false;
