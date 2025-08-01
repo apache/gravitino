@@ -20,12 +20,10 @@ package org.apache.gravitino.lineage.sink;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.openlineage.client.OpenLineageClient;
-import io.openlineage.client.OpenLineageClientException;
 import io.openlineage.client.transports.HttpConfig;
 import io.openlineage.client.transports.HttpTransport;
 import io.openlineage.server.OpenLineage;
 import java.util.Map;
-import javax.ws.rs.BadRequestException;
 import org.apache.gravitino.lineage.Utils;
 import org.apache.gravitino.lineage.auth.AuthenticationFactory;
 import org.apache.gravitino.lineage.auth.LineageServerAuthenticationStrategy;
@@ -57,9 +55,6 @@ public class LineageHttpSink implements LineageSink {
     try {
       client.emit(Utils.getClientRunEvent(runEvent));
       LOG.info("Sent lineage event to http sink: {}", runEvent);
-    } catch (OpenLineageClientException e) {
-      LOG.warn("Failed to send lineage event to http sink ", e);
-      throw new BadRequestException(String.format(e.getMessage()), e);
     } catch (JsonProcessingException e) {
       LOG.warn("Could not parse lineage run event", e);
       throw new RuntimeException(e);
