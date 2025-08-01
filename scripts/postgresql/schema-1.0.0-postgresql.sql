@@ -668,3 +668,59 @@ COMMENT ON COLUMN policy_relation_meta.audit_info IS 'policy relation audit info
 COMMENT ON COLUMN policy_relation_meta.current_version IS 'policy relation current version';
 COMMENT ON COLUMN policy_relation_meta.last_version IS 'policy relation last version';
 COMMENT ON COLUMN policy_relation_meta.deleted_at IS 'policy relation deleted at';
+
+
+CREATE TABLE IF NOT EXISTS job_template_meta (
+    job_template_id BIGINT NOT NULL,
+    job_template_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    job_template_comment TEXT DEFAULT NULL,
+    job_template_content TEXT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (job_template_id),
+    UNIQUE (metalake_id, job_template_name, deleted_at)
+);
+
+COMMENT ON TABLE job_template_meta IS 'job template metadata';
+COMMENT ON COLUMN job_template_meta.job_template_id IS 'job template id';
+COMMENT ON COLUMN job_template_meta.job_template_name IS 'job template name';
+COMMENT ON COLUMN job_template_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN job_template_meta.job_template_comment IS 'job template comment';
+COMMENT ON COLUMN job_template_meta.job_template_content IS 'job template content';
+COMMENT ON COLUMN job_template_meta.audit_info IS 'job template audit info';
+COMMENT ON COLUMN job_template_meta.current_version IS 'job template current version';
+COMMENT ON COLUMN job_template_meta.last_version IS 'job template last version';
+COMMENT ON COLUMN job_template_meta.deleted_at IS 'job template deleted at';
+
+
+CREATE TABLE IF NOT EXISTS job_run_meta (
+    job_run_id BIGINT NOT NULL,
+    job_template_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    job_execution_id VARCHAR(256) NOT NULL,
+    job_run_status VARCHAR(64) NOT NULL,
+    job_finished_at BIGINT NOT NULL DEFAULT 0,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (job_run_id),
+    UNIQUE (metalake_id, job_execution_id, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_template_id ON job_run_meta (job_template_id);
+CREATE INDEX IF NOT EXISTS idx_job_execution_id ON job_run_meta (job_execution_id);
+COMMENT ON TABLE job_run_meta IS 'job run metadata';
+COMMENT ON COLUMN job_run_meta.job_run_id IS 'job run id';
+COMMENT ON COLUMN job_run_meta.job_template_id IS 'job template id';
+COMMENT ON COLUMN job_run_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN job_run_meta.job_execution_id IS 'job execution id';
+COMMENT ON COLUMN job_run_meta.job_run_status IS 'job run status';
+COMMENT ON COLUMN job_run_meta.job_finished_at IS 'job run finished at';
+COMMENT ON COLUMN job_run_meta.audit_info IS 'job run audit info';
+COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';
+COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';
+COMMENT ON COLUMN job_run_meta.deleted_at IS 'job run deleted at';
