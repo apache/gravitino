@@ -55,11 +55,10 @@ github:
   collaborators:
     - noidname01
     - orenccl
-    - Abyss-lord
     - sunxiaojian
     - tengqm
     - hdygxsj
-    - unknowntpo
+    - bharos
 
 notifications:
   commits: commits@gravitino.apache.org
