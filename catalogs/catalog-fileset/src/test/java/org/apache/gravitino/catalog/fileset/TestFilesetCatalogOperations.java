@@ -1453,19 +1453,16 @@ public class TestFilesetCatalogOperations {
       when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
       when(mockOps.extractPrefix(Mockito.anyString())).thenCallRealMethod();
-      when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any(), Mockito.any()))
-          .thenCallRealMethod();
+      when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
           String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
 
       FileSystem fs1 =
-          mockOps.getFileSystemWithCache(
-              new Path("file:///dir1/subdir/file1"), mockOps.getConf(), filesetIdent);
+          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file1"), mockOps.getConf());
 
       FileSystem fs2 =
-          mockOps.getFileSystemWithCache(
-              new Path("file:///dir1/subdir/file2"), mockOps.getConf(), filesetIdent);
+          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file2"), mockOps.getConf());
 
       Assertions.assertSame(fs1, fs2);
     }
