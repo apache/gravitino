@@ -181,6 +181,15 @@ public class SparkJobTemplate extends JobTemplate {
     return sb + super.toString() + "}\n";
   }
 
+  /**
+   * Creates a new builder for constructing instances of {@link SparkJobTemplate}.
+   *
+   * @return a new instance of {@link Builder}
+   */
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** Builder for creating instances of {@link SparkJobTemplate}. */
   public static class Builder extends JobTemplate.BaseBuilder<Builder, SparkJobTemplate> {
 
@@ -193,6 +202,8 @@ public class SparkJobTemplate extends JobTemplate {
     private List<String> archives;
 
     private Map<String, String> configs;
+
+    private Builder() {}
 
     /**
      * Sets the class name of the Spark application to be executed.
