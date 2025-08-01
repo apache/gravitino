@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Cherry pick into branch-0.8
-        uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
+        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
         with:
           branch: branch-0.8
           labels: |
@@ -36,7 +36,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Cherry pick into branch-0.9
-        uses: carloscastrojumo/github-cherry-pick-action@v1.0.9
+        uses: carloscastrojumo/github-cherry-pick-action@503773289f4a459069c832dc628826685b75b4b3
         with:
           branch: branch-0.9
           labels: |

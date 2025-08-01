@@ -384,7 +384,7 @@ public class JobManager implements JobOperationDispatcher, Closeable {
   }
 
   @VisibleForTesting
-  static JobTemplate createRuntimeJobTemplate(
+  public static JobTemplate createRuntimeJobTemplate(
       JobTemplateEntity jobTemplateEntity, Map<String, String> jobConf, File stagingDir) {
     String name = jobTemplateEntity.name();
     String comment = jobTemplateEntity.comment();
