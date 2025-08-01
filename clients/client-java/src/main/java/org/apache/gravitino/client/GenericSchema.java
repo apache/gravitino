@@ -25,17 +25,22 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.SchemaDTO;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic schema. */
-class GenericSchema implements Schema, SupportsTags, SupportsRoles {
+class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPolicies {
 
   private final SchemaDTO schemaDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
+  private final MetadataObjectPolicyOperations objectPolicyOperations;
 
   GenericSchema(SchemaDTO schemaDTO, RESTClient restClient, String metalake, String catalog) {
     this.schemaDTO = schemaDTO;
@@ -44,10 +49,17 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles {
     this.objectTagOperations = new MetadataObjectTagOperations(metalake, schemaObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(metalake, schemaObject, restClient);
+    this.objectPolicyOperations =
+        new MetadataObjectPolicyOperations(metalake, schemaObject, restClient);
   }
 
   @Override
   public SupportsTags supportsTags() {
+    return this;
+  }
+
+  @Override
+  public SupportsPolicies supportsPolicies() {
     return this;
   }
 
@@ -94,6 +106,27 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listPolicies() {
+    return objectPolicyOperations.listPolicies();
+  }
+
+  @Override
+  public Policy[] listPolicyInfos() {
+    return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public Policy getPolicy(String name) throws NoSuchPolicyException {
+    return objectPolicyOperations.getPolicy(name);
+  }
+
+  @Override
+  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
+      throws PolicyAlreadyAssociatedException {
+    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
   }
 
   @Override

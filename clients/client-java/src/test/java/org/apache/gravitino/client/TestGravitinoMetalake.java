@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import static org.apache.gravitino.policy.Policy.SUPPORTS_ALL_OBJECT_TYPES;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -785,10 +786,10 @@ public class TestGravitinoMetalake extends TestBase {
     Assertions.assertEquals(2, policyInfos.length);
     Assertions.assertEquals(policy1.name(), policyInfos[0].name());
     Assertions.assertEquals(policy1.comment(), policyInfos[0].comment());
-    Assertions.assertEquals(policy1.content(), policyInfos[0].content());
+    Assertions.assertEquals(fromDTO(policy1.content()), policyInfos[0].content());
     Assertions.assertEquals(policy2.name(), policyInfos[1].name());
     Assertions.assertEquals(policy2.comment(), policyInfos[1].comment());
-    Assertions.assertEquals(policy2.content(), policyInfos[1].content());
+    Assertions.assertEquals(fromDTO(policy2.content()), policyInfos[1].content());
 
     // Test empty policy list
     PolicyListResponse resp1 = new PolicyListResponse(new PolicyDTO[] {});
@@ -833,8 +834,8 @@ public class TestGravitinoMetalake extends TestBase {
 
     Policy policy = gravitinoClient.getPolicy(policyName);
     Assertions.assertEquals(policyName, policy.name());
-    Assertions.assertEquals(policy1.comment(), policy.comment());
-    Assertions.assertEquals(policy1.content(), policy.content());
+    Assertions.assertEquals((policy1.comment()), policy.comment());
+    Assertions.assertEquals(fromDTO(policy1.content()), policy.content());
 
     // Test throw NoSuchMetalakeException
     ErrorResponse errorResponse =

@@ -50,7 +50,6 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersionChange;
-import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -377,8 +376,7 @@ class DTOConverters {
       PolicyChange.UpdateContent updateContent = (PolicyChange.UpdateContent) change;
       String policyType = updateContent.getPolicyType();
       return new PolicyUpdateRequest.UpdatePolicyContentRequest(
-          policyType,
-          toDTO(updateContent.getContent(), Policy.BuiltInType.fromPolicyType(policyType)));
+          policyType, toDTO(updateContent.getContent()));
 
     } else {
       throw new IllegalArgumentException(

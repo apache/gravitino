@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
+
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
@@ -33,12 +35,15 @@ class GenericPolicy implements Policy, Policy.AssociatedObjects {
 
   private final PolicyDTO policyDTO;
 
+  private final PolicyContent content;
+
   private final RESTClient restClient;
 
   private final String metalake;
 
   GenericPolicy(PolicyDTO policyDTO, RESTClient restClient, String metalake) {
     this.policyDTO = policyDTO;
+    this.content = fromDTO(policyDTO.content());
     this.restClient = restClient;
     this.metalake = metalake;
   }
@@ -80,7 +85,7 @@ class GenericPolicy implements Policy, Policy.AssociatedObjects {
 
   @Override
   public PolicyContent content() {
-    return policyDTO.content();
+    return content;
   }
 
   @Override
@@ -127,5 +132,18 @@ class GenericPolicy implements Policy, Policy.AssociatedObjects {
   @Override
   public int hashCode() {
     return policyDTO.hashCode();
+  }
+
+  @Override
+  public String toString() {
+    return "GenericPolicy{"
+        + "policyDTO="
+        + policyDTO
+        + ", content="
+        + content
+        + ", metalake='"
+        + metalake
+        + '\''
+        + '}';
   }
 }

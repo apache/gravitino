@@ -548,8 +548,7 @@ public class DTOConverters {
             .withExclusive(policy.exclusive())
             .withInheritable(policy.inheritable())
             .withSupportedObjectTypes(policy.supportedObjectTypes())
-            .withContent(
-                toDTO(policy.content(), Policy.BuiltInType.fromPolicyType(policy.policyType())))
+            .withContent(toDTO(policy.content()))
             .withInherited(inherited)
             .withAudit(toDTO(policy.auditInfo()))
             .withInherited(inherited);
@@ -561,10 +560,9 @@ public class DTOConverters {
    * Converts a PolicyContent to a PolicyContentDTO.
    *
    * @param policyContent The policyContent to be converted.
-   * @param policyTyp The built-in type of the policy.
    * @return The policy content DTO.
    */
-  public static PolicyContentDTO toDTO(PolicyContent policyContent, Policy.BuiltInType policyTyp) {
+  public static PolicyContentDTO toDTO(PolicyContent policyContent) {
     if (policyContent == null) {
       return null;
     }
@@ -573,16 +571,15 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
-    switch (policyTyp) {
-      case CUSTOM:
-        PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
-        return PolicyContentDTO.CustomContentDTO.builder()
-            .withCustomRules(customContent.customRules())
-            .withProperties(customContent.properties())
-            .build();
-      default:
-        throw new IllegalArgumentException("Unsupported policy type: " + policyTyp.name());
+    if (policyContent instanceof PolicyContents.CustomContent) {
+      PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
+      return PolicyContentDTO.CustomContentDTO.builder()
+          .withCustomRules(customContent.customRules())
+          .withProperties(customContent.properties())
+          .build();
     }
+
+    throw new IllegalArgumentException("Unsupported policy content: " + policyContent);
   }
 
   /**
@@ -1220,5 +1217,26 @@ public class DTOConverters {
     } else {
       return Privileges.deny(privilegeDTO.name());
     }
+  }
+
+  /**
+   * Converts a PolicyContentDTO to a PolicyContent.
+   *
+   * @param policyContentDTO The policy content DTO to be converted.
+   * @return The policy content.
+   */
+  public static PolicyContent fromDTO(PolicyContentDTO policyContentDTO) {
+    if (policyContentDTO == null) {
+      return null;
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.CustomContentDTO) {
+      PolicyContentDTO.CustomContentDTO customContentDTO =
+          (PolicyContentDTO.CustomContentDTO) policyContentDTO;
+      return PolicyContents.custom(customContentDTO.customRules(), customContentDTO.properties());
+    }
+
+    throw new IllegalArgumentException(
+        "Unsupported policy content type: " + policyContentDTO.getClass());
   }
 }
