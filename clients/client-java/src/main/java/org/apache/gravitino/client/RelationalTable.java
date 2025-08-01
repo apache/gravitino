@@ -42,8 +42,12 @@ import org.apache.gravitino.dto.responses.PartitionListResponse;
 import org.apache.gravitino.dto.responses.PartitionNameListResponse;
 import org.apache.gravitino.dto.responses.PartitionResponse;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
@@ -57,7 +61,8 @@ import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a relational table. */
-class RelationalTable implements Table, SupportsPartitions, SupportsTags, SupportsRoles {
+class RelationalTable
+    implements Table, SupportsPartitions, SupportsTags, SupportsRoles, SupportsPolicies {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
@@ -69,6 +74,7 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
+  private final MetadataObjectPolicyOperations objectPolicyOperations;
 
   /**
    * Creates a new RelationalTable.
@@ -99,6 +105,8 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(namespace.level(0), tableObject, restClient);
+    this.objectPolicyOperations =
+        new MetadataObjectPolicyOperations(namespace.level(0), tableObject, restClient);
   }
 
   /**
@@ -300,6 +308,11 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
   }
 
   @Override
+  public SupportsPolicies supportsPolicies() {
+    return this;
+  }
+
+  @Override
   public SupportsRoles supportsRoles() {
     return this;
   }
@@ -326,6 +339,27 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listPolicies() {
+    return objectPolicyOperations.listPolicies();
+  }
+
+  @Override
+  public Policy[] listPolicyInfos() {
+    return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public Policy getPolicy(String name) throws NoSuchPolicyException {
+    return objectPolicyOperations.getPolicy(name);
+  }
+
+  @Override
+  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
+      throws PolicyAlreadyAssociatedException {
+    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
   }
 
   @Override

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.policy;
 
+import java.util.Arrays;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
@@ -171,7 +172,11 @@ public interface PolicyDispatcher {
    * @param metadataObject the metadata object for which associated policies
    * @return The array of policy names associated with the specified metadata object.
    */
-  String[] listPoliciesForMetadataObject(String metalake, MetadataObject metadataObject);
+  default String[] listPoliciesForMetadataObject(String metalake, MetadataObject metadataObject) {
+    return Arrays.stream(listPolicyInfosForMetadataObject(metalake, metadataObject))
+        .map(Policy::name)
+        .toArray(String[]::new);
+  }
 
   /**
    * List all the policies with detailed information associated with a metadata object under a

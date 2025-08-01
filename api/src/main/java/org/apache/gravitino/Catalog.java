@@ -26,6 +26,7 @@ import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
@@ -222,6 +223,14 @@ public interface Catalog extends Auditable {
    */
   default SupportsTags supportsTags() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support tag operations");
+  }
+
+  /**
+   * @return the {@link SupportsPolicies} if the catalog supports policy operations.
+   * @throws UnsupportedOperationException if the catalog does not support policy operations.
+   */
+  default SupportsPolicies supportsPolicies() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support policy operations");
   }
 
   /**
