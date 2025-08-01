@@ -154,14 +154,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       try {
         Long roleId =
             MetadataIdConverter.getID(
-                MetadataObjects.of(
-                    String.join(
-                        ".",
-                        nameIdentifier.namespace().level(1),
-                        nameIdentifier.namespace().level(2)),
-                    nameIdentifier.name(),
-                    MetadataObject.Type.ROLE),
-                metalake);
+                NameIdentifierUtil.toMetadataObject(nameIdentifier, type), metalake);
         UserEntity userEntity = getUserEntity(currentUserName, metalake);
         Long userId = userEntity.id();
         loadRolePrivilege(metalake, currentUserName, userId);
