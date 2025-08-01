@@ -753,10 +753,9 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
     Map<String, String> properties = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
     String modelComment = "model1 comment";
-    String modelVersionUri = "S3://test/path/to/model/version";
+    Map<String, String> modelVersionUris = ImmutableMap.of("n1", "u1");
     List<String> modelVersionAliases = ImmutableList.of("alias1", "alias2");
     String modelVersionComment = "test comment";
-    String updatedUri = "S3://test/path/to/new/model/version";
     int version = 0;
 
     ModelEntity modelEntity =
@@ -773,17 +772,18 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         createModelVersionEntity(
             modelEntity.nameIdentifier(),
             version,
-            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, modelVersionUri),
+            modelVersionUris,
             modelVersionAliases,
             modelVersionComment,
             properties,
             auditInfo);
 
+    Map<String, String> newModelVersionUris = ImmutableMap.of("n1", "u1-1", "n2", "u2");
     ModelVersionEntity updatedModelVersionEntity =
         createModelVersionEntity(
             modelVersionEntity.modelIdentifier(),
             modelVersionEntity.version(),
-            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, updatedUri),
+            newModelVersionUris,
             modelVersionEntity.aliases(),
             modelVersionEntity.comment(),
             modelVersionEntity.properties(),

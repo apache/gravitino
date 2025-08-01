@@ -56,6 +56,11 @@ public class ModelVersionMetaSQLProviderFactory {
     return getProvider().insertModelVersionMetas(modelVersionPOs);
   }
 
+  public static String insertModelVersionMetasWithVersionNumber(
+      @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    return getProvider().insertModelVersionMetasWithVersionNumber(modelVersionPOs);
+  }
+
   public static String listModelVersionMetasByModelId(@Param("modelId") Long modelId) {
     return getProvider().listModelVersionMetasByModelId(modelId);
   }
@@ -107,12 +112,5 @@ public class ModelVersionMetaSQLProviderFactory {
       @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
       @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO) {
     return getProvider().updateModelVersionMeta(newModelVersionPO, oldModelVersionPO);
-  }
-
-  public static String updateModelVersionUris(
-      @Param("modelId") Long modelId,
-      @Param("modelVersion") Integer modelVersion,
-      @Param("uris") Map<String, String> uris) {
-    return getProvider().updateModelVersionUris(modelId, modelVersion, uris);
   }
 }

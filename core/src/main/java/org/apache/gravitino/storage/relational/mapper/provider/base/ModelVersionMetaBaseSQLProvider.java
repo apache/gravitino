@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -48,6 +47,33 @@ public class ModelVersionMetaBaseSQLProvider {
         + " ) v"
         + " JOIN"
         + " (SELECT metalake_id, catalog_id, schema_id, model_id, model_latest_version"
+        + " FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0) m"
+        + " ON v.model_id = m.model_id"
+        + "</script>";
+  }
+
+  public String insertModelVersionMetasWithVersionNumber(
+      @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs) {
+    return "<script>"
+        + "INSERT INTO "
+        + ModelVersionMetaMapper.TABLE_NAME
+        + "(metalake_id, catalog_id, schema_id, model_id, version, model_version_comment,"
+        + " model_version_properties, model_version_uri_name, model_version_uri, audit_info, deleted_at)"
+        + " SELECT m.metalake_id, m.catalog_id, m.schema_id, m.model_id, v.model_version_number, v.model_version_comment,"
+        + " v.model_version_properties, v.model_version_uri_name, v.model_version_uri, v.audit_info, v.deleted_at"
+        + " FROM ("
+        + "<foreach collection='modelVersionMetas' item='version' separator='UNION ALL'>"
+        + " SELECT"
+        + " #{version.modelId} AS model_id, #{version.modelVersionComment} AS model_version_comment,"
+        + " #{version.modelVersionProperties} AS model_version_properties, #{version.auditInfo} AS audit_info,"
+        + " #{version.deletedAt} AS deleted_at, #{version.modelVersionUriName} AS model_version_uri_name,"
+        + " #{version.modelVersionUri} AS model_version_uri, #{version.modelVersion} AS model_version_number "
+        + "</foreach>"
+        + " ) v"
+        + " JOIN"
+        + " (SELECT metalake_id, catalog_id, schema_id, model_id"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE model_id = #{modelVersionMetas[0].modelId} AND deleted_at = 0) m"
@@ -184,22 +210,5 @@ public class ModelVersionMetaBaseSQLProvider {
         + "AND model_version_properties = #{oldModelVersionMeta.modelVersionProperties} "
         + "AND audit_info = #{oldModelVersionMeta.auditInfo} "
         + "AND deleted_at = 0";
-  }
-
-  public String updateModelVersionUris(
-      @Param("modelId") Long modelId,
-      @Param("modelVersion") Integer modelVersion,
-      @Param("uris") Map<String, String> uris) {
-    return "<script>"
-        + "UPDATE "
-        + ModelVersionMetaMapper.TABLE_NAME
-        + " SET"
-        + " model_version_uri = CASE"
-        + "<foreach collection='uris' index='k' item='v' separator=''>"
-        + " WHEN model_version_uri_name = #{k} THEN #{v}"
-        + "</foreach>"
-        + " ELSE model_version_uri END"
-        + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0"
-        + "</script>";
   }
 }

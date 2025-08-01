@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import java.util.Map;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -35,6 +34,12 @@ public interface ModelVersionMetaMapper {
       type = ModelVersionMetaSQLProviderFactory.class,
       method = "insertModelVersionMetas")
   void insertModelVersionMetas(@Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs);
+
+  @InsertProvider(
+      type = ModelVersionMetaSQLProviderFactory.class,
+      method = "insertModelVersionMetasWithVersionNumber")
+  void insertModelVersionMetasWithVersionNumber(
+      @Param("modelVersionMetas") List<ModelVersionPO> modelVersionPOs);
 
   @SelectProvider(
       type = ModelVersionMetaSQLProviderFactory.class,
@@ -98,12 +103,4 @@ public interface ModelVersionMetaMapper {
   Integer updateModelVersionMeta(
       @Param("newModelVersionMeta") ModelVersionPO newModelVersionPO,
       @Param("oldModelVersionMeta") ModelVersionPO oldModelVersionPO);
-
-  @UpdateProvider(
-      type = ModelVersionMetaSQLProviderFactory.class,
-      method = "updateModelVersionUris")
-  Integer updateModelVersionUris(
-      @Param("modelId") Long modelId,
-      @Param("modelVersion") Integer modelVersion,
-      @Param("uris") Map<String, String> uris);
 }

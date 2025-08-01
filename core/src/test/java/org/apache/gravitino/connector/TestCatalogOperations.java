@@ -1133,7 +1133,7 @@ public class TestCatalogOperations
     String newComment = testModelVersion.comment();
     int newVersion = testModelVersion.version();
     String[] newAliases = testModelVersion.aliases();
-    String newUri = testModelVersion.uri();
+    Map<String, String> newUris = Maps.newHashMap(testModelVersion.uris());
 
     for (ModelVersionChange change : changes) {
       if (change instanceof ModelVersionChange.UpdateComment) {
@@ -1162,11 +1162,23 @@ public class TestCatalogOperations
 
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
-        newUri = updateUriChange.newUri();
+        newUris.replace(updateUriChange.uriName(), updateUriChange.newUri());
+
+      } else if (change instanceof ModelVersionChange.AddUri) {
+        ModelVersionChange.AddUri addUriChange = (ModelVersionChange.AddUri) change;
+        newUris.putIfAbsent(addUriChange.uriName(), addUriChange.uri());
+
+      } else if (change instanceof ModelVersionChange.RemoveUri) {
+        ModelVersionChange.RemoveUri removeUriChange = (ModelVersionChange.RemoveUri) change;
+        newUris.remove(removeUriChange.uriName());
 
       } else {
         throw new IllegalArgumentException("Unsupported model version change: " + change);
       }
+    }
+
+    if (newUris.isEmpty()) {
+      throw new IllegalArgumentException("Model version URI cannot be empty");
     }
 
     TestModelVersion updatedModelVersion =
@@ -1175,7 +1187,7 @@ public class TestCatalogOperations
             .withComment(newComment)
             .withProperties(newProps)
             .withAuditInfo(updatedAuditInfo)
-            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, newUri))
+            .withUris(newUris)
             .withAliases(newAliases)
             .build();
 

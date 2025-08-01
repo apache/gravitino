@@ -169,7 +169,21 @@ public class TestModelVersionChange {
     ModelVersionChange.UpdateUri updateUriChange =
         (ModelVersionChange.UpdateUri) modelVersionChange;
     Assertions.assertEquals(newUri, updateUriChange.newUri());
-    Assertions.assertEquals("UpdateUri " + newUri, updateUriChange.toString());
+    Assertions.assertEquals(ModelVersion.URI_NAME_UNKNOWN, updateUriChange.uriName());
+    Assertions.assertEquals(
+        "UpdateUri uriName: (unknown) newUri: (" + newUri + ")", updateUriChange.toString());
+
+    String uriName = "n1";
+    modelVersionChange = ModelVersionChange.updateUri(uriName, newUri);
+
+    Assertions.assertEquals(ModelVersionChange.UpdateUri.class, modelVersionChange.getClass());
+
+    updateUriChange = (ModelVersionChange.UpdateUri) modelVersionChange;
+    Assertions.assertEquals(newUri, updateUriChange.newUri());
+    Assertions.assertEquals(uriName, updateUriChange.uriName());
+    Assertions.assertEquals(
+        "UpdateUri uriName: (" + uriName + ") newUri: (" + newUri + ")",
+        updateUriChange.toString());
   }
 
   @Test
@@ -182,7 +196,21 @@ public class TestModelVersionChange {
     ModelVersionChange.UpdateUri updateUriChange =
         (ModelVersionChange.UpdateUri) modelVersionChange;
     Assertions.assertEquals(newUri, updateUriChange.newUri());
-    Assertions.assertEquals("UpdateUri " + newUri, updateUriChange.toString());
+    Assertions.assertEquals(ModelVersion.URI_NAME_UNKNOWN, updateUriChange.uriName());
+    Assertions.assertEquals(
+        "UpdateUri uriName: (unknown) newUri: (" + newUri + ")", updateUriChange.toString());
+
+    String uriName = "n1";
+    modelVersionChange = new ModelVersionChange.UpdateUri(uriName, newUri);
+
+    Assertions.assertEquals(ModelVersionChange.UpdateUri.class, modelVersionChange.getClass());
+
+    updateUriChange = (ModelVersionChange.UpdateUri) modelVersionChange;
+    Assertions.assertEquals(newUri, updateUriChange.newUri());
+    Assertions.assertEquals(uriName, updateUriChange.uriName());
+    Assertions.assertEquals(
+        "UpdateUri uriName: (" + uriName + ") newUri: (" + newUri + ")",
+        updateUriChange.toString());
   }
 
   @Test
@@ -193,6 +221,110 @@ public class TestModelVersionChange {
     ModelVersionChange modelVersionChange1 = ModelVersionChange.updateUri(uri1);
     ModelVersionChange modelVersionChange2 = ModelVersionChange.updateUri(uri1);
     ModelVersionChange modelVersionChange3 = ModelVersionChange.updateUri(uri2);
+
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
+    Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
+    Assertions.assertNotEquals(modelVersionChange2, modelVersionChange3);
+
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
+    Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+
+    modelVersionChange1 = ModelVersionChange.updateUri("n1", uri1);
+    modelVersionChange2 = ModelVersionChange.updateUri("n1", uri1);
+    modelVersionChange3 = ModelVersionChange.updateUri("n2", uri2);
+
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
+    Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
+    Assertions.assertNotEquals(modelVersionChange2, modelVersionChange3);
+
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
+    Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+  }
+
+  @Test
+  void testAddUriChangeUseStaticMethod() {
+    String uri = "S3://bucket/key";
+    String uriName = "n1";
+    ModelVersionChange modelVersionChange = ModelVersionChange.addUri(uriName, uri);
+
+    Assertions.assertEquals(ModelVersionChange.AddUri.class, modelVersionChange.getClass());
+
+    ModelVersionChange.AddUri change = (ModelVersionChange.AddUri) modelVersionChange;
+    Assertions.assertEquals(uri, change.uri());
+    Assertions.assertEquals(uriName, change.uriName());
+    Assertions.assertEquals(
+        "AddUri uriName: (" + uriName + ") uri: (" + uri + ")", change.toString());
+  }
+
+  @Test
+  void testAddUriChangeUseConstructor() {
+    String uri = "S3://bucket/key";
+    String uriName = "n1";
+    ModelVersionChange modelVersionChange = new ModelVersionChange.AddUri(uriName, uri);
+
+    Assertions.assertEquals(ModelVersionChange.AddUri.class, modelVersionChange.getClass());
+
+    ModelVersionChange.AddUri change = (ModelVersionChange.AddUri) modelVersionChange;
+    Assertions.assertEquals(uri, change.uri());
+    Assertions.assertEquals(uriName, change.uriName());
+    Assertions.assertEquals(
+        "AddUri uriName: (" + uriName + ") uri: (" + uri + ")", change.toString());
+  }
+
+  @Test
+  void testAddUriChangeEquals() {
+    String uri1 = "S3://bucket/key1";
+    String uri2 = "S3://bucket/key2";
+    String uriName1 = "n1";
+    String uriName2 = "n2";
+
+    ModelVersionChange modelVersionChange1 = ModelVersionChange.addUri(uriName1, uri1);
+    ModelVersionChange modelVersionChange2 = ModelVersionChange.addUri(uriName1, uri1);
+    ModelVersionChange modelVersionChange3 = ModelVersionChange.addUri(uriName2, uri2);
+
+    Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
+    Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
+    Assertions.assertNotEquals(modelVersionChange2, modelVersionChange3);
+
+    Assertions.assertEquals(modelVersionChange1.hashCode(), modelVersionChange2.hashCode());
+    Assertions.assertNotEquals(modelVersionChange1.hashCode(), modelVersionChange3.hashCode());
+    Assertions.assertNotEquals(modelVersionChange2.hashCode(), modelVersionChange3.hashCode());
+  }
+
+  @Test
+  void testRemoveUriChangeUseStaticMethod() {
+    String uriName = "n1";
+    ModelVersionChange modelVersionChange = ModelVersionChange.removeUri(uriName);
+
+    Assertions.assertEquals(ModelVersionChange.RemoveUri.class, modelVersionChange.getClass());
+
+    ModelVersionChange.RemoveUri change = (ModelVersionChange.RemoveUri) modelVersionChange;
+    Assertions.assertEquals(uriName, change.uriName());
+    Assertions.assertEquals("RemoveUri uriName: (" + uriName + ")", change.toString());
+  }
+
+  @Test
+  void testRemoveUriChangeUseConstructor() {
+    String uriName = "n1";
+    ModelVersionChange modelVersionChange = new ModelVersionChange.RemoveUri(uriName);
+
+    Assertions.assertEquals(ModelVersionChange.RemoveUri.class, modelVersionChange.getClass());
+
+    ModelVersionChange.RemoveUri change = (ModelVersionChange.RemoveUri) modelVersionChange;
+    Assertions.assertEquals(uriName, change.uriName());
+    Assertions.assertEquals("RemoveUri uriName: (" + uriName + ")", change.toString());
+  }
+
+  @Test
+  void testRemoveUriChangeEquals() {
+    String uriName1 = "n1";
+    String uriName2 = "n2";
+
+    ModelVersionChange modelVersionChange1 = ModelVersionChange.removeUri(uriName1);
+    ModelVersionChange modelVersionChange2 = ModelVersionChange.removeUri(uriName1);
+    ModelVersionChange modelVersionChange3 = ModelVersionChange.removeUri(uriName2);
 
     Assertions.assertEquals(modelVersionChange1, modelVersionChange2);
     Assertions.assertNotEquals(modelVersionChange1, modelVersionChange3);
