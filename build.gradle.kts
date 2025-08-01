@@ -273,44 +273,24 @@ subprojects {
     mavenLocal()
   }
 
-  if (project.hasProperty("release8")) {
-    version = "jdk8-" + version
-  }
-
-  tasks.withType<Jar>().configureEach {
-    archiveVersion.set(project.version.toString())
-  }
-
-/*
   fun CompatibleWithJDK8(project: Project): Boolean {
     val name = project.name.lowercase()
     val path = project.path.lowercase()
 
+    if (path.startsWith(":client") ||
+      path.startsWith(":bundles") ||
+      path.startsWith(":flink-connector") ||
+      path.startsWith(":spark-connector")
+    ) {
+      return true
+    }
     // bundles module rely on catalog-fileset module
     if (name == "catalog-common" || name == "hadoop-common" || name == "catalog-fileset") {
       return true
     }
 
-    if (path.startsWith(":catalogs:") || path.startsWith(":iceberg:") || path.startsWith(":authorizations:")) {
-      return false
-    }
-
-    if (path == ":trino-connector:integration-test" || path == ":web:integration-test") {
-      return false
-    }
-
-    if (name in listOf("server", "lineage")) {
-      return false
-    }
-
-    // All ITs could only run embedded mode in JDK17
-    if (path.startsWith(":integration-test:") && rootProject.extra["isTestModeEmbedded"] == true) {
-      return false
-    }
-
-    return true
+    return false
   }
-  */
 
   tasks.register("printJvm") {
     group = "help"
@@ -357,7 +337,7 @@ subprojects {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (isRelease8) {
+      } else if (isRelease8 && CompatibleWithJDK8(project)) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
