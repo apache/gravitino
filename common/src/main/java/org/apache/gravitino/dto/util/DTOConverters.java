@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.util;
 
+import static org.apache.gravitino.policy.Policy.BuiltInType.CUSTOM;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import java.util.Arrays;
@@ -54,6 +55,8 @@ import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
+import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
@@ -86,6 +89,9 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -523,6 +529,52 @@ public class DTOConverters {
             .withInherited(inherited);
 
     return builder.build();
+  }
+
+  /**
+   * Converts a Policy to a PolicyDTO.
+   *
+   * @param policy The policy to be converted.
+   * @param inherited The inherited flag.
+   * @return The policy DTO.
+   */
+  public static PolicyDTO toDTO(Policy policy, Optional<Boolean> inherited) {
+    PolicyDTO.Builder builder =
+        PolicyDTO.builder()
+            .withName(policy.name())
+            .withComment(policy.comment())
+            .withPolicyType(policy.policyType())
+            .withEnabled(policy.enabled())
+            .withExclusive(policy.exclusive())
+            .withInheritable(policy.inheritable())
+            .withSupportedObjectTypes(policy.supportedObjectTypes())
+            .withContent(
+                toDTO(policy.content(), Policy.BuiltInType.fromPolicyType(policy.policyType())))
+            .withInherited(inherited)
+            .withAudit(toDTO(policy.auditInfo()))
+            .withInherited(inherited);
+
+    return builder.build();
+  }
+
+  /**
+   * Converts a PolicyContent to a PolicyContentDTO.
+   *
+   * @param policyContent The policyContent to be converted.
+   * @param policyTyp The built-in type of the policy.
+   * @return The policy content DTO.
+   */
+  public static PolicyContentDTO toDTO(PolicyContent policyContent, Policy.BuiltInType policyTyp) {
+    switch (policyTyp) {
+      case CUSTOM:
+        PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
+        return PolicyContentDTO.CustomContentDTO.builder()
+            .withCustomRules(customContent.customRules())
+            .withProperties(customContent.properties())
+            .build();
+      default:
+        throw new IllegalArgumentException("Unsupported policy type: " + policyTyp.name());
+    }
   }
 
   /**
@@ -979,6 +1031,25 @@ public class DTOConverters {
       return new Column[0];
     }
     return Arrays.stream(columns).map(DTOConverters::fromDTO).toArray(Column[]::new);
+  }
+
+  /**
+   * Converts a PolicyContentDTO to a PolicyContent.
+   *
+   * @param policyContentDTO The policy content DTO to be converted.
+   * @param policyType The built-in type of the policy.
+   * @return The policy content.
+   */
+  public static PolicyContent fromDTO(
+      PolicyContentDTO policyContentDTO, Policy.BuiltInType policyType) {
+    switch (policyType) {
+      case CUSTOM:
+        PolicyContentDTO.CustomContentDTO customContentDTO =
+            (PolicyContentDTO.CustomContentDTO) policyContentDTO;
+        return PolicyContents.custom(customContentDTO.customRules(), customContentDTO.properties());
+      default:
+        throw new IllegalArgumentException("Unsupported policy type: " + policyType.name());
+    }
   }
 
   /**

@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.POLICY_META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.ibatis.annotations.Param;
@@ -44,6 +45,32 @@ public class PolicyMetaBaseSQLProvider {
         + " WHERE mm.metalake_name = #{metalakeName}"
         + " AND pm.deleted_at = 0 AND mm.deleted_at = 0"
         + " AND pvi.deleted_at = 0";
+  }
+
+  public String listPolicyPOsByMetalakeAndPolicyNames(
+      @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
+    return "<script>"
+        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"
+        + " pm.exclusive, pm.supported_object_types, pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
+        + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON pm.metalake_id = mm.metalake_id"
+        + " JOIN "
+        + POLICY_VERSION_TABLE_NAME
+        + " pvi ON pm.policy_id = pvi.policy_id"
+        + " AND pm.current_version = pvi.version"
+        + " WHERE mm.metalake_name = #{metalakeName}"
+        + " AND pm.policy_name IN "
+        + " <foreach item='policyName' index='index' collection='policyNames' open='(' separator=',' close=')'>"
+        + " #{policyName}"
+        + " </foreach>"
+        + " AND pm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND pvi.deleted_at = 0"
+        + "</script>";
   }
 
   public String insertPolicyMetaOnDuplicateKeyUpdate(@Param("policyMeta") PolicyPO policyPO) {
