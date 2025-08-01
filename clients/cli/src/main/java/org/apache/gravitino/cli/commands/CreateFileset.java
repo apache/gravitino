@@ -29,6 +29,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.utils.MapUtils;
 
 public class CreateFileset extends Command {
   protected final String metalake;
@@ -70,8 +71,11 @@ public class CreateFileset extends Command {
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, fileset);
-    boolean managed = properties.get("managed").equals("true");
-    String location = properties.get("location");
+    boolean managed = "true".equals(properties.get("managed"));
+    Map<String, String> storageLocations = MapUtils.getPrefixMap(properties, "location-", true);
+    Map<String, String> propertiesWithoutLocation =
+        MapUtils.getMapWithoutPrefix(properties, "location-");
+
     Fileset.Type filesetType = managed ? Fileset.Type.MANAGED : Fileset.Type.EXTERNAL;
 
     try {
@@ -79,7 +83,8 @@ public class CreateFileset extends Command {
       client
           .loadCatalog(catalog)
           .asFilesetCatalog()
-          .createFileset(name, comment, filesetType, location, null);
+          .createMultipleLocationFileset(
+              name, comment, filesetType, storageLocations, propertiesWithoutLocation);
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchCatalogException err) {
@@ -93,5 +98,14 @@ public class CreateFileset extends Command {
     }
 
     printInformation(fileset + " created");
+  }
+
+  @Override
+  public Command validate() {
+    if (!properties.containsKey("managed")) {
+      exitWithError("Missing property 'managed'");
+    }
+
+    return this;
   }
 }
