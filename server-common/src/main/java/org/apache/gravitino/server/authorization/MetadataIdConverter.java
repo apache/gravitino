@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
-import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -46,10 +45,11 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /** It is used to convert MetadataObject to MetadataId */
 public class MetadataIdConverter {
-  private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
+
   // Maps metadata type to entity type
   private static final Map<MetadataObject.Type, Entity.EntityType> METADATA_TO_ENTITY_TYPE_MAPPING =
       ImmutableMap.of(
@@ -104,10 +104,7 @@ public class MetadataIdConverter {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
 
     MetadataObject.Type metadataType = metadataObject.type();
-    NameIdentifier ident =
-        (metadataType != MetadataObject.Type.METALAKE)
-            ? NameIdentifier.of(DOT_PATTERN.split(metalake + "." + metadataObject.fullName()))
-            : NameIdentifier.of(metadataObject.fullName());
+    NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
 
     NameIdentifier normalizedIdent =
         normalizeCaseSensitive(ident, METADATA_SCOPE_MAPPING.get(metadataType), catalogManager);
