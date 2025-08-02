@@ -1,7 +1,7 @@
 from mcp_server.connector import SchemaOperation
 from httpx import Client
 
-from .utils import get_json_from_response
+from .utils import extract_content_from_response
 
 
 class RESTClientSchemaOperation(SchemaOperation):
@@ -13,4 +13,4 @@ class RESTClientSchemaOperation(SchemaOperation):
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas"
         )
-        return get_json_from_response(response)
+        return extract_content_from_response(response, "schemas", [])

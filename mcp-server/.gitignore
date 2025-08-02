@@ -18,7 +18,7 @@
 
 **/.pytest_cache/**
 **/__pycache__/**
-apache_gravitino.egg-info
+mcp_server.egg-info
 vevn
 venv
 .vevn

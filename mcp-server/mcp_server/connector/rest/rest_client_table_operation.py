@@ -1,8 +1,6 @@
 from mcp_server.connector import TableOperation
 from httpx import Client
-
-from .utils import get_json_from_response
-
+from mcp_server.connector.rest.utils import extract_content_from_response
 
 class RESTClientTableOperation(TableOperation):
 
@@ -14,10 +12,10 @@ class RESTClientTableOperation(TableOperation):
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables"
         )
-        return get_json_from_response(response)
+        return extract_content_from_response(response, "tables", [])
 
     def load_table(self, catalog_name: str, schema_name: str, table_name: str):
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}"
         )
-        return get_json_from_response(response)
+        return extract_content_from_response(response, "table", {})

@@ -1,6 +1,6 @@
 
 from mcp_server.connector import CatalogOperation
-from mcp_server.connector.rest.utils import get_json_from_response
+from mcp_server.connector.rest.utils import extract_content_from_response
 from httpx import Client
 
 
@@ -13,4 +13,4 @@ class RESTClientCatalogOperation(CatalogOperation):
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs?details=true"
         )
-        return get_json_from_response(response)
+        return extract_content_from_response(response, "catalogs", [])

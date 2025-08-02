@@ -35,7 +35,6 @@ def create_gravition_mcp(setting: Setting) -> FastMCP:
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )
 
-    mcp.add_middleware(StructuredLoggingMiddleware(include_payloads=True))
     mcp.add_middleware(TimingMiddleware())
     mcp.add_middleware(
         ErrorHandlingMiddleware(
