@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.starrocks.integration.test;
 
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -924,5 +927,73 @@ public class CatalogStarRocksIT extends BaseIT {
     Assertions.assertArrayEquals(
         distribution.expressions(), loadTable.distribution().expressions());
     tableCatalog.dropTable(tableIdentifier);
+  }
+
+  @Test
+  void testColumnDefaultValue() {
+    // create a table
+    String tableName = GravitinoITUtils.genRandomName("test_table_with_defaule_value");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    Column col_default_value_date =
+        Column.of(
+            "col_default_value_date",
+            Types.DateType.get(),
+            "col_default_value_date",
+            false,
+            false,
+            Literals.dateLiteral("2024-01-01"));
+
+    Column col_default_value_timestamp =
+        Column.of(
+            "col_default_value_timestamp",
+            Types.TimestampType.withoutTimeZone(),
+            "col_default_value_timestamp",
+            false,
+            false,
+            Literals.timestampLiteral("2024-01-01T01:01:01"));
+
+    Column col_default_value_timestamp_2 =
+        Column.of(
+            "col_default_value_timestamp_2",
+            Types.TimestampType.withoutTimeZone(),
+            "col_default_value_timestamp_2",
+            false,
+            false,
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP);
+    columns =
+        ArrayUtils.addAll(
+            columns,
+            col_default_value_date,
+            col_default_value_timestamp,
+            col_default_value_timestamp_2);
+    Distribution distribution = createDistribution();
+
+    Map<String, String> properties = createTableProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        distribution,
+        null,
+        null);
+
+    // load table
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    Column[] colDefaultValues =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("col_default_value_"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 1, 1)), colDefaultValues[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.timestampLiteral(LocalDateTime.of(2024, 1, 1, 1, 1, 1)),
+        colDefaultValues[1].defaultValue());
+    Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, colDefaultValues[2].defaultValue());
   }
 }

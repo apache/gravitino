@@ -20,21 +20,25 @@ package org.apache.gravitino.catalog.jdbc.converter;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 
 public class JdbcColumnDefaultValueConverter {
 
   protected static final String CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP";
   protected static final String NULL = "NULL";
   protected static final DateTimeFormatter DATE_TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S]");
   protected static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd");
+  protected static final DateTimeFormatter TIME_FORMATTER =
+      DateTimeFormatter.ofPattern("HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S]");
 
   public String fromGravitino(Expression defaultValue) {
     if (DEFAULT_VALUE_NOT_SET.equals(defaultValue)) {
@@ -58,6 +62,12 @@ public class JdbcColumnDefaultValueConverter {
         return NULL;
       } else if (type instanceof Type.NumericType) {
         return literal.value().toString();
+      } else if (type instanceof Types.TimestampType) {
+        /** @see LocalDateTime#toString() would return like 'yyyy-MM-ddTHH:mm:ss' */
+        if (literal.value() instanceof String || literal.value() instanceof LocalDateTime) {
+          return String.format("'%s'", literal.value().toString().replace("T", " "));
+        }
+        return String.format("'%s'", literal.value());
       } else {
         return String.format("'%s'", literal.value());
       }

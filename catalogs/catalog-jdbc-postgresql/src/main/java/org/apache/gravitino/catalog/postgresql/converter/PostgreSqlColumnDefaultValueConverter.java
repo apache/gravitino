@@ -23,6 +23,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -98,9 +99,13 @@ public class PostgreSqlColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));
       case JdbcTypeConverter.DATE:
-        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
+      case JdbcTypeConverter.TIME:
+        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
+      case JdbcTypeConverter.TIMESTAMP:
       case PostgreSqlTypeConverter.TIMESTAMP_TZ:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        return Literals.timestampLiteral(
+            LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
       case VARCHAR:
         return Literals.varcharLiteral(type.getColumnSize(), columnDefaultValue);
       case PostgreSqlTypeConverter.BPCHAR:

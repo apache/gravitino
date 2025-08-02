@@ -27,6 +27,9 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -917,8 +920,32 @@ public class CatalogPostgreSqlIT extends BaseIT {
             true,
             false,
             Literals.integerLiteral(1000));
+    Column col7 =
+        Column.of(
+            "col_7",
+            Types.DateType.get(),
+            "col_7_comment",
+            false,
+            false,
+            Literals.dateLiteral("2024-01-01"));
+    Column col8 =
+        Column.of(
+            "col_8",
+            Types.TimestampType.withoutTimeZone(),
+            "col_8_comment",
+            false,
+            false,
+            Literals.timestampLiteral("2024-01-01T01:01:01"));
+    Column col9 =
+        Column.of(
+            "col_9",
+            Types.TimeType.get(),
+            "col_9_comment",
+            false,
+            false,
+            Literals.timeLiteral("01:01:01"));
 
-    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6};
+    Column[] newColumns = new Column[] {col1, col2, col3, col4, col5, col6, col7, col8, col9};
 
     NameIdentifier tableIdent =
         NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("pg_it_table"));
@@ -934,6 +961,13 @@ public class CatalogPostgreSqlIT extends BaseIT {
     Assertions.assertEquals(
         Literals.varcharLiteral(255, "current_timestamp"), loadedTable.columns()[4].defaultValue());
     Assertions.assertEquals(Literals.integerLiteral(1000), loadedTable.columns()[5].defaultValue());
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 1, 1)), loadedTable.columns()[6].defaultValue());
+    Assertions.assertEquals(
+        Literals.timestampLiteral(LocalDateTime.of(2024, 1, 1, 1, 1, 1)),
+        loadedTable.columns()[7].defaultValue());
+    Assertions.assertEquals(
+        Literals.timeLiteral(LocalTime.of(1, 1, 1)), loadedTable.columns()[8].defaultValue());
   }
 
   @Test
@@ -1001,9 +1035,10 @@ public class CatalogPostgreSqlIT extends BaseIT {
             + "    date_col_2 date,\n"
             + "    date_col_3 date default (current_date + interval '1 year'),\n"
             + "    date_col_4 date default current_date,\n"
-            // todo: uncomment when we support timestamp in PG catalog
-            // + "    timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
-            + "    decimal_6_2_col_1 decimal(6, 2) default 1.2\n"
+            + "    date_col_5 date default '2012-12-31',\n"
+            + "    decimal_6_2_col_1 decimal(6, 2) default 1.2,\n"
+            + "    timestamp_col_1 timestamp default '2012-12-31 11:30:45',\n"
+            + "    time_col_1 time default '11:30:45'\n"
             + ");";
     System.out.println(sql);
     postgreSqlService.executeQuery(sql);
@@ -1057,13 +1092,15 @@ public class CatalogPostgreSqlIT extends BaseIT {
         case "date_col_4":
           Assertions.assertEquals(UnparsedExpression.of("CURRENT_DATE"), column.defaultValue());
           break;
+        case "date_col_5":
+          Assertions.assertEquals(Literals.dateLiteral("2012-12-31"), column.defaultValue());
+          break;
         case "timestamp_col_1":
           Assertions.assertEquals(
               Literals.timestampLiteral("2012-12-31T11:30:45"), column.defaultValue());
           break;
-        case "timestamp_col_2":
-          Assertions.assertEquals(
-              Literals.timestampLiteral("1983-09-05T00:00:00"), column.defaultValue());
+        case "time_col_1":
+          Assertions.assertEquals(Literals.timeLiteral("11:30:45"), column.defaultValue());
           break;
         case "decimal_6_2_col_1":
           Assertions.assertEquals(
