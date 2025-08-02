@@ -50,7 +50,7 @@ class GravitinoMCPServer:
     def __init__(self, setting: Setting):
         self.setting = setting
         self.mcp = create_gravition_mcp(setting)
+        load_tools(self.mcp)
 
     def run(self):
-        load_tools(self.mcp)
         self.mcp.run()

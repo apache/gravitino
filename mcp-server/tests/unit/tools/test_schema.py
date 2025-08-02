@@ -25,22 +25,17 @@ from fastmcp import Client
 
 from tests.unit.tools import MockOperation
 
-
-class TestCatalogTool(unittest.TestCase):
+class TestSchemaTool(unittest.TestCase):
 
   def setUp(self):
     ConnectorFactory.set_test_connector(MockOperation)
     server = GravitinoMCPServer(Setting("", "", ""))
     self.mcp = server.mcp
 
-  def test_list_catalogs(self):
-    async def _test_list_catalogs(mcp_server):
+  def test_list_schemas(self):
+    async def _test_list_schemas(mcp_server):
       async with Client(mcp_server) as client:
-        result = await client.call_tool("get_list_of_catalogs")
-        self.assertEqual("mock_catalogs", result.content[0].text)
+        result = await client.call_tool("get_list_of_schemas", {"catalog_name":"mock"})
+        self.assertEqual("mock_schemas", result.content[0].text)
 
-    asyncio.run(_test_list_catalogs(self.mcp))
-
-
-if __name__ == '__main__':
-  unittest.main()
+    asyncio.run(_test_list_schemas(self.mcp))

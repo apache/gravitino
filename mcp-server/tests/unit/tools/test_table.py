@@ -25,22 +25,22 @@ from fastmcp import Client
 
 from tests.unit.tools import MockOperation
 
-
-class TestCatalogTool(unittest.TestCase):
-
+class TestTableTool(unittest.TestCase):
   def setUp(self):
     ConnectorFactory.set_test_connector(MockOperation)
     server = GravitinoMCPServer(Setting("", "", ""))
     self.mcp = server.mcp
 
-  def test_list_catalogs(self):
-    async def _test_list_catalogs(mcp_server):
+  def test_list_tables(self):
+    async def _test_list_tables(mcp_server):
       async with Client(mcp_server) as client:
-        result = await client.call_tool("get_list_of_catalogs")
-        self.assertEqual("mock_catalogs", result.content[0].text)
+        result = await client.call_tool("get_list_of_tables", {"catalog_name":"mock", "schema_name":"mock"})
+        self.assertEqual("mock_tables", result.content[0].text)
+    asyncio.run(_test_list_tables(self.mcp))
 
-    asyncio.run(_test_list_catalogs(self.mcp))
-
-
-if __name__ == '__main__':
-  unittest.main()
+  def test_load_table(self):
+    async def _test_load_table(mcp_server):
+      async with Client(mcp_server) as client:
+        result = await client.call_tool("get_table_detail_by_name", {"catalog_name":"mock", "schema_name":"mock", "table_name":"mock"})
+        self.assertEqual("mock_table", result.content[0].text)
+    asyncio.run(_test_load_table(self.mcp))

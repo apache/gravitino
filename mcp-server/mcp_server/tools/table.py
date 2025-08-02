@@ -1,8 +1,4 @@
-import logging
-
-import httpx
 from fastmcp import Context, FastMCP
-
 
 def load_table_tools(mcp: FastMCP):
     @mcp.tool(
@@ -21,20 +17,6 @@ def load_table_tools(mcp: FastMCP):
         return connector.as_table_operation().get_list_of_tables(
             catalog_name, schema_name
         )
-
-    def _get_table_by_fqn_response(session: httpx.Client, fully_qualified_name: str):
-        table_names = fully_qualified_name.split(".")
-        # metalake=table_names[0]
-        catalog_name = table_names[0]
-        schema_name = table_names[1]
-        table_name = table_names[2]
-        response = session.get(
-            f"/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}"
-        )
-        response.raise_for_status()
-        response_json = response.json()
-        logging.info(f"response: {response_json}")
-        return response_json
 
     @mcp.tool(
         name="get_table_detail_by_name",
