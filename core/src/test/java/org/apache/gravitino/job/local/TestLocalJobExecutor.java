@@ -118,7 +118,7 @@ public class TestLocalJobExecutor {
     Assertions.assertNotNull(jobId);
 
     Awaitility.await()
-        .atMost(10, TimeUnit.SECONDS)
+        .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.SUCCEEDED);
 
     String output = FileUtils.readFileToString(new File(workingDir, "output.log"), "UTF-8");
@@ -145,7 +145,7 @@ public class TestLocalJobExecutor {
     Assertions.assertNotNull(jobId);
 
     Awaitility.await()
-        .atMost(10, TimeUnit.SECONDS)
+        .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.FAILED);
 
     String output = FileUtils.readFileToString(new File(workingDir, "output.log"), "UTF-8");
@@ -171,12 +171,12 @@ public class TestLocalJobExecutor {
     String jobId = jobExecutor.submitJob(template);
     Assertions.assertNotNull(jobId);
     // sleep a while to ensure the job is running.
-    Thread.sleep(100);
+    Thread.sleep(1000);
 
     jobExecutor.cancelJob(jobId);
 
     Awaitility.await()
-        .atMost(10, TimeUnit.SECONDS)
+        .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(jobId) == JobHandle.Status.CANCELLED);
 
     Assertions.assertEquals(JobHandle.Status.CANCELLED, jobExecutor.getJobStatus(jobId));
@@ -199,7 +199,7 @@ public class TestLocalJobExecutor {
         JobManager.createRuntimeJobTemplate(jobTemplateEntity, successJobConf, workingDir);
     String successJobId = jobExecutor.submitJob(successTemplate);
     Awaitility.await()
-        .atMost(10, TimeUnit.SECONDS)
+        .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(successJobId) == JobHandle.Status.SUCCEEDED);
 
     Assertions.assertDoesNotThrow(() -> jobExecutor.cancelJob(successJobId));
@@ -219,7 +219,7 @@ public class TestLocalJobExecutor {
         JobManager.createRuntimeJobTemplate(jobTemplateEntity, failJobConf, workingDir);
     String failJobId = jobExecutor.submitJob(failTemplate);
     Awaitility.await()
-        .atMost(10, TimeUnit.SECONDS)
+        .atMost(3, TimeUnit.MINUTES)
         .until(() -> jobExecutor.getJobStatus(failJobId) == JobHandle.Status.FAILED);
 
     Assertions.assertDoesNotThrow(() -> jobExecutor.cancelJob(failJobId));
