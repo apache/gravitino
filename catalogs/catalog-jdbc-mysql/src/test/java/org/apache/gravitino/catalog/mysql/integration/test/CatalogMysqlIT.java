@@ -528,6 +528,8 @@ public class CatalogMysqlIT extends BaseIT {
             + "  varchar200_col_1 varchar(200) default 'curdate()',\n"
             + "  varchar200_col_2 varchar(200) default (curdate()),\n"
             + "  varchar200_col_3 varchar(200) default (CURRENT_TIMESTAMP),\n"
+            + "  time_col_1 time default '00:00:00',\n"
+            + "  time_col_2 time default (now()),\n"
             + "  datetime_col_1 datetime default CURRENT_TIMESTAMP,\n"
             + "  datetime_col_2 datetime default current_timestamp,\n"
             + "  datetime_col_3 datetime default null,\n"
@@ -583,6 +585,12 @@ public class CatalogMysqlIT extends BaseIT {
           Assertions.assertEquals(UnparsedExpression.of("curdate()"), column.defaultValue());
           break;
         case "varchar200_col_3":
+          Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
+          break;
+        case "time_col_1":
+          Assertions.assertEquals(Literals.timeLiteral("00:00:00"), column.defaultValue());
+          break;
+        case "time_col_2":
           Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
           break;
         case "datetime_col_1":

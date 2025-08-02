@@ -24,7 +24,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -35,9 +34,6 @@ import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Types;
 
 public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
-
-  private static final DateTimeFormatter DATE_TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.SSSSSS][.SSSSS][.SSSS][.SSS][.SS][.S]");
 
   @Override
   public Expression toGravitino(
@@ -90,7 +86,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       case JdbcTypeConverter.DATE:
         return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case JdbcTypeConverter.TIME:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
         if (columnDefaultValue.startsWith(CURRENT_TIMESTAMP)) {
