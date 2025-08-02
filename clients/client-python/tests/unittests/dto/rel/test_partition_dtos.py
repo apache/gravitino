@@ -3,6 +3,7 @@ import unittest
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
+from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 
 
@@ -49,6 +50,64 @@ class TestPartitionDTOs(unittest.TestCase):
         self.assertEqual(dto.name(), partition_name)
         self.assertListEqual(dto.field_names(), field_names)
         self.assertListEqual(dto.values(), values)
+        self.assertDictEqual(dto.properties(), properties)
+
+        self.assertTrue(dto == dto)
+        self.assertTrue(dto == similar_dto)
+        self.assertFalse(dto == different_dto)
+
+        self.assertEqual(len(dtos), 2)
+        self.assertEqual(dtos[dto], 2)
+
+    def test_list_partition_dto(self):
+        partition_name = "p202508_California"
+        properties = {}
+        lists = [
+            [
+                LiteralDTO.builder()
+                .with_data_type(data_type=Types.DateType.get())
+                .with_value(value="2025-08-08")
+                .build(),
+                LiteralDTO.builder()
+                .with_data_type(data_type=Types.StringType.get())
+                .with_value(value="Los Angeles")
+                .build(),
+            ],
+            [
+                LiteralDTO.builder()
+                .with_data_type(data_type=Types.DateType.get())
+                .with_value(value="2025-08-08")
+                .build(),
+                LiteralDTO.builder()
+                .with_data_type(data_type=Types.StringType.get())
+                .with_value(value="San Francisco")
+                .build(),
+            ],
+        ]
+        dto = ListPartitionDTO(
+            name=partition_name,
+            lists=lists,
+            properties=properties,
+        )
+
+        similar_dto = ListPartitionDTO(
+            name=partition_name,
+            lists=lists,
+            properties=properties,
+        )
+
+        different_dto = ListPartitionDTO(
+            name="different_partition",
+            lists=lists,
+            properties=properties,
+        )
+
+        dtos = {dto: 1, similar_dto: 2, different_dto: 3}
+
+        self.assertIsInstance(dto, ListPartitionDTO)
+        self.assertIs(dto.type(), PartitionDTO.Type.LIST)
+        self.assertEqual(dto.name(), partition_name)
+        self.assertListEqual(dto.lists(), lists)
         self.assertDictEqual(dto.properties(), properties)
 
         self.assertTrue(dto == dto)
