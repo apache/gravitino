@@ -150,13 +150,31 @@ val hadoopPackName = "hadoop-${hadoopVersion}.tar.gz"
 val hadoopDirName = "hadoop-${hadoopVersion}"
 val hadoopDownloadUrl = "https://archive.apache.org/dist/hadoop/core/hadoop-${hadoopVersion}/${hadoopPackName}"
 tasks {
+  val installUv by registering(Exec::class) {
+    val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+    if (isWindows) {
+      commandLine("powershell", "-c", "irm https://astral.sh/uv/install.ps1 | iex")
+    } else {
+      commandLine("/bin/sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh")
+    }
+    doFirst {
+      println("Installing uv...")
+    }
+  }
+
   val checkUv by registering(Exec::class) {
     commandLine("uv", "--version")
+    isIgnoreExitValue = true
     doFirst {
       println("Checking uv installation...")
     }
     doLast {
-      println("uv is available")
+      if (execResult?.exitValue != 0) {
+        println("uv not found, installing...")
+        installUv.get().exec()
+      } else {
+        println("uv is available")
+      }
     }
   }
 
