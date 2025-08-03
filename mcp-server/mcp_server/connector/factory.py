@@ -17,13 +17,14 @@
 
 from mcp_server.connector import RESTClientOperation
 
+
 class ConnectorFactory:
-  _connector_class = RESTClientOperation
+    _connector_class = RESTClientOperation
 
-  @classmethod
-  def create_connector(cls, metalake_name, uri):
-    return cls._connector_class(metalake_name, uri)
+    @classmethod
+    def create_connector(cls, metalake_name, uri):
+        return cls._connector_class(metalake_name, uri)
 
-  @classmethod
-  def set_test_connector(cls, connector_class):
-    cls._connector_class = connector_class
+    @classmethod
+    def set_test_connector(cls, connector_class):
+        cls._connector_class = connector_class

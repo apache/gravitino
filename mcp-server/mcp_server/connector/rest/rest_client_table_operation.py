@@ -19,6 +19,7 @@ from mcp_server.connector import TableOperation
 from httpx import Client
 from mcp_server.connector.rest.utils import extract_content_from_response
 
+
 class RESTClientTableOperation(TableOperation):
 
     def __init__(self, metalake_name: str, rest_client: Client):

@@ -28,19 +28,19 @@ from tests.unit.tools import MockOperation
 
 class TestCatalogTool(unittest.TestCase):
 
-  def setUp(self):
-    ConnectorFactory.set_test_connector(MockOperation)
-    server = GravitinoMCPServer(Setting("", "", ""))
-    self.mcp = server.mcp
+    def setUp(self):
+        ConnectorFactory.set_test_connector(MockOperation)
+        server = GravitinoMCPServer(Setting("", "", ""))
+        self.mcp = server.mcp
 
-  def test_list_catalogs(self):
-    async def _test_list_catalogs(mcp_server):
-      async with Client(mcp_server) as client:
-        result = await client.call_tool("get_list_of_catalogs")
-        self.assertEqual("mock_catalogs", result.content[0].text)
+    def test_list_catalogs(self):
+        async def _test_list_catalogs(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool("get_list_of_catalogs")
+                self.assertEqual("mock_catalogs", result.content[0].text)
 
-    asyncio.run(_test_list_catalogs(self.mcp))
+        asyncio.run(_test_list_catalogs(self.mcp))
 
 
-if __name__ == '__main__':
-  unittest.main()
+if __name__ == "__main__":
+    unittest.main()

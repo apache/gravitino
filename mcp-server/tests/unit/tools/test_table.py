@@ -25,22 +25,35 @@ from fastmcp import Client
 
 from tests.unit.tools import MockOperation
 
+
 class TestTableTool(unittest.TestCase):
-  def setUp(self):
-    ConnectorFactory.set_test_connector(MockOperation)
-    server = GravitinoMCPServer(Setting("", "", ""))
-    self.mcp = server.mcp
+    def setUp(self):
+        ConnectorFactory.set_test_connector(MockOperation)
+        server = GravitinoMCPServer(Setting("", "", ""))
+        self.mcp = server.mcp
 
-  def test_list_tables(self):
-    async def _test_list_tables(mcp_server):
-      async with Client(mcp_server) as client:
-        result = await client.call_tool("get_list_of_tables", {"catalog_name":"mock", "schema_name":"mock"})
-        self.assertEqual("mock_tables", result.content[0].text)
-    asyncio.run(_test_list_tables(self.mcp))
+    def test_list_tables(self):
+        async def _test_list_tables(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "get_list_of_tables",
+                    {"catalog_name": "mock", "schema_name": "mock"},
+                )
+                self.assertEqual("mock_tables", result.content[0].text)
 
-  def test_load_table(self):
-    async def _test_load_table(mcp_server):
-      async with Client(mcp_server) as client:
-        result = await client.call_tool("get_table_detail_by_name", {"catalog_name":"mock", "schema_name":"mock", "table_name":"mock"})
-        self.assertEqual("mock_table", result.content[0].text)
-    asyncio.run(_test_load_table(self.mcp))
+        asyncio.run(_test_list_tables(self.mcp))
+
+    def test_load_table(self):
+        async def _test_load_table(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "get_table_detail_by_name",
+                    {
+                        "catalog_name": "mock",
+                        "schema_name": "mock",
+                        "table_name": "mock",
+                    },
+                )
+                self.assertEqual("mock_table", result.content[0].text)
+
+        asyncio.run(_test_load_table(self.mcp))

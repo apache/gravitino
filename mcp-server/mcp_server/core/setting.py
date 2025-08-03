@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+
 class Setting:
     def __init__(self, metalake_name: str, uri: str, mode: str):
         self._metalake_name = metalake_name

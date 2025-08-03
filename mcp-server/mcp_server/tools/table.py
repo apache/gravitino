@@ -17,6 +17,7 @@
 
 from fastmcp import Context, FastMCP
 
+
 def load_table_tools(mcp: FastMCP):
     @mcp.tool(
         name="get_list_of_tables",

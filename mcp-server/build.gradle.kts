@@ -1,366 +1,232 @@
-import java.nio.file.Paths
-import org.gradle.internal.os.OperatingSystem
+import org.gradle.api.GradleException
+import org.gradle.api.tasks.Delete
+import org.gradle.api.tasks.Exec
+import org.gradle.kotlin.dsl.register
+import java.io.File
 
-plugins {
-    base
+val pythonProjectDir = project.projectDir
+val venvDir = pythonProjectDir.resolve(".venv")
+
+// 确定系统Python命令
+val systemPython = when {
+  System.getProperty("os.name").contains("win", ignoreCase = true) -> "python"
+  else -> "python3"
 }
 
-// 项目配置
-group = "com.example"
-version = "1.0.0"
-
-// 环境配置
-val projectDir = project.layout.projectDirectory.asFile
-val buildDir = layout.buildDirectory.get().asFile
-val venvDir = file("$buildDir/venv")
-val pythonExecutable = if (OperatingSystem.current().isWindows) {
-    Paths.get(venvDir.path, "Scripts", "python.exe").toString()
-} else {
-    Paths.get(venvDir.path, "bin", "python").toString()
-}
-val uvExecutable = if (OperatingSystem.current().isWindows) {
-    Paths.get(venvDir.path, "Scripts", "uv.exe").toString()
-} else {
-    Paths.get(venvDir.path, "bin", "uv").toString()
+// 定义全局UV可执行文件路径
+val globalUvExecutable = when {
+  System.getProperty("os.name").contains("win", ignoreCase = true) -> "uv.exe"
+  else -> "uv"
 }
 
-// 基础环境检查
-tasks.register("checkPython") {
-    group = "Setup"
-    description = "Check Python installation"
+// 定义虚拟环境中的可执行文件路径
+val venvPython = when {
+  System.getProperty("os.name").contains("win", ignoreCase = true) ->
+    venvDir.resolve("Scripts/python.exe").absolutePath
+  else ->
+    venvDir.resolve("bin/python").absolutePath
+}
+
+tasks {
+  // 1. 检查系统Python是否可用
+  register<Exec>("checkSystemPython") {
+    group = "python"
+    description = "Check system Python availability"
+    commandLine(systemPython, "--version")
 
     doLast {
-        val pythonVersion = "3.10"
-        val checkProcess = ProcessBuilder("python", "--version").start()
-        checkProcess.waitFor()
-
-        if (checkProcess.exitValue() != 0) {
-            throw GradleException("Python is not installed. Please install Python $pythonVersion")
-        }
-
-        val output = checkProcess.inputStream.bufferedReader().readText()
-        if (!output.contains(pythonVersion)) {
-            throw GradleException("Required Python $pythonVersion not found. Found: $output")
-        }
+      if (executionResult.get().exitValue != 0) {
+        throw GradleException("System Python not found. Please install Python and ensure '$systemPython' is in PATH.")
+      }
     }
-}
+  }
 
-// 安装 UV
-tasks.register("installUv") {
-    group = "Setup"
-    description = "Install UV package manager"
+  // 2. 安装全局UV（如果尚未安装）
+  register<Exec>("installGlobalUv") {
+    group = "python"
+    description = "Install UV globally if not present"
+    dependsOn("checkSystemPython")
 
-    dependsOn("checkPython")
-
-    doLast {
-        // 创建虚拟环境
+    // 先检查UV是否已安装
+    onlyIf {
+      try {
         exec {
-            commandLine("python", "-m", "venv", venvDir)
-        }
-
-        // 安装 UV
-        exec {
-            commandLine(
-                if (OperatingSystem.current().isWindows)
-                    "$venvDir/Scripts/python" else "$venvDir/bin/python",
-                "-m", "pip", "install", "--upgrade", "pip"
-            )
-        }
-
-        exec {
-            commandLine(
-                if (OperatingSystem.current().isWindows)
-                    "$venvDir/Scripts/pip" else "$venvDir/bin/pip",
-                "install", "uv==0.2.0"
-            )
-        }
+          commandLine(globalUvExecutable, "--version")
+          isIgnoreExitValue = true
+        }.exitValue != 0
+      } catch (e: Exception) {
+        true
+      }
     }
-}
 
-// 安装项目依赖
-tasks.register("installDependencies") {
-    group = "Build"
-    description = "Install Python dependencies"
+    doFirst {
+      logger.lifecycle("UV not found, installing via official script...")
+    }
 
-    dependsOn("installUv")
-
-    inputs.file("requirements.txt")
-    outputs.dir("$buildDir/dist-packages")
+    val isWindows = System.getProperty("os.name").contains("win", ignoreCase = true)
+    if (isWindows) {
+      commandLine("powershell", "-Command", "irm https://astral.sh/uv/install.ps1 | iex")
+    } else {
+      commandLine("/bin/sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh")
+    }
 
     doLast {
-        exec {
-            commandLine(
-                uvExecutable,
-                "pip", "install", "-r", "requirements.txt"
-            )
-            environment("PYTHONPATH", "$buildDir/dist-packages")
-        }
+      // 验证UV是否安装成功
+      val uvCheck = exec {
+        commandLine(globalUvExecutable, "--version")
+        isIgnoreExitValue = true
+      }
+      if (uvCheck.exitValue != 0) {
+        throw GradleException("UV installation failed. Please check the installation script.")
+      }
     }
-}
+  }
 
-// 生成锁定文件
-tasks.register("generateLockfile") {
-    group = "Build"
-    description = "Generate dependency lockfile"
+  // 3. 使用全局UV创建虚拟环境
+  register<Exec>("createVenvWithUv") {
+    group = "python"
+    description = "Create Python virtual environment using global UV"
+    dependsOn("installGlobalUv")
+    workingDir(pythonProjectDir)
 
-    dependsOn("installUv")
-
-    inputs.file("requirements.txt")
-    outputs.file("requirements.lock")
+    commandLine(globalUvExecutable, "venv", venvDir.absolutePath)
 
     doLast {
-        exec {
-            commandLine(
-                uvExecutable,
-                "pip", "compile", "requirements.txt", "-o", "requirements.lock"
-            )
-        }
+      if (executionResult.get().exitValue != 0) {
+        throw GradleException("Failed to create virtual environment with UV. Exit code: ${executionResult.get().exitValue}")
+      }
+
+      // 验证虚拟环境是否创建成功
+      if (!File(venvPython).exists()) {
+        throw GradleException("Virtual environment creation failed. Python executable not found at: $venvPython")
+      }
     }
-}
+  }
 
-// 运行 Python 测试 (避免与内置 test 任务冲突)
-tasks.register("runPythonTests") {
-    group = "Verification"
-    description = "Run Python tests"
+  // 4. 使用全局UV安装项目依赖
+  register<Exec>("installDependenciesWithUv") {
+    group = "python"
+    description = "Install Python dependencies using global UV"
+    dependsOn("createVenvWithUv")
+    workingDir(pythonProjectDir)
 
-    dependsOn("installDependencies")
+    // 使用全局UV安装依赖到虚拟环境
+    commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "-e", ".")
 
     doLast {
-        exec {
-            commandLine(
-                uvExecutable,
-                "run", "pytest", "tests/"
-            )
-            environment("PYTHONPATH", "$buildDir/dist-packages")
-        }
+      if (executionResult.get().exitValue != 0) {
+        throw GradleException("Failed to install dependencies. Exit code: ${executionResult.get().exitValue}")
+      }
     }
-}
+  }
 
-// 运行代码检查
-tasks.register("runPythonLint") {
-    group = "Verification"
-    description = "Run Python code linting"
+  // 5. 安装格式化工具（Black）
+  register<Exec>("installFormatTools") {
+    group = "python"
+    description = "Install code formatting tools"
+    dependsOn("createVenvWithUv")
+    workingDir(pythonProjectDir)
 
-    dependsOn("installDependencies")
+    // 使用全局UV安装Black到虚拟环境
+    commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "black")
 
     doLast {
-        exec {
-            commandLine(
-                uvExecutable,
-                "run", "ruff", "check", "src/"
-            )
-        }
+      if (executionResult.get().exitValue != 0) {
+        throw GradleException("Failed to install formatting tools. Exit code: ${executionResult.get().exitValue}")
+      }
     }
-}
+  }
 
-// 安全扫描
-tasks.register("runPythonSecurityScan") {
-    group = "Verification"
-    description = "Run Python security scan"
-
-    dependsOn("installDependencies")
-
+  // 6. Python 构建任务
+  register("buildPython") {
+    group = "python"
+    description = "Build Python project"
+    dependsOn("installDependenciesWithUv")
     doLast {
-        exec {
-            commandLine(
-                uvExecutable,
-                "run", "bandit", "-r", "src/"
-            )
-        }
+      logger.lifecycle("Python project built successfully")
     }
-}
+  }
 
-// 构建应用包
-tasks.register("buildPython") {
-    group = "Build"
-    description = "Build Python application package"
-
-    dependsOn("installDependencies", "generateLockfile")
-
-    doLast {
-        // 复制源文件到构建目录
-        copy {
-            from("src")
-            into("$buildDir/dist")
-        }
-
-        // 复制依赖清单
-        copy {
-            from("requirements.lock")
-            into("$buildDir/dist")
-        }
-    }
-
-    outputs.dir("$buildDir/dist")
-}
-
-// 运行应用
-tasks.register("runPythonApp") {
-    group = "Application"
-    description = "Run Python application"
-
-    dependsOn("installDependencies")
-
-    doLast {
-        exec {
-            commandLine(
-                uvExecutable,
-                "run", "python", "src/main.py"
-            )
-            environment("PYTHONPATH", "$buildDir/dist-packages")
-        }
-    }
-}
-
-// 容器构建
-tasks.register("buildDockerImage") {
-    group = "Build"
-    description = "Build Docker image"
-
-    dependsOn("generateLockfile")
-
-    inputs.file("Dockerfile")
-    outputs.dir("$buildDir/docker")
-
-    doLast {
-        exec {
-            commandLine("docker", "build", "-t", "$group/${project.name}:$version", ".")
-        }
-    }
-}
-
-// 清理任务
-tasks.named("clean") {
-    group = "Build"
-    description = "Clean build artifacts"
-
-    doLast {
-        delete(buildDir)
-        delete("__pycache__")
-        delete("**/*.pyc")
-        delete("dist")
-    }
-}
-
-// 任务依赖配置
-tasks.register("pythonCheck") {
-    group = "Verification"
-    description = "Run all Python quality checks"
-
-    dependsOn("runPythonTests", "runPythonLint", "runPythonSecurityScan")
-}
-
-tasks.register("assemblePython") {
-    group = "Build"
-    description = "Assemble Python artifacts"
-
-    dependsOn("buildPython", "buildDockerImage")
-}
-
-// 检查任务配置
-tasks.register("checkEnvironment") {
-    group = "Verification"
-    description = "Check required environment variables"
-
-    doLast {
-        val requiredVars = listOf("DB_URL", "API_KEY")
-        val missing = mutableListOf<String>()
-
-        requiredVars.forEach { varName ->
-            if (System.getenv(varName) == null) {
-                missing.add(varName)
-            }
-        }
-
-        if (missing.isNotEmpty()) {
-            throw GradleException("Missing required environment variables: ${missing.joinToString(", ")}")
-        }
-    }
-}
-
-// 设置测试依赖
-tasks.named("runPythonTests") {
-    dependsOn("checkEnvironment")
-}
-
-// 创建发布任务
-tasks.register("publishPython") {
-    group = "Publishing"
-    description = "Publish Python artifacts"
-
-    dependsOn("buildPython", "buildDockerImage")
-
-    doLast {
-        println("Publishing Python artifacts to repository...")
-        // 添加实际的发布逻辑
-    }
-}
-
-// 跨平台支持增强
-tasks.withType<Exec>().configureEach {
-    if (OperatingSystem.current().isWindows) {
-        // Windows 命令处理
-        commandLine = listOf("cmd", "/c") + commandLine
-    }
-}
-
-// 依赖扫描
-tasks.register("scanPythonDependencies") {
-    group = "Verification"
-    description = "Scan Python dependencies for vulnerabilities"
-
-    dependsOn("generateLockfile")
-
-    doLast {
-        exec {
-            commandLine(
-                uvExecutable,
-                "pip", "install", "safety"
-            )
-        }
-
-        exec {
-            commandLine(
-                uvExecutable,
-                "run", "safety", "check", "-r", "requirements.lock"
-            )
-        }
-    }
-}
-
-// 环境特定配置
-tasks.register("setProductionEnv") {
-    group = "Configuration"
-    description = "Set production environment variables"
-
-    doLast {
-        file("$buildDir/.env").writeText("""
-            APP_ENV=production
-            LOG_LEVEL=WARNING
-            DATABASE_URL=${System.getenv("PROD_DB_URL")}
-        """.trimIndent())
-    }
-}
-
-tasks.named("buildDockerImage") {
-    dependsOn("setProductionEnv")
-
-    doLast {
-        exec {
-            commandLine("docker", "build", "--build-arg", "ENV_FILE=$buildDir/.env", "...")
-        }
-    }
-}
-
-// 主构建任务
-tasks.named("build") {
+  // 7. 运行单元测试（使用Python内置unittest）
+  register<Exec>("testPython") {
+    group = "python"
+    description = "Run Python unit tests with unittest"
     dependsOn("buildPython")
+    workingDir(pythonProjectDir)
+
+    // 使用unittest发现并运行测试
+    commandLine(venvPython, "-m", "unittest", "discover", "-s", "tests", "-v")
+
+    doLast {
+      if (executionResult.get().exitValue != 0) {
+        throw GradleException("Unit tests failed. Exit code: ${executionResult.get().exitValue}")
+      }
+    }
+  }
+
+  // 8. 清理任务
+  register<Delete>("cleanPython") {
+    group = "python"
+    description = "Clean Python build artifacts"
+    delete(venvDir)
+    delete(pythonProjectDir.resolve("dist"))
+    delete(pythonProjectDir.resolve("build"))
+    delete(pythonProjectDir.resolve("*.egg-info"))
+  }
+
+  // 9. 应用代码格式化（使用虚拟环境的Python）
+  register<Exec>("formatApplyPython") {
+    group = "python"
+    description = "Apply Black formatting to Python code"
+    dependsOn("installFormatTools") // 确保Black已安装
+    workingDir(pythonProjectDir)
+    commandLine(venvPython, "-m", "black", "mcp_server", "tests")
+
+    doLast {
+      logger.lifecycle("Black formatting applied successfully")
+    }
+  }
+
+  // 10. 检查代码格式（使用虚拟环境的Python）
+  register<Exec>("formatCheckPython") {
+    group = "python"
+    description = "Check Python code formatting with Black"
+    dependsOn("installFormatTools") // 确保Black已安装
+    workingDir(pythonProjectDir)
+    commandLine(venvPython, "-m", "black", "--check", "--diff", "mcp_server", "tests")
+
+    isIgnoreExitValue = true
+
+    doLast {
+      when (val exitCode = executionResult.get().exitValue) {
+        0 -> logger.lifecycle("Black check passed. Code is formatted correctly.")
+        1 -> throw GradleException("Black found formatting issues! Run 'formatApplyPython' to fix them.")
+        else -> throw GradleException("Black check failed with exit code: $exitCode")
+      }
+    }
+  }
+
+  // 11. 生成锁文件（使用全局UV）
+  register<Exec>("generateLockfile") {
+    group = "python"
+    description = "Generate lock file using global UV"
+    dependsOn("createVenvWithUv")
+    workingDir(pythonProjectDir)
+    commandLine(globalUvExecutable, "pip", "compile", "pyproject.toml", "--python", venvPython, "-o", "requirements.lock")
+  }
 }
 
+// 集成 Python 任务到主构建生命周期
 tasks.named("check") {
-    dependsOn("pythonCheck")
+  dependsOn("testPython")
+  dependsOn("formatCheckPython")
 }
 
-tasks.named("assemble") {
-    dependsOn("assemblePython")
+// 注意：已移除 packagePython 任务及其在构建中的依赖
+tasks.named("build") {
+  dependsOn("buildPython")
+}
+
+tasks.named("clean") {
+  dependsOn("cleanPython")
 }
