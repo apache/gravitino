@@ -15,9 +15,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from httpx import Client
+
 from mcp_server.connector import CatalogOperation
 from mcp_server.connector.rest.utils import extract_content_from_response
-from httpx import Client
 
 
 class RESTClientCatalogOperation(CatalogOperation):

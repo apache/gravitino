@@ -15,8 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector import TableOperation
 from httpx import Client
+
+from mcp_server.connector import TableOperation
 from mcp_server.connector.rest.utils import extract_content_from_response
 
 

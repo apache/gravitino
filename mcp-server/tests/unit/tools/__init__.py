@@ -15,9 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from tests.unit.tools.mock_operation import (
-    MockOperation,
-    MockCatalogOperation,
-    MockSchemaOperation,
-    MockTableOperation,
-)
+from tests.unit.tools.mock_operation import (MockCatalogOperation,
+                                             MockOperation,
+                                             MockSchemaOperation,
+                                             MockTableOperation)

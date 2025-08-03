@@ -15,8 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.core import Setting
 from mcp_server.connector import ConnectorFactory
+from mcp_server.core import Setting
 
 
 class GravitinoContext:

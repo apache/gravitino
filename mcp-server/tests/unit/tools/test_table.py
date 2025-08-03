@@ -15,14 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import unittest
 import asyncio
+import unittest
+
+from fastmcp import Client
 
 from mcp_server.connector import ConnectorFactory
 from mcp_server.core import Setting
 from mcp_server.server import GravitinoMCPServer
-from fastmcp import Client
-
 from tests.unit.tools import MockOperation
 
 

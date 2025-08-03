@@ -15,5 +15,5 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.core.setting import Setting
 from mcp_server.core.context import GravitinoContext
+from mcp_server.core.setting import Setting

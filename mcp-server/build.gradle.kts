@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
@@ -133,7 +134,7 @@ tasks {
     dependsOn("createVenvWithUv")
     workingDir(pythonProjectDir)
 
-    commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "black")
+    commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "black", "isort")
 
     doLast {
       if (executionResult.get().exitValue != 0) {
@@ -175,32 +176,63 @@ tasks {
     delete(pythonProjectDir.resolve("*.egg-info"))
   }
 
-  register<Exec>("formatApplyPython") {
+  // 9. Apply Python code formatting (fixed)
+  register<DefaultTask>("formatApplyPython") {
     group = "python"
-    description = "Apply Black formatting to Python code"
-    dependsOn("installFormatTools") // 确保Black已安装
-    workingDir(pythonProjectDir)
-    commandLine(venvPython, "-m", "black", "mcp_server", "tests")
+    description = "Apply Black formatting and isort import sorting"
+    dependsOn("installFormatTools")
 
     doLast {
-      logger.lifecycle("Black formatting applied successfully")
+      // Apply isort
+      exec {
+        workingDir = pythonProjectDir
+        commandLine(venvPython, "-m", "isort", "mcp_server", "tests")
+      }
+
+      // Apply Black
+      exec {
+        workingDir = pythonProjectDir
+        commandLine(venvPython, "-m", "black", "mcp_server", "tests")
+      }
+
+      logger.lifecycle("Python formatting applied (isort + Black)")
     }
   }
 
-  register<Exec>("formatCheckPython") {
+  // 10. Check Python code formatting (fixed to run both checks)
+  register<DefaultTask>("formatCheckPython") {
     group = "python"
-    description = "Check Python code formatting with Black"
-    dependsOn("installFormatTools") // 确保Black已安装
-    workingDir(pythonProjectDir)
-    commandLine(venvPython, "-m", "black", "--check", "--diff", "mcp_server", "tests")
-
-    isIgnoreExitValue = true
+    description = "Check Python code formatting with Black and import order with isort"
+    dependsOn("installFormatTools")
 
     doLast {
-      when (val exitCode = executionResult.get().exitValue) {
-        0 -> logger.lifecycle("Black check passed. Code is formatted correctly.")
-        1 -> throw GradleException("Black found formatting issues! Run 'formatApplyPython' to fix them.")
-        else -> throw GradleException("Black check failed with exit code: $exitCode")
+      var anyFailed = false
+
+      // 执行 isort 检查
+      val isortExitCode = exec {
+        workingDir = pythonProjectDir
+        commandLine(venvPython, "-m", "isort", "--check", "mcp_server", "tests")
+        isIgnoreExitValue = true
+      }.exitValue
+
+      if (isortExitCode != 0) {
+        anyFailed = true
+      }
+
+      // 执行 Black 检查
+      val blackExitCode = exec {
+        workingDir = pythonProjectDir
+        commandLine(venvPython, "-m", "black", "--check", "mcp_server", "tests")
+        isIgnoreExitValue = true
+      }.exitValue
+
+      if (blackExitCode != 0) {
+        anyFailed = true
+      }
+
+      // 如果任一检查失败，则任务失败
+      if (anyFailed) {
+        throw GradleException("Python formatting check failed")
       }
     }
   }

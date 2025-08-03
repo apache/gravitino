@@ -14,12 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from mcp_server.connector import (
-    GravitinoOperation,
-    CatalogOperation,
-    SchemaOperation,
-    TableOperation,
-)
+from mcp_server.connector import (CatalogOperation, GravitinoOperation,
+                                  SchemaOperation, TableOperation)
 
 
 class MockOperation(GravitinoOperation):
