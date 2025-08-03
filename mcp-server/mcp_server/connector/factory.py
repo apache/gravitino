@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector import RESTClientOperation
+from mcp_server.connector.rest.rest_client_operation import RESTClientOperation
 
 
 class ConnectorFactory:

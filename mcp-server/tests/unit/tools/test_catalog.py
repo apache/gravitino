@@ -20,7 +20,7 @@ import unittest
 
 from fastmcp import Client
 
-from mcp_server.connector import ConnectorFactory
+from mcp_server.connector.factory import ConnectorFactory
 from mcp_server.core import Setting
 from mcp_server.server import GravitinoMCPServer
 from tests.unit.tools import MockOperation
