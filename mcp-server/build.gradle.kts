@@ -1,3 +1,21 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
@@ -7,19 +25,16 @@ import java.io.File
 val pythonProjectDir = project.projectDir
 val venvDir = pythonProjectDir.resolve(".venv")
 
-// 确定系统Python命令
 val systemPython = when {
   System.getProperty("os.name").contains("win", ignoreCase = true) -> "python"
   else -> "python3"
 }
 
-// 定义全局UV可执行文件路径
 val globalUvExecutable = when {
   System.getProperty("os.name").contains("win", ignoreCase = true) -> "uv.exe"
   else -> "uv"
 }
 
-// 定义虚拟环境中的可执行文件路径
 val venvPython = when {
   System.getProperty("os.name").contains("win", ignoreCase = true) ->
     venvDir.resolve("Scripts/python.exe").absolutePath
@@ -28,7 +43,6 @@ val venvPython = when {
 }
 
 tasks {
-  // 1. 检查系统Python是否可用
   register<Exec>("checkSystemPython") {
     group = "python"
     description = "Check system Python availability"
@@ -41,13 +55,11 @@ tasks {
     }
   }
 
-  // 2. 安装全局UV（如果尚未安装）
   register<Exec>("installGlobalUv") {
     group = "python"
     description = "Install UV globally if not present"
     dependsOn("checkSystemPython")
 
-    // 先检查UV是否已安装
     onlyIf {
       try {
         exec {
@@ -71,7 +83,6 @@ tasks {
     }
 
     doLast {
-      // 验证UV是否安装成功
       val uvCheck = exec {
         commandLine(globalUvExecutable, "--version")
         isIgnoreExitValue = true
@@ -82,7 +93,6 @@ tasks {
     }
   }
 
-  // 3. 使用全局UV创建虚拟环境
   register<Exec>("createVenvWithUv") {
     group = "python"
     description = "Create Python virtual environment using global UV"
@@ -96,21 +106,18 @@ tasks {
         throw GradleException("Failed to create virtual environment with UV. Exit code: ${executionResult.get().exitValue}")
       }
 
-      // 验证虚拟环境是否创建成功
       if (!File(venvPython).exists()) {
         throw GradleException("Virtual environment creation failed. Python executable not found at: $venvPython")
       }
     }
   }
 
-  // 4. 使用全局UV安装项目依赖
   register<Exec>("installDependenciesWithUv") {
     group = "python"
     description = "Install Python dependencies using global UV"
     dependsOn("createVenvWithUv")
     workingDir(pythonProjectDir)
 
-    // 使用全局UV安装依赖到虚拟环境
     commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "-e", ".")
 
     doLast {
@@ -120,14 +127,12 @@ tasks {
     }
   }
 
-  // 5. 安装格式化工具（Black）
   register<Exec>("installFormatTools") {
     group = "python"
     description = "Install code formatting tools"
     dependsOn("createVenvWithUv")
     workingDir(pythonProjectDir)
 
-    // 使用全局UV安装Black到虚拟环境
     commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "black")
 
     doLast {
@@ -137,7 +142,6 @@ tasks {
     }
   }
 
-  // 6. Python 构建任务
   register("buildPython") {
     group = "python"
     description = "Build Python project"
@@ -147,14 +151,12 @@ tasks {
     }
   }
 
-  // 7. 运行单元测试（使用Python内置unittest）
   register<Exec>("testPython") {
     group = "python"
     description = "Run Python unit tests with unittest"
     dependsOn("buildPython")
     workingDir(pythonProjectDir)
 
-    // 使用unittest发现并运行测试
     commandLine(venvPython, "-m", "unittest", "discover", "-s", "tests", "-v")
 
     doLast {
@@ -164,7 +166,6 @@ tasks {
     }
   }
 
-  // 8. 清理任务
   register<Delete>("cleanPython") {
     group = "python"
     description = "Clean Python build artifacts"
@@ -174,7 +175,6 @@ tasks {
     delete(pythonProjectDir.resolve("*.egg-info"))
   }
 
-  // 9. 应用代码格式化（使用虚拟环境的Python）
   register<Exec>("formatApplyPython") {
     group = "python"
     description = "Apply Black formatting to Python code"
@@ -187,7 +187,6 @@ tasks {
     }
   }
 
-  // 10. 检查代码格式（使用虚拟环境的Python）
   register<Exec>("formatCheckPython") {
     group = "python"
     description = "Check Python code formatting with Black"
@@ -206,7 +205,6 @@ tasks {
     }
   }
 
-  // 11. 生成锁文件（使用全局UV）
   register<Exec>("generateLockfile") {
     group = "python"
     description = "Generate lock file using global UV"
@@ -216,17 +214,22 @@ tasks {
   }
 }
 
-// 集成 Python 任务到主构建生命周期
-tasks.named("check") {
+tasks.named("test") {
   dependsOn("testPython")
-  dependsOn("formatCheckPython")
 }
 
-// 注意：已移除 packagePython 任务及其在构建中的依赖
 tasks.named("build") {
   dependsOn("buildPython")
 }
 
 tasks.named("clean") {
   dependsOn("cleanPython")
+}
+
+tasks.named("spotlessCheck") {
+  dependsOn("formatCheckPython")
+}
+
+tasks.named("spotlessApply") {
+  dependsOn("formatApplyPython")
 }
