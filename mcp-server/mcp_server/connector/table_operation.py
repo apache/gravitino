@@ -25,5 +25,7 @@ class TableOperation(ABC):
         pass
 
     @abstractmethod
-    def load_table(self, catalog_name: str, schema_name: str, table_name: str) -> str:
+    def load_table(
+        self, catalog_name: str, schema_name: str, table_name: str
+    ) -> str:
         pass

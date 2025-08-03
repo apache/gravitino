@@ -14,8 +14,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from mcp_server.connector import (CatalogOperation, GravitinoOperation,
-                                  SchemaOperation, TableOperation)
+from mcp_server.connector import (
+    CatalogOperation,
+    GravitinoOperation,
+    SchemaOperation,
+    TableOperation,
+)
 
 
 class MockOperation(GravitinoOperation):
@@ -46,5 +50,7 @@ class MockTableOperation(TableOperation):
     def get_list_of_tables(self, catalog_name: str, schema_name: str) -> str:
         return "mock_tables"
 
-    def load_table(self, catalog_name: str, schema_name: str, table_name: str) -> str:
+    def load_table(
+        self, catalog_name: str, schema_name: str, table_name: str
+    ) -> str:
         return "mock_table"

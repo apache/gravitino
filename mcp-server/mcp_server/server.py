@@ -21,8 +21,10 @@ from typing import AsyncIterator
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
-from fastmcp.server.middleware.logging import (LoggingMiddleware,
-                                               StructuredLoggingMiddleware)
+from fastmcp.server.middleware.logging import (
+    LoggingMiddleware,
+    StructuredLoggingMiddleware,
+)
 from fastmcp.server.middleware.timing import TimingMiddleware
 
 from mcp_server.core.context import GravitinoContext

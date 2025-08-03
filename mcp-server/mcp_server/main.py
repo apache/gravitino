@@ -46,7 +46,10 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--mode", choices=["stdio", "http"], default="stdio", help="start up mode"
+        "--mode",
+        choices=["stdio", "http"],
+        default="stdio",
+        help="start up mode",
     )
 
     parser.add_argument(

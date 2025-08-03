@@ -212,27 +212,23 @@ tasks {
       val isortExitCode = exec {
         workingDir = pythonProjectDir
         commandLine(venvPython, "-m", "isort", "--check", "mcp_server", "tests")
-        isIgnoreExitValue = true
+        isIgnoreExitValue = false
       }.exitValue
 
       if (isortExitCode != 0) {
-        anyFailed = true
+        throw GradleException("Python isort formatting check failed")
       }
 
       // 执行 Black 检查
       val blackExitCode = exec {
         workingDir = pythonProjectDir
         commandLine(venvPython, "-m", "black", "--check", "mcp_server", "tests")
-        isIgnoreExitValue = true
+        isIgnoreExitValue = false
       }.exitValue
 
       if (blackExitCode != 0) {
+        throw GradleException("Python black formatting check failed")
         anyFailed = true
-      }
-
-      // 如果任一检查失败，则任务失败
-      if (anyFailed) {
-        throw GradleException("Python formatting check failed")
       }
     }
   }

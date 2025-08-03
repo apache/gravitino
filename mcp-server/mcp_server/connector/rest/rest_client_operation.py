@@ -17,14 +17,21 @@
 
 import httpx
 
-from mcp_server.connector import (CatalogOperation, GravitinoOperation,
-                                  SchemaOperation, TableOperation)
-from mcp_server.connector.rest.rest_client_catalog_operation import \
-    RESTClientCatalogOperation
-from mcp_server.connector.rest.rest_client_schema_operation import \
-    RESTClientSchemaOperation
-from mcp_server.connector.rest.rest_client_table_operation import \
-    RESTClientTableOperation
+from mcp_server.connector import (
+    CatalogOperation,
+    GravitinoOperation,
+    SchemaOperation,
+    TableOperation,
+)
+from mcp_server.connector.rest.rest_client_catalog_operation import (
+    RESTClientCatalogOperation,
+)
+from mcp_server.connector.rest.rest_client_schema_operation import (
+    RESTClientSchemaOperation,
+)
+from mcp_server.connector.rest.rest_client_table_operation import (
+    RESTClientTableOperation,
+)
 
 
 class RESTClientOperation(GravitinoOperation):
