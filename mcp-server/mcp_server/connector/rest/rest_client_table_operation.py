@@ -31,7 +31,7 @@ class RESTClientTableOperation(TableOperation):
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables"
         )
-        return extract_content_from_response(response, "tables", [])
+        return extract_content_from_response(response, "identifiers", [])
 
     def load_table(self, catalog_name: str, schema_name: str, table_name: str):
         response = self.rest_client.get(
