@@ -19,16 +19,43 @@ from fastmcp import Context, FastMCP
 
 
 def load_schema_tools(mcp: FastMCP):
-    @mcp.tool(
-        name="get_list_of_schemas",
-        description="Get a list of schemas, filtered by catalog it belongs to.",
-    )
-    def get_list_of_schemas(ctx: Context, catalog_name: str):
+    @mcp.tool()
+    def get_list_of_schemas(ctx: Context, catalog_name: str) -> str:
         """
-        Get a list of schemas, filtered by catalog it belongs to.
+        Retrieve a list of schemas belonging to a specific catalog.
 
-        Args:
-            catalog_name (str):  name of the catalog
+        This function returns a JSON-formatted string containing schema information
+        filtered by the specified catalog name.
+
+        Parameters:
+            ctx (Context): The context object containing Gravitino context.
+            catalog_name (str): The name of the catalog to filter schemas by.
+
+        Returns:
+            str: A JSON string representing an array of schema objects with the following structure:
+                [
+                    {
+                        "namespace": ["metalake_name", "catalog_name"],  # Namespace hierarchy
+                        "name": "schema_name"                            # Schema identifier
+                    },
+                    ...
+                ]
+
+        Example Return Value:
+            [
+              {
+                "namespace": ["test", "iceberg"],
+                "name": "db1"
+              },
+              {
+                "namespace": ["test", "iceberg"],
+                "name": "db2"
+              }
+            ]
+
+        Special Considerations:
+            - Namespace elements represent a hierarchical path (e.g., ["test", "iceberg"]
+              correspond to test.iceberg in dot notation)
         """
         connector = ctx.request_context.lifespan_context.connector()
         return connector.as_schema_operation().get_list_of_schemas(catalog_name)

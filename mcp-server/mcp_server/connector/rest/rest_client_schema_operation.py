@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import logging
 
 from httpx import Client
 
@@ -31,4 +32,4 @@ class RESTClientSchemaOperation(SchemaOperation):
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas"
         )
-        return extract_content_from_response(response, "schemas", [])
+        return extract_content_from_response(response, "identifiers", [])

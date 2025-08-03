@@ -42,4 +42,11 @@ async def get_list_schemas(catalog_name: str):
         print(result)
 
 
-asyncio.run(get_list_catalogs())
+async def list_tools():
+    async with client:
+        result = await client.list_tools()
+        print(result)
+
+
+# asyncio.run(list_tools())
+asyncio.run(get_list_schemas("iceberg"))
