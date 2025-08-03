@@ -176,7 +176,6 @@ tasks {
     delete(pythonProjectDir.resolve("*.egg-info"))
   }
 
-  // 9. Apply Python code formatting (fixed)
   register<DefaultTask>("formatApplyPython") {
     group = "python"
     description = "Apply Black formatting and isort import sorting"
@@ -199,7 +198,6 @@ tasks {
     }
   }
 
-  // 10. Check Python code formatting (fixed to run both checks)
   register<DefaultTask>("formatCheckPython") {
     group = "python"
     description = "Check Python code formatting with Black and import order with isort"
@@ -208,7 +206,6 @@ tasks {
     doLast {
       var anyFailed = false
 
-      // 执行 isort 检查
       val isortExitCode = exec {
         workingDir = pythonProjectDir
         commandLine(venvPython, "-m", "isort", "--check", "mcp_server", "tests")
@@ -219,7 +216,6 @@ tasks {
         throw GradleException("Python isort formatting check failed")
       }
 
-      // 执行 Black 检查
       val blackExitCode = exec {
         workingDir = pythonProjectDir
         commandLine(venvPython, "-m", "black", "--check", "mcp_server", "tests")
@@ -243,7 +239,10 @@ tasks {
 }
 
 tasks.named("test") {
-  dependsOn("testPython")
+  val skipUTs = project.hasProperty("skipTests")
+  if (!skipUTs) {
+    dependsOn("testPython")
+  }
 }
 
 tasks.named("build") {

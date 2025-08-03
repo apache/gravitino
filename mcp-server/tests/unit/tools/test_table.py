@@ -47,7 +47,7 @@ class TestTableTool(unittest.TestCase):
         async def _test_load_table(mcp_server):
             async with Client(mcp_server) as client:
                 result = await client.call_tool(
-                    "get_table_detail_by_name",
+                    "get_table_metadata_details",
                     {
                         "catalog_name": "mock",
                         "schema_name": "mock",
