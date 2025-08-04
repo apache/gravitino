@@ -198,6 +198,11 @@ public class LocalJobExecutor implements JobExecutor {
         return;
       }
 
+      if (statusPair.getLeft() == JobHandle.Status.CANCELLING) {
+        LOG.warn("Job {} is already being cancelled, no action taken", jobId);
+        return;
+      }
+
       // If the job is queued.
       if (statusPair.getLeft() == JobHandle.Status.QUEUED) {
         waitingQueue.removeIf(p -> p.getLeft().equals(jobId));
