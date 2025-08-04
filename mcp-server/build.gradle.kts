@@ -37,6 +37,16 @@ val globalUvExecutable = when {
   else -> "uv"
 }
 
+fun getUvExecutable(): String {
+  return if (project.extensions.extraProperties.has("uvExecutable")) {
+    println("UV executable in func: ${project.extensions.extraProperties.get("uvExecutable")}")
+    project.extensions.extraProperties.get("uvExecutable") as String
+  } else {
+    println("UV executable in func: gloable")
+    globalUvExecutable
+  }
+}
+
 val venvPython = when {
   System.getProperty("os.name").contains("win", ignoreCase = true) ->
     venvDir.resolve("Scripts/python.exe").absolutePath
@@ -86,19 +96,33 @@ tasks {
     }
   }
 
-  register<Exec>("installGlobalUv") {
+  register<Exec>("installUv") {
     group = "python"
-    description = "Install UV globally if not present"
+    description = "Install UV if not present"
     dependsOn("checkSystemPython")
 
+    val isWindows = System.getProperty("os.name").contains("win", ignoreCase = true)
+    val uvInstallDir = file("$pythonProjectDir/.uv/bin").apply { mkdirs() }
+    val uvExecutable = if (isWindows) {
+      file("$uvInstallDir/uv.exe")
+    } else {
+      file("$uvInstallDir/uv")
+    }
+
     onlyIf {
-      try {
-        exec {
-          commandLine(globalUvExecutable, "--version")
-          isIgnoreExitValue = true
-        }.exitValue != 0
-      } catch (e: Exception) {
-        true
+      if (uvExecutable.exists()) {
+        project.extensions.extraProperties.set("uvExecutable", uvExecutable.absolutePath)
+        logger.lifecycle("UV already installed at: ${uvExecutable.absolutePath}")
+        false
+      } else {
+        try {
+          exec {
+            commandLine(globalUvExecutable, "--version")
+            isIgnoreExitValue = true
+          }.exitValue != 0
+        } catch (e: Exception) {
+          true
+        }
       }
     }
 
@@ -106,31 +130,45 @@ tasks {
       logger.lifecycle("UV not found, installing via official script...")
     }
 
-    val isWindows = System.getProperty("os.name").contains("win", ignoreCase = true)
     if (isWindows) {
-      commandLine("powershell", "-Command", "irm https://astral.sh/uv/install.ps1 | iex")
+      commandLine(
+        "powershell",
+        "-Command",
+        "\$env:UV_INSTALL_DIR='${uvInstallDir.absolutePath}'; " +
+          "irm https://astral.sh/uv/install.ps1 | iex"
+      )
     } else {
-      commandLine("/bin/sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh")
+      commandLine(
+        "/bin/sh",
+        "-c",
+        "export UV_INSTALL_DIR=${uvInstallDir.absolutePath}; " +
+          "curl -LsSf https://astral.sh/uv/install.sh | sh"
+      )
     }
 
     doLast {
       val uvCheck = exec {
-        commandLine(globalUvExecutable, "--version")
+        commandLine(uvExecutable.absolutePath, "--version")
         isIgnoreExitValue = true
       }
       if (uvCheck.exitValue != 0) {
-        throw GradleException("UV installation failed. Please check the installation script.")
+        throw GradleException("UV installation failed")
       }
+
+      project.extensions.extraProperties.set("uvExecutable", uvExecutable.absolutePath)
     }
   }
 
   register<Exec>("createVenvWithUv") {
     group = "python"
-    description = "Create Python virtual environment using global UV"
-    dependsOn("installGlobalUv")
+    description = "Create Python virtual environment using UV"
+    dependsOn("installUv")
     workingDir(pythonProjectDir)
 
-    commandLine(globalUvExecutable, "venv", venvDir.absolutePath)
+    doFirst {
+      println("UV executable: ${getUvExecutable()}")
+      commandLine(getUvExecutable(), "venv", venvDir.absolutePath)
+    }
 
     doLast {
       if (executionResult.get().exitValue != 0) {
@@ -149,7 +187,9 @@ tasks {
     dependsOn("createVenvWithUv")
     workingDir(pythonProjectDir)
 
-    commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "-e", ".")
+    doFirst {
+      commandLine(getUvExecutable(), "pip", "install", "--python", venvPython, "-e", ".")
+    }
 
     doLast {
       if (executionResult.get().exitValue != 0) {
@@ -164,7 +204,9 @@ tasks {
     dependsOn("createVenvWithUv")
     workingDir(pythonProjectDir)
 
-    commandLine(globalUvExecutable, "pip", "install", "--python", venvPython, "black", "isort")
+    doFirst {
+      commandLine(getUvExecutable(), "pip", "install", "--python", venvPython, "black", "isort")
+    }
 
     doLast {
       if (executionResult.get().exitValue != 0) {
@@ -201,6 +243,7 @@ tasks {
     group = "python"
     description = "Clean Python build artifacts"
     delete(venvDir)
+    delete(pythonProjectDir.resolve(".uv"))
     delete(pythonProjectDir.resolve("dist"))
     delete(pythonProjectDir.resolve("build"))
     delete(pythonProjectDir.resolve("*.egg-info"))

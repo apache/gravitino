@@ -24,6 +24,7 @@ venv
 .vevn
 .venv
 .idea
+.uv
 dist
 build
 
