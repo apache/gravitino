@@ -1158,7 +1158,7 @@ public class DTOConverters {
   public static JobTemplate fromDTO(JobTemplateDTO jobTemplateDTO) {
     switch (jobTemplateDTO.jobType()) {
       case SHELL:
-        return new ShellJobTemplate.Builder()
+        return ShellJobTemplate.builder()
             .withName(jobTemplateDTO.name())
             .withComment(jobTemplateDTO.comment())
             .withExecutable(jobTemplateDTO.executable())
@@ -1169,7 +1169,7 @@ public class DTOConverters {
             .build();
 
       case SPARK:
-        return new SparkJobTemplate.Builder()
+        return SparkJobTemplate.builder()
             .withName(jobTemplateDTO.name())
             .withComment(jobTemplateDTO.comment())
             .withExecutable(jobTemplateDTO.executable())
