@@ -71,6 +71,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
   private static final Schema viewSchema =
       new Schema(Types.NestedField.of(1, false, "foo_string", Types.StringType.get()));
