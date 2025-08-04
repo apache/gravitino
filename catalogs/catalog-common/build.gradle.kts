@@ -23,6 +23,7 @@ plugins {
 
 // try to avoid adding extra dependencies because it is used by catalogs and connectors.
 dependencies {
+  implementation(project(":common"))
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.slf4j.api)

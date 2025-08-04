@@ -278,14 +278,16 @@ subprojects {
     val path = project.path.lowercase()
 
     if (path.startsWith(":client") ||
-      path.startsWith(":bundles") ||
+      path.startsWith(":spark-connector") ||
       path.startsWith(":flink-connector") ||
-      path.startsWith(":spark-connector")
+      path.startsWith(":bundles")
     ) {
       return true
     }
-    // bundles module rely on catalog-fileset module
-    if (name == "catalog-common" || name == "hadoop-common" || name == "catalog-fileset") {
+
+    if (name == "api" || name == "common" ||
+      name == "catalog-common" || name == "hadoop-common"
+    ) {
       return true
     }
 
