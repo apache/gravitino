@@ -77,6 +77,7 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -1447,6 +1448,29 @@ public class POConverters {
           .withLastVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .withPolicyVersionPO(policyVersionPO)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static PolicyMetadataObjectRelPO initializePolicyMetadataObjectRelPOWithVersion(
+      Long policyId, Long metadataObjectId, String metadataObjectType) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder()
+              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+              .withCreateTime(Instant.now())
+              .build();
+
+      return PolicyMetadataObjectRelPO.builder()
+          .withPolicyId(policyId)
+          .withMetadataObjectId(metadataObjectId)
+          .withMetadataObjectType(metadataObjectType)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
