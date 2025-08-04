@@ -539,6 +539,7 @@ tasks.rat {
     "**/*.egg-info",
     "**/.pytest_cache",
     "**/.python-version",
+    "**/.uv",
     "**/__pycache__",
     "**/uv.lock",
     "**/licenses/*.txt",
