@@ -162,16 +162,22 @@ tasks {
     }
   }
 
-  val checkUv by registering(Exec::class) {
-    commandLine("uv", "--version")
-    isIgnoreExitValue = true
-    doFirst {
-      println("Checking uv installation...")
-    }
+  val checkUv by registering {
     doLast {
-      if (execResult?.exitValue != 0) {
+      val uvCheck = project.exec {
+        commandLine("uv", "--version")
+        isIgnoreExitValue = true
+      }
+      if (uvCheck.exitValue != 0) {
         println("uv not found, installing...")
-        installUv.get().exec()
+        project.exec {
+          val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+          if (isWindows) {
+            commandLine("powershell", "-c", "irm https://astral.sh/uv/install.ps1 | iex")
+          } else {
+            commandLine("/bin/sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh")
+          }
+        }
       } else {
         println("uv is available")
       }
