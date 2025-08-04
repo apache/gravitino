@@ -30,7 +30,7 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4spark.get()
+val icebergVersion: String = libs.versions.iceberg4connector.get()
 val paimonVersion: String = libs.versions.paimon.get()
 // kyuubi hive connector for Spark 3.3 doesn't support scala 2.13
 val kyuubiVersion: String = libs.versions.kyuubi4spark34.get()
