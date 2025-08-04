@@ -66,8 +66,8 @@ public class TestIcebergExtendAPI {
 
   @Test
   void testExtendAPI() {
-    RESTClient client = HTTPClient.builder(ImmutableMap.of()).uri(uri)
-        .withAuthSession(AuthSession.EMPTY).build();
+    RESTClient client =
+        HTTPClient.builder(ImmutableMap.of()).uri(uri).withAuthSession(AuthSession.EMPTY).build();
     HelloResponse helloResponse =
         client.get(
             HelloOperations.HELLO_URI_PATH,
