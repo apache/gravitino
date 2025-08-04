@@ -26,6 +26,7 @@ import { useSearchParams } from 'next/navigation'
 
 import { useAppDispatch } from '@/lib/hooks/useStore'
 import { initialVersion, fetchGitHubInfo } from '@/lib/store/sys'
+import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 import { to } from '../utils'
 import { getAuthConfigs, setAuthToken } from '../store/auth'
@@ -46,9 +47,15 @@ const AuthProvider = ({ children }) => {
   const router = useRouter()
   const [loading, setLoading] = useState(authProvider.loading)
 
+  const searchParams = useSearchParams()
+  const accessTokenFromUrl = searchParams.get('access_token')
+
+  if (typeof window !== 'undefined' && accessTokenFromUrl) {
+    localStorage.setItem('accessToken', accessTokenFromUrl)
+  }
+
   const token = (typeof window !== 'undefined' && localStorage.getItem('accessToken')) || null
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
-  const searchParams = useSearchParams()
   const paramsSize = [...searchParams.keys()].length
 
   const expiredIn = localStorage.getItem('expiredIn') && JSON.parse(localStorage.getItem('expiredIn')) // seconds
@@ -81,12 +88,23 @@ const AuthProvider = ({ children }) => {
         dispatch(fetchGitHubInfo())
         goToMetalakeListPage()
       } else if (authType === 'oauth') {
-        if (token) {
-          dispatch(setAuthToken(token))
+        let tokenToUse = token
+
+        // Try to get token from OAuth provider if not present in localStorage
+        if (!tokenToUse) {
+          tokenToUse = await oauthProviderFactory.getAccessToken()
+        }
+
+        if (tokenToUse) {
+          dispatch(setAuthToken(tokenToUse))
           dispatch(initialVersion())
           dispatch(fetchGitHubInfo())
           goToMetalakeListPage()
         } else {
+          if (typeof window !== 'undefined' && window.location.pathname.startsWith('/ui/oauth/callback')) {
+            // Do nothing, let the callback page handle it
+            return
+          }
           router.push('/login')
         }
       }

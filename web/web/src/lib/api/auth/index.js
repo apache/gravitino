@@ -38,3 +38,28 @@ export const loginApi = (url, params) => {
     { withToken: false }
   )
 }
+
+export const initiateOAuthFlowApi = redirectUri => {
+  const params = new URLSearchParams()
+  if (redirectUri) {
+    params.append('redirect_uri', redirectUri)
+  }
+
+  // This will redirect the browser to the OAuth provider
+  window.location.href = `/api/oauth/authorize${params.toString() ? '?' + params.toString() : ''}`
+}
+
+export const handleOAuthCallbackApi = () => {
+  // The callback is handled by the backend endpoint automatically
+  // This function is here for completeness but not typically called directly
+  return defHttp.get({
+    url: '/api/oauth/callback'
+  })
+}
+
+export const getOAuthConfigsApi = () => {
+  return defHttp.get({
+    url: '/api/oauth/config',
+    headers: { Accept: 'application/json' }
+  })
+}

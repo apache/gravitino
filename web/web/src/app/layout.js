@@ -34,18 +34,20 @@ export const metadata = {
   }
 }
 
-const RootLayout = ({ children }) => {
-  return (
-    <html lang='en' suppressHydrationWarning>
-      <body>
+import OAuthProviderGate from './oauth-provider-gate'
+
+const RootLayout = ({ children }) => (
+  <html lang='en' suppressHydrationWarning>
+    <body>
+      <OAuthProviderGate>
         <Provider>
           <NavigationEvents />
           <Layout>{children}</Layout>
         </Provider>
         <StyledToast />
-      </body>
-    </html>
-  )
-}
+      </OAuthProviderGate>
+    </body>
+  </html>
+)
 
 export default RootLayout

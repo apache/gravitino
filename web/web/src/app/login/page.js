@@ -22,72 +22,112 @@
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Roboto } from 'next/font/google'
-import { useEffect } from 'react'
-import { Box, Card, Grid, Button, CardContent, Typography, TextField, FormControl, FormHelperText } from '@mui/material'
-
+import { useEffect, useState } from 'react'
+import { Box, Card, Grid, CardContent, Typography, Alert } from '@mui/material'
 import clsx from 'clsx'
-import * as yup from 'yup'
-import { useForm, Controller } from 'react-hook-form'
-import { yupResolver } from '@hookform/resolvers/yup'
 
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { loginAction, setIntervalIdAction, clearIntervalId } from '@/lib/store/auth'
+import OidcLogin from './components/OidcLogin'
+import DefaultLogin from './components/DefaultLogin'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
-const defaultValues = {
-  grant_type: 'client_credentials',
-  client_id: '',
-  client_secret: '',
-  scope: ''
+// OAuth provider types
+const OAUTH_PROVIDERS = {
+  OIDC: 'oidc',
+  GENERIC: 'generic'
 }
 
-const schema = yup.object().shape({
-  grant_type: yup.string().required(),
-  client_id: yup.string().required(),
-  client_secret: yup.string().required(),
-  scope: yup.string().required()
-})
-
 const LoginPage = () => {
-  const router = useRouter()
-  const dispatch = useAppDispatch()
-  const store = useAppSelector(state => state.auth)
-
-  const {
-    control,
-    handleSubmit,
-    reset,
-    formState: { errors }
-  } = useForm({
-    defaultValues: Object.assign({}, defaultValues),
-    mode: 'onChange',
-    resolver: yupResolver(schema)
-  })
+  const [oauthConfig, setOauthConfig] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [message, setMessage] = useState(null)
 
   useEffect(() => {
-    if (store.intervalId) {
-      clearIntervalId()
+    // Check for URL parameters (logout messages, errors, etc.)
+    const urlParams = new URLSearchParams(window.location.search)
+    const messageParam = urlParams.get('message')
+    const errorParam = urlParams.get('error')
+
+    if (messageParam === 'logged_out') {
+      setMessage('You have been successfully logged out.')
+    } else if (errorParam) {
+      setError(decodeURIComponent(errorParam))
     }
-  }, [store.intervalId])
 
-  const onSubmit = async data => {
-    await dispatch(loginAction({ params: data, router }))
-    await dispatch(setIntervalIdAction())
+    // Fetch OAuth configuration from backend
+    console.log('[LoginPage] Starting to fetch configs...')
+    fetch('/configs')
+      .then(response => {
+        console.log('[LoginPage] Response status:', response.status)
+        console.log('[LoginPage] Response headers:', response.headers)
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
 
-    reset({ ...data })
+        return response.json()
+      })
+      .then(config => {
+        console.log('[LoginPage] OAuth config received:', config)
+        console.log('[LoginPage] Setting oauthConfig and stopping loading...')
+        setOauthConfig(config)
+        setLoading(false)
+        console.log('[LoginPage] Loading state should now be false')
+      })
+      .catch(err => {
+        console.error('[LoginPage] Failed to fetch OAuth config:', err)
+        setError(`Failed to load authentication configuration: ${err.message}`)
+        setLoading(false)
+      })
+  }, [])
+
+  if (loading) {
+    return (
+      <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <Box>
+          <Card sx={{ width: 480 }}>
+            <CardContent className='twc-p-12'>
+              <Typography variant='body1' sx={{ textAlign: 'center' }}>
+                Loading authentication...
+              </Typography>
+              <Typography variant='body2' sx={{ textAlign: 'center', mt: 2, color: 'text.secondary' }}>
+                Fetching OAuth configuration from /configs
+              </Typography>
+              <Typography variant='body2' sx={{ textAlign: 'center', mt: 1, color: 'text.secondary' }}>
+                Check browser console for details
+              </Typography>
+            </CardContent>
+          </Card>
+        </Box>
+      </Grid>
+    )
   }
 
-  const onError = errors => {
-    console.error('fields error', errors)
+  if (error) {
+    return (
+      <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+        <Box>
+          <Card sx={{ width: 480 }}>
+            <CardContent className='twc-p-12'>
+              <Alert severity='error'>{error}</Alert>
+            </CardContent>
+          </Card>
+        </Box>
+      </Grid>
+    )
   }
+
+  // Determine OAuth provider
+  const provider = oauthConfig?.['gravitino.authenticator.oauth.provider']?.toLowerCase()
+  console.log('[LoginPage] Determined provider:', provider)
+  console.log('[LoginPage] About to render LoginContent with provider:', provider)
 
   return (
     <Grid container spacing={2} sx={{ justifyContent: 'center', alignItems: 'center', height: '100%' }}>
       <Box>
         <Card sx={{ width: 480 }}>
-          <CardContent className={`twc-p-12`}>
-            <Box className={`twc-mb-8 twc-flex twc-items-center twc-justify-center`}>
+          <CardContent className='twc-p-12'>
+            <Box className='twc-mb-8 twc-flex twc-items-center twc-justify-center'>
               <Image
                 src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/icons/gravitino.svg`}
                 width={24}
@@ -99,105 +139,74 @@ const LoginPage = () => {
               </Typography>
             </Box>
 
-            <form autoComplete='off' onSubmit={handleSubmit(onSubmit, onError)}>
-              <Grid item xs={12} sx={{ mt: 4 }}>
-                <FormControl fullWidth>
-                  <Controller
-                    name='grant_type'
-                    control={control}
-                    rules={{ required: true }}
-                    render={({ field: { value, onChange } }) => (
-                      <TextField
-                        value={value}
-                        label='Grant Type'
-                        disabled
-                        onChange={onChange}
-                        placeholder=''
-                        error={Boolean(errors.grant_type)}
-                      />
-                    )}
-                  />
-                  {errors.grant_type && (
-                    <FormHelperText className={'twc-text-error-main'}>{errors.grant_type.message}</FormHelperText>
-                  )}
-                </FormControl>
-              </Grid>
+            {/* Display success messages */}
+            {message && (
+              <Box sx={{ mb: 2 }}>
+                <Alert severity='success'>{message}</Alert>
+              </Box>
+            )}
 
-              <Grid item xs={12} sx={{ mt: 4 }}>
-                <FormControl fullWidth>
-                  <Controller
-                    name='client_id'
-                    control={control}
-                    rules={{ required: true }}
-                    render={({ field: { value, onChange } }) => (
-                      <TextField
-                        value={value}
-                        label='Client ID'
-                        onChange={onChange}
-                        placeholder=''
-                        error={Boolean(errors.client_id)}
-                      />
-                    )}
-                  />
-                  {errors.client_id && (
-                    <FormHelperText className={'twc-text-error-main'}>{errors.client_id.message}</FormHelperText>
-                  )}
-                </FormControl>
-              </Grid>
+            {/* Display error messages */}
+            {error && (
+              <Box sx={{ mb: 2 }}>
+                <Alert severity='error'>{error}</Alert>
+              </Box>
+            )}
 
-              <Grid item xs={12} sx={{ mt: 4 }}>
-                <FormControl fullWidth>
-                  <Controller
-                    name='client_secret'
-                    control={control}
-                    rules={{ required: true }}
-                    render={({ field: { value, onChange } }) => (
-                      <TextField
-                        value={value}
-                        label='Client Secret'
-                        onChange={onChange}
-                        placeholder=''
-                        error={Boolean(errors.client_secret)}
-                      />
-                    )}
-                  />
-                  {errors.client_secret && (
-                    <FormHelperText className={'twc-text-error-main'}>{errors.client_secret.message}</FormHelperText>
-                  )}
-                </FormControl>
-              </Grid>
-
-              <Grid item xs={12} sx={{ mt: 4 }}>
-                <FormControl fullWidth>
-                  <Controller
-                    name='scope'
-                    control={control}
-                    rules={{ required: true }}
-                    render={({ field: { value, onChange } }) => (
-                      <TextField
-                        value={value}
-                        label='Scope'
-                        onChange={onChange}
-                        placeholder=''
-                        error={Boolean(errors.scope)}
-                      />
-                    )}
-                  />
-                  {errors.scope && (
-                    <FormHelperText className={'twc-text-error-main'}>{errors.scope.message}</FormHelperText>
-                  )}
-                </FormControl>
-              </Grid>
-
-              <Button fullWidth size='large' type='submit' variant='contained' sx={{ mb: 7, mt: 12 }}>
-                Login
-              </Button>
-            </form>
+            <LoginContent provider={provider} oauthConfig={oauthConfig} />
           </CardContent>
         </Card>
       </Box>
     </Grid>
   )
+}
+
+// Main login content that switches based on OAuth configuration
+function LoginContent({ provider, oauthConfig }) {
+  console.log('[LoginContent] Rendering with provider:', provider)
+  console.log('[LoginContent] OAuth config available:', !!oauthConfig)
+
+  // Use OIDC for any provider that's not 'generic' (same logic as factory)
+  const configuredProvider = oauthConfig?.['gravitino.authenticator.oauth.provider']
+  const authority = oauthConfig?.['gravitino.authenticator.oauth.authority']
+  const clientId = oauthConfig?.['gravitino.authenticator.oauth.client-id']
+
+  if (configuredProvider && configuredProvider.toLowerCase() !== 'generic' && authority && clientId) {
+    console.log('[LoginContent] OIDC provider detected, rendering OidcLogin component')
+
+    // Create OIDC config from backend config - use existing provider field for display name
+    const providerName = getProviderDisplayName(configuredProvider)
+
+    const oidcConfig = {
+      authority: authority,
+      clientId: clientId,
+      scope: oauthConfig['gravitino.authenticator.oauth.scope'] || 'openid profile email',
+      providerName: providerName
+    }
+
+    return <OidcLogin oauthConfig={oidcConfig} />
+  } else {
+    console.log('[LoginContent] Using DefaultLogin component (generic/backward compatibility)')
+
+    return <DefaultLogin oauthConfig={oauthConfig} />
+  }
+}
+
+// Helper function to get display name for provider
+function getProviderDisplayName(provider) {
+  if (!provider) return 'OAuth Provider'
+
+  const displayNames = {
+    azure: 'Microsoft',
+    microsoft: 'Microsoft',
+    google: 'Google',
+    auth0: 'Auth0',
+    keycloak: 'Keycloak',
+    okta: 'Okta',
+    oidc: 'OAuth Provider'
+  }
+
+  return displayNames[provider.toLowerCase()] || provider.charAt(0).toUpperCase() + provider.slice(1)
 }
 
 export default LoginPage
