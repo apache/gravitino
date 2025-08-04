@@ -174,7 +174,11 @@ public class LocalJobExecutor implements JobExecutor {
       if (!jobStatus.containsKey(jobId)) {
         throw new NoSuchJobException("No job found with ID: %s", jobId);
       }
-
+      LOG.trace(
+          "Get status {} and finished time {} for job {}",
+          jobStatus.get(jobId).getLeft(),
+          jobStatus.get(jobId).getRight(),
+          jobId);
       return jobStatus.get(jobId).getLeft();
     }
   }
@@ -274,8 +278,6 @@ public class LocalJobExecutor implements JobExecutor {
         }
       }
 
-      runningProcesses.remove(jobId);
-
     } catch (Exception e) {
       LOG.error("Error while executing job", e);
       // If an error occurs, we should mark the job as failed
@@ -284,6 +286,8 @@ public class LocalJobExecutor implements JobExecutor {
         jobStatus.put(jobId, Pair.of(JobHandle.Status.FAILED, System.currentTimeMillis()));
       }
     }
+
+    runningProcesses.remove(jobPair.getLeft());
   }
 
   public void pollJob() {
