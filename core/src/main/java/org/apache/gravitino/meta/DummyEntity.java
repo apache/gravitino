@@ -26,8 +26,15 @@ import lombok.ToString;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.policy.PolicyManager;
 
-/** A dummy entity that mainly used for temporary transactions or internal operations. */
+/**
+ * A dummy entity that mainly used for temporary transactions or internal operations.
+ *
+ * <p>For example, it can be used to represent different types of entities for {@link
+ * PolicyManager#listMetadataObjectsForPolicy(String, String)} intermediate result then can be
+ * converted to metadata objects.
+ */
 @EqualsAndHashCode
 @ToString
 public class DummyEntity implements Entity, HasIdentifier {

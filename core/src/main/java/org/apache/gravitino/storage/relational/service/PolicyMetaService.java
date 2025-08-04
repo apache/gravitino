@@ -44,6 +44,7 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -269,7 +270,9 @@ public class PolicyMetaService {
               r ->
                   DummyEntity.builder()
                       .withId(r.getMetadataObjectId())
-                      .withEntityType(Entity.EntityType.valueOf(r.getMetadataObjectType()))
+                      .withEntityType(
+                          MetadataObjectUtil.toEntityType(
+                              MetadataObject.Type.valueOf(r.getMetadataObjectType())))
                       .build())
           .collect(Collectors.toList());
 
