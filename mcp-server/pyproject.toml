@@ -17,7 +17,7 @@
 
 [project]
 name = "gravitino_mcp_server"
-version = "1.0.0-SNAPSHOT"
+version = "1.0.0"
 description = "Gravitino MCP server"
 readme = "README.md"
 requires-python = ">=3.10"
