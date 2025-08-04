@@ -40,7 +40,7 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
         + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " #{jobMeta.metalakeId}, #{jobMeta.jobExecutionId},"
-        + " #{jobMeta.jobRunStatus}, #{jobMeta.jobFinished}, #{jobMeta.auditInfo},"
+        + " #{jobMeta.jobRunStatus}, #{jobMeta.jobFinishedAt}, #{jobMeta.auditInfo},"
         + " #{jobMeta.currentVersion}, #{jobMeta.lastVersion},"
         + " #{jobMeta.deletedAt})"
         + " ON CONFLICT (job_run_id) DO UPDATE SET"
