@@ -65,6 +65,15 @@ paths:
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags"
 
+  /metalakes/{metalake}/policies:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies"
+
+  /metalakes/{metalake}/policies/{policy}:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D"
+
+  /metalakes/{metalake}/policies/{policy}/objects:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D~1objects"
+
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1roles"
 
@@ -465,6 +474,14 @@ components:
       name: tag
       in: path
       description: The name of the tag
+      required: true
+      schema:
+        type: string
+
+    policy:
+      name: policy
+      in: path
+      description: The name of the policy
       required: true
       schema:
         type: string
