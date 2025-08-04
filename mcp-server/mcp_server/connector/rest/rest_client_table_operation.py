@@ -27,13 +27,15 @@ class RESTClientTableOperation(TableOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    def get_list_of_tables(self, catalog_name: str, schema_name: str):
+    def get_list_of_tables(self, catalog_name: str, schema_name: str) -> str:
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables"
         )
         return extract_content_from_response(response, "identifiers", [])
 
-    def load_table(self, catalog_name: str, schema_name: str, table_name: str):
+    def load_table(
+        self, catalog_name: str, schema_name: str, table_name: str
+    ) -> str:
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}"
         )

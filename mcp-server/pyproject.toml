@@ -16,9 +16,9 @@
 # under the License.
 
 [project]
-name = "mcp-server"
-version = "0.1.0"
-description = "Add your description here"
+name = "gravitino_mcp_server"
+version = "1.0.0-SNAPSHOT"
+description = "Gravitino MCP server"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

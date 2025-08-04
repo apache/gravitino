@@ -27,7 +27,7 @@ class RESTClientSchemaOperation(SchemaOperation):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    def get_list_of_schemas(self, catalog_name: str):
+    def get_list_of_schemas(self, catalog_name: str) -> str:
         response = self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas"
         )
