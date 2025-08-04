@@ -33,14 +33,11 @@ from mcp_server.tools import load_tools
 
 
 def create_lifespan_manager(gravitino_context: GravitinoContext):
+
     @asynccontextmanager
     async def app_lifespan(server: FastMCP) -> AsyncIterator[GravitinoContext]:
         logging.info(f"Add Gravitino context: {gravitino_context}")
         yield gravitino_context
-        # try:
-        #     yield gravitino_context
-        # finally:
-        #     logging.info("Close Gravitino context")
 
     return app_lifespan
 

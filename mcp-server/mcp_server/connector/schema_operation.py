@@ -19,7 +19,19 @@ from abc import ABC, abstractmethod
 
 
 class SchemaOperation(ABC):
+    """
+    Abstract base class for Gravitino schema operations.
+    """
 
     @abstractmethod
     def get_list_of_schemas(self, catalog_name: str) -> str:
+        """
+        Retrieve the list of schemas under a specified catalog.
+
+        Args:
+            catalog_name: Name of the catalog
+
+        Returns:
+            str: JSON-formatted string containing catalog information.
+        """
         pass

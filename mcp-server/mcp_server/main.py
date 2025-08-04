@@ -24,7 +24,7 @@ from mcp_server.server import GravitinoMCPServer
 
 def do_main():
     args = parse_args()
-    setting = Setting(args.metalake, args.uri, args.mode)
+    setting = Setting(args.metalake, args.uri)
     init_logging(setting)
     server = GravitinoMCPServer(setting)
     server.run()
@@ -42,21 +42,13 @@ def init_logging(setting: Setting):
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Gravitino Mcp server",
-        epilog="Example: uv run mcp_server add 5 3 --verbose",
-    )
-
-    parser.add_argument(
-        "--mode",
-        choices=["stdio", "http"],
-        default="stdio",
-        help="start up mode",
+        epilog="Example: uv run mcp_server --metalake test --uri http://127.0.0.1:8090",
     )
 
     parser.add_argument(
         "--metalake",
         type=str,
-        default="test",
-        required=False,
+        required=True,
         help="Gravitino metalake name",
     )
     parser.add_argument(

@@ -30,7 +30,7 @@ class TestCatalogTool(unittest.TestCase):
 
     def setUp(self):
         ConnectorFactory.set_test_connector(MockOperation)
-        server = GravitinoMCPServer(Setting("", "", ""))
+        server = GravitinoMCPServer(Setting("", ""))
         self.mcp = server.mcp
 
     def test_list_catalogs(self):

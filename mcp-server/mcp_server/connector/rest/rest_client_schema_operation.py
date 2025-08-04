@@ -19,8 +19,7 @@ import logging
 from httpx import Client
 
 from mcp_server.connector import SchemaOperation
-
-from .utils import extract_content_from_response
+from mcp_server.connector.rest.utils import extract_content_from_response
 
 
 class RESTClientSchemaOperation(SchemaOperation):

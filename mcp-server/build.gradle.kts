@@ -258,14 +258,6 @@ tasks {
       }
     }
   }
-
-  register<Exec>("generateLockfile") {
-    group = "python"
-    description = "Generate lock file using global UV"
-    dependsOn("createVenvWithUv")
-    workingDir(pythonProjectDir)
-    commandLine(globalUvExecutable, "pip", "compile", "pyproject.toml", "--python", venvPython, "-o", "requirements.lock")
-  }
 }
 
 tasks.named("test") {

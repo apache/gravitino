@@ -19,7 +19,16 @@ from abc import ABC, abstractmethod
 
 
 class CatalogOperation(ABC):
+    """
+    Abstract base class for Gravitino catalog operations.
+    """
 
     @abstractmethod
     def get_list_of_catalogs(self) -> str:
+        """
+        Retrieve the list of catalogs.
+
+        Returns:
+            str: JSON-formatted string containing catalog information.
+        """
         pass

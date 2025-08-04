@@ -23,15 +23,36 @@ from mcp_server.connector.table_operation import TableOperation
 
 
 class GravitinoOperation(ABC):
+    """
+    Abstract base class for Gravitino operations with multiple operation facets.
+    """
 
     @abstractmethod
     def as_table_operation(self) -> TableOperation:
+        """
+        Access the table operation interface of this Gravitino operation.
+
+        Returns:
+            TableOperation: Interface for performing table-level operations
+        """
         pass
 
     @abstractmethod
     def as_schema_operation(self) -> SchemaOperation:
+        """
+        Access the schema operation interface of this Gravitino operation.
+
+        Returns:
+            SchemaOperation: Interface for performing schema-level operations
+        """
         pass
 
     @abstractmethod
     def as_catalog_operation(self) -> CatalogOperation:
+        """
+        Access the catalog operation interface of this Gravitino operation.
+
+        Returns:
+            CatalogOperation: Interface for performing catalog-level operations
+        """
         pass

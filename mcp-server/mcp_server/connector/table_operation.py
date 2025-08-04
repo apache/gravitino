@@ -19,13 +19,37 @@ from abc import ABC, abstractmethod
 
 
 class TableOperation(ABC):
+    """
+    Abstract base class for Gravitino table operations.
+    """
 
     @abstractmethod
     def get_list_of_tables(self, catalog_name: str, schema_name: str) -> str:
+        """
+        Retrieve the list of tables within a specified schema and catalog.
+
+        Args:
+            catalog_name: Name of the catalog
+            schema_name: Name of the schema
+
+        Returns:
+            str: JSON-formatted string containing table list information
+        """
         pass
 
     @abstractmethod
     def load_table(
         self, catalog_name: str, schema_name: str, table_name: str
     ) -> str:
+        """
+        Load detailed information of a specific table.
+
+        Args:
+            catalog_name: Name of the catalog
+            schema_name: Name of the schema
+            table_name: Name of the table
+
+        Returns:
+            str: JSON-formatted string containing full table metadata
+        """
         pass

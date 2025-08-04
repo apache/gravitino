@@ -19,12 +19,34 @@ from mcp_server.connector.rest.rest_client_operation import RESTClientOperation
 
 
 class ConnectorFactory:
+    """
+    Factory for creating and configuring Gravitino connector instances.
+    """
+
     _connector_class = RESTClientOperation
 
     @classmethod
-    def create_connector(cls, metalake_name, uri):
+    def create_connector(
+        cls, metalake_name: str, uri: str
+    ) -> "RESTClientOperation":
+        """
+        Create a new connector instance with the specified parameters.
+
+        Args:
+            metalake_name: Name of the metalake
+            uri: URI of the Gravitino server endpoint
+
+        Returns:
+            New instance of the configured connector class
+        """
         return cls._connector_class(metalake_name, uri)
 
     @classmethod
-    def set_test_connector(cls, connector_class):
+    def set_test_connector(cls, connector_class: type) -> None:
+        """
+        Configure the factory to use a different connector class (primarily for testing).
+
+        Args:
+            connector_class: Class to use for future connector creations
+        """
         cls._connector_class = connector_class
