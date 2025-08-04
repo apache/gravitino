@@ -37,7 +37,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " VALUES (#{jobMeta.jobRunId},"
         + " (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobMeta.jobTemplateName} AND deleted_at = 0),"
+        + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
+        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " #{jobMeta.metalakeId}, #{jobMeta.jobExecutionId},"
         + " #{jobMeta.jobRunStatus}, #{jobMeta.jobFinished}, #{jobMeta.auditInfo},"
         + " #{jobMeta.currentVersion}, #{jobMeta.lastVersion},"
@@ -45,7 +46,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " ON CONFLICT (job_run_id) DO UPDATE SET"
         + " job_template_id = (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobMeta.jobTemplateName} AND deleted_at = 0),"
+        + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
+        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " metalake_id = #{jobMeta.metalakeId},"
         + " job_execution_id = #{jobMeta.jobExecutionId},"
         + " job_run_status = #{jobMeta.jobRunStatus},"

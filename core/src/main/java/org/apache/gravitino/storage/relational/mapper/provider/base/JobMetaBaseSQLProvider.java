@@ -35,7 +35,8 @@ public class JobMetaBaseSQLProvider {
         + " VALUES (#{jobMeta.jobRunId},"
         + " (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobMeta.jobTemplateName} AND deleted_at = 0),"
+        + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
+        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " #{jobMeta.metalakeId}, #{jobMeta.jobExecutionId},"
         + " #{jobMeta.jobRunStatus}, #{jobMeta.jobFinishedAt}, #{jobMeta.auditInfo},"
         + " #{jobMeta.currentVersion}, #{jobMeta.lastVersion},"
@@ -51,7 +52,8 @@ public class JobMetaBaseSQLProvider {
         + " VALUES (#{jobMeta.jobRunId},"
         + " (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobMeta.jobTemplateName} AND deleted_at = 0),"
+        + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
+        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " #{jobMeta.metalakeId}, #{jobMeta.jobExecutionId},"
         + " #{jobMeta.jobRunStatus}, #{jobMeta.jobFinishedAt}, #{jobMeta.auditInfo},"
         + " #{jobMeta.currentVersion}, #{jobMeta.lastVersion},"
@@ -59,7 +61,8 @@ public class JobMetaBaseSQLProvider {
         + " ON DUPLICATE KEY UPDATE"
         + " job_template_id = (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobMeta.jobTemplateName} AND deleted_at = 0),"
+        + " WHERE job_template_name = #{jobMeta.jobTemplateName}"
+        + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " metalake_id = #{jobMeta.metalakeId},"
         + " job_execution_id = #{jobMeta.jobExecutionId},"
         + " job_run_status = #{jobMeta.jobRunStatus},"
@@ -141,7 +144,7 @@ public class JobMetaBaseSQLProvider {
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
         + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND job_template_id = ("
+        + " AND job_template_id IN ("
         + " SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
         + " WHERE job_template_name = #{jobTemplateName} AND deleted_at = 0)"

@@ -277,8 +277,8 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteJobTemplateMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)));
+                    JobMetaMapper.class,
+                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
