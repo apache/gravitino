@@ -49,10 +49,17 @@ Gravitino doesn't support metadata authentication. It means that Gravitino won't
 #### Build-in Authorization
 
 Gravitino provides built-in metadata authorization. You can enable the built-in metadata authorization through the following configuration.
+
 ```
 gravitino.authorization.enable = true
-gravitino.authorization.impl = org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer
 ```
+
+You can close the built-in metadata authorization through the following configuration.
+
+```
+gravitino.authorization.impl = org.apache.gravitino.server.authorization.PassThroughAuthorizer
+```
+
 :::info
 
 Built-in metadata authorization depends on the authentication feature. To use the built-in metadata authorization, authentication must be enabled and privileges must be granted to users.You can see the privileges required for different REST APIs in the [API required conditions](##API required conditions).
