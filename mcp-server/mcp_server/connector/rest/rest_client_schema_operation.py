@@ -14,21 +14,20 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import logging
 
-from httpx import Client
+from httpx import AsyncClient
 
 from mcp_server.connector import SchemaOperation
 from mcp_server.connector.rest.utils import extract_content_from_response
 
 
 class RESTClientSchemaOperation(SchemaOperation):
-    def __init__(self, metalake_name: str, rest_client: Client):
+    def __init__(self, metalake_name: str, rest_client: AsyncClient):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    def get_list_of_schemas(self, catalog_name: str) -> str:
-        response = self.rest_client.get(
+    async def get_list_of_schemas(self, catalog_name: str) -> str:
+        response = await self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas"
         )
         return extract_content_from_response(response, "identifiers", [])

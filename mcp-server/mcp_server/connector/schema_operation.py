@@ -24,7 +24,7 @@ class SchemaOperation(ABC):
     """
 
     @abstractmethod
-    def get_list_of_schemas(self, catalog_name: str) -> str:
+    async def get_list_of_schemas(self, catalog_name: str) -> str:
         """
         Retrieve the list of schemas under a specified catalog.
 

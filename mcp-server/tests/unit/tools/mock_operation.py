@@ -38,20 +38,22 @@ class MockOperation(GravitinoOperation):
 
 
 class MockCatalogOperation(CatalogOperation):
-    def get_list_of_catalogs(self) -> str:
+    async def get_list_of_catalogs(self) -> str:
         return "mock_catalogs"
 
 
 class MockSchemaOperation(SchemaOperation):
-    def get_list_of_schemas(self, catalog_name: str) -> str:
+    async def get_list_of_schemas(self, catalog_name: str) -> str:
         return "mock_schemas"
 
 
 class MockTableOperation(TableOperation):
-    def get_list_of_tables(self, catalog_name: str, schema_name: str) -> str:
+    async def get_list_of_tables(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
         return "mock_tables"
 
-    def load_table(
+    async def load_table(
         self, catalog_name: str, schema_name: str, table_name: str
     ) -> str:
         return "mock_table"

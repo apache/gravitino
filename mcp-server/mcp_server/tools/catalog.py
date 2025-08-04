@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_catalog_tools(mcp: FastMCP):
     @mcp.tool()
-    def get_list_of_catalogs(ctx: Context) -> str:
+    async def get_list_of_catalogs(ctx: Context) -> str:
         """
         Retrieve a list of all catalogs in the system.
 
@@ -100,4 +100,4 @@ def load_catalog_tools(mcp: FastMCP):
             ]
         """
         connector = ctx.request_context.lifespan_context.connector()
-        return connector.as_catalog_operation().get_list_of_catalogs()
+        return await connector.as_catalog_operation().get_list_of_catalogs()

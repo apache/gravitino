@@ -24,7 +24,7 @@ class CatalogOperation(ABC):
     """
 
     @abstractmethod
-    def get_list_of_catalogs(self) -> str:
+    async def get_list_of_catalogs(self) -> str:
         """
         Retrieve the list of catalogs.
 

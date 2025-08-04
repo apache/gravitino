@@ -37,7 +37,7 @@ from mcp_server.connector.rest.rest_client_table_operation import (
 class RESTClientOperation(GravitinoOperation):
     def __init__(self, metalake_name: str, uri: str):
         self.metalake_name = metalake_name
-        self.rest_client = httpx.Client(base_url=uri)
+        self.rest_client = httpx.AsyncClient(base_url=uri)
 
     def as_catalog_operation(self) -> CatalogOperation:
         return RESTClientCatalogOperation(

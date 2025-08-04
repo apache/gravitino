@@ -15,19 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from httpx import Client
+from httpx import AsyncClient
 
 from mcp_server.connector import CatalogOperation
 from mcp_server.connector.rest.utils import extract_content_from_response
 
 
 class RESTClientCatalogOperation(CatalogOperation):
-    def __init__(self, metalake_name: str, rest_client: Client):
+    def __init__(self, metalake_name: str, rest_client: AsyncClient):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    def get_list_of_catalogs(self) -> str:
-        response = self.rest_client.get(
+    async def get_list_of_catalogs(self) -> str:
+        response = await self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/catalogs?details=true"
         )
         return extract_content_from_response(response, "catalogs", [])

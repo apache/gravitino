@@ -24,7 +24,9 @@ class TableOperation(ABC):
     """
 
     @abstractmethod
-    def get_list_of_tables(self, catalog_name: str, schema_name: str) -> str:
+    async def get_list_of_tables(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
         """
         Retrieve the list of tables within a specified schema and catalog.
 
@@ -38,7 +40,7 @@ class TableOperation(ABC):
         pass
 
     @abstractmethod
-    def load_table(
+    async def load_table(
         self, catalog_name: str, schema_name: str, table_name: str
     ) -> str:
         """

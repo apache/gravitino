@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_table_tools(mcp: FastMCP):
     @mcp.tool()
-    def get_list_of_tables(
+    async def get_list_of_tables(
         ctx: Context,
         catalog_name: str,
         schema_name: str,
@@ -72,12 +72,12 @@ def load_table_tools(mcp: FastMCP):
             - Only tables belonging to the specified catalog_name and schema_name are returned
         """
         connector = ctx.request_context.lifespan_context.connector()
-        return connector.as_table_operation().get_list_of_tables(
+        return await connector.as_table_operation().get_list_of_tables(
             catalog_name, schema_name
         )
 
     @mcp.tool()
-    def get_table_metadata_details(
+    async def get_table_metadata_details(
         ctx: Context, catalog_name: str, schema_name: str, table_name: str
     ):
         """
@@ -222,6 +222,6 @@ def load_table_tools(mcp: FastMCP):
             - "indexes" represents the table index, such as primary key or unique key.
         """
         connector = ctx.request_context.lifespan_context.connector()
-        return connector.as_table_operation().load_table(
+        return await connector.as_table_operation().load_table(
             catalog_name, schema_name, table_name
         )

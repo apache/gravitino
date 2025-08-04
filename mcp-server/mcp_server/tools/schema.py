@@ -20,7 +20,7 @@ from fastmcp import Context, FastMCP
 
 def load_schema_tools(mcp: FastMCP):
     @mcp.tool()
-    def get_list_of_schemas(ctx: Context, catalog_name: str) -> str:
+    async def get_list_of_schemas(ctx: Context, catalog_name: str) -> str:
         """
         Retrieve a list of schemas belonging to a specific catalog.
 
@@ -58,4 +58,6 @@ def load_schema_tools(mcp: FastMCP):
               correspond to test.iceberg in dot notation)
         """
         connector = ctx.request_context.lifespan_context.connector()
-        return connector.as_schema_operation().get_list_of_schemas(catalog_name)
+        return await connector.as_schema_operation().get_list_of_schemas(
+            catalog_name
+        )
