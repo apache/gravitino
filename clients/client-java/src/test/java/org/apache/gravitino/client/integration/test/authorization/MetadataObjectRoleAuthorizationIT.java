@@ -21,6 +21,7 @@ import static org.junit.Assert.assertArrayEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -85,6 +86,7 @@ public class MetadataObjectRoleAuthorizationIT extends BaseRestApiAuthorizationI
     assertArrayEquals(new String[] {role1}, roleNames);
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(role2), NORMAL_USER);
     roleNames = catalogLoadByNormalUser.supportsRoles().listBindingRoleNames();
+    Arrays.sort(roleNames);
     assertArrayEquals(new String[] {role1, role2}, roleNames);
     // reset
     gravitinoMetalake.deleteRole(role1);
