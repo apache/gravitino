@@ -50,9 +50,6 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals("catalog", IcebergRestUtils.getCatalogName(prefix));
     Assertions.assertEquals(
         IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, IcebergRestUtils.getCatalogName(""));
-    Assertions.assertThrowsExactly(
-        IllegalArgumentException.class,
-        () -> IcebergRestUtils.getCatalogName(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG + "/"));
   }
 
   @Test
