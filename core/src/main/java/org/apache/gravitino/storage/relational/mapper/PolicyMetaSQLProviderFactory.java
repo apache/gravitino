@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetaBaseSQLProvider;
@@ -49,6 +50,11 @@ public class PolicyMetaSQLProviderFactory {
 
   public static String listPolicyPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return getProvider().listPolicyPOsByMetalake(metalakeName);
+  }
+
+  public static String listPolicyPOsByMetalakeAndPolicyNames(
+      @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
+    return getProvider().listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames);
   }
 
   public static String insertPolicyMetaOnDuplicateKeyUpdate(
