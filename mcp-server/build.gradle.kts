@@ -39,10 +39,8 @@ val globalUvExecutable = when {
 
 fun getUvExecutable(): String {
   return if (project.extensions.extraProperties.has("uvExecutable")) {
-    println("UV executable in func: ${project.extensions.extraProperties.get("uvExecutable")}")
     project.extensions.extraProperties.get("uvExecutable") as String
   } else {
-    println("UV executable in func: gloable")
     globalUvExecutable
   }
 }
@@ -166,7 +164,7 @@ tasks {
     workingDir(pythonProjectDir)
 
     doFirst {
-      println("UV executable: ${getUvExecutable()}")
+      println("UV executable path: ${getUvExecutable()}")
       commandLine(getUvExecutable(), "venv", venvDir.absolutePath)
     }
 

@@ -16,8 +16,20 @@
 # under the License.
 
 import json
+import logging
 
 
 def extract_content_from_response(response, field: str, default="") -> str:
-    response.raise_for_status()
-    return json.dumps(response.json().get(field, default))
+    response_json = response.json()
+    _handle_gravitino_exception(response_json)
+    return json.dumps(response_json.get(field, default))
+
+
+def _handle_gravitino_exception(response: dict):
+    error_code = response.get("code", 0)
+    if error_code != 0:
+        t = response.get("type", "")
+        message = response.get("message", "")
+        error_message = f"Error code: {error_code}, Error type: {t}, Error message: {message}"
+        logging.warn(error_message)
+        raise Exception(error_message)
