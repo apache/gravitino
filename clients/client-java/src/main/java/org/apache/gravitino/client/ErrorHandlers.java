@@ -52,6 +52,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -64,6 +65,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
+import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -204,6 +207,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> tagErrorHandler() {
     return TagErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to policy operations.
+   *
+   * @return A Consumer representing the policy error handler.
+   */
+  public static Consumer<ErrorResponse> policyErrorHandler() {
+    return PolicyErrorHandler.INSTANCE;
   }
 
   /**
@@ -952,6 +964,52 @@ public class ErrorHandlers {
               .getType()
               .equals(TagAlreadyAssociatedException.class.getSimpleName())) {
             throw new TagAlreadyAssociatedException(errorMessage);
+          } else {
+            throw new AlreadyExistsException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to policy operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class PolicyErrorHandler extends RestErrorHandler {
+
+    private static final PolicyErrorHandler INSTANCE = new PolicyErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchPolicyException.class.getSimpleName())) {
+            throw new NoSuchPolicyException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (errorResponse.getType().equals(PolicyAlreadyExistsException.class.getSimpleName())) {
+            throw new PolicyAlreadyExistsException(errorMessage);
+          } else if (errorResponse
+              .getType()
+              .equals(PolicyAlreadyAssociatedException.class.getSimpleName())) {
+            throw new PolicyAlreadyAssociatedException(errorMessage);
           } else {
             throw new AlreadyExistsException(errorMessage);
           }
