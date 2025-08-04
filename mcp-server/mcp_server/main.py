@@ -23,7 +23,6 @@ from mcp_server.server import GravitinoMCPServer
 
 
 def do_main():
-    sss
     args = parse_args()
     setting = Setting(args.metalake, args.uri, args.mode)
     init_logging(setting)

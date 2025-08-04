@@ -26,8 +26,6 @@ venv
 .idea
 dist
 build
-README.md
-gravitino/version.ini
 
 logs/
 *.log
