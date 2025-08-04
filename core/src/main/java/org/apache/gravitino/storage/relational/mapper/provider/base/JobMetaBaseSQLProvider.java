@@ -71,12 +71,12 @@ public class JobMetaBaseSQLProvider {
   }
 
   public String listJobPOsByMetalake(@Param("metalakeName") String metalakeName) {
-    return "SELECT jrm.job_run_id as jobRunId, jtm.job_template_name as jobTemplateName,"
-        + " jrm.metalake_id as metalakeId, jrm.job_execution_id as jobExecutionId,"
-        + " jrm.job_run_status as jobRunStatus, jrm.job_finished_at as jobFinishedAt,"
-        + " jrm.audit_info as auditInfo,"
-        + " jrm.current_version as currentVersion, jrm.last_version as lastVersion,"
-        + " jrm.deleted_at as deletedAt"
+    return "SELECT jrm.job_run_id AS jobRunId, jtm.job_template_name AS jobTemplateName,"
+        + " jrm.metalake_id AS metalakeId, jrm.job_execution_id AS jobExecutionId,"
+        + " jrm.job_run_status AS jobRunStatus, jrm.job_finished_at AS jobFinishedAt,"
+        + " jrm.audit_info AS auditInfo,"
+        + " jrm.current_version AS currentVersion, jrm.last_version AS lastVersion,"
+        + " jrm.deleted_at AS deletedAt"
         + " FROM "
         + JobMetaMapper.TABLE_NAME
         + " jrm JOIN "
@@ -92,12 +92,12 @@ public class JobMetaBaseSQLProvider {
   public String listJobPOsByMetalakeAndTemplate(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
-    return "SELECT jrm.job_run_id as jobRunId, jtm.job_template_name as jobTemplateName,"
-        + " jrm.metalake_id as metalakeId, jrm.job_execution_id as jobExecutionId,"
-        + " jrm.job_run_status as jobRunStatus, jrm.job_finished_at as jobFinishedAt, "
-        + " jrm.audit_info as auditInfo,"
-        + " jrm.current_version as currentVersion, jrm.last_version as lastVersion,"
-        + " jrm.deleted_at as deletedAt"
+    return "SELECT jrm.job_run_id AS jobRunId, jtm.job_template_name AS jobTemplateName,"
+        + " jrm.metalake_id AS metalakeId, jrm.job_execution_id AS jobExecutionId,"
+        + " jrm.job_run_status AS jobRunStatus, jrm.job_finished_at AS jobFinishedAt, "
+        + " jrm.audit_info AS auditInfo,"
+        + " jrm.current_version AS currentVersion, jrm.last_version AS lastVersion,"
+        + " jrm.deleted_at AS deletedAt"
         + " FROM "
         + JobMetaMapper.TABLE_NAME
         + " jrm JOIN "
@@ -112,12 +112,12 @@ public class JobMetaBaseSQLProvider {
 
   public String selectJobPOByMetalakeAndRunId(
       @Param("metalakeName") String metalakeName, @Param("jobRunId") Long jobRunId) {
-    return "SELECT jrm.job_run_id as jobRunId, jtm.job_template_name as jobTemplateName,"
-        + " jrm.metalake_id as metalakeId, jrm.job_execution_id as jobExecutionId,"
-        + " jrm.job_run_status as jobRunStatus, jrm.job_finished_at as jobFinishedAt,"
-        + " jrm.audit_info as auditInfo,"
-        + " jrm.current_version as currentVersion, jrm.last_version as lastVersion,"
-        + " jrm.deleted_at as deletedAt"
+    return "SELECT jrm.job_run_id AS jobRunId, jtm.job_template_name AS jobTemplateName,"
+        + " jrm.metalake_id AS metalakeId, jrm.job_execution_id AS jobExecutionId,"
+        + " jrm.job_run_status AS jobRunStatus, jrm.job_finished_at AS jobFinishedAt,"
+        + " jrm.audit_info AS auditInfo,"
+        + " jrm.current_version AS currentVersion, jrm.last_version AS lastVersion,"
+        + " jrm.deleted_at AS deletedAt"
         + " FROM "
         + JobMetaMapper.TABLE_NAME
         + " jrm JOIN "

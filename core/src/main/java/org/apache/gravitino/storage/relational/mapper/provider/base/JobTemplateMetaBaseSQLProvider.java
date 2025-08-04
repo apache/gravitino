@@ -62,11 +62,11 @@ public class JobTemplateMetaBaseSQLProvider {
   }
 
   public String listJobTemplatePOsByMetalake(@Param("metalakeName") String metalakeName) {
-    return "SELECT jtm.job_template_id as jobTemplateId, jtm.job_template_name as jobTemplateName,"
-        + " jtm.metalake_id as metalakeId, jtm.job_template_comment as jobTemplateComment,"
-        + " jtm.job_template_content as jobTemplateContent, jtm.audit_info as auditInfo,"
-        + " jtm.current_version as currentVersion, jtm.last_version as lastVersion,"
-        + " jtm.deleted_at as deletedAt"
+    return "SELECT jtm.job_template_id AS jobTemplateId, jtm.job_template_name AS jobTemplateName,"
+        + " jtm.metalake_id AS metalakeId, jtm.job_template_comment AS jobTemplateComment,"
+        + " jtm.job_template_content AS jobTemplateContent, jtm.audit_info AS auditInfo,"
+        + " jtm.current_version AS currentVersion, jtm.last_version AS lastVersion,"
+        + " jtm.deleted_at AS deletedAt"
         + " FROM "
         + JobTemplateMetaMapper.TABLE_NAME
         + " jtm JOIN "
@@ -78,11 +78,11 @@ public class JobTemplateMetaBaseSQLProvider {
   public String selectJobTemplatePOByMetalakeAndName(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
-    return "SELECT jtm.job_template_id as jobTemplateId, jtm.job_template_name as jobTemplateName,"
-        + " jtm.metalake_id as metalakeId, jtm.job_template_comment as jobTemplateComment,"
-        + " jtm.job_template_content as jobTemplateContent, jtm.audit_info as auditInfo,"
-        + " jtm.current_version as currentVersion, jtm.last_version as lastVersion,"
-        + " jtm.deleted_at as deletedAt"
+    return "SELECT jtm.job_template_id AS jobTemplateId, jtm.job_template_name AS jobTemplateName,"
+        + " jtm.metalake_id AS metalakeId, jtm.job_template_comment AS jobTemplateComment,"
+        + " jtm.job_template_content AS jobTemplateContent, jtm.audit_info AS auditInfo,"
+        + " jtm.current_version AS currentVersion, jtm.last_version AS lastVersion,"
+        + " jtm.deleted_at AS deletedAt"
         + " FROM "
         + JobTemplateMetaMapper.TABLE_NAME
         + " jtm JOIN "
