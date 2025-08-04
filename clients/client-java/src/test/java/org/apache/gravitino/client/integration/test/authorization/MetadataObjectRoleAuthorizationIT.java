@@ -86,5 +86,8 @@ public class MetadataObjectRoleAuthorizationIT extends BaseRestApiAuthorizationI
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(role2), NORMAL_USER);
     roleNames = catalogLoadByNormalUser.supportsRoles().listBindingRoleNames();
     assertArrayEquals(new String[] {role1, role2}, roleNames);
+    // reset
+    gravitinoMetalake.deleteRole(role1);
+    gravitinoMetalake.deleteRole(role2);
   }
 }
