@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -158,13 +159,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   static class FileSystemCacheKey {
+    // When the path is a local path without prefixes 'file', the scheme and authority are both null
+    @Nullable private final String scheme;
+    @Nullable private final String authority;
     private final Map<String, String> conf;
-    private final String pathPrefix;
     private final String currentUser;
 
-    FileSystemCacheKey(Map<String, String> conf, String pathPrefix) {
+    FileSystemCacheKey(String scheme, String authority, Map<String, String> conf) {
+      this.scheme = scheme;
+      this.authority = authority;
       this.conf = conf;
-      this.pathPrefix = pathPrefix;
 
       try {
         this.currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
@@ -183,15 +187,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return conf.equals(that.conf)
-          && pathPrefix.equals(that.pathPrefix)
+          && (scheme == null ? that.authority == null : scheme.equals(that.scheme))
+          && (authority == null ? that.authority == null : authority.equals(that.authority))
           && currentUser.equals(that.currentUser);
     }
 
     @Override
     public int hashCode() {
       int result = conf.hashCode();
+      result = 31 * result + (scheme == null ? 0 : scheme.hashCode());
+      result = 31 * result + (authority == null ? 0 : authority.hashCode());
       result = 31 * result + currentUser.hashCode();
-      result = 31 * result + pathPrefix.hashCode();
       return result;
     }
   }
@@ -1300,11 +1306,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   @VisibleForTesting
   FileSystem getFileSystemWithCache(Path path, Map<String, String> conf) {
-    String pathString = path.toString();
-    // extract the prefix of the path to use as the cache key
-    String prefix = extractPrefix(pathString);
+    String scheme = path.toUri().getScheme();
+    String authority = path.toUri().getAuthority();
     return fileSystemCache.get(
-        new FileSystemCacheKey(conf, prefix),
+        new FileSystemCacheKey(scheme, authority, conf),
         cacheKey -> {
           try {
             return getFileSystem(path, conf);
@@ -1313,37 +1318,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
           }
         });
-  }
-
-  /**
-   * Extracts the prefix from the given path. The prefix is defined as the scheme and the first
-   * slash after the scheme.
-   *
-   * @param path the path from which to extract the prefix.
-   * @return the prefix of the path, or an empty string if the path is null or empty.
-   */
-  @VisibleForTesting
-  String extractPrefix(String path) {
-    if (path == null || path.isEmpty()) {
-      return "";
-    }
-
-    if (path.startsWith("file:/")) {
-      return "file:///";
-    }
-
-    String protocolSlash = "://";
-    int protocolStart = path.indexOf(protocolSlash);
-    if (protocolStart == -1) {
-      return path;
-    }
-
-    int firstSlash = path.indexOf('/', protocolStart + protocolSlash.length());
-    if (firstSlash == -1) {
-      return path + "/";
-    }
-
-    return path.substring(0, firstSlash + 1);
   }
 
   private boolean checkSingleFile(Fileset fileset, String locationName) {

@@ -1452,7 +1452,6 @@ public class TestFilesetCatalogOperations {
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
       when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
-      when(mockOps.extractPrefix(Mockito.anyString())).thenCallRealMethod();
       when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
@@ -1813,27 +1812,6 @@ public class TestFilesetCatalogOperations {
         Assertions.assertEquals("file://a/b/e", ops.getTargetLocation(filesetWithMultipleLocation));
       }
     }
-  }
-
-  @ParameterizedTest
-  @MethodSource("pathPrefixArguments")
-  void testPathPrefix(String path, String prefix) {
-    FilesetCatalogOperations filesetCatalogOperations =
-        Mockito.mock(FilesetCatalogOperations.class);
-    when(filesetCatalogOperations.extractPrefix(Mockito.anyString())).thenCallRealMethod();
-    Assertions.assertEquals(prefix, filesetCatalogOperations.extractPrefix(path));
-  }
-
-  private static Stream<Arguments> pathPrefixArguments() {
-    return Stream.of(
-        Arguments.of("hdfs://localhost:9000/user1", "hdfs://localhost:9000/"),
-        Arguments.of("/user1/path/to/file", "/user1/path/to/file"),
-        Arguments.of("file:///user1", "file:///"),
-        Arguments.of("s3://bucket/path/to/file", "s3://bucket/"),
-        Arguments.of("gs://bucket/path/to/file", "gs://bucket/"),
-        Arguments.of("s3a://bucket/path/to/file", "s3a://bucket/"),
-        Arguments.of("oss://bucket/path/to/file", "oss://bucket/"),
-        Arguments.of("adfss://bucket:xxx/user1/", "adfss://bucket:xxx/"));
   }
 
   private static Stream<Arguments> multipleLocationsArguments() {
