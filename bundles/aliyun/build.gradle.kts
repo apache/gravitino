@@ -82,7 +82,7 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.aliyun", "org.apache.gravitino.aliyun.shaded.com.aliyun")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
   relocate("com.google", "org.apache.gravitino.aliyun.shaded.com.google.common")
-  relocate("com.sun", "org.apache.gravitino.aliyun.shaded.com.sun")
+  relocate("com.sun.activation", "org.apache.gravitino.aliyun.shaded.com.sun.activation")
   relocate("okhttp3", "org.apache.gravitino.aliyun.shaded.okhttp3")
   relocate("okio", "org.apache.gravitino.aliyun.shaded.okio")
   relocate("org.apache.commons", "org.apache.gravitino.aliyun.shaded.org.apache.commons")
