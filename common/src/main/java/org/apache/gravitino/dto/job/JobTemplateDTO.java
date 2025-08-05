@@ -88,7 +88,7 @@ public abstract class JobTemplateDTO {
   /**
    * Default constructor for Jackson. This constructor is required for deserialization of the DTO.
    */
-  public JobTemplateDTO() {
+  protected JobTemplateDTO() {
     // Default constructor for Jackson
   }
 

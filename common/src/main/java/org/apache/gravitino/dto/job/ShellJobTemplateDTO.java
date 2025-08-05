@@ -38,7 +38,7 @@ public class ShellJobTemplateDTO extends JobTemplateDTO {
   private List<String> scripts;
 
   /** Creates a new ShellJobTemplateDTO with the specified properties. */
-  public ShellJobTemplateDTO() {
+  private ShellJobTemplateDTO() {
     // Default constructor for Jackson
     super();
   }

@@ -53,7 +53,7 @@ public class SparkJobTemplateDTO extends JobTemplateDTO {
   private Map<String, String> configs;
 
   /** Creates a new SparkJobTemplateDTO with the specified properties. */
-  public SparkJobTemplateDTO() {
+  private SparkJobTemplateDTO() {
     // Default constructor for Jackson
     super();
   }

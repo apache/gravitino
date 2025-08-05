@@ -43,7 +43,7 @@ public class JobTemplateResponse extends BaseResponse {
   }
 
   /** Default constructor for Jackson deserialization. */
-  public JobTemplateResponse() {
+  private JobTemplateResponse() {
     super();
     this.jobTemplate = null;
   }
