@@ -49,11 +49,13 @@ public class HiveConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, String> config = new HashMap<>();
-    config.put("hive.metastore.uri", catalog.getRequiredProperty("metastore.uris"));
-    config.put("hive.security", "allow-all");
+    String metastoreUri = catalog.getRequiredProperty("metastore.uris");
     Map<String, String> trinoProperty =
         catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
+    // The order of put operations determines the priority of parameters.
     config.putAll(trinoProperty);
+    config.put("hive.metastore.uri", metastoreUri);
+    config.put("hive.security", "allow-all");
     return config;
   }
 

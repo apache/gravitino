@@ -137,6 +137,7 @@ call gravitino.system.create_catalog(
 ```
 
 A prefix with `trino.bypass.` in the configuration key is used to indicate Gravitino Trino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
+Note that it is when a configuration property is explicitly defined in Gravitino that the `trino.bypass.`properties which for the same property will be skipped.
 
 More Trino connector configurations can refer to:
 - [Hive catalog](https://trino.io/docs/current/connector/hive.html#hive-general-configuration-properties)

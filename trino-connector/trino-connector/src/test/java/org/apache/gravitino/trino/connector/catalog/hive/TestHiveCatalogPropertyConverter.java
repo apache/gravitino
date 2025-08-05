@@ -51,12 +51,15 @@ public class TestHiveCatalogPropertyConverter {
   @SuppressWarnings("unchecked")
   public void testBuildConnectorProperties() throws Exception {
     String name = "test_catalog";
+    // trino.bypass properties will be skipped when the catalog properties is defined by Gravitino
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
+            .put("trino.bypass.hive.security", "skip_value")
             .put("metastore.uris", "thrift://localhost:9083")
             .put("unknown-key", "1")
             .put("trino.bypass.hive.unknown-key", "1")
             .put("trino.bypass.hive.config.resources", "/tmp/hive-site.xml, /tmp/core-site.xml")
+            .put("trino.bypass.hive.metastore.uri", "skip_value")
             .build();
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
