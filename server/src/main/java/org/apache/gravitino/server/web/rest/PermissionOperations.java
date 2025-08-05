@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConverter.CAN_OPERATE_METADATA_PRIVILEGE;
+
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Locale;
@@ -30,6 +32,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -46,6 +49,8 @@ import org.apache.gravitino.dto.responses.UserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -69,8 +74,10 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "grant-roles-to-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "grant-roles-to-user", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GRANTS")
   public Response grantRolesToUser(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("user") String user,
       RoleGrantRequest request) {
     try {
@@ -95,8 +102,10 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "grant-roles-to-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "grant-roles-to-group", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GRANTS")
   public Response grantRolesToGroup(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("group") String group,
       RoleGrantRequest request) {
     try {
@@ -121,8 +130,10 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "revoke-roles-from-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "revoke-roles-from-user", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GRANTS")
   public Response revokeRolesFromUser(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("user") String user,
       RoleRevokeRequest request) {
     try {
@@ -147,8 +158,10 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "revoke-roles-from-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "revokes-role-from-group", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::MANAGE_GRANTS")
   public Response revokeRolesFromGroup(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("group") String group,
       RoleRevokeRequest request) {
     try {
@@ -173,8 +186,12 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "grant-privilege-to-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "grant-privilege-to-role", absolute = true)
+  @AuthorizationExpression(
+      expression = CAN_OPERATE_METADATA_PRIVILEGE,
+      errorMessage = "Current user can not grant privilege to role.")
   public Response grantPrivilegeToRole(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("role") String role,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
@@ -216,8 +233,12 @@ public class PermissionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "revoke-privilege-from-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "revoke-privilege-from-role", absolute = true)
+  @AuthorizationExpression(
+      expression = CAN_OPERATE_METADATA_PRIVILEGE,
+      errorMessage = "Current user can not revoke privilege from role.")
   public Response revokePrivilegeFromRole(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("role") String role,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,

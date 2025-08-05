@@ -1098,26 +1098,111 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertNotNull(table.index()[0].name());
     Assertions.assertNotNull(table.index()[1].name());
 
-    Column notNullCol = Column.of("col_6", Types.LongType.get(), "id", true, false, null);
-    Exception exception =
+    NameIdentifier nullableTableIdent = NameIdentifier.of(schemaName, "test_nullable");
+    Column nullWithAutoIncrementCol =
+        Column.of("col_6", Types.LongType.get(), "id", true, true, null);
+
+    Exception uniqueKeyNotExistException =
         assertThrows(
             IllegalArgumentException.class,
             () ->
                 tableCatalog.createTable(
-                    tableIdent,
-                    new Column[] {notNullCol},
+                    nullableTableIdent,
+                    new Column[] {nullWithAutoIncrementCol},
                     table_comment,
                     properties,
                     Transforms.EMPTY_TRANSFORM,
                     Distributions.NONE,
                     new SortOrder[0],
                     new Index[] {
-                      Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_6"}}),
+                      Indexes.of(
+                          Index.IndexType.UNIQUE_KEY,
+                          "u_key",
+                          new String[][] {{"col_7"}, {"col_6"}}),
                     }));
     Assertions.assertTrue(
-        exception
+        uniqueKeyNotExistException
             .getMessage()
-            .contains("Column col_6 in the unique index null must be a not null column"));
+            .contains("Column col_7 in the unique index u_key does not exist in the table"));
+
+    Exception uniqueKeyNotNullException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    nullableTableIdent,
+                    new Column[] {nullWithAutoIncrementCol},
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.of(Index.IndexType.UNIQUE_KEY, "u_key", new String[][] {{"col_6"}}),
+                    }));
+    Assertions.assertTrue(
+        uniqueKeyNotNullException
+            .getMessage()
+            .contains(
+                "Auto increment column col_6 in the unique index u_key must be a not null column"));
+
+    Column nullWithoutAutoIncrementCol =
+        Column.of("col_7", Types.LongType.get(), "id", true, false, null);
+    tableCatalog.createTable(
+        nullableTableIdent,
+        new Column[] {nullWithoutAutoIncrementCol},
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.of(Index.IndexType.UNIQUE_KEY, "u_key", new String[][] {{"col_7"}}),
+        });
+    table = tableCatalog.loadTable(nullableTableIdent);
+
+    Assertions.assertEquals(1, table.index().length);
+    Assertions.assertNotNull(table.index()[0].name());
+
+    Exception primaryKeyNotExistexception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    nullableTableIdent,
+                    new Column[] {nullWithoutAutoIncrementCol},
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_8"}}),
+                    }));
+    Assertions.assertTrue(
+        primaryKeyNotExistexception
+            .getMessage()
+            .contains("Column col_8 in the primary key does not exist in the table"));
+
+    Exception primaryKeyNotNullException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    nullableTableIdent,
+                    new Column[] {nullWithoutAutoIncrementCol},
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_7"}}),
+                    }));
+    Assertions.assertTrue(
+        primaryKeyNotNullException
+            .getMessage()
+            .contains("Column col_7 in the primary key must be a not null column"));
   }
 
   @Test

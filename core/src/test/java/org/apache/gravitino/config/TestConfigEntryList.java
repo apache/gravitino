@@ -155,7 +155,7 @@ public class TestConfigEntryList {
             .checkValue(value -> !value.isEmpty(), "error")
             .toSequence()
             .create();
-    testConfWithoutDefault.writeTo(configMap, Lists.newArrayList(""));
+    testConfWithoutDefault.writeTo(configMap, Lists.newArrayList("valid", "", "another"));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> testConfWithoutDefault.readFrom(configMap));
   }

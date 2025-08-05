@@ -75,7 +75,7 @@ public class TestJcasbinModel {
   public void testMetalakeOwner() {
     Assertions.assertTrue(
         enforcer.enforce("role1", MetadataObject.Type.METALAKE.name(), "metalake1", "OWNER"));
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         enforcer.enforce(
             "role1",
             MetadataObject.Type.METALAKE.name(),
@@ -99,13 +99,13 @@ public class TestJcasbinModel {
   public void testCatalogOwner() {
     Assertions.assertTrue(
         enforcer.enforce("role2", MetadataObject.Type.CATALOG.name(), "catalog1", "OWNER"));
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         enforcer.enforce(
             "role2",
             MetadataObject.Type.CATALOG.name(),
             "catalog1",
             Privilege.Name.USE_SCHEMA.name()));
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         enforcer.enforce(
             "role2",
             MetadataObject.Type.CATALOG.name(),
@@ -128,7 +128,7 @@ public class TestJcasbinModel {
   public void testSchemaOwner() {
     Assertions.assertTrue(
         enforcer.enforce("role3", MetadataObject.Type.SCHEMA.name(), "schema1", "OWNER"));
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         enforcer.enforce(
             "role3",
             MetadataObject.Type.SCHEMA.name(),
@@ -149,13 +149,13 @@ public class TestJcasbinModel {
   public void testTableOwner() {
     Assertions.assertTrue(
         enforcer.enforce("role4", MetadataObject.Type.TABLE.name(), "table1", "OWNER"));
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         enforcer.enforce(
             "role4",
             MetadataObject.Type.TABLE.name(),
             "table1",
             Privilege.Name.MODIFY_TABLE.name()));
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         enforcer.enforce(
             "role4",
             MetadataObject.Type.TABLE.name(),

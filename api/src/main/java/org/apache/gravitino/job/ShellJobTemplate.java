@@ -89,10 +89,21 @@ public class ShellJobTemplate extends JobTemplate {
     return "\nShellJobTemplate{\n" + super.toString() + sb + "}\n";
   }
 
+  /**
+   * Creates a new builder for constructing instances of {@link ShellJobTemplate}.
+   *
+   * @return a new instance of {@link Builder}
+   */
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** Builder for creating instances of {@link ShellJobTemplate}. */
   public static class Builder extends BaseBuilder<Builder, ShellJobTemplate> {
 
     private List<String> scripts;
+
+    private Builder() {}
 
     /**
      * Sets the scripts to be executed by the shell job template.
