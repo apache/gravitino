@@ -12,14 +12,14 @@ license: "This software is licensed under the Apache License version 2."
 
 + Linux or macOS operating system
 + Git
-+ A Java Development Kit, version 8 to 17, installed in your environment to launch Gradle
++ A Java Development Kit, version 17 or higher, installed in your environment to launch Gradle
 + Python 3.8, 3.9, 3.10, 3.11, or 3.12 to build the Gravitino Python client
 + Optionally, Docker to run integration tests
 
 :::info Please read the following notes before trying to build Gravitino.
 
-+ Gravitino requires a minimum of JDK8 and supports up to JDK17 to run Gradle, so you need to install a JDK, version 8 to 17, to launch the build environment.
-+ Gravitino itself supports using JDK 8, 11, or 17 to build. The Gravitino Trino connector uses JDK17 to build (to avoid vendor-related issues on some platforms, Gravitino uses the specified Amazon Corretto OpenJDK 17 to build the Trino connector on macOS).
++ Gravitino requires a minimum of JDK17 to run Gradle, so you need to install a JDK17 to launch the build environment.
++ Gravitino itself supports using JDK 17 to build. The Gravitino Trino connector uses JDK17 to build (to avoid vendor-related issues on some platforms, Gravitino uses the specified Amazon Corretto OpenJDK 17 to build the Trino connector on macOS).
  You don't have to preinstall the specified JDK environment, as Gradle detects the JDK version needed and downloads it automatically.
 + Gravitino uses the Gradle Java Toolchain to detect and manage JDK versions, and it checks the installed JDK by running the `./gradlew javaToolchains` command. See [Gradle Java Toolchain](https://docs.gradle.org/current/userguide/toolchains.html#sec:java_toolchain).
 + Gravitino excludes all Docker-related tests by default. To run Docker-related tests, make sure you have installed Docker in your environment and either (1) set `skipDockerTests=false` in the `gradle.properties` file (or use `-PskipDockerTests=false` in the command) or (2) `export SKIP_DOCKER_TESTS=false` in the shell. Otherwise, all tests requiring Docker will be skipped.
@@ -45,16 +45,15 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew build
    ```
 
-   The default specified JDK version is 8, but if you want to use JDK 11 or 17 to build, modify the property `jdkVersion` to 11 or 17 in the `gradle.properties` file, or specify the version with `-P`, like:
-
+   The default specified JDK version is 17, but if you want to use a different JDK version , update the `jdkVersion` property in gradle.properties, or pass it via the -P option, for example:
    ```shell
    ./gradlew build -PjdkVersion=11
    ```
 
-   Or:
+   If you want to use the client module with JDK 8, you can specify the version using -PclientCompatibleWithJDK8, for example:
 
    ```shell
-   ./gradlew build -PjdkVersion=17
+   ./gradlew build -PclientCompatibleWithJDK8 -x test
    ```
 
   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
