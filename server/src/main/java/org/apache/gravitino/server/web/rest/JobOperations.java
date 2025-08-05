@@ -185,7 +185,7 @@ public class JobOperations {
           () -> {
             boolean deleted = jobOperationDispatcher.deleteJobTemplate(metalake, name);
             if (!deleted) {
-              LOG.warn("Failed to delete job template {} in metalake {}", name, metalake);
+              LOG.warn("Cannot find job template {} in metalake {}", name, metalake);
             } else {
               LOG.info("Deleted job template {} in metalake {}", name, metalake);
             }

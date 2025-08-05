@@ -350,9 +350,9 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the AuditLogManager associated with the Gravitino environment.
+   * Get the PolicyDispatcher associated with the Gravitino environment.
    *
-   * @return The AuditLogManager instance.
+   * @return The PolicyDispatcher instance.
    */
   public PolicyDispatcher policyDispatcher() {
     return policyDispatcher;
@@ -404,9 +404,9 @@ public class GravitinoEnv {
   }
 
   /**
-   * Get the AuditLogManager associated with the Gravitino environment.
+   * Get the JobOperationDispatcher associated with the Gravitino environment.
    *
-   * @return The AuditLogManager instance.
+   * @return The JobOperationDispatcher instance.
    */
   public JobOperationDispatcher jobOperationDispatcher() {
     Preconditions.checkArgument(jobOperationDispatcher != null, "GravitinoEnv is not initialized.");
@@ -584,6 +584,7 @@ public class GravitinoEnv {
     // todo: support policy event dispatcher
     this.policyDispatcher = new PolicyManager(idGenerator, entityStore);
 
+    // TODO: Support event for job operation dispatcher
     this.jobOperationDispatcher = new JobManager(config, entityStore, idGenerator);
   }
 }
