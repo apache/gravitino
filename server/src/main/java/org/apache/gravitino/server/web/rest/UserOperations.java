@@ -60,6 +60,8 @@ public class UserOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserOperations.class);
 
+  private static final String LOAD_USER_PRIVILEGE = "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF";
+
   private final AccessControlDispatcher accessControlManager;
 
   @Context private HttpServletRequest httpRequest;
@@ -76,7 +78,7 @@ public class UserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-user", absolute = true)
-  @AuthorizationExpression(expression = "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF")
+  @AuthorizationExpression(expression = LOAD_USER_PRIVILEGE)
   public Response getUser(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -106,43 +108,15 @@ public class UserOperations {
           () -> {
             if (verbose) {
               User[] users = accessControlManager.listUsers(metalake);
-              users =
-                  Arrays.stream(users)
-                      .filter(
-                          user -> {
-                            NameIdentifier[] nameIdentifiers =
-                                new NameIdentifier[] {
-                                  NameIdentifierUtil.ofUser(metalake, user.name())
-                                };
-                            return MetadataFilterHelper.filterByExpression(
-                                        metalake,
-                                        "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF",
-                                        Entity.EntityType.USER,
-                                        nameIdentifiers)
-                                    .length
-                                > 0;
-                          })
-                      .collect(Collectors.toList())
-                      .toArray(new User[0]);
-              return Utils.ok(new UserListResponse(DTOConverters.toDTOs(users)));
+                users = MetadataFilterHelper.filterByExpression(metalake,LOAD_USER_PRIVILEGE,
+                        Entity.EntityType.USER,users,(userEntity)->
+                                NameIdentifierUtil.ofUser(metalake, userEntity.name()));
+
+                return Utils.ok(new UserListResponse(DTOConverters.toDTOs(users)));
             } else {
               String[] users = accessControlManager.listUserNames(metalake);
-              users =
-                  Arrays.stream(users)
-                      .filter(
-                          user -> {
-                            NameIdentifier[] nameIdentifiers =
-                                new NameIdentifier[] {NameIdentifierUtil.ofUser(metalake, user)};
-                            return MetadataFilterHelper.filterByExpression(
-                                        metalake,
-                                        "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF",
-                                        Entity.EntityType.USER,
-                                        nameIdentifiers)
-                                    .length
-                                > 0;
-                          })
-                      .collect(Collectors.toList())
-                      .toArray(new String[0]);
+              users = MetadataFilterHelper.filterByExpression(metalake,LOAD_USER_PRIVILEGE,
+                      Entity.EntityType.USER,users,(username)->NameIdentifierUtil.ofUser(metalake, username));
               return Utils.ok(new NameListResponse(users));
             }
           });

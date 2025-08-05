@@ -90,10 +90,22 @@ public class MetalakeOperations {
           httpRequest,
           () -> {
             Metalake[] metalakes = metalakeDispatcher.listMetalakes();
-              metalakes = MetadataFilterHelper.filterByExpression(metalakes,"METALAKE_USER",
-                    Entity.EntityType.METALAKE,metalakes
-                    ,(metalake)->NameIdentifierUtil.ofMetalake(metalake.name()));
-
+            metalakes =
+                Arrays.stream(metalakes)
+                    .filter(
+                        metalake -> {
+                          NameIdentifier[] nameIdentifiers =
+                              new NameIdentifier[] {NameIdentifierUtil.ofMetalake(metalake.name())};
+                          return MetadataFilterHelper.filterByExpression(
+                                      metalake.name(),
+                                      "METALAKE_USER",
+                                      Entity.EntityType.METALAKE,
+                                      nameIdentifiers)
+                                  .length
+                              > 0;
+                        })
+                    .toList()
+                    .toArray(new Metalake[0]);
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));

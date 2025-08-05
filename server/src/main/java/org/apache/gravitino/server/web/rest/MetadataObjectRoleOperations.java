@@ -51,6 +51,8 @@ public class MetadataObjectRoleOperations {
 
   @Context private HttpServletRequest httpRequest;
 
+  private static final String LIST_ROLE_PRIVILEGE = "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF";
+
   public MetadataObjectRoleOperations() {
     // Because accessControlManager may be null when Gravitino doesn't enable authorization,
     // and Jersey injection doesn't support null value. So MedataObjectRoleOperations chooses to
@@ -76,22 +78,8 @@ public class MetadataObjectRoleOperations {
           httpRequest,
           () -> {
             String[] names = accessControlDispatcher.listRoleNamesByObject(metalake, object);
-            names =
-                Arrays.stream(names)
-                    .filter(
-                        role -> {
-                          NameIdentifier[] nameIdentifiers =
-                              new NameIdentifier[] {NameIdentifierUtil.ofRole(metalake, role)};
-                          return MetadataFilterHelper.filterByExpression(
-                                      metalake,
-                                      "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF",
-                                      Entity.EntityType.ROLE,
-                                      nameIdentifiers)
-                                  .length
-                              > 0;
-                        })
-                    .collect(Collectors.toList())
-                    .toArray(new String[0]);
+            names = MetadataFilterHelper.filterByExpression(metalake,LIST_ROLE_PRIVILEGE,
+                    Entity.EntityType.ROLE,names,(roleName)->NameIdentifierUtil.ofRole(metalake, roleName));
             return Utils.ok(new NameListResponse(names));
           });
     } catch (Exception e) {
