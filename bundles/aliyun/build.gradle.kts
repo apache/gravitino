@@ -59,7 +59,7 @@ dependencies {
 
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
   // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
-  implementation(libs.sun)
+  implementation(libs.sun.activation)
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
