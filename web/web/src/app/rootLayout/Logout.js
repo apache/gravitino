@@ -19,63 +19,52 @@
 
 'use client'
 
+import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+
 import { Box, IconButton } from '@mui/material'
-import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
 
 import Icon from '@/components/Icon'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { clearIntervalId, setAuthToken } from '@/lib/store/auth'
+import { logoutAction } from '@/lib/store/auth'
+import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 const LogoutButton = () => {
+  const router = useRouter()
   const dispatch = useAppDispatch()
   const authStore = useAppSelector(state => state.auth)
+  const [showLogoutButton, setShowLogoutButton] = useState(false)
 
-  const handleLogout = async () => {
-    try {
-      // Clear UserManager's user data to prevent token restoration
-      const userManager = new UserManager({
-        userStore: new WebStorageStateStore({ store: window.localStorage })
-      })
-      await userManager.removeUser()
-    } catch (error) {
-      // Continue with logout even if UserManager cleanup fails
-    }
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        // Check Redux store first
+        if (authStore.authToken) {
+          setShowLogoutButton(true)
 
-    // Clear all authentication data
-    localStorage.removeItem('oidc_access_token')
-    localStorage.removeItem('oidc_user_profile')
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('authParams')
-    localStorage.removeItem('expiredIn')
-    localStorage.removeItem('isIdle')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('oauthUrl')
-    localStorage.removeItem('oauthProvider')
-    localStorage.removeItem('version')
+          return
+        }
 
-    // Clear all OIDC UserManager keys
-    const keysToRemove = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('oidc.')) {
-        keysToRemove.push(key)
+        // Check provider authentication status for OIDC
+        const provider = await oauthProviderFactory.getProvider()
+        if (provider) {
+          const isAuth = await provider.isAuthenticated()
+          setShowLogoutButton(isAuth)
+        } else {
+          setShowLogoutButton(false)
+        }
+      } catch (error) {
+        // If provider check fails, fallback to false
+        setShowLogoutButton(false)
       }
     }
-    keysToRemove.forEach(key => localStorage.removeItem(key))
 
-    // Clear Redux auth state
-    dispatch(clearIntervalId())
-    dispatch(setAuthToken(''))
+    checkAuthStatus()
+  }, [authStore.authToken])
 
-    // Redirect to login
-    window.location.href = '/ui/login?message=logged_out'
+  const handleLogout = () => {
+    dispatch(logoutAction({ router }))
   }
-
-  // Show logout button if any authentication data exists
-  const showLogoutButton =
-    authStore.authToken ||
-    (typeof window !== 'undefined' &&
-      (localStorage.getItem('oidc_access_token') || localStorage.getItem('accessToken')))
 
   return (
     <Box>

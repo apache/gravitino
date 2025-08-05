@@ -22,9 +22,10 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi, getOAuthConfigsApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
+import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 
@@ -91,34 +92,23 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
 })
 
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
-  console.log('Logging out...')
+  // Clear provider authentication data first
+  try {
+    const provider = await oauthProviderFactory.getProvider()
+    if (provider) {
+      await provider.clearAuthData()
+      console.log('[Logout Action] Provider cleanup completed')
+    }
+  } catch (error) {
+    console.warn('[Logout Action] Provider cleanup failed:', error)
+  }
 
   // Clear legacy auth tokens
   localStorage.removeItem('accessToken')
   localStorage.removeItem('authParams')
   localStorage.removeItem('expiredIn')
   localStorage.removeItem('isIdle')
-  localStorage.removeItem('refresh_token')
-  localStorage.removeItem('oauthUrl')
-  localStorage.removeItem('oauthProvider')
   localStorage.removeItem('version')
-
-  // Clear OIDC tokens as well (in case both systems are present)
-  localStorage.removeItem('oidc_access_token')
-  localStorage.removeItem('oidc_user_profile')
-
-  // Clear all OIDC UserManager keys
-  const keysToRemove = []
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i)
-    if (key && key.startsWith('oidc.')) {
-      keysToRemove.push(key)
-    }
-  }
-  keysToRemove.forEach(key => {
-    localStorage.removeItem(key)
-    console.log('[Logout Action] Removed OIDC key:', key)
-  })
 
   dispatch(clearIntervalId())
   dispatch(setAuthToken(''))
@@ -134,7 +124,6 @@ export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', 
 
   let intervalId = setInterval(() => {
     if (localStorage.getItem('isIdle') === 'true') {
-      console.log('User is idle, skipping token refresh')
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authParams')
       dispatch(clearIntervalId())
@@ -152,47 +141,6 @@ export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', 
   }
 })
 
-export const getOAuthConfig = createAsyncThunk('auth/getOAuthConfig', async () => {
-  const [err, res] = await to(getOAuthConfigsApi())
-  if (err || !res) {
-    throw new Error(err?.message || 'Failed to fetch OAuth configs')
-  }
-
-  return {
-    providerName: res.providerName,
-    authorizationCodeFlowEnabled: res.authorizationCodeFlowEnabled
-  }
-})
-
-export const handleOAuthCallback = createAsyncThunk(
-  'auth/handleOAuthCallback',
-  async ({ access_token, refresh_token, expires_in, router }, { dispatch }) => {
-    if (!access_token) {
-      throw new Error('No OAuth access token received')
-    }
-    console.log('OAuth Callback received access_token:', access_token)
-    if (refresh_token) {
-      console.log('OAuth Callback received refresh_token:', refresh_token)
-      localStorage.setItem('refresh_token', refresh_token)
-    }
-
-    // Store the OAuth access token
-    localStorage.setItem('accessToken', access_token)
-    if (expires_in) {
-      localStorage.setItem('expiredIn', expires_in)
-      dispatch(setExpiredIn(expires_in))
-    }
-    localStorage.setItem('isIdle', false)
-    dispatch(setAuthToken(access_token))
-
-    // Initialize version and redirect to main app
-    await dispatch(initialVersion())
-    router.push('/metalakes')
-
-    return { token: access_token, expired: expires_in }
-  }
-)
-
 export const authSlice = createSlice({
   name: 'auth',
   initialState: {
@@ -201,12 +149,7 @@ export const authSlice = createSlice({
     authToken: null,
     authParams: null,
     expiredIn: null,
-    intervalId: null,
-
-    // OAuth Authorization Code Flow state
-    oauthConfig: null,
-    oauthSupported: false,
-    oauthRedirecting: false
+    intervalId: null
   },
   reducers: {
     setIntervalId(state, action) {
@@ -226,9 +169,6 @@ export const authSlice = createSlice({
     },
     setExpiredIn(state, action) {
       state.expiredIn = action.payload
-    },
-    setOAuthRedirecting(state, action) {
-      state.oauthRedirecting = action.payload
     }
   },
   extraReducers: builder => {
@@ -237,32 +177,15 @@ export const authSlice = createSlice({
       state.authType = action.payload.authType
     })
     builder.addCase(refreshToken.fulfilled, (state, action) => {
-      console.log('Token refreshed successfully:', action.payload.token)
       localStorage.setItem('accessToken', action.payload.token)
       localStorage.setItem('expiredIn', action.payload.expiredIn)
       localStorage.setItem('isIdle', false)
       state.authToken = action.payload.token
       state.expiredIn = action.payload.expiredIn
     })
-
-    // OAuth Authorization Code Flow reducers
-    builder.addCase(getOAuthConfig.fulfilled, (state, action) => {
-      state.oauthConfig = action.payload
-      state.oauthSupported = action.payload.authorizationCodeFlowEnabled
-    })
-    builder.addCase(getOAuthConfig.rejected, state => {
-      state.oauthSupported = false
-    })
-    builder.addCase(handleOAuthCallback.fulfilled, (state, action) => {
-      state.authToken = action.payload.token
-      state.oauthRedirecting = false
-    })
-    builder.addCase(handleOAuthCallback.rejected, state => {
-      state.oauthRedirecting = false
-    })
   }
 })
 
-export const { setAuthToken, setAuthParams, setExpiredIn, clearIntervalId, setOAuthRedirecting } = authSlice.actions
+export const { setAuthToken, setAuthParams, setExpiredIn, clearIntervalId } = authSlice.actions
 
 export default authSlice.reducer

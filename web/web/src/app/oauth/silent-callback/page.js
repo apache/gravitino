@@ -34,7 +34,8 @@ export default function SilentCallback() {
       })
       await userManager.signinSilentCallback()
     } catch (error) {
-      console.error('[Silent Callback] Error processing silent callback:', error)
+      // Silent callback failed, fall back to normal login
+      window.parent.postMessage({ type: 'SILENT_CALLBACK_ERROR', error: error.message }, window.location.origin)
     }
   }
 

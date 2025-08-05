@@ -34,30 +34,12 @@ import { isString, isUndefined, isNull, isEmpty } from '@/lib/utils/is'
 import { setObjToUrlParams, deepMerge } from '@/lib/utils'
 import { joinTimestamp, formatRequestDate } from './helper'
 import { AxiosRetry } from './axiosRetry'
-import { AxiosCanceler } from './axiosCancel'
 import { NextAxios } from './Axios'
 import { checkStatus } from './checkStatus'
 import { useAuth as Auth } from '../../provider/session'
 import { githubApis } from '@/lib/api/github'
+import { isProdEnv } from '@/lib/utils'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
-
-let isRefreshing = false
-
-const refreshToken = async () => {
-  const url = localStorage.getItem('oauthUrl')
-  const params = localStorage.getItem('authParams')
-
-  const res = await defHttp.post({ url: `${url}?${qs.stringify(JSON.parse(params))}` }, { withToken: false })
-
-  return res
-}
-
-const resetToLoginState = () => {
-  console.error('Resetting to login state due to authentication failure')
-  localStorage.removeItem('accessToken')
-  localStorage.removeItem('authParams')
-  window.location.href = '/ui/login'
-}
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -192,17 +174,12 @@ const transform = {
    */
   requestInterceptors: async (config, options) => {
     // ** Pre-Request Configuration Handling
-    console.log('[Axios] Request interceptor running for:', config.url)
-
+    // Use OAuth provider factory for proper token management
     const token = await oauthProviderFactory.getAccessToken()
-    console.log('[Axios] Retrieved token:', token ? 'present' : 'null')
 
     if (token && config?.requestOptions?.withToken !== false) {
       // ** jwt token
       config.headers.Authorization = options.authenticationScheme ? `${options.authenticationScheme} ${token}` : token
-      console.log('[Axios] Added Authorization header:', config.headers.Authorization ? 'yes' : 'no')
-    } else {
-      console.log('[Axios] Token not added - token:', !!token, 'withToken:', config?.requestOptions?.withToken)
     }
 
     return config
@@ -221,120 +198,63 @@ const transform = {
    * @param {any} error
    * @returns {Promise<any>}
    */
-  responseInterceptorsCatch: (axiosInstance, error) => {
-    // Destructure with optional chaining to avoid errors if error or its properties are undefined
-    const response = error?.response
-    const code = error?.code
-    const message = error?.message
-    const originConfig = error?.config
-
-    // Safe access to nested properties with fallbacks
-    const errorMessageMode = originConfig?.requestOptions?.errorMessageMode ?? 'none'
+  responseInterceptorsCatch: async (axiosInstance, error) => {
+    const { response, code, message, config: originConfig } = error || {}
+    const errorMessageMode = originConfig?.requestOptions?.errorMessageMode || 'none'
     const msg = response?.data?.error?.message ?? response?.data?.message ?? ''
-    const err = error?.toString() ?? ''
+    const err = error?.toString?.() ?? ''
+    let errMessage = ''
 
-    // Log everything to understand what the error looks like
-    console.error('Axios error caught:', {
-      message,
-      code,
-      err,
-      responseData: response?.data,
-      status: response?.status,
-      originConfig,
-      url: originConfig?.url,
-      method: originConfig?.method,
-      error
-    })
-
-    // Early exit if axios request is cancelled
     if (axios.isCancel(error)) {
-      console.warn('Request cancelled:', error)
-
       return Promise.reject(error)
     }
 
     try {
-      if (code === 'ECONNABORTED' && message?.includes('timeout')) {
-        const timeoutMsg = 'The interface request timed out, please refresh the page and try again!'
-        if (errorMessageMode === 'modal') {
-          console.log({ title: 'Error Tip', text: timeoutMsg, icon: 'error' })
-        } else if (errorMessageMode === 'message') {
-          toast.error(timeoutMsg)
-        }
-
-        return Promise.reject(error)
+      if (code === 'ECONNABORTED' && message.indexOf('timeout') !== -1) {
+        errMessage = 'The interface request timed out, please refresh the page and try again!'
       }
-
       if (err?.includes('Network Error')) {
-        const networkMsg = 'Unable to connect to Gravitino. Please check if Gravitino is running.'
+        errMessage = 'Unable to connect to Gravitino. Please check if Gravitino is running.'
+      }
+
+      if (errMessage) {
         if (errorMessageMode === 'modal') {
-          console.log({ title: 'Error Tip', text: networkMsg, icon: 'error' })
+          console.log({ title: 'Error Tip', text: errMessage, icon: 'error' })
         } else if (errorMessageMode === 'message') {
-          toast.error(networkMsg)
+          toast.error(errMessage)
         }
 
         return Promise.reject(error)
       }
-    } catch (catchError) {
-      console.error('Error in error handler:', catchError)
-      throw catchError
+    } catch (error) {
+      throw new Error(error)
     }
 
-    checkStatus(response?.status, msg, errorMessageMode)
+    checkStatus(error?.response?.status, msg, errorMessageMode)
 
-    // Skip auto-refresh for some URLs
-    const skipAutoRefreshUrls = ['/configs']
+    if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('authParams')
 
-    const shouldSkipAutoRefresh = skipAutoRefreshUrls.some(url => originConfig?.url?.includes(url))
-
-    if (
-      response?.status === 401 &&
-      !originConfig?._retry &&
-      originConfig?.url !== githubApis.GET &&
-      !shouldSkipAutoRefresh
-    ) {
-      // Log out directly if idle for more than 30 minutes
-      const isIdle = localStorage.getItem('isIdle') && JSON.parse(localStorage.getItem('isIdle'))
-      if (isIdle) {
-        console.error('User is idle')
-        resetToLoginState()
+      try {
+        const provider = await oauthProviderFactory.getProvider()
+        if (provider && provider.clearAuthData) {
+          await provider.clearAuthData()
+        }
+      } catch (error) {
+        console.warn('Provider cleanup failed during 401 handling:', error)
       }
 
-      originConfig._retry = true
-
-      if (!isRefreshing) {
-        isRefreshing = true
-
-        try {
-          refreshToken()
-            .then(res => {
-              const { access_token } = res
-              localStorage.setItem('accessToken', access_token)
-
-              return defHttp.request(originConfig)
-            })
-            .catch(err => {
-              console.error('refreshToken error =>', err)
-              resetToLoginState()
-            })
-        } catch (err) {
-          console.error('Error refreshing token:', err)
-        } finally {
-          isRefreshing = false
-
-          // Only reload if this wasn't a login/config related error
-          if (!shouldSkipAutoRefresh) {
-            location.reload()
-          }
-        }
+      if (isProdEnv) {
+        window.location.href = '/ui/login'
+      } else {
+        window.location.href = '/login'
       }
     }
 
     const retryRequest = new AxiosRetry()
-    const isOpenRetry = originConfig?.requestOptions?.retryRequest?.isOpenRetry
-    if (originConfig?.method?.toUpperCase() === RequestEnum.GET && isOpenRetry) {
-      retryRequest.retry(axiosInstance, error)
-    }
+    const { isOpenRetry } = originConfig.requestOptions.retryRequest
+    originConfig.method?.toUpperCase() === RequestEnum.GET && isOpenRetry && retryRequest.retry(axiosInstance, error)
 
     return Promise.reject(error)
   }

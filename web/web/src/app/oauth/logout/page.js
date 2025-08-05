@@ -20,72 +20,40 @@
 'use client'
 
 import { useEffect } from 'react'
-import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
+import { useRouter } from 'next/navigation'
 import { Box, Typography, CircularProgress } from '@mui/material'
+import { oauthProviderFactory } from '@/lib/auth/providers/factory'
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { logoutAction } from '@/lib/store/auth'
 
 export default function OAuthLogout() {
+  const router = useRouter()
+  const dispatch = useAppDispatch()
+
   useEffect(() => {
     const handleLogoutCallback = async () => {
       try {
-        // Create UserManager for logout callback processing
-        const userManager = new UserManager({
-          userStore: new WebStorageStateStore({ store: window.localStorage })
-        })
+        // Get the OIDC provider for logout callback processing
+        const provider = await oauthProviderFactory.getProvider()
 
-        // Complete the signout process and clean up OIDC library state
-        await userManager.signoutRedirectCallback()
-        await userManager.removeUser()
+        if (provider && provider.getUserManager) {
+          const userManager = provider.getUserManager()
 
-        // Clear all authentication data
-        clearAllAuthenticationData()
-
-        // Redirect to login with success message
-        window.location.href = '/ui/login?message=logged_out'
-      } catch (error) {
-        console.error('[OAuth Logout] Error processing logout callback:', error)
-
-        // Even if there's an error, clear all auth data and redirect
-        try {
-          const userManager = new UserManager({
-            userStore: new WebStorageStateStore({ store: window.localStorage })
-          })
-          await userManager.removeUser()
-        } catch (removeError) {
-          // Ignore removeUser errors
+          if (userManager) {
+            // Complete the OIDC signout redirect callback
+            await userManager.signoutRedirectCallback()
+          }
         }
-
-        clearAllAuthenticationData()
-        window.location.href = '/ui/login?message=logged_out'
+      } catch (error) {
+        console.warn('OIDC logout callback failed:', error)
+      } finally {
+        // Use centralized logout action for complete cleanup
+        dispatch(logoutAction({ router }))
       }
     }
+
     handleLogoutCallback()
-  }, [])
-
-  const clearAllAuthenticationData = () => {
-    // Clear OIDC tokens
-    localStorage.removeItem('oidc_access_token')
-    localStorage.removeItem('oidc_user_profile')
-
-    // Clear legacy authentication tokens
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('expiredIn')
-    localStorage.removeItem('isIdle')
-    localStorage.removeItem('refresh_token')
-    localStorage.removeItem('authParams')
-    localStorage.removeItem('oauthUrl')
-    localStorage.removeItem('oauthProvider')
-    localStorage.removeItem('version')
-
-    // Clear all OIDC UserManager keys
-    const keysToRemove = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('oidc.')) {
-        keysToRemove.push(key)
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key))
-  }
+  }, [dispatch, router])
 
   return (
     <Box

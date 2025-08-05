@@ -23,7 +23,7 @@ import { GenericOAuthProvider } from './generic'
 // Registry of available OAuth providers
 const PROVIDER_REGISTRY = {
   oidc: OidcOAuthProvider,
-  generic: GenericOAuthProvider
+  default: GenericOAuthProvider
 }
 
 /**
@@ -59,67 +59,30 @@ class OAuthProviderFactory {
 
   async _initializeProvider() {
     try {
-      console.log('[OAuthProviderFactory] Fetching OAuth configuration...')
-
       const response = await fetch('/configs')
       if (!response.ok) {
         throw new Error(`Failed to fetch OAuth config: ${response.status}`)
       }
 
       const config = await response.json()
-
-      // Determine provider type based on configuration
-      let providerType = 'generic' // Default to generic (backward compatibility)
-
-      // Check OAuth provider configuration
+      let providerType = 'default'
       const provider = config['gravitino.authenticator.oauth.provider']
 
-      // Use OIDC for any provider that's not 'generic' (or undefined)
-      if (provider && provider.toLowerCase() !== 'generic') {
-        providerType = 'oidc'
-        console.log('[OAuthProviderFactory] OIDC provider detected')
-        console.log(`  Provider: ${provider}`)
-
-        // Validate required OIDC configuration
-        const authority = config['gravitino.authenticator.oauth.authority']
-        const clientId = config['gravitino.authenticator.oauth.client-id']
-
-        if (!authority || !clientId) {
-          console.warn(
-            '[OAuthProviderFactory] OIDC provider missing required config (authority/client-id), falling back to generic'
-          )
-          providerType = 'generic'
+      if (provider) {
+        const normalizedProvider = provider.toLowerCase()
+        if (normalizedProvider === 'oidc') {
+          providerType = 'oidc'
         }
-      } else {
-        console.log('[OAuthProviderFactory] Using generic provider')
-        if (provider) {
-          console.log(`  Provider type: ${provider} (treated as generic)`)
-        }
+
+        // If provider is set to something else, fall back to default
       }
-      console.log('[OAuthProviderFactory] Selected provider type:', providerType)
 
-      // Get provider class from registry
       const ProviderClass = PROVIDER_REGISTRY[providerType]
-      if (!ProviderClass) {
-        console.warn(`[OAuthProviderFactory] Unknown provider type: ${providerType}, falling back to generic`)
-        this.currentProvider = new GenericOAuthProvider()
-      } else {
-        this.currentProvider = new ProviderClass()
-      }
-
-      // Initialize the provider with configuration
+      this.currentProvider = new ProviderClass()
       await this.currentProvider.initialize(config)
-
-      // Store provider type in localStorage for other components
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('oauthProvider', providerType)
-      }
-
-      console.log('[OAuthProviderFactory] Provider initialized successfully:', this.currentProvider.getType())
 
       return this.currentProvider
     } catch (error) {
-      console.error('[OAuthProviderFactory] Failed to initialize OAuth provider:', error)
       this.configPromise = null
       throw error
     }
@@ -130,25 +93,9 @@ class OAuthProviderFactory {
    * @returns {Promise<string|null>}
    */
   async getAccessToken() {
-    console.log('[OAuthProviderFactory] getAccessToken called')
-
-    const provider = await this.getProvider()
-    console.log('[OAuthProviderFactory] Provider type:', provider ? provider.getType() : 'null')
-
-    const token = await provider.getAccessToken()
-    console.log('[OAuthProviderFactory] Token retrieved from provider:', !!token)
-
-    return token
-  }
-
-  /**
-   * Get provider configuration
-   * @returns {Promise<Object>}
-   */
-  async getConfig() {
     const provider = await this.getProvider()
 
-    return provider.getConfig()
+    return await provider.getAccessToken()
   }
 
   /**
@@ -159,34 +106,6 @@ class OAuthProviderFactory {
     const provider = await this.getProvider()
 
     return provider.getType()
-  }
-
-  /**
-   * Check if current provider requires a wrapper component
-   * @returns {Promise<boolean>}
-   */
-  async requiresWrapper() {
-    const provider = await this.getProvider()
-
-    return provider.requiresWrapper()
-  }
-
-  /**
-   * Get wrapper component from current provider
-   * @returns {Promise<React.Component|null>}
-   */
-  async getWrapperComponent() {
-    const provider = await this.getProvider()
-
-    return provider.getWrapperComponent()
-  }
-
-  /**
-   * Reset the factory (useful for testing or provider switching)
-   */
-  reset() {
-    this.currentProvider = null
-    this.configPromise = null
   }
 }
 

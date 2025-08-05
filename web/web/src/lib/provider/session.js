@@ -45,16 +45,12 @@ export const useAuth = () => useContext(AuthContext)
 
 const AuthProvider = ({ children }) => {
   const router = useRouter()
-  const [loading, setLoading] = useState(authProvider.loading)
-
   const searchParams = useSearchParams()
-  const accessTokenFromUrl = searchParams.get('access_token')
+  const dispatch = useAppDispatch()
 
-  if (typeof window !== 'undefined' && accessTokenFromUrl) {
-    localStorage.setItem('accessToken', accessTokenFromUrl)
-  }
+  const [loading, setLoading] = useState(authProvider.loading)
+  const [token, setToken] = useState(null)
 
-  const token = (typeof window !== 'undefined' && localStorage.getItem('accessToken')) || null
   const version = (typeof window !== 'undefined' && localStorage.getItem('version')) || null
   const paramsSize = [...searchParams.keys()].length
 
@@ -76,8 +72,6 @@ const AuthProvider = ({ children }) => {
     }
   }
 
-  const dispatch = useAppDispatch()
-
   useEffect(() => {
     const initAuth = async () => {
       const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
@@ -88,12 +82,10 @@ const AuthProvider = ({ children }) => {
         dispatch(fetchGitHubInfo())
         goToMetalakeListPage()
       } else if (authType === 'oauth') {
-        let tokenToUse = token
+        const tokenToUse = await oauthProviderFactory.getAccessToken()
 
-        // Try to get token from OAuth provider if not present in localStorage
-        if (!tokenToUse) {
-          tokenToUse = await oauthProviderFactory.getAccessToken()
-        }
+        // Update local token state
+        setToken(tokenToUse)
 
         if (tokenToUse) {
           dispatch(setAuthToken(tokenToUse))
@@ -101,8 +93,9 @@ const AuthProvider = ({ children }) => {
           dispatch(fetchGitHubInfo())
           goToMetalakeListPage()
         } else {
+          // Don't redirect to login if we're on the OAuth callback page
+          // Let the callback page handle the OAuth flow completion
           if (typeof window !== 'undefined' && window.location.pathname.startsWith('/ui/oauth/callback')) {
-            // Do nothing, let the callback page handle it
             return
           }
           router.push('/login')

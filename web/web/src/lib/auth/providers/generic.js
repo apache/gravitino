@@ -22,13 +22,11 @@ import { BaseOAuthProvider } from './base'
 export class GenericOAuthProvider extends BaseOAuthProvider {
   constructor() {
     super()
-    this.providerType = 'generic'
+    this.providerType = 'default'
   }
 
   async initialize(config) {
-    console.log('[GenericOAuthProvider] Initializing with config:', config)
     this.config = config
-    console.log('[GenericOAuthProvider] Initialized successfully')
   }
 
   async getAccessToken() {
@@ -36,36 +34,36 @@ export class GenericOAuthProvider extends BaseOAuthProvider {
     // 1. Client credentials flow (backend handles token exchange)
     // 2. Authorization code flow (stored in localStorage after login)
 
-    // Check localStorage for OIDC token first (from OidcLogin component)
-    let token = typeof window !== 'undefined' ? localStorage.getItem('oidc_access_token') : null
+    // Check localStorage for generic OAuth token
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
 
-    if (token) {
-      console.log('[GenericOAuthProvider] OIDC token found in localStorage')
-
-      return token
-    }
-
-    // Fallback to legacy accessToken for backward compatibility
-    token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
-
-    if (token) {
-      console.log('[GenericOAuthProvider] Legacy token found in localStorage')
-
-      return token
-    }
-
-    console.log('[GenericOAuthProvider] No token found in localStorage')
-
-    return null
+    return token
   }
 
-  requiresWrapper() {
-    // Generic providers don't need special React context wrappers
+  /**
+   * Check if user is currently authenticated
+   */
+  async isAuthenticated() {
+    if (typeof window === 'undefined') {
+      return false
+    }
 
-    return false
+    const token = localStorage.getItem('accessToken')
+
+    return !!token
   }
 
-  getWrapperComponent() {
-    return null
+  /**
+   * Clear authentication data
+   */
+  async clearAuthData() {
+    if (typeof window === 'undefined') return
+
+    // Clear generic OAuth tokens
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('authParams')
+    localStorage.removeItem('expiredIn')
+    localStorage.removeItem('isIdle')
+    localStorage.removeItem('refresh_token')
   }
 }

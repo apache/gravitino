@@ -18,101 +18,121 @@
  */
 
 import { BaseOAuthProvider } from './base'
+import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
 
 export class OidcOAuthProvider extends BaseOAuthProvider {
   constructor() {
     super()
     this.providerType = 'oidc'
     this.oidcConfig = null
+    this.userManager = null
   }
 
   async initialize(config) {
     this.config = config
 
     const authority = config['gravitino.authenticator.oauth.authority']
-    const clientId = config['gravitino.authenticator.oauth.client-id']
-    const jwksUri = config['gravitino.authenticator.oauth.jwks-uri']
+    const clientId = config['gravitino.authenticator.oauth.clientId']
     const scope = config['gravitino.authenticator.oauth.scope'] || 'openid profile email'
-    const provider = config['gravitino.authenticator.oauth.provider'] || 'OAuth Provider'
 
     if (!authority || !clientId) {
-      throw new Error('OIDC provider requires both authority and client-id to be configured')
+      throw new Error('OIDC provider requires both authority and clientId to be configured')
     }
 
-    // Map provider names to display names
-    const providerDisplayNames = {
-      azure: 'Microsoft',
-      google: 'Google',
-      auth0: 'Auth0',
-      keycloak: 'Keycloak',
-      okta: 'Okta'
-    }
-
+    // Use provider name directly from config without hardcoded mapping
     this.oidcConfig = {
       authority: authority,
-      clientId: clientId,
+      client_id: clientId,
+      response_type: 'code', // Use Authorization Code flow with PKCE
       scope: scope,
-      providerName: providerDisplayNames[provider.toLowerCase()] || provider,
-      jwksUri: jwksUri
+      redirect_uri: `${window.location.origin}/ui/oauth/callback`,
+      post_logout_redirect_uri: `${window.location.origin}/ui/oauth/logout`,
+      silent_redirect_uri: `${window.location.origin}/ui/oauth/silent-callback`,
+      automaticSilentRenew: true,
+      silentRequestTimeout: 10000,
+      userStore: new WebStorageStateStore({ store: window.localStorage })
     }
+
+    // Create shared UserManager instance
+    this.userManager = new UserManager(this.oidcConfig)
   }
 
   async getAccessToken() {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('oidc_access_token') : null
-
-    console.log('[OidcOAuthProvider] getAccessToken called')
-    console.log('[OidcOAuthProvider] Token found in localStorage:', !!token)
-    console.log('[OidcOAuthProvider] Token value (first 20 chars):', token ? token.substring(0, 20) + '...' : 'null')
-
-    // Just return the token if it exists - the OIDC library already validated it
-    if (token && token.trim().length > 0) {
-      console.log('[OidcOAuthProvider] Token exists and is non-empty, returning token')
-
-      return token
+    if (!this.userManager) {
+      return null
     }
 
-    console.log('[OidcOAuthProvider] No token found, returning null')
+    try {
+      // Get current user from UserManager (includes expiration checking)
+      let user = await this.userManager.getUser()
 
-    return null
+      if (user && !user.expired) {
+        // For JWKS validation, we need the ID token (JWT format), not the access token
+        return user.id_token || user.access_token
+      }
+
+      if (user && user.expired) {
+        try {
+          // Attempt silent refresh
+          const refreshedUser = await this.userManager.signinSilent()
+
+          // Return ID token for JWKS validation
+          return refreshedUser.id_token || refreshedUser.access_token
+        } catch (refreshError) {
+          // Clear expired tokens
+          await this.userManager.removeUser()
+
+          return null
+        }
+      }
+
+      return null
+    } catch (error) {
+      return null
+    }
+  }
+
+  /**
+   * Get the shared UserManager instance
+   */
+  getUserManager() {
+    return this.userManager
   }
 
   getOidcConfig() {
     return this.oidcConfig
   }
 
-  requiresWrapper() {
-    return false
-  }
-
-  getWrapperComponent() {
-    return null
-  }
-
   /**
    * Check if user is currently authenticated
    */
-  isAuthenticated() {
-    if (typeof window === 'undefined') return false
+  async isAuthenticated() {
+    if (typeof window === 'undefined' || !this.userManager) {
+      return false
+    }
 
-    const token = localStorage.getItem('oidc_access_token')
-    const userProfile = localStorage.getItem('oidc_user_profile')
+    try {
+      const user = await this.userManager.getUser()
 
-    return !!(token && userProfile)
+      return !!(user && !user.expired)
+    } catch (error) {
+      return false
+    }
   }
 
   /**
    * Get current user profile
    */
-  getUserProfile() {
-    if (typeof window === 'undefined') return null
+  async getUserProfile() {
+    if (typeof window === 'undefined' || !this.userManager) {
+      return null
+    }
 
     try {
-      const profileData = localStorage.getItem('oidc_user_profile')
+      const user = await this.userManager.getUser()
 
-      return profileData ? JSON.parse(profileData) : null
+      return user ? user.profile : null
     } catch (error) {
-      console.error('[OidcOAuthProvider] Error parsing user profile:', error)
-
       return null
     }
   }
@@ -120,10 +140,16 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
   /**
    * Clear authentication data
    */
-  clearAuthData() {
+  async clearAuthData() {
     if (typeof window === 'undefined') return
 
-    localStorage.removeItem('oidc_access_token')
-    localStorage.removeItem('oidc_user_profile')
+    // Clear UserManager data if available
+    if (this.userManager) {
+      try {
+        await this.userManager.removeUser()
+      } catch (error) {
+        // Silent error handling for production
+      }
+    }
   }
 }

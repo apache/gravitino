@@ -43,7 +43,7 @@ const schema = yup.object().shape({
   scope: yup.string().required()
 })
 
-function DefaultLogin({ oauthConfig }) {
+function DefaultLogin() {
   const router = useRouter()
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.auth)
@@ -73,7 +73,7 @@ function DefaultLogin({ oauthConfig }) {
   }
 
   const onError = errors => {
-    console.error('fields error', errors)
+    // Form validation errors are handled by the UI
   }
 
   return (

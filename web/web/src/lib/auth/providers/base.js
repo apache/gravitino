@@ -45,27 +45,19 @@ export class BaseOAuthProvider {
   }
 
   /**
-   * Check if provider requires a wrapper component for React context
-   * @returns {boolean}
+   * Check if user is currently authenticated
+   * @returns {Promise<boolean>} - True if authenticated, false otherwise
    */
-  requiresWrapper() {
-    return false
+  async isAuthenticated() {
+    throw new Error('isAuthenticated() must be implemented by OAuth provider')
   }
 
   /**
-   * Get the wrapper component if required
-   * @returns {React.Component|null}
+   * Clear authentication data (logout)
+   * @returns {Promise<void>}
    */
-  getWrapperComponent() {
-    return null
-  }
-
-  /**
-   * Get provider-specific configuration
-   * @returns {Object}
-   */
-  getConfig() {
-    return this.config
+  async clearAuthData() {
+    throw new Error('clearAuthData() must be implemented by OAuth provider')
   }
 
   /**
