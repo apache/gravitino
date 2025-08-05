@@ -30,6 +30,7 @@ from fastmcp.server.middleware.timing import TimingMiddleware
 from mcp_server.core.context import GravitinoContext
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
+import asyncio
 
 
 def create_lifespan_manager(gravitino_context: GravitinoContext):
@@ -69,4 +70,4 @@ class GravitinoMCPServer:
         load_tools(self.mcp)
 
     def run(self):
-        self.mcp.run()
+        asyncio.run(self.mcp.run_async())
