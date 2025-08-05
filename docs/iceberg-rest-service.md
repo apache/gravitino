@@ -484,7 +484,6 @@ connector.name=iceberg
 iceberg.catalog.type=rest
 iceberg.rest-catalog.uri=http://localhost:9001/iceberg/
 fs.hadoop.enabled=true
-iceberg.rest-catalog.view-endpoints-enabled=false
 ```
 
 Please refer to [Trino Iceberg document](https://trino.io/docs/current/connector/iceberg.html) for more details.
