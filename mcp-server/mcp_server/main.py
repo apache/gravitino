@@ -23,9 +23,10 @@ from mcp_server.server import GravitinoMCPServer
 
 
 def do_main():
-    args = parse_args()
-    setting = Setting(args.metalake, args.uri)
+    args = _parse_args()
+    setting = Setting(args.metalake, args.uri, args.include_tool_tags)
     init_logging(setting)
+    logging.info(f"Gravitino MCP server setting: {setting}")
     server = GravitinoMCPServer(setting)
     server.run()
 
@@ -39,7 +40,14 @@ def init_logging(setting: Setting):
     )
 
 
-def parse_args():
+def _comma_separated_set(value) -> set:
+    print(f"value={value}")
+    if not value:
+        return set()
+    return set(item.strip() for item in value.split(",") if item.strip())
+
+
+def _parse_args():
     parser = argparse.ArgumentParser(
         description="Gravitino Mcp server",
         epilog="Example: uv run mcp_server --metalake test --uri http://127.0.0.1:8090",
@@ -56,6 +64,13 @@ def parse_args():
         type=str,
         default="http://127.0.0.1:8090",
         help="The uri of Gravitino server",
+    )
+
+    parser.add_argument(
+        "--include-tool-tags",
+        type=_comma_separated_set,
+        default=set(),
+        help="The tool tags to include, separated by commas, support tags:[metalake, schema, table]. If not specified, all tools will be included.",
     )
 
     args = parser.parse_args()

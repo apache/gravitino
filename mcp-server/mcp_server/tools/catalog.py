@@ -19,7 +19,7 @@ from fastmcp import Context, FastMCP
 
 
 def load_catalog_tools(mcp: FastMCP):
-    @mcp.tool()
+    @mcp.tool(tags={"catalog"})
     async def get_list_of_catalogs(ctx: Context) -> str:
         """
         Retrieve a list of all catalogs in the system.

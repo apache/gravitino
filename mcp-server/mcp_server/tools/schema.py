@@ -19,7 +19,7 @@ from fastmcp import Context, FastMCP
 
 
 def load_schema_tools(mcp: FastMCP):
-    @mcp.tool()
+    @mcp.tool(tags={"schema"})
     async def get_list_of_schemas(ctx: Context, catalog_name: str) -> str:
         """
         Retrieve a list of schemas belonging to a specific catalog.

@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
@@ -30,7 +31,6 @@ from fastmcp.server.middleware.timing import TimingMiddleware
 from mcp_server.core.context import GravitinoContext
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
-import asyncio
 
 
 def create_lifespan_manager(gravitino_context: GravitinoContext):
@@ -44,10 +44,17 @@ def create_lifespan_manager(gravitino_context: GravitinoContext):
 
 
 def create_gravition_mcp(setting: Setting) -> FastMCP:
-    mcp = FastMCP(
-        "Gravitino MCP Server",
-        lifespan=create_lifespan_manager(GravitinoContext(setting)),
-    )
+    if setting.tags is not None and len(setting.tags) > 0:
+        mcp = FastMCP(
+            "Gravitino MCP Server",
+            lifespan=create_lifespan_manager(GravitinoContext(setting)),
+            include_tags=setting.tags,
+        )
+    else:
+        mcp = FastMCP(
+            "Gravitino MCP Server",
+            lifespan=create_lifespan_manager(GravitinoContext(setting)),
+        )
 
     mcp.add_middleware(
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)

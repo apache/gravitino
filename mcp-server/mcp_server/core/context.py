@@ -22,7 +22,7 @@ from mcp_server.core.setting import Setting
 class GravitinoContext:
     def __init__(self, setting: Setting):
         self.gravitino_connector = ConnectorFactory.create_connector(
-            setting.metalake(), setting.uri()
+            setting.metalake, setting.uri
         )
 
     def connector(self):

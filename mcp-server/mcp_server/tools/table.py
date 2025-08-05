@@ -19,7 +19,7 @@ from fastmcp import Context, FastMCP
 
 
 def load_table_tools(mcp: FastMCP):
-    @mcp.tool()
+    @mcp.tool(tags={"table"})
     async def get_list_of_tables(
         ctx: Context,
         catalog_name: str,
@@ -76,7 +76,7 @@ def load_table_tools(mcp: FastMCP):
             catalog_name, schema_name
         )
 
-    @mcp.tool()
+    @mcp.tool(tags={"table"})
     async def get_table_metadata_details(
         ctx: Context, catalog_name: str, schema_name: str, table_name: str
     ):
