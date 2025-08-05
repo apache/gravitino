@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -53,9 +54,7 @@ public class JobTemplateRegisterRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    if (jobTemplate == null) {
-      throw new IllegalArgumentException("\"jobTemplate\" is required and cannot be null");
-    }
+    Preconditions.checkArgument(jobTemplate != null, "\"jobTemplate\" must not be null");
     jobTemplate.validate();
   }
 }

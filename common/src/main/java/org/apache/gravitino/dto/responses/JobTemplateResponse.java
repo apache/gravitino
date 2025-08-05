@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
@@ -50,9 +51,7 @@ public class JobTemplateResponse extends BaseResponse {
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
-    if (jobTemplate == null) {
-      throw new IllegalArgumentException("jobTemplate must not be null");
-    }
+    Preconditions.checkArgument(jobTemplate != null, "jobTemplate must not be null");
     jobTemplate.validate();
   }
 }

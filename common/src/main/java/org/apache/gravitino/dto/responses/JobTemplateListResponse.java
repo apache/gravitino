@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -44,15 +45,12 @@ public class JobTemplateListResponse extends BaseResponse {
 
   /** Default constructor for Jackson deserialization. */
   public JobTemplateListResponse() {
-    super();
-    this.jobTemplates = null;
+    this(null);
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
-    if (jobTemplates == null) {
-      throw new IllegalArgumentException("jobTemplates must not be null");
-    }
+    Preconditions.checkArgument(jobTemplates != null, "jobTemplates must not be null");
   }
 }

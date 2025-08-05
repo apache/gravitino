@@ -34,6 +34,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.lineage.LineageConfig;
 import org.apache.gravitino.lineage.LineageDispatcher;
 import org.apache.gravitino.lineage.LineageService;
@@ -143,9 +144,7 @@ public class GravitinoServer extends ResourceConfig {
                 .ranked(1);
             bind(gravitinoEnv.modelDispatcher()).to(ModelDispatcher.class).ranked(1);
             bind(lineageService).to(LineageDispatcher.class).ranked(1);
-            bind(gravitinoEnv.jobOperationDispatcher())
-                .to(org.apache.gravitino.job.JobOperationDispatcher.class)
-                .ranked(1);
+            bind(gravitinoEnv.jobOperationDispatcher()).to(JobOperationDispatcher.class).ranked(1);
           }
         });
     register(JsonProcessingExceptionMapper.class);

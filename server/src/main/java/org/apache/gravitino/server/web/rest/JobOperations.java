@@ -103,7 +103,6 @@ public class JobOperations {
           });
 
     } catch (Exception e) {
-      LOG.error("Error listing job templates in metalake: {}", metalake, e);
       return ExceptionHandlers.handleJobTemplateException(OperationType.LIST, "", metalake, e);
     }
   }
@@ -134,11 +133,6 @@ public class JobOperations {
           });
 
     } catch (Exception e) {
-      LOG.error(
-          "Error registering job template: {} in metalake: {}",
-          request.getJobTemplate().name(),
-          metalake,
-          e);
       return ExceptionHandlers.handleJobTemplateException(
           OperationType.REGISTER, request.getJobTemplate().name(), metalake, e);
     }
@@ -165,7 +159,6 @@ public class JobOperations {
           });
 
     } catch (Exception e) {
-      LOG.error("Error getting job template: {} in metalake: {}", name, metalake, e);
       return ExceptionHandlers.handleJobTemplateException(OperationType.GET, name, metalake, e);
     }
   }
@@ -194,7 +187,6 @@ public class JobOperations {
           });
 
     } catch (Exception e) {
-      LOG.error("Error deleting job template: {} in metalake: {}", name, metalake, e);
       return ExceptionHandlers.handleJobTemplateException(OperationType.DELETE, name, metalake, e);
     }
   }
@@ -237,8 +229,6 @@ public class JobOperations {
             .build();
 
       default:
-        LOG.error(
-            "Unsupported job template type: {}", jobTemplateEntity.templateContent().jobType());
         throw new IllegalArgumentException(
             "Unsupported job template type: " + jobTemplateEntity.templateContent().jobType());
     }
