@@ -446,6 +446,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
           FileSystem fs = getFileSystemWithCache(formalizePath, conf);
+
+          if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
+            throw new RuntimeException("Fileset location cannot be a file: " + formalizePath);
+          }
+
           if (!fs.exists(formalizePath)) {
             if (!fs.mkdirs(formalizePath)) {
               throw new RuntimeException(
