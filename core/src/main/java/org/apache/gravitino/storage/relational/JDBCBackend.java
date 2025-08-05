@@ -544,17 +544,17 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
       Type relType,
-      NameIdentifier entityIdentifier,
-      Entity.EntityType entityType,
-      NameIdentifier[] entitiesToAdd,
-      NameIdentifier[] entitiesToRemove)
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      NameIdentifier[] destEntitiesToAdd,
+      NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     switch (relType) {
       case POLICY_METADATA_OBJECT_REL:
         return (List<E>)
             PolicyMetaService.getInstance()
                 .associatePoliciesWithMetadataObject(
-                    entityIdentifier, entityType, entitiesToAdd, entitiesToRemove);
+                    srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

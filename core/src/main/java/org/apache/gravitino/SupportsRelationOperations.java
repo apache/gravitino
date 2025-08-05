@@ -128,10 +128,11 @@ public interface SupportsRelationOperations {
    * @param <E> The type of the entity returned in the list, which represents the final state of
    *     related entities.
    * @param relType The type of relation to update.
-   * @param entityIdentifier The identifier of the entity for which to update relations.
-   * @param entityType The type of the entity.
-   * @param entitiesToAdd An array of identifiers for entities to be associated with.
-   * @param entitiesToRemove An array of identifiers for entities to be disassociated from.
+   * @param srcEntityIdent The identifier of the source entity whose relations are being updated.
+   * @param srcEntityType The type of the source entity, which is the entity whose relations are
+   *     being updated.
+   * @param destEntitiesToAdd An array of identifiers for entities to be associated with.
+   * @param destEntitiesToRemove An array of identifiers for entities to be disassociated from.
    * @return A list of entities that are related to the given entity after the update.
    * @throws IOException If a storage-related error occurs.
    * @throws NoSuchEntityException If any of the specified entities does not exist.
@@ -139,10 +140,10 @@ public interface SupportsRelationOperations {
    */
   default <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
       Type relType,
-      NameIdentifier entityIdentifier,
-      Entity.EntityType entityType,
-      NameIdentifier[] entitiesToAdd,
-      NameIdentifier[] entitiesToRemove)
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      NameIdentifier[] destEntitiesToAdd,
+      NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     throw new UnsupportedOperationException(
         "updateEntityRelations is not supported by this implementation");

@@ -251,13 +251,13 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
       Type relType,
-      NameIdentifier entityIdentifier,
-      Entity.EntityType entityType,
-      NameIdentifier[] entitiesToAdd,
-      NameIdentifier[] entitiesToRemove)
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      NameIdentifier[] destEntitiesToAdd,
+      NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    cache.invalidate(entityIdentifier, entityType, relType);
+    cache.invalidate(srcEntityIdent, srcEntityType, relType);
     return backend.updateEntityRelations(
-        relType, entityIdentifier, entityType, entitiesToAdd, entitiesToRemove);
+        relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
   }
 }
