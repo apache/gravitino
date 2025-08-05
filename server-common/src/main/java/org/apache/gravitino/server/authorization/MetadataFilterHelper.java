@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
-
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -113,23 +112,26 @@ public class MetadataFilterHelper {
    * @return Filtered Metadata Entity
    * @param <E> Entity class
    */
-  public static <E> E[] filterByExpression(String metalake,
-                                           String expression,
-                                           Entity.EntityType entityType,
-                                           E[] entities, Function<E,NameIdentifier> toNameIdentifier){
+  public static <E> E[] filterByExpression(
+      String metalake,
+      String expression,
+      Entity.EntityType entityType,
+      E[] entities,
+      Function<E, NameIdentifier> toNameIdentifier) {
     if (!enableAuthorization()) {
       return entities;
     }
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-            new AuthorizationExpressionEvaluator(expression);
+        new AuthorizationExpressionEvaluator(expression);
     return Arrays.stream(entities)
-            .filter(entity -> {
+        .filter(
+            entity -> {
               NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
               Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                      spiltMetadataNames(metalake, entityType, nameIdentifier);
+                  spiltMetadataNames(metalake, entityType, nameIdentifier);
               return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
             })
-            .toArray(size -> Arrays.copyOf(entities, size));
+        .toArray(size -> Arrays.copyOf(entities, size));
   }
 
   /**

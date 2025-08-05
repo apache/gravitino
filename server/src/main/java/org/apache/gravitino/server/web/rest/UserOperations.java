@@ -20,8 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.Arrays;
-import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -35,7 +33,6 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.requests.UserAddRequest;
@@ -60,7 +57,8 @@ public class UserOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(UserOperations.class);
 
-  private static final String LOAD_USER_PRIVILEGE = "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF";
+  private static final String LOAD_USER_PRIVILEGE =
+      "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF";
 
   private final AccessControlDispatcher accessControlManager;
 
@@ -108,15 +106,24 @@ public class UserOperations {
           () -> {
             if (verbose) {
               User[] users = accessControlManager.listUsers(metalake);
-                users = MetadataFilterHelper.filterByExpression(metalake,LOAD_USER_PRIVILEGE,
-                        Entity.EntityType.USER,users,(userEntity)->
-                                NameIdentifierUtil.ofUser(metalake, userEntity.name()));
+              users =
+                  MetadataFilterHelper.filterByExpression(
+                      metalake,
+                      LOAD_USER_PRIVILEGE,
+                      Entity.EntityType.USER,
+                      users,
+                      (userEntity) -> NameIdentifierUtil.ofUser(metalake, userEntity.name()));
 
-                return Utils.ok(new UserListResponse(DTOConverters.toDTOs(users)));
+              return Utils.ok(new UserListResponse(DTOConverters.toDTOs(users)));
             } else {
               String[] users = accessControlManager.listUserNames(metalake);
-              users = MetadataFilterHelper.filterByExpression(metalake,LOAD_USER_PRIVILEGE,
-                      Entity.EntityType.USER,users,(username)->NameIdentifierUtil.ofUser(metalake, username));
+              users =
+                  MetadataFilterHelper.filterByExpression(
+                      metalake,
+                      LOAD_USER_PRIVILEGE,
+                      Entity.EntityType.USER,
+                      users,
+                      (username) -> NameIdentifierUtil.ofUser(metalake, username));
               return Utils.ok(new NameListResponse(users));
             }
           });
