@@ -38,8 +38,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.DummyEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -660,31 +660,31 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
 
     // Test list associated dummy entities for policy2
-    List<DummyEntity> entities =
+    List<GenericEntity> entities =
         policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 
     Assertions.assertEquals(3, entities.size());
     Set<Entity.EntityType> actualTypes =
-        entities.stream().map(DummyEntity::type).collect(Collectors.toSet());
+        entities.stream().map(GenericEntity::type).collect(Collectors.toSet());
     Assertions.assertTrue(actualTypes.contains(Entity.EntityType.CATALOG));
     Assertions.assertTrue(actualTypes.contains(Entity.EntityType.SCHEMA));
     Assertions.assertTrue(actualTypes.contains(Entity.EntityType.TABLE));
 
     // Test list associated dummy entities for policy3
-    List<DummyEntity> entities1 =
+    List<GenericEntity> entities1 =
         policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy3"));
 
     Assertions.assertEquals(3, entities1.size());
     Set<Entity.EntityType> actualTypes1 =
-        entities1.stream().map(DummyEntity::type).collect(Collectors.toSet());
+        entities1.stream().map(GenericEntity::type).collect(Collectors.toSet());
     Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.CATALOG));
     Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.SCHEMA));
     Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.TABLE));
 
     // Test list associated dummy entities for non-existent policy
-    List<DummyEntity> entities2 =
+    List<GenericEntity> entities2 =
         policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy4"));
     Assertions.assertEquals(0, entities2.size());
@@ -695,31 +695,31 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         Entity.EntityType.TABLE,
         false);
 
-    List<DummyEntity> entities3 =
+    List<GenericEntity> entities3 =
         policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 
     Assertions.assertEquals(2, entities3.size());
     Set<Entity.EntityType> actualTypes3 =
-        entities3.stream().map(DummyEntity::type).collect(Collectors.toSet());
+        entities3.stream().map(GenericEntity::type).collect(Collectors.toSet());
     Assertions.assertTrue(actualTypes3.contains(Entity.EntityType.CATALOG));
     Assertions.assertTrue(actualTypes3.contains(Entity.EntityType.SCHEMA));
 
     backend.delete(
         NameIdentifier.of(metalakeName, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
 
-    List<DummyEntity> entities4 =
+    List<GenericEntity> entities4 =
         policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 
     Assertions.assertEquals(1, entities4.size());
     Set<Entity.EntityType> actualTypes4 =
-        entities4.stream().map(DummyEntity::type).collect(Collectors.toSet());
+        entities4.stream().map(GenericEntity::type).collect(Collectors.toSet());
     Assertions.assertTrue(actualTypes4.contains(Entity.EntityType.CATALOG));
 
     backend.delete(NameIdentifier.of(metalakeName, "catalog1"), Entity.EntityType.CATALOG, false);
 
-    List<DummyEntity> entities5 =
+    List<GenericEntity> entities5 =
         policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 

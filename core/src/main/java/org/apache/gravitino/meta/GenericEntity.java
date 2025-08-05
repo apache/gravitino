@@ -29,7 +29,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.policy.PolicyManager;
 
 /**
- * A dummy entity that mainly used for temporary transactions or internal operations.
+ * A generic entity that mainly used for temporary transactions or internal operations.
  *
  * <p>For example, it can be used to represent different types of entities for {@link
  * PolicyManager#listMetadataObjectsForPolicy(String, String)} intermediate result then can be
@@ -37,7 +37,7 @@ import org.apache.gravitino.policy.PolicyManager;
  */
 @EqualsAndHashCode
 @ToString
-public class DummyEntity implements Entity, HasIdentifier {
+public class GenericEntity implements Entity, HasIdentifier {
 
   public static final Field ID = Field.required("id", Long.class, "The unique identifier");
   public static final Field ENTITY_TYPE =
@@ -47,7 +47,7 @@ public class DummyEntity implements Entity, HasIdentifier {
   private EntityType entityType;
   private String name;
 
-  private DummyEntity() {}
+  private GenericEntity() {}
 
   /**
    * A map of fields and their corresponding values.
@@ -93,13 +93,13 @@ public class DummyEntity implements Entity, HasIdentifier {
     return entityType;
   }
 
-  /** Builder class for creating instances of {@link DummyEntity}. */
+  /** Builder class for creating instances of {@link GenericEntity}. */
   public static class Builder {
-    private final DummyEntity entity;
+    private final GenericEntity entity;
 
     /** Constructs a new {@link Builder}. */
     private Builder() {
-      entity = new DummyEntity();
+      entity = new GenericEntity();
     }
 
     /**
@@ -136,17 +136,17 @@ public class DummyEntity implements Entity, HasIdentifier {
     }
 
     /**
-     * Builds the {@link DummyEntity} instance after validation.
+     * Builds the {@link GenericEntity} instance after validation.
      *
-     * @return the constructed and validated {@link DummyEntity} instance.
+     * @return the constructed and validated {@link GenericEntity} instance.
      */
-    public DummyEntity build() {
-      DummyEntity dummyEntity = new DummyEntity();
-      dummyEntity.id = entity.id;
-      dummyEntity.name = entity.name;
-      dummyEntity.entityType = entity.entityType;
-      dummyEntity.validate();
-      return dummyEntity;
+    public GenericEntity build() {
+      GenericEntity genericEntity = new GenericEntity();
+      genericEntity.id = entity.id;
+      genericEntity.name = entity.name;
+      genericEntity.entityType = entity.entityType;
+      genericEntity.validate();
+      return genericEntity;
     }
   }
 

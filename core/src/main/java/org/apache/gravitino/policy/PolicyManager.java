@@ -42,7 +42,7 @@ import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.DummyEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
@@ -242,14 +242,15 @@ public class PolicyManager implements PolicyDispatcher {
                   "Policy with name %s under metalake %s does not exist", policyName, metalake);
             }
 
-            List<DummyEntity> entities =
+            List<GenericEntity> entities =
                 entityStore
                     .relationOperations()
                     .listEntitiesByRelation(
                         SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
                         policyIdent,
                         Entity.EntityType.POLICY);
-            return MetadataObjectService.fromDummyEntities(entities).toArray(new MetadataObject[0]);
+            return MetadataObjectService.fromGenericEntities(entities)
+                .toArray(new MetadataObject[0]);
           } catch (IOException e) {
             LOG.error("Failed to list metadata objects for policy {}", policyName, e);
             throw new RuntimeException(e);

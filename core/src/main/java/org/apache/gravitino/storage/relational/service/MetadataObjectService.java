@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.meta.DummyEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -77,7 +77,7 @@ public class MetadataObjectService {
 
   private MetadataObjectService() {}
 
-  public static List<MetadataObject> fromDummyEntities(List<DummyEntity> entities) {
+  public static List<MetadataObject> fromGenericEntities(List<GenericEntity> entities) {
     if (entities == null || entities.isEmpty()) {
       return Lists.newArrayList();
     }
@@ -86,7 +86,8 @@ public class MetadataObjectService {
         entities.stream()
             .collect(
                 Collectors.groupingBy(
-                    DummyEntity::type, Collectors.mapping(DummyEntity::id, Collectors.toList())));
+                    GenericEntity::type,
+                    Collectors.mapping(GenericEntity::id, Collectors.toList())));
 
     List<MetadataObject> metadataObjects = Lists.newArrayList();
     for (Map.Entry<Entity.EntityType, List<Long>> entry : groupIdsByType.entrySet()) {

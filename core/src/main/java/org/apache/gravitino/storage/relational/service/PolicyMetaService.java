@@ -33,7 +33,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.DummyEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
@@ -252,7 +252,7 @@ public class PolicyMetaService {
     return POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake));
   }
 
-  public List<DummyEntity> listAssociatedEntitiesForPolicy(NameIdentifier policyIdent)
+  public List<GenericEntity> listAssociatedEntitiesForPolicy(NameIdentifier policyIdent)
       throws IOException {
     String metalakeName = policyIdent.namespace().level(0);
     String policyName = policyIdent.name();
@@ -268,7 +268,7 @@ public class PolicyMetaService {
       return policyMetadataObjectRelPOs.stream()
           .map(
               r ->
-                  DummyEntity.builder()
+                  GenericEntity.builder()
                       .withId(r.getMetadataObjectId())
                       .withEntityType(
                           MetadataObjectUtil.toEntityType(
