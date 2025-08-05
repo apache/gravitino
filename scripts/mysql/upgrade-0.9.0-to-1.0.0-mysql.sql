@@ -68,3 +68,34 @@ ALTER TABLE `model_version_info` DROP INDEX `uk_mid_ver_del`;
 ALTER TABLE `model_version_info` ADD CONSTRAINT `uk_mid_ver_uri_del` UNIQUE KEY (`model_id`, `version`, `model_version_uri_name`, `deleted_at`);
 -- remove the default value for model_version_uri_name
 ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` DROP DEFAULT;
+
+CREATE TABLE IF NOT EXISTS `job_template_meta` (
+    `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
+    `job_template_name` VARCHAR(128) NOT NULL COMMENT 'job template name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `job_template_comment` TEXT DEFAULT NULL COMMENT 'job template comment',
+    `job_template_content` MEDIUMTEXT NOT NULL COMMENT 'job template content',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job template audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job template current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job template last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job template deleted at',
+    PRIMARY KEY (`job_template_id`),
+    UNIQUE KEY `uk_mid_jtn_del` (`metalake_id`, `job_template_name`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'job template metadata';
+
+CREATE TABLE IF NOT EXISTS `job_run_meta` (
+    `job_run_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job run id',
+    `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `job_execution_id` varchar(256) NOT NULL COMMENT 'job execution id',
+    `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
+    `job_finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job finished at',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job run audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job run deleted at',
+    PRIMARY KEY (`job_run_id`),
+    UNIQUE KEY `uk_mid_jei_del` (`metalake_id`, `job_execution_id`, `deleted_at`),
+    KEY `idx_job_template_id` (`job_template_id`),
+    KEY `idx_job_execution_id` (`job_execution_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'job run metadata';

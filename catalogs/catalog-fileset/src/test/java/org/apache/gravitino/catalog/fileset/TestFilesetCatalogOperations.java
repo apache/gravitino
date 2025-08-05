@@ -44,6 +44,8 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
@@ -56,6 +58,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -1426,6 +1430,21 @@ public class TestFilesetCatalogOperations {
 
     try (FilesetCatalogOperations mockOps = Mockito.mock(FilesetCatalogOperations.class)) {
       mockOps.hadoopConf = new Configuration();
+      mockOps.conf = Maps.newHashMap();
+      mockOps.scheduler = new ScheduledThreadPoolExecutor(1);
+      mockOps.fileSystemCache =
+          Caffeine.newBuilder()
+              .expireAfterAccess(1000 * 60 * 60 /* 1 hour */, TimeUnit.MILLISECONDS)
+              .removalListener(
+                  (ignored, value, cause) -> {
+                    try {
+                      ((FileSystem) value).close();
+                    } catch (IOException e) {
+                      // Ignore
+                    }
+                  })
+              .scheduler(Scheduler.forScheduledExecutorService(mockOps.scheduler))
+              .build();
       when(mockOps.loadFileset(filesetIdent)).thenReturn(mockFileset);
       when(mockOps.getConf()).thenReturn(Maps.newHashMap());
       String subPath = "/test/test.parquet";
@@ -1433,9 +1452,18 @@ public class TestFilesetCatalogOperations {
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
       when(mockOps.getFileSystem(Mockito.any(), Mockito.any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
+      when(mockOps.getFileSystemWithCache(Mockito.any(), Mockito.any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
       Assertions.assertEquals(
           String.format("%s%s", mockFileset.storageLocation(), subPath.substring(1)), fileLocation);
+
+      FileSystem fs1 =
+          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file1"), mockOps.getConf());
+
+      FileSystem fs2 =
+          mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file2"), mockOps.getConf());
+
+      Assertions.assertSame(fs1, fs2);
     }
   }
 

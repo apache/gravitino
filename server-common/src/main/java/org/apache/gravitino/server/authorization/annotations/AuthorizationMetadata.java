@@ -22,7 +22,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.Entity;
 
 /** This annotation identify which parameters in the request are to be used for authorization. */
 @Target({ElementType.PARAMETER, ElementType.FIELD})
@@ -33,5 +33,5 @@ public @interface AuthorizationMetadata {
    *
    * @return the type of the parameter to be used for authorization.
    */
-  MetadataObject.Type type();
+  Entity.EntityType type();
 }

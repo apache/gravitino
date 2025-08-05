@@ -38,7 +38,9 @@ public interface SupportsRelationOperations {
     /** Role and group relationship */
     ROLE_GROUP_REL,
     /** Job template and job relationship */
-    JOB_TEMPLATE_JOB_REL
+    JOB_TEMPLATE_JOB_REL,
+    /** Policy and metadata object relationship */
+    POLICY_METADATA_OBJECT_REL,
   }
 
   /**
