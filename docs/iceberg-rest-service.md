@@ -12,9 +12,11 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 
 ### Capabilities
 
-- Supports the Apache Iceberg REST API defined in Iceberg 1.5, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
+- Supports the Apache Iceberg REST API defined in Iceberg 1.9, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - multi table transaction
   - pagination
+  - scan planning
+  - load table credentials
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Supports credential vending for `S3`、`GCS`、`OSS` and `ADLS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS`, `ADLS` and provides the capability to support other storages.
