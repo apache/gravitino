@@ -64,11 +64,6 @@ dependencies {
   compileOnly(libs.lombok)
 
   // Iceberg doesn't provide Aliyun bundle jar, use Gravitino Aliyun bundle to provide OSS packages
-  implementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
-  implementation(project(":bundles:aws-bundle", configuration = "shadow"))
-  implementation(project(":bundles:gcp-bundle", configuration = "shadow"))
-  implementation(project(":bundles:azure-bundle", configuration = "shadow"))
-
   testImplementation(project(":bundles:aliyun-bundle"))
   testImplementation(project(":bundles:aws"))
   testImplementation(project(":bundles:gcp", configuration = "shadow"))
