@@ -139,6 +139,8 @@ Gravitino provides governance features to manage metadata in a unified way. See:
 
 * [Manage tags in Gravitino](./manage-tags-in-gravitino.md): a complete guide to using Gravitino
   to manage tags.
+* [Manage policies in Gravitino](./manage-policies-in-gravitino.md): a complete guide to using Gravitino
+  to manage policies.
 * [Manage jobs in Gravitino](./manage-jobs-in-gravitino.md): a complete guide to using Gravitino
   to manage jobs.
 
