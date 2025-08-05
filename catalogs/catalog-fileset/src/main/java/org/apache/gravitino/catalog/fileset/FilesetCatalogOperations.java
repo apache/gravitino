@@ -159,7 +159,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   static class FileSystemCacheKey {
-    // When the path is a local path without prefixes 'file', the scheme and authority are both null
+    // When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
+    // authority are both null
     @Nullable private final String scheme;
     @Nullable private final String authority;
     private final Map<String, String> conf;
