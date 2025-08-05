@@ -229,10 +229,10 @@ public class RelationalEntityStore
       Type relType,
       NameIdentifier srcIdentifier,
       Entity.EntityType srcType,
-      NameIdentifier entityIdent)
+      NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
     // todo: support cache
-    return backend.getEntityByRelation(relType, srcIdentifier, srcType, entityIdent);
+    return backend.getEntityByRelation(relType, srcIdentifier, srcType, destEntityIdent);
   }
 
   @Override

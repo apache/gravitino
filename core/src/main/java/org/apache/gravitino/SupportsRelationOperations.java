@@ -88,7 +88,7 @@ public interface SupportsRelationOperations {
    * @param srcIdentifier The identifier of the source entity in the relation (e.g., a metadata
    *     object).
    * @param srcType The type of the source entity.
-   * @param entityIdent The identifier of the target entity to retrieve (e.g., a policy).
+   * @param destEntityIdent The identifier of the target entity to retrieve (e.g., a policy).
    * @return The specific entity that is related to the source entity.
    * @throws IOException If a storage-related error occurs.
    * @throws NoSuchEntityException If the source entity or the target related entity does not exist,
@@ -98,7 +98,7 @@ public interface SupportsRelationOperations {
       Type relType,
       NameIdentifier srcIdentifier,
       Entity.EntityType srcType,
-      NameIdentifier entityIdent)
+      NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException;
 
   /**

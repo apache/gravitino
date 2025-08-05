@@ -566,13 +566,13 @@ public class JDBCBackend implements RelationalBackend {
       Type relType,
       NameIdentifier srcIdentifier,
       Entity.EntityType srcType,
-      NameIdentifier entityIdent)
+      NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
     switch (relType) {
       case POLICY_METADATA_OBJECT_REL:
         return (E)
             PolicyMetaService.getInstance()
-                .getPolicyForMetadataObject(srcIdentifier, srcType, entityIdent);
+                .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
