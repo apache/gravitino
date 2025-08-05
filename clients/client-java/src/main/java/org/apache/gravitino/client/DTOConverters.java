@@ -22,6 +22,7 @@ import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -44,6 +45,7 @@ import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
+import org.apache.gravitino.dto.stats.StatisticValueDTO;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.model.ModelChange;
@@ -51,6 +53,7 @@ import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.tag.TagChange;
 
 class DTOConverters {
@@ -417,6 +420,48 @@ class DTOConverters {
     } else {
       throw new IllegalArgumentException(
           "Unknown model version change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  /**
+   * Converts a {@link StatisticValue} to a {@link StatisticValueDTO}.
+   *
+   * @param value The StatisticValue to convert.
+   * @return The converted StatisticValueDTO.
+   */
+  @SuppressWarnings("unchecked")
+  static StatisticValueDTO<?> toStatisticValueDTO(StatisticValue<?> value) {
+    if (value == null) {
+      return null;
+    }
+
+    Object val = value.value();
+
+    if (val instanceof Boolean) {
+      return new StatisticValueDTO.BooleanValueDTO((Boolean) val);
+    } else if (val instanceof Long) {
+      return new StatisticValueDTO.LongValueDTO((Long) val);
+    } else if (val instanceof Double) {
+      return new StatisticValueDTO.DoubleValueDTO((Double) val);
+    } else if (val instanceof String) {
+      return new StatisticValueDTO.StringValueDTO((String) val);
+    } else if (val instanceof List) {
+      List<StatisticValue<?>> listVal = (List<StatisticValue<?>>) val;
+      List<StatisticValueDTO<?>> convertedList =
+          listVal.stream().map(DTOConverters::toStatisticValueDTO).collect(Collectors.toList());
+      return new StatisticValueDTO.ListValueDTO(
+          convertedList, listVal.isEmpty() ? null : listVal.get(0).dataType());
+    } else if (val instanceof Map) {
+      Map<String, StatisticValue<?>> mapVal = (Map<String, StatisticValue<?>>) val;
+      Map<String, StatisticValueDTO<?>> convertedMap =
+          mapVal.entrySet().stream()
+              .collect(
+                  Collectors.toMap(
+                      Map.Entry::getKey, entry -> toStatisticValueDTO(entry.getValue())));
+      return new StatisticValueDTO.ObjectValueDTO(convertedMap);
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown StatisticValue type: " + val.getClass().getSimpleName());
     }
   }
 }

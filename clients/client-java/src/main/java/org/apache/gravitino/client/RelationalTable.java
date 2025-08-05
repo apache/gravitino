@@ -26,6 +26,7 @@ import com.google.common.base.Joiner;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.SneakyThrows;
@@ -53,11 +54,15 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.stats.Statistic;
+import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a relational table. */
-class RelationalTable implements Table, SupportsPartitions, SupportsTags, SupportsRoles {
+class RelationalTable
+    implements Table, SupportsPartitions, SupportsTags, SupportsRoles, SupportsStatistics {
 
   private static final Joiner DOT_JOINER = Joiner.on(".");
 
@@ -69,6 +74,7 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
+  private final MetadataObjectStatisticsOperations objectStatisticsOperations;
 
   /**
    * Creates a new RelationalTable.
@@ -99,6 +105,9 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(namespace.level(0), tableObject, restClient);
+    this.objectStatisticsOperations =
+        new MetadataObjectStatisticsOperations(
+            namespace.level(0), namespace.level(1), tableObject, restClient);
   }
 
   /**
@@ -331,5 +340,20 @@ class RelationalTable implements Table, SupportsPartitions, SupportsTags, Suppor
   @Override
   public String[] listBindingRoleNames() {
     return objectRoleOperations.listBindingRoleNames();
+  }
+
+  @Override
+  public List<Statistic> listStatistics() {
+    return objectStatisticsOperations.listStatistics();
+  }
+
+  @Override
+  public List<Statistic> updateStatistics(Map<String, StatisticValue<?>> statistics) {
+    return objectStatisticsOperations.updateStatistics(statistics);
+  }
+
+  @Override
+  public boolean dropStatistics(List<String> statistics) {
+    return objectStatisticsOperations.dropStatistics(statistics);
   }
 }
