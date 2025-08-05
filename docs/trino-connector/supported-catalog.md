@@ -137,7 +137,10 @@ call gravitino.system.create_catalog(
 ```
 
 A prefix with `trino.bypass.` in the configuration key is used to indicate Gravitino Trino connector to pass the Trino connector configuration to the Gravitino catalog in the Trino runtime.
-Note that it is when a configuration property is explicitly defined in Gravitino that the `trino.bypass.`properties which for the same property will be skipped.
+
+Note that if Trino connector properties directly inherit values from a Gravitino catalog, these configurations cannot be overridden through any `trino.bypass.*` properties.
+For example, the Trino MySQL connector properties `connection-url`, `connection-user` and `connection-password` directly inherit the `jdbc-url`, `jdbc-user` and `jdbc-password` values defined in the Gravitino MySQL catalog.
+Therefore, defining `trino.bypass.connection-url`, `trino.bypass.connection-user` or `trino.bypass.connection-password` will be ommitted and does not take effect.
 
 More Trino connector configurations can refer to:
 - [Hive catalog](https://trino.io/docs/current/connector/hive.html#hive-general-configuration-properties)
