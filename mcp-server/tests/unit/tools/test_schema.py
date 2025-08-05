@@ -30,7 +30,7 @@ class TestSchemaTool(unittest.TestCase):
 
     def setUp(self):
         ConnectorFactory.set_test_connector(MockOperation)
-        server = GravitinoMCPServer(Setting("", ""))
+        server = GravitinoMCPServer(Setting("mock_metalake"))
         self.mcp = server.mcp
 
     def test_list_schemas(self):

@@ -30,7 +30,7 @@ class TestCatalogTool(unittest.TestCase):
 
     def setUp(self):
         ConnectorFactory.set_test_connector(MockOperation)
-        server = GravitinoMCPServer(Setting("", ""))
+        server = GravitinoMCPServer(Setting("mock_metalake"))
         self.mcp = server.mcp
 
     def test_list_catalogs(self):
@@ -40,7 +40,3 @@ class TestCatalogTool(unittest.TestCase):
                 self.assertEqual("mock_catalogs", result.content[0].text)
 
         asyncio.run(_test_list_catalogs(self.mcp))
-
-
-if __name__ == "__main__":
-    unittest.main()

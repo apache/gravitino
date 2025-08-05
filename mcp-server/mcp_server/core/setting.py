@@ -15,11 +15,21 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Set
+
+
+@dataclass
+class DefaultSetting:
+    default_uri: str = "http://127.0.0.1:8090"
+    default_transport: str = "stdio"
+    default_mcp_url: str = "http://127.0.0.1:8000/mcp"
 
 
 @dataclass
 class Setting:
     metalake: str
-    uri: str
-    tags: set[str] = None
+    uri: str = DefaultSetting.default_uri
+    tags: Set[str] = field(default_factory=set)
+    transport: str = DefaultSetting.default_transport
+    mcp_url: str = DefaultSetting.default_mcp_url

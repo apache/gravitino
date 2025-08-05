@@ -17,14 +17,15 @@
 
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
+from urllib.parse import urlparse
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import (
     LoggingMiddleware,
-    StructuredLoggingMiddleware,
 )
 from fastmcp.server.middleware.timing import TimingMiddleware
 
@@ -70,6 +71,28 @@ def create_gravition_mcp(setting: Setting) -> FastMCP:
     return mcp
 
 
+def parse_url(url: str) -> ():
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() != "http":
+            raise ValueError(f"Not support: {parsed.scheme}，only support HTTP")
+
+        host = parsed.hostname or "0.0.0.0"
+
+        port = parsed.port
+        if port is None:
+            port = 80
+
+        path = parsed.path
+        if not path.startswith("/"):
+            path = "/" + path
+
+        return host, port, path
+
+    except Exception as e:
+        raise ValueError(f"Invalid URL: {url}") from e
+
+
 class GravitinoMCPServer:
     def __init__(self, setting: Setting):
         self.setting = setting
@@ -77,4 +100,18 @@ class GravitinoMCPServer:
         load_tools(self.mcp)
 
     def run(self):
-        asyncio.run(self.mcp.run_async())
+        if self.setting.transport == "stdio":
+            self._run_stdio()
+        else:
+            self._run_http()
+
+    def _run_stdio(self):
+        asyncio.run(self.mcp.run_async(transport="stdio"))
+
+    def _run_http(self):
+        _host, _port, _path = parse_url(self.setting.mcp_url)
+        asyncio.run(
+            self.mcp.run_async(
+                transport="http", host=_host, port=_port, path=_path
+            )
+        )

@@ -29,7 +29,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 1. Clone the code from GitHub, and change to `mcp-server` directory
 2. Create virtual environment, `uv venv`
 3. Install the required Python packages. `uv pip install -e .`
-4. Add Gravitino MCP server to corresponding LLM tools, the configuration is like:
+4. Add Gravitino MCP server to corresponding LLM tools, use local MCP server like:
 ```json
 {
   "mcpServers": {
@@ -45,6 +45,18 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
         "--uri",
         "http://127.0.0.1:8090"
       ]
+    }
+  }
+}
+```
+
+Or start a HTTP MCP server by `uv run mcp_server --metalake test --uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp`, and use the configuration:
+
+```json
+{
+  "mcpServers": {
+    "gravitino": {
+      "url": "http://localhost:1234/mcp1"
     }
   }
 }
