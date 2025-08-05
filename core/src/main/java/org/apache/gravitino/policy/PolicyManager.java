@@ -230,12 +230,12 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName) {
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+
     return TreeLockUtils.doWithTreeLock(
         policyIdent,
         LockType.READ,
         () -> {
-          checkMetalake(NameIdentifier.of(metalake), entityStore);
-
           try {
             if (!entityStore.exists(policyIdent, Entity.EntityType.POLICY)) {
               throw new NoSuchPolicyException(
@@ -267,14 +267,13 @@ public class PolicyManager implements PolicyDispatcher {
         Policy.SUPPORTS_ALL_OBJECT_TYPES.contains(metadataObject.type()),
         "Cannot list policies for unsupported metadata object type %s",
         metadataObject.type());
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
         () -> {
           try {
-            checkMetalake(NameIdentifier.of(metalake), entityStore);
-
             return entityStore.relationOperations()
                 .listEntitiesByRelation(
                     SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
@@ -330,6 +329,7 @@ public class PolicyManager implements PolicyDispatcher {
             .map(p -> NameIdentifierUtil.ofPolicy(metalake, p))
             .toArray(NameIdentifier[]::new);
 
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
@@ -339,8 +339,6 @@ public class PolicyManager implements PolicyDispatcher {
                 LockType.WRITE,
                 () -> {
                   try {
-                    checkMetalake(NameIdentifier.of(metalake), entityStore);
-
                     List<PolicyEntity> updatedPolicies =
                         entityStore
                             .relationOperations()
@@ -379,13 +377,13 @@ public class PolicyManager implements PolicyDispatcher {
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
 
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
 
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
         () -> {
           try {
-            checkMetalake(NameIdentifier.of(metalake), entityStore);
             return entityStore
                 .relationOperations()
                 .getEntityByRelation(
