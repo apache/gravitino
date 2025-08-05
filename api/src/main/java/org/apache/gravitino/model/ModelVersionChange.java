@@ -335,8 +335,7 @@ public interface ModelVersionChange {
      * @param newUri The new uri to be set for the model version.
      */
     public UpdateUri(String newUri) {
-      this.uriName = ModelVersion.URI_NAME_UNKNOWN;
-      this.newUri = newUri;
+      this(ModelVersion.URI_NAME_UNKNOWN, newUri);
     }
 
     /**
