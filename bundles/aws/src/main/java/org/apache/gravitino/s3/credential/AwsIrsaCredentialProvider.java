@@ -87,323 +87,323 @@ import software.amazon.awssdk.services.sts.model.Credentials;
  */
 public class AwsIrsaCredentialProvider implements CredentialProvider {
 
-    private WebIdentityTokenFileCredentialsProvider baseCredentialsProvider;
-    private String roleArn;
-    private int tokenExpireSecs;
-    private String region;
-    private String stsEndpoint;
+  private WebIdentityTokenFileCredentialsProvider baseCredentialsProvider;
+  private String roleArn;
+  private int tokenExpireSecs;
+  private String region;
+  private String stsEndpoint;
 
-    @Override
-    public void initialize(Map<String, String> properties) {
-        // Use WebIdentityTokenFileCredentialsProvider for base IRSA configuration
-        this.baseCredentialsProvider = WebIdentityTokenFileCredentialsProvider.create();
+  @Override
+  public void initialize(Map<String, String> properties) {
+    // Use WebIdentityTokenFileCredentialsProvider for base IRSA configuration
+    this.baseCredentialsProvider = WebIdentityTokenFileCredentialsProvider.create();
 
-        S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
-        this.roleArn = s3CredentialConfig.s3RoleArn();
-        this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
-        this.region = s3CredentialConfig.region();
-        this.stsEndpoint = s3CredentialConfig.stsEndpoint();
-    }
+    S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
+    this.roleArn = s3CredentialConfig.s3RoleArn();
+    this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
+    this.region = s3CredentialConfig.region();
+    this.stsEndpoint = s3CredentialConfig.stsEndpoint();
+  }
 
-    @Override
-    public void close() {
-        // No external resources to close
-    }
+  @Override
+  public void close() {
+    // No external resources to close
+  }
 
-    @Override
-    public String credentialType() {
-        return AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE;
-    }
+  @Override
+  public String credentialType() {
+    return AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE;
+  }
 
-    @Override
-    public Credential getCredential(CredentialContext context) {
-        if (!(context instanceof PathBasedCredentialContext)) {
-            // Fallback to original behavior for non-path-based contexts
-            AwsCredentials creds = baseCredentialsProvider.resolveCredentials();
-            if (creds instanceof AwsSessionCredentials) {
-                AwsSessionCredentials sessionCreds = (AwsSessionCredentials) creds;
-                long expiration =
-                        sessionCreds.expirationTime().isPresent()
-                                ? sessionCreds.expirationTime().get().toEpochMilli()
-                                : 0L;
-                return new AwsIrsaCredential(
-                        sessionCreds.accessKeyId(),
-                        sessionCreds.secretAccessKey(),
-                        sessionCreds.sessionToken(),
-                        expiration);
-            } else {
-                throw new IllegalStateException(
-                        "AWS IRSA credentials must be of type AwsSessionCredentials. "
-                                + "Check your EKS/IRSA configuration. Got: "
-                                + creds.getClass().getName());
-            }
-        }
-
-        PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
-
-        Credentials s3Token =
-                createCredentialsWithSessionPolicy(
-                        pathBasedCredentialContext.getReadPaths(),
-                        pathBasedCredentialContext.getWritePaths(),
-                        pathBasedCredentialContext.getUserName());
+  @Override
+  public Credential getCredential(CredentialContext context) {
+    if (!(context instanceof PathBasedCredentialContext)) {
+      // Fallback to original behavior for non-path-based contexts
+      AwsCredentials creds = baseCredentialsProvider.resolveCredentials();
+      if (creds instanceof AwsSessionCredentials) {
+        AwsSessionCredentials sessionCreds = (AwsSessionCredentials) creds;
+        long expiration =
+            sessionCreds.expirationTime().isPresent()
+                ? sessionCreds.expirationTime().get().toEpochMilli()
+                : 0L;
         return new AwsIrsaCredential(
-                s3Token.accessKeyId(),
-                s3Token.secretAccessKey(),
-                s3Token.sessionToken(),
-                s3Token.expiration().toEpochMilli());
+            sessionCreds.accessKeyId(),
+            sessionCreds.secretAccessKey(),
+            sessionCreds.sessionToken(),
+            expiration);
+      } else {
+        throw new IllegalStateException(
+            "AWS IRSA credentials must be of type AwsSessionCredentials. "
+                + "Check your EKS/IRSA configuration. Got: "
+                + creds.getClass().getName());
+      }
     }
 
-    private Credentials createCredentialsWithSessionPolicy(
-            Set<String> readLocations, Set<String> writeLocations, String userName) {
-        validateInputParameters(readLocations, writeLocations, userName);
+    PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
 
-        // Create session policy that restricts access to specific paths
-        IamPolicy sessionPolicy = createSessionPolicy(readLocations, writeLocations);
+    Credentials s3Token =
+        createCredentialsWithSessionPolicy(
+            pathBasedCredentialContext.getReadPaths(),
+            pathBasedCredentialContext.getWritePaths(),
+            pathBasedCredentialContext.getUserName());
+    return new AwsIrsaCredential(
+        s3Token.accessKeyId(),
+        s3Token.secretAccessKey(),
+        s3Token.sessionToken(),
+        s3Token.expiration().toEpochMilli());
+  }
 
-        // Get web identity token file path and validate
-        String webIdentityTokenFile = getValidatedWebIdentityTokenFile();
+  private Credentials createCredentialsWithSessionPolicy(
+      Set<String> readLocations, Set<String> writeLocations, String userName) {
+    validateInputParameters(readLocations, writeLocations, userName);
 
-        // Get role ARN and validate
-        String effectiveRoleArn = getValidatedRoleArn();
+    // Create session policy that restricts access to specific paths
+    IamPolicy sessionPolicy = createSessionPolicy(readLocations, writeLocations);
 
-        try {
-            String tokenContent =
-                    Files.readString(Paths.get(webIdentityTokenFile), StandardCharsets.UTF_8);
-            if (StringUtils.isBlank(tokenContent)) {
-                throw new IllegalStateException(
-                        "Web identity token file is empty: " + webIdentityTokenFile);
-            }
+    // Get web identity token file path and validate
+    String webIdentityTokenFile = getValidatedWebIdentityTokenFile();
 
-            return assumeRoleWithSessionPolicy(effectiveRoleArn, userName, tokenContent, sessionPolicy);
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Failed to create credentials with session policy for user: " + userName, e);
-        }
+    // Get role ARN and validate
+    String effectiveRoleArn = getValidatedRoleArn();
+
+    try {
+      String tokenContent =
+          Files.readString(Paths.get(webIdentityTokenFile), StandardCharsets.UTF_8);
+      if (StringUtils.isBlank(tokenContent)) {
+        throw new IllegalStateException(
+            "Web identity token file is empty: " + webIdentityTokenFile);
+      }
+
+      return assumeRoleWithSessionPolicy(effectiveRoleArn, userName, tokenContent, sessionPolicy);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed to create credentials with session policy for user: " + userName, e);
+    }
+  }
+
+  private IamPolicy createSessionPolicy(Set<String> readLocations, Set<String> writeLocations) {
+    IamPolicy.Builder policyBuilder = IamPolicy.builder();
+    String arnPrefix = getArnPrefix();
+
+    // Add read permissions for all locations
+    addReadPermissions(policyBuilder, readLocations, writeLocations, arnPrefix);
+
+    // Add write permissions if needed
+    if (!writeLocations.isEmpty()) {
+      addWritePermissions(policyBuilder, writeLocations, arnPrefix);
     }
 
-    private IamPolicy createSessionPolicy(Set<String> readLocations, Set<String> writeLocations) {
-        IamPolicy.Builder policyBuilder = IamPolicy.builder();
-        String arnPrefix = getArnPrefix();
+    // Add bucket-level permissions
+    addBucketPermissions(policyBuilder, readLocations, writeLocations, arnPrefix);
 
-        // Add read permissions for all locations
-        addReadPermissions(policyBuilder, readLocations, writeLocations, arnPrefix);
+    return policyBuilder.build();
+  }
 
-        // Add write permissions if needed
-        if (!writeLocations.isEmpty()) {
-            addWritePermissions(policyBuilder, writeLocations, arnPrefix);
-        }
+  private void addReadPermissions(
+      IamPolicy.Builder policyBuilder,
+      Set<String> readLocations,
+      Set<String> writeLocations,
+      String arnPrefix) {
+    IamStatement.Builder allowGetObjectStatementBuilder =
+        IamStatement.builder()
+            .effect(IamEffect.ALLOW)
+            .addAction("s3:GetObject")
+            .addAction("s3:GetObjectVersion");
 
-        // Add bucket-level permissions
-        addBucketPermissions(policyBuilder, readLocations, writeLocations, arnPrefix);
+    Stream.concat(readLocations.stream(), writeLocations.stream())
+        .distinct()
+        .forEach(
+            location -> {
+              URI uri = URI.create(location);
+              allowGetObjectStatementBuilder.addResource(
+                  IamResource.create(getS3UriWithArn(arnPrefix, uri)));
+            });
 
-        return policyBuilder.build();
+    policyBuilder.addStatement(allowGetObjectStatementBuilder.build());
+  }
+
+  private void addWritePermissions(
+      IamPolicy.Builder policyBuilder, Set<String> writeLocations, String arnPrefix) {
+    IamStatement.Builder allowPutObjectStatementBuilder =
+        IamStatement.builder()
+            .effect(IamEffect.ALLOW)
+            .addAction("s3:PutObject")
+            .addAction("s3:DeleteObject");
+
+    writeLocations.forEach(
+        location -> {
+          URI uri = URI.create(location);
+          allowPutObjectStatementBuilder.addResource(
+              IamResource.create(getS3UriWithArn(arnPrefix, uri)));
+        });
+
+    policyBuilder.addStatement(allowPutObjectStatementBuilder.build());
+  }
+
+  private void addBucketPermissions(
+      IamPolicy.Builder policyBuilder,
+      Set<String> readLocations,
+      Set<String> writeLocations,
+      String arnPrefix) {
+    Map<String, IamStatement.Builder> bucketListStatmentBuilder = new HashMap<>();
+    Map<String, IamStatement.Builder> bucketGetLocationStatmentBuilder = new HashMap<>();
+
+    Stream.concat(readLocations.stream(), writeLocations.stream())
+        .distinct()
+        .forEach(
+            location -> {
+              URI uri = URI.create(location);
+              String bucketArn = arnPrefix + getBucketName(uri);
+              String rawPath = trimLeadingSlash(uri.getPath());
+
+              // Add list bucket permissions with prefix conditions
+              bucketListStatmentBuilder
+                  .computeIfAbsent(
+                      bucketArn,
+                      key ->
+                          IamStatement.builder()
+                              .effect(IamEffect.ALLOW)
+                              .addAction("s3:ListBucket")
+                              .addResource(key))
+                  .addConditions(
+                      IamConditionOperator.STRING_LIKE,
+                      "s3:prefix",
+                      Arrays.asList(
+                          rawPath, // Get raw path metadata information
+                          addWildcardToPath(rawPath))); // Listing objects in raw path
+
+              // Add get bucket location permissions
+              bucketGetLocationStatmentBuilder.computeIfAbsent(
+                  bucketArn,
+                  key ->
+                      IamStatement.builder()
+                          .effect(IamEffect.ALLOW)
+                          .addAction("s3:GetBucketLocation")
+                          .addResource(key));
+            });
+
+    // Add bucket list statements
+    addStatementsToPolicy(policyBuilder, bucketListStatmentBuilder, "s3:ListBucket");
+
+    // Add bucket location statements
+    addStatementsToPolicy(policyBuilder, bucketGetLocationStatmentBuilder, null);
+  }
+
+  private void addStatementsToPolicy(
+      IamPolicy.Builder policyBuilder,
+      Map<String, IamStatement.Builder> statementBuilders,
+      String fallbackAction) {
+    if (!statementBuilders.isEmpty()) {
+      statementBuilders
+          .values()
+          .forEach(statementBuilder -> policyBuilder.addStatement(statementBuilder.build()));
+    } else if (fallbackAction != null) {
+      policyBuilder.addStatement(
+          IamStatement.builder().effect(IamEffect.ALLOW).addAction(fallbackAction).build());
+    }
+  }
+
+  private String getS3UriWithArn(String arnPrefix, URI uri) {
+    return arnPrefix + addWildcardToPath(removeSchemaFromS3Uri(uri));
+  }
+
+  private String getArnPrefix() {
+    // For session policies, we default to standard AWS S3 ARN prefix
+    // The region can be determined from the AWS environment or configuration
+    if (StringUtils.isNotBlank(region)) {
+      if (region.contains("cn-")) {
+        return "arn:aws-cn:s3:::";
+      } else if (region.contains("us-gov-")) {
+        return "arn:aws-us-gov:s3:::";
+      }
+    }
+    return "arn:aws:s3:::";
+  }
+
+  private static String addWildcardToPath(String path) {
+    return path.endsWith("/") ? path + "*" : path + "/*";
+  }
+
+  // Transform 's3://bucket/path' to /bucket/path
+  private static String removeSchemaFromS3Uri(URI uri) {
+    String bucket = uri.getHost();
+    String path = trimLeadingSlash(uri.getPath());
+    return String.join(
+        "/", Stream.of(bucket, path).filter(Objects::nonNull).toArray(String[]::new));
+  }
+
+  private static String trimLeadingSlash(String path) {
+    if (path.startsWith("/")) {
+      path = path.substring(1);
+    }
+    return path;
+  }
+
+  private static String getBucketName(URI uri) {
+    return uri.getHost();
+  }
+
+  private void validateInputParameters(
+      Set<String> readLocations, Set<String> writeLocations, String userName) {
+    if (StringUtils.isBlank(userName)) {
+      throw new IllegalArgumentException("userName cannot be null or empty");
+    }
+    if ((readLocations == null || readLocations.isEmpty())
+        && (writeLocations == null || writeLocations.isEmpty())) {
+      throw new IllegalArgumentException("At least one read or write location must be specified");
+    }
+  }
+
+  private String getValidatedWebIdentityTokenFile() {
+    String webIdentityTokenFile = System.getenv("AWS_WEB_IDENTITY_TOKEN_FILE");
+    if (StringUtils.isBlank(webIdentityTokenFile)) {
+      throw new IllegalStateException(
+          "AWS_WEB_IDENTITY_TOKEN_FILE environment variable is not set. "
+              + "Ensure IRSA is properly configured in your EKS cluster.");
+    }
+    if (!Files.exists(Paths.get(webIdentityTokenFile))) {
+      throw new IllegalStateException(
+          "Web identity token file does not exist: " + webIdentityTokenFile);
+    }
+    return webIdentityTokenFile;
+  }
+
+  private String getValidatedRoleArn() {
+    String effectiveRoleArn =
+        StringUtils.isNotBlank(roleArn) ? roleArn : System.getenv("AWS_ROLE_ARN");
+    if (StringUtils.isBlank(effectiveRoleArn)) {
+      throw new IllegalStateException(
+          "No role ARN available. Either configure s3-role-arn or ensure AWS_ROLE_ARN environment variable is set.");
+    }
+    if (!effectiveRoleArn.startsWith("arn:aws")) {
+      throw new IllegalArgumentException("Invalid role ARN format: " + effectiveRoleArn);
+    }
+    return effectiveRoleArn;
+  }
+
+  private Credentials assumeRoleWithSessionPolicy(
+      String roleArn, String userName, String webIdentityToken, IamPolicy sessionPolicy) {
+    // Create STS client for this request
+    StsClientBuilder stsBuilder = StsClient.builder();
+    if (StringUtils.isNotBlank(region)) {
+      stsBuilder.region(Region.of(region));
+    }
+    if (StringUtils.isNotBlank(stsEndpoint)) {
+      stsBuilder.endpointOverride(URI.create(stsEndpoint));
     }
 
-    private void addReadPermissions(
-            IamPolicy.Builder policyBuilder,
-            Set<String> readLocations,
-            Set<String> writeLocations,
-            String arnPrefix) {
-        IamStatement.Builder allowGetObjectStatementBuilder =
-                IamStatement.builder()
-                        .effect(IamEffect.ALLOW)
-                        .addAction("s3:GetObject")
-                        .addAction("s3:GetObjectVersion");
+    try (StsClient stsClient = stsBuilder.build()) {
+      AssumeRoleWithWebIdentityRequest request =
+          AssumeRoleWithWebIdentityRequest.builder()
+              .roleArn(roleArn)
+              .roleSessionName("gravitino_irsa_session_" + userName)
+              .durationSeconds(tokenExpireSecs)
+              .webIdentityToken(webIdentityToken)
+              .policy(sessionPolicy.toJson())
+              .build();
 
-        Stream.concat(readLocations.stream(), writeLocations.stream())
-                .distinct()
-                .forEach(
-                        location -> {
-                            URI uri = URI.create(location);
-                            allowGetObjectStatementBuilder.addResource(
-                                    IamResource.create(getS3UriWithArn(arnPrefix, uri)));
-                        });
-
-        policyBuilder.addStatement(allowGetObjectStatementBuilder.build());
+      AssumeRoleWithWebIdentityResponse response = stsClient.assumeRoleWithWebIdentity(request);
+      return response.credentials();
     }
-
-    private void addWritePermissions(
-            IamPolicy.Builder policyBuilder, Set<String> writeLocations, String arnPrefix) {
-        IamStatement.Builder allowPutObjectStatementBuilder =
-                IamStatement.builder()
-                        .effect(IamEffect.ALLOW)
-                        .addAction("s3:PutObject")
-                        .addAction("s3:DeleteObject");
-
-        writeLocations.forEach(
-                location -> {
-                    URI uri = URI.create(location);
-                    allowPutObjectStatementBuilder.addResource(
-                            IamResource.create(getS3UriWithArn(arnPrefix, uri)));
-                });
-
-        policyBuilder.addStatement(allowPutObjectStatementBuilder.build());
-    }
-
-    private void addBucketPermissions(
-            IamPolicy.Builder policyBuilder,
-            Set<String> readLocations,
-            Set<String> writeLocations,
-            String arnPrefix) {
-        Map<String, IamStatement.Builder> bucketListStatmentBuilder = new HashMap<>();
-        Map<String, IamStatement.Builder> bucketGetLocationStatmentBuilder = new HashMap<>();
-
-        Stream.concat(readLocations.stream(), writeLocations.stream())
-                .distinct()
-                .forEach(
-                        location -> {
-                            URI uri = URI.create(location);
-                            String bucketArn = arnPrefix + getBucketName(uri);
-                            String rawPath = trimLeadingSlash(uri.getPath());
-
-                            // Add list bucket permissions with prefix conditions
-                            bucketListStatmentBuilder
-                                    .computeIfAbsent(
-                                            bucketArn,
-                                            key ->
-                                                    IamStatement.builder()
-                                                            .effect(IamEffect.ALLOW)
-                                                            .addAction("s3:ListBucket")
-                                                            .addResource(key))
-                                    .addConditions(
-                                            IamConditionOperator.STRING_LIKE,
-                                            "s3:prefix",
-                                            Arrays.asList(
-                                                    rawPath, // Get raw path metadata information
-                                                    addWildcardToPath(rawPath))); // Listing objects in raw path
-
-                            // Add get bucket location permissions
-                            bucketGetLocationStatmentBuilder.computeIfAbsent(
-                                    bucketArn,
-                                    key ->
-                                            IamStatement.builder()
-                                                    .effect(IamEffect.ALLOW)
-                                                    .addAction("s3:GetBucketLocation")
-                                                    .addResource(key));
-                        });
-
-        // Add bucket list statements
-        addStatementsToPolicy(policyBuilder, bucketListStatmentBuilder, "s3:ListBucket");
-
-        // Add bucket location statements
-        addStatementsToPolicy(policyBuilder, bucketGetLocationStatmentBuilder, null);
-    }
-
-    private void addStatementsToPolicy(
-            IamPolicy.Builder policyBuilder,
-            Map<String, IamStatement.Builder> statementBuilders,
-            String fallbackAction) {
-        if (!statementBuilders.isEmpty()) {
-            statementBuilders
-                    .values()
-                    .forEach(statementBuilder -> policyBuilder.addStatement(statementBuilder.build()));
-        } else if (fallbackAction != null) {
-            policyBuilder.addStatement(
-                    IamStatement.builder().effect(IamEffect.ALLOW).addAction(fallbackAction).build());
-        }
-    }
-
-    private String getS3UriWithArn(String arnPrefix, URI uri) {
-        return arnPrefix + addWildcardToPath(removeSchemaFromS3Uri(uri));
-    }
-
-    private String getArnPrefix() {
-        // For session policies, we default to standard AWS S3 ARN prefix
-        // The region can be determined from the AWS environment or configuration
-        if (StringUtils.isNotBlank(region)) {
-            if (region.contains("cn-")) {
-                return "arn:aws-cn:s3:::";
-            } else if (region.contains("us-gov-")) {
-                return "arn:aws-us-gov:s3:::";
-            }
-        }
-        return "arn:aws:s3:::";
-    }
-
-    private static String addWildcardToPath(String path) {
-        return path.endsWith("/") ? path + "*" : path + "/*";
-    }
-
-    // Transform 's3://bucket/path' to /bucket/path
-    private static String removeSchemaFromS3Uri(URI uri) {
-        String bucket = uri.getHost();
-        String path = trimLeadingSlash(uri.getPath());
-        return String.join(
-                "/", Stream.of(bucket, path).filter(Objects::nonNull).toArray(String[]::new));
-    }
-
-    private static String trimLeadingSlash(String path) {
-        if (path.startsWith("/")) {
-            path = path.substring(1);
-        }
-        return path;
-    }
-
-    private static String getBucketName(URI uri) {
-        return uri.getHost();
-    }
-
-    private void validateInputParameters(
-            Set<String> readLocations, Set<String> writeLocations, String userName) {
-        if (StringUtils.isBlank(userName)) {
-            throw new IllegalArgumentException("userName cannot be null or empty");
-        }
-        if ((readLocations == null || readLocations.isEmpty())
-                && (writeLocations == null || writeLocations.isEmpty())) {
-            throw new IllegalArgumentException("At least one read or write location must be specified");
-        }
-    }
-
-    private String getValidatedWebIdentityTokenFile() {
-        String webIdentityTokenFile = System.getenv("AWS_WEB_IDENTITY_TOKEN_FILE");
-        if (StringUtils.isBlank(webIdentityTokenFile)) {
-            throw new IllegalStateException(
-                    "AWS_WEB_IDENTITY_TOKEN_FILE environment variable is not set. "
-                            + "Ensure IRSA is properly configured in your EKS cluster.");
-        }
-        if (!Files.exists(Paths.get(webIdentityTokenFile))) {
-            throw new IllegalStateException(
-                    "Web identity token file does not exist: " + webIdentityTokenFile);
-        }
-        return webIdentityTokenFile;
-    }
-
-    private String getValidatedRoleArn() {
-        String effectiveRoleArn =
-                StringUtils.isNotBlank(roleArn) ? roleArn : System.getenv("AWS_ROLE_ARN");
-        if (StringUtils.isBlank(effectiveRoleArn)) {
-            throw new IllegalStateException(
-                    "No role ARN available. Either configure s3-role-arn or ensure AWS_ROLE_ARN environment variable is set.");
-        }
-        if (!effectiveRoleArn.startsWith("arn:aws")) {
-            throw new IllegalArgumentException("Invalid role ARN format: " + effectiveRoleArn);
-        }
-        return effectiveRoleArn;
-    }
-
-    private Credentials assumeRoleWithSessionPolicy(
-            String roleArn, String userName, String webIdentityToken, IamPolicy sessionPolicy) {
-        // Create STS client for this request
-        StsClientBuilder stsBuilder = StsClient.builder();
-        if (StringUtils.isNotBlank(region)) {
-            stsBuilder.region(Region.of(region));
-        }
-        if (StringUtils.isNotBlank(stsEndpoint)) {
-            stsBuilder.endpointOverride(URI.create(stsEndpoint));
-        }
-
-        try (StsClient stsClient = stsBuilder.build()) {
-            AssumeRoleWithWebIdentityRequest request =
-                    AssumeRoleWithWebIdentityRequest.builder()
-                            .roleArn(roleArn)
-                            .roleSessionName("gravitino_irsa_session_" + userName)
-                            .durationSeconds(tokenExpireSecs)
-                            .webIdentityToken(webIdentityToken)
-                            .policy(sessionPolicy.toJson())
-                            .build();
-
-            AssumeRoleWithWebIdentityResponse response = stsClient.assumeRoleWithWebIdentity(request);
-            return response.credentials();
-        }
-    }
+  }
 }
