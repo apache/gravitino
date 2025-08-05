@@ -25,9 +25,12 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -36,23 +39,29 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.JobListResponse;
+import org.apache.gravitino.dto.responses.JobResponse;
 import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
+import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
@@ -489,8 +498,206 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(InUseException.class.getSimpleName(), errorResp4.getType());
   }
 
+  @Test
+  public void testListJobs() {
+    String templateName = "shell_template_1";
+    JobEntity job1 = newJobEntity(templateName, JobHandle.Status.QUEUED);
+    JobEntity job2 = newJobEntity(templateName, JobHandle.Status.STARTED);
+    JobEntity job3 = newJobEntity("spark_template_1", JobHandle.Status.SUCCEEDED);
+
+    when(jobOperationDispatcher.listJobs(metalake, Optional.empty()))
+        .thenReturn(Lists.newArrayList(job1, job2, job3));
+
+    Response resp =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    JobListResponse jobListResponse = resp.readEntity(JobListResponse.class);
+    Assertions.assertEquals(0, jobListResponse.getCode());
+
+    Assertions.assertEquals(3, jobListResponse.getJobs().size());
+    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse.getJobs().get(1));
+    Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(2));
+
+    // Test list jobs by template name
+    when(jobOperationDispatcher.listJobs(metalake, Optional.of(templateName)))
+        .thenReturn(Lists.newArrayList(job1, job2));
+
+    Response resp1 =
+        target(jobRunPath())
+            .queryParam("jobTemplateName", templateName)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
+    Assertions.assertEquals(APPLICATION_JSON_TYPE, resp1.getMediaType());
+
+    JobListResponse jobListResponse1 = resp1.readEntity(JobListResponse.class);
+    Assertions.assertEquals(0, jobListResponse1.getCode());
+    Assertions.assertEquals(2, jobListResponse1.getJobs().size());
+    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse1.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse1.getJobs().get(1));
+
+    // Test throw NoSuchMetalakeException
+    doThrow(new NoSuchMetalakeException("mock error"))
+        .when(jobOperationDispatcher)
+        .listJobs(any(), any());
+
+    Response resp2 =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchMetalakeException.class.getSimpleName(), errorResp.getType());
+
+    // Test throw MetalakeNotInUseException
+    doThrow(new MetalakeNotInUseException("mock error"))
+        .when(jobOperationDispatcher)
+        .listJobs(any(), any());
+
+    Response resp3 =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp3.getStatus());
+
+    ErrorResponse errorResp2 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_IN_USE_CODE, errorResp2.getCode());
+    Assertions.assertEquals(MetalakeNotInUseException.class.getSimpleName(), errorResp2.getType());
+
+    // Test NoSuchJobTemplateException
+    doThrow(new NoSuchJobTemplateException("mock error"))
+        .when(jobOperationDispatcher)
+        .listJobs(any(), any());
+
+    Response resp4 =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp4.getStatus());
+
+    ErrorResponse errorResp3 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp3.getCode());
+    Assertions.assertEquals(NoSuchJobTemplateException.class.getSimpleName(), errorResp3.getType());
+
+    // Test throw RuntimeException
+    doThrow(new RuntimeException("mock error")).when(jobOperationDispatcher).listJobs(any(), any());
+
+    Response resp5 =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp5.getStatus());
+
+    ErrorResponse errorResp4 = resp5.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp4.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testRunJob() {
+    String templateName = "shell_template_1";
+    Map<String, String> jobConf = ImmutableMap.of("key1", "value1", "key2", "value2");
+    JobEntity job = newJobEntity(templateName, JobHandle.Status.QUEUED);
+    JobRunRequest req = new JobRunRequest(templateName, jobConf);
+
+    when(jobOperationDispatcher.runJob(metalake, templateName, jobConf)).thenReturn(job);
+
+    Response resp =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(JobOperations.toDTO(job), jobResp.getJob());
+
+    // Test throw NoSuchJobTemplateException
+    doThrow(new NoSuchJobTemplateException("mock error"))
+        .when(jobOperationDispatcher)
+        .runJob(any(), any(), any());
+
+    Response resp2 =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchJobTemplateException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  public void testCancelJob() {
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.STARTED);
+
+    when(jobOperationDispatcher.cancelJob(metalake, job.name())).thenReturn(job);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(JobOperations.toDTO(job), jobResp.getJob());
+
+    // Test throw NoSuchJobException
+    doThrow(new NoSuchJobException("mock error"))
+        .when(jobOperationDispatcher)
+        .cancelJob(any(), any());
+
+    Response resp2 =
+        target(jobRunPath())
+            .path(job.name())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchJobException.class.getSimpleName(), errorResp.getType());
+  }
+
   private String jobTemplatePath() {
     return "/metalakes/" + metalake + "/jobs/templates";
+  }
+
+  private String jobRunPath() {
+    return "/metalakes/" + metalake + "/jobs/runs";
   }
 
   private JobTemplateEntity newShellJobTemplateEntity(String name, String comment) {
@@ -527,6 +734,19 @@ public class TestJobOperations extends JerseyTest {
         .withNamespace(NamespaceUtil.ofJobTemplate(metalake))
         .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(sparkJobTemplate))
         .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private JobEntity newJobEntity(String templateName, JobHandle.Status status) {
+    Random rand = new Random();
+    return JobEntity.builder()
+        .withId(rand.nextLong())
+        .withJobExecutionId(rand.nextLong() + "")
+        .withNamespace(NamespaceUtil.ofJob(metalake))
+        .withJobTemplateName(templateName)
+        .withStatus(status)
+        .withAuditInfo(
+            AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
   }
 }
