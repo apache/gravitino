@@ -46,7 +46,7 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.google", "org.apache.gravitino.azure.shaded.com.google")
   relocate("com.microsoft.aad", "org.apache.gravitino.azure.shaded.com.microsoft.aad")
   relocate("com.nimbusds", "org.apache.gravitino.azure.shaded.com.nimbusds")
-  relocate("com.sun.activation", "org.apache.gravitino.azure.shaded.com.sun.activation")
+  relocate("com.sun", "org.apache.gravitino.azure.shaded.com.sun")
   relocate("io.netty", "org.apache.gravitino.azure.shaded.io.netty")
   relocate("net.minidev", "org.apache.gravitino.azure.shaded.net.minidev")
   relocate("net.jcip.annotations", "org.apache.gravitino.azure.shaded.net.jcip.annotations")

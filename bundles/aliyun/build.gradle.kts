@@ -59,7 +59,7 @@ dependencies {
 
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
   // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
-  implementation(libs.sun.activation)
+  implementation(libs.sun)
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
@@ -82,7 +82,7 @@ tasks.withType(ShadowJar::class.java) {
   relocate("com.aliyun", "org.apache.gravitino.aliyun.shaded.com.aliyun")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
   relocate("com.google", "org.apache.gravitino.aliyun.shaded.com.google.common")
-  relocate("com.sun.activation", "org.apache.gravitino.aliyun.shaded.com.sun.activation")
+  relocate("com.sun", "org.apache.gravitino.aliyun.shaded.com.sun")
   relocate("okhttp3", "org.apache.gravitino.aliyun.shaded.okhttp3")
   relocate("okio", "org.apache.gravitino.aliyun.shaded.okio")
   relocate("org.apache.commons", "org.apache.gravitino.aliyun.shaded.org.apache.commons")
