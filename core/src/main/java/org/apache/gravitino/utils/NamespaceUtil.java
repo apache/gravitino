@@ -186,6 +186,27 @@ public class NamespaceUtil {
   }
 
   /**
+   * Create a namespace for job template.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for job template
+   */
+  public static Namespace ofJobTemplate(String metalake) {
+    return Namespace.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.JOB_TEMPLATE_SCHEMA_NAME);
+  }
+
+  /**
+   * Create a namespace for job.
+   *
+   * @param metalake The metalake name
+   * @return A namespace for job
+   */
+  public static Namespace ofJob(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.JOB_SCHEMA_NAME);
+  }
+
+  /**
    * Convert a model name identifier to a model version namespace.
    *
    * @param modelIdent The model name identifier

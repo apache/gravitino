@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.info;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Audit;
@@ -32,7 +33,7 @@ import org.apache.gravitino.model.ModelVersion;
  */
 @DeveloperApi
 public class ModelVersionInfo {
-  private final String uri;
+  private final Map<String, String> uris;
   private final Map<String, String> properties;
 
   private final Optional<String[]> aliases;
@@ -46,7 +47,7 @@ public class ModelVersionInfo {
    */
   public ModelVersionInfo(ModelVersion modelVersion) {
     this(
-        modelVersion.uri(),
+        modelVersion.uris(),
         modelVersion.comment(),
         modelVersion.properties(),
         modelVersion.aliases(),
@@ -68,7 +69,7 @@ public class ModelVersionInfo {
   }
 
   /**
-   * Constructs a {@link ModelVersionInfo} instance based on given uri, comment, properties,
+   * Constructs a {@link ModelVersionInfo} instance based on given URI, comment, properties,
    * aliases, and audit information.
    *
    * @param uri The URI of the model version.
@@ -83,8 +84,8 @@ public class ModelVersionInfo {
       Map<String, String> properties,
       String[] aliases,
       Audit auditInfo) {
-    this.uri = uri;
-
+    this.uris =
+        uri == null ? Collections.emptyMap() : ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri);
     this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
     this.comment = Optional.ofNullable(comment);
     this.audit = Optional.ofNullable(auditInfo);
@@ -92,12 +93,44 @@ public class ModelVersionInfo {
   }
 
   /**
-   * Returns the URI of the model version.
+   * Constructs a {@link ModelVersionInfo} instance based on given URIs, comment, properties,
+   * aliases, and audit information.
    *
-   * @return the URI of the model version.
+   * @param uris The URIs of the model version.
+   * @param comment The comment of the model version.
+   * @param properties The properties of the model version.
+   * @param aliases The aliases of the model version.
+   * @param auditInfo The audit information of the model version.
+   */
+  public ModelVersionInfo(
+      Map<String, String> uris,
+      String comment,
+      Map<String, String> properties,
+      String[] aliases,
+      Audit auditInfo) {
+    this.uris = uris;
+    this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+    this.comment = Optional.ofNullable(comment);
+    this.audit = Optional.ofNullable(auditInfo);
+    this.aliases = Optional.ofNullable(aliases);
+  }
+
+  /**
+   * Returns the unknown URI of the model version.
+   *
+   * @return the unknown URI of the model version.
    */
   public String uri() {
-    return uri;
+    return uris.get(ModelVersion.URI_NAME_UNKNOWN);
+  }
+
+  /**
+   * Returns the URIs of the model version.
+   *
+   * @return the URIs of the model version.
+   */
+  public Map<String, String> uris() {
+    return uris;
   }
 
   /**

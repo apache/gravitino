@@ -210,7 +210,7 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
 5. Add users
 
     Initially, the realm has no users. Use these steps to create a user:
-   * Verify that you are still in the gravitinorealm realm, which is next to Current realm.
+   * Verify that you are still in the gravitinorealm realm, which is next to *Current realm*.
    * Click Users in the left-hand menu.
    * Click *Create new user*.
    * Fill in the form with the following values:  
@@ -230,7 +230,7 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
    *  Confirm that `Client authentication` `Standard flow` `Direct access grants` `Service accounts roles` is enabled.
    *  Click *Next*
    *  Set *Valid redirect URIs* to `http://localhost:8090/*`
-   *  Set *Web origins* to `http://localhost:8090/*`
+   *  Set *Web origins* to `http://localhost:8090`
    *  Click *Save*.
    *  Click *Credentials* tab page, get `Client Secret`. 
 

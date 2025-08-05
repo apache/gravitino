@@ -30,6 +30,21 @@ import org.apache.commons.lang3.StringUtils;
  * Represents a job template for executing Spark applications. This class extends the JobTemplate
  * class and provides functionality specific to Spark job templates, including the class name, jars,
  * files, archives, and configurations required for the Spark job.
+ *
+ * <p>Take Spark word count job as an example:
+ *
+ * <p>className: "org.apache.spark.examples.JavaWordCount" executable
+ * "https://example.com/spark-examples.jar" arguments: ["{{input_path}}", "{{output_path}}"]
+ * configs: {"spark.master": "local[*]", "spark.app.name": "WordCount"}
+ *
+ * <p>configs is a map of configuration parameters that will be used by the Spark application. It
+ * can be templated by using placeholders like "{{foo_value}}" and "{{bar_value}}". These
+ * placeholders will be replaced with actual values when the job is executed.
+ *
+ * <p>jars, files, and archives are lists of resources that will be used by the Spark application .
+ * These resources must be accessible to the Gravitino server, and can be located in the local file
+ * system, on a web server (e.g., HTTP, HTTPS, FTP). Distributed file systems like HDFS or S3 will
+ * be supported in the future.
  */
 public class SparkJobTemplate extends JobTemplate {
 
@@ -121,6 +136,7 @@ public class SparkJobTemplate extends JobTemplate {
         && Objects.equals(configs, that.configs);
   }
 
+  @Override
   public int hashCode() {
     return Objects.hash(super.hashCode(), className, jars, files, archives, configs);
   }
@@ -165,6 +181,15 @@ public class SparkJobTemplate extends JobTemplate {
     return sb + super.toString() + "}\n";
   }
 
+  /**
+   * Creates a new builder for constructing instances of {@link SparkJobTemplate}.
+   *
+   * @return a new instance of {@link Builder}
+   */
+  public static Builder builder() {
+    return new Builder();
+  }
+
   /** Builder for creating instances of {@link SparkJobTemplate}. */
   public static class Builder extends JobTemplate.BaseBuilder<Builder, SparkJobTemplate> {
 
@@ -177,6 +202,8 @@ public class SparkJobTemplate extends JobTemplate {
     private List<String> archives;
 
     private Map<String, String> configs;
+
+    private Builder() {}
 
     /**
      * Sets the class name of the Spark application to be executed.
@@ -240,6 +267,7 @@ public class SparkJobTemplate extends JobTemplate {
      */
     @Override
     public SparkJobTemplate build() {
+      validate();
       return new SparkJobTemplate(this);
     }
 

@@ -528,6 +528,8 @@ public class CatalogMysqlIT extends BaseIT {
             + "  varchar200_col_1 varchar(200) default 'curdate()',\n"
             + "  varchar200_col_2 varchar(200) default (curdate()),\n"
             + "  varchar200_col_3 varchar(200) default (CURRENT_TIMESTAMP),\n"
+            + "  time_col_1 time default '00:00:00',\n"
+            + "  time_col_2 time default (now()),\n"
             + "  datetime_col_1 datetime default CURRENT_TIMESTAMP,\n"
             + "  datetime_col_2 datetime default current_timestamp,\n"
             + "  datetime_col_3 datetime default null,\n"
@@ -585,6 +587,12 @@ public class CatalogMysqlIT extends BaseIT {
         case "varchar200_col_3":
           Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
           break;
+        case "time_col_1":
+          Assertions.assertEquals(Literals.timeLiteral("00:00:00"), column.defaultValue());
+          break;
+        case "time_col_2":
+          Assertions.assertEquals(UnparsedExpression.of("now()"), column.defaultValue());
+          break;
         case "datetime_col_1":
         case "datetime_col_2":
           Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
@@ -622,8 +630,7 @@ public class CatalogMysqlIT extends BaseIT {
               Literals.timestampLiteral("1983-09-05T00:00:00"), column.defaultValue());
           break;
         case "timestamp_col_3":
-          Assertions.assertEquals(
-              UnparsedExpression.of("CURRENT_TIMESTAMP(6)"), column.defaultValue());
+          Assertions.assertEquals(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, column.defaultValue());
           break;
         case "decimal_6_2_col_1":
           Assertions.assertEquals(
@@ -659,8 +666,20 @@ public class CatalogMysqlIT extends BaseIT {
             + "  double_col double,\n"
             + "  date_col date,\n"
             + "  time_col time,\n"
+            + "  time_col_0 time(0),\n"
+            + "  time_col_1 time(1),\n"
+            + "  time_col_3 time(3),\n"
+            + "  time_col_6 time(6),\n"
             + "  timestamp_col timestamp,\n"
+            + "  timestamp_col_0 timestamp(0) default current_timestamp,\n"
+            + "  timestamp_col_1 timestamp(1) default current_timestamp(1),\n"
+            + "  timestamp_col_3 timestamp(3) default '2012-12-31 11:30:45.123',\n"
+            + "  timestamp_col_6 timestamp(6) default '2012-12-31 11:30:45.123456',\n"
             + "  datetime_col datetime,\n"
+            + "  datetime_col_0 datetime(0),\n"
+            + "  datetime_col_1 datetime(1),\n"
+            + "  datetime_col_3 datetime(3),\n"
+            + "  datetime_col_6 datetime(6),\n"
             + "  decimal_6_2_col decimal(6, 2),\n"
             + "  varchar20_col varchar(20),\n"
             + "  text_col text,\n"
@@ -698,13 +717,43 @@ public class CatalogMysqlIT extends BaseIT {
           Assertions.assertEquals(Types.DateType.get(), column.dataType());
           break;
         case "time_col":
-          Assertions.assertEquals(Types.TimeType.get(), column.dataType());
+        case "time_col_0":
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
+          break;
+        case "time_col_1":
+          Assertions.assertEquals(Types.TimeType.of(1), column.dataType());
+          break;
+        case "time_col_3":
+          Assertions.assertEquals(Types.TimeType.of(3), column.dataType());
+          break;
+        case "time_col_6":
+          Assertions.assertEquals(Types.TimeType.of(6), column.dataType());
           break;
         case "timestamp_col":
-          Assertions.assertEquals(Types.TimestampType.withTimeZone(), column.dataType());
+        case "timestamp_col_0":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
+          break;
+        case "timestamp_col_1":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(1), column.dataType());
+          break;
+        case "timestamp_col_3":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(3), column.dataType());
+          break;
+        case "timestamp_col_6":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(6), column.dataType());
           break;
         case "datetime_col":
-          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+        case "datetime_col_0":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_col_1":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(1), column.dataType());
+          break;
+        case "datetime_col_3":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
+          break;
+        case "datetime_col_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
           break;
         case "decimal_6_2_col":
           Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
@@ -865,7 +914,7 @@ public class CatalogMysqlIT extends BaseIT {
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[0].name()}, Literals.of("1.2345", Types.FloatType.get())),
             TableChange.updateColumnDefaultValue(
-                new String[] {columns[1].name()}, FunctionExpression.of("current_timestamp")),
+                new String[] {columns[1].name()}, DEFAULT_VALUE_OF_CURRENT_TIMESTAMP),
             TableChange.updateColumnDefaultValue(
                 new String[] {columns[2].name()}, Literals.of("hello", Types.VarCharType.of(255))),
             TableChange.updateColumnDefaultValue(
@@ -1057,26 +1106,111 @@ public class CatalogMysqlIT extends BaseIT {
     Assertions.assertNotNull(table.index()[0].name());
     Assertions.assertNotNull(table.index()[1].name());
 
-    Column notNullCol = Column.of("col_6", Types.LongType.get(), "id", true, false, null);
-    Exception exception =
+    NameIdentifier nullableTableIdent = NameIdentifier.of(schemaName, "test_nullable");
+    Column nullWithAutoIncrementCol =
+        Column.of("col_6", Types.LongType.get(), "id", true, true, null);
+
+    Exception uniqueKeyNotExistException =
         assertThrows(
             IllegalArgumentException.class,
             () ->
                 tableCatalog.createTable(
-                    tableIdent,
-                    new Column[] {notNullCol},
+                    nullableTableIdent,
+                    new Column[] {nullWithAutoIncrementCol},
                     table_comment,
                     properties,
                     Transforms.EMPTY_TRANSFORM,
                     Distributions.NONE,
                     new SortOrder[0],
                     new Index[] {
-                      Indexes.of(Index.IndexType.UNIQUE_KEY, null, new String[][] {{"col_6"}}),
+                      Indexes.of(
+                          Index.IndexType.UNIQUE_KEY,
+                          "u_key",
+                          new String[][] {{"col_7"}, {"col_6"}}),
                     }));
     Assertions.assertTrue(
-        exception
+        uniqueKeyNotExistException
             .getMessage()
-            .contains("Column col_6 in the unique index null must be a not null column"));
+            .contains("Column col_7 in the unique index u_key does not exist in the table"));
+
+    Exception uniqueKeyNotNullException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    nullableTableIdent,
+                    new Column[] {nullWithAutoIncrementCol},
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.of(Index.IndexType.UNIQUE_KEY, "u_key", new String[][] {{"col_6"}}),
+                    }));
+    Assertions.assertTrue(
+        uniqueKeyNotNullException
+            .getMessage()
+            .contains(
+                "Auto increment column col_6 in the unique index u_key must be a not null column"));
+
+    Column nullWithoutAutoIncrementCol =
+        Column.of("col_7", Types.LongType.get(), "id", true, false, null);
+    tableCatalog.createTable(
+        nullableTableIdent,
+        new Column[] {nullWithoutAutoIncrementCol},
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[] {
+          Indexes.of(Index.IndexType.UNIQUE_KEY, "u_key", new String[][] {{"col_7"}}),
+        });
+    table = tableCatalog.loadTable(nullableTableIdent);
+
+    Assertions.assertEquals(1, table.index().length);
+    Assertions.assertNotNull(table.index()[0].name());
+
+    Exception primaryKeyNotExistexception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    nullableTableIdent,
+                    new Column[] {nullWithoutAutoIncrementCol},
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_8"}}),
+                    }));
+    Assertions.assertTrue(
+        primaryKeyNotExistexception
+            .getMessage()
+            .contains("Column col_8 in the primary key does not exist in the table"));
+
+    Exception primaryKeyNotNullException =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableCatalog.createTable(
+                    nullableTableIdent,
+                    new Column[] {nullWithoutAutoIncrementCol},
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[] {
+                      Indexes.createMysqlPrimaryKey(new String[][] {{"col_7"}}),
+                    }));
+    Assertions.assertTrue(
+        primaryKeyNotNullException
+            .getMessage()
+            .contains("Column col_7 in the primary key must be a not null column"));
   }
 
   @Test
@@ -2099,5 +2233,83 @@ public class CatalogMysqlIT extends BaseIT {
 
     loadCatalog.asSchemas().dropSchema("test", true);
     metalake.dropCatalog(testCatalogName, true);
+  }
+
+  @Test
+  void testTimeTypePrecision() {
+    // Test different time type precisions
+    String tableName = GravitinoITUtils.genRandomName("test_time_precision");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  time_no_precision time,\n"
+            + "  time_precision_0 time(0),\n"
+            + "  time_precision_1 time(1),\n"
+            + "  time_precision_3 time(3),\n"
+            + "  time_precision_6 time(6),\n"
+            + "  datetime_no_precision datetime,\n"
+            + "  datetime_precision_0 datetime(0),\n"
+            + "  datetime_precision_1 datetime(1),\n"
+            + "  datetime_precision_3 datetime(3),\n"
+            + "  datetime_precision_6 datetime(6),\n"
+            + "  timestamp_no_precision timestamp,\n"
+            + "  timestamp_precision_0 timestamp(0) default current_timestamp,\n"
+            + "  timestamp_precision_1 timestamp(1) default current_timestamp(1),\n"
+            + "  timestamp_precision_3 timestamp(3) default '2012-12-31 11:30:45.123',\n"
+            + "  timestamp_precision_6 timestamp(6) default '2012-12-31 11:30:45.123456'\n"
+            + ");\n";
+
+    mysqlService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    // Verify time type precisions
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "time_no_precision":
+        case "time_precision_0":
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
+          break;
+        case "time_precision_1":
+          Assertions.assertEquals(Types.TimeType.of(1), column.dataType());
+          break;
+        case "time_precision_3":
+          Assertions.assertEquals(Types.TimeType.of(3), column.dataType());
+          break;
+        case "time_precision_6":
+          Assertions.assertEquals(Types.TimeType.of(6), column.dataType());
+          break;
+        case "datetime_no_precision":
+        case "datetime_precision_0":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_precision_1":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(1), column.dataType());
+          break;
+        case "datetime_precision_3":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
+          break;
+        case "datetime_precision_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
+          break;
+        case "timestamp_no_precision":
+        case "timestamp_precision_0":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
+          break;
+        case "timestamp_precision_1":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(1), column.dataType());
+          break;
+        case "timestamp_precision_3":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(3), column.dataType());
+          break;
+        case "timestamp_precision_6":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected column name: " + column.name());
+      }
+    }
   }
 }

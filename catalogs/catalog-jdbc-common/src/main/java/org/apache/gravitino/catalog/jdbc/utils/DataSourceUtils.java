@@ -19,8 +19,6 @@
 package org.apache.gravitino.catalog.jdbc.utils;
 
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.sql.DataSource;
@@ -28,6 +26,7 @@ import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.dbcp2.BasicDataSourceFactory;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 
 /**
  * Utility class for creating a {@link DataSource} from a {@link JdbcConfig}. It is mainly
@@ -38,26 +37,6 @@ public class DataSourceUtils {
 
   /** SQL statements for database connection pool testing. */
   private static final String POOL_TEST_QUERY = "SELECT 1";
-
-  private static final List<String> unsafeMySQLParameters =
-      Arrays.asList(
-          "maxAllowedPacket",
-          "autoDeserialize",
-          "queryInterceptors",
-          "statementInterceptors",
-          "detectCustomCollations",
-          "allowloadlocalinfile",
-          "allowUrlInLocalInfile",
-          "allowLoadLocalInfileInPath");
-
-  private static final List<String> unsafePostgresParameters =
-      Arrays.asList(
-          "socketFactory",
-          "socketFactoryArg",
-          "sslfactory",
-          "sslhostnameverifier",
-          "sslpasswordcallback",
-          "authenticationPluginClassName");
 
   public static DataSource createDataSource(Map<String, String> properties) {
     return createDataSource(new JdbcConfig(properties));
@@ -73,7 +52,7 @@ public class DataSourceUtils {
   }
 
   private static DataSource createDBCPDataSource(JdbcConfig jdbcConfig) throws Exception {
-    validateJdbcConfig(
+    JdbcUrlUtils.validateJdbcConfig(
         jdbcConfig.getJdbcDriver(), jdbcConfig.getJdbcUrl(), jdbcConfig.getAllConfig());
     BasicDataSource basicDataSource =
         BasicDataSourceFactory.createDataSource(getProperties(jdbcConfig));
@@ -115,44 +94,6 @@ public class DataSourceUtils {
     } while (!prev.equals(decoded) && --max > 0);
 
     return decoded;
-  }
-
-  private static void checkUnsafeParameters(
-      String url, Map<String, String> config, List<String> unsafeParams, String dbType) {
-
-    String lowerUrl = url.toLowerCase();
-
-    for (String param : unsafeParams) {
-      String lowerParam = param.toLowerCase();
-      if (lowerUrl.contains(lowerParam) || containsValueIgnoreCase(config, param)) {
-        throw new GravitinoRuntimeException(
-            "Unsafe %s parameter '%s' detected in JDBC URL", dbType, param);
-      }
-    }
-  }
-
-  public static void validateJdbcConfig(String driver, String url, Map<String, String> all) {
-    String lowerUrl = url.toLowerCase();
-    String decodedUrl = recursiveDecode(lowerUrl);
-
-    if (driver != null) {
-      if (decodedUrl.startsWith("jdbc:mysql")) {
-        checkUnsafeParameters(decodedUrl, all, unsafeMySQLParameters, "MySQL");
-      } else if (decodedUrl.startsWith("jdbc:mariadb")) {
-        checkUnsafeParameters(decodedUrl, all, unsafeMySQLParameters, "MariaDB");
-      } else if (decodedUrl.startsWith("jdbc:postgresql")) {
-        checkUnsafeParameters(decodedUrl, all, unsafePostgresParameters, "PostgreSQL");
-      }
-    }
-  }
-
-  private static boolean containsValueIgnoreCase(Map<String, String> map, String value) {
-    for (String keyValue : map.values()) {
-      if (keyValue != null && keyValue.equalsIgnoreCase(value)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   public static void closeDataSource(DataSource dataSource) {

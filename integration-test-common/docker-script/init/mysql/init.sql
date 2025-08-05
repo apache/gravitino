@@ -118,4 +118,3 @@ INSERT INTO gt_mysql_test_all_type.demo (
     ST_GeomFromText('POINT(10 20)'),        -- point_col
     ST_GeomFromText('LINESTRING(0 0, 10 10)') -- geometry_col
 );
-

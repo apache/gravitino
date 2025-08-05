@@ -19,9 +19,11 @@
 package org.apache.gravitino.config;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -158,10 +160,11 @@ public class ConfigEntry<T> {
    * @return The list of converted type.
    */
   public List<T> strToSeq(String str, Function<String, T> converter) {
+    if (str == null || str.isEmpty()) {
+      return Collections.emptyList();
+    }
     List<String> strList = Arrays.asList(str.split(","));
-    List<T> valList = strList.stream().map(converter).collect(Collectors.toList());
-
-    return valList;
+    return strList.stream().map(converter).collect(Collectors.toList());
   }
 
   /**
@@ -172,9 +175,9 @@ public class ConfigEntry<T> {
    * @return The converted string.
    */
   public String seqToStr(List<T> seq, Function<T, String> converter) {
-    List<String> valList = seq.stream().map(converter).collect(Collectors.toList());
-    String str = String.join(",", valList);
-    return str;
+    List<String> valList =
+        seq.stream().filter(Objects::nonNull).map(converter).collect(Collectors.toList());
+    return String.join(",", valList);
   }
 
   /**

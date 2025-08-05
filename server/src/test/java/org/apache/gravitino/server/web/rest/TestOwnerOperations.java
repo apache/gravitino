@@ -57,14 +57,13 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
-import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-class TestOwnerOperations extends JerseyTest {
+class TestOwnerOperations extends BaseOperationsTest {
   private static final OwnerManager manager = mock(OwnerManager.class);
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final AccessControlDispatcher accessControlDispatcher =
@@ -86,7 +85,7 @@ class TestOwnerOperations extends JerseyTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerManager", manager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", manager, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(

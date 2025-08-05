@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.postgresql.converter;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Optional;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -63,11 +64,17 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case TIME:
-        return Types.TimeType.get();
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimeType::of)
+            .orElseGet(Types.TimeType::get);
       case TIMESTAMP:
-        return Types.TimestampType.withoutTimeZone();
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimestampType::withoutTimeZone)
+            .orElseGet(Types.TimestampType::withoutTimeZone);
       case TIMESTAMP_TZ:
-        return Types.TimestampType.withTimeZone();
+        return Optional.ofNullable(typeBean.getDatetimePrecision())
+            .map(Types.TimestampType::withTimeZone)
+            .orElseGet(Types.TimestampType::withTimeZone);
       case NUMERIC:
         return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
       case VARCHAR:
@@ -103,10 +110,12 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       return type.simpleString();
     } else if (type instanceof Types.TimeType) {
       return type.simpleString();
-    } else if (type instanceof Types.TimestampType && !((Types.TimestampType) type).hasTimeZone()) {
-      return TIMESTAMP;
-    } else if (type instanceof Types.TimestampType && ((Types.TimestampType) type).hasTimeZone()) {
-      return TIMESTAMP_TZ;
+    } else if (type instanceof Types.TimestampType) {
+      Types.TimestampType timestampType = (Types.TimestampType) type;
+      String baseType = timestampType.hasTimeZone() ? TIMESTAMP_TZ : TIMESTAMP;
+      return timestampType.hasPrecisionSet()
+          ? String.format("%s(%d)", baseType, timestampType.precision())
+          : baseType;
     } else if (type instanceof Types.DecimalType) {
       return NUMERIC
           + "("

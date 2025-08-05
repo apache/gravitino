@@ -64,6 +64,7 @@ public abstract class BaseEntityCache implements EntityCache {
    * @param entity The {@link Entity} instance to check.
    */
   protected static void validateEntityHasIdentifier(Entity entity) {
+    Preconditions.checkArgument(entity != null, "Entity cannot be null");
     Preconditions.checkArgument(
         entity instanceof HasIdentifier, "Unsupported EntityType: " + entity.type());
   }
