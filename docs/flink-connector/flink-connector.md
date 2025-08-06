@@ -52,6 +52,7 @@ TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build(
 ```
 
 3. Add necessary jar files to Flink's `lib` sub-folder.
+
 To run Flink with Gravitino connector and then access the data sources like Hive, Iceberg and others, you need to put the necessary jar files into Flink's `lib` folder. For example, to access Hive, you need to add at least these jar files: `flink-connector-hive_{version}.jar`, `hive-metastore-{version}.jar`, `hive-exec-{version}-core.jar`, `hive-serde-{version}.jar`, `hive-shims-common-{version}.jar`, `hive-storage-api-{version}.jar`, etc.
 
 4. Execute the Flink SQL query.
