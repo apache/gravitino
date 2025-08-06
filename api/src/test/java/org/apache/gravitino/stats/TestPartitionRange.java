@@ -25,42 +25,61 @@ public class TestPartitionRange {
 
   @Test
   public void testPartitionRange() {
-    PartitionRange range1 = PartitionRange.lessThan("upper");
+    PartitionRange range1 = PartitionRange.upTo("upper", PartitionRange.BoundType.OPEN);
     Assertions.assertTrue(range1.upperPartitionName.isPresent());
     Assertions.assertFalse(range1.lowerPartitionName.isPresent());
     Assertions.assertEquals("upper", range1.upperPartitionName.get());
     Assertions.assertEquals(PartitionComparator.Type.NAME, range1.comparator().type());
+    Assertions.assertEquals(PartitionRange.BoundType.OPEN, range1.upperBoundType().get());
 
-    PartitionRange range2 = PartitionRange.greaterOrEqual("lower");
+    PartitionRange range2 = PartitionRange.downTo("lower", PartitionRange.BoundType.CLOSED);
     Assertions.assertFalse(range2.upperPartitionName.isPresent());
     Assertions.assertTrue(range2.lowerPartitionName.isPresent());
     Assertions.assertEquals("lower", range2.lowerPartitionName.get());
     Assertions.assertEquals(PartitionComparator.Type.NAME, range2.comparator().type());
+    Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range2.lowerBoundType().get());
 
-    PartitionRange range3 = PartitionRange.greaterOrEqual("lower", PartitionComparator.Type.NAME);
+    PartitionRange range3 =
+        PartitionRange.downTo(
+            "lower", PartitionRange.BoundType.CLOSED, PartitionComparator.Type.NAME);
     Assertions.assertTrue(range3.lowerPartitionName.isPresent());
     Assertions.assertFalse(range3.upperPartitionName.isPresent());
     Assertions.assertEquals("lower", range3.lowerPartitionName.get());
     Assertions.assertEquals(PartitionComparator.Type.NAME, range3.comparator().type());
+    Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range3.lowerBoundType().get());
 
-    PartitionRange range4 = PartitionRange.lessThan("upper", PartitionComparator.Type.NAME);
+    PartitionRange range4 =
+        PartitionRange.upTo("upper", PartitionRange.BoundType.OPEN, PartitionComparator.Type.NAME);
     Assertions.assertTrue(range4.upperPartitionName.isPresent());
     Assertions.assertFalse(range4.lowerPartitionName.isPresent());
     Assertions.assertEquals("upper", range4.upperPartitionName.get());
     Assertions.assertEquals(PartitionComparator.Type.NAME, range4.comparator().type());
+    Assertions.assertEquals(PartitionRange.BoundType.OPEN, range4.upperBoundType().get());
 
-    PartitionRange range5 = PartitionRange.between("lower", "upper", PartitionComparator.Type.NAME);
+    PartitionRange range5 =
+        PartitionRange.between(
+            "lower",
+            PartitionRange.BoundType.OPEN,
+            "upper",
+            PartitionRange.BoundType.CLOSED,
+            PartitionComparator.Type.NAME);
     Assertions.assertTrue(range5.lowerPartitionName.isPresent());
     Assertions.assertTrue(range5.upperPartitionName.isPresent());
     Assertions.assertEquals("lower", range5.lowerPartitionName.get());
     Assertions.assertEquals("upper", range5.upperPartitionName.get());
     Assertions.assertEquals(PartitionComparator.Type.NAME, range5.comparator().type());
+    Assertions.assertEquals(PartitionRange.BoundType.OPEN, range5.lowerBoundType().get());
+    Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range5.upperBoundType().get());
 
-    PartitionRange range6 = PartitionRange.between("lower", "upper");
+    PartitionRange range6 =
+        PartitionRange.between(
+            "lower", PartitionRange.BoundType.CLOSED, "upper", PartitionRange.BoundType.OPEN);
     Assertions.assertTrue(range6.lowerPartitionName.isPresent());
     Assertions.assertTrue(range6.upperPartitionName.isPresent());
     Assertions.assertEquals("lower", range6.lowerPartitionName.get());
     Assertions.assertEquals("upper", range6.upperPartitionName.get());
     Assertions.assertEquals(PartitionComparator.Type.NAME, range6.comparator().type());
+    Assertions.assertEquals(PartitionRange.BoundType.CLOSED, range6.lowerBoundType().get());
+    Assertions.assertEquals(PartitionRange.BoundType.OPEN, range6.upperBoundType().get());
   }
 }
