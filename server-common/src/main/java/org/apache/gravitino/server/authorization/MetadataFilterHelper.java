@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization;
 
+import java.lang.reflect.Array;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.HashMap;
