@@ -168,7 +168,7 @@ public class AwsIrsaCredentialProvider implements CredentialProvider {
 
     try {
       String tokenContent =
-          Files.readString(Paths.get(webIdentityTokenFile), StandardCharsets.UTF_8);
+          new String(Files.readAllBytes(Paths.get(webIdentityTokenFile)), StandardCharsets.UTF_8);
       if (StringUtils.isBlank(tokenContent)) {
         throw new IllegalStateException(
             "Web identity token file is empty: " + webIdentityTokenFile);
