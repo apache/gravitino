@@ -71,6 +71,8 @@ const MetalakeTree = props => {
             return 'devicon:postgresql-wordmark'
           case 'jdbc-doris':
             return 'custom-icons-doris'
+          case 'jdbc-starrocks':
+            return 'custom-icons-starrocks'
           case 'lakehouse-paimon':
             return 'custom-icons-paimon'
           case 'lakehouse-hudi':

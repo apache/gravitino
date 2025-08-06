@@ -36,6 +36,8 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
@@ -272,8 +274,17 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteModelMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+<<<<<<< HEAD
                     StatisticMetaMapper.class,
                     mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)));
+=======
+                    JobTemplateMetaMapper.class,
+                    mapper -> mapper.softDeleteJobTemplateMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    JobMetaMapper.class,
+                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
+>>>>>>> upstream/main
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -326,7 +337,15 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     StatisticMetaMapper.class,
-                    mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteStatisticsByMetalakeId(metalakeId)),
+                () ->
+                        SessionUtils.doWithoutCommit(
+                    JobTemplateMetaMapper.class,
+                    mapper -> mapper.softDeleteJobTemplateMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    JobMetaMapper.class,
+                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
       }
     }
     return true;

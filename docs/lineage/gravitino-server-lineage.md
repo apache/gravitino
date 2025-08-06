@@ -55,6 +55,17 @@ curl -X POST \
 
 Log sink prints the log in a separate log file `gravitino_lineage.log`, you could change the default behavior in `conf/log4j2.properties`.
 
+## Lineage HTTP sink
+
+The HTTP sink supports sending the lineage event to an HTTP server that follows the OpenLineage REST specification, like marquez
+| Property Name                     | Description                                                                                                                            | Default Value                                      | Required | Since Version |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|----------|---------------|
+| gravitino.lineage.sinks           | Specifies the lineage sink implementation to use. For http sink `http`.                                                                | `log`                                              | Yes      | 0.9.0         |
+| gravitino.lineage.http.sinkClass  | Fully qualified class name of the http sink lineage sink implementation  `org.apache.gravitino.lineage.sink.LineageHttpSink`)          | `org.apache.gravitino.lineage.sink.LineageLogSink` | Yes      | 0.9.0         |
+| gravitino.lineage.http.url        | URL of the http sink server endpoint for lineage collection(e.g., `http://localhost:5000`)                                             | none                                               | Yes      | 1.0.0         |
+| gravitino.lineage.http.authType   | Authentication type for http sink (options: `apiKey` or `none`)                                                                        | none                                               | Yes      | 1.0.0         |
+| gravitino.lineage.http.apiKey     | API key for authenticating with http sink (required if authType=`apiKey`)                                                              | none                                               | No       | 1.0.0         |
+
 ## High watermark status
 
 When the lineage sink operates slowly, lineage events accumulate in the async queue. Once the queue size exceeds 90% of its capacity (high watermark threshold), the lineage system enters a high watermark status. In this state, the lineage source must implement retry and logging mechanisms for rejected events to prevent system overload. For the HTTP source, it returns the `429 Too Many Requests` status code to the client.

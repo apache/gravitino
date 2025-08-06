@@ -38,6 +38,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -161,7 +162,13 @@ public class ModelMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByObjectId(modelId)));
+                mapper -> mapper.softDeleteStatisticsByObjectId(modelId)),
+    () ->
+            SessionUtils.doWithoutCommit(
+                PolicyMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                        modelId, MetadataObject.Type.MODEL.name())));
 
     return modelDeletedCount.get() > 0;
   }

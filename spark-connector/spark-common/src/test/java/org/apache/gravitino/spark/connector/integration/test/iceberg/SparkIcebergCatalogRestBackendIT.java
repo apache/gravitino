@@ -22,11 +22,15 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.DisabledIf;
 
 /**
  * This class use Apache Iceberg RESTCatalog for test, and the real backend catalog is HiveCatalog.
  */
 @Tag("gravitino-docker-test")
+// Spark connector use low Iceberg version, couldn't work with Iceberg REST server with high Iceberg
+// version in embedded mode.
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public abstract class SparkIcebergCatalogRestBackendIT extends SparkIcebergCatalogIT {
 
   @Override

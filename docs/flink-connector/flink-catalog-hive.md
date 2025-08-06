@@ -39,18 +39,24 @@ USE CATALOG hive_a;
 CREATE DATABASE IF NOT EXISTS mydatabase;
 USE mydatabase;
 
+SET 'execution.runtime-mode' = 'batch';
+-- [INFO] Execute statement succeed.
+
+SET 'sql-client.execution.result-mode' = 'tableau';
+-- [INFO] Execute statement succeed.
+
 // Create table
 CREATE TABLE IF NOT EXISTS employees (
     id INT,
     name STRING,
-    date INT
+    dt INT
 )
-PARTITIONED BY (date);
+PARTITIONED BY (dt);
 
-DESC TABLE EXTENDED employees;
+DESC EXTENDED employees;
 
-INSERT INTO TABLE employees VALUES (1, 'John Doe', 20240101), (2, 'Jane Smith', 20240101);
-SELECT * FROM employees WHERE date = '20240101';
+INSERT INTO employees VALUES (1, 'John Doe', 20240101), (2, 'Jane Smith', 20240101);
+SELECT * FROM employees WHERE dt = 20240101;
 ```
 
 ## Catalog properties
