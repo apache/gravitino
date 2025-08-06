@@ -41,23 +41,23 @@ interface SupportsPartitionStatistics {
    * unmodifiable, it will throw an UnmodifiableStatisticException.
    *
    * @param statisticsToUpdate a list of PartitionUpdateStatistics, where each
-   *     PartitionUpdateStatistics contains the partition name and a map of statistic names to their
+   *     PartitionStatisticsUpdate contains the partition name and a map of statistic names to their
    *     values to be updated.
    * @return a list of updated PartitionStatistics, where each PartitionStatistics contains the
    *     partition name and a list of statistics applicable to that partition.
    * @throws UnmodifiableStatisticException if any of the statistics to be updated are unmodifiable
    */
-  List<PartitionStatistics> updateStatistics(List<PartitionUpdateStatistics> statisticsToUpdate)
+  List<PartitionStatistics> updateStatistics(List<PartitionStatisticsUpdate> statisticsToUpdate)
       throws UnmodifiableStatisticException;
 
   /**
    * Drops statistics for the specified partitions. If the statistic is unmodifiable, it will throw
    * an UnmodifiableStatisticException.
    *
-   * @param statisticsToDrop a list of PartitionDropStatistics, where each PartitionDropStatistics
+   * @param statisticsToDrop a list of PartitionStatisticsDrop, where each PartitionStatisticsDrop
    * @return true if the statistics were successfully dropped.
    * @throws UnmodifiableStatisticException if any of the statistics to be dropped are unmodifiable
    */
-  boolean dropStatistics(List<PartitionDropStatistics> statisticsToDrop)
+  boolean dropStatistics(List<PartitionStatisticsDrop> statisticsToDrop)
       throws UnmodifiableStatisticException;
 }

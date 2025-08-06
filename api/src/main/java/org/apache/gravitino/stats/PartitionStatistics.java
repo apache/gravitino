@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.stats;
 
-import java.util.List;
-
 /** PartitionStatistics represents statistics for a specific partition in a data source. */
 public interface PartitionStatistics {
 
@@ -33,7 +31,7 @@ public interface PartitionStatistics {
   /**
    * Returns the statistics for the partition.
    *
-   * @return a list of statistics applicable to the partition
+   * @return a array of statistics applicable to the partition
    */
-  List<Statistic> statistics();
+  Statistic[] statistics();
 }

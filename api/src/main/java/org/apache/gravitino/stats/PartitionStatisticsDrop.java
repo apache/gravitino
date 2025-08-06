@@ -25,7 +25,7 @@ import java.util.List;
  * source. It is used to manage and track the statistics that are relevant when partitions are
  * dropped.
  */
-public class PartitionDropStatistics {
+public class PartitionStatisticsDrop {
 
   private final String partitionName;
   private final List<String> statisticNames;
@@ -39,11 +39,11 @@ public class PartitionDropStatistics {
    *     dropped.
    * @return a PartitionDropStatistics instance
    */
-  public static PartitionDropStatistics of(String partitionName, List<String> statisticNames) {
-    return new PartitionDropStatistics(partitionName, statisticNames);
+  public static PartitionStatisticsDrop of(String partitionName, List<String> statisticNames) {
+    return new PartitionStatisticsDrop(partitionName, statisticNames);
   }
 
-  private PartitionDropStatistics(String partitionName, List<String> statisticNames) {
+  private PartitionStatisticsDrop(String partitionName, List<String> statisticNames) {
     this.partitionName = partitionName;
     this.statisticNames = statisticNames;
   }

@@ -24,24 +24,6 @@ import org.apache.gravitino.rel.partitions.Partition;
 public interface PartitionComparator {
 
   /**
-   * Returns a default comparator for comparing two partitions.
-   *
-   * @return a default comparator that compares partitions by their names
-   */
-  static PartitionComparator defaultComparator() {
-    return (firstPartition, secondPartition) -> {
-      if (firstPartition == null && secondPartition == null) {
-        return 0;
-      } else if (firstPartition == null) {
-        return -1;
-      } else if (secondPartition == null) {
-        return 1;
-      }
-      return firstPartition.name().compareTo(secondPartition.name());
-    };
-  }
-
-  /**
    * Compares two partitions.
    *
    * @param firstPartition the first partition to compare
@@ -50,4 +32,58 @@ public interface PartitionComparator {
    *     equal to, or greater than the second.
    */
   int compareTo(Partition firstPartition, Partition secondPartition);
+
+  /**
+   * Returns the type of this partition comparator.
+   *
+   * @return the type of this partition comparator
+   */
+  Type type();
+
+  /**
+   * Creates a PartitionComparator based on the specified type.
+   *
+   * @param type the type of partition comparator to create
+   * @return a PartitionComparator instance based on the specified type
+   */
+  static PartitionComparator of(Type type) {
+    switch (type) {
+      case NAME:
+        return nameComparator();
+      default:
+        throw new IllegalArgumentException("Unsupported partition comparator type: " + type);
+    }
+  }
+
+  /** Enum representing the type of partition comparator. */
+  enum Type {
+    /** Comparator based on partition names */
+    NAME
+  }
+
+  /**
+   * Returns a partition name comparator for comparing two partitions.
+   *
+   * @return a partition name comparator that compares partitions by their names
+   */
+  static PartitionComparator nameComparator() {
+    return new PartitionComparator() {
+      @Override
+      public int compareTo(Partition firstPartition, Partition secondPartition) {
+        if (firstPartition == null && secondPartition == null) {
+          return 0;
+        } else if (firstPartition == null) {
+          return -1;
+        } else if (secondPartition == null) {
+          return 1;
+        }
+        return firstPartition.name().compareTo(secondPartition.name());
+      }
+
+      @Override
+      public Type type() {
+        return Type.NAME;
+      }
+    };
+  }
 }

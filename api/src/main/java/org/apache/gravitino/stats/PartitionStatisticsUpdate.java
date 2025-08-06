@@ -24,7 +24,7 @@ import java.util.Map;
  * PartitionUpdateStatistics represents the statistics for a specific partition that can be updated.
  * It contains the partition name and a map of statistic names to their values.
  */
-public class PartitionUpdateStatistics {
+public class PartitionStatisticsUpdate {
 
   private final String partitionName;
   private final Map<String, StatisticValue<?>> statistics;
@@ -36,12 +36,12 @@ public class PartitionUpdateStatistics {
    * @param statistics a map of statistic names to their values to be updated
    * @return a PartitionUpdateStatistics instance
    */
-  public static PartitionUpdateStatistics of(
+  public static PartitionStatisticsUpdate of(
       String partitionName, Map<String, StatisticValue<?>> statistics) {
-    return new PartitionUpdateStatistics(partitionName, statistics);
+    return new PartitionStatisticsUpdate(partitionName, statistics);
   }
 
-  private PartitionUpdateStatistics(
+  private PartitionStatisticsUpdate(
       String partitionName, Map<String, StatisticValue<?>> statistics) {
     this.partitionName = partitionName;
     this.statistics = statistics;

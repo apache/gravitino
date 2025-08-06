@@ -24,6 +24,7 @@ import java.util.Optional;
 public class PartitionRange {
   Optional<String> lowerPartitionName = Optional.empty();
   Optional<String> upperPartitionName = Optional.empty();
+  private PartitionComparator comparator = PartitionComparator.nameComparator();
 
   private PartitionRange() {}
 
@@ -34,8 +35,21 @@ public class PartitionRange {
    * @return a PartitionRange with the upper partition name.
    */
   public static PartitionRange lessThan(String upperPartitionName) {
+    return lessThan(upperPartitionName, PartitionComparator.Type.NAME);
+  }
+
+  /**
+   * Creates a PartitionRange which only has upper bound partition name with a specific comparator
+   * type.
+   *
+   * @param upperPartitionName the upper partition name, exclusive.
+   * @param type the type of partition comparator to use for this range.
+   * @return a PartitionRange with the upper partition name and the specified comparator type.
+   */
+  public static PartitionRange lessThan(String upperPartitionName, PartitionComparator.Type type) {
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.upperPartitionName = Optional.of(upperPartitionName);
+    partitionRange.comparator = PartitionComparator.of(type);
     return partitionRange;
   }
 
@@ -46,8 +60,22 @@ public class PartitionRange {
    * @return a PartitionRange with the lower partition name.
    */
   public static PartitionRange greaterOrEqual(String lowerPartitionName) {
+    return greaterOrEqual(lowerPartitionName, PartitionComparator.Type.NAME);
+  }
+
+  /**
+   * Creates a PartitionRange which only has lower bound partition name with a specific comparator
+   * type.
+   *
+   * @param lowerPartitionName the lower partition name, inclusive.
+   * @param type the type of partition comparator to use for this range.
+   * @return a PartitionRange with the lower partition name and the specified comparator type.
+   */
+  public static PartitionRange greaterOrEqual(
+      String lowerPartitionName, PartitionComparator.Type type) {
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.lowerPartitionName = Optional.of(lowerPartitionName);
+    partitionRange.comparator = PartitionComparator.of(type);
     return partitionRange;
   }
 
@@ -59,9 +87,25 @@ public class PartitionRange {
    * @return a PartitionRange with both lower and upper partition names.
    */
   public static PartitionRange between(String lowerPartitionName, String upperPartitionName) {
+    return between(lowerPartitionName, upperPartitionName, PartitionComparator.Type.NAME);
+  }
+
+  /**
+   * Creates a PartitionRange which has both lower and upper partition names with a specific
+   * comparator type.
+   *
+   * @param lowerPartitionName the lower partition name, inclusive.
+   * @param upperPartitionName the upper partition name, exclusive.
+   * @param type the type of partition comparator to use for this range.
+   * @return a PartitionRange with both lower and upper partition names and the specified comparator
+   *     type.
+   */
+  public static PartitionRange between(
+      String lowerPartitionName, String upperPartitionName, PartitionComparator.Type type) {
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.upperPartitionName = Optional.of(upperPartitionName);
     partitionRange.lowerPartitionName = Optional.of(lowerPartitionName);
+    partitionRange.comparator = PartitionComparator.of(type);
     return partitionRange;
   }
 
@@ -91,6 +135,6 @@ public class PartitionRange {
    * @return a PartitionComparator that can be used to compare partitions.
    */
   public PartitionComparator comparator() {
-    return PartitionComparator.defaultComparator();
+    return comparator;
   }
 }
