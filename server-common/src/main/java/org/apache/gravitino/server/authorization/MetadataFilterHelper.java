@@ -131,7 +131,7 @@ public class MetadataFilterHelper {
                   spiltMetadataNames(metalake, entityType, nameIdentifier);
               return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
             })
-        .toArray(size -> Arrays.copyOf(entities, size));
+        .toArray(size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size));
   }
 
   /**
