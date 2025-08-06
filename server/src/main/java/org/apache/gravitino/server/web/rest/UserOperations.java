@@ -58,7 +58,7 @@ public class UserOperations {
   private static final Logger LOG = LoggerFactory.getLogger(UserOperations.class);
 
   private static final String LOAD_USER_PRIVILEGE =
-      "METALAKE::OWNER || MATALAKE::MANAGE_USERS || USER::SELF";
+      "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";
 
   private final AccessControlDispatcher accessControlManager;
 
