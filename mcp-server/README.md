@@ -29,7 +29,8 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 1. Clone the code from GitHub, and change to `mcp-server` directory
 2. Create virtual environment, `uv venv`
 3. Install the required Python packages. `uv pip install -e .`
-4. Add Gravitino MCP server to corresponding LLM tools, use local MCP server like:
+4. Add Gravitino MCP server to corresponding LLM tools. Take `cursor` for example, edit `~/.cursor/mcp.json`, use following configuration for local Gravitino MCP server:
+
 ```json
 {
   "mcpServers": {
