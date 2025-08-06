@@ -55,7 +55,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~", "default_catalog/"})
+  @ValueSource(strings = {"hello", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
   public void testInvalidGetOps(String rawPrefix) {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);

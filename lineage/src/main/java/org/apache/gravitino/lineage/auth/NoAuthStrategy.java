@@ -16,10 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.lineage.auth;
 
-package org.apache.gravitino.spark.connector.integration.test.iceberg;
+import io.openlineage.client.transports.HttpConfig;
+import java.net.URI;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import org.junit.jupiter.api.condition.DisabledIf;
+// No authentication
+class NoAuthStrategy implements LineageServerAuthenticationStrategy {
+  private static final Logger LOG = LoggerFactory.getLogger(NoAuthStrategy.class);
 
-@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
-public class SparkIcebergCatalogRestBackendIT35 extends SparkIcebergCatalogRestBackendIT {}
+  @Override
+  public HttpConfig configureHttpConfig(String url, Map<String, String> configs) {
+    LOG.info("Using no authentication for OpenLineage client");
+    HttpConfig config = new HttpConfig();
+    config.setUrl(URI.create(url));
+    return config;
+  }
+}

@@ -16,10 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.lineage.auth;
 
-package org.apache.gravitino.spark.connector.integration.test.iceberg;
+import javax.ws.rs.BadRequestException;
 
-import org.junit.jupiter.api.condition.DisabledIf;
+public class AuthenticationFactory {
+  public static LineageServerAuthenticationStrategy createStrategy(String authType) {
+    if (authType == null || authType.trim().isEmpty()) {
+      return new NoAuthStrategy();
+    }
 
-@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
-public class SparkIcebergCatalogRestBackendIT35 extends SparkIcebergCatalogRestBackendIT {}
+    switch (authType) {
+      case "apiKey":
+        return new ApiKeyAuthStrategy();
+      case "none":
+        return new NoAuthStrategy();
+      default:
+        throw new BadRequestException("Unsupported authentication ");
+    }
+  }
+}

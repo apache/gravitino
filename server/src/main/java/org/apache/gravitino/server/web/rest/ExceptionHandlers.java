@@ -139,6 +139,11 @@ public class ExceptionHandlers {
     return JobTemplateExceptionHandler.INSTANCE.handle(op, jobTemplate, metalake, e);
   }
 
+  public static Response handleJobException(
+      OperationType op, String job, String metalake, Exception e) {
+    return JobExceptionHandler.INSTANCE.handle(op, job, metalake, e);
+  }
+
   public static Response handleTestConnectionException(Exception e) {
     ErrorResponse response;
     if (e instanceof IllegalArgumentException) {
@@ -808,6 +813,41 @@ public class ExceptionHandlers {
 
       } else if (e instanceof InUseException) {
         return Utils.inUse(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else {
+        return super.handle(op, jobTemplate, parent, e);
+      }
+    }
+  }
+
+  private static class JobExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new JobExceptionHandler();
+
+    private static String getJobErrorMsg(
+        String jobTemplate, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate job(s)%s operation [%s] under object [%s], reason [%s]",
+          jobTemplate, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String jobTemplate, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(jobTemplate) ? "" : " [" + jobTemplate + "]";
+      String errorMsg = getJobErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
 
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);

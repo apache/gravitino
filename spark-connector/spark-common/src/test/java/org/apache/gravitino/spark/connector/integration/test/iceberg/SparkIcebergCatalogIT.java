@@ -832,7 +832,9 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
                     getCatalogName(), fullTableName))
             .collectAsList();
     Assertions.assertEquals(1, callResult.size());
-    Assertions.assertEquals(2, callResult.get(0).getInt(0));
+    int rewrite_delete_files = callResult.get(0).getInt(0);
+    // rewrite delete files is 1 in Iceberg 1.9
+    Assertions.assertTrue(rewrite_delete_files == 1 || rewrite_delete_files == 2);
     Assertions.assertEquals(1, callResult.get(0).getInt(1));
   }
 
@@ -1111,7 +1113,11 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     icebergTable.refresh();
     tableInfo = getTableInfo(tableName);
     tableProperties = tableInfo.getTableProperties();
-    Assertions.assertEquals("none", tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE));
+    // After https://github.com/apache/iceberg/pull/10774/, distribution mode is not changed for
+    // local sort order
+    String distributionMode = tableProperties.get(ICEBERG_WRITE_DISTRIBUTION_MODE);
+    Assertions.assertTrue(
+        "none".equalsIgnoreCase(distributionMode) || "range".equalsIgnoreCase(distributionMode));
     Assertions.assertEquals(
         "id DESC NULLS LAST", tableProperties.get(IcebergPropertiesConstants.ICEBERG_SORT_ORDER));
     sortOrder =
