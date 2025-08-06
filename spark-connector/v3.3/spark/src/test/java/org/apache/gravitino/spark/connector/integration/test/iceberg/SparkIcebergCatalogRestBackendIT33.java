@@ -19,4 +19,7 @@
 
 package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
+import org.junit.jupiter.api.condition.DisabledIf;
+
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class SparkIcebergCatalogRestBackendIT33 extends SparkIcebergCatalogRestBackendIT {}
