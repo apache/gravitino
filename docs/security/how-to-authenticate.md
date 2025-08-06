@@ -8,12 +8,12 @@ license: "This software is licensed under the Apache License version 2."
 ## Authentication
 
 Apache Gravitino supports three kinds of authentication mechanisms: simple, OAuth and Kerberos.
-If you don't enable authentication for your client and server explicitly, you will use user `anonymous` to access the server.
+If you don't enable authentication for your client and server explicitly, the user `anonymous` will be used to access the server.
 
 ### Simple mode
 
-If the client sets the simple mode, it will use the value of environment variable `GRAVITINO_USER` as the user.
-If the environment variable `GRAVITINO_USER` in the client isn't set, the client uses the user logging in the machine that sends requests.
+In simple mode, the client uses the value of the `GRAVITINO_USER` environment variable as the username.
+If the environment variable `GRAVITINO_USER` in the client isn't set, the client defaults to the username of the user logged into the machine sending the requests.
 
 For the client side, users can enable `simple` mode by the following code:
 
@@ -60,7 +60,7 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 ### Kerberos mode
 
-To enable Kerberos mode, users need to guarantee that the server and client have the correct Kerberos configuration. In the server side, users should set `gravitino.authenticators` as `kerberos` and give
+To enable Kerberos mode, users must ensure that the server and client have the correct Kerberos configuration. On the server side, users should set `gravitino.authenticators` as `kerberos` and give
 `gravitino.authenticator.kerberos.principal` and `gravitino.authenticator.kerberos.keytab` a proper value. For the client side, users can enable `kerberos` mode by the following code:
 
 ```java
@@ -82,14 +82,14 @@ GravitinoClient client = GravitinoClient.builder(uri)
 ```
 
 :::info
-Now Iceberg REST service doesn't support Kerberos authentication.
-The URI must use the hostname of server instead of IP.
+Currently, the Iceberg REST service does not support Kerberos authentication.
+The URI must be the server's hostname instead of its IP address.
 :::
 
 ### Custom mode
 
-Gravitino also supports to implement custom authentication mode.
-For server side, you can implement the interface `Authenticator` and specify `grantviino.authenciators`.
+Gravitino also supports custom authentication implementations.
+For server side, you can implement the interface `Authenticator` and specify `gravitino.authenciators`.
 For client side, you extend the abstract class `CustomTokenProvider` and specify the token provider.
 
 ```java
@@ -158,7 +158,7 @@ You can follow the steps to set up an OAuth mode Gravitino server.
 
 5. Copy the public key and remove the character `\n` and you can get the default signing key of Gravitino server.
 
-6. You can refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+6. Refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
 gravitino.authenticators = oauth
@@ -246,7 +246,7 @@ gravitino.authenticator.oauth.tokenPath = /realms/gravitinorealm/protocol/openid
 gravitino.authenticator.oauth.serverUri = http://localhost:8080
 ```
 
-8. Use client credentials to authentication. The `access token` is bound to a service account.
+8. Use client credentials to authenticate. The `access token` is bound to a service account.
 
 Get access token
 
@@ -264,7 +264,7 @@ Use the access token to request the Gravitino
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
 ```
 
-9. Use password to authenticate users. The openid scope returns an `id_token` which includes users information which we can use for consumer mapping and group mapping in future posts.
+9. Use password to authenticate users. The openid scope returns an `id_token` that includes user information which can be used for consumer mapping and group mapping in future posts.
 
 Get access token
 
@@ -279,7 +279,7 @@ curl \
   "http://localhost:8080/realms/gravitinorealm/protocol/openid-connect/token"
 ```
 
-Use the access token to request the Gravitino
+Use the access token to make requests to the Gravitino server
 
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
