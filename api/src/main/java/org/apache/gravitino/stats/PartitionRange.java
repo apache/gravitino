@@ -24,7 +24,7 @@ import java.util.Optional;
 public class PartitionRange {
   Optional<String> lowerPartitionName = Optional.empty();
   Optional<String> upperPartitionName = Optional.empty();
-  private PartitionComparator comparator = PartitionComparator.nameComparator();
+  private PartitionComparator comparator = PartitionNameComparator.instance();
 
   private PartitionRange() {}
 
