@@ -227,8 +227,6 @@ tasks {
     dependsOn("installFormatTools")
 
     doLast {
-      var anyFailed = false
-
       val isortExitCode = exec {
         workingDir = pythonProjectDir
         commandLine(venvPython, "-m", "isort", "--check", "mcp_server", "tests")
@@ -247,7 +245,6 @@ tasks {
 
       if (blackExitCode != 0) {
         throw GradleException("Python black formatting check failed")
-        anyFailed = true
       }
     }
   }
