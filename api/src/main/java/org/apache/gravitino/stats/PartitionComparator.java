@@ -49,7 +49,7 @@ public interface PartitionComparator {
   static PartitionComparator of(Type type) {
     switch (type) {
       case NAME:
-        return nameComparator();
+        return PartitionNameComparator.instance();
       default:
         throw new IllegalArgumentException("Unsupported partition comparator type: " + type);
     }
@@ -59,31 +59,5 @@ public interface PartitionComparator {
   enum Type {
     /** Comparator based on partition names */
     NAME
-  }
-
-  /**
-   * Returns a partition name comparator for comparing two partitions.
-   *
-   * @return a partition name comparator that compares partitions by their names
-   */
-  static PartitionComparator nameComparator() {
-    return new PartitionComparator() {
-      @Override
-      public int compareTo(Partition firstPartition, Partition secondPartition) {
-        if (firstPartition == null && secondPartition == null) {
-          return 0;
-        } else if (firstPartition == null) {
-          return -1;
-        } else if (secondPartition == null) {
-          return 1;
-        }
-        return firstPartition.name().compareTo(secondPartition.name());
-      }
-
-      @Override
-      public Type type() {
-        return Type.NAME;
-      }
-    };
   }
 }
