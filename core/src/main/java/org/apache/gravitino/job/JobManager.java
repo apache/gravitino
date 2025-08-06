@@ -476,7 +476,8 @@ public class JobManager implements JobOperationDispatcher {
     cleanUpExecutor.shutdownNow();
   }
 
-  public void pullAndUpdateJobStatus() {
+  @VisibleForTesting
+  void pullAndUpdateJobStatus() {
     List<String> metalakes = listInUseMetalakes(entityStore);
     for (String metalake : metalakes) {
       // This unnecessary list all the jobs, we need to improve the code to only list the active
@@ -531,7 +532,8 @@ public class JobManager implements JobOperationDispatcher {
     }
   }
 
-  public void cleanUpStagingDirs() {
+  @VisibleForTesting
+  void cleanUpStagingDirs() {
     List<String> metalakes = listInUseMetalakes(entityStore);
 
     for (String metalake : metalakes) {
