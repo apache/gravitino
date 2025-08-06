@@ -44,14 +44,12 @@ plugins {
   // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue
   // running against JDK21, but we cannot upgrade the spotless to 6.19.0 or later since it only
   // support JDK11+. So we don't support JDK21 and thrown an exception for now.
-  if (JavaVersion.current() >= JavaVersion.VERSION_1_8 &&
-    JavaVersion.current() <= JavaVersion.VERSION_17
-  ) {
+  if (JavaVersion.current() >= JavaVersion.VERSION_17) {
     alias(libs.plugins.spotless)
   } else {
     throw GradleException(
       "The Gravitino Gradle toolchain currently does not support " +
-        "Java version ${JavaVersion.current()}. Please use JDK versions 8 through 17."
+        "Java version ${JavaVersion.current()}. Please use JDK version 17 or higher."
     )
   }
 
@@ -64,21 +62,12 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
-if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
-  throw GradleException(
-    "The Gravitino Gradle toolchain currently does not support building with " +
-      "Java version ${extra["jdkVersion"]}. Please use JDK versions 8, 11 or 17."
-  )
-}
-
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
-project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
-  listOf()
-} else {
+project.extra["extraJvmArgs"] =
   listOf(
     "-XX:+IgnoreUnrecognizedVMOptions",
     "--add-opens", "java.base/java.io=ALL-UNNAMED",
@@ -103,7 +92,6 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
     "--add-opens", "java.base/sun.util.calendar=ALL-UNNAMED",
     "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
   )
-}
 
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
@@ -344,7 +332,7 @@ subprojects {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
       } else {
-        languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
+        languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
   }
