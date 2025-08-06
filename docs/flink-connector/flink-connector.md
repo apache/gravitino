@@ -27,6 +27,7 @@ This capability allows users to perform federation queries, accessing data from 
 ## How to use it
 
 1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
+
 2. Configure the Flink configuration to use the Gravitino flink connector.
 
 | Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
@@ -51,9 +52,9 @@ EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConf
 TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
 ```
 
-3. Add necessary jar files to Flink's `lib` sub-folder.
+3. Add necessary jar files to Flink's classpath.
 
-To run Flink with Gravitino connector and then access the data sources like Hive, Iceberg and others, you need to put the necessary jar files into Flink's `lib` folder. For example, to access Hive, you need to add at least these jar files: `flink-connector-hive_{version}.jar`, `hive-metastore-{version}.jar`, `hive-exec-{version}-core.jar`, `hive-serde-{version}.jar`, `hive-shims-common-{version}.jar`, `hive-storage-api-{version}.jar`, etc.
+To run Flink with Gravitino connector and then access the data sources like Hive, Iceberg and others, you may need to put additional jars to Flink's classpath. You can refer to the [Flink document](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/hive/overview/#dependencies) for more information.
 
 4. Execute the Flink SQL query.
 
