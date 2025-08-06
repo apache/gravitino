@@ -77,10 +77,22 @@ public interface OAuthConfig {
   // OAuth provider configs
   ConfigEntry<String> PROVIDER =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "provider")
-          .doc("The OAuth provider to use (e.g., azure)")
+          .doc(
+              "The OAuth provider to use. This will be used in the Gravitino Web UI to determine the authentication flow.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
-          .create();
+          .checkValue(
+              value -> {
+                if (value == null) return false;
+                for (ProviderType type : ProviderType.values()) {
+                  if (type.name().equalsIgnoreCase(value)) {
+                    return true;
+                  }
+                }
+                return false;
+              },
+              "Invalid OAuth provider type. Supported values: 'default', 'oidc'")
+          .createWithDefault(ProviderType.DEFAULT.name().toLowerCase());
 
   ConfigEntry<String> CLIENT_ID =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "clientId")
@@ -91,21 +103,21 @@ public interface OAuthConfig {
 
   ConfigEntry<String> AUTHORITY =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "authority")
-          .doc("OAuth authority URL (authorization server)")
+          .doc("OAuth authority URL (authorization server) used for Web UI authentication")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .create();
 
   ConfigEntry<String> SCOPE =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "scope")
-          .doc("OAuth scopes (space-separated)")
+          .doc("OAuth scopes (space-separated) used for Web UI authentication")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .create();
 
   ConfigEntry<String> JWKS_URI =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "jwksUri")
-          .doc("JWKS URI for token validation")
+          .doc("JWKS URI used for server-side OAuth token validation")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()
           .create();
