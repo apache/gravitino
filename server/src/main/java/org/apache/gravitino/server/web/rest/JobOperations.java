@@ -279,7 +279,7 @@ public class JobOperations {
     }
   }
 
-  @DELETE
+  @POST
   @Path("runs/{jobId}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "cancel-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)

@@ -664,7 +664,7 @@ public class TestJobOperations extends JerseyTest {
             .path(job.name())
             .request(APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
-            .delete();
+            .post(null);
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(APPLICATION_JSON_TYPE, resp.getMediaType());
@@ -683,7 +683,7 @@ public class TestJobOperations extends JerseyTest {
             .path(job.name())
             .request(APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
-            .delete();
+            .post(null);
 
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
 
