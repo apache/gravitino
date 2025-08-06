@@ -63,20 +63,20 @@ def _parse_args():
         "--metalake",
         type=str,
         required=True,
-        help="Gravitino metalake name",
+        help="Gravitino metalake name.",
     )
     parser.add_argument(
         "--uri",
         type=str,
         default=DefaultSetting.default_uri,
-        help=f"The uri of Gravitino server, (default: $DefaultSetting.default_uri)",
+        help=f"The uri of Gravitino server. (default: {DefaultSetting.default_uri})",
     )
 
     parser.add_argument(
         "--include-tool-tags",
         type=_comma_separated_set,
         default=set(),
-        help="The tool tags to include, separated by commas, support tags:[metalake, schema, table]. (default: empty, all tools will be included).",
+        help="The tool tags to include, separated by commas, support tags:[catalog, schema, table]. (default: empty, all tools will be included).",
     )
 
     parser.add_argument(
@@ -84,14 +84,14 @@ def _parse_args():
         type=str,
         choices=["stdio", "http"],
         default=DefaultSetting.default_transport,
-        help=f"Transport protocol type: stdio (local), http (Streamable HTTP) (default: {DefaultSetting.default_transport})",
+        help=f"Transport protocol type: stdio (local), http (Streamable HTTP). (default: {DefaultSetting.default_transport})",
     )
 
     parser.add_argument(
         "--mcp-url",
         type=str,
         default=DefaultSetting.default_mcp_url,
-        help=f"The url of MCP server if using http transport, (default: {DefaultSetting.default_mcp_url})",
+        help=f"The url of MCP server if using http transport. (default: {DefaultSetting.default_mcp_url})",
     )
 
     args = parser.parse_args()
