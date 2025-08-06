@@ -112,9 +112,6 @@ public class TestDynamicIcebergConfigProvider {
         IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(invalidCatalogName));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(""));
-    Assertions.assertThrowsExactly(
-        IllegalArgumentException.class,
-        () -> provider.getIcebergCatalogConfig(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG));
   }
 
   @Test

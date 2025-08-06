@@ -32,14 +32,17 @@ public class TestMySQLCatalogPropertyConverter {
   @SuppressWarnings("unchecked")
   public void testBuildMySqlConnectorProperties() throws Exception {
     String name = "test_catalog";
+    // trino.bypass properties will be skipped when the catalog properties is defined by Gravitino
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
+            .put("trino.bypass.connection-user", "skip_value")
             .put("jdbc-url", "jdbc:mysql://localhost:5432/test")
             .put("jdbc-user", "test")
             .put("jdbc-password", "test")
             .put("trino.bypass.join-pushdown.strategy", "EAGER")
             .put("unknown-key", "1")
             .put("trino.bypass.mysql.unknown-key", "1")
+            .put("trino.bypass.connection-url", "skip_value")
             .build();
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(

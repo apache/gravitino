@@ -33,6 +33,10 @@ dependencies {
     isTransitive = false
   }
   implementation(libs.slf4j.api)
+  implementation(libs.httpclient5)
+  implementation(libs.httpcore5)
+  implementation(libs.jackson.dataformat.yaml)
+  implementation(libs.micrometer.core)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
