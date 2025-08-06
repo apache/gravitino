@@ -210,7 +210,7 @@ public class TopicMetaService {
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
                 mapper -> mapper.softDeleteStatisticsByObjectId(topicId)),
-    () ->
+        () ->
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->

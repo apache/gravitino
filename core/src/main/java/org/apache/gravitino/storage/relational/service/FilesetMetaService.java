@@ -267,8 +267,8 @@ public class FilesetMetaService {
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
                 mapper -> mapper.softDeleteStatisticsByObjectId(filesetId)),
-            () ->
-                    SessionUtils.doWithoutCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
