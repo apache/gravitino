@@ -751,6 +751,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           if (schemaPath != null && !containsPlaceholder(schemaPath.toString())) {
             try {
               FileSystem fs = getFileSystemWithCache(schemaPath, conf);
+              if (fs.exists(schemaPath) && fs.getFileStatus(schemaPath).isFile()) {
+                throw new RuntimeException(
+                    "Fileset schema location cannot be a file: " + schemaPath);
+              }
+
               if (!fs.exists(schemaPath)) {
                 if (!fs.mkdirs(schemaPath)) {
                   // Fail the operation when failed to create the schema path.
@@ -1039,6 +1044,20 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             }
 
             checkPlaceholderValue(v);
+
+            if (!containsPlaceholder(v)) {
+              Path path = new Path(v);
+              FileSystem fs = getFileSystemWithCache(path, conf);
+              try {
+                if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
+                  throw new RuntimeException("Fileset catalog location cannot be a file: " + v);
+                }
+              } catch (IOException e) {
+                throw new RuntimeException(
+                    "Failed to check if fileset catalog location exists: " + v, e);
+              }
+            }
+
             catalogStorageLocations.put(locationName, new Path((ensureTrailingSlash(v))));
           }
         });
