@@ -91,7 +91,13 @@ public interface OAuthConfig {
                 }
                 return false;
               },
-              "Invalid OAuth provider type. Supported values: 'default', 'oidc'")
+              "Invalid OAuth provider type. Supported values: '"
+                  + String.join(
+                      ", ",
+                      java.util.Arrays.stream(ProviderType.values())
+                          .map(v -> v.name().toLowerCase())
+                          .toArray(String[]::new))
+                  + "'")
           .createWithDefault(ProviderType.DEFAULT.name().toLowerCase());
 
   ConfigEntry<String> CLIENT_ID =
