@@ -47,10 +47,12 @@ public class CatalogPropertyConverter extends PropertyConverter {
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> gravitinoProperties) {
     Map<String, String> engineProperties = new HashMap<>();
     Map<String, String> gravitinoToEngineMapping = reverseMap(engineToGravitinoMapping());
+    Map<String, String> trinoBypassProperties = new HashMap<>();
     for (Map.Entry<String, String> entry : gravitinoProperties.entrySet()) {
       String gravitinoKey = entry.getKey();
       if (gravitinoKey.startsWith(TRINO_PROPERTIES_PREFIX)) {
-        engineProperties.put(gravitinoKey.replace(TRINO_PROPERTIES_PREFIX, ""), entry.getValue());
+        trinoBypassProperties.put(
+            gravitinoKey.replace(TRINO_PROPERTIES_PREFIX, ""), entry.getValue());
         continue;
       }
       String engineKey = gravitinoToEngineMapping.get(gravitinoKey);
@@ -58,6 +60,17 @@ public class CatalogPropertyConverter extends PropertyConverter {
         engineProperties.put(engineKey, entry.getValue());
       } else {
         LOG.info("Property {} is not supported by engine", entry.getKey());
+      }
+    }
+    // trino.bypass properties will be skipped when the catalog properties is defined by Gravitino
+    if (!trinoBypassProperties.isEmpty()) {
+      for (Map.Entry<String, String> entry : trinoBypassProperties.entrySet()) {
+        String key = entry.getKey();
+        if (!engineProperties.containsKey(key)) {
+          engineProperties.put(key, entry.getValue());
+        } else {
+          LOG.info("Property {} which with trino.bypass prefix is skipped", key);
+        }
       }
     }
     return engineProperties;

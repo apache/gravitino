@@ -495,6 +495,7 @@ public class CatalogOceanBaseIT extends BaseIT {
             + "  double_col_1 double default 123.45,\n"
             + "  varchar100_col_1 varchar(100) default 'CURRENT_TIMESTAMP',\n"
             + "  varchar200_col_1 varchar(200) default 'curdate()',\n"
+            + "  time_col_1 time default '00:00:00',\n"
             + "  datetime_col_1 datetime default CURRENT_TIMESTAMP,\n"
             + "  datetime_col_2 datetime default current_timestamp,\n"
             + "  datetime_col_3 datetime default null,\n"
@@ -539,6 +540,9 @@ public class CatalogOceanBaseIT extends BaseIT {
           break;
         case "varchar200_col_1":
           Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
+          break;
+        case "time_col_1":
+          Assertions.assertEquals(Literals.timeLiteral("00:00:00"), column.defaultValue());
           break;
         case "datetime_col_1":
         case "datetime_col_2":

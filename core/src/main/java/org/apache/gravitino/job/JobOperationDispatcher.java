@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.job;
 
+import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,7 +31,7 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 
 /** The interface for job operation dispatcher. */
-public interface JobOperationDispatcher {
+public interface JobOperationDispatcher extends Closeable {
 
   /**
    * Lists all the job templates in the specified metalake.
