@@ -34,7 +34,7 @@ from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
 
 
-def create_lifespan_manager(gravitino_context: GravitinoContext):
+def _create_lifespan_manager(gravitino_context: GravitinoContext):
 
     @asynccontextmanager
     async def app_lifespan(server: FastMCP) -> AsyncIterator[GravitinoContext]:
@@ -44,17 +44,17 @@ def create_lifespan_manager(gravitino_context: GravitinoContext):
     return app_lifespan
 
 
-def create_gravition_mcp(setting: Setting) -> FastMCP:
+def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     if setting.tags is not None and len(setting.tags) > 0:
         mcp = FastMCP(
             "Gravitino MCP Server",
-            lifespan=create_lifespan_manager(GravitinoContext(setting)),
+            lifespan=_create_lifespan_manager(GravitinoContext(setting)),
             include_tags=setting.tags,
         )
     else:
         mcp = FastMCP(
             "Gravitino MCP Server",
-            lifespan=create_lifespan_manager(GravitinoContext(setting)),
+            lifespan=_create_lifespan_manager(GravitinoContext(setting)),
         )
 
     mcp.add_middleware(
@@ -71,7 +71,7 @@ def create_gravition_mcp(setting: Setting) -> FastMCP:
     return mcp
 
 
-def parse_url(url: str) -> ():
+def _parse_mcp_url(url: str) -> ():
     try:
         parsed = urlparse(url)
         if parsed.scheme.lower() != "http":
@@ -96,7 +96,7 @@ def parse_url(url: str) -> ():
 class GravitinoMCPServer:
     def __init__(self, setting: Setting):
         self.setting = setting
-        self.mcp = create_gravition_mcp(setting)
+        self.mcp = _create_gravitino_mcp(setting)
         load_tools(self.mcp)
 
     def run(self):
@@ -109,7 +109,7 @@ class GravitinoMCPServer:
         asyncio.run(self.mcp.run_async(transport="stdio"))
 
     def _run_http(self):
-        _host, _port, _path = parse_url(self.setting.mcp_url)
+        _host, _port, _path = _parse_mcp_url(self.setting.mcp_url)
         asyncio.run(
             self.mcp.run_async(
                 transport="http", host=_host, port=_port, path=_path

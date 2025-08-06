@@ -31,13 +31,13 @@ def do_main():
         transport=args.transport,
         mcp_url=args.mcp_url,
     )
-    init_logging(setting)
+    _init_logging(setting)
     logging.info(f"Gravitino MCP server setting: {setting}")
     server = GravitinoMCPServer(setting)
     server.run()
 
 
-def init_logging(setting: Setting):
+def _init_logging(setting: Setting):
     logging.basicConfig(
         filename="gravitino-mcp.log",
         level=logging.INFO,

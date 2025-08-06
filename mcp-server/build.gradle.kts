@@ -21,16 +21,10 @@ import org.gradle.api.GradleException
 import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.Exec
 import org.gradle.kotlin.dsl.register
-import java.io.ByteArrayOutputStream
 import java.io.File
 
 val pythonProjectDir = project.projectDir
 val venvDir = pythonProjectDir.resolve(".venv")
-
-val systemPython = when {
-  System.getProperty("os.name").contains("win", ignoreCase = true) -> "python"
-  else -> "python3"
-}
 
 val globalUvExecutable = when {
   System.getProperty("os.name").contains("win", ignoreCase = true) -> "uv.exe"
@@ -53,51 +47,9 @@ val venvPython = when {
 }
 
 tasks {
-  register<Exec>("checkSystemPython") {
-    group = "python"
-    description = "Check system Python availability and version (>=3.10)"
-
-    commandLine(systemPython, "--version")
-
-    // Capture output for version parsing
-    standardOutput = ByteArrayOutputStream()
-    errorOutput = standardOutput
-    isIgnoreExitValue = true // We'll handle exit codes manually
-
-    doLast {
-      // Check if Python executable was found
-      if (executionResult.get().exitValue != 0) {
-        throw GradleException(
-          "System Python not found. " +
-            "Please install Python and ensure '$systemPython' is in PATH."
-        )
-      }
-
-      // Parse Python version from output
-      val output = standardOutput.toString().trim()
-      val versionMatch = Regex("Python (\\d+)\\.(\\d+)\\.(\\d+)").find(output)
-        ?: throw GradleException("Failed to parse Python version from: '$output'")
-
-      // Extract major and minor version
-      val major = versionMatch.groupValues[1].toInt()
-      val minor = versionMatch.groupValues[2].toInt()
-
-      // Check version requirement
-      if (major < 3 || (major == 3 && minor < 10)) {
-        throw GradleException(
-          "Python version $major.$minor is too old. " +
-            "Requires Python >= 3.10. Found: $output"
-        )
-      }
-
-      logger.lifecycle("✅ Python version $major.$minor meets requirement (>=3.10)")
-    }
-  }
-
   register<Exec>("installUv") {
     group = "python"
     description = "Install UV if not present"
-    dependsOn("checkSystemPython")
 
     val isWindows = System.getProperty("os.name").contains("win", ignoreCase = true)
     val uvInstallDir = file("$pythonProjectDir/.uv/bin").apply { mkdirs() }
