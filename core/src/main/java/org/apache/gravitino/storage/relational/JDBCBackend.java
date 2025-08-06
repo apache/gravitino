@@ -307,6 +307,8 @@ public class JDBCBackend implements RelationalBackend {
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
         return JobTemplateMetaService.getInstance().deleteJobTemplate(ident);
+      case JOB:
+        return JobMetaService.getInstance().deleteJob(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);

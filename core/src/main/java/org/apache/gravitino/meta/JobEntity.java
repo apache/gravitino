@@ -48,6 +48,8 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required(
           "audit_info", AuditInfo.class, "The audit details of the job template entity.");
+  public static final Field FINISHED_AT =
+      Field.optional("job_finished_at", Long.class, "The time when the job finished execution.");
 
   private Long id;
   private String jobExecutionId;
@@ -55,6 +57,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   private String jobTemplateName;
   private Namespace namespace;
   private AuditInfo auditInfo;
+  private Long finishedAt;
 
   private JobEntity() {}
 
@@ -66,6 +69,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     fields.put(TEMPLATE_NAME, jobTemplateName);
     fields.put(STATUS, status);
     fields.put(AUDIT_INFO, auditInfo);
+    fields.put(FINISHED_AT, finishedAt);
     return Collections.unmodifiableMap(fields);
   }
 
@@ -94,6 +98,10 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
   public String jobTemplateName() {
     return jobTemplateName;
+  }
+
+  public Long finishedAt() {
+    return finishedAt;
   }
 
   @Override
@@ -167,6 +175,11 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withAuditInfo(AuditInfo auditInfo) {
       jobEntity.auditInfo = auditInfo;
+      return this;
+    }
+
+    public Builder withFinishedAt(Long finishedAt) {
+      jobEntity.finishedAt = finishedAt;
       return this;
     }
 
