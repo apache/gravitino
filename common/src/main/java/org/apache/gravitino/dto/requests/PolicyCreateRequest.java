@@ -62,6 +62,9 @@ public class PolicyCreateRequest implements RESTRequest {
     // add mappings for built-in types here
     // For example: @JsonSubTypes.Type(value = DataCompactionContent.class, name =
     // "system_data_compaction")
+    @JsonSubTypes.Type(
+        value = PolicyContentDTO.DataCompactionContentDTO.class,
+        name = "system_data_compaction")
   })
   private final PolicyContentDTO policyContent;
 

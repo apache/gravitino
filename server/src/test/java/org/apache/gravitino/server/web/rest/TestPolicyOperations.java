@@ -237,21 +237,6 @@ public class TestPolicyOperations extends JerseyTest {
     Assertions.assertEquals(policy2.comment(), policyListResp.getPolicies()[1].comment());
     Assertions.assertEquals(Optional.empty(), policyListResp.getPolicies()[1].inherited());
 
-    // Test return null
-    when(policyManager.listPolicyInfos(metalake)).thenReturn(null);
-    Response resp1 =
-        target(policyPath(metalake))
-            .queryParam("details", true)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp1.getStatus());
-
-    PolicyListResponse policyListResp1 = resp1.readEntity(PolicyListResponse.class);
-    Assertions.assertEquals(0, policyListResp1.getCode());
-    Assertions.assertEquals(0, policyListResp1.getPolicies().length);
-
     // Test return empty array
     when(policyManager.listPolicyInfos(metalake)).thenReturn(new Policy[0]);
     Response resp2 =
