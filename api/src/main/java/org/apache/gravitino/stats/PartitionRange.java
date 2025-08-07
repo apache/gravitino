@@ -57,14 +57,15 @@ public class PartitionRange {
    *
    * @param upperPartitionName the upper partition name.
    * @param upperBoundType the type of the upper bound (open or closed).
+   * @param comparator the comparator to use for this range.
    * @return a PartitionRange with the upper partition name and the specified comparator type.
    */
   public static PartitionRange upTo(
-      String upperPartitionName, BoundType upperBoundType, SortOrder sortOrder) {
+      String upperPartitionName, BoundType upperBoundType, SortOrder comparator) {
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.upperPartitionName = Optional.of(upperPartitionName);
     partitionRange.upperBoundType = Optional.of(upperBoundType);
-    partitionRange.comparator = sortOrder;
+    partitionRange.comparator = comparator;
     return partitionRange;
   }
 
@@ -85,15 +86,15 @@ public class PartitionRange {
    *
    * @param lowerPartitionName the lower partition name.
    * @param lowerBoundType the type of the lower bound (open or closed).
-   * @param sortOrder the comparator to use for this range.
+   * @param comparator the comparator to use for this range.
    * @return a PartitionRange with the lower partition name and the specified comparator type.
    */
   public static PartitionRange downTo(
-      String lowerPartitionName, BoundType lowerBoundType, SortOrder sortOrder) {
+      String lowerPartitionName, BoundType lowerBoundType, SortOrder comparator) {
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.lowerPartitionName = Optional.of(lowerPartitionName);
     partitionRange.lowerBoundType = Optional.of(lowerBoundType);
-    partitionRange.comparator = sortOrder;
+    partitionRange.comparator = comparator;
     return partitionRange;
   }
 
