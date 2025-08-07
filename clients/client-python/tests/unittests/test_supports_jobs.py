@@ -215,7 +215,7 @@ class TestSupportsJobs(unittest.TestCase):
         mock_resp = self._mock_http_response(resp.to_json())
 
         with patch(
-            "gravitino.utils.http_client.HTTPClient.delete", return_value=mock_resp
+            "gravitino.utils.http_client.HTTPClient.post", return_value=mock_resp
         ):
             job_handle = gravitino_client.cancel_job(job_dto.job_id())
             self._compare_job_handle(job_handle, job_dto)
