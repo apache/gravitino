@@ -86,6 +86,14 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
+    return "UPDATE "
+        + JobMetaMapper.TABLE_NAME
+        + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
+        + " timestamp '1970-01-01 00:00:00')*1000))) "
+        + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
+  }
+
   @Override
   public String softDeleteJobMetasByLegacyTimeline(@Param("legacyTimeline") Long legacyTimeline) {
     return "UPDATE "

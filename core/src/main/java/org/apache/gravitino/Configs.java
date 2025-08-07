@@ -424,4 +424,25 @@ public class Configs {
           .stringConf()
           .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault("local");
+
+  public static final ConfigEntry<Long> JOB_STAGING_DIR_KEEP_TIME_IN_MS =
+      new ConfigBuilder("gravitino.job.stagingDirKeepTimeInMs")
+          .doc(
+              "The time in milliseconds to keep the staging files of the finished job in the job"
+                  + " staging directory. The minimum recommended value is 10 minutes if you're "
+                  + "not testing.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(7 * 24 * 3600 * 1000L); // Default is 7 days
+
+  public static final ConfigEntry<Long> JOB_STATUS_PULL_INTERVAL_IN_MS =
+      new ConfigBuilder("gravitino.job.statusPullIntervalInMs")
+          .doc(
+              "The interval in milliseconds to pull the job status from the job executor. The "
+                  + "minimum recommended value is 1 minute if you're not testing.")
+          .version(ConfigConstants.VERSION_1_0_0)
+          .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 }

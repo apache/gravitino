@@ -67,4 +67,7 @@ public interface JobMetaMapper {
   @DeleteProvider(type = JobMetaSQLProviderFactory.class, method = "deleteJobMetasByLegacyTimeline")
   Integer deleteJobMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = JobMetaSQLProviderFactory.class, method = "softDeleteJobMetaByRunId")
+  Integer softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId);
 }
