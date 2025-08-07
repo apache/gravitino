@@ -132,6 +132,17 @@ public class TestJobMetaService extends TestJDBCBackend {
         JobMetaService.getInstance()
             .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobOverwrite.name()));
     Assertions.assertEquals(jobOverwrite, updatedJob);
+
+    // Test insert and get job with finishedAt
+    JobEntity finishedJob =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(finishedJob, false));
+
+    JobEntity retrievedFinishedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, finishedJob.name()));
+    Assertions.assertTrue(retrievedFinishedJob.finishedAt() > 0);
   }
 
   @Test
@@ -179,5 +190,36 @@ public class TestJobMetaService extends TestJDBCBackend {
     List<JobEntity> jobs =
         JobMetaService.getInstance().listJobsByNamespace(NamespaceUtil.ofJob(METALAKE_NAME));
     Assertions.assertTrue(jobs.isEmpty(), "Jobs should be deleted by legacy timeline");
+  }
+
+  @Test
+  public void testDeleteJobByIdentifier() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "test_job_template", "test_comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    JobEntity job =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
+    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(job, false));
+
+    JobEntity retrievedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
+    Assertions.assertEquals(job, retrievedJob);
+
+    Assertions.assertTrue(
+        JobMetaService.getInstance()
+            .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
+
+    // Verify that the job is deleted
+    Assertions.assertFalse(
+        JobMetaService.getInstance()
+            .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
   }
 }

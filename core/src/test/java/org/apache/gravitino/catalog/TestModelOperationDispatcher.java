@@ -774,9 +774,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelName = randomModelName();
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    String newUri = "s3://new-bucket/new-path/new-model.json";
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    Map<String, String> versionUris = ImmutableMap.of("n1", "u1");
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -790,12 +789,14 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.linkModelVersion(
         modelIdent, versionUris, versionAliases, versionComment, props);
 
-    ModelVersionChange change = ModelVersionChange.updateUri(newUri);
+    String newUri = "u2";
+    Map<String, String> newVersionUris = ImmutableMap.of("n1", newUri);
+    ModelVersionChange change = ModelVersionChange.updateUri("n1", newUri);
     ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
 
-    Assertions.assertEquals(newUri, alteredModelVersion.uri());
+    Assertions.assertEquals(newVersionUris, alteredModelVersion.uris());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
@@ -810,9 +811,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     String modelName = randomModelName();
     String modelComment = "model which tests update";
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    String newUri = "s3://new-bucket/new-path/new-model.json";
 
-    Map<String, String> versionUris = ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri");
+    Map<String, String> versionUris = ImmutableMap.of("n1", "u1");
     String[] versionAliases = {"alias1", "alias2"};
     String versionComment = "version which tests update";
 
@@ -826,13 +826,165 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher.linkModelVersion(
         modelIdent, versionUris, versionAliases, versionComment, props);
 
-    ModelVersionChange change = ModelVersionChange.updateUri(newUri);
+    String newUri = "u2";
+    Map<String, String> newVersionUris = ImmutableMap.of("n1", newUri);
+    ModelVersionChange change = ModelVersionChange.updateUri("n1", newUri);
     ModelVersion modelVersion =
         modelOperationDispatcher.getModelVersion(modelIdent, versionAliases[0]);
     ModelVersion alteredModelVersion =
         modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], change);
 
-    Assertions.assertEquals(newUri, alteredModelVersion.uri());
+    Assertions.assertEquals(newVersionUris, alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
+    Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
+  }
+
+  @Test
+  void testAddModelVersionUri() {
+    String schemaName = randomSchemaName();
+    String schemaComment = "schema which tests update";
+
+    String modelName = randomModelName();
+    String modelComment = "model which tests update";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    Map<String, String> versionUris = ImmutableMap.of("n1", "u1");
+    String[] versionAliases = {"alias1", "alias2"};
+    String versionComment = "version which tests update";
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    modelOperationDispatcher.linkModelVersion(
+        modelIdent, versionUris, versionAliases, versionComment, props);
+
+    String newUriName = "n2";
+    String newUri = "u2";
+    Map<String, String> newVersionUris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    ModelVersionChange change = ModelVersionChange.addUri(newUriName, newUri);
+    ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
+    ModelVersion alteredModelVersion =
+        modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
+
+    Assertions.assertEquals(newVersionUris, alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
+    Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
+  }
+
+  @Test
+  void testAddModelVersionUriByAlias() {
+    String schemaName = randomSchemaName();
+    String schemaComment = "schema which tests update";
+
+    String modelName = randomModelName();
+    String modelComment = "model which tests update";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    Map<String, String> versionUris = ImmutableMap.of("n1", "u1");
+    String[] versionAliases = {"alias1", "alias2"};
+    String versionComment = "version which tests update";
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    modelOperationDispatcher.linkModelVersion(
+        modelIdent, versionUris, versionAliases, versionComment, props);
+
+    String newUriName = "n2";
+    String newUri = "u2";
+    Map<String, String> newVersionUris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    ModelVersionChange change = ModelVersionChange.addUri(newUriName, newUri);
+    ModelVersion modelVersion =
+        modelOperationDispatcher.getModelVersion(modelIdent, versionAliases[0]);
+    ModelVersion alteredModelVersion =
+        modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], change);
+
+    Assertions.assertEquals(newVersionUris, alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
+    Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
+  }
+
+  @Test
+  void testRemoveModelVersionUri() {
+    String schemaName = randomSchemaName();
+    String schemaComment = "schema which tests update";
+
+    String modelName = randomModelName();
+    String modelComment = "model which tests update";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    Map<String, String> versionUris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    String[] versionAliases = {"alias1", "alias2"};
+    String versionComment = "version which tests update";
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    modelOperationDispatcher.linkModelVersion(
+        modelIdent, versionUris, versionAliases, versionComment, props);
+
+    Map<String, String> newVersionUris = ImmutableMap.of("n2", "u2");
+    ModelVersionChange change = ModelVersionChange.removeUri("n1");
+    ModelVersion modelVersion = modelOperationDispatcher.getModelVersion(modelIdent, 0);
+    ModelVersion alteredModelVersion =
+        modelOperationDispatcher.alterModelVersion(modelIdent, 0, change);
+
+    Assertions.assertEquals(newVersionUris, alteredModelVersion.uris());
+    Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
+    Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
+    Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());
+    Assertions.assertEquals(modelVersion.properties(), alteredModelVersion.properties());
+  }
+
+  @Test
+  void testRemoveModelVersionUriByAlias() {
+    String schemaName = randomSchemaName();
+    String schemaComment = "schema which tests update";
+
+    String modelName = randomModelName();
+    String modelComment = "model which tests update";
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+
+    Map<String, String> versionUris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    String[] versionAliases = {"alias1", "alias2"};
+    String versionComment = "version which tests update";
+
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
+    schemaOperationDispatcher.createSchema(schemaIdent, schemaComment, props);
+
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalake, catalog, schemaName, modelName);
+    modelOperationDispatcher.registerModel(modelIdent, modelComment, props);
+
+    modelOperationDispatcher.linkModelVersion(
+        modelIdent, versionUris, versionAliases, versionComment, props);
+
+    Map<String, String> newVersionUris = ImmutableMap.of("n2", "u2");
+    ModelVersionChange change = ModelVersionChange.removeUri("n1");
+    ModelVersion modelVersion =
+        modelOperationDispatcher.getModelVersion(modelIdent, versionAliases[0]);
+    ModelVersion alteredModelVersion =
+        modelOperationDispatcher.alterModelVersion(modelIdent, versionAliases[0], change);
+
+    Assertions.assertEquals(newVersionUris, alteredModelVersion.uris());
     Assertions.assertEquals(modelVersion.version(), alteredModelVersion.version());
     Assertions.assertEquals(modelVersion.aliases(), alteredModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), alteredModelVersion.comment());

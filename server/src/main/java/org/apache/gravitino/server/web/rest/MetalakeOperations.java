@@ -21,7 +21,6 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -104,7 +103,7 @@ public class MetalakeOperations {
                                   .length
                               > 0;
                         })
-                    .collect(Collectors.toList())
+                    .toList()
                     .toArray(new Metalake[0]);
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);

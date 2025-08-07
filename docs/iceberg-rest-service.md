@@ -338,7 +338,7 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 ...
 ```
 
-You can access different catalogs by setting the `prefix` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `prefix`. For instance, consider the case of SparkSQL.
+You can access different catalogs by setting the `warehouse` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `warehouse`. For instance, consider the case of SparkSQL.
 
 ```shell
 ./bin/spark-sql -v \
@@ -348,11 +348,11 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 ...
 --conf spark.sql.catalog.hive_backend_catalog.type=rest  \
 --conf spark.sql.catalog.hive_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.hive_backend_catalog.prefix=hive_backend \
+--conf spark.sql.catalog.hive_backend_catalog.warehouse=hive_backend \
 ...
 --conf spark.sql.catalog.jdbc_backend_catalog.type=rest  \
 --conf spark.sql.catalog.jdbc_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.jdbc_backend_catalog.prefix=jdbc_backend \
+--conf spark.sql.catalog.jdbc_backend_catalog.warehouse=jdbc_backend \
 ...
 ```
 
@@ -373,6 +373,8 @@ gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
 ```
 
+You can access different catalogs by setting the `warehouse` to the catalog name in Gravitino server in the client side.
+
 ### Other Apache Iceberg catalog properties
 
 You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.6.1/configuration/#catalog-properties).
@@ -385,7 +387,6 @@ The `clients` property for example:
 :::info
 `catalog-impl` has no effect.
 :::
-
 
 ### Event listener
 
@@ -561,7 +562,7 @@ SELECT * FROM t;
 You could run Gravitino Iceberg REST server though docker container:
 
 ```shell
-docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.8.0-incubating
+docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 ```
 
 Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
@@ -607,7 +608,7 @@ The below environment is deprecated, please use the corresponding configuration 
 Or build it manually to add custom configuration or logics:
 
 ```shell
-sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag 0.7.0-incubating
+sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag $tag
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).

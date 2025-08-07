@@ -16,13 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.stats;
 
-package org.apache.gravitino.auth;
+/** PartitionStatistics represents statistics for a specific partition in a data source. */
+public interface PartitionStatistics {
 
-/** The type of OAuth provider. */
-public enum ProviderType {
-  /** Default provider. */
-  DEFAULT,
-  /** Azure AD provider. */
-  AZURE
+  /**
+   * Returns the name of the partition for which these statistics are applicable.
+   *
+   * @return the name of the partition
+   */
+  String name();
+
+  /**
+   * Returns the statistics for the partition.
+   *
+   * @return a array of statistics applicable to the partition
+   */
+  Statistic[] statistics();
 }
