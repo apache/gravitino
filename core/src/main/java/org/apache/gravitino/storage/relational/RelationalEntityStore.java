@@ -20,14 +20,17 @@ package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -59,6 +62,39 @@ public class RelationalEntityStore
   private RelationalBackend backend;
   private RelationalGarbageCollector garbageCollector;
   private EntityCache cache;
+
+  // Key is the type of relation, and the type of entity that the relation targets.
+  private static final Map<Type, List<EntityType>> RELATION_TARGET_TYPE_TO_ENTITY_TYPE =
+      ImmutableMap.of(
+          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+          ImmutableList.of(Entity.EntityType.ROLE),
+          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+          ImmutableList.of(Entity.EntityType.POLICY),
+          Type.OWNER_REL,
+          ImmutableList.of(Entity.EntityType.USER, Entity.EntityType.GROUP),
+          Type.ROLE_USER_REL,
+          ImmutableList.of(Entity.EntityType.USER),
+          Type.ROLE_GROUP_REL,
+          ImmutableList.of(Entity.EntityType.GROUP),
+          Type.JOB_TEMPLATE_JOB_REL,
+          ImmutableList.of(Entity.EntityType.JOB));
+
+  // Key is the type of relation, values are type that are allowed to use `listEntitiesByRelation`
+  // to get entities. An empty list means all types are allowed.
+  private static final Map<Type, List<Entity.EntityType>> RELATION_ALLOWED_ENTITY_TYPE =
+      ImmutableMap.of(
+          SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
+          ImmutableList.of(),
+          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+          ImmutableList.of(),
+          Type.OWNER_REL,
+          ImmutableList.of(),
+          Type.ROLE_USER_REL,
+          ImmutableList.of(Entity.EntityType.ROLE, Entity.EntityType.USER),
+          Type.ROLE_GROUP_REL,
+          ImmutableList.of(Entity.EntityType.ROLE),
+          Type.JOB_TEMPLATE_JOB_REL,
+          ImmutableList.of(Entity.EntityType.JOB_TEMPLATE));
 
   @Override
   public void initialize(Config config) throws RuntimeException {
@@ -120,7 +156,32 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     cache.invalidate(ident, entityType);
+
+    // Invalid all related cache entries by relation.
+    invalidateCacheByRelation(ident, entityType);
+
     return backend.update(ident, entityType, updater);
+  }
+
+  private void invalidateCacheByRelation(NameIdentifier ident, Entity.EntityType entityType)
+      throws IOException {
+    for (Map.Entry<Type, List<EntityType>> entry : RELATION_TARGET_TYPE_TO_ENTITY_TYPE.entrySet()) {
+      Type relType = entry.getKey();
+      List<EntityType> relatedEntityTypes = entry.getValue();
+
+      for (EntityType relatedEntityType : relatedEntityTypes) {
+        List<EntityType> allowEntityType = RELATION_ALLOWED_ENTITY_TYPE.get(relType);
+        if (allowEntityType == null
+            || allowEntityType.isEmpty()
+            || allowEntityType.contains(entityType)) {
+          backend.listEntitiesByRelation(relType, ident, entityType, false).stream()
+              .forEach(
+                  roleEntity -> {
+                    cache.invalidate(roleEntity.nameIdentifier(), relatedEntityType);
+                  });
+        }
+      }
+    }
   }
 
   @Override
@@ -145,6 +206,7 @@ public class RelationalEntityStore
       throws IOException {
     try {
       cache.invalidate(ident, entityType);
+      invalidateCacheByRelation(ident, entityType);
       return backend.delete(ident, entityType, cascade);
     } catch (NoSuchEntityException e) {
       return false;
