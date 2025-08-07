@@ -35,9 +35,6 @@ import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
-import org.apache.gravitino.dto.job.JobTemplateDTO;
-import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
-import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -48,9 +45,6 @@ import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
 import org.apache.gravitino.file.FilesetChange;
-import org.apache.gravitino.job.JobTemplate;
-import org.apache.gravitino.job.ShellJobTemplate;
-import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersionChange;
@@ -423,41 +417,6 @@ class DTOConverters {
     } else {
       throw new IllegalArgumentException(
           "Unknown model version change type: " + change.getClass().getSimpleName());
-    }
-  }
-
-  static JobTemplateDTO toJobTemplateDTO(JobTemplate jobTemplate) {
-    switch (jobTemplate.jobType()) {
-      case SHELL:
-        return ShellJobTemplateDTO.builder()
-            .withJobType(jobTemplate.jobType())
-            .withName(jobTemplate.name())
-            .withComment(jobTemplate.comment())
-            .withExecutable(jobTemplate.executable())
-            .withArguments(jobTemplate.arguments())
-            .withEnvironments(jobTemplate.environments())
-            .withCustomFields(jobTemplate.customFields())
-            .withScripts(((ShellJobTemplate) jobTemplate).scripts())
-            .build();
-
-      case SPARK:
-        return SparkJobTemplateDTO.builder()
-            .withJobType(jobTemplate.jobType())
-            .withName(jobTemplate.name())
-            .withComment(jobTemplate.comment())
-            .withExecutable(jobTemplate.executable())
-            .withArguments(jobTemplate.arguments())
-            .withEnvironments(jobTemplate.environments())
-            .withCustomFields(jobTemplate.customFields())
-            .withClassName(((SparkJobTemplate) jobTemplate).className())
-            .withJars(((SparkJobTemplate) jobTemplate).jars())
-            .withFiles(((SparkJobTemplate) jobTemplate).files())
-            .withArchives(((SparkJobTemplate) jobTemplate).archives())
-            .withConfigs(((SparkJobTemplate) jobTemplate).configs())
-            .build();
-
-      default:
-        throw new IllegalArgumentException("Unsupported job type: " + jobTemplate.jobType());
     }
   }
 }
