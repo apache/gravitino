@@ -20,7 +20,7 @@ import unittest
 
 from fastmcp import Client
 
-from mcp_server.connector.factory import ConnectorFactory
+from mcp_server.connector.factory import RESTClientFactory
 from mcp_server.core import Setting
 from mcp_server.server import GravitinoMCPServer
 from tests.unit.tools import MockOperation
@@ -29,7 +29,7 @@ from tests.unit.tools import MockOperation
 class TestCatalogTool(unittest.TestCase):
 
     def setUp(self):
-        ConnectorFactory.set_test_connector(MockOperation)
+        RESTClientFactory.set_rest_client(MockOperation)
         server = GravitinoMCPServer(Setting("mock_metalake"))
         self.mcp = server.mcp
 

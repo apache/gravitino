@@ -57,7 +57,7 @@ def load_schema_tools(mcp: FastMCP):
             - Namespace elements represent a hierarchical path (e.g., ["test", "iceberg"]
               correspond to test.iceberg in dot notation)
         """
-        connector = ctx.request_context.lifespan_context.connector()
+        connector = ctx.request_context.lifespan_context.rest_client()
         return await connector.as_schema_operation().get_list_of_schemas(
             catalog_name
         )
