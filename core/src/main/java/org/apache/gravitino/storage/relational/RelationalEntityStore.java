@@ -165,6 +165,11 @@ public class RelationalEntityStore
 
   private void invalidateCacheByRelation(NameIdentifier ident, Entity.EntityType entityType)
       throws IOException {
+    if (entityType == EntityType.METALAKE) {
+      // For metalake, we do not need to invalidate cache by relation.
+      return;
+    }
+
     for (Map.Entry<Type, List<EntityType>> entry : RELATION_TARGET_TYPE_TO_ENTITY_TYPE.entrySet()) {
       Type relType = entry.getKey();
       List<EntityType> relatedEntityTypes = entry.getValue();
