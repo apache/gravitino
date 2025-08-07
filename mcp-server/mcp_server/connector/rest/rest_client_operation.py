@@ -32,6 +32,10 @@ from mcp_server.connector.rest.rest_client_schema_operation import (
 from mcp_server.connector.rest.rest_client_table_operation import (
     RESTClientTableOperation,
 )
+from mcp_server.connector.rest.rest_client_tag_operation import (
+    RESTClientTagOperation,
+)
+from mcp_server.connector.tag_operation import TagOperation
 
 
 class RESTClientOperation(GravitinoOperation):
@@ -51,5 +55,10 @@ class RESTClientOperation(GravitinoOperation):
 
     def as_schema_operation(self) -> SchemaOperation:
         return RESTClientSchemaOperation(
+            metalake_name=self.metalake_name, rest_client=self.rest_client
+        )
+
+    def as_tag_operation(self) -> TagOperation:
+        return RESTClientTagOperation(
             metalake_name=self.metalake_name, rest_client=self.rest_client
         )
