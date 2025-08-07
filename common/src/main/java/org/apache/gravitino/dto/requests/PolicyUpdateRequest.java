@@ -73,8 +73,8 @@ public interface PolicyUpdateRequest extends RESTRequest {
     }
 
     /** This is the constructor that is used by Jackson deserializer */
-    public RenamePolicyRequest() {
-      this.newName = null;
+    private RenamePolicyRequest() {
+      this(null);
     }
 
     @Override
@@ -107,8 +107,8 @@ public interface PolicyUpdateRequest extends RESTRequest {
     }
 
     /** This is the constructor that is used by Jackson deserializer */
-    public UpdatePolicyCommentRequest() {
-      this.newComment = null;
+    private UpdatePolicyCommentRequest() {
+      this(null);
     }
 
     @Override
@@ -156,9 +156,8 @@ public interface PolicyUpdateRequest extends RESTRequest {
     }
 
     /** This is the constructor that is used by Jackson deserializer */
-    public UpdatePolicyContentRequest() {
-      this.policyType = null;
-      this.newContent = null;
+    private UpdatePolicyContentRequest() {
+      this(null, null);
     }
 
     @Override

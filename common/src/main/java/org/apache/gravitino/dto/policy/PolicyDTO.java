@@ -108,7 +108,9 @@ public class PolicyDTO implements Policy {
         audit);
   }
 
-  /** @return a new builder for constructing a PolicyDTO. */
+  /**
+   * @return a new builder for constructing a PolicyDTO.
+   */
   public static Builder builder() {
     return new Builder();
   }
@@ -281,16 +283,18 @@ public class PolicyDTO implements Policy {
       return this;
     }
 
-    /** @return The constructed Policy DTO. */
+    /**
+     * @return The constructed Policy DTO.
+     */
     public PolicyDTO build() {
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(policyDTO.name), "policy name cannot be null or empty");
+          StringUtils.isNotBlank(policyDTO.name), "policy name cannot be empty");
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(policyDTO.policyType), "policy type cannot be null or empty");
+          StringUtils.isNotBlank(policyDTO.policyType), "policy type cannot be empty");
       Preconditions.checkArgument(policyDTO.content != null, "policy content cannot be null");
       Preconditions.checkArgument(
           CollectionUtils.isNotEmpty(policyDTO.supportedObjectTypes),
-          "supported objectTypes cannot be null or empty");
+          "supported objectTypes cannot be empty");
       policyDTO.content.validate();
       return policyDTO;
     }

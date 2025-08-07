@@ -107,14 +107,7 @@ public class PolicyCreateRequest implements RESTRequest {
 
   /** This is the constructor that is used by Jackson deserializer */
   private PolicyCreateRequest() {
-    this.name = null;
-    this.policyType = null;
-    this.comment = null;
-    this.enabled = null;
-    this.exclusive = null;
-    this.inheritable = null;
-    this.supportedObjectTypes = null;
-    this.policyContent = null;
+    this(null, null, null, true, false, false, null, null);
   }
 
   /**

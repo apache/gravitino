@@ -576,8 +576,7 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
-    if (policyContent instanceof PolicyContents.CustomContent) {
-      PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
+    if (policyContent instanceof PolicyContents.CustomContent customContent) {
       return PolicyContentDTO.CustomContentDTO.builder()
           .withCustomRules(customContent.customRules())
           .withProperties(customContent.properties())
@@ -1256,9 +1255,7 @@ public class DTOConverters {
       return null;
     }
 
-    if (policyContentDTO instanceof PolicyContentDTO.CustomContentDTO) {
-      PolicyContentDTO.CustomContentDTO customContentDTO =
-          (PolicyContentDTO.CustomContentDTO) policyContentDTO;
+    if (policyContentDTO instanceof PolicyContentDTO.CustomContentDTO customContentDTO) {
       return PolicyContents.custom(customContentDTO.customRules(), customContentDTO.properties());
     }
 

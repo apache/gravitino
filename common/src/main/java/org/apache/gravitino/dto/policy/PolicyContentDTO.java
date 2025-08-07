@@ -20,7 +20,6 @@ package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -33,7 +32,6 @@ public interface PolicyContentDTO extends PolicyContent {
   @EqualsAndHashCode
   @ToString
   @Builder(setterPrefix = "with")
-  @AllArgsConstructor
   class CustomContentDTO implements PolicyContentDTO {
 
     @JsonProperty("customRules")

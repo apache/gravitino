@@ -38,7 +38,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
@@ -88,15 +87,10 @@ public class PolicyOperations {
           () -> {
             if (verbose) {
               Policy[] policies = policyDispatcher.listPolicyInfos(metalake);
-              PolicyDTO[] policyDTOs;
-              if (ArrayUtils.isEmpty(policies)) {
-                policyDTOs = new PolicyDTO[0];
-              } else {
-                policyDTOs =
-                    Arrays.stream(policies)
-                        .map(p -> DTOConverters.toDTO(p, Optional.empty()))
-                        .toArray(PolicyDTO[]::new);
-              }
+              PolicyDTO[] policyDTOs =
+                  Arrays.stream(policies)
+                      .map(p -> DTOConverters.toDTO(p, Optional.empty()))
+                      .toArray(PolicyDTO[]::new);
 
               LOG.info("List {} policies info under metalake: {}", policyDTOs.length, metalake);
               return Utils.ok(new PolicyListResponse(policyDTOs));
@@ -215,7 +209,7 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "set-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "set-policy", absolute = true)
-  public Response alterPolicy(
+  public Response setPolicy(
       @PathParam("metalake") String metalake,
       @PathParam("policy") String name,
       PolicySetRequest request) {
@@ -259,7 +253,7 @@ public class PolicyOperations {
           () -> {
             boolean deleted = policyDispatcher.deletePolicy(metalake, name);
             if (!deleted) {
-              LOG.warn("Failed to delete policy {} under metalake {}", name, metalake);
+              LOG.warn("Cannot find to be deleted policy {} under metalake {}", name, metalake);
             } else {
               LOG.info("Deleted policy: {} under metalake: {}", name, metalake);
             }
