@@ -96,7 +96,7 @@ class TagOperation(ABC):
         metadata_full_name: str,
         metadata_type: str,
         tags_to_associate: list,
-        tags_to_disassociate,
+        tags_to_disassociate: list,
     ) -> str:
         """
         Associate tags with metadata.

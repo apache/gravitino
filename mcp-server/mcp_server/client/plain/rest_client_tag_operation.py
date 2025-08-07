@@ -71,7 +71,7 @@ class PlainRESTClientTagOperation(TagOperation):
         metadata_full_name: str,
         metadata_type: str,
         tags_to_associate: list,
-        tags_to_disassociate,
+        tags_to_disassociate: list,
     ) -> str:
         response = await self.rest_client.post(
             f"/api/metalakes/{self.metalake_name}/objects/{metadata_type}/{metadata_full_name}/tags",
