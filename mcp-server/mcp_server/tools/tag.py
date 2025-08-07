@@ -50,8 +50,8 @@ def load_tag_tool(mcp: FastMCP):
               "inherited": null
             }
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().create_tag(
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().create_tag(
             name, comment, properties
         )
 
@@ -83,8 +83,8 @@ def load_tag_tool(mcp: FastMCP):
               "inherited": null
             }
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().get_tag_by_name(name)
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().get_tag_by_name(name)
 
     @mcp.tool(tags={"tag"})
     async def get_list_of_tags(ctx: Context) -> str:
@@ -116,8 +116,8 @@ def load_tag_tool(mcp: FastMCP):
               ...
             ]
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().get_list_of_tags()
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().get_list_of_tags()
 
     @mcp.tool(tags={"tag"})
     async def alter_tag(ctx: Context, name: str, updates: list) -> str:
@@ -168,8 +168,8 @@ def load_tag_tool(mcp: FastMCP):
               "inherited": null
             }
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().alter_tag(name, updates)
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().alter_tag(name, updates)
 
     @mcp.tool(tags={"tag"})
     async def delete_tag(ctx: Context, name: str) -> None:
@@ -187,8 +187,8 @@ def load_tag_tool(mcp: FastMCP):
         Raises:
             Exception: If the deletion fails, an exception is raised with an error message.
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().delete_tag(name)
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().delete_tag(name)
 
     @mcp.tool(tags={"tag"})
     async def association_tag_with_metadata(
@@ -228,8 +228,8 @@ def load_tag_tool(mcp: FastMCP):
               "tag2"
             ]
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().association_tag_with_metadata(
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().association_tag_with_metadata(
             metadata_full_name,
             metadata_type,
             tags_to_associate,
@@ -262,8 +262,8 @@ def load_tag_tool(mcp: FastMCP):
               "tag2"
             ]
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().list_tags_for_metadata(
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().list_tags_for_metadata(
             metadata_full_name, metadata_type
         )
 
@@ -309,5 +309,5 @@ def load_tag_tool(mcp: FastMCP):
               ...
             ]
         """
-        connector = ctx.request_context.lifespan_context.connector()
-        return await connector.as_tag_operation().list_metadata_by_tag(tag_name)
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().list_metadata_by_tag(tag_name)

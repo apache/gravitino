@@ -15,11 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector.rest.utils import extract_content_from_response
-from mcp_server.connector.tag_operation import TagOperation
+from mcp_server.client.plain.utils import extract_content_from_response
+from mcp_server.client.tag_operation import TagOperation
 
 
-class RESTClientTagOperation(TagOperation):
+class PlainRESTClientTagOperation(TagOperation):
     def __init__(self, metalake_name: str, rest_client):
         self.metalake_name = metalake_name
         self.rest_client = rest_client

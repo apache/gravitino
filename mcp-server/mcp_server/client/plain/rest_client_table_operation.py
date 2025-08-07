@@ -17,17 +17,28 @@
 
 from httpx import AsyncClient
 
-from mcp_server.connector import SchemaOperation
-from mcp_server.connector.rest.utils import extract_content_from_response
+from mcp_server.client import TableOperation
+from mcp_server.client.plain.utils import extract_content_from_response
 
 
-class RESTClientSchemaOperation(SchemaOperation):
+class PlainRESTClientTableOperation(TableOperation):
+
     def __init__(self, metalake_name: str, rest_client: AsyncClient):
         self.metalake_name = metalake_name
         self.rest_client = rest_client
 
-    async def get_list_of_schemas(self, catalog_name: str) -> str:
+    async def get_list_of_tables(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas"
+            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables"
         )
         return extract_content_from_response(response, "identifiers", [])
+
+    async def load_table(
+        self, catalog_name: str, schema_name: str, table_name: str
+    ) -> str:
+        response = await self.rest_client.get(
+            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}"
+        )
+        return extract_content_from_response(response, "table", {})

@@ -17,11 +17,11 @@
 
 from httpx import AsyncClient
 
-from mcp_server.connector import CatalogOperation
-from mcp_server.connector.rest.utils import extract_content_from_response
+from mcp_server.client import CatalogOperation
+from mcp_server.client.plain.utils import extract_content_from_response
 
 
-class RESTClientCatalogOperation(CatalogOperation):
+class PlainRESTClientCatalogOperation(CatalogOperation):
     def __init__(self, metalake_name: str, rest_client: AsyncClient):
         self.metalake_name = metalake_name
         self.rest_client = rest_client

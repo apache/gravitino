@@ -15,15 +15,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector.factory import ConnectorFactory
+from mcp_server.client.factory import RESTClientFactory
 from mcp_server.core.setting import Setting
 
 
 class GravitinoContext:
     def __init__(self, setting: Setting):
-        self.gravitino_connector = ConnectorFactory.create_connector(
+        self.gravitino_client = RESTClientFactory.create_rest_client(
             setting.metalake, setting.uri
         )
 
-    def connector(self):
-        return self.gravitino_connector
+    def rest_client(self):
+        return self.gravitino_client

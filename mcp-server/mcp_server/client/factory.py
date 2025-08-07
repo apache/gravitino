@@ -15,38 +15,40 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector.rest.rest_client_operation import RESTClientOperation
+from mcp_server.client.plain.rest_client_operation import (
+    PlainRESTClientOperation,
+)
 
 
-class ConnectorFactory:
+class RESTClientFactory:
     """
-    Factory for creating and configuring Gravitino connector instances.
+    Factory for creating and configuring Gravitino rest client instances.
     """
 
-    _connector_class = RESTClientOperation
+    _rest_client_class = PlainRESTClientOperation
 
     @classmethod
-    def create_connector(
+    def create_rest_client(
         cls, metalake_name: str, uri: str
-    ) -> "RESTClientOperation":
+    ) -> "PlainRESTClientOperation":
         """
-        Create a new connector instance with the specified parameters.
+        Create a new rest client instance with the specified parameters.
 
         Args:
             metalake_name: Name of the metalake
             uri: URI of the Gravitino server endpoint
 
         Returns:
-            New instance of the configured connector class
+            New instance of the configured rest client class
         """
-        return cls._connector_class(metalake_name, uri)
+        return cls._rest_client_class(metalake_name, uri)
 
     @classmethod
-    def set_test_connector(cls, connector_class: type) -> None:
+    def set_rest_client(cls, rest_client_class: type) -> None:
         """
-        Configure the factory to use a different connector class (primarily for testing).
+        Configure the factory to use a different rest client class (primarily for testing).
 
         Args:
-            connector_class: Class to use for future connector creations
+            rest_client_class: Class to use for future rest creations
         """
-        cls._connector_class = connector_class
+        cls._rest_client_class = rest_client_class

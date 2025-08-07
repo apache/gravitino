@@ -45,7 +45,7 @@ Or start a HTTP MCP server by `uv run mcp_server --metalake test --uri http://12
 {
   "mcpServers": {
     "gravitino": {
-      "url": "http://localhost:1234/mcp1"
+      "url": "http://localhost:8000/mcp"
     }
   }
 }

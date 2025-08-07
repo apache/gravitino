@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector import (
+from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
     SchemaOperation,
