@@ -66,9 +66,10 @@ public class TableOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
 
   private static final String loadTableAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) ||"
-          + "SCHEMA_OWNER_WITH_USE_CATALOG ||"
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)";
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)""";
 
   private final TableDispatcher dispatcher;
 

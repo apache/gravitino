@@ -60,9 +60,9 @@ public class TopicOperations {
   private static final Logger LOG = LoggerFactory.getLogger(TopicOperations.class);
 
   private static final String loadTopicsAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) || "
-          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_CONSUME_TOPIC || ANY_PRODUCE_TOPIC)";
+      """ANY(OWNER, METALAKE, CATALOG) ||
+         SCHEMA_OWNER_WITH_USE_CATALOG ||
+         ANY_USE_CATALOG && ANY_USE_SCHEMA && (TOPIC::OWNER || ANY_CONSUME_TOPIC || ANY_PRODUCE_TOPIC)""";
 
   private final TopicDispatcher dispatcher;
 

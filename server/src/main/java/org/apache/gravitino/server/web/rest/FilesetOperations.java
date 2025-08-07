@@ -82,9 +82,9 @@ public class FilesetOperations {
   private final FilesetDispatcher dispatcher;
 
   private static final String loadFilesetAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) || "
-          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)";
+      """ANY(OWNER, METALAKE, CATALOG) ||
+         SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)""";
 
   @Context private HttpServletRequest httpRequest;
 

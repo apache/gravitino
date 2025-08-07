@@ -73,9 +73,10 @@ public class ModelOperations {
   private static final Logger LOG = LoggerFactory.getLogger(ModelOperations.class);
 
   private static final String loadModelAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) ||"
-          + " SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + " ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL)";
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL)""";
 
   private final ModelDispatcher modelDispatcher;
 
