@@ -15,7 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector.rest.rest_client_operation import RESTClientOperation
+from mcp_server.client.plain.rest_client_operation import (
+    PlainRESTClientOperation,
+)
 
 
 class RESTClientFactory:
@@ -23,12 +25,12 @@ class RESTClientFactory:
     Factory for creating and configuring Gravitino rest client instances.
     """
 
-    _rest_client_class = RESTClientOperation
+    _rest_client_class = PlainRESTClientOperation
 
     @classmethod
     def create_rest_client(
         cls, metalake_name: str, uri: str
-    ) -> "RESTClientOperation":
+    ) -> "PlainRESTClientOperation":
         """
         Create a new rest client instance with the specified parameters.
 

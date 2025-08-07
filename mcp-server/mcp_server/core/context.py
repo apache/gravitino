@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector.factory import RESTClientFactory
+from mcp_server.client.factory import RESTClientFactory
 from mcp_server.core.setting import Setting
 
 

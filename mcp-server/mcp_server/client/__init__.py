@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.connector.catalog_operation import CatalogOperation
-from mcp_server.connector.gravitino_operation import GravitinoOperation
-from mcp_server.connector.schema_operation import SchemaOperation
-from mcp_server.connector.table_operation import TableOperation
+from mcp_server.client.catalog_operation import CatalogOperation
+from mcp_server.client.gravitino_operation import GravitinoOperation
+from mcp_server.client.schema_operation import SchemaOperation
+from mcp_server.client.table_operation import TableOperation
