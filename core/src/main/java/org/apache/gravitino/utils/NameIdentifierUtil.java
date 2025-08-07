@@ -548,6 +548,13 @@ public class NameIdentifierUtil {
     return NameIdentifier.of(NamespaceUtil.ofGroup(metalake), groupName);
   }
 
+  /**
+   * Create a statistic {@link NameIdentifier} from the given identifier and name.
+   *
+   * @param identifier The identifier to use
+   * @param name The name of the statistic
+   * @return The created statistic {@link NameIdentifier}
+   */
   public static NameIdentifier ofStatistic(NameIdentifier identifier, String name) {
     return NameIdentifier.of(Namespace.fromString(identifier.toString()), name);
   }

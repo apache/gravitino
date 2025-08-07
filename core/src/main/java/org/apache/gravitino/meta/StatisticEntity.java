@@ -119,11 +119,6 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
       return this;
     }
 
-    public Builder withNamespace(String namespace) {
-      statisticEntity.namespace = Namespace.of(namespace);
-      return this;
-    }
-
     public StatisticEntity build() {
       statisticEntity.validate();
       return statisticEntity;

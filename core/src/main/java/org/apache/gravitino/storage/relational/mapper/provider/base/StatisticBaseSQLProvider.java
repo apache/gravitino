@@ -36,7 +36,8 @@ public class StatisticBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + STATISTIC_META_TABLE_NAME
-        + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id, metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
+        + " (statistic_id, statistic_name, statistic_value, metalake_id, metadata_object_id,"
+        + " metadata_object_type, audit_info, current_version, last_version, deleted_at) VALUES "
         + "<foreach collection='statisticPOs' item='item' separator=','>"
         + "(#{item.statisticId}, "
         + "#{item.statisticName}, "
