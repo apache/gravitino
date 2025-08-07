@@ -699,10 +699,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
         switch (dataOperation) {
           case RENAME:
-            // Fileset only mounts a single file, the storage location of the fileset cannot be
-            // renamed; Otherwise the metadata in the Gravitino server may be inconsistent.
-            // if the sub path is blank, it cannot be renamed,
-            // otherwise the metadata in the Gravitino server may be inconsistent.
+            // if the sub path is blank, it cannot be renamed otherwise the metadata in the
+            // Gravitino server may be inconsistent.
             if (StringUtils.isBlank(processedSubPath)
                 || (processedSubPath.startsWith(SLASH) && processedSubPath.length() == 1)) {
               throw new GravitinoRuntimeException(
@@ -716,13 +714,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     String fileLocation;
-    // 1. if the storage location is a single file, we pass the storage location directly
-    // 2. if the processed sub path is blank, we pass the storage location directly
+    // If the processed sub path is blank, we pass the storage location directly
     if (StringUtils.isBlank(processedSubPath)) {
       fileLocation = fileset.storageLocations().get(targetLocationName);
     } else {
       // the processed sub path always starts with "/" if it is not blank,
-      // so we can safely remove the tailing slash if storage location ends with "/".
+      // so we can safely remove the tailing slash if the storage location ends with "/".
       String storageLocation =
           removeTrailingSlash(fileset.storageLocations().get(targetLocationName));
       fileLocation = String.format("%s%s", storageLocation, processedSubPath);
