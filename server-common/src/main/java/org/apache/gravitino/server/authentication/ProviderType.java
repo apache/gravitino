@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth;
+package org.apache.gravitino.server.authentication;
 
-/** The type of OAuth provider. */
+/** The type of OAuth provider to use for Gravitino Web UI OAuth sign-in workflow. */
 public enum ProviderType {
   /** Default provider. */
   DEFAULT,
-  /** Azure AD provider. */
-  AZURE
+  /** OIDC provider. */
+  OIDC
 }
