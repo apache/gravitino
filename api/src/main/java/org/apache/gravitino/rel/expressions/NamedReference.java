@@ -119,10 +119,12 @@ public interface NamedReference extends Expression {
 
   /** A {@link NamedReference} that references a metadata field. */
   final class MetadataField implements NamedReference {
-    /* * The name of the metadata field that contains the partition name.
-     * This is used to reference the partition name in metadata fields.
+    /**
+     * The name of the metadata field that contains the partition name. This is used to reference
+     * the partition name in metadata fields.
      */
     public static final String PARTITION_NAME_FIELD = "partition_name";
+
     private final String[] fieldName;
 
     MetadataField(String[] fieldName) {
