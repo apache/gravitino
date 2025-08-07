@@ -71,6 +71,10 @@ public class TestCaffeineEntityCache {
   private static GroupEntity entity11;
   private static RoleEntity entity12;
   private static RoleEntity entity13;
+  private static RoleEntity entity14;
+  private static RoleEntity entity15;
+  private static RoleEntity entity16;
+  private static RoleEntity entity17;
 
   private static Object getCacheDataFrom(EntityCache cache) {
     try {
@@ -112,6 +116,10 @@ public class TestCaffeineEntityCache {
 
     entity12 = TestUtil.getTestRoleEntity(12L, "role1", "metalake1");
     entity13 = TestUtil.getTestRoleEntity(13L, "role2", "metalake2");
+    entity14 = TestUtil.getTestRoleEntity(14L, "role3", "metalake1");
+    entity15 = TestUtil.getTestRoleEntity(15L, "role4", "metalake2");
+    entity16 = TestUtil.getTestRoleEntity(16L, "role5", "metalake1");
+    entity17 = TestUtil.getTestRoleEntity(17L, "role6", "metalake2");
   }
 
   @Test
@@ -163,8 +171,32 @@ public class TestCaffeineEntityCache {
         Entity.EntityType.ROLE,
         SupportsRelationOperations.Type.ROLE_USER_REL,
         ImmutableList.of(testUserEntity));
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        false,
+        ImmutableList.of(testGroupEntity));
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        false,
+        ImmutableList.of(testUserEntity));
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        true,
+        ImmutableList.of(testGroupEntity));
+    cache.put(
+        testRoleEntity.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        true,
+        ImmutableList.of(testUserEntity));
 
-    Assertions.assertEquals(14, cache.size());
+    Assertions.assertEquals(18, cache.size());
     Assertions.assertTrue(
         cache.getIfPresent(testMetalake.nameIdentifier(), Entity.EntityType.METALAKE).isPresent());
     Assertions.assertTrue(
@@ -212,6 +244,38 @@ public class TestCaffeineEntityCache {
                 testRoleEntity.nameIdentifier(),
                 Entity.EntityType.ROLE)
             .isPresent());
+    Assertions.assertTrue(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                false)
+            .isPresent());
+    Assertions.assertTrue(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                testRoleEntity.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                false)
+            .isPresent());
+    Assertions.assertTrue(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                testRoleEntity.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true)
+            .isPresent());
+    Assertions.assertTrue(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                testRoleEntity.nameIdentifier(),
+                Entity.EntityType.ROLE,
+                true)
+            .isPresent());
   }
 
   @Test
@@ -258,6 +322,30 @@ public class TestCaffeineEntityCache {
         Entity.EntityType.ROLE,
         SupportsRelationOperations.Type.ROLE_GROUP_REL,
         ImmutableList.of(entity10, entity11));
+    cache.put(
+        entity14.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        true,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity15.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        true,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity16.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        false,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity17.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        false,
+        ImmutableList.of(entity8, entity9));
 
     Assertions.assertTrue(cache.contains(entity1.nameIdentifier(), entity1.type()));
     Assertions.assertTrue(cache.contains(entity2.nameIdentifier(), entity2.type()));
@@ -282,6 +370,30 @@ public class TestCaffeineEntityCache {
             entity13.nameIdentifier(),
             entity13.type(),
             SupportsRelationOperations.Type.ROLE_GROUP_REL));
+    Assertions.assertTrue(
+        cache.contains(
+            entity14.nameIdentifier(),
+            entity14.type(),
+            SupportsRelationOperations.Type.ROLE_USER_REL,
+            true));
+    Assertions.assertTrue(
+        cache.contains(
+            entity15.nameIdentifier(),
+            entity15.type(),
+            SupportsRelationOperations.Type.ROLE_GROUP_REL,
+            true));
+    Assertions.assertTrue(
+        cache.contains(
+            entity16.nameIdentifier(),
+            entity16.type(),
+            SupportsRelationOperations.Type.ROLE_USER_REL,
+            false));
+    Assertions.assertTrue(
+        cache.contains(
+            entity17.nameIdentifier(),
+            entity17.type(),
+            SupportsRelationOperations.Type.ROLE_GROUP_REL,
+            false));
   }
 
   @Test
@@ -369,8 +481,32 @@ public class TestCaffeineEntityCache {
         Entity.EntityType.ROLE,
         SupportsRelationOperations.Type.ROLE_GROUP_REL,
         ImmutableList.of(entity10, entity11));
+    cache.put(
+        entity14.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        true,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity15.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        true,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity16.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        false,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity17.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        false,
+        ImmutableList.of(entity8, entity9));
 
-    Assertions.assertEquals(9, cache.size());
+    Assertions.assertEquals(13, cache.size());
 
     cache.clear();
 
@@ -403,6 +539,38 @@ public class TestCaffeineEntityCache {
                 entity13.nameIdentifier(),
                 entity13.type())
             .isPresent());
+    Assertions.assertFalse(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                entity14.nameIdentifier(),
+                entity14.type(),
+                true)
+            .isPresent());
+    Assertions.assertFalse(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                entity15.nameIdentifier(),
+                entity15.type(),
+                true)
+            .isPresent());
+    Assertions.assertFalse(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_USER_REL,
+                entity16.nameIdentifier(),
+                entity16.type(),
+                false)
+            .isPresent());
+    Assertions.assertFalse(
+        cache
+            .getIfPresent(
+                SupportsRelationOperations.Type.ROLE_GROUP_REL,
+                entity17.nameIdentifier(),
+                entity17.type(),
+                false)
+            .isPresent());
   }
 
   @Test
@@ -431,12 +599,36 @@ public class TestCaffeineEntityCache {
         Entity.EntityType.ROLE,
         SupportsRelationOperations.Type.ROLE_GROUP_REL,
         ImmutableList.of(entity10, entity11));
+    cache.put(
+        entity14.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        true,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity15.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        true,
+        ImmutableList.of(entity8, entity9));
+    cache.put(
+        entity16.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_USER_REL,
+        false,
+        ImmutableList.of(entity10, entity11));
+    cache.put(
+        entity17.nameIdentifier(),
+        Entity.EntityType.ROLE,
+        SupportsRelationOperations.Type.ROLE_GROUP_REL,
+        false,
+        ImmutableList.of(entity10, entity11));
 
-    Assertions.assertEquals(13, cache.size());
+    Assertions.assertEquals(17, cache.size());
 
     cache.invalidate(entity7.nameIdentifier(), entity7.type());
 
-    Assertions.assertEquals(4, cache.size());
+    Assertions.assertEquals(6, cache.size());
     Assertions.assertTrue(cache.contains(entity10.nameIdentifier(), entity10.type()));
     Assertions.assertTrue(cache.contains(entity11.nameIdentifier(), entity11.type()));
     Assertions.assertTrue(
@@ -444,6 +636,18 @@ public class TestCaffeineEntityCache {
             entity13.nameIdentifier(),
             entity13.type(),
             SupportsRelationOperations.Type.ROLE_GROUP_REL));
+    Assertions.assertTrue(
+        cache.contains(
+            entity15.nameIdentifier(),
+            entity15.type(),
+            SupportsRelationOperations.Type.ROLE_GROUP_REL,
+            true));
+    Assertions.assertTrue(
+        cache.contains(
+            entity17.nameIdentifier(),
+            entity17.type(),
+            SupportsRelationOperations.Type.ROLE_GROUP_REL,
+            false));
     Assertions.assertTrue(cache.getIfPresent(entity2.nameIdentifier(), entity2.type()).isPresent());
 
     Assertions.assertFalse(cache.contains(entity1.nameIdentifier(), entity1.type()));
@@ -452,6 +656,8 @@ public class TestCaffeineEntityCache {
     Assertions.assertFalse(cache.contains(entity5.nameIdentifier(), entity5.type()));
     Assertions.assertFalse(cache.contains(entity6.nameIdentifier(), entity6.type()));
     Assertions.assertFalse(cache.contains(entity7.nameIdentifier(), entity7.type()));
+    Assertions.assertFalse(cache.contains(entity14.nameIdentifier(), entity14.type()));
+    Assertions.assertFalse(cache.contains(entity16.nameIdentifier(), entity16.type()));
   }
 
   @Test

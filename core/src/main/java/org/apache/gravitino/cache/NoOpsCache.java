@@ -31,6 +31,7 @@ import org.apache.gravitino.SupportsRelationOperations;
 /** A cache implementation that does not cache anything. */
 public class NoOpsCache extends BaseEntityCache {
   private final ReentrantLock opLock = new ReentrantLock();
+
   /**
    * Constructs a new {@link BaseEntityCache} instance.
    *
@@ -132,8 +133,28 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType,
+      boolean allFields) {
+    return Optional.empty();
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean invalidate(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
+    return false;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean invalidate(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields) {
     return false;
   }
 
@@ -146,10 +167,31 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public boolean contains(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields) {
+    return false;
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public <E extends Entity & HasIdentifier> void put(
       NameIdentifier ident,
       Entity.EntityType type,
       SupportsRelationOperations.Type relType,
+      List<E> entities) {
+    // do nothing
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E extends Entity & HasIdentifier> void put(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields,
       List<E> entities) {
     // do nothing
   }

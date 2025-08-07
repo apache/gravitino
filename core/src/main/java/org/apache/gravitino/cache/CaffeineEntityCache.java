@@ -139,6 +139,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType,
+      boolean allFields) {
+    List<Entity> entitiesFromCache =
+        cacheData.getIfPresent(EntityCacheKey.of(nameIdentifier, identType, relType));
+    return Optional.ofNullable(entitiesFromCache).map(BaseEntityCache::convertEntities);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
       NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
@@ -161,6 +173,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public boolean invalidate(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields) {
+    checkArguments(ident, type, relType);
+
+    return withLock(() -> invalidateEntities(ident));
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
@@ -173,6 +197,17 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType) {
     checkArguments(ident, type, relType);
     return cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType)) != null;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean contains(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields) {
+    checkArguments(ident, type, relType);
+    return cacheData.getIfPresent(EntityCacheKey.of(ident, type, relType, allFields)) != null;
   }
 
   /** {@inheritDoc} */
@@ -215,6 +250,28 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
           syncEntitiesToCache(
               EntityCacheKey.of(ident, type, relType),
+              entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
+        });
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public <E extends Entity & HasIdentifier> void put(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields,
+      List<E> entities) {
+    checkArguments(ident, type, relType);
+    Preconditions.checkArgument(entities != null, "Entities cannot be null");
+    withLock(
+        () -> {
+          if (entities.isEmpty()) {
+            return;
+          }
+
+          syncEntitiesToCache(
+              EntityCacheKey.of(ident, type, relType, allFields),
               entities.stream().map(e -> (Entity) e).collect(Collectors.toList()));
         });
   }
