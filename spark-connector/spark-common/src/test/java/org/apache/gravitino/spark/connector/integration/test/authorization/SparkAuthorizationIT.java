@@ -121,7 +121,7 @@ public class SparkAuthorizationIT extends BaseIT {
             .set("hive.exec.dynamic.partition.mode", "nonstrict")
             .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
-    System.setProperty("HADOOP_USER_NAME", USER);
+    setEnv("HADOOP_USER_NAME", USER);
     adminUserSparkSession =
         SparkSession.builder()
             .master("local[1]")
@@ -129,7 +129,7 @@ public class SparkAuthorizationIT extends BaseIT {
             .config(sparkConf)
             .enableHiveSupport()
             .getOrCreate();
-    System.setProperty("HADOOP_USER_NAME", NORMAL_USER);
+    setEnv("HADOOP_USER_NAME", NORMAL_USER);
     normalUserSparkSession =
         SparkSession.builder()
             .master("local[1]")
