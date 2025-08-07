@@ -71,8 +71,8 @@ def load_table_tools(mcp: FastMCP):
         Filtering Behavior:
             - Only tables belonging to the specified catalog_name and schema_name are returned
         """
-        connector = ctx.request_context.lifespan_context.rest_client()
-        return await connector.as_table_operation().get_list_of_tables(
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_table_operation().get_list_of_tables(
             catalog_name, schema_name
         )
 
@@ -221,7 +221,7 @@ def load_table_tools(mcp: FastMCP):
             - "partitioning" is a partitioning strategy that is used to split a table into parts based on partition keys. Supporting diverse partitioning strategies like "identity", "bucket[N]", "truncate[W]", "list", "range", "func", etc.
             - "indexes" represents the table index, such as primary key or unique key.
         """
-        connector = ctx.request_context.lifespan_context.rest_client()
-        return await connector.as_table_operation().load_table(
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_table_operation().load_table(
             catalog_name, schema_name, table_name
         )
