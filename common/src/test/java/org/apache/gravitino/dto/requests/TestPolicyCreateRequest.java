@@ -58,30 +58,5 @@ public class TestPolicyCreateRequest {
     Assertions.assertEquals(
         Policy.SUPPORTS_ALL_OBJECT_TYPES, deserRequest.getSupportedObjectTypes());
     Assertions.assertEquals(content, deserRequest.getPolicyContent());
-
-    // test data compaction content
-    content = PolicyContentDTO.DataCompactionContentDTO.builder().withTargetSizeBytes(123).build();
-    request =
-        new PolicyCreateRequest(
-            "policy_test",
-            "system_data_compaction",
-            "policy comment",
-            true,
-            true,
-            true,
-            Policy.SUPPORTS_ALL_OBJECT_TYPES,
-            content);
-    serJson = JsonUtils.objectMapper().writeValueAsString(request);
-    deserRequest = JsonUtils.objectMapper().readValue(serJson, PolicyCreateRequest.class);
-    Assertions.assertEquals(request, deserRequest);
-    Assertions.assertEquals("policy_test", deserRequest.getName());
-    Assertions.assertEquals("policy comment", deserRequest.getComment());
-    Assertions.assertEquals("system_data_compaction", deserRequest.getPolicyType());
-    Assertions.assertTrue(deserRequest.getEnabled());
-    Assertions.assertTrue(deserRequest.getExclusive());
-    Assertions.assertTrue(deserRequest.getInheritable());
-    Assertions.assertEquals(
-        Policy.SUPPORTS_ALL_OBJECT_TYPES, deserRequest.getSupportedObjectTypes());
-    Assertions.assertEquals(content, deserRequest.getPolicyContent());
   }
 }

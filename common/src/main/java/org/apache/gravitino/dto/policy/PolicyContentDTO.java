@@ -64,40 +64,4 @@ public interface PolicyContentDTO extends PolicyContent {
       // no validation needed for custom content
     }
   }
-
-  /** Represents a data compaction policy content DTO. */
-  @EqualsAndHashCode
-  @ToString
-  @Builder(setterPrefix = "with")
-  @AllArgsConstructor(access = lombok.AccessLevel.PRIVATE)
-  class DataCompactionContentDTO implements PolicyContentDTO {
-
-    @JsonProperty("targetSizeBytes")
-    private long targetSizeBytes;
-
-    @JsonProperty("properties")
-    private Map<String, String> properties;
-
-    // Default constructor for Jackson deserialization only.
-    private DataCompactionContentDTO() {}
-
-    /**
-     * Returns the target size in bytes for data compaction.
-     *
-     * @return the target size in bytes.
-     */
-    public long targetSizeBytes() {
-      return targetSizeBytes;
-    }
-
-    @Override
-    public Map<String, String> properties() {
-      return properties;
-    }
-
-    @Override
-    public void validate() throws IllegalArgumentException {
-      // no validation needed for custom content
-    }
-  }
 }

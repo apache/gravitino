@@ -68,18 +68,6 @@ public class TestPolicyUpdatesRequest {
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("test_type", deserRequest.getPolicyType());
     Assertions.assertEquals(contentDTO, deserRequest.getNewContent());
-
-    contentDTO =
-        PolicyContentDTO.DataCompactionContentDTO.builder().withTargetSizeBytes(123).build();
-    request =
-        new PolicyUpdateRequest.UpdatePolicyContentRequest("system_data_compaction", contentDTO);
-    serJson = JsonUtils.objectMapper().writeValueAsString(request);
-    deserRequest =
-        JsonUtils.objectMapper()
-            .readValue(serJson, PolicyUpdateRequest.UpdatePolicyContentRequest.class);
-    Assertions.assertEquals(request, deserRequest);
-    Assertions.assertEquals("system_data_compaction", deserRequest.getPolicyType());
-    Assertions.assertEquals(contentDTO, deserRequest.getNewContent());
   }
 
   @Test
