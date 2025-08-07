@@ -75,14 +75,13 @@ public class Namespace {
    */
   public static Namespace fromString(String namespace) {
     Preconditions.checkArgument(namespace != null, "Cannot create a namespace with null input");
+    // Reject blank or whitespace-only namespaces (e.g., " ", "\t", "\n")
+    Preconditions.checkArgument(!StringUtils.isBlank(namespace), "Cannot create a namespace with blank input");
     Preconditions.checkArgument(!namespace.endsWith("."), "Cannot create a namespace end with dot");
     Preconditions.checkArgument(
         !namespace.startsWith("."), "Cannot create a namespace starting with a dot");
     Preconditions.checkArgument(
         !namespace.contains(".."), "Cannot create a namespace with an empty level");
-    if (StringUtils.isBlank(namespace)) {
-      return empty();
-    }
     return Namespace.of(namespace.split("\\."));
   }
 
