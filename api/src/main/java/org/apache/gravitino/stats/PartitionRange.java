@@ -27,7 +27,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 
 /** PartitionRange represents a range of partitions defined by lower and upper partition names. */
 public class PartitionRange {
-  private static final SortOrder defaultSortOrder =
+  private static final SortOrder DEFAULT_COMPARATOR =
       SortOrders.of(NamedReference.MetadataField.PARTITION_NAME_FIELD, SortDirection.ASCENDING);
   private Optional<String> lowerPartitionName = Optional.empty();
   private Optional<BoundType> lowerBoundType = Optional.empty();
@@ -46,7 +46,7 @@ public class PartitionRange {
    * @return a PartitionRange with the upper partition name.
    */
   public static PartitionRange upTo(String upperPartitionName, BoundType upperBoundType) {
-    return upTo(upperPartitionName, upperBoundType, defaultSortOrder);
+    return upTo(upperPartitionName, upperBoundType, DEFAULT_COMPARATOR);
   }
 
   /**
@@ -79,7 +79,7 @@ public class PartitionRange {
    * @return a PartitionRange with the lower partition name.
    */
   public static PartitionRange downTo(String lowerPartitionName, BoundType lowerBoundType) {
-    return downTo(lowerPartitionName, lowerBoundType, defaultSortOrder);
+    return downTo(lowerPartitionName, lowerBoundType, DEFAULT_COMPARATOR);
   }
 
   /**
@@ -118,7 +118,7 @@ public class PartitionRange {
       String upperPartitionName,
       BoundType upperBoundType) {
     return between(
-        lowerPartitionName, lowerBoundType, upperPartitionName, upperBoundType, defaultSortOrder);
+        lowerPartitionName, lowerBoundType, upperPartitionName, upperBoundType, DEFAULT_COMPARATOR);
   }
 
   /**
