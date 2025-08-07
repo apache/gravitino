@@ -117,6 +117,7 @@ public interface NamedReference extends Expression {
     }
   }
 
+  /** A {@link NamedReference} that references a metadata field. */
   final class MetadataField implements NamedReference {
     public static final String PARTITION_NAME_FIELD = "partition_name";
     private final String[] fieldName;
@@ -147,7 +148,6 @@ public interface NamedReference extends Expression {
       return Arrays.hashCode(fieldName);
     }
 
-    /** @return The string representation of the field reference. */
     @Override
     public String toString() {
       return String.join(".", fieldName);
