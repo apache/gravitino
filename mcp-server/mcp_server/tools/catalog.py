@@ -99,5 +99,5 @@ def load_catalog_tools(mcp: FastMCP):
               }
             ]
         """
-        connector = ctx.request_context.lifespan_context.rest_client()
-        return await connector.as_catalog_operation().get_list_of_catalogs()
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_catalog_operation().get_list_of_catalogs()
