@@ -30,10 +30,7 @@ public class TestPartitionRange {
   @Test
   public void testPartitionRange() {
     SortOrder defaultSortOrder =
-        SortOrders.of(
-            NamedReference.metadataField(
-                new String[] {NamedReference.MetadataField.PARTITION_NAME_FIELD}),
-            SortDirection.ASCENDING);
+        SortOrders.of(NamedReference.MetadataField.PARTITION_NAME_FIELD, SortDirection.ASCENDING);
 
     PartitionRange range1 = PartitionRange.upTo("upper", PartitionRange.BoundType.OPEN);
     Assertions.assertTrue(range1.upperPartitionName.isPresent());

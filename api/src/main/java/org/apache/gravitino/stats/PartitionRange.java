@@ -27,10 +27,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 /** PartitionRange represents a range of partitions defined by lower and upper partition names. */
 public class PartitionRange {
   private static final SortOrder defaultSortOrder =
-      SortOrders.of(
-          NamedReference.metadataField(
-              new String[] {NamedReference.MetadataField.PARTITION_NAME_FIELD}),
-          SortDirection.ASCENDING);
+      SortOrders.of(NamedReference.MetadataField.PARTITION_NAME_FIELD, SortDirection.ASCENDING);
   Optional<String> lowerPartitionName = Optional.empty();
   Optional<BoundType> lowerBoundType = Optional.empty();
   Optional<String> upperPartitionName = Optional.empty();
