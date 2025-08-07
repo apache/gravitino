@@ -174,7 +174,7 @@ public class LocalJobExecutor implements JobExecutor {
       if (!jobStatus.containsKey(jobId)) {
         throw new NoSuchJobException("No job found with ID: %s", jobId);
       }
-      LOG.trace(
+      LOG.debug(
           "Get status {} and finished time {} for job {}",
           jobStatus.get(jobId).getLeft(),
           jobStatus.get(jobId).getRight(),
