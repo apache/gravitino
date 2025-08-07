@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.stats;
 
+import com.google.common.base.Preconditions;
 import java.util.Optional;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
@@ -28,10 +29,10 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 public class PartitionRange {
   private static final SortOrder defaultSortOrder =
       SortOrders.of(NamedReference.MetadataField.PARTITION_NAME_FIELD, SortDirection.ASCENDING);
-  Optional<String> lowerPartitionName = Optional.empty();
-  Optional<BoundType> lowerBoundType = Optional.empty();
-  Optional<String> upperPartitionName = Optional.empty();
-  Optional<BoundType> upperBoundType = Optional.empty();
+  private Optional<String> lowerPartitionName = Optional.empty();
+  private Optional<BoundType> lowerBoundType = Optional.empty();
+  private Optional<String> upperPartitionName = Optional.empty();
+  private Optional<BoundType> upperBoundType = Optional.empty();
 
   private SortOrder comparator;
 
@@ -59,6 +60,10 @@ public class PartitionRange {
    */
   public static PartitionRange upTo(
       String upperPartitionName, BoundType upperBoundType, SortOrder comparator) {
+    Preconditions.checkArgument(upperPartitionName != null, "Upper partition name cannot be null");
+    Preconditions.checkArgument(upperBoundType != null, "Upper bound type cannot be null");
+    Preconditions.checkArgument(
+        !upperPartitionName.isEmpty(), "Upper partition name cannot be empty");
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.upperPartitionName = Optional.of(upperPartitionName);
     partitionRange.upperBoundType = Optional.of(upperBoundType);
@@ -88,6 +93,9 @@ public class PartitionRange {
    */
   public static PartitionRange downTo(
       String lowerPartitionName, BoundType lowerBoundType, SortOrder comparator) {
+    Preconditions.checkArgument(lowerPartitionName != null, "Lower partition name cannot be null");
+    Preconditions.checkArgument(lowerBoundType != null, "Lower bound type cannot be null");
+    Preconditions.checkArgument(comparator != null, "Comparator cannot be null");
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.lowerPartitionName = Optional.of(lowerPartitionName);
     partitionRange.lowerBoundType = Optional.of(lowerBoundType);
@@ -131,6 +139,11 @@ public class PartitionRange {
       String upperPartitionName,
       BoundType upperBoundType,
       SortOrder comparator) {
+    Preconditions.checkArgument(lowerPartitionName != null, "Lower partition name cannot be null");
+    Preconditions.checkArgument(upperPartitionName != null, "Upper partition name cannot be null");
+    Preconditions.checkArgument(lowerBoundType != null, "Lower bound type cannot be null");
+    Preconditions.checkArgument(upperBoundType != null, "Upper bound type cannot be null");
+    Preconditions.checkArgument(comparator != null, "Comparator cannot be null");
     PartitionRange partitionRange = new PartitionRange();
     partitionRange.upperPartitionName = Optional.of(upperPartitionName);
     partitionRange.lowerPartitionName = Optional.of(lowerPartitionName);
