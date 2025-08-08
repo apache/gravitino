@@ -38,29 +38,33 @@ public class TestMemoryPartitionStatsStorage {
   @Test
   public void testMemoryPartitionStatsStorage() throws IOException {
     MemoryPartitionStatsStorageFactory factory = new MemoryPartitionStatsStorageFactory();
-    try (PartitionStatisticStorage storage = factory.open("testMetalake", Maps.newHashMap())) {
+    try (PartitionStatisticStorage storage = factory.open(Maps.newHashMap())) {
       MetadataObject metadataObject =
           MetadataObjects.of(
               Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
 
-      Map<String, Map<String, StatisticValue<?>>> stats =
+      List<PartitionStatistics> stats =
           storage.listStatistics(
-              metadataObject, PartitionRange.upTo("p0", PartitionRange.BoundType.CLOSED));
+              "metalake",
+              metadataObject,
+              PartitionRange.upTo("p0", PartitionRange.BoundType.CLOSED));
       Assertions.assertEquals(0, stats.size());
 
       Map<String, StatisticValue<?>> statistics = Maps.newHashMap();
       statistics.put("k1", StatisticValues.stringValue("v1"));
       PartitionStatisticsUpdate update = PartitionStatisticsUpdate.of("p0", statistics);
-      Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate = Maps.newHashMap();
-      statisticsToUpdate.put(metadataObject, Lists.newArrayList(update));
-      storage.updateStatistics(statisticsToUpdate);
+      MetadataObjectStatisticsUpdate metadataObjectStatisticsUpdate =
+          MetadataObjectStatisticsUpdate.of(metadataObject, Lists.newArrayList(update));
+      storage.updateStatistics("metalake", Lists.newArrayList(metadataObjectStatisticsUpdate));
 
       stats =
           storage.listStatistics(
-              metadataObject, PartitionRange.upTo("p0", PartitionRange.BoundType.CLOSED));
+              "metalake",
+              metadataObject,
+              PartitionRange.upTo("p0", PartitionRange.BoundType.CLOSED));
       Assertions.assertEquals(1, stats.size());
-      Assertions.assertTrue(stats.containsKey("p0"));
-      Map<String, StatisticValue<?>> partitionStats = stats.get("p0");
+      Assertions.assertEquals(stats.get(0).partitionName(), "p0");
+      Map<String, StatisticValue<?>> partitionStats = stats.get(0).statistics();
       Assertions.assertEquals(1, partitionStats.size());
       Assertions.assertTrue(partitionStats.containsKey("k1"));
       StatisticValue<?> value = partitionStats.get("k1");
@@ -69,17 +73,16 @@ public class TestMemoryPartitionStatsStorage {
       PartitionStatisticsDrop drop = PartitionStatisticsDrop.of("p0", Lists.newArrayList("k1"));
       List<PartitionStatisticsDrop> drops = Lists.newArrayList(drop);
 
-      Map<MetadataObject, List<PartitionStatisticsDrop>> statisticsToDrop = Maps.newHashMap();
-      statisticsToDrop.put(metadataObject, drops);
-      storage.dropStatistics(statisticsToDrop);
+      List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop =
+          Lists.newArrayList(MetadataObjectStatisticsDrop.of(metadataObject, drops));
+      storage.dropStatistics("metalake", partitionStatisticsToDrop);
 
       stats =
           storage.listStatistics(
-              metadataObject, PartitionRange.upTo("p0", PartitionRange.BoundType.CLOSED));
-      Assertions.assertEquals(1, stats.size());
-      Assertions.assertTrue(stats.containsKey("p0"));
-      partitionStats = stats.get("p0");
-      Assertions.assertEquals(0, partitionStats.size());
+              "metalake",
+              metadataObject,
+              PartitionRange.upTo("p0", PartitionRange.BoundType.CLOSED));
+      Assertions.assertEquals(0, stats.size());
     }
   }
 }

@@ -27,12 +27,10 @@ import java.util.Map;
 public interface PartitionStatisticStorageFactory {
 
   /**
-   * Creates an instance of {@link org.apache.gravitino.stats.storage.PartitionStatisticStorage} for
-   * the specified metalake and metadata object. Different metadata objects have different storages.
+   * Creates an instance of {@link org.apache.gravitino.stats.storage.PartitionStatisticStorage}.
    *
-   * @param metalake the name of the metalake
    * @param properties additional properties for the storage configuration
    * @return an instance of {@link org.apache.gravitino.stats.storage.PartitionStatisticStorage}
    */
-  PartitionStatisticStorage open(String metalake, Map<String, String> properties);
+  PartitionStatisticStorage open(Map<String, String> properties);
 }

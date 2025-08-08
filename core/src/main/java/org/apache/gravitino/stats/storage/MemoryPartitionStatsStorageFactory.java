@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.stats.storage;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
@@ -31,138 +35,137 @@ import org.apache.gravitino.stats.StatisticValue;
 public class MemoryPartitionStatsStorageFactory implements PartitionStatisticStorageFactory {
 
   @Override
-  public PartitionStatisticStorage open(String metalake, Map<String, String> properties) {
-    return new MemoryPartitionStatsStorage(metalake, properties);
+  public PartitionStatisticStorage open(Map<String, String> properties) {
+    return new MemoryPartitionStatsStorage();
   }
 
   public static class MemoryPartitionStatsStorage implements PartitionStatisticStorage {
-    private static final Map<
-            String, Map<MetadataObject, Map<String, Map<String, StatisticValue<?>>>>>
+    private static final Map<MetadataContainerKey, MetadataObjectStatisticsContainer>
         totalStatistics = Maps.newConcurrentMap();
 
-    private final String metalake;
-    private final Map<String, String> properties;
-
-    private MemoryPartitionStatsStorage(String metalake, Map<String, String> properties) {
-      this.metalake = metalake;
-      this.properties = properties;
-    }
+    private MemoryPartitionStatsStorage() {}
 
     @Override
-    public Map<String, Map<String, StatisticValue<?>>> listStatistics(
-        MetadataObject metadataObject, PartitionRange range) {
-      Map<String, Map<String, StatisticValue<?>>> tableStats =
-          totalStatistics
-              .computeIfAbsent(metalake, k -> Maps.newConcurrentMap())
-              .computeIfAbsent(metadataObject, k -> Maps.newConcurrentMap());
-      Map<String, Map<String, StatisticValue<?>>> resultStats = Maps.newHashMap();
+    public List<PartitionStatistics> listStatistics(
+        String metalake, MetadataObject metadataObject, PartitionRange range) {
+      MetadataObjectStatisticsContainer tableStats =
+          totalStatistics.get(new MetadataContainerKey(metalake, metadataObject));
 
-      for (Map.Entry<String, Map<String, StatisticValue<?>>> entry : tableStats.entrySet()) {
-        String partitionName = entry.getKey();
-        boolean lowerBoundSatisfied =
-            range
-                .lowerPartitionName()
-                .flatMap(
-                    fromPartitionName ->
-                        range
-                            .lowerBoundType()
-                            .map(
-                                type -> {
-                                  if (type == PartitionRange.BoundType.OPEN) {
-                                    return partitionName.compareTo(fromPartitionName) > 0;
-                                  } else {
-                                    return partitionName.compareTo(fromPartitionName) >= 0;
-                                  }
-                                }))
-                .orElse(true);
-
-        boolean upperBoundSatisfied =
-            range
-                .upperPartitionName()
-                .flatMap(
-                    toPartitionName ->
-                        range
-                            .upperBoundType()
-                            .map(
-                                type -> {
-                                  if (type == PartitionRange.BoundType.OPEN) {
-                                    return partitionName.compareTo(toPartitionName) < 0;
-                                  } else {
-                                    return partitionName.compareTo(toPartitionName) <= 0;
-                                  }
-                                }))
-                .orElse(true);
-
-        if (lowerBoundSatisfied && upperBoundSatisfied && entry.getValue() != null) {
-          resultStats.put(partitionName, entry.getValue());
-        }
+      if (tableStats == null) {
+        return Lists.newArrayList();
       }
-      return resultStats;
+
+      synchronized (tableStats) {
+        Map<String, Map<String, StatisticValue<?>>> resultStats = Maps.newHashMap();
+        for (PartitionStatistics partitionStat : tableStats.partitionStatistics().values()) {
+          String partitionName = partitionStat.partitionName();
+          boolean lowerBoundSatisfied =
+              range
+                  .lowerPartitionName()
+                  .flatMap(
+                      fromPartitionName ->
+                          range
+                              .lowerBoundType()
+                              .map(
+                                  type -> {
+                                    if (type == PartitionRange.BoundType.OPEN) {
+                                      return partitionName.compareTo(fromPartitionName) > 0;
+                                    } else {
+                                      return partitionName.compareTo(fromPartitionName) >= 0;
+                                    }
+                                  }))
+                  .orElse(true);
+
+          boolean upperBoundSatisfied =
+              range
+                  .upperPartitionName()
+                  .flatMap(
+                      toPartitionName ->
+                          range
+                              .upperBoundType()
+                              .map(
+                                  type -> {
+                                    if (type == PartitionRange.BoundType.OPEN) {
+                                      return partitionName.compareTo(toPartitionName) < 0;
+                                    } else {
+                                      return partitionName.compareTo(toPartitionName) <= 0;
+                                    }
+                                  }))
+                  .orElse(true);
+
+          if (lowerBoundSatisfied && upperBoundSatisfied) {
+            resultStats.put(partitionName, Maps.newHashMap(partitionStat.statistics()));
+          }
+        }
+        return resultStats.entrySet().stream()
+            .map(entry -> PartitionStatistics.of(entry.getKey(), entry.getValue()))
+            .collect(Collectors.toList());
+      }
     }
 
     @Override
-    public String metalake() {
-      return metalake;
-    }
+    public void updateStatistics(String metalake, List<MetadataObjectStatisticsUpdate> updates) {
+      for (MetadataObjectStatisticsUpdate update : updates) {
+        MetadataObject metadataObject = update.metadataObject();
+        MetadataObjectStatisticsContainer tableStats =
+            totalStatistics.computeIfAbsent(
+                new MetadataContainerKey(metalake, metadataObject),
+                key -> new MetadataObjectStatisticsContainer(Maps.newHashMap()));
 
-    @Override
-    public Map<String, String> properties() {
-      return properties;
-    }
-
-    @Override
-    public void updateStatistics(
-        Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToUpdate) {
-      for (Map.Entry<MetadataObject, List<PartitionStatisticsUpdate>> entry :
-          statisticsToUpdate.entrySet()) {
-        MetadataObject metadataObject = entry.getKey();
-        List<PartitionStatisticsUpdate> stats = entry.getValue();
-        Map<String, Map<String, StatisticValue<?>>> innerMap =
-            totalStatistics
-                .computeIfAbsent(metalake, k -> Maps.newConcurrentMap())
-                .computeIfAbsent(metadataObject, k -> Maps.newConcurrentMap());
-        for (PartitionStatisticsUpdate partStat : stats) {
-          String partitionName = partStat.partitionName();
-          Map<String, StatisticValue<?>> partitionStats = partStat.statistics();
-          Map<String, StatisticValue<?>> nestedInnerMap =
-              innerMap.computeIfAbsent(partitionName, k -> Maps.newConcurrentMap());
-          for (Map.Entry<String, StatisticValue<?>> statEntry : partitionStats.entrySet()) {
-            String statName = statEntry.getKey();
-            StatisticValue<?> statValue = statEntry.getValue();
-            nestedInnerMap.put(statName, statValue);
+        List<PartitionStatisticsUpdate> stats = update.partitionUpdates();
+        synchronized (tableStats) {
+          for (PartitionStatisticsUpdate updatePartStat : stats) {
+            String partitionName = updatePartStat.partitionName();
+            Map<String, StatisticValue<?>> partitionStats = updatePartStat.statistics();
+            PartitionStatistics existedPartitionStats =
+                tableStats
+                    .partitionStatistics()
+                    .computeIfAbsent(
+                        partitionName, k -> PartitionStatistics.of(partitionName, new HashMap<>()));
+            for (Map.Entry<String, StatisticValue<?>> statEntry : partitionStats.entrySet()) {
+              String statName = statEntry.getKey();
+              StatisticValue<?> statValue = statEntry.getValue();
+              existedPartitionStats.statistics().put(statName, statValue);
+            }
           }
         }
       }
     }
 
     @Override
-    public Map<String, Map<String, StatisticValue<?>>> listStatistics(
-        MetadataObject metadataObject, List<String> partitionNames) {
+    public List<PartitionStatistics> listStatistics(
+        String metalake, MetadataObject metadataObject, List<String> partitionNames) {
       throw new UnsupportedOperationException(
           "Don't support listing statistics by partition names");
     }
 
     @Override
     public void appendStatistics(
-        Map<MetadataObject, List<PartitionStatisticsUpdate>> statisticsToAppend) {
+        String metalake, List<MetadataObjectStatisticsUpdate> statisticsToAppend) {
       throw new UnsupportedOperationException("Don't support appending statistics");
     }
 
     @Override
-    public void dropStatistics(
-        Map<MetadataObject, List<PartitionStatisticsDrop>> partitionStatisticsToDrop) {
-      for (Map.Entry<MetadataObject, List<PartitionStatisticsDrop>> entry :
-          partitionStatisticsToDrop.entrySet()) {
-        MetadataObject metadataObject = entry.getKey();
-        List<PartitionStatisticsDrop> partitionsToDrop = entry.getValue();
-        Map<String, Map<String, StatisticValue<?>>> innerMap =
-            totalStatistics
-                .computeIfAbsent(metalake, k -> Maps.newConcurrentMap())
-                .computeIfAbsent(metadataObject, k -> Maps.newConcurrentMap());
-        for (PartitionStatisticsDrop partStats : partitionsToDrop) {
-          for (String statName : partStats.statisticNames()) {
-            if (innerMap.containsKey(partStats.partitionName())) {
-              innerMap.get(partStats.partitionName()).remove(statName);
+    public void dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> drops) {
+      for (MetadataObjectStatisticsDrop drop : drops) {
+        MetadataObject metadataObject = drop.metadataObject();
+        List<PartitionStatisticsDrop> partitionsToDrop = drop.drops();
+        MetadataObjectStatisticsContainer tableStats =
+            totalStatistics.computeIfAbsent(
+                new MetadataContainerKey(metalake, metadataObject),
+                key -> new MetadataObjectStatisticsContainer(Maps.newHashMap()));
+
+        synchronized (tableStats) {
+          for (PartitionStatisticsDrop partStats : partitionsToDrop) {
+            if (tableStats.partitionStatistics().containsKey(partStats.partitionName())) {
+              PartitionStatistics partitionStatistics =
+                  tableStats.partitionStatistics().get(partStats.partitionName());
+              for (String statName : partStats.statisticNames()) {
+                partitionStatistics.statistics().remove(statName);
+              }
+              if (partitionStatistics.statistics().isEmpty()) {
+                tableStats.partitionStatistics().remove(partStats.partitionName());
+              }
             }
           }
         }
@@ -171,5 +174,43 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
 
     @Override
     public void close() throws IOException {}
+
+    private static class MetadataContainerKey {
+      private final String metalake;
+      private final MetadataObject metadataObject;
+
+      private MetadataContainerKey(String metalake, MetadataObject metadataObject) {
+        this.metalake = metalake;
+        this.metadataObject = metadataObject;
+      }
+
+      @Override
+      public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof MetadataContainerKey)) return false;
+        MetadataContainerKey that = (MetadataContainerKey) o;
+        return Objects.equals(metalake, that.metalake)
+            && Objects.equals(metadataObject, that.metadataObject);
+      }
+
+      @Override
+      public int hashCode() {
+        return Objects.hash(metalake, metadataObject);
+      }
+    }
+
+    private static class MetadataObjectStatisticsContainer {
+
+      private final Map<String, PartitionStatistics> partitionStatistics;
+
+      private MetadataObjectStatisticsContainer(
+          Map<String, PartitionStatistics> partitionStatistics) {
+        this.partitionStatistics = partitionStatistics;
+      }
+
+      public Map<String, PartitionStatistics> partitionStatistics() {
+        return partitionStatistics;
+      }
+    }
   }
 }
