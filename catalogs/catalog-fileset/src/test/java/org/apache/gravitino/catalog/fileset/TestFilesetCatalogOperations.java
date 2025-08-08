@@ -274,6 +274,14 @@ public class TestFilesetCatalogOperations {
               .when(spySchemaMetaService)
               .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
                   Mockito.anyString(), Mockito.anyString(), Mockito.eq("s24_" + newName));
+
+          doReturn(schemaId)
+              .when(spySchemaMetaService)
+              .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq("s24_" + oldName));
+
+          doReturn(schemaId)
+              .when(spySchemaMetaService)
+              .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq("s24_" + newName));
         });
 
     locationArguments()
@@ -285,6 +293,9 @@ public class TestFilesetCatalogOperations {
                   .when(spySchemaMetaService)
                   .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
                       Mockito.anyString(), Mockito.anyString(), Mockito.eq("s1_" + name));
+              doReturn(schemaId)
+                  .when(spySchemaMetaService)
+                  .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq("s1_" + name));
             });
 
     locationWithPlaceholdersArguments()
@@ -759,7 +770,12 @@ public class TestFilesetCatalogOperations {
     try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
+        long testId = generateTestId();
+        createSchema(testId, schemaName, comment, catalogPath, schemaPath);
+
+        doReturn(testId)
+            .when(spySchemaMetaService)
+            .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq(schemaName));
       }
       Fileset fileset =
           createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
@@ -1073,7 +1089,11 @@ public class TestFilesetCatalogOperations {
     try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
+        long testId = generateTestId();
+        createSchema(testId, schemaName, comment, catalogPath, schemaPath);
+        doReturn(testId)
+            .when(spySchemaMetaService)
+            .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq(schemaName));
       }
       Fileset fileset =
           createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
@@ -1117,6 +1137,10 @@ public class TestFilesetCatalogOperations {
 
     FilesetChange change1 = FilesetChange.setProperty("k1", "v1");
     FilesetChange change2 = FilesetChange.removeProperty("k1");
+
+    doReturn(testId)
+        .when(spySchemaMetaService)
+        .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq(schemaName));
 
     try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
@@ -1230,6 +1254,11 @@ public class TestFilesetCatalogOperations {
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.updateComment(comment + "_new");
+
+    doReturn(testId)
+        .when(spySchemaMetaService)
+        .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq(schemaName));
+
     try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
       NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, name);
@@ -1253,6 +1282,10 @@ public class TestFilesetCatalogOperations {
     createSchema(testId, schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
+
+    doReturn(testId)
+        .when(spySchemaMetaService)
+        .getSchemaIdByCatalogIdAndName(Mockito.eq(1L), Mockito.eq(schemaName));
 
     FilesetChange change1 = FilesetChange.updateComment(null);
     try (SecureFilesetCatalogOperations ops = new SecureFilesetCatalogOperations(store)) {
