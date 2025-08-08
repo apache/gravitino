@@ -73,9 +73,10 @@ public class ModelOperations {
   private static final Logger LOG = LoggerFactory.getLogger(ModelOperations.class);
 
   private static final String loadModelAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) ||"
-          + " SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + " ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL)";
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL)""";
 
   private final ModelDispatcher modelDispatcher;
 
@@ -151,10 +152,11 @@ public class ModelOperations {
   @Timed(name = "register-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-model", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_MODEL",
+      expression = """
+      ANY(OWNER, METALAKE, CATALOG) ||
+      SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_MODEL
+      """,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerModel(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -196,10 +198,11 @@ public class ModelOperations {
   @Timed(name = "delete-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-model", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
+      expression = """
+      ANY(OWNER, METALAKE, CATALOG) ||
+      SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER
+      """,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModel(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -386,10 +389,11 @@ public class ModelOperations {
   @Timed(name = "link-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "link-model-version", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL && ANY_CREATE_MODEL_VERSION)",
+      expression = """
+      ANY(OWNER, METALAKE, CATALOG) ||
+      SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL && ANY_CREATE_MODEL_VERSION)
+      """,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response linkModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -428,10 +432,11 @@ public class ModelOperations {
   @Timed(name = "delete-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-model-version", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
+      expression = """
+      ANY(OWNER, METALAKE, CATALOG) ||
+      SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER
+      """,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -475,10 +480,11 @@ public class ModelOperations {
   @Timed(name = "delete-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "delete-model-alias", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
+      expression = """
+      ANY(OWNER, METALAKE, CATALOG) ||
+      SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER
+      """,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response deleteModelVersionByAlias(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -523,10 +529,10 @@ public class ModelOperations {
   @Timed(name = "alter-model-version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-model-version", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
+      expression = """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER""",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModelVersion(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -576,10 +582,10 @@ public class ModelOperations {
   @Timed(name = "alter-model-alias." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-model-alias", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
+      expression = """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER""",
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModelVersionByAlias(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -628,10 +634,11 @@ public class ModelOperations {
   @Timed(name = "alter-model." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-model", absolute = true)
   @AuthorizationExpression(
-      expression =
-          " ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER",
+      expression = """
+      ANY(OWNER, METALAKE, CATALOG) ||
+      SCHEMA_OWNER_WITH_USE_CATALOG ||
+      ANY_USE_CATALOG && ANY_USE_SCHEMA && MODEL::OWNER
+      """,
       accessMetadataType = MetadataObject.Type.MODEL)
   public Response alterModel(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
