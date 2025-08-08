@@ -258,11 +258,17 @@ public class LocalJobExecutor implements JobExecutor {
 
       Process process;
       synchronized (lock) {
-        jobStatus.put(jobId, Pair.of(JobHandle.Status.STARTED, UNEXPIRED_TIME_IN_MS));
+        // This happens when the job is cancelled before it starts.
+        Pair<JobHandle.Status, Long> statusPair = jobStatus.get(jobId);
+        if (statusPair == null || statusPair.getLeft() != JobHandle.Status.QUEUED) {
+          LOG.warn("Job {} is not in QUEUED state, cannot start it", jobId);
+          return;
+        }
 
         LocalProcessBuilder processBuilder = LocalProcessBuilder.create(jobTemplate, configs);
         process = processBuilder.start();
         runningProcesses.put(jobId, process);
+        jobStatus.put(jobId, Pair.of(JobHandle.Status.STARTED, UNEXPIRED_TIME_IN_MS));
       }
 
       LOG.info("Starting job: {}", jobId);
