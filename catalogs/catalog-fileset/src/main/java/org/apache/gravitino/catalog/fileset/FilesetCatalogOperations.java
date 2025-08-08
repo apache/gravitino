@@ -1042,7 +1042,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
             checkPlaceholderValue(v);
 
-            if (!containsPlaceholder(v)) {
+            if (!disableFSOps && !containsPlaceholder(v)) {
               Path path = new Path(v);
               FileSystem fs = getFileSystemWithCache(path, conf);
               try {
