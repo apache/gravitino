@@ -303,7 +303,6 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         req = JobTemplateRegisterRequest(
             DTOConverters.to_job_template_dto(job_template)
         )
-        req.validate()
 
         self.rest_client.post(url, json=req, error_handler=JOB_ERROR_HANDLER)
 
@@ -424,7 +423,6 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         """
         url = f"{self.API_METALAKES_JOB_RUNS_PATH}/{encode_string(self.name())}"
         request = JobRunRequest(job_template_name, job_conf)
-        request.validate()
 
         response = self.rest_client.post(
             url, json=request, error_handler=JOB_ERROR_HANDLER
