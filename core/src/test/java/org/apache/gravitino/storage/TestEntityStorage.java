@@ -2638,6 +2638,7 @@ public class TestEntityStorage {
       List<SecurableObject> securableObjects = newRow.securableObjects();
       Assertions.assertEquals(1, securableObjects.size());
       Assertions.assertEquals("newCatalogName", securableObjects.get(0).name());
+      destroy(type);
     }
   }
 }
