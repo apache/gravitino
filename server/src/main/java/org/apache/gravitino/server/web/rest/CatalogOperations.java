@@ -148,7 +148,7 @@ public class CatalogOperations {
   @ResponseMetered(name = "create-catalog", absolute = true)
   @AuthorizationExpression(
       expression = "METALAKE::CREATE_CATALOG || METALAKE::OWNER",
-      accessMetadataType = MetadataObject.Type.CATALOG)
+      accessMetadataType = MetadataObject.Type.METALAKE)
   public Response createCatalog(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
