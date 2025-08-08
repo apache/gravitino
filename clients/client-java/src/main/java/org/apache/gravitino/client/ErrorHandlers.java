@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.client;
 
-import static org.apache.gravitino.dto.responses.ErrorConstants.FORBIDDEN_CODE;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import java.util.List;
@@ -356,7 +354,7 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
-        case FORBIDDEN_CODE:
+        case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
@@ -409,7 +407,7 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
-        case FORBIDDEN_CODE:
+        case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
@@ -462,7 +460,7 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new CatalogAlreadyExistsException(errorMessage);
 
-        case FORBIDDEN_CODE:
+        case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
@@ -624,7 +622,7 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new FilesetAlreadyExistsException(errorMessage);
 
-        case FORBIDDEN_CODE:
+        case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
@@ -675,7 +673,7 @@ public class ErrorHandlers {
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TopicAlreadyExistsException(errorMessage);
 
-        case FORBIDDEN_CODE:
+        case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
@@ -823,7 +821,7 @@ public class ErrorHandlers {
         case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
           throw new UnsupportedOperationException(errorMessage);
 
-        case FORBIDDEN_CODE:
+        case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMessage);
 
         case ErrorConstants.NOT_IN_USE_CODE:
@@ -1044,7 +1042,7 @@ public class ErrorHandlers {
             throw new AlreadyExistsException(errorMsg);
           }
 
-        case FORBIDDEN_CODE:
+        case ErrorConstants.FORBIDDEN_CODE:
           throw new ForbiddenException(errorMsg);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
@@ -1087,7 +1085,7 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
-      if (errorResponse.getCode() == FORBIDDEN_CODE) {
+      if (errorResponse.getCode() == ErrorConstants.FORBIDDEN_CODE) {
         throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
       }
       throw new RESTException("Unable to process: %s", formatErrorMessage(errorResponse));
