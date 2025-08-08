@@ -37,6 +37,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -141,6 +142,30 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
     tableCatalogNormalUser.createTable(
         NameIdentifier.of(SCHEMA, "table3"), createColumns(), "test2", new HashMap<>());
+    String tempUser = "tempUser";
+    gravitinoMetalake.addUser(tempUser);
+    GravitinoAdminClient tempUserClient =
+        GravitinoAdminClient.builder(serverUri).withSimpleAuth(tempUser).build();
+    String tempRole = "tempRole";
+    gravitinoMetalake.createRole(tempRole, new HashMap<>(), new ArrayList<>());
+    gravitinoMetalake.grantPrivilegesToRole(
+        tempRole,
+        MetadataObjects.of(ImmutableList.of(CATALOG), MetadataObject.Type.CATALOG),
+        ImmutableList.of(Privileges.UseCatalog.allow()));
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of(tempRole), tempUser);
+    TableCatalog catalogLoadByTmpUser =
+        tempUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
+    assertThrows(
+        "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
+        ForbiddenException.class,
+        () -> {
+          catalogLoadByTmpUser.createTable(
+              NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
+        });
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of(role), tempUser);
+    catalogLoadByTmpUser.createTable(
+        NameIdentifier.of(SCHEMA, "table4"), createColumns(), "test2", new HashMap<>());
+    tableCatalog.dropTable(NameIdentifier.of(SCHEMA, "table4"));
   }
 
   @Test

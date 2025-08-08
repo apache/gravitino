@@ -358,16 +358,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     for (RoleEntity role : entities) {
       Long roleId = role.id();
+      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      if (loadedRoles.contains(roleId)) {
+        continue;
+      }
       role =
           entityStore.get(
               NameIdentifierUtil.ofRole(metalake, role.name()),
               Entity.EntityType.ROLE,
               RoleEntity.class);
-      if (loadedRoles.contains(roleId)) {
-        continue;
-      }
-      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+
       loadPolicyByRoleEntity(role);
       loadedRoles.add(roleId);
     }
