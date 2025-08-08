@@ -66,18 +66,18 @@ public class PoliciesAssociateRequest implements RESTRequest {
         "policiesToAdd and policiesToRemove cannot both be null");
 
     if (policiesToAdd != null) {
-      for (String Policy : policiesToAdd) {
+      for (String policy : policiesToAdd) {
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(Policy),
-            "policiesToAdd must not contain null or empty Policy names");
+            StringUtils.isNotBlank(policy),
+            "policiesToAdd must not contain null or empty policy names");
       }
     }
 
     if (policiesToRemove != null) {
-      for (String Policy : policiesToRemove) {
+      for (String policy : policiesToRemove) {
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(Policy),
-            "policiesToRemove must not contain null or empty Policy names");
+            StringUtils.isNotBlank(policy),
+            "policiesToRemove must not contain null or empty policy names");
       }
     }
   }

@@ -73,6 +73,16 @@ public class PolicyMetaBaseSQLProvider {
         + "</script>";
   }
 
+  /**
+   * Lists all policy POs that are different from the given policy PO in terms of inheritable,
+   * exclusive, and supported object types. This is used to find policies that are have same policy
+   * type but different immutable attributes.
+   *
+   * @param metalakeId the ID of the metalake to filter policies by
+   * @param policyPO the policy PO to compare against (the policy ID and policy type are used for
+   *     filtering) (the inheritable, exclusive, and supported object types are used for comparison)
+   * @return a SQL query string that selects policy POs
+   */
   public String listDiffPolicyPOsByMetalakeIdAndPolicy(
       @Param("metalakeId") Long metalakeId, @Param("policy") PolicyPO policyPO) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"

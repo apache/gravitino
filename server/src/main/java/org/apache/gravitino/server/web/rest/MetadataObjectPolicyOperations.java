@@ -107,11 +107,11 @@ public class MetadataObjectPolicyOperations {
             Policy targetPolicy = policyDispatcher.getPolicy(metalake, policyName);
             if (!targetPolicy.inheritable()
                 || !targetPolicy.supportedObjectTypes().contains(object.type())) {
-              return logNotFoundPolicy(metalake, policyName, type, fullName);
+              return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
             }
 
             if (hasConflictExclusivePolicy(metalake, object, targetPolicy)) {
-              return logNotFoundPolicy(metalake, policyName, type, fullName);
+              return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
             }
 
             MetadataObject parentObject = MetadataObjects.parent(object);
@@ -127,7 +127,7 @@ public class MetadataObjectPolicyOperations {
               if (hasConflictExclusivePolicy(parentPolicies, targetPolicy)) {
                 // If another same type exclusive policy is found, it means the target policy will
                 // be replaced by the same type policy
-                return logNotFoundPolicy(metalake, policyName, type, fullName);
+                return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
               }
 
               Optional<Policy> inheritedPolicy =
@@ -152,7 +152,7 @@ public class MetadataObjectPolicyOperations {
               parentObject = MetadataObjects.parent(parentObject);
             }
 
-            return logNotFoundPolicy(metalake, policyName, type, fullName);
+            return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
           });
 
     } catch (Exception e) {
@@ -315,7 +315,7 @@ public class MetadataObjectPolicyOperations {
                     && !p.name().equals(targetPolicy.name()));
   }
 
-  private Response logNotFoundPolicy(
+  private Response getPolicyNotFoundResponse(
       String metalakeName, String policyName, String objectType, String fullName) {
     LOG.warn(
         "Policy {} not found for object type: {}, full name: {} under metalake: {}",

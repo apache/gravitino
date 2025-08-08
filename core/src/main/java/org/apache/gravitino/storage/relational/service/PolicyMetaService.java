@@ -506,6 +506,14 @@ public class PolicyMetaService {
         mapper -> mapper.listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames));
   }
 
+  /**
+   * Get a list of policyPOs of the same type as the given policyPO under the specified metalake ID,
+   * but with different immutable attributes (exclusive, inheritable, supportedObjectTypes).
+   *
+   * @param metalakeId the ID of the metalake
+   * @param policyPO the policy PO to compare with
+   * @return a list of policy POs that have same type but different immutable attributes
+   */
   private List<PolicyPO> getDiffPolicyPOsByMetalakeIdAndPolicy(Long metalakeId, PolicyPO policyPO) {
     return SessionUtils.getWithoutCommit(
         PolicyMetaMapper.class,
