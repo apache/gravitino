@@ -65,7 +65,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
                 .flatMap(
                     fromPartitionName ->
                         range
-                            .upperBoundType()
+                            .lowerBoundType()
                             .map(
                                 type -> {
                                   if (type == PartitionRange.BoundType.OPEN) {
