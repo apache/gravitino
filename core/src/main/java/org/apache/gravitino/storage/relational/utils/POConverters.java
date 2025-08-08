@@ -77,6 +77,7 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -92,8 +93,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
-  private static final long INIT_VERSION = 1L;
-  private static final long DEFAULT_DELETED_AT = 0L;
+  public static final long INIT_VERSION = 1L;
+  public static final long DEFAULT_DELETED_AT = 0L;
 
   private POConverters() {}
 
@@ -1453,6 +1454,29 @@ public class POConverters {
     }
   }
 
+  public static PolicyMetadataObjectRelPO initializePolicyMetadataObjectRelPOWithVersion(
+      Long policyId, Long metadataObjectId, String metadataObjectType) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder()
+              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+              .withCreateTime(Instant.now())
+              .build();
+
+      return PolicyMetadataObjectRelPO.builder()
+          .withPolicyId(policyId)
+          .withMetadataObjectId(metadataObjectId)
+          .withMetadataObjectType(metadataObjectType)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
   public static OwnerRelPO initializeOwnerRelPOsWithVersion(
       Long metalakeId,
       String ownerType,
@@ -1593,11 +1617,10 @@ public class POConverters {
           .withMetalakeId(oldModelVersionPO.getMetalakeId())
           .withCatalogId(oldModelVersionPO.getCatalogId())
           .withSchemaId(oldModelVersionPO.getSchemaId())
-          // TODO The modelVersionUriName and modelVersionUri here are not actually used.
-          // They are only used for occupying positions to avoid verification failures. They will
-          // be removed when the model version with multiple URIs is supported to be modified later
-          .withModelVersionUriName("uriName")
-          .withModelVersionUri("uri")
+          // The modelVersionUriName and modelVersionUri here are not actually used.
+          // They are only used for occupying positions to avoid verification failures.
+          .withModelVersionUriName(oldModelVersionPO.getModelVersionUriName())
+          .withModelVersionUri(oldModelVersionPO.getModelVersionUri())
           .withModelVersion(oldModelVersionPO.getModelVersion())
           .withModelVersionComment(newModelVersion.comment())
           .withModelVersionProperties(

@@ -355,6 +355,7 @@ public class GravitinoMockServer implements AutoCloseable {
             anyMap(),
             any(),
             any(),
+            any(),
             any()))
         .thenAnswer(
             new Answer<Table>() {

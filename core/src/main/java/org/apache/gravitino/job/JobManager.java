@@ -19,10 +19,11 @@
 
 package org.apache.gravitino.job;
 
+import static org.apache.gravitino.Metalake.PROPERTY_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.io.Closeable;
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -31,6 +32,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -53,16 +57,34 @@ import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class JobManager implements JobOperationDispatcher, Closeable {
+public class JobManager implements JobOperationDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JobManager.class);
 
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{([\\w.-]+)\\}\\}");
+
+  private static final String JOB_STAGING_DIR =
+      File.separator
+          + "%s"
+          + File.separator
+          + "%s"
+          + File.separator
+          + JobHandle.JOB_ID_PREFIX
+          + "%s";
+
+  private static final long JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS = 600 * 1000L; // 10 minute
+
+  private static final long JOB_STATUS_PULL_MIN_INTERVAL_IN_MS = 60 * 1000L; // 1 minute
 
   private static final int TIMEOUT_IN_MS = 30 * 1000; // 30 seconds
 
@@ -73,6 +95,12 @@ public class JobManager implements JobOperationDispatcher, Closeable {
   private final JobExecutor jobExecutor;
 
   private final IdGenerator idGenerator;
+
+  private final long jobStagingDirKeepTimeInMs;
+
+  private final ScheduledExecutorService cleanUpExecutor;
+
+  private final ScheduledExecutorService statusPullExecutor;
 
   public JobManager(Config config, EntityStore entityStore, IdGenerator idGenerator) {
     this(config, entityStore, idGenerator, JobExecutorFactory.create(config));
@@ -103,6 +131,56 @@ public class JobManager implements JobOperationDispatcher, Closeable {
             String.format("Failed to create staging directory %s", stagingDirPath));
       }
     }
+
+    this.jobStagingDirKeepTimeInMs = config.get(Configs.JOB_STAGING_DIR_KEEP_TIME_IN_MS);
+    if (jobStagingDirKeepTimeInMs < JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS) {
+      LOG.warn(
+          "The job staging directory keep time is set to {} ms, the number is too small, "
+              + "which will cause frequent cleanup, please set it to a value larger than {} if "
+              + "you're not using it to do the test.",
+          jobStagingDirKeepTimeInMs,
+          JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS);
+    }
+
+    this.cleanUpExecutor =
+        Executors.newSingleThreadScheduledExecutor(
+            runnable -> {
+              Thread thread = new Thread(runnable, "job-staging-dir-cleanup");
+              thread.setDaemon(true);
+              return thread;
+            });
+    long scheduleInterval = jobStagingDirKeepTimeInMs / 10;
+    Preconditions.checkArgument(
+        scheduleInterval != 0,
+        "The schedule interval for "
+            + "job staging directory cleanup cannot be zero, please set the job staging directory "
+            + "keep time to a value larger than %s ms",
+        JOB_STAGING_DIR_CLEANUP_MIN_TIME_IN_MS);
+
+    cleanUpExecutor.scheduleAtFixedRate(
+        this::cleanUpStagingDirs, scheduleInterval, scheduleInterval, TimeUnit.MILLISECONDS);
+
+    long jobStatusPullIntervalInMs = config.get(Configs.JOB_STATUS_PULL_INTERVAL_IN_MS);
+    if (jobStatusPullIntervalInMs < JOB_STATUS_PULL_MIN_INTERVAL_IN_MS) {
+      LOG.warn(
+          "The job status pull interval is set to {} ms, the number is too small, "
+              + "which will cause frequent job status pull from external job executor, please set "
+              + "it to a value larger than {} if you're not using it to do the test.",
+          jobStatusPullIntervalInMs,
+          JOB_STATUS_PULL_MIN_INTERVAL_IN_MS);
+    }
+    this.statusPullExecutor =
+        Executors.newSingleThreadScheduledExecutor(
+            runnable -> {
+              Thread thread = new Thread(runnable, "job-status-pull");
+              thread.setDaemon(true);
+              return thread;
+            });
+    statusPullExecutor.scheduleAtFixedRate(
+        this::pullAndUpdateJobStatus,
+        jobStatusPullIntervalInMs,
+        jobStatusPullIntervalInMs,
+        TimeUnit.MILLISECONDS);
   }
 
   @Override
@@ -186,6 +264,18 @@ public class JobManager implements JobOperationDispatcher, Closeable {
       throw new InUseException(
           "Job template %s under metalake %s has active jobs associated with it",
           jobTemplateName, metalake);
+    }
+
+    // Delete all the job staging directories associated with the job template.
+    String jobTemplateStagingPath =
+        stagingDir.getAbsolutePath() + File.separator + metalake + File.separator + jobTemplateName;
+    File jobTemplateStagingDir = new File(jobTemplateStagingPath);
+    if (jobTemplateStagingDir.exists()) {
+      try {
+        FileUtils.deleteDirectory(jobTemplateStagingDir);
+      } catch (IOException e) {
+        LOG.error("Failed to delete job template staging directory: {}", jobTemplateStagingPath, e);
+      }
     }
 
     // Delete the job template entity as well as all the jobs associated with it.
@@ -276,15 +366,10 @@ public class JobManager implements JobOperationDispatcher, Closeable {
     JobTemplateEntity jobTemplateEntity = getJobTemplate(metalake, jobTemplateName);
 
     // Create staging directory.
-    // TODO(jerry). The job staging directory will be deleted using a background thread.
     long jobId = idGenerator.nextId();
     String jobStagingPath =
         stagingDir.getAbsolutePath()
-            + File.separator
-            + metalake
-            + File.separator
-            + JobHandle.JOB_ID_PREFIX
-            + jobId;
+            + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
     File jobStagingDir = new File(jobStagingPath);
     if (!jobStagingDir.mkdirs()) {
       throw new RuntimeException(
@@ -335,10 +420,12 @@ public class JobManager implements JobOperationDispatcher, Closeable {
     // Retrieve the job entity, will throw NoSuchJobException if the job does not exist.
     JobEntity jobEntity = getJob(metalake, jobId);
 
-    if (jobEntity.status() == JobHandle.Status.CANCELLED
+    if (jobEntity.status() == JobHandle.Status.CANCELLING
+        || jobEntity.status() == JobHandle.Status.CANCELLED
         || jobEntity.status() == JobHandle.Status.SUCCEEDED
         || jobEntity.status() == JobHandle.Status.FAILED) {
-      // If the job is already cancelled, succeeded, or failed, we do not need to cancel it again.
+      // If the job is already cancelling, cancelled, succeeded, or failed, we do not need to cancel
+      // it again.
       return jobEntity;
     }
 
@@ -366,25 +453,127 @@ public class JobManager implements JobOperationDispatcher, Closeable {
                     .withLastModifiedTime(Instant.now())
                     .build())
             .build();
-
-    try {
-      // Update the job entity in the entity store
-      entityStore.put(newJobEntity, true /* overwrite */);
-      return newJobEntity;
-    } catch (IOException e) {
-      throw new RuntimeException(
-          String.format("Failed to update job entity %s to CANCELING status", newJobEntity), e);
-    }
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifierUtil.ofJob(metalake, jobId),
+        LockType.WRITE,
+        () -> {
+          try {
+            // Update the job entity in the entity store
+            entityStore.put(newJobEntity, true /* overwrite */);
+            return newJobEntity;
+          } catch (IOException e) {
+            throw new RuntimeException(
+                String.format("Failed to update job entity %s to CANCELING status", newJobEntity),
+                e);
+          }
+        });
   }
 
   @Override
   public void close() throws IOException {
     jobExecutor.close();
-    // TODO(jerry). Implement any necessary cleanup logic for the JobManager.
+    statusPullExecutor.shutdownNow();
+    cleanUpExecutor.shutdownNow();
   }
 
   @VisibleForTesting
-  static JobTemplate createRuntimeJobTemplate(
+  void pullAndUpdateJobStatus() {
+    List<String> metalakes = listInUseMetalakes(entityStore);
+    for (String metalake : metalakes) {
+      // This unnecessary list all the jobs, we need to improve the code to only list the active
+      // jobs.
+      List<JobEntity> activeJobs =
+          listJobs(metalake, Optional.empty()).stream()
+              .filter(
+                  job ->
+                      job.status() == JobHandle.Status.QUEUED
+                          || job.status() == JobHandle.Status.STARTED
+                          || job.status() == JobHandle.Status.CANCELLING)
+              .toList();
+
+      activeJobs.forEach(
+          job -> {
+            JobHandle.Status newStatus = jobExecutor.getJobStatus(job.jobExecutionId());
+            if (newStatus != job.status()) {
+              JobEntity newJobEntity =
+                  JobEntity.builder()
+                      .withId(job.id())
+                      .withJobExecutionId(job.jobExecutionId())
+                      .withJobTemplateName(job.jobTemplateName())
+                      .withStatus(newStatus)
+                      .withNamespace(job.namespace())
+                      .withAuditInfo(
+                          AuditInfo.builder()
+                              .withCreator(job.auditInfo().creator())
+                              .withCreateTime(job.auditInfo().createTime())
+                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                              .withLastModifiedTime(Instant.now())
+                              .build())
+                      .build();
+
+              // Update the job entity with new status.
+              TreeLockUtils.doWithTreeLock(
+                  NameIdentifierUtil.ofJob(metalake, job.name()),
+                  LockType.WRITE,
+                  () -> {
+                    try {
+                      entityStore.put(newJobEntity, true /* overwrite */);
+                      return null;
+                    } catch (IOException e) {
+                      throw new RuntimeException(
+                          String.format(
+                              "Failed to update job entity %s to status %s",
+                              newJobEntity, newStatus),
+                          e);
+                    }
+                  });
+            }
+          });
+    }
+  }
+
+  @VisibleForTesting
+  void cleanUpStagingDirs() {
+    List<String> metalakes = listInUseMetalakes(entityStore);
+
+    for (String metalake : metalakes) {
+      List<JobEntity> finishedJobs =
+          listJobs(metalake, Optional.empty()).stream()
+              .filter(
+                  job ->
+                      job.status() == JobHandle.Status.CANCELLED
+                          || job.status() == JobHandle.Status.SUCCEEDED
+                          || job.status() == JobHandle.Status.FAILED)
+              .filter(
+                  job ->
+                      job.finishedAt() > 0
+                          && job.finishedAt() + jobStagingDirKeepTimeInMs
+                              < System.currentTimeMillis())
+              .toList();
+
+      finishedJobs.forEach(
+          job -> {
+            try {
+              entityStore.delete(
+                  NameIdentifierUtil.ofJob(metalake, job.name()), Entity.EntityType.JOB);
+
+              String jobStagingPath =
+                  stagingDir.getAbsolutePath()
+                      + String.format(JOB_STAGING_DIR, metalake, job.jobTemplateName(), job.id());
+              File jobStagingDir = new File(jobStagingPath);
+              if (jobStagingDir.exists()) {
+                FileUtils.deleteDirectory(jobStagingDir);
+                LOG.info("Deleted job staging directory {} for job {}", jobStagingPath, job.name());
+              }
+            } catch (IOException e) {
+              LOG.error("Failed to delete job and staging directory for job {}", job.name(), e);
+            }
+          });
+    }
+  }
+
+  @VisibleForTesting
+  public static JobTemplate createRuntimeJobTemplate(
       JobTemplateEntity jobTemplateEntity, Map<String, String> jobConf, File stagingDir) {
     String name = jobTemplateEntity.name();
     String comment = jobTemplateEntity.comment();
@@ -461,7 +650,7 @@ public class JobManager implements JobOperationDispatcher, Closeable {
       return inputString; // Return as is if the input string is blank
     }
 
-    StringBuffer result = new StringBuffer();
+    StringBuilder result = new StringBuilder();
 
     Matcher matcher = PLACEHOLDER_PATTERN.matcher(inputString);
     while (matcher.find()) {
@@ -511,6 +700,24 @@ public class JobManager implements JobOperationDispatcher, Closeable {
       return destFile.getAbsolutePath();
     } catch (Exception e) {
       throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
+    }
+  }
+
+  private static List<String> listInUseMetalakes(EntityStore entityStore) {
+    try {
+      List<BaseMetalake> metalakes =
+          TreeLockUtils.doWithRootTreeLock(
+              LockType.READ,
+              () ->
+                  entityStore.list(
+                      Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE));
+      return metalakes.stream()
+          .filter(
+              m -> (boolean) m.propertiesMetadata().getOrDefault(m.properties(), PROPERTY_IN_USE))
+          .map(BaseMetalake::name)
+          .collect(Collectors.toList());
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list in-use metalakes", e);
     }
   }
 }

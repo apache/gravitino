@@ -62,7 +62,7 @@ public class StarRocksColumnDefaultValueConverter extends JdbcColumnDefaultValue
       if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
-      // The parsing of Doris expressions is complex, so we are not currently undertaking the
+      // The parsing of StarRocks expressions is complex, so we are not currently undertaking the
       // parsing.
       return UnparsedExpression.of(columnDefaultValue);
     }
@@ -84,7 +84,7 @@ public class StarRocksColumnDefaultValueConverter extends JdbcColumnDefaultValue
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, columnType.getColumnSize(), columnType.getScale()));
       case DATE:
-        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case DATETIME:
         return CURRENT_TIMESTAMP.equals(columnDefaultValue)
             ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP

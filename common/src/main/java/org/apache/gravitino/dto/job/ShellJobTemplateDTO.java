@@ -16,13 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.dto.job;
 
-package org.apache.gravitino.auth;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
+import lombok.experimental.Accessors;
+import lombok.experimental.SuperBuilder;
 
-/** The type of OAuth provider. */
-public enum ProviderType {
-  /** Default provider. */
-  DEFAULT,
-  /** Azure AD provider. */
-  AZURE
+/** Represents a Shell Job Template Data Transfer Object (DTO). */
+@Getter
+@Accessors(fluent = true)
+@EqualsAndHashCode(callSuper = true)
+@SuperBuilder(setterPrefix = "with")
+@ToString(callSuper = true)
+public class ShellJobTemplateDTO extends JobTemplateDTO {
+
+  @JsonProperty("scripts")
+  private List<String> scripts;
+
+  /** Creates a new ShellJobTemplateDTO with the specified properties. */
+  private ShellJobTemplateDTO() {
+    // Default constructor for Jackson
+    super();
+  }
 }

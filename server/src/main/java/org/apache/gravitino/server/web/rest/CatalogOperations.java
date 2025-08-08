@@ -20,8 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.Arrays;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -104,23 +102,13 @@ public class CatalogOperations {
             if (verbose) {
               Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
               catalogs =
-                  Arrays.stream(catalogs)
-                      .filter(
-                          catalog -> {
-                            NameIdentifier[] nameIdentifiers =
-                                new NameIdentifier[] {
-                                  NameIdentifierUtil.ofCatalog(metalake, catalog.name())
-                                };
-                            return MetadataFilterHelper.filterByExpression(
-                                        metalake,
-                                        loadCatalogAuthorizationExpression,
-                                        Entity.EntityType.CATALOG,
-                                        nameIdentifiers)
-                                    .length
-                                > 0;
-                          })
-                      .collect(Collectors.toList())
-                      .toArray(new Catalog[0]);
+                  MetadataFilterHelper.filterByExpression(
+                      metalake,
+                      loadCatalogAuthorizationExpression,
+                      Entity.EntityType.CATALOG,
+                      catalogs,
+                      (catalogEntity) ->
+                          NameIdentifierUtil.ofCatalog(metalake, catalogEntity.name()));
               Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
               LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
               return response;

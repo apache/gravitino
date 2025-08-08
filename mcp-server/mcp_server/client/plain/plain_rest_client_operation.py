@@ -22,6 +22,7 @@ from mcp_server.client import (
     GravitinoOperation,
     SchemaOperation,
     TableOperation,
+    TagOperation,
 )
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
@@ -35,7 +36,6 @@ from mcp_server.client.plain.plain_rest_client_table_operation import (
 from mcp_server.client.plain.plain_rest_client_tag_operation import (
     PlainRESTClientTagOperation,
 )
-from mcp_server.client.tag_operation import TagOperation
 
 
 class PlainRESTClientOperation(GravitinoOperation):

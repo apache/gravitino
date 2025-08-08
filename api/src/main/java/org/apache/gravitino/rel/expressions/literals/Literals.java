@@ -177,6 +177,16 @@ public class Literals {
   }
 
   /**
+   * Creates a date type literal with the given value.
+   *
+   * @param value the date literal value, must be in the format "yyyy-MM-dd"
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<LocalDate> dateLiteral(String value) {
+    return dateLiteral(LocalDate.parse(value));
+  }
+
+  /**
    * Creates a time type literal with the given value.
    *
    * @param value the time literal value
@@ -184,6 +194,16 @@ public class Literals {
    */
   public static LiteralImpl<LocalTime> timeLiteral(LocalTime value) {
     return of(value, Types.TimeType.get());
+  }
+
+  /**
+   * Creates a time type literal with the given value.
+   *
+   * @param value the time literal value, must be in the format "HH:mm:ss"
+   * @return a new {@link Literal} instance
+   */
+  public static LiteralImpl<LocalTime> timeLiteral(String value) {
+    return timeLiteral(LocalTime.parse(value));
   }
 
   /**

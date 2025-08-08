@@ -79,6 +79,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private static final Schema tableSchema =
@@ -374,7 +375,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private Response doUpdateTable(Namespace ns, String name, TableMetadata base) {
-    TableMetadata newMetadata = base.updateSchema(newTableSchema, base.lastColumnId());
+    TableMetadata newMetadata = base.updateSchema(newTableSchema);
     List<MetadataUpdate> metadataUpdates = newMetadata.changes();
     List<UpdateRequirement> requirements = UpdateRequirements.forUpdateTable(base, metadataUpdates);
     UpdateTableRequest updateTableRequest = new UpdateTableRequest(requirements, metadataUpdates);

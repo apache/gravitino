@@ -338,6 +338,47 @@ public class TestMetadataObjectTagOperations extends JerseyTest {
     Assertions.assertTrue(resultNames2.contains("tag3"));
     Assertions.assertTrue(resultNames2.contains("tag5"));
     Assertions.assertTrue(resultNames2.contains("tag7"));
+
+    tableTagInfos =
+        new Tag[] {
+          TagEntity.builder().withName("tag5").withId(1L).withAuditInfo(testAuditInfo1).build(),
+          // Tag tag3 already associated with schema
+          TagEntity.builder().withName("tag3").withId(2L).withAuditInfo(testAuditInfo1).build(),
+          // Tag tag1 already associated with catalog
+          TagEntity.builder().withName("tag1").withId(3L).withAuditInfo(testAuditInfo1).build(),
+          TagEntity.builder().withName("tag0").withId(3L).withAuditInfo(testAuditInfo1).build()
+        };
+    when(tagManager.listTagsInfoForMetadataObject(metalake, table)).thenReturn(tableTagInfos);
+
+    Response response8 =
+        target(basePath(metalake))
+            .path(table.type().toString())
+            .path(table.fullName())
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response8.getStatus());
+
+    TagListResponse tagListResponse8 = response8.readEntity(TagListResponse.class);
+    Assertions.assertEquals(0, tagListResponse8.getCode());
+    Assertions.assertEquals(4, tagListResponse8.getTags().length);
+
+    Map<String, Tag> resultTags8 =
+        Arrays.stream(tagListResponse8.getTags())
+            .collect(Collectors.toMap(Tag::name, Function.identity()));
+
+    Assertions.assertTrue(resultTags8.containsKey("tag0"));
+    Assertions.assertTrue(resultTags8.containsKey("tag1"));
+    Assertions.assertTrue(resultTags8.containsKey("tag3"));
+    Assertions.assertTrue(resultTags8.containsKey("tag5"));
+
+    Assertions.assertFalse(resultTags8.get("tag1").inherited().get());
+    Assertions.assertFalse(resultTags8.get("tag3").inherited().get());
+    Assertions.assertFalse(resultTags8.get("tag5").inherited().get());
+    Assertions.assertFalse(resultTags8.get("tag0").inherited().get());
   }
 
   @Test

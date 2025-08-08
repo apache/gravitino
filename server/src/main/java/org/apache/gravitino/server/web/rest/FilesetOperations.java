@@ -139,7 +139,7 @@ public class FilesetOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && SCHEMA::CREATE_FILESET",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response createFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -335,7 +335,7 @@ public class FilesetOperations {
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             boolean dropped = dispatcher.dropFileset(ident);
             if (!dropped) {
-              LOG.warn("Failed to drop fileset {} under schema {}", fileset, schema);
+              LOG.warn("Cannot find to be dropped fileset {} under schema {}", fileset, schema);
             }
 
             Response response = Utils.ok(new DropResponse(dropped));
