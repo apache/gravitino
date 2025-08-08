@@ -189,7 +189,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         ForbiddenException.class,
         () -> {
-          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(CATALOG, SCHEMA, "fileset1"));
+          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset1"));
         });
     Fileset fileset2 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset2"));
     assertEquals("fileset2", fileset2.name());
@@ -244,8 +244,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
         ForbiddenException.class,
         () -> {
-          filesetCatalogNormalUser.getFileLocation(
-              NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "fileset1"), "/test");
+          filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
         });
     // grant normal user owner privilege on fileset4
     gravitinoMetalake.setOwner(

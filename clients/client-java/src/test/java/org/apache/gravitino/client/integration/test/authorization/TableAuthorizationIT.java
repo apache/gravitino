@@ -176,7 +176,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
         ForbiddenException.class,
         () -> {
-          tableCatalogNormalUser.loadTable(NameIdentifier.of(CATALOG, SCHEMA, "table1"));
+          tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
         });
     Table table2 = tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table2"));
     assertEquals("table2", table2.name());
