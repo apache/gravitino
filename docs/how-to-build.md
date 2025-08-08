@@ -45,11 +45,6 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew build
    ```
 
-   The default specified JDK version is 17, but if you want to use a different JDK version , update the `jdkVersion` property in gradle.properties, or pass it via the -P option, for example:
-   ```shell
-   ./gradlew build -PjdkVersion=11
-   ```
-
    If you want to use the client module with JDK 8, you can specify the version using -PclientCompatibleWithJDK8, for example:
 
    ```shell
