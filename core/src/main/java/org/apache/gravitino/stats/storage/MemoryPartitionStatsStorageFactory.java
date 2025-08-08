@@ -138,7 +138,8 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
     @Override
     public Map<String, Map<String, StatisticValue<?>>> listStatistics(
         MetadataObject metadataObject, List<String> partitionNames) {
-      throw new UnsupportedOperationException("Don't support listing statistics by partition names");
+      throw new UnsupportedOperationException(
+          "Don't support listing statistics by partition names");
     }
 
     @Override
