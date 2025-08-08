@@ -35,6 +35,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
@@ -204,7 +205,6 @@ public class HTTPClient implements RESTClient {
   private void throwFailure(
       CloseableHttpResponse response, String responseBody, Consumer<ErrorResponse> errorHandler) {
     ErrorResponse errorResponse = null;
-
     if (responseBody != null) {
       try {
         if (errorHandler instanceof ErrorHandler) {
@@ -233,7 +233,9 @@ public class HTTPClient implements RESTClient {
     }
 
     errorHandler.accept(errorResponse);
-
+    if (response.getCode() == 403) {
+      throw new ForbiddenException("Forbidden error :" + errorResponse.getMessage());
+    }
     // Throw an exception in case the provided error handler does not throw.
     throw new RESTException("Unhandled error: %s", errorResponse);
   }

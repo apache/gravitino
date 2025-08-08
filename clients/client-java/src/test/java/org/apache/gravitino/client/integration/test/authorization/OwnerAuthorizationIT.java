@@ -32,6 +32,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.rel.Column;
@@ -107,7 +108,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user can not set owner",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.setOwner(
               MetadataObjects.of(
@@ -133,7 +134,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user can not set owner",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.setOwner(
               MetadataObjects.of(
@@ -179,7 +180,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user can not set owner",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.setOwner(
               MetadataObjects.of(
@@ -195,7 +196,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can set owner
     assertThrows(
         "Current user can not set owner",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           // NORMAL_USER has not USE_CATALOG
           gravitinoMetalakeLoadByNormalUser.setOwner(
@@ -239,7 +240,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user can not set owner",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.setOwner(
               MetadataObjects.of(
@@ -254,7 +255,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
         Owner.Type.USER);
     assertThrows(
         "Current user can not set owner",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           // NORMAL_USER has not USE_SCHEMA
           gravitinoMetalakeLoadByNormalUser.setOwner(
@@ -290,7 +291,7 @@ public class OwnerAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user can not set owner",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.setOwner(
               MetadataObjects.of(ImmutableList.of(tempRole), MetadataObject.Type.ROLE),

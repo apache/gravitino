@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.rel.Column;
@@ -102,7 +103,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
         });
@@ -124,7 +125,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTableCatalog();
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.createTable(
               NameIdentifier.of(SCHEMA, "table2"), createColumns(), "test2", new HashMap<>());
@@ -173,7 +174,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can load table2 and table3, but not table1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.loadTable(NameIdentifier.of(CATALOG, SCHEMA, "table1"));
         });
@@ -195,7 +196,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
         ImmutableList.of(Privileges.SelectTable.deny()));
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.loadTable(NameIdentifier.of(SCHEMA, "table1"));
         });
@@ -211,7 +212,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot alter table1 (no privilege)
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.alterTable(
               NameIdentifier.of(SCHEMA, "table1"), TableChange.setProperty("key", "value"));
@@ -239,7 +240,7 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot drop table1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "table1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           tableCatalogNormalUser.dropTable(NameIdentifier.of(SCHEMA, "table1"));
         });
