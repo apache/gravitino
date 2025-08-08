@@ -43,7 +43,7 @@ public class TestMemoryPartitionStatsStorage {
           MetadataObjects.of(
               Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);
 
-      List<PartitionStatistics> stats =
+      List<PersistedPartitionStatistics> stats =
           storage.listStatistics(
               "metalake",
               metadataObject,

@@ -46,7 +46,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
     private MemoryPartitionStatsStorage() {}
 
     @Override
-    public List<PartitionStatistics> listStatistics(
+    public List<PersistedPartitionStatistics> listStatistics(
         String metalake, MetadataObject metadataObject, PartitionRange range) {
       MetadataObjectStatisticsContainer tableStats =
           totalStatistics.get(new MetadataContainerKey(metalake, metadataObject));
@@ -57,7 +57,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
 
       synchronized (tableStats) {
         Map<String, Map<String, StatisticValue<?>>> resultStats = Maps.newHashMap();
-        for (PartitionStatistics partitionStat : tableStats.partitionStatistics().values()) {
+        for (PersistedPartitionStatistics partitionStat : tableStats.partitionStatistics().values()) {
           String partitionName = partitionStat.partitionName();
           boolean lowerBoundSatisfied =
               range
@@ -98,7 +98,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
           }
         }
         return resultStats.entrySet().stream()
-            .map(entry -> PartitionStatistics.of(entry.getKey(), entry.getValue()))
+            .map(entry -> PersistedPartitionStatistics.of(entry.getKey(), entry.getValue()))
             .collect(Collectors.toList());
       }
     }
@@ -117,11 +117,11 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
           for (PartitionStatisticsUpdate updatePartStat : stats) {
             String partitionName = updatePartStat.partitionName();
             Map<String, StatisticValue<?>> partitionStats = updatePartStat.statistics();
-            PartitionStatistics existedPartitionStats =
+            PersistedPartitionStatistics existedPartitionStats =
                 tableStats
                     .partitionStatistics()
                     .computeIfAbsent(
-                        partitionName, k -> PartitionStatistics.of(partitionName, new HashMap<>()));
+                        partitionName, k -> PersistedPartitionStatistics.of(partitionName, new HashMap<>()));
             for (Map.Entry<String, StatisticValue<?>> statEntry : partitionStats.entrySet()) {
               String statName = statEntry.getKey();
               StatisticValue<?> statValue = statEntry.getValue();
@@ -133,7 +133,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
     }
 
     @Override
-    public List<PartitionStatistics> listStatistics(
+    public List<PersistedPartitionStatistics> listStatistics(
         String metalake, MetadataObject metadataObject, List<String> partitionNames) {
       throw new UnsupportedOperationException(
           "Don't support listing statistics by partition names");
@@ -158,12 +158,12 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
         synchronized (tableStats) {
           for (PartitionStatisticsDrop partStats : partitionsToDrop) {
             if (tableStats.partitionStatistics().containsKey(partStats.partitionName())) {
-              PartitionStatistics partitionStatistics =
+              PersistedPartitionStatistics persistedPartitionStatistics =
                   tableStats.partitionStatistics().get(partStats.partitionName());
               for (String statName : partStats.statisticNames()) {
-                partitionStatistics.statistics().remove(statName);
+                persistedPartitionStatistics.statistics().remove(statName);
               }
-              if (partitionStatistics.statistics().isEmpty()) {
+              if (persistedPartitionStatistics.statistics().isEmpty()) {
                 tableStats.partitionStatistics().remove(partStats.partitionName());
               }
             }
@@ -201,14 +201,14 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
 
     private static class MetadataObjectStatisticsContainer {
 
-      private final Map<String, PartitionStatistics> partitionStatistics;
+      private final Map<String, PersistedPartitionStatistics> partitionStatistics;
 
       private MetadataObjectStatisticsContainer(
-          Map<String, PartitionStatistics> partitionStatistics) {
+          Map<String, PersistedPartitionStatistics> partitionStatistics) {
         this.partitionStatistics = partitionStatistics;
       }
 
-      public Map<String, PartitionStatistics> partitionStatistics() {
+      public Map<String, PersistedPartitionStatistics> partitionStatistics() {
         return partitionStatistics;
       }
     }

@@ -22,32 +22,32 @@ import java.util.Map;
 import org.apache.gravitino.stats.StatisticValue;
 
 /** Represents a collection of statistics for a specific partition in a metadata object. */
-public class PartitionStatistics {
+public class PersistedPartitionStatistics {
 
   private final String partitionName;
   private final Map<String, StatisticValue<?>> statistics;
 
   /**
-   * Creates an instance of {@link PartitionStatistics}.
+   * Creates an instance of {@link PersistedPartitionStatistics}.
    *
    * @param partitionName the name of the partition for which these statistics are applicable
    * @param statistics a map of statistics applicable to the partition, where the key is the
    *     statistic name
-   * @return a new instance of {@link PartitionStatistics}
+   * @return a new instance of {@link PersistedPartitionStatistics}
    */
-  public static PartitionStatistics of(
+  public static PersistedPartitionStatistics of(
       String partitionName, Map<String, StatisticValue<?>> statistics) {
-    return new PartitionStatistics(partitionName, statistics);
+    return new PersistedPartitionStatistics(partitionName, statistics);
   }
 
   /**
-   * Private constructor for {@link PartitionStatistics}.
+   * Private constructor for {@link PersistedPartitionStatistics}.
    *
    * @param partitionName the name of the partition for which these statistics are applicable
    * @param statistics a map of statistics applicable to the partition, where the key is the
    *     statistic name
    */
-  private PartitionStatistics(String partitionName, Map<String, StatisticValue<?>> statistics) {
+  private PersistedPartitionStatistics(String partitionName, Map<String, StatisticValue<?>> statistics) {
     this.partitionName = partitionName;
     this.statistics = statistics;
   }

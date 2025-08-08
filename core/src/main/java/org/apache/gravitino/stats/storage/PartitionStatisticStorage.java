@@ -36,9 +36,9 @@ public interface PartitionStatisticStorage extends Closeable {
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which statistics are being listed
    * @param partitionRange the range of partition names for which statistics are being listed
-   * @return a list of {@link PartitionStatistics} objects, each containing the partition name
+   * @return a list of {@link PersistedPartitionStatistics} objects, each containing the partition name
    */
-  List<PartitionStatistics> listStatistics(
+  List<PersistedPartitionStatistics> listStatistics(
       String metalake, MetadataObject metadataObject, PartitionRange partitionRange);
 
   /**
@@ -49,9 +49,9 @@ public interface PartitionStatisticStorage extends Closeable {
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which statistics are being listed
    * @param partitionNames a list of partition names for which statistics are being listed
-   * @return a list of {@link PartitionStatistics} objects, each containing the partition name
+   * @return a list of {@link PersistedPartitionStatistics} objects, each containing the partition name
    */
-  default List<PartitionStatistics> listStatistics(
+  default List<PersistedPartitionStatistics> listStatistics(
       String metalake, MetadataObject metadataObject, List<String> partitionNames) {
     throw new UnsupportedOperationException(
         "Don't support listStatistics with partition names yet.");
