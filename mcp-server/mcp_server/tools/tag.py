@@ -198,7 +198,6 @@ def load_tag_tool(mcp: FastMCP):
         metadata_full_name: str,
         metadata_type: str,
         tags_to_associate: list,
-        tags_to_disassociate: list,
     ) -> str:
         """
         Associate or disassociate tags with metadata.
@@ -213,7 +212,6 @@ def load_tag_tool(mcp: FastMCP):
             metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
              "fileset", "model", "topic").
             tags_to_associate (list): List of tag names to associate with the metadata.
-            tags_to_disassociate (list): List of tag names to disassociate from the metadata.
 
         Example input:
             metadata_full_name: "catalog.schema.table"
@@ -235,7 +233,44 @@ def load_tag_tool(mcp: FastMCP):
             metadata_full_name,
             metadata_type,
             tags_to_associate,
-            tags_to_disassociate,
+            [],
+        )
+
+    @mcp.tool(tags={"tag"})
+    async def disassociate_tag_from_metadata(
+        ctx: Context,
+        metadata_full_name: str,
+        metadata_type: str,
+        tags_to_disassociate: list,
+    ) -> str:
+        """
+        Disassociate tags from metadata.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            metadata_full_name (str): Full name of the metadata object to disassociate tags from.
+            metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
+             "fileset", "model", "topic").
+            tags_to_disassociate (list): List of tag names to disassociate from the metadata.
+
+        Example input:
+            metadata_full_name: "catalog.schema.table"
+            metadata_type: "table"
+            tags_to_disassociate: ["tag1", "tag2"]
+
+        Returns:
+            str: JSON-formatted string containing the names of disassociated tags.
+
+        Example Return Value:
+            [
+              "tag1",
+              "tag2"
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_tag_operation().associate_tag_with_metadata(
+            metadata_full_name, metadata_type, [], tags_to_disassociate
         )
 
     @mcp.tool(tags={"tag"})
