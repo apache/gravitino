@@ -26,7 +26,6 @@ plugins {
 
 dependencies {
   compileOnly(project(":api"))
-  compileOnly(project(":catalogs:catalog-common"))
   compileOnly(libs.hadoop3.aws)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
