@@ -234,7 +234,7 @@ public class HTTPClient implements RESTClient {
 
     errorHandler.accept(errorResponse);
     if (response.getCode() == 403) {
-      throw new ForbiddenException("Forbidden error :" + errorResponse.getMessage());
+      throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
     }
     // Throw an exception in case the provided error handler does not throw.
     throw new RESTException("Unhandled error: %s", errorResponse);
