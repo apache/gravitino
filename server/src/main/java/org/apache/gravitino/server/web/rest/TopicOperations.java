@@ -250,7 +250,7 @@ public class TopicOperations {
             boolean dropped = dispatcher.dropTopic(ident);
 
             if (!dropped) {
-              LOG.warn("Failed to drop topic {} under schema {}", topic, schema);
+              LOG.warn("Cannot find to be dropped topic {} under schema {}", topic, schema);
             }
 
             Response response = Utils.ok(new DropResponse(dropped));
