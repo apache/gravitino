@@ -60,12 +60,17 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
 
   @Override
   public FSDataInputStream open(Path gvfsPath, int bufferSize) throws IOException {
+    if (gvfsPath.toString().endsWith("/")) {
+      String message =
+          "Cannot open a directory path: "
+              + gvfsPath
+              + ". Please use listStatus or getFileStatus to access directory.";
+      throw new IOException(message);
+    }
+
     FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
     Path actualFilePath =
         getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.OPEN);
-    if (actualFs.exists(actualFilePath) && !actualFs.getFileStatus(actualFilePath).isFile()) {
-      // Throw exception
-    }
     return actualFs.open(actualFilePath, bufferSize);
   }
 
