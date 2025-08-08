@@ -291,7 +291,7 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
 
     def register_job_template(self, job_template: JobTemplate) -> None:
         """Register a job template with the specified job template to Gravitino. The registered
-        job will be maintained in Gravitino, allowing it to be executed later.
+        job template will be maintained in Gravitino, allowing it to be executed later.
 
         Args:
             job_template: The job template to register.
@@ -332,10 +332,12 @@ class GravitinoMetalake(MetalakeDTO, SupportsJobs):
         return DTOConverters.from_job_template_dto(resp.job_template())
 
     def delete_job_template(self, job_template_name: str) -> bool:
-        """Deletes a job template by its name. This will remove the job template from Gravitino, and it
+        """
+        Deletes a job template by its name. This will remove the job template from Gravitino, and it
         will no longer be available for execution. Only when all the jobs associated with this job
         template are completed, failed or cancelled, the job template can be deleted successfully,
-        otherwise it will return false.
+        otherwise it will throw InUseException. Returns false if the job template to be deleted does
+        not exist.
 
         The deletion of a job template will also delete all the jobs associated with this template.
 

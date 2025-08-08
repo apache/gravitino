@@ -113,7 +113,7 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs):
 
     def register_job_template(self, job_template) -> None:
         """Register a job template with the specified job template to Gravitino. The registered
-        job will be maintained in Gravitino, allowing it to be executed later.
+        job template will be maintained in Gravitino, allowing it to be executed later.
 
         Args:
             job_template: The job template to register.
@@ -142,7 +142,8 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs):
         Deletes a job template by its name. This will remove the job template from Gravitino, and it
         will no longer be available for execution. Only when all the jobs associated with this job
         template are completed, failed or cancelled, the job template can be deleted successfully,
-        otherwise it will return false.
+        otherwise it will throw InUseException. Returns false if the job template to be deleted does
+        not exist.
 
         The deletion of a job template will also delete all the jobs associated with this template.
 
@@ -199,7 +200,7 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs):
         return self.get_metalake().run_job(job_template_name, job_conf)
 
     def cancel_job(self, job_id: str) -> JobHandle:
-        """Cancels a running job by its ID.
+        """Cancels a job by its ID.
 
         Args:
             job_id: The ID of the job to cancel.
