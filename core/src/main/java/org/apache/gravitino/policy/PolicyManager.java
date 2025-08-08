@@ -491,6 +491,11 @@ public class PolicyManager implements PolicyDispatcher {
         newComment = ((PolicyChange.UpdatePolicyComment) change).getNewComment();
       } else if (change instanceof PolicyChange.UpdateContent) {
         PolicyChange.UpdateContent updateContent = (PolicyChange.UpdateContent) change;
+        Preconditions.checkArgument(
+            policyEntity.policyType().equalsIgnoreCase(updateContent.getPolicyType()),
+            "Policy type mismatch: expected %s but got %s",
+            policyEntity.policyType(),
+            updateContent.getPolicyType());
         newContent = updateContent.getContent();
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
