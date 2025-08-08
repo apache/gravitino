@@ -23,13 +23,13 @@ from mcp_server.client import (
     SchemaOperation,
     TableOperation,
 )
-from mcp_server.client.plain.rest_client_catalog_operation import (
+from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
 )
-from mcp_server.client.plain.rest_client_schema_operation import (
+from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
 )
-from mcp_server.client.plain.rest_client_table_operation import (
+from mcp_server.client.plain.plain_rest_client_table_operation import (
     PlainRESTClientTableOperation,
 )
 from mcp_server.client.plain.rest_client_tag_operation import (

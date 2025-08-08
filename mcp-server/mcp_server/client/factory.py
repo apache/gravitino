@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from mcp_server.client.plain.rest_client_operation import (
+from mcp_server.client.plain.plain_rest_client_operation import (
     PlainRESTClientOperation,
 )
 
