@@ -335,6 +335,15 @@ public class MetadataObjectPolicyOperations {
             + metalakeName);
   }
 
+  /**
+   * Get the policy for the given metadata object and policy name. If the policy is not found,
+   * return an empty Optional.
+   *
+   * @param metalake the name of the metalake
+   * @param object the metadata object for which the policy is associated
+   * @param policyName the name of the policy to retrieve
+   * @return an Optional containing the policy if found, otherwise an empty Optional
+   */
   private Optional<Policy> getPolicyForObject(
       String metalake, MetadataObject object, String policyName) {
     try {
