@@ -80,9 +80,21 @@ public class RelationalEntityStore
   private static final Map<Type, List<Entity.EntityType>> RELATION_ALLOWED_ENTITY_TYPE =
       ImmutableMap.of(
           SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
-          ImmutableList.of(),
+          ImmutableList.of(
+              EntityType.CATALOG,
+              EntityType.SCHEMA,
+              EntityType.TABLE,
+              EntityType.COLUMN,
+              EntityType.FILESET,
+              EntityType.MODEL),
           SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-          ImmutableList.of(),
+          ImmutableList.of(
+              EntityType.CATALOG,
+              EntityType.SCHEMA,
+              EntityType.TABLE,
+              EntityType.COLUMN,
+              EntityType.FILESET,
+              EntityType.MODEL),
           Type.JOB_TEMPLATE_JOB_REL,
           ImmutableList.of(Entity.EntityType.JOB_TEMPLATE));
 
