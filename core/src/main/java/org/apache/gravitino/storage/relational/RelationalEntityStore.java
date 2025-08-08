@@ -68,14 +68,10 @@ public class RelationalEntityStore
       ImmutableMap.of(
           SupportsRelationOperations.Type.METADATA_OBJECT_ROLE_REL,
           ImmutableList.of(Entity.EntityType.ROLE),
-          SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-          ImmutableList.of(Entity.EntityType.POLICY),
-          Type.OWNER_REL,
-          ImmutableList.of(Entity.EntityType.USER, Entity.EntityType.GROUP),
-          Type.ROLE_USER_REL,
-          ImmutableList.of(Entity.EntityType.USER),
-          Type.ROLE_GROUP_REL,
-          ImmutableList.of(Entity.EntityType.GROUP),
+          // Policy entity does not contain metadata field directly, so we do not need to
+          // include it here.
+          // SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+          // ImmutableList.of(Entity.EntityType.POLICY),
           Type.JOB_TEMPLATE_JOB_REL,
           ImmutableList.of(Entity.EntityType.JOB));
 
@@ -87,12 +83,6 @@ public class RelationalEntityStore
           ImmutableList.of(),
           SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
           ImmutableList.of(),
-          Type.OWNER_REL,
-          ImmutableList.of(),
-          Type.ROLE_USER_REL,
-          ImmutableList.of(Entity.EntityType.ROLE, Entity.EntityType.USER),
-          Type.ROLE_GROUP_REL,
-          ImmutableList.of(Entity.EntityType.ROLE),
           Type.JOB_TEMPLATE_JOB_REL,
           ImmutableList.of(Entity.EntityType.JOB_TEMPLATE));
 
@@ -170,22 +160,27 @@ public class RelationalEntityStore
       return;
     }
 
-    for (Map.Entry<Type, List<EntityType>> entry : RELATION_TARGET_TYPE_TO_ENTITY_TYPE.entrySet()) {
-      Type relType = entry.getKey();
-      List<EntityType> relatedEntityTypes = entry.getValue();
+    try {
+      for (Map.Entry<Type, List<EntityType>> entry :
+          RELATION_TARGET_TYPE_TO_ENTITY_TYPE.entrySet()) {
+        Type relType = entry.getKey();
+        List<EntityType> relatedEntityTypes = entry.getValue();
 
-      for (EntityType relatedEntityType : relatedEntityTypes) {
-        List<EntityType> allowEntityType = RELATION_ALLOWED_ENTITY_TYPE.get(relType);
-        if (allowEntityType == null
-            || allowEntityType.isEmpty()
-            || allowEntityType.contains(entityType)) {
-          backend.listEntitiesByRelation(relType, ident, entityType, false).stream()
-              .forEach(
-                  roleEntity -> {
-                    cache.invalidate(roleEntity.nameIdentifier(), relatedEntityType);
-                  });
+        for (EntityType relatedEntityType : relatedEntityTypes) {
+          List<EntityType> allowEntityType = RELATION_ALLOWED_ENTITY_TYPE.get(relType);
+          if (allowEntityType == null
+              || allowEntityType.isEmpty()
+              || allowEntityType.contains(entityType)) {
+            backend.listEntitiesByRelation(relType, ident, entityType, false).stream()
+                .forEach(
+                    roleEntity -> {
+                      cache.invalidate(roleEntity.nameIdentifier(), relatedEntityType);
+                    });
+          }
         }
       }
+    } catch (NoSuchEntityException e) {
+      // Ignore
     }
   }
 
