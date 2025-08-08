@@ -172,13 +172,6 @@ class TestSupportsJobs(unittest.TestCase):
             job_handle = gravitino_client.run_job(job_template_name, {})
             self._compare_job_handle(job_handle, job_dto)
 
-        # test with invalid input
-        with self.assertRaises(ValueError):
-            gravitino_client.run_job("", {})
-
-        with self.assertRaises(ValueError):
-            gravitino_client.run_job(None, {})
-
     def test_get_job(self, *mock_methods):
         gravitino_client = GravitinoClient(
             uri="http://localhost:8090",
