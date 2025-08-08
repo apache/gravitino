@@ -42,6 +42,9 @@ import org.apache.gravitino.listener.api.event.GetTagPreEvent;
 import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagEvent;
 import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagFailureEvent;
 import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagPreEvent;
+import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagsEvent;
+import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagsFailureEvent;
+import org.apache.gravitino.listener.api.event.ListMetadataObjectsForTagsPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsEvent;
 import org.apache.gravitino.listener.api.event.ListTagsFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTagsForMetadataObjectEvent;
@@ -194,6 +197,25 @@ public class TagEventDispatcher implements TagDispatcher {
       eventBus.dispatchEvent(
           new ListMetadataObjectsForTagFailureEvent(
               PrincipalUtils.getCurrentUserName(), metalake, name, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public MetadataObject[] listMetadataObjectsForTags(String metalake, String[] names) {
+    eventBus.dispatchEvent(
+        new ListMetadataObjectsForTagsPreEvent(
+            PrincipalUtils.getCurrentUserName(), metalake, names));
+    try {
+      MetadataObject[] metadataObjects = dispatcher.listMetadataObjectsForTags(metalake, names);
+      eventBus.dispatchEvent(
+          new ListMetadataObjectsForTagsEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, names));
+      return metadataObjects;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListMetadataObjectsForTagsFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, names, e));
       throw e;
     }
   }
