@@ -1225,7 +1225,6 @@ public class GravitinoMetalake extends MetalakeDTO
       throws JobTemplateAlreadyExistsException {
     JobTemplateRegisterRequest req =
         new JobTemplateRegisterRequest(DTOConverters.toJobTemplateDTO(jobTemplate));
-    req.validate();
 
     BaseResponse resp =
         restClient.post(
@@ -1311,7 +1310,6 @@ public class GravitinoMetalake extends MetalakeDTO
         StringUtils.isNotBlank(jobTemplateName), "job template name must not be null or empty");
 
     JobRunRequest req = new JobRunRequest(jobTemplateName, jobConf);
-    req.validate();
 
     JobResponse resp =
         restClient.post(
