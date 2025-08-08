@@ -172,27 +172,22 @@ public class RelationalEntityStore
       return;
     }
 
-    try {
-      for (Map.Entry<Type, List<EntityType>> entry :
-          RELATION_TARGET_TYPE_TO_ENTITY_TYPE.entrySet()) {
-        Type relType = entry.getKey();
-        List<EntityType> relatedEntityTypes = entry.getValue();
+    for (Map.Entry<Type, List<EntityType>> entry : RELATION_TARGET_TYPE_TO_ENTITY_TYPE.entrySet()) {
+      Type relType = entry.getKey();
+      List<EntityType> relatedEntityTypes = entry.getValue();
 
-        for (EntityType relatedEntityType : relatedEntityTypes) {
-          List<EntityType> allowEntityType = RELATION_ALLOWED_ENTITY_TYPE.get(relType);
-          if (allowEntityType == null
-              || allowEntityType.isEmpty()
-              || allowEntityType.contains(entityType)) {
-            backend.listEntitiesByRelation(relType, ident, entityType, false).stream()
-                .forEach(
-                    roleEntity -> {
-                      cache.invalidate(roleEntity.nameIdentifier(), relatedEntityType);
-                    });
-          }
+      for (EntityType relatedEntityType : relatedEntityTypes) {
+        List<EntityType> allowEntityType = RELATION_ALLOWED_ENTITY_TYPE.get(relType);
+        if (allowEntityType == null
+            || allowEntityType.isEmpty()
+            || allowEntityType.contains(entityType)) {
+          backend.listEntitiesByRelation(relType, ident, entityType, false).stream()
+              .forEach(
+                  roleEntity -> {
+                    cache.invalidate(roleEntity.nameIdentifier(), relatedEntityType);
+                  });
         }
       }
-    } catch (NoSuchEntityException e) {
-      // Ignore
     }
   }
 
