@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Any, ClassVar, Dict, cast
+from typing import Any, Dict, cast
 
 from gravitino.api.types.json_serdes._helper.serdes_utils import (
     SerdesUtils as TypesSerdesUtils,
@@ -27,17 +27,10 @@ from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.expressions.unparsed_expression_dto import UnparsedExpressionDTO
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition
+from gravitino.utils.serdes import SerdesUtilsBase
 
 
-class SerdesUtils:
-    EXPRESSION_TYPE: ClassVar[str] = "type"
-    DATA_TYPE: ClassVar[str] = "dataType"
-    LITERAL_VALUE: ClassVar[str] = "value"
-    FIELD_NAME: ClassVar[str] = "fieldName"
-    FUNCTION_NAME: ClassVar[str] = "funcName"
-    FUNCTION_ARGS: ClassVar[str] = "funcArgs"
-    UNPARSED_EXPRESSION: ClassVar[str] = "unparsedExpression"
-
+class SerdesUtils(SerdesUtilsBase):
     @classmethod
     def write_function_arg(cls, arg: FunctionArg) -> Dict[str, Any]:
         arg_type = arg.arg_type()

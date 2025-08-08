@@ -16,91 +16,17 @@
 # under the License.
 
 import json
-import re
-from types import MappingProxyType
-from typing import Any, ClassVar, Dict, Mapping, Pattern, Set, Union, overload
+from typing import Any, Dict, Union, overload
 
 from dataclasses_json.core import Json
 
 from gravitino.api.types.type import Name, Type
 from gravitino.api.types.types import Types
 from gravitino.utils.precondition import Precondition
+from gravitino.utils.serdes import SerdesUtilsBase
 
 
-class SerdesUtils:
-    EXPRESSION_TYPE: ClassVar[str] = "type"
-    DATA_TYPE: ClassVar[str] = "dataType"
-    LITERAL_VALUE: ClassVar[str] = "value"
-    FIELD_NAME: ClassVar[str] = "fieldName"
-    FUNCTION_NAME: ClassVar[str] = "funcName"
-    FUNCTION_ARGS: ClassVar[str] = "funcArgs"
-    UNPARSED_EXPRESSION: ClassVar[str] = "unparsedExpression"
-    TYPE: ClassVar[str] = "type"
-    STRUCT: ClassVar[str] = "struct"
-    FIELDS: ClassVar[str] = "fields"
-    STRUCT_FIELD_NAME: ClassVar[str] = "name"
-    STRUCT_FIELD_NULLABLE: ClassVar[str] = "nullable"
-    STRUCT_FIELD_COMMENT: ClassVar[str] = "comment"
-    LIST: ClassVar[str] = "list"
-    LIST_ELEMENT_TYPE: ClassVar[str] = "elementType"
-    LIST_ELEMENT_NULLABLE: ClassVar[str] = "containsNull"
-    MAP: ClassVar[str] = "map"
-    MAP_KEY_TYPE: ClassVar[str] = "keyType"
-    MAP_VALUE_TYPE: ClassVar[str] = "valueType"
-    MAP_VALUE_NULLABLE: ClassVar[str] = "valueContainsNull"
-    UNION: ClassVar[str] = "union"
-    UNION_TYPES: ClassVar[str] = "types"
-    UNPARSED: ClassVar[str] = "unparsed"
-    UNPARSED_TYPE: ClassVar[str] = "unparsedType"
-    EXTERNAL: ClassVar[str] = "external"
-    CATALOG_STRING: ClassVar[str] = "catalogString"
-
-    NON_PRIMITIVE_TYPES: ClassVar[Set[Name]] = {
-        Name.STRUCT,
-        Name.LIST,
-        Name.MAP,
-        Name.UNION,
-        Name.UNPARSED,
-        Name.EXTERNAL,
-    }
-    PRIMITIVE_AND_NULL_TYPES: ClassVar[Set[Name]] = (
-        set(list(Name)) - NON_PRIMITIVE_TYPES
-    )
-
-    DECIMAL_PATTERN: ClassVar[Pattern[str]] = re.compile(
-        r"decimal\(\s*(\d+)\s*,\s*(\d+)\s*\)"
-    )
-    FIXED_PATTERN: ClassVar[Pattern[str]] = re.compile(r"fixed\(\s*(\d+)\s*\)")
-    FIXEDCHAR_PATTERN: ClassVar[Pattern[str]] = re.compile(r"char\(\s*(\d+)\s*\)")
-    VARCHAR_PATTERN: ClassVar[Pattern[str]] = re.compile(r"varchar\(\s*(\d+)\s*\)")
-    TYPES: ClassVar[Mapping] = MappingProxyType(
-        {
-            type_instance.simple_string(): type_instance
-            for type_instance in {
-                Types.NullType.get(),
-                Types.BooleanType.get(),
-                Types.ByteType.get(),
-                Types.ByteType.unsigned(),
-                Types.IntegerType.get(),
-                Types.IntegerType.unsigned(),
-                Types.ShortType.get(),
-                Types.ShortType.unsigned(),
-                Types.LongType.get(),
-                Types.LongType.unsigned(),
-                Types.FloatType.get(),
-                Types.DoubleType.get(),
-                Types.DateType.get(),
-                Types.TimeType.get(),
-                Types.TimestampType.with_time_zone(),
-                Types.TimestampType.without_time_zone(),
-                Types.IntervalYearType.get(),
-                Types.IntervalDayType.get(),
-                Types.StringType.get(),
-                Types.UUIDType.get(),
-            }
-        }
-    )
-
+class SerdesUtils(SerdesUtilsBase):
     @classmethod
     def write_data_type(cls, data_type: Type) -> Union[str, Dict[str, Any]]:
         """Write Gravitino Type to JSON data. Used for Gravitino Type JSON Serialization.
