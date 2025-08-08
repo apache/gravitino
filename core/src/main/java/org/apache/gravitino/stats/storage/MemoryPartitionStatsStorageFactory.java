@@ -57,7 +57,8 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
 
       synchronized (tableStats) {
         Map<String, Map<String, StatisticValue<?>>> resultStats = Maps.newHashMap();
-        for (PersistedPartitionStatistics partitionStat : tableStats.partitionStatistics().values()) {
+        for (PersistedPartitionStatistics partitionStat :
+            tableStats.partitionStatistics().values()) {
           String partitionName = partitionStat.partitionName();
           boolean lowerBoundSatisfied =
               range
@@ -121,7 +122,8 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
                 tableStats
                     .partitionStatistics()
                     .computeIfAbsent(
-                        partitionName, k -> PersistedPartitionStatistics.of(partitionName, new HashMap<>()));
+                        partitionName,
+                        k -> PersistedPartitionStatistics.of(partitionName, new HashMap<>()));
             for (Map.Entry<String, StatisticValue<?>> statEntry : partitionStats.entrySet()) {
               String statName = statEntry.getKey();
               StatisticValue<?> statValue = statEntry.getValue();

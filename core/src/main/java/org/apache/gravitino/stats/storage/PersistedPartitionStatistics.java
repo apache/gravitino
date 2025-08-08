@@ -47,7 +47,8 @@ public class PersistedPartitionStatistics {
    * @param statistics a map of statistics applicable to the partition, where the key is the
    *     statistic name
    */
-  private PersistedPartitionStatistics(String partitionName, Map<String, StatisticValue<?>> statistics) {
+  private PersistedPartitionStatistics(
+      String partitionName, Map<String, StatisticValue<?>> statistics) {
     this.partitionName = partitionName;
     this.statistics = statistics;
   }
