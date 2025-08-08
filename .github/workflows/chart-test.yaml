@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3.0.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: filter
         with:
           filters: |
@@ -64,7 +64,7 @@ jobs:
         if: steps.list-changed.outputs.changed == 'true'
         run: |
           helm repo add bitnami https://charts.bitnami.com/bitnami
-          ct lint --chart-dirs=dev/charts --chart-yaml-schema=dev/ci/chart_schema.yaml --lint-conf=dev/ci/lintconf.yaml --target-branch ${{ github.event.pull_request.base.ref }} 
+          ct lint --chart-dirs=dev/charts --chart-yaml-schema=dev/ci/chart_schema.yaml --lint-conf=dev/ci/lintconf.yaml --target-branch ${{ github.event.pull_request.base.ref }} --check-version-increment=false
 
       - name: Set up kind cluster
         if: steps.list-changed.outputs.changed == 'true'

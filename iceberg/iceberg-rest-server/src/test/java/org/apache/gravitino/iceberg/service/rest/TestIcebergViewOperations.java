@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -63,11 +64,14 @@ import org.apache.iceberg.types.Types;
 import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
 import org.apache.iceberg.view.ImmutableViewVersion;
 import org.apache.iceberg.view.ViewMetadata;
+import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
   private static final Schema viewSchema =
       new Schema(Types.NestedField.of(1, false, "foo_string", Types.StringType.get()));
@@ -88,6 +92,17 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     // create namespace before each view test
     resourceConfig.register(MockIcebergNamespaceOperations.class);
     resourceConfig.register(MockIcebergViewRenameOperations.class);
+
+    // register a mock HttpServletRequest with user info
+    resourceConfig.register(
+        new AbstractBinder() {
+          @Override
+          protected void configure() {
+            HttpServletRequest mockRequest = Mockito.mock(HttpServletRequest.class);
+            Mockito.when(mockRequest.getUserPrincipal()).thenReturn(() -> "test-user");
+            bind(mockRequest).to(HttpServletRequest.class);
+          }
+        });
 
     return resourceConfig;
   }

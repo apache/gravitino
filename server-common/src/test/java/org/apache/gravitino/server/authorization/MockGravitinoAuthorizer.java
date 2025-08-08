@@ -19,7 +19,9 @@ package org.apache.gravitino.server.authorization;
 
 import java.security.Principal;
 import java.util.Objects;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 
@@ -56,6 +58,15 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean deny(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      Privilege.Name privilege) {
+    return false;
+  }
+
+  @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
     if (!("tester".equals(principal.getName()) && "metalakeWithOwner".equals(metalake))) {
       return false;
@@ -65,7 +76,36 @@ public class MockGravitinoAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean isServiceAdmin() {
+    return false;
+  }
+
+  @Override
+  public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+    return true;
+  }
+
+  @Override
+  public boolean isMetalakeUser(String metalake) {
+    return true;
+  }
+
+  @Override
+  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+    return true;
+  }
+
+  @Override
+  public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
+    return true;
+  }
+
+  @Override
   public void handleRolePrivilegeChange(Long roleId) {}
+
+  @Override
+  public void handleMetadataOwnerChange(
+      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {}
 
   @Override
   public void close() {}

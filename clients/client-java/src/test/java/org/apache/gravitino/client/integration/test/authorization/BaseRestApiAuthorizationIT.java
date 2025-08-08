@@ -23,7 +23,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -53,16 +52,20 @@ public class BaseRestApiAuthorizationIT extends BaseIT {
             USER,
             Configs.ENABLE_AUTHORIZATION.getKey(),
             "true",
-            Configs.AUTHORIZATION_IMPL.getKey(),
-            JcasbinAuthorizer.class.getCanonicalName(),
             Configs.CACHE_ENABLED.getKey(),
-            "false"));
+            "false",
+            Configs.AUTHENTICATORS.getKey(),
+            "simple"));
+    putServiceAdmin();
     super.startIntegrationTest();
     client.createMetalake(METALAKE, "", new HashMap<>());
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
-    gravitinoMetalake.addUser(USER);
     gravitinoMetalake.addUser(NORMAL_USER);
     normalUserClient = GravitinoAdminClient.builder(serverUri).withSimpleAuth(NORMAL_USER).build();
+  }
+
+  protected void putServiceAdmin() {
+    customConfigs.put(Configs.SERVICE_ADMINS.getKey(), USER);
   }
 
   @AfterAll

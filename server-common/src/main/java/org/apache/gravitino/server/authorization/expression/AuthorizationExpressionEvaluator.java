@@ -18,7 +18,11 @@
 package org.apache.gravitino.server.authorization.expression;
 
 import java.security.Principal;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
@@ -54,25 +58,48 @@ public class AuthorizationExpressionEvaluator {
    * @return authorization result
    */
   public boolean evaluate(Map<Entity.EntityType, NameIdentifier> metadataNames) {
+    return evaluate(metadataNames, new HashMap<>());
+  }
+
+  /**
+   * Use OGNL expressions to invoke GravitinoAuthorizer for authorizing multiple types of metadata
+   * IDs.
+   *
+   * @param metadataNames key-metadata type, value-metadata NameIdentifier
+   * @param pathParams params from request path
+   * @return authorization result
+   */
+  public boolean evaluate(
+      Map<Entity.EntityType, NameIdentifier> metadataNames, Map<String, Object> pathParams) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     GravitinoAuthorizer gravitinoAuthorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     OgnlContext ognlContext = Ognl.createDefaultContext(null);
     ognlContext.put("principal", currentPrincipal);
     ognlContext.put("authorizer", gravitinoAuthorizer);
+    ognlContext.putAll(pathParams);
     metadataNames.forEach(
-        (metadataType, metadataName) -> {
-          MetadataObject metadataObject =
-              NameIdentifierUtil.toMetadataObject(metadataName, metadataType);
-          ognlContext.put(metadataType.name(), metadataObject);
+        (type, entityNameIdent) -> {
+          if (isMetadataType(type)) {
+            MetadataObject metadataObject =
+                NameIdentifierUtil.toMetadataObject(entityNameIdent, type);
+            ognlContext.put(type.name(), metadataObject);
+          }
+          ognlContext.put(type.name() + "_NAME_IDENT", entityNameIdent);
         });
     NameIdentifier nameIdentifier = metadataNames.get(Entity.EntityType.METALAKE);
-    ognlContext.put("METALAKE_NAME", nameIdentifier.name());
+    ognlContext.put(
+        "METALAKE_NAME", Optional.ofNullable(nameIdentifier).map(NameIdentifier::name).orElse(""));
     try {
       Object value = Ognl.getValue(ognlAuthorizationExpression, ognlContext);
       return (boolean) value;
     } catch (OgnlException e) {
       throw new RuntimeException("ognl evaluate error", e);
     }
+  }
+
+  private static boolean isMetadataType(Entity.EntityType type) {
+    return Arrays.stream(MetadataObject.Type.values())
+        .anyMatch(e -> Objects.equals(e.name(), type.name()));
   }
 }

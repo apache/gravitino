@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -71,11 +72,14 @@ import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
+import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 
+@SuppressWarnings("deprecation")
 public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private static final Schema tableSchema =
@@ -95,6 +99,17 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     // create namespace before each table test
     resourceConfig.register(MockIcebergNamespaceOperations.class);
     resourceConfig.register(MockIcebergTableRenameOperations.class);
+
+    // register a mock HttpServletRequest with user info
+    resourceConfig.register(
+        new AbstractBinder() {
+          @Override
+          protected void configure() {
+            HttpServletRequest mockRequest = Mockito.mock(HttpServletRequest.class);
+            Mockito.when(mockRequest.getUserPrincipal()).thenReturn(() -> "test-user");
+            bind(mockRequest).to(HttpServletRequest.class);
+          }
+        });
 
     return resourceConfig;
   }
@@ -360,7 +375,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private Response doUpdateTable(Namespace ns, String name, TableMetadata base) {
-    TableMetadata newMetadata = base.updateSchema(newTableSchema, base.lastColumnId());
+    TableMetadata newMetadata = base.updateSchema(newTableSchema);
     List<MetadataUpdate> metadataUpdates = newMetadata.changes();
     List<UpdateRequirement> requirements = UpdateRequirements.forUpdateTable(base, metadataUpdates);
     UpdateTableRequest updateTableRequest = new UpdateTableRequest(requirements, metadataUpdates);

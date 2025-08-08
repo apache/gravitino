@@ -233,6 +233,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return CatalogHandlers.listViews(getViewCatalog(), namespace);
   }
 
+  public boolean supportsViewOperations() {
+    return catalog instanceof ViewCatalog;
+  }
+
   @Override
   public void close() throws Exception {
     if (catalog instanceof AutoCloseable) {

@@ -44,7 +44,41 @@ public class PassThroughAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public boolean deny(
+      Principal principal,
+      String metalake,
+      MetadataObject metadataObject,
+      Privilege.Name privilege) {
+    return false;
+  }
+
+  @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+    return true;
+  }
+
+  @Override
+  public boolean isServiceAdmin() {
+    return true;
+  }
+
+  @Override
+  public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+    return true;
+  }
+
+  @Override
+  public boolean isMetalakeUser(String metalake) {
+    return true;
+  }
+
+  @Override
+  public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+    return true;
+  }
+
+  @Override
+  public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
     return true;
   }
 

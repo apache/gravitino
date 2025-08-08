@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog.model;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -28,6 +27,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionException;
+import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
@@ -226,7 +227,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   @Override
   public void linkModelVersion(
       NameIdentifier ident,
-      String uri,
+      Map<String, String> uris,
       String[] aliases,
       String comment,
       Map<String, String> properties)
@@ -245,7 +246,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
             // executing the insert operation.
             .withVersion(INIT_VERSION)
             .withAliases(aliasList)
-            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, uri))
+            .withUris(uris)
             .withComment(comment)
             .withProperties(properties)
             .withAuditInfo(
@@ -265,6 +266,24 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (NoSuchEntityException e) {
       throw new NoSuchModelException(e, "Model %s does not exist", ident);
     }
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, int version, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    NameIdentifierUtil.checkModel(ident);
+    NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, version);
+
+    return internalGetModelVersionUri(ident, modelVersionIdent, Optional.ofNullable(uriName));
+  }
+
+  @Override
+  public String getModelVersionUri(NameIdentifier ident, String alias, String uriName)
+      throws NoSuchModelVersionException, NoSuchModelVersionURINameException {
+    NameIdentifierUtil.checkModel(ident);
+    NameIdentifier modelVersionIdent = NameIdentifierUtil.toModelVersionIdentifier(ident, alias);
+
+    return internalGetModelVersionUri(ident, modelVersionIdent, Optional.ofNullable(uriName));
   }
 
   @Override
@@ -431,7 +450,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
         modelVersionEntity.aliases() == null
             ? Lists.newArrayList()
             : Lists.newArrayList(modelVersionEntity.aliases());
-    String entityUri = modelVersionEntity.uris().get(ModelVersion.URI_NAME_UNKNOWN);
+    Map<String, String> entityUris = Maps.newHashMap(modelVersionEntity.uris());
     Map<String, String> entityProperties =
         modelVersionEntity.properties() == null
             ? Maps.newHashMap()
@@ -454,7 +473,15 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
 
       } else if (change instanceof ModelVersionChange.UpdateUri) {
         ModelVersionChange.UpdateUri updateUriChange = (ModelVersionChange.UpdateUri) change;
-        entityUri = updateUriChange.newUri();
+        doUpdateUri(entityUris, updateUriChange);
+
+      } else if (change instanceof ModelVersionChange.AddUri) {
+        ModelVersionChange.AddUri addUriChange = (ModelVersionChange.AddUri) change;
+        doAddUri(entityUris, addUriChange);
+
+      } else if (change instanceof ModelVersionChange.RemoveUri) {
+        ModelVersionChange.RemoveUri removeUriChange = (ModelVersionChange.RemoveUri) change;
+        doRemoveUri(entityUris, removeUriChange);
 
       } else if (change instanceof ModelVersionChange.UpdateAliases) {
         ModelVersionChange.UpdateAliases updateAliasesChange =
@@ -473,12 +500,16 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       }
     }
 
+    if (entityUris.isEmpty()) {
+      throw new IllegalArgumentException("Model version URI cannot be empty");
+    }
+
     return ModelVersionEntity.builder()
         .withVersion(entityVersion)
         .withModelIdentifier(entityModelIdentifier)
         .withAliases(entityAliases)
         .withComment(entityComment)
-        .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, entityUri))
+        .withUris(entityUris)
         .withProperties(entityProperties)
         .withAuditInfo(
             AuditInfo.builder()
@@ -504,7 +535,7 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     return ModelVersionImpl.builder()
         .withVersion(modelVersion.version())
         .withAliases(modelVersion.aliases().toArray(new String[0]))
-        .withUri(modelVersion.uris().get(ModelVersion.URI_NAME_UNKNOWN))
+        .withUris(modelVersion.uris())
         .withComment(modelVersion.comment())
         .withProperties(modelVersion.properties())
         .withAuditInfo(modelVersion.auditInfo())
@@ -522,6 +553,49 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to get model version " + ident, ioe);
     }
+  }
+
+  private String internalGetModelVersionUri(
+      NameIdentifier modelIdent, NameIdentifier modelVersionIdent, Optional<String> uriName) {
+    ModelVersion modelVersion = internalGetModelVersion(modelVersionIdent);
+
+    Map<String, String> uris = modelVersion.uris();
+    // If the uriName is present, get from the uris directly
+    if (uriName.isPresent()) {
+      return getUriByName(uris, uriName.get(), modelVersionIdent);
+    }
+
+    // If there is only one uri of the model version, use it
+    if (uris.size() == 1) {
+      return uris.values().iterator().next();
+    }
+
+    // If the uri name is null, try to get the default uri name from the model version properties
+    Map<String, String> modelVersionProperties = modelVersion.properties();
+    if (modelVersionProperties.containsKey(ModelVersion.PROPERTY_DEFAULT_URI_NAME)) {
+      String defaultUriName = modelVersionProperties.get(ModelVersion.PROPERTY_DEFAULT_URI_NAME);
+      return getUriByName(uris, defaultUriName, modelVersionIdent);
+    }
+
+    // If the default uri name is not set for the model version, try to get the default uri name
+    // from the model properties
+    Map<String, String> modelProperties = getModel(modelIdent).properties();
+    if (modelProperties.containsKey(ModelVersion.PROPERTY_DEFAULT_URI_NAME)) {
+      String defaultUriName = modelProperties.get(ModelVersion.PROPERTY_DEFAULT_URI_NAME);
+      return getUriByName(uris, defaultUriName, modelVersionIdent);
+    }
+
+    throw new IllegalArgumentException(
+        "The default uri name needs to be set when the uri name is not specified");
+  }
+
+  private String getUriByName(
+      Map<String, String> uris, String uriName, NameIdentifier modelVersionIdent) {
+    if (!uris.containsKey(uriName)) {
+      throw new NoSuchModelVersionURINameException(
+          "URI name %s does not exist in model version %s", uriName, modelVersionIdent);
+    }
+    return uris.get(uriName);
   }
 
   private boolean internalDeleteModelVersion(NameIdentifier ident) {
@@ -549,6 +623,18 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   private void doRemoveProperty(
       Map<String, String> entityProperties, ModelVersionChange.RemoveProperty change) {
     entityProperties.remove(change.property());
+  }
+
+  private void doUpdateUri(Map<String, String> entityUris, ModelVersionChange.UpdateUri change) {
+    entityUris.replace(change.uriName(), change.newUri());
+  }
+
+  private void doAddUri(Map<String, String> entityUris, ModelVersionChange.AddUri change) {
+    entityUris.putIfAbsent(change.uriName(), change.uri());
+  }
+
+  private void doRemoveUri(Map<String, String> entityUris, ModelVersionChange.RemoveUri change) {
+    entityUris.remove(change.uriName());
   }
 
   private void doDeleteAlias(List<String> entityAliases, Set<String> deleteSet) {

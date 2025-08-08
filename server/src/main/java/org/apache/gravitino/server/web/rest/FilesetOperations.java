@@ -98,12 +98,10 @@ public class FilesetOperations {
   @Timed(name = "list-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-fileset", absolute = true)
   public Response listFilesets(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA)
-          String schema) {
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
 
     try {
       LOG.info("Received list filesets request for schema: {}.{}.{}", metalake, catalog, schema);
@@ -141,14 +139,13 @@ public class FilesetOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && SCHEMA::CREATE_FILESET",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response createFileset(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FilesetCreateRequest request) {
     LOG.info(
         "Received create fileset request: {}.{}.{}.{}",
@@ -200,12 +197,11 @@ public class FilesetOperations {
       expression = loadFilesetAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response loadFileset(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET)
           String fileset) {
     LOG.info("Received load fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
@@ -285,13 +281,11 @@ public class FilesetOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
-          String fileset,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       FilesetUpdatesRequest request) {
     LOG.info("Received alter fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
@@ -327,12 +321,11 @@ public class FilesetOperations {
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET)
           String fileset) {
     LOG.info("Received drop fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
@@ -342,7 +335,7 @@ public class FilesetOperations {
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             boolean dropped = dispatcher.dropFileset(ident);
             if (!dropped) {
-              LOG.warn("Failed to drop fileset {} under schema {}", fileset, schema);
+              LOG.warn("Cannot find to be dropped fileset {} under schema {}", fileset, schema);
             }
 
             Response response = Utils.ok(new DropResponse(dropped));
@@ -364,13 +357,11 @@ public class FilesetOperations {
       expression = loadFilesetAuthorizationExpression,
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response getFileLocation(
-      @PathParam("metalake") @AuthorizationMetadata(type = MetadataObject.Type.METALAKE)
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = MetadataObject.Type.CATALOG)
-          String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = MetadataObject.Type.SCHEMA) String schema,
-      @PathParam("fileset") @AuthorizationMetadata(type = MetadataObject.Type.FILESET)
-          String fileset,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @NotNull String subPath,
       @QueryParam("location_name") String locationName) {
     LOG.info(

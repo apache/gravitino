@@ -29,7 +29,9 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
@@ -53,6 +55,7 @@ public class TestGravitinoInterceptionService {
       principalUtilsMocked
           .when(PrincipalUtils::getCurrentPrincipal)
           .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
       MethodInvocation methodInvocation = mock(MethodInvocation.class);
       GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
       mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
@@ -75,8 +78,51 @@ public class TestGravitinoInterceptionService {
       when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake2"});
       Response response2 = (Response) methodInterceptor.invoke(methodInvocation);
       assertEquals(
-          "Can not access metadata {testMetalake2}.",
+          "User 'tester' is not authorized to perform operation 'testMethod' on metadata 'testMetalake2'",
           ((ErrorResponse) response2.getEntity()).getMessage());
+    }
+  }
+
+  @Test
+  public void testSystemInternalErrorHandling() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+
+      // Mock an exception during authorization
+      when(mockedProvider.getGravitinoAuthorizer())
+          .thenThrow(new RuntimeException("Database connection failed"));
+
+      GravitinoInterceptionService gravitinoInterceptionService =
+          new GravitinoInterceptionService();
+      Class<TestOperations> testOperationsClass = TestOperations.class;
+      Method[] methods = testOperationsClass.getMethods();
+      Method testMethod = methods[0];
+      List<MethodInterceptor> methodInterceptors =
+          gravitinoInterceptionService.getMethodInterceptors(testMethod);
+      MethodInterceptor methodInterceptor = methodInterceptors.get(0);
+
+      // Test system internal error
+      when(methodInvocation.getMethod()).thenReturn(testMethod);
+      when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
+      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+
+      // Verify the system internal error message
+      ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+      assertEquals(
+          "Authorization failed due to system internal error. Please contact administrator.",
+          errorResponse.getMessage());
+
+      // Verify correct HTTP status
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
     }
   }
 
@@ -86,7 +132,7 @@ public class TestGravitinoInterceptionService {
         expression = "METALAKE::USE_CATALOG || METALAKE::OWNER",
         accessMetadataType = MetadataObject.Type.METALAKE)
     public Response testMethod(
-        @AuthorizationMetadata(type = MetadataObject.Type.METALAKE) String metalake) {
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake) {
       return Utils.ok("ok");
     }
   }
@@ -109,12 +155,50 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
+    public boolean deny(
+        Principal principal,
+        String metalake,
+        MetadataObject metadataObject,
+        Privilege.Name privilege) {
+      return false;
+    }
+
+    @Override
     public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
       return false;
     }
 
     @Override
+    public boolean isServiceAdmin() {
+      return false;
+    }
+
+    @Override
+    public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+      return true;
+    }
+
+    @Override
+    public boolean isMetalakeUser(String metalake) {
+      return true;
+    }
+
+    @Override
+    public boolean hasSetOwnerPermission(String metalake, String type, String fullName) {
+      return true;
+    }
+
+    @Override
+    public boolean hasMetadataPrivilegePermission(String metalake, String type, String fullName) {
+      return true;
+    }
+
+    @Override
     public void handleRolePrivilegeChange(Long roleId) {}
+
+    @Override
+    public void handleMetadataOwnerChange(
+        String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {}
 
     @Override
     public void close() throws IOException {}

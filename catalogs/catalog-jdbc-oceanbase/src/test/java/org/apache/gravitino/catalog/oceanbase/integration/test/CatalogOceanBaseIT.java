@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -494,6 +495,7 @@ public class CatalogOceanBaseIT extends BaseIT {
             + "  double_col_1 double default 123.45,\n"
             + "  varchar100_col_1 varchar(100) default 'CURRENT_TIMESTAMP',\n"
             + "  varchar200_col_1 varchar(200) default 'curdate()',\n"
+            + "  time_col_1 time default '00:00:00',\n"
             + "  datetime_col_1 datetime default CURRENT_TIMESTAMP,\n"
             + "  datetime_col_2 datetime default current_timestamp,\n"
             + "  datetime_col_3 datetime default null,\n"
@@ -538,6 +540,9 @@ public class CatalogOceanBaseIT extends BaseIT {
           break;
         case "varchar200_col_1":
           Assertions.assertEquals(Literals.varcharLiteral(200, "curdate()"), column.defaultValue());
+          break;
+        case "time_col_1":
+          Assertions.assertEquals(Literals.timeLiteral("00:00:00"), column.defaultValue());
           break;
         case "datetime_col_1":
         case "datetime_col_2":
@@ -640,13 +645,13 @@ public class CatalogOceanBaseIT extends BaseIT {
           Assertions.assertEquals(Types.DateType.get(), column.dataType());
           break;
         case "time_col":
-          Assertions.assertEquals(Types.TimeType.get(), column.dataType());
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
           break;
         case "timestamp_col":
-          Assertions.assertEquals(Types.TimestampType.withTimeZone(), column.dataType());
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
           break;
         case "datetime_col":
-          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(), column.dataType());
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
           break;
         case "decimal_6_2_col":
           Assertions.assertEquals(Types.DecimalType.of(6, 2), column.dataType());
@@ -1862,5 +1867,127 @@ public class CatalogOceanBaseIT extends BaseIT {
     Assertions.assertEquals(columns[5].dataType().simpleString(), "integer unsigned");
     Assertions.assertEquals(columns[6].dataType().simpleString(), "long");
     Assertions.assertEquals(columns[7].dataType().simpleString(), "long unsigned");
+  }
+
+  @Test
+  void testTimeTypePrecision() {
+    String tableName = GravitinoITUtils.genRandomName("test_time_precision");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns = createColumns();
+    columns =
+        ArrayUtils.addAll(
+            columns,
+            // time type
+            Column.of("time_col", Types.TimeType.get()),
+            Column.of("time_col_0", Types.TimeType.of(0)),
+            Column.of("time_col_1", Types.TimeType.of(1)),
+            Column.of("time_col_3", Types.TimeType.of(3)),
+            Column.of("time_col_6", Types.TimeType.of(6)),
+            // timestamp type
+            Column.of("timestamp_col", Types.TimestampType.withTimeZone()),
+            Column.of("timestamp_col_0", Types.TimestampType.withTimeZone(0)),
+            Column.of("timestamp_col_1", Types.TimestampType.withTimeZone(1)),
+            Column.of("timestamp_col_3", Types.TimestampType.withTimeZone(3)),
+            Column.of("timestamp_col_6", Types.TimestampType.withTimeZone(6)),
+            // datetime type (without time zone)
+            Column.of("datetime_col", Types.TimestampType.withoutTimeZone()),
+            Column.of("datetime_col_0", Types.TimestampType.withoutTimeZone(0)),
+            Column.of("datetime_col_1", Types.TimestampType.withoutTimeZone(1)),
+            Column.of("datetime_col_3", Types.TimestampType.withoutTimeZone(3)),
+            Column.of("datetime_col_6", Types.TimestampType.withoutTimeZone(6)));
+
+    Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        new SortOrder[0]);
+
+    Table loadTable = tableCatalog.loadTable(tableIdentifier);
+
+    // Verify time type precisions
+    Column[] timeColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("time_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(5, timeColumns.length);
+    for (Column column : timeColumns) {
+      switch (column.name()) {
+        case "time_col":
+        case "time_col_0":
+          Assertions.assertEquals(Types.TimeType.of(0), column.dataType());
+          break;
+        case "time_col_1":
+          Assertions.assertEquals(Types.TimeType.of(1), column.dataType());
+          break;
+        case "time_col_3":
+          Assertions.assertEquals(Types.TimeType.of(3), column.dataType());
+          break;
+        case "time_col_6":
+          Assertions.assertEquals(Types.TimeType.of(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected time column: " + column.name());
+      }
+    }
+
+    // Verify timestamp type precisions
+    Column[] timestampColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("timestamp_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(5, timestampColumns.length);
+    for (Column column : timestampColumns) {
+      switch (column.name()) {
+        case "timestamp_col":
+        case "timestamp_col_0":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(0), column.dataType());
+          break;
+        case "timestamp_col_1":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(1), column.dataType());
+          break;
+        case "timestamp_col_3":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(3), column.dataType());
+          break;
+        case "timestamp_col_6":
+          Assertions.assertEquals(Types.TimestampType.withTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected timestamp column: " + column.name());
+      }
+    }
+
+    // Verify datetime type precisions
+    Column[] datetimeColumns =
+        Arrays.stream(loadTable.columns())
+            .filter(c -> c.name().startsWith("datetime_col"))
+            .toArray(Column[]::new);
+
+    Assertions.assertEquals(5, datetimeColumns.length);
+    for (Column column : datetimeColumns) {
+      switch (column.name()) {
+        case "datetime_col":
+        case "datetime_col_0":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(0), column.dataType());
+          break;
+        case "datetime_col_1":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(1), column.dataType());
+          break;
+        case "datetime_col_3":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(3), column.dataType());
+          break;
+        case "datetime_col_6":
+          Assertions.assertEquals(Types.TimestampType.withoutTimeZone(6), column.dataType());
+          break;
+        default:
+          Assertions.fail("Unexpected datetime column: " + column.name());
+      }
+    }
   }
 }

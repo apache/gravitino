@@ -28,7 +28,7 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark35.get()
 val kyuubiVersion: String = libs.versions.kyuubi4paimon.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4spark.get()
+val icebergVersion: String = libs.versions.iceberg.get()
 val paimonVersion: String = libs.versions.paimon.get()
 
 dependencies {

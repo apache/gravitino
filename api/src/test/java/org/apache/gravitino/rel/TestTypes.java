@@ -109,6 +109,8 @@ public class TestTypes {
     Assertions.assertEquals(10, decimalType.scale());
     Assertions.assertEquals("decimal(26,10)", decimalType.simpleString());
     Assertions.assertEquals(decimalType, Types.DecimalType.of(26, 10));
+    Assertions.assertTrue(decimalType.equals(Types.DecimalType.of(26, 10)));
+    Assertions.assertFalse(decimalType.equals(Types.DecimalType.of(20, 10)));
 
     Types.DateType dateType = Types.DateType.get();
     Assertions.assertEquals(Type.Name.DATE, dateType.name());

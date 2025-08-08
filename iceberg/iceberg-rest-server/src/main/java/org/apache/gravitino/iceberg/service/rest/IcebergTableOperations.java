@@ -41,12 +41,14 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRestUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTUtil;
@@ -93,9 +95,19 @@ public class IcebergTableOperations {
     String catalogName = IcebergRestUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    ListTablesResponse listTablesResponse = tableOperationDispatcher.listTable(context, icebergNS);
-    return IcebergRestUtils.ok(listTablesResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            ListTablesResponse listTablesResponse =
+                tableOperationDispatcher.listTable(context, icebergNS);
+            return IcebergRestUtils.ok(listTablesResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @POST
@@ -118,11 +130,19 @@ public class IcebergTableOperations {
         createTableRequest,
         accessDelegation,
         isCredentialVending);
-    IcebergRequestContext context =
-        new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
-    LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
-    return IcebergRestUtils.ok(loadTableResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+            LoadTableResponse loadTableResponse =
+                tableOperationDispatcher.createTable(context, icebergNS, createTableRequest);
+            return IcebergRestUtils.ok(loadTableResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @POST
@@ -145,11 +165,20 @@ public class IcebergTableOperations {
           table,
           SerializeUpdateTableRequest(updateTableRequest));
     }
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
-    return IcebergRestUtils.ok(loadTableResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+            LoadTableResponse loadTableResponse =
+                tableOperationDispatcher.updateTable(context, tableIdentifier, updateTableRequest);
+            return IcebergRestUtils.ok(loadTableResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @DELETE
@@ -170,10 +199,19 @@ public class IcebergTableOperations {
         icebergNS,
         table,
         purgeRequested);
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
-    return IcebergRestUtils.noContent();
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            tableOperationDispatcher.dropTable(context, tableIdentifier, purgeRequested);
+            return IcebergRestUtils.noContent();
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @GET
@@ -199,12 +237,20 @@ public class IcebergTableOperations {
         accessDelegation,
         isCredentialVending);
     // todo support snapshots
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    IcebergRequestContext context =
-        new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
-    LoadTableResponse loadTableResponse =
-        tableOperationDispatcher.loadTable(context, tableIdentifier);
-    return IcebergRestUtils.ok(loadTableResponse);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
+            LoadTableResponse loadTableResponse =
+                tableOperationDispatcher.loadTable(context, tableIdentifier);
+            return IcebergRestUtils.ok(loadTableResponse);
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   @HEAD
@@ -223,13 +269,22 @@ public class IcebergTableOperations {
         catalogName,
         icebergNS,
         table);
-    IcebergRequestContext context = new IcebergRequestContext(httpServletRequest(), catalogName);
-    TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
-    boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
-    if (exists) {
-      return IcebergRestUtils.noContent();
-    } else {
-      return IcebergRestUtils.notExists();
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            IcebergRequestContext context =
+                new IcebergRequestContext(httpServletRequest(), catalogName);
+            TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, table);
+            boolean exists = tableOperationDispatcher.tableExists(context, tableIdentifier);
+            if (exists) {
+              return IcebergRestUtils.noContent();
+            } else {
+              return IcebergRestUtils.notExists();
+            }
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
     }
   }
 
@@ -243,8 +298,23 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("namespace") String namespace,
       @PathParam("table") String table,
       ReportMetricsRequest request) {
-    icebergMetricsManager.recordMetric(request.report());
-    return IcebergRestUtils.noContent();
+    String catalogName = IcebergRestUtils.getCatalogName(prefix);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    LOG.info(
+        "Report Iceberg table metrics, catalog: {}, namespace: {}, table: {}",
+        catalogName,
+        icebergNS,
+        table);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            icebergMetricsManager.recordMetric(request.report());
+            return IcebergRestUtils.noContent();
+          });
+    } catch (Exception e) {
+      return IcebergExceptionMapper.toRESTResponse(e);
+    }
   }
 
   // HTTP request is null in Jersey test, override with a mock request when testing.
