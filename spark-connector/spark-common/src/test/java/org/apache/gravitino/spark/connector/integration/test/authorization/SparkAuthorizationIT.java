@@ -17,21 +17,29 @@
 
 package org.apache.gravitino.spark.connector.integration.test.authorization;
 
+import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.catalyst.expressions.GenericRow;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -45,15 +53,19 @@ public class SparkAuthorizationIT extends BaseIT {
 
   protected static final String NORMAL_USER = "tester2";
 
-  protected static final String HIVE_CATALOG = "hiveCatalog";
+  protected static final String JDBC_CATALOG = "jdbcCatalog";
 
-  protected static final String HIVE_DATABASE = "hiveDatabase";
+  protected static final String JDBC_DATABASE = "jdbcDatabase";
 
   private String gravitinoUri;
 
-  protected String hiveMetastoreUri = "thrift://127.0.0.1:9083";
+  protected String mysqlUrl;
 
-  protected String warehouse;
+  protected String mysqlUsername;
+
+  protected String mysqlPassword;
+
+  protected String mysqlDriver;
 
   private SparkSession adminUserSparkSession;
 
@@ -76,25 +88,19 @@ public class SparkAuthorizationIT extends BaseIT {
             Configs.AUTHENTICATORS.getKey(),
             "simple"));
     putServiceAdmin();
-    initHiveCatalog();
+    initMysqlContainer();
     super.startIntegrationTest();
     gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
     initMetalakeAndCatalogs();
     initSparkEnv();
   }
 
-  private void initHiveCatalog() {
-    containerSuite.startHiveContainer();
-    hiveMetastoreUri =
-        String.format(
-            "thrift://%s:%d",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HIVE_METASTORE_PORT);
-    warehouse =
-        String.format(
-            "hdfs://%s:%d/user/hive/warehouse",
-            containerSuite.getHiveContainer().getContainerIpAddress(),
-            HiveContainer.HDFS_DEFAULTFS_PORT);
+  private void initMysqlContainer() throws SQLException {
+    containerSuite.startMySQLContainer(TestDatabaseName.MYSQL_CATALOG_MYSQL_IT);
+    mysqlUrl = containerSuite.getMySQLContainer().getJdbcUrl();
+    mysqlUsername = containerSuite.getMySQLContainer().getUsername();
+    mysqlPassword = containerSuite.getMySQLContainer().getPassword();
+    mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
   }
 
   private void initMetalakeAndCatalogs() {
@@ -102,10 +108,13 @@ public class SparkAuthorizationIT extends BaseIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.addUser(NORMAL_USER);
     Map<String, String> properties = Maps.newHashMap();
-    properties.put("metastore.uris", hiveMetastoreUri);
+    properties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, mysqlUrl);
+    properties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, mysqlUsername);
+    properties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, mysqlPassword);
+    properties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, mysqlDriver);
     client
         .loadMetalake(METALAKE)
-        .createCatalog(HIVE_CATALOG, Catalog.Type.RELATIONAL, "hive", "comment", properties);
+        .createCatalog(JDBC_CATALOG, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", properties);
   }
 
   protected void putServiceAdmin() {
@@ -118,8 +127,6 @@ public class SparkAuthorizationIT extends BaseIT {
             .set("spark.plugins", GravitinoSparkPlugin.class.getName())
             .set(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .set(GravitinoSparkConfig.GRAVITINO_METALAKE, METALAKE)
-            .set("hive.exec.dynamic.partition.mode", "nonstrict")
-            .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
     setEnv("HADOOP_USER_NAME", USER);
     adminUserSparkSession =
@@ -127,7 +134,6 @@ public class SparkAuthorizationIT extends BaseIT {
             .master("local[1]")
             .appName("Spark connector integration test")
             .config(sparkConf)
-            .enableHiveSupport()
             .getOrCreate();
     setEnv("HADOOP_USER_NAME", NORMAL_USER);
     normalUserSparkSession =
@@ -141,14 +147,34 @@ public class SparkAuthorizationIT extends BaseIT {
 
   @Test
   public void testCreateSchema() {
+    List<Row> catalogs =
+        executeSqlByUser(NORMAL_USER, () -> normalUserSparkSession.sql("show catalogs"))
+            .collectAsList();
+    assertListEquals(List.of(), catalogs);
+    catalogs =
+        executeSqlByUser(USER, () -> adminUserSparkSession.sql("show catalogs")).collectAsList();
+    assertListEquals(List.of(new GenericRow(new String[] {JDBC_CATALOG})), catalogs);
     assertThrows(
         String.format(
             "%s is not authorized to perform operation 'loadMetalake' on metadata 'metalake'",
             NORMAL_USER),
         RuntimeException.class,
         () -> {
-          normalUserSparkSession.sql("create database " + HIVE_DATABASE);
+          executeSqlByUser(
+              NORMAL_USER, () -> normalUserSparkSession.sql("create database " + JDBC_DATABASE));
         });
-    adminUserSparkSession.sql("create database " + HIVE_DATABASE);
+    executeSqlByUser(USER, () -> adminUserSparkSession.sql("create database " + JDBC_DATABASE));
+  }
+
+  private <E> void assertListEquals(List<E> expected, List<E> actual) {
+    assertEquals(expected.size(), actual.size());
+    for (int i = 0; i < expected.size(); i++) {
+      assertEquals(expected.get(i), actual.get(i));
+    }
+  }
+
+  private <R> R executeSqlByUser(String user, Supplier<R> supplier) {
+    setEnv("HADOOP_USER_NAME", user);
+    return supplier.get();
   }
 }
