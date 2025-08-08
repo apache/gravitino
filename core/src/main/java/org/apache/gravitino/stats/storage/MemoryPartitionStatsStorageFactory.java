@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.external.stats;
+package org.apache.gravitino.stats.storage;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -28,7 +28,7 @@ import org.apache.gravitino.stats.PartitionStatisticsDrop;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 
-public class MemoryPartitionStatsFileFactory implements PartitionStatisticStorageFactory {
+public class MemoryPartitionStatsStorageFactory implements PartitionStatisticStorageFactory {
 
   @Override
   public PartitionStatisticStorage open(String metalake, Map<String, String> properties) {
