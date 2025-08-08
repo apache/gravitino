@@ -157,9 +157,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             currentUser,
             methodName,
             ex);
-        return Utils.forbidden(
-            "Authorization failed due to system internal error. Please contact administrator.",
-            null);
+        return Utils.internalError(
+            "Authorization failed due to system internal error. Please contact administrator.", ex);
       }
     }
 

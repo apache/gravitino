@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -238,6 +239,12 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     FilesetCatalog filesetCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+    // reset privilege
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        ImmutableSet.of(Privileges.WriteFileset.allow(), Privileges.ReadFileset.allow()));
 
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
