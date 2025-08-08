@@ -156,12 +156,12 @@ public class LocalJobExecutor implements JobExecutor {
     String newJobId = LOCAL_JOB_PREFIX + UUID.randomUUID();
     Pair<String, JobTemplate> jobPair = Pair.of(newJobId, jobTemplate);
 
-    // Add the job template to the waiting queue
-    if (!waitingQueue.offer(jobPair)) {
-      throw new IllegalStateException("Waiting queue is full, cannot submit job: " + jobTemplate);
-    }
-
     synchronized (lock) {
+      // Add the job template to the waiting queue
+      if (!waitingQueue.offer(jobPair)) {
+        throw new IllegalStateException("Waiting queue is full, cannot submit job: " + jobTemplate);
+      }
+
       jobStatus.put(newJobId, Pair.of(JobHandle.Status.QUEUED, UNEXPIRED_TIME_IN_MS));
     }
 
@@ -255,15 +255,18 @@ public class LocalJobExecutor implements JobExecutor {
     try {
       String jobId = jobPair.getLeft();
       JobTemplate jobTemplate = jobPair.getRight();
+
+      Process process;
       synchronized (lock) {
         jobStatus.put(jobId, Pair.of(JobHandle.Status.STARTED, UNEXPIRED_TIME_IN_MS));
+
+        LocalProcessBuilder processBuilder = LocalProcessBuilder.create(jobTemplate, configs);
+        process = processBuilder.start();
+        runningProcesses.put(jobId, process);
       }
 
-      LocalProcessBuilder processBuilder = LocalProcessBuilder.create(jobTemplate, configs);
-      Process process = processBuilder.start();
-      runningProcesses.put(jobId, process);
-
       LOG.info("Starting job: {}", jobId);
+
       int exitCode = process.waitFor();
       if (exitCode == 0) {
         LOG.info("Job {} completed successfully", jobId);
