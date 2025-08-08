@@ -91,7 +91,7 @@ class TagOperation(ABC):
         pass
 
     @abstractmethod
-    async def association_tag_with_metadata(
+    async def associate_tag_with_metadata(
         self,
         metadata_full_name: str,
         metadata_type: str,

@@ -81,7 +81,7 @@ class MockTagOperation(TagOperation):
     async def delete_tag(self, name: str) -> str:
         return f"mock_tag_deleted: {name}"
 
-    async def association_tag_with_metadata(
+    async def associate_tag_with_metadata(
         self,
         metadata_full_name: str,
         metadata_type: str,

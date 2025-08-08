@@ -66,7 +66,7 @@ class PlainRESTClientTagOperation(TagOperation):
             raise Exception(f"Failed to delete tag {name}: {response.text}")
         return None
 
-    async def association_tag_with_metadata(
+    async def associate_tag_with_metadata(
         self,
         metadata_full_name: str,
         metadata_type: str,

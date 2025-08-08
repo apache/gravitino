@@ -119,7 +119,8 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().get_list_of_tags()
 
-    @mcp.tool(tags={"tag"})
+    # Disable the alter_tag tool by default as it can be destructive.
+    @mcp.tool(tags={"tag"}, enabled=False)
     async def alter_tag(ctx: Context, name: str, updates: list) -> str:
         """
         Alter an existing tag within the specified metalake.
@@ -171,7 +172,8 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().alter_tag(name, updates)
 
-    @mcp.tool(tags={"tag"})
+    # Disable the delete_tag tool by default as it can be destructive.
+    @mcp.tool(tags={"tag"}, enabled=False)
     async def delete_tag(ctx: Context, name: str) -> None:
         """
         Delete a tag by its name.
@@ -191,7 +193,7 @@ def load_tag_tool(mcp: FastMCP):
         return await client.as_tag_operation().delete_tag(name)
 
     @mcp.tool(tags={"tag"})
-    async def association_tag_with_metadata(
+    async def associate_tag_with_metadata(
         ctx: Context,
         metadata_full_name: str,
         metadata_type: str,
@@ -229,7 +231,7 @@ def load_tag_tool(mcp: FastMCP):
             ]
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_tag_operation().association_tag_with_metadata(
+        return await client.as_tag_operation().associate_tag_with_metadata(
             metadata_full_name,
             metadata_type,
             tags_to_associate,
