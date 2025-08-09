@@ -112,6 +112,22 @@ public class TestTypeUtils {
         .forEach(this::checkUnsupportedType);
   }
 
+  @Test
+  void testToPaimonTypeNullability() {
+    assertEquals(
+        DataTypes.ARRAY(DataTypes.INT().notNull()),
+        toPaimonType(Types.ListType.of(Types.IntegerType.get(), false)));
+    assertEquals(
+        DataTypes.ARRAY(DataTypes.INT().nullable()),
+        toPaimonType(Types.ListType.of(Types.IntegerType.get(), true)));
+    assertEquals(
+        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().notNull()),
+        toPaimonType(Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), false)));
+    assertEquals(
+        DataTypes.MAP(DataTypes.STRING(), DataTypes.INT().nullable()),
+        toPaimonType(Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true)));
+  }
+
   private Type toGravitinoDataType(DataType dataType) {
     switch (dataType.getTypeRoot()) {
       case BOOLEAN:
