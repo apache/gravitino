@@ -180,7 +180,7 @@ public class GravitinoTable {
               column.getComment(),
               column.isNullable(),
               column.isAutoIncrement(),
-              null);
+              column.getDefaultValue());
     }
     return gravitinoColumns;
   }

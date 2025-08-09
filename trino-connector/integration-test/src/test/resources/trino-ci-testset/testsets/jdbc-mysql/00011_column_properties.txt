@@ -1,0 +1,161 @@
+"CREATE TABLE gt_mysql.gt_mysql_test_column_properties.demo_all_data_types_default_value (
+   col_bit boolean,
+   col_tinyint tinyint WITH ( default = '0' ),
+   col_smallint smallint WITH ( default = '-1' ),
+   col_mediumint integer,
+   col_int integer WITH ( default = '1' ),
+   col_bigint bigint WITH ( default = '9999999' ),
+   col_float real WITH ( default = '0.0' ),
+   col_double double WITH ( default = '1.23456' ),
+   col_decimal decimal(10, 2) WITH ( default = '100.50' ),
+   col_date date WITH ( default = '2000-01-01' ),
+   col_time time(0) WITH ( default = '12:30:01' ),
+   col_datetime timestamp(0) WITH ( default = '2025-01-01 00:00:01' ),
+   col_timestamp timestamp(0) with time zone WITH ( default = '2025-01-01 00:00:01' ),
+   col_year date,
+   col_char char(10) WITH ( default = 'abc' ),
+   col_varchar varchar(100) WITH ( default = 'Hello' ),
+   col_tinytext varchar,
+   col_text varchar,
+   col_mediumtext varchar,
+   col_longtext varchar,
+   col_binary varbinary,
+   col_varbinary varbinary,
+   col_blob varbinary,
+   col_mediumblob varbinary,
+   col_longblob varbinary,
+   col_enum varchar,
+   col_set varchar,
+   col_json json,
+   col_boolean boolean,
+   col_geometry varbinary,
+   col_point varbinary
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+"CREATE TABLE gt_mysql.gt_mysql_test_column_properties.demo_default_value_with_expression (
+   int_col_2 integer,
+   varchar200_col_1 varchar(200),
+   varchar200_col_2 varchar(200),
+   datetime_col_1 timestamp(0) WITH ( default = 'CURRENT_TIMESTAMP' ),
+   datetime_col_2 timestamp(0) WITH ( default = 'CURRENT_TIMESTAMP' ),
+   date_col_1 date,
+   date_col_2 date,
+   date_col_3 date,
+   timestamp_col_1 timestamp(0) with time zone WITH ( default = 'CURRENT_TIMESTAMP' ),
+   timestamp_col_2 timestamp(0) with time zone WITH ( default = 'CURRENT_TIMESTAMP' )
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB'
+)"
+
+CREATE SCHEMA
+
+CREATE TABLE
+
+"CREATE TABLE gt_mysql.gt_mysql_test_column_properties_v2.test_create_with_default_value (
+   key1 integer NOT NULL WITH ( auto_increment = true ),
+   f1 varchar(200) WITH ( default = 'VARCHAR' ),
+   f2 char(20) WITH ( default = 'CHAR' ),
+   f4 decimal(10, 3) WITH ( default = '0.300' ),
+   f5 real WITH ( default = '0.3' ),
+   f6 double WITH ( default = '0.3' ),
+   f8 tinyint WITH ( default = '1' ),
+   f9 smallint WITH ( default = '1' ),
+   f10 integer WITH ( default = '1' ),
+   f11 integer WITH ( default = '1' ),
+   f12 bigint WITH ( default = '1' ),
+   f13 date WITH ( default = '2024-04-01' ),
+   f14 time(0) WITH ( default = '08:00' ),
+   f15 timestamp(0) WITH ( default = '2012-12-31 11:30:45' ),
+   f16 timestamp(0) with time zone WITH ( default = '2012-12-31 11:30:45' ),
+   f17 timestamp(0) with time zone WITH ( default = 'CURRENT_TIMESTAMP' )
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['key1']
+)"
+
+DROP TABLE
+
+<QUERY_FAILED> Invalidate default value 1 for DATE type. Text '1' could not be parsed at index 0
+
+<QUERY_FAILED> Invalidate default value 1 for UUID type. This Type not support default value
+
+CREATE TABLE
+
+"CREATE TABLE gt_mysql.gt_mysql_test_column_properties_v2.test_create_with_auto_increment_1 (
+   key1 integer NOT NULL WITH ( auto_increment = true ),
+   f1 timestamp(0),
+   f2 date
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['key1']
+)"
+
+DROP TABLE
+
+CREATE TABLE
+
+"CREATE TABLE gt_mysql.gt_mysql_test_column_properties_v2.test_create_with_auto_increment_2 (
+   key1 integer NOT NULL WITH ( auto_increment = true ),
+   key2 integer NOT NULL,
+   f1 timestamp(0),
+   f2 date
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['key1','key2']
+)"
+
+DROP TABLE
+
+CREATE TABLE
+
+"CREATE TABLE gt_mysql.gt_mysql_test_column_properties_v2.test_create_with_auto_increment_3 (
+   key1 integer NOT NULL WITH ( auto_increment = true ),
+   col1 integer
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   unique_key = ARRAY['unique_key1:key1']
+)"
+
+DROP TABLE
+
+CREATE TABLE
+
+"CREATE TABLE gt_mysql.gt_mysql_test_column_properties_v2.test_create_with_auto_increment_4 (
+   key1 integer NOT NULL WITH ( auto_increment = true ),
+   key2 integer,
+   col1 integer
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['key1'],
+   unique_key = ARRAY['unique_key1:key1,key2']
+)"
+
+DROP TABLE
+
+<QUERY_FAILED> Auto increment column must be defined as a key in MySQL
+
+<QUERY_FAILED> Only one column can be auto-incremented in MySQL
+
+<QUERY_FAILED> Auto increment column must be not null in MySQL
+
+<QUERY_FAILED> Auto increment column cannot have a default value in MySQL
+
+<QUERY_FAILED> Auto increment column must be integer type in MySQL
+
+DROP SCHEMA

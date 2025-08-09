@@ -16,7 +16,7 @@ To connect to MySQL, you need:
 
 ## Create table
 
-At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, comments, primary keys and indexes. However, it does not support advanced features like default values and auto-increment.
+At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, comments, primary keys, indexes, default values and auto-increment.
 
 The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
@@ -46,6 +46,32 @@ The following are supported MySQL table properties:
 | auto_increment_offset              | string | (none)         | The auto increment offset for the table.                                                                                                | No       | 0.4.0         |
 | primary_key                        | list   | (none)         | The primary keys for the table, can choose multi columns as the table primary key. All key columns must be defined as `NOT NULL`.       | No       | 1.0.0         |
 | unique_key                         | list   | (none)         | The unique keys for the table, can choose multi columns for multi unique key. Each unique key should be defined as `keyName:col1,col2`. | No       | 1.0.0         |
+
+The following are supported MySQL column properties:
+
+| Property name                      | Type    | Default Value | Description                                       | Required | Since Version |
+|------------------------------------|---------|---------------|---------------------------------------------------|----------|---------------|
+| auto_increment                     | boolean | false         | The auto increment column.                        | No       | 1.0.0         |
+| default                            | string  | (none)        | The default value for column.                     | No       | 1.0.0         |
+
+**Note:** Currently, creating tables only supports constant default values and does not support expression default values, 
+and `show create table` also exclusively renders constant default values in its output.
+The following are Trino type which support configuration of default values:
+
+| Type name | Default Value example                   |
+|-----------|-----------------------------------------|
+| TINYINT   | 1                                       |
+| SMALLINT  | 1                                       | 
+| INT       | 1                                       | 
+| BIGINT    | 1                                       | 
+| REAL      | 1.0                                     | 
+| DOUBLE    | 1.0                                     | 
+| DECIMAL   | 1.0                                     | 
+| VARCHAR   | abc                                     | 
+| CHAR      | abc                                     | 
+| DATE      | 2025-08-07                              | 
+| TIME      | 01:01:01                                | 
+| TIMESTAMP | 2025-08-07 01:01:01 (CURRENT_TIMESTAMP) | 
 
 ## Basic usage examples
 
@@ -141,6 +167,32 @@ WITH (
    engine = 'InnoDB',
    primary_key = ARRAY['key5','key1'],
    unique_key = ARRAY['unique_key1:key2','unique_key2:key4,key3']
+);
+```
+
+Create a new table named `table_column_properties` in schema `mysql_test.database_01` with auto_increment and default.
+
+```sql
+CREATE TABLE mysql_test.database_01.table_column_properties(
+    key1 INT NOT NULL WITH (auto_increment=true),
+    f1 VARCHAR(200) WITH (default='VARCHAR'),
+    f2 CHAR(20) WITH (default='CHAR') ,
+    f4 DECIMAL(10, 3) WITH (default='0.3') ,
+    f5 REAL WITH (default='0.3') ,
+    f6 DOUBLE WITH (default='0.3') ,
+    f8 TINYINT WITH (default='1') ,
+    f9 SMALLINT WITH (default='1') ,
+    f10 INT WITH (default='1') ,
+    f11 INTEGER WITH (default='1') ,
+    f12 BIGINT WITH (default='1'),
+    f13 DATE WITH (default='2024-04-01'),
+    f14 TIME WITH (default='08:00:00'),
+    f15 TIMESTAMP WITH (default='2012-12-31 11:30:45'),
+    f16 TIMESTAMP WITH TIME ZONE WITH (default='2012-12-31 11:30:45'),
+    f17 TIMESTAMP WITH TIME ZONE WITH (default='CURRENT_TIMESTAMP')
+)
+WITH (
+   primary_key = ARRAY['key1']
 );
 ```
 

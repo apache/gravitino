@@ -21,10 +21,14 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 import static io.trino.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.lang.String.format;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_PRIMARY_KEY;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_UNIQUE_KEY;
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.filterColumnProperties;
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.getDefaultValue;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.getPrimaryKey;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.getUniqueKey;
+import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.isAutoIncrement;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -43,10 +47,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.jdbc.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.logging.log4j.util.Strings;
@@ -55,6 +62,7 @@ import org.apache.logging.log4j.util.Strings;
 public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   private final PropertyConverter tableConverter;
+  private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
   /**
    * Constructs a new MySQLMetadataAdapter.
@@ -70,6 +78,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
     super(schemaProperties, tableProperties, columnProperties, new MySQLDataTypeTransformer());
     this.tableConverter = new MySQLTablePropertyConverter();
+    this.columnDefaultValueConverter = new MysqlColumnDefaultValueConverter();
   }
 
   @Override
@@ -97,28 +106,43 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
     Map<String, Set<String>> uniqueKeyMap = getUniqueKey(tableProperties);
 
     List<GravitinoColumn> columns = new ArrayList<>();
+    ImmutableList.Builder<GravitinoColumn> incrementColumnListBuilder = ImmutableList.builder();
     ImmutableSet.Builder<String> columnNamesBuilder = ImmutableSet.builder();
     for (int i = 0; i < tableMetadata.getColumns().size(); i++) {
       ColumnMetadata column = tableMetadata.getColumns().get(i);
       if (primaryKeyList.contains(column.getName()) && column.isNullable()) {
         throw new TrinoException(NOT_SUPPORTED, "Primary key must be NOT NULL in MySQL");
       }
-      boolean autoIncrement =
-          (boolean) column.getProperties().getOrDefault(MySQLPropertyMeta.AUTO_INCREMENT, false);
 
-      columns.add(
+      Map<String, Object> columnProperties = column.getProperties();
+      boolean autoIncrement = isAutoIncrement(columnProperties);
+      String defaultValue = getDefaultValue(columnProperties);
+
+      Type gravitinoType = dataTypeTransformer.getGravitinoType(column.getType());
+      GravitinoColumn gravitinoColumn =
           new GravitinoColumn(
               column.getName(),
-              dataTypeTransformer.getGravitinoType(column.getType()),
+              gravitinoType,
               i,
               column.getComment(),
               column.isNullable(),
               autoIncrement,
-              column.getProperties()));
+              columnDefaultValueConverter.toGravitino(
+                  gravitinoType, defaultValue, column.isNullable()),
+              filterColumnProperties(columnProperties));
+
+      columns.add(gravitinoColumn);
+
+      if (autoIncrement) {
+        incrementColumnListBuilder.add(gravitinoColumn);
+      }
+
       columnNamesBuilder.add(column.getName());
     }
 
     Index[] indexes = buildIndexes(primaryKeyList, uniqueKeyMap, columnNamesBuilder.build());
+
+    validateIncrementCol(incrementColumnListBuilder.build(), indexes);
 
     return new GravitinoTable(schemaName, tableName, columns, comment, properties, indexes);
   }
@@ -172,6 +196,57 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
 
   private static String[][] convertIndexFieldNames(Set<String> fieldNames) {
     return fieldNames.stream().map(colName -> new String[] {colName}).toArray(String[][]::new);
+  }
+
+  /**
+   * The auto-increment column will be verified. There can only be one auto-increment column and it
+   * must be the primary key or unique index.
+   *
+   * @param columns table auto increment columns
+   * @param indexes table indexes
+   */
+  protected static void validateIncrementCol(List<GravitinoColumn> columns, Index[] indexes) {
+    // check not exists multi auto-increment column
+    if (columns.size() > 1) {
+      throw new TrinoException(NOT_SUPPORTED, "Only one column can be auto-incremented in MySQL");
+    }
+    if (!columns.isEmpty()) {
+      GravitinoColumn incrementColumn = columns.get(0);
+      // check auto-increment column must be integer type
+      if (!(incrementColumn.getType() instanceof Type.IntegralType)) {
+        throw new TrinoException(
+            NOT_SUPPORTED, "Auto increment column must be integer type in MySQL");
+      }
+      // check auto-increment column must be not null
+      if (incrementColumn.isNullable()) {
+        throw new TrinoException(NOT_SUPPORTED, "Auto increment column must be not null in MySQL");
+      }
+      // check auto-increment column have no default value
+      if (DEFAULT_VALUE_NOT_SET != incrementColumn.getDefaultValue()) {
+        throw new TrinoException(
+            NOT_SUPPORTED, "Auto increment column cannot have a default value in MySQL");
+      }
+      // check the only one auto-increment column can only be defined in primary key or unique
+      // key.
+      // auto-increment column can exist in both primary key and unique key
+      String colName = incrementColumn.getName();
+      Optional<Index> existAutoIncrementColIndexOptional =
+          Arrays.stream(indexes)
+              .filter(
+                  index ->
+                      Arrays.stream(index.fieldNames())
+                          .flatMap(Arrays::stream)
+                          .anyMatch(s -> StringUtils.equalsIgnoreCase(colName, s)))
+              .filter(
+                  index ->
+                      index.type() == Index.IndexType.PRIMARY_KEY
+                          || index.type() == Index.IndexType.UNIQUE_KEY)
+              .findAny();
+      if (!existAutoIncrementColIndexOptional.isPresent()) {
+        throw new TrinoException(
+            NOT_SUPPORTED, "Auto increment column must be defined as a key in MySQL");
+      }
+    }
   }
 
   @Override
@@ -229,6 +304,11 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
     Map<String, Object> propertyMap = Maps.newHashMap(column.getProperties());
     if (column.isAutoIncrement()) {
       propertyMap.put(MySQLPropertyMeta.AUTO_INCREMENT, true);
+    }
+
+    String defaultValue = columnDefaultValueConverter.fromGravitino(column.getDefaultValue());
+    if (defaultValue != null) {
+      propertyMap.put(MySQLPropertyMeta.DEFAULT, defaultValue);
     }
 
     return ColumnMetadata.builder()
