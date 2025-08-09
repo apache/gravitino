@@ -22,6 +22,7 @@ from mcp_server.client import (
     GravitinoOperation,
     SchemaOperation,
     TableOperation,
+    TagOperation,
 )
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
@@ -31,6 +32,9 @@ from mcp_server.client.plain.plain_rest_client_schema_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_table_operation import (
     PlainRESTClientTableOperation,
+)
+from mcp_server.client.plain.plain_rest_client_tag_operation import (
+    PlainRESTClientTagOperation,
 )
 
 
@@ -51,5 +55,10 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_schema_operation(self) -> SchemaOperation:
         return PlainRESTClientSchemaOperation(
+            metalake_name=self.metalake_name, rest_client=self.rest_client
+        )
+
+    def as_tag_operation(self) -> TagOperation:
+        return PlainRESTClientTagOperation(
             metalake_name=self.metalake_name, rest_client=self.rest_client
         )
