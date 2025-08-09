@@ -51,6 +51,17 @@ public interface NamedReference extends Expression {
   }
 
   /**
+   * Returns a {@link MetadataField} for the given field name(s). The array of field name(s) is used
+   * to reference metadata fields.
+   *
+   * @param fieldNames the field name(s)
+   * @return a {@link MetadataField} for the given field name(s)
+   */
+  static MetadataField metadataField(String[] fieldNames) {
+    return new MetadataField(fieldNames);
+  }
+
+  /**
    * Returns the referenced field name as an array of String parts.
    *
    * <p>Each string in the returned array represents a field name.
@@ -100,6 +111,46 @@ public interface NamedReference extends Expression {
     }
 
     /** @return The string representation of the field reference. */
+    @Override
+    public String toString() {
+      return String.join(".", fieldName);
+    }
+  }
+
+  /** A {@link NamedReference} that references a metadata field. */
+  final class MetadataField implements NamedReference {
+    /** A metadata field that represents the name of a partition in a partitioned table. */
+    public static final MetadataField PARTITION_NAME_FIELD =
+        new MetadataField(new String[] {"partition_name"});
+
+    private final String[] fieldName;
+
+    MetadataField(String[] fieldName) {
+      this.fieldName = fieldName;
+    }
+
+    @Override
+    public String[] fieldName() {
+      return fieldName;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      MetadataField that = (MetadataField) o;
+      return Arrays.equals(fieldName, that.fieldName);
+    }
+
+    @Override
+    public int hashCode() {
+      return Arrays.hashCode(fieldName);
+    }
+
     @Override
     public String toString() {
       return String.join(".", fieldName);

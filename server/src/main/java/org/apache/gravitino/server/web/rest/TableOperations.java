@@ -261,7 +261,7 @@ public class TableOperations {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
             boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
             if (!dropped) {
-              LOG.warn("Failed to drop table {} under schema {}", table, schema);
+              LOG.warn("Cannot find to be dropped table {} under schema {}", table, schema);
             }
 
             Response response = Utils.ok(new DropResponse(dropped));

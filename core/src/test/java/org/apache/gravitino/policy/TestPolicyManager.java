@@ -334,10 +334,19 @@ public class TestPolicyManager {
     // test update content
     Map<String, Object> newCustomRules = ImmutableMap.of("rule3", 1, "rule4", "value2");
     PolicyContent newContent = PolicyContents.custom(newCustomRules, null);
-    PolicyChange contentChange = PolicyChange.updateContent(newContent);
+    PolicyChange contentChange = PolicyChange.updateContent("test", newContent);
     Policy updatedContentPolicy =
         policyManager.alterPolicy(METALAKE, changedCommentPolicy.name(), contentChange);
     Assertions.assertEquals(newContent, updatedContentPolicy.content());
+
+    // test policy type mismatch
+    PolicyChange typeChange = PolicyChange.updateContent("mismatch_type", newContent);
+    Exception e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> policyManager.alterPolicy(METALAKE, updatedContentPolicy.name(), typeChange));
+    Assertions.assertEquals(
+        "Policy type mismatch: expected test but got mismatch_type", e.getMessage());
 
     // test disable policy
     Assertions.assertDoesNotThrow(

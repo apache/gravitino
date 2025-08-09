@@ -34,12 +34,12 @@ import { isString, isUndefined, isNull, isEmpty } from '@/lib/utils/is'
 import { setObjToUrlParams, deepMerge } from '@/lib/utils'
 import { joinTimestamp, formatRequestDate } from './helper'
 import { AxiosRetry } from './axiosRetry'
-import { AxiosCanceler } from './axiosCancel'
 import { NextAxios } from './Axios'
 import { checkStatus } from './checkStatus'
 import { useAuth as Auth } from '../../provider/session'
 import { githubApis } from '@/lib/api/github'
 import { isProdEnv } from '@/lib/utils'
+import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 /**
  * @description: Data processing to facilitate the distinction of multiple processing methods
@@ -172,9 +172,10 @@ const transform = {
    * @param {CreateAxiosOptions} options
    * @returns {InternalAxiosRequestConfig}
    */
-  requestInterceptors: (config, options) => {
+  requestInterceptors: async (config, options) => {
     // ** Pre-Request Configuration Handling
-    const token = localStorage.getItem('accessToken')
+    // Use OAuth provider factory for proper token management
+    const token = await oauthProviderFactory.getAccessToken()
 
     if (token && config?.requestOptions?.withToken !== false) {
       // ** jwt token
@@ -197,7 +198,7 @@ const transform = {
    * @param {any} error
    * @returns {Promise<any>}
    */
-  responseInterceptorsCatch: (axiosInstance, error) => {
+  responseInterceptorsCatch: async (axiosInstance, error) => {
     const { response, code, message, config: originConfig } = error || {}
     const errorMessageMode = originConfig?.requestOptions?.errorMessageMode || 'none'
     const msg = response?.data?.error?.message ?? response?.data?.message ?? ''
@@ -234,6 +235,15 @@ const transform = {
     if (response?.status === 401 && !originConfig._retry && response.config.url !== githubApis.GET) {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('authParams')
+
+      try {
+        const provider = await oauthProviderFactory.getProvider()
+        if (provider && provider.clearAuthData) {
+          await provider.clearAuthData()
+        }
+      } catch (error) {
+        console.warn('Provider cleanup failed during 401 handling:', error)
+      }
 
       if (isProdEnv) {
         window.location.href = '/ui/login'
