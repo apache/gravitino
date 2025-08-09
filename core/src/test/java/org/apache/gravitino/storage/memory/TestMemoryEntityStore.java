@@ -154,8 +154,8 @@ public class TestMemoryEntityStore {
     @Override
     public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable)
         throws E, IOException {
-      lock.lock();
       Map<NameIdentifier, Entity> snapshot = createSnapshot();
+      lock.lock();
       try {
         return executable.execute();
       } catch (Exception e) {
@@ -176,10 +176,17 @@ public class TestMemoryEntityStore {
     }
 
     public Map<NameIdentifier, Entity> createSnapshot() {
-      return entityMap.entrySet().stream()
-          .collect(
-              Collectors.toMap(
-                  Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, Maps::newHashMap));
+      lock.lock();
+      try {
+        return entityMap.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, Maps::newHashMap));
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create snapshot of entity store", e);
+      } finally {
+        lock.unlock();
+      }
     }
   }
 
