@@ -157,12 +157,15 @@ public class ConfigEntry<T> {
    * Leading/trailing whitespace of the input and each element will be trimmed, and blank elements
    * will be ignored before conversion.
    *
-   * Examples:
-   *   strToSeq(null, converter) = []
-   *   strToSeq("   ", converter) = []
-   *   strToSeq("A,B,C", converter) = ["A", "B", "C"]
-   *   strToSeq(" A, B , ,C,   ,D ", converter) = ["A", "B", "C", "D"]
-   *   strToSeq(" AB, B C, ,D,   , E F ", converter) = ["AB", "B C", "D", "E F"]
+   * <p>Examples:
+   *
+   * <pre>{@code
+   * strToSeq(null, converter) = []
+   * strToSeq("   ", converter) = []
+   * strToSeq("A,B,C", converter) = ["A", "B", "C"]
+   * strToSeq(" A, B , ,C,   ,D ", converter) = ["A", "B", "C", "D"]
+   * strToSeq(" AB, B C, ,D,   , E F ", converter) = ["AB", "B C", "D", "E F"]
+   * }</pre>
    *
    * @param str The string form of the value list from the conf entry.
    * @param converter The original ConfigEntry valueConverter.
