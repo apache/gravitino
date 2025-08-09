@@ -667,7 +667,9 @@ public class CatalogsPageTest extends BaseWebIT {
             SCHEMA_NAME_FILESET,
             FILESET_NAME);
     catalogsPage.clickTreeNode(filesetNode);
-    // 5. verify show tab details
+    // 5. verify Files tab is shown by default, then switch to Details and verify details content
+    Assertions.assertTrue(catalogsPage.verifyShowFilesContent());
+    clickAndWait(catalogsPage.tabDetailsBtn);
     Assertions.assertTrue(catalogsPage.verifyShowDetailsContent());
     Assertions.assertTrue(
         catalogsPage.verifyShowPropertiesItemInList(
