@@ -25,6 +25,7 @@ import { to, isProdEnv } from '@/lib/utils'
 import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
+import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 
 const devOauthUrl = process.env.NEXT_PUBLIC_OAUTH_PATH
 
@@ -91,8 +92,24 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
 })
 
 export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
+  // Clear provider authentication data first
+  try {
+    const provider = await oauthProviderFactory.getProvider()
+    if (provider) {
+      await provider.clearAuthData()
+      console.log('[Logout Action] Provider cleanup completed')
+    }
+  } catch (error) {
+    console.warn('[Logout Action] Provider cleanup failed:', error)
+  }
+
+  // Clear legacy auth tokens
   localStorage.removeItem('accessToken')
   localStorage.removeItem('authParams')
+  localStorage.removeItem('expiredIn')
+  localStorage.removeItem('isIdle')
+  localStorage.removeItem('version')
+
   dispatch(clearIntervalId())
   dispatch(setAuthToken(''))
   await router.push('/login')
