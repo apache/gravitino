@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import static org.apache.gravitino.client.GravitinoClientConfiguration.CLIENT_CONNECTION_TIMEOUT_MS;
+import static org.apache.gravitino.client.GravitinoClientConfiguration.CLIENT_SOCKET_TIMEOUT_MS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE_DEFAULT;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_CONFIG_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX;
 import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.extractIdentifier;
+import static org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystemUtils.getConfigMap;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,6 +47,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.SocketTimeoutException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -67,6 +72,7 @@ import org.apache.gravitino.dto.responses.VersionResponse;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -76,6 +82,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hc.core5.http.Method;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -983,6 +990,55 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       assertEquals(1, fs.getDefaultReplication(testPath));
       assertEquals(FS_GRAVITINO_BLOCK_SIZE_DEFAULT, fs.getDefaultBlockSize(testPath));
     }
+  }
+
+  @Test
+  public void testGravitinoClientConfig() {
+    Configuration configuration = new Configuration(conf);
+    // test valid client property
+    configuration.set(FS_GRAVITINO_CLIENT_CONFIG_PREFIX + "connectionTimeoutMs", "8000");
+    configuration.set(FS_GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs", "4000");
+    Map<String, String> clientConfig =
+        GravitinoVirtualFileSystemUtils.extractClientConfig(getConfigMap(configuration));
+    Assertions.assertEquals(clientConfig.get(CLIENT_CONNECTION_TIMEOUT_MS), "8000");
+    Assertions.assertEquals(clientConfig.get(CLIENT_SOCKET_TIMEOUT_MS), "4000");
+
+    // test invalid client property
+    configuration.set(FS_GRAVITINO_CLIENT_CONFIG_PREFIX + "xxxx", "2000");
+    Throwable throwable =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> {
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+            });
+    Assertions.assertEquals(
+        "Invalid property for client: gravitino.client.xxxx", throwable.getMessage());
+  }
+
+  @Test
+  public void testSocketTimeout() throws IOException {
+
+    Configuration configuration = new Configuration(conf);
+    configuration.set(FS_GRAVITINO_CLIENT_CONFIG_PREFIX + "socketTimeoutMs", "2000");
+
+    mockServer().clear(request().withPath("/api/version"));
+    HttpRequest req = request().withPath("/api/version");
+    mockServer()
+        .when(req, Times.once())
+        .respond(
+            response()
+                .withStatusCode(SC_OK)
+                .withBody(getJsonString(new VersionResponse(Version.getCurrentVersionDTO())))
+                .withDelay(TimeUnit.MILLISECONDS, 5000));
+
+    Throwable throwable =
+        Assertions.assertThrows(
+            RESTException.class,
+            () -> {
+              try (FileSystem fs = new Path("gvfs://fileset/").getFileSystem(configuration)) {}
+            });
+    Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
+    Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
   }
 
   private void buildMockResourceForCredential(String filesetName, String filesetLocation)

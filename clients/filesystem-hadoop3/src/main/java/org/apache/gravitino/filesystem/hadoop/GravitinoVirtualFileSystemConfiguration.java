@@ -143,6 +143,9 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING =
       "fs.gravitino.enableCredentialVending";
 
+  /** The configuration key prefix for the Gravitino client config. */
+  public static final String FS_GRAVITINO_CLIENT_CONFIG_PREFIX = "fs.gravitino.client.config.";
+
   /** The default value for whether to enable credential vending. */
   public static final boolean FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT = false;
 
