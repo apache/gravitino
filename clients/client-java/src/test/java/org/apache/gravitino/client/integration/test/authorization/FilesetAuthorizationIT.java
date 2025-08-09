@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
@@ -74,7 +76,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // try to load the schema as normal user, expect failure
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
@@ -95,7 +97,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
         });
@@ -120,7 +122,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.createFileset(
               //              NameIdentifier.of(SCHEMA, "fileset2"),
@@ -186,9 +188,9 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can load fileset2 and fileset3, but not fileset1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
-          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(CATALOG, SCHEMA, "fileset1"));
+          filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset1"));
         });
     Fileset fileset2 = filesetCatalogNormalUser.loadFileset(NameIdentifier.of(SCHEMA, "fileset2"));
     assertEquals("fileset2", fileset2.name());
@@ -216,7 +218,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.alterFileset(
               NameIdentifier.of(SCHEMA, "fileset1"), FilesetChange.setProperty("key", "value"));
@@ -237,14 +239,19 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     FilesetCatalog filesetCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asFilesetCatalog();
+    // reset privilege
+    gravitinoMetalake.revokePrivilegesFromRole(
+        role,
+        MetadataObjects.of(
+            ImmutableList.of(CATALOG, SCHEMA, "fileset1"), MetadataObject.Type.FILESET),
+        ImmutableSet.of(Privileges.WriteFileset.allow(), Privileges.ReadFileset.allow()));
 
     // normal user cannot alter fileset1 (no privilege)
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
-          filesetCatalogNormalUser.getFileLocation(
-              NameIdentifier.of(METALAKE, CATALOG, SCHEMA, "fileset1"), "/test");
+          filesetCatalogNormalUser.getFileLocation(NameIdentifier.of(SCHEMA, "fileset1"), "/test");
         });
     // grant normal user owner privilege on fileset4
     gravitinoMetalake.setOwner(
@@ -270,7 +277,7 @@ public class FilesetAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot drop fileset1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "fileset1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           filesetCatalogNormalUser.dropFileset(NameIdentifier.of(SCHEMA, "fileset1"));
         });

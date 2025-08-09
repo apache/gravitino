@@ -140,7 +140,7 @@ public class FilesetOperations {
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET",
-      accessMetadataType = MetadataObject.Type.FILESET)
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

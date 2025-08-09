@@ -117,7 +117,7 @@ public class TableOperations {
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
-      accessMetadataType = MetadataObject.Type.TABLE)
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

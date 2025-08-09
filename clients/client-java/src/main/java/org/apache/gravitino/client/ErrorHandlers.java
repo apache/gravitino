@@ -1150,6 +1150,9 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.FORBIDDEN_CODE) {
+        throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
+      }
       throw new RESTException("Unable to process: %s", formatErrorMessage(errorResponse));
     }
   }

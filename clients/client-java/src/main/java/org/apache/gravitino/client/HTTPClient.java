@@ -204,7 +204,6 @@ public class HTTPClient implements RESTClient {
   private void throwFailure(
       CloseableHttpResponse response, String responseBody, Consumer<ErrorResponse> errorHandler) {
     ErrorResponse errorResponse = null;
-
     if (responseBody != null) {
       try {
         if (errorHandler instanceof ErrorHandler) {
@@ -233,7 +232,6 @@ public class HTTPClient implements RESTClient {
     }
 
     errorHandler.accept(errorResponse);
-
     // Throw an exception in case the provided error handler does not throw.
     throw new RESTException("Unhandled error: %s", errorResponse);
   }

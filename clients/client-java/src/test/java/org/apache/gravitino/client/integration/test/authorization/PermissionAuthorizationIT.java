@@ -26,6 +26,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.ImmutableList;
@@ -52,26 +53,26 @@ public class PermissionAuthorizationIT extends BaseRestApiAuthorizationIT {
     GravitinoMetalake gravitinoMetalakeLoadByNormalUser = normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user can not grant.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.grantRolesToUser(
               ImmutableList.of("role1"), NORMAL_USER);
         });
     assertThrows(
         "Current user can not grant.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.grantRolesToGroup(ImmutableList.of("role2"), "group1");
         });
     assertThrows(
         "Current user can not grant.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.grantRolesToGroup(ImmutableList.of("role2"), "group1");
         });
     assertThrows(
         "Current user can not grant.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.revokePrivilegesFromRole(
               "role1",
@@ -80,14 +81,14 @@ public class PermissionAuthorizationIT extends BaseRestApiAuthorizationIT {
         });
     assertThrows(
         "Current user can not grant.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.revokeRolesFromGroup(
               ImmutableList.of("role2"), "group1");
         });
     assertThrows(
         "Current user can not grant.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           gravitinoMetalakeLoadByNormalUser.revokeRolesFromUser(
               ImmutableList.of("role1"), NORMAL_USER);

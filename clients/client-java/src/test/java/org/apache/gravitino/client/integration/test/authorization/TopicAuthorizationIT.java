@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.KafkaContainer;
 import org.apache.gravitino.messaging.Topic;
@@ -98,7 +99,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertEquals(CATALOG, catalogLoadByNormalUser.name());
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           catalogLoadByNormalUser.asSchemas().loadSchema(SCHEMA);
         });
@@ -115,7 +116,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
     assertThrows(
         "Can not access metadata {" + CATALOG + "." + SCHEMA + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.createTopic(
               NameIdentifier.of(SCHEMA, "topic2"), "test2", null, new HashMap<>());
@@ -164,7 +165,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can load topic2 and topic3, but not topic1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.loadTopic(NameIdentifier.of(SCHEMA, "topic1"));
         });
@@ -192,7 +193,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot alter topic1 (no privilege)
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.alterTopic(
               NameIdentifier.of(SCHEMA, "topic1"), TopicChange.updateComment("new comment"));
@@ -220,7 +221,7 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user cannot drop topic1
     assertThrows(
         String.format("Can not access metadata {%s.%s.%s}.", CATALOG, SCHEMA, "topic1"),
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           topicCatalogNormalUser.dropTopic(NameIdentifier.of(SCHEMA, "topic1"));
         });

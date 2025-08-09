@@ -25,6 +25,7 @@ import java.util.HashMap;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -45,7 +46,7 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can not create role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
@@ -84,13 +85,13 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can not get role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).getRole("role2");
         });
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).getRole("role3");
         });
@@ -102,19 +103,19 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can not delete role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role1");
         });
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role2");
         });
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).deleteRole("role3");
         });
@@ -125,7 +126,7 @@ public class RoleAuthorizationIT extends BaseRestApiAuthorizationIT {
     // normal user can not create role after delete role
     assertThrows(
         "Current user can not create role.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
