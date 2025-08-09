@@ -20,7 +20,6 @@
 package org.apache.gravitino.credential.config;
 
 import java.util.Map;
-import javax.validation.constraints.NotNull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -85,17 +84,14 @@ public class OSSCredentialConfig extends Config {
     return this.get(OSS_REGION);
   }
 
-  @NotNull
   public String ossRoleArn() {
     return this.get(OSS_ROLE_ARN);
   }
 
-  @NotNull
   public String accessKeyID() {
     return this.get(OSS_ACCESS_KEY_ID);
   }
 
-  @NotNull
   public String secretAccessKey() {
     return this.get(OSS_SECRET_ACCESS_KEY);
   }

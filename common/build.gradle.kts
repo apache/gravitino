@@ -36,6 +36,7 @@ dependencies {
   implementation(libs.jackson.datatype.jdk8)
   implementation(libs.jackson.datatype.jsr310)
   implementation(libs.jackson.databind)
+  implementation(libs.bundles.log4j)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)

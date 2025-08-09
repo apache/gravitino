@@ -41,17 +41,13 @@ plugins {
   alias(libs.plugins.gradle.extensions)
   alias(libs.plugins.node) apply false
 
-  // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue
-  // running against JDK21, but we cannot upgrade the spotless to 6.19.0 or later since it only
-  // support JDK11+. So we don't support JDK21 and thrown an exception for now.
-  if (JavaVersion.current() >= JavaVersion.VERSION_1_8 &&
-    JavaVersion.current() <= JavaVersion.VERSION_17
-  ) {
+  // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue running against JDK21.
+  if (JavaVersion.current() >= JavaVersion.VERSION_17) {
     alias(libs.plugins.spotless)
   } else {
     throw GradleException(
       "The Gravitino Gradle toolchain currently does not support " +
-        "Java version ${JavaVersion.current()}. Please use JDK versions 8 through 17."
+        "Java version ${JavaVersion.current()}. Please use JDK version 17 or higher."
     )
   }
 
@@ -64,21 +60,12 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
-if (extra["jdkVersion"] !in listOf("8", "11", "17")) {
-  throw GradleException(
-    "The Gravitino Gradle toolchain currently does not support building with " +
-      "Java version ${extra["jdkVersion"]}. Please use JDK versions 8, 11 or 17."
-  )
-}
-
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
 }
 
-project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
-  listOf()
-} else {
+project.extra["extraJvmArgs"] =
   listOf(
     "-XX:+IgnoreUnrecognizedVMOptions",
     "--add-opens", "java.base/java.io=ALL-UNNAMED",
@@ -103,7 +90,6 @@ project.extra["extraJvmArgs"] = if (extra["jdkVersion"] in listOf("8", "11")) {
     "--add-opens", "java.base/sun.util.calendar=ALL-UNNAMED",
     "--add-opens", "java.security.jgss/sun.security.krb5=ALL-UNNAMED"
   )
-}
 
 val pythonVersion: String = project.properties["pythonVersion"] as? String ?: project.extra["pythonVersion"].toString()
 project.extra["pythonVersion"] = pythonVersion
@@ -273,19 +259,78 @@ subprojects {
     mavenLocal()
   }
 
+  fun CompatibleWithJDK8(project: Project): Boolean {
+    val name = project.name.lowercase()
+    val path = project.path.lowercase()
+
+    if (path.startsWith(":client") ||
+      path.startsWith(":spark-connector") ||
+      path.startsWith(":flink-connector") ||
+      path.startsWith(":bundles")
+    ) {
+      return true
+    }
+
+    if (name == "api" || name == "common" ||
+      name == "catalog-common" || name == "hadoop-common"
+    ) {
+      return true
+    }
+
+    return false
+  }
+
+  tasks.register("printJvm") {
+    group = "help"
+    description = "print JVM information"
+
+    doLast {
+
+      val compileJvmVersion = tasks.withType<JavaCompile>().firstOrNull()?.javaCompiler?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "undefined"
+
+      val testJvmVersion = tasks.withType<Test>().firstOrNull()?.javaLauncher?.get()
+        ?.metadata?.languageVersion?.asInt() ?: "undefined"
+
+      val testJvmArgs = tasks.withType<Test>().firstOrNull()?.jvmArgs ?: listOf()
+
+      val targetJvmVersion = (java.targetCompatibility?.majorVersion ?: "undefined")
+
+      val sourceJvmVersion = (java.sourceCompatibility?.majorVersion ?: "undefined")
+
+      println(
+        """
+              |=== ${project.name} JVM information===
+              | project path: ${project.path}
+              | JVM for compile: $compileJvmVersion
+              | JVM for test: $testJvmVersion
+              | JVM test args: $testJvmArgs
+              | target JVM version: $targetJvmVersion
+              | source JVM version: $sourceJvmVersion
+              |==================================
+        """.trimMargin()
+      )
+    }
+  }
+
   java {
     toolchain {
       // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
       // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
       // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
       // Trino-connector on macOS.
+      val clientCompatibleWithJDK8 = project.hasProperty("clientCompatibleWithJDK8")
       if (project.name == "trino-connector") {
         if (OperatingSystem.current().isMacOsX) {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
+      } else if (clientCompatibleWithJDK8 && CompatibleWithJDK8(project)) {
+        languageVersion.set(JavaLanguageVersion.of(17))
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
       } else {
-        languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
+        languageVersion.set(JavaLanguageVersion.of(17))
       }
     }
   }
