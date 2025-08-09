@@ -66,7 +66,7 @@ public class SqlSessionFactoryHelper {
     BasicDataSource dataSource = new BasicDataSource();
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     String driverClass = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER);
-    JdbcUrlUtils.validateJdbcConfig(jdbcUrl, driverClass, config.getAllConfig());
+    JdbcUrlUtils.validateJdbcConfig(driverClass, jdbcUrl, config.getAllConfig());
 
     JDBCBackendType jdbcType = JDBCBackendType.fromURI(jdbcUrl);
     dataSource.setUrl(jdbcUrl);
