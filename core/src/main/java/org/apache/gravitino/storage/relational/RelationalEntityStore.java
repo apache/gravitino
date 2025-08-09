@@ -210,7 +210,8 @@ public class RelationalEntityStore
       throws IOException {
     return cache.withCacheLock(
         () -> {
-          Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
+          Optional<List<E>> entities =
+              cache.getIfPresent(relType, nameIdentifier, identType, allFields);
           if (entities.isPresent()) {
             return entities.get();
           }

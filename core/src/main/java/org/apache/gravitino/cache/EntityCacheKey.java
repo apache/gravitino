@@ -30,6 +30,24 @@ public class EntityCacheKey {
   private final NameIdentifier identifier;
   private final Entity.EntityType type;
   private final SupportsRelationOperations.Type relationType;
+  private final Boolean allFields;
+
+  /**
+   * Creates a new instance of {@link EntityCacheKey} with the given arguments.
+   *
+   * @param ident The identifier of the entity.
+   * @param type The type of the entity.
+   * @param relationType The type of the relation, it can be null.
+   * @param allFields Whether to retrieve all fields of the entity.
+   * @return A new instance of {@link EntityCacheKey}.
+   */
+  public static EntityCacheKey of(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relationType,
+      boolean allFields) {
+    return new EntityCacheKey(ident, type, relationType, allFields);
+  }
 
   /**
    * Creates a new instance of {@link EntityCacheKey} with the given arguments.
@@ -41,7 +59,7 @@ public class EntityCacheKey {
    */
   public static EntityCacheKey of(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relationType) {
-    return new EntityCacheKey(ident, type, relationType);
+    return new EntityCacheKey(ident, type, relationType, null);
   }
 
   /**
@@ -52,7 +70,7 @@ public class EntityCacheKey {
    * @return A new instance of {@link EntityCacheKey}.
    */
   public static EntityCacheKey of(NameIdentifier ident, Entity.EntityType type) {
-    return new EntityCacheKey(ident, type, null);
+    return new EntityCacheKey(ident, type, null, null);
   }
 
   /**
@@ -65,13 +83,15 @@ public class EntityCacheKey {
   private EntityCacheKey(
       NameIdentifier identifier,
       Entity.EntityType type,
-      SupportsRelationOperations.Type relationType) {
+      SupportsRelationOperations.Type relationType,
+      Boolean allFields) {
     Preconditions.checkArgument(identifier != null, "identifier cannot be null");
     Preconditions.checkArgument(type != null, "type cannot be null");
 
     this.identifier = identifier;
     this.type = type;
     this.relationType = relationType;
+    this.allFields = allFields;
   }
 
   /**
@@ -116,7 +136,8 @@ public class EntityCacheKey {
 
     return Objects.equals(identifier, other.identifier)
         && Objects.equals(type, other.type)
-        && Objects.equals(relationType, other.relationType);
+        && Objects.equals(relationType, other.relationType)
+        && Objects.equals(allFields, other.allFields);
   }
 
   /**
@@ -127,7 +148,7 @@ public class EntityCacheKey {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(identifier, type, relationType);
+    return Objects.hash(identifier, type, relationType, allFields);
   }
 
   /**
@@ -141,6 +162,9 @@ public class EntityCacheKey {
     String stringExpr = identifier.toString() + ":" + type.toString();
     if (relationType != null) {
       stringExpr += ":" + relationType.name();
+    }
+    if (allFields != null) {
+      stringExpr += ":" + allFields.toString();
     }
 
     return stringExpr;

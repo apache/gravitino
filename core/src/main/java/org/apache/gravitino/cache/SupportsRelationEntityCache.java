@@ -37,13 +37,29 @@ public interface SupportsRelationEntityCache {
    * @param relType the relation type
    * @param nameIdentifier the name identifier of the entity to find related entities for
    * @param identType the identifier type of the related entities to find
-   * @return a list of related entities, or an empty list if none are found
    * @param <E> The class of the related entities
+   * @return a list of related entities, or an empty list if none are found
    */
   <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
       SupportsRelationOperations.Type relType,
       NameIdentifier nameIdentifier,
       Entity.EntityType identType);
+
+  /**
+   * Retrieves a list of related entities from the cache, if present.
+   *
+   * @param relType the relation type
+   * @param nameIdentifier the name identifier of the entity to find related entities for
+   * @param identType the identifier type of the related entities to find
+   * @param allFields whether to retrieve all fields of the related entities
+   * @param <E> The class of the related entities
+   * @return a list of related entities, or an empty list if none are found
+   */
+  <E extends Entity & HasIdentifier> Optional<List<E>> getIfPresent(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType,
+      boolean allFields);
 
   /**
    * Invalidates the cached relation for the given entity and relation type.
@@ -55,6 +71,21 @@ public interface SupportsRelationEntityCache {
    */
   boolean invalidate(
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
+
+  /**
+   * Invalidates the cached relation for the given entity and relation type.
+   *
+   * @param ident the name identifier
+   * @param type the entity type
+   * @param relType the relation type
+   * @param allFields whether to invalidate all fields of the related entities
+   * @return true if the cache entry was removed
+   */
+  boolean invalidate(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields);
 
   /**
    * Checks whether an entity with the given name identifier, type, and relation type is present in
@@ -69,6 +100,22 @@ public interface SupportsRelationEntityCache {
       NameIdentifier ident, Entity.EntityType type, SupportsRelationOperations.Type relType);
 
   /**
+   * Checks whether an entity with the given name identifier, type, and relation type is present in
+   * the cache.
+   *
+   * @param ident the name identifier of the entity
+   * @param type the type of the entity
+   * @param relType the relation type
+   * @param allFields whether to check for all fields of the related entities
+   * @return {@code true} if the entity is cached; {@code false} otherwise
+   */
+  boolean contains(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields);
+
+  /**
    * Puts a list of related entities into the cache.
    *
    * @param ident The name identifier of the entity to cache the related entities for
@@ -81,5 +128,22 @@ public interface SupportsRelationEntityCache {
       NameIdentifier ident,
       Entity.EntityType type,
       SupportsRelationOperations.Type relType,
+      List<E> entities);
+
+  /**
+   * Puts a list of related entities into the cache.
+   *
+   * @param ident The name identifier of the entity to cache the related entities for
+   * @param type The type of the entity to cache the related entities for
+   * @param relType The relation type to cache the related entities for
+   * @param allFields Whether to cache all fields of the related entities
+   * @param entities The list of related entities to cache
+   * @param <E> The class of the related entities
+   */
+  <E extends Entity & HasIdentifier> void put(
+      NameIdentifier ident,
+      Entity.EntityType type,
+      SupportsRelationOperations.Type relType,
+      boolean allFields,
       List<E> entities);
 }
