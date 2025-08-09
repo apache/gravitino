@@ -259,15 +259,15 @@ public class TypeUtils {
         case LIST:
           Types.ListType listType = (Types.ListType) type;
           DataType elementType = visit(listType.elementType());
-          DataType elementTypeWithNullability = listType.elementNullable() ? 
-              elementType.nullable() : elementType.notNull();
+          DataType elementTypeWithNullability =
+              listType.elementNullable() ? elementType.nullable() : elementType.notNull();
           return DataTypes.ARRAY(elementTypeWithNullability);
         case MAP:
           Types.MapType mapType = (Types.MapType) type;
           DataType keyType = visit(mapType.keyType());
           DataType valueType = visit(mapType.valueType());
-          DataType valueTypeWithNullability = mapType.valueNullable() ? 
-              valueType.nullable() : valueType.notNull();
+          DataType valueTypeWithNullability =
+              mapType.valueNullable() ? valueType.nullable() : valueType.notNull();
           return DataTypes.MAP(keyType, valueTypeWithNullability);
         case STRUCT:
           RowType.Builder builder = RowType.builder();
