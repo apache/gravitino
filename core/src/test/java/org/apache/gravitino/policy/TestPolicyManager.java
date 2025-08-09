@@ -389,11 +389,11 @@ public class TestPolicyManager {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
     PolicyContent content = PolicyContents.custom(customRules, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName1, content);
+    createCustomPolicy(METALAKE, policyName1, content, false);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName2, content);
+    createCustomPolicy(METALAKE, policyName2, content, false);
     String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName3, content);
+    createCustomPolicy(METALAKE, policyName3, content, false);
 
     // Test associate policies for catalog
     MetadataObject catalogObject =
@@ -436,6 +436,45 @@ public class TestPolicyManager {
                     METALAKE, catalogObject, policiesToAdd, null));
     Assertions.assertTrue(
         e.getMessage().contains("Failed to associate policies for metadata object"));
+
+    // Test associate multiple same type exclusive policies
+    String exclusivePolicyName1 =
+        "exclusive_policy_1_" + UUID.randomUUID().toString().replace("-", "");
+    createCustomPolicy(METALAKE, exclusivePolicyName1, content, "test_exclusive", true);
+    String exclusivePolicyName2 =
+        "exclusive_policy_2_" + UUID.randomUUID().toString().replace("-", "");
+    createCustomPolicy(METALAKE, exclusivePolicyName2, content, "test_exclusive", true);
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                policyManager.associatePoliciesForMetadataObject(
+                    METALAKE,
+                    catalogObject,
+                    new String[] {exclusivePolicyName1, exclusivePolicyName2},
+                    null));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("Cannot associate multiple exclusive policies of the same type"));
+
+    policies2 =
+        policyManager.associatePoliciesForMetadataObject(
+            METALAKE,
+            catalogObject,
+            new String[] {exclusivePolicyName1, exclusivePolicyName2},
+            new String[] {exclusivePolicyName2});
+    Assertions.assertEquals(3, policies2.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policyName2, policyName3, exclusivePolicyName1),
+        ImmutableSet.copyOf(policies2));
+
+    policies2 =
+        policyManager.associatePoliciesForMetadataObject(
+            METALAKE, catalogObject, null, new String[] {exclusivePolicyName1});
+    Assertions.assertEquals(2, policies2.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policyName2, policyName3), ImmutableSet.copyOf(policies2));
 
     // Test associate and disassociate non-existent policies for catalog
     String[] policies3 =
@@ -529,11 +568,11 @@ public class TestPolicyManager {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
     PolicyContent content = PolicyContents.custom(customRules, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName1, content);
+    createCustomPolicy(METALAKE, policyName1, content, false);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName2, content);
+    createCustomPolicy(METALAKE, policyName2, content, false);
     String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
-    createCustomPolicy(METALAKE, policyName3, content);
+    createCustomPolicy(METALAKE, policyName3, content, false);
 
     MetadataObject catalogObject =
         NameIdentifierUtil.toMetadataObject(
@@ -584,11 +623,11 @@ public class TestPolicyManager {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
     PolicyContent content = PolicyContents.custom(customRules, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
-    Policy policy1 = createCustomPolicy(METALAKE, policyName1, content);
+    Policy policy1 = createCustomPolicy(METALAKE, policyName1, content, false);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
-    Policy policy2 = createCustomPolicy(METALAKE, policyName2, content);
+    Policy policy2 = createCustomPolicy(METALAKE, policyName2, content, false);
     String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
-    Policy policy3 = createCustomPolicy(METALAKE, policyName3, content);
+    Policy policy3 = createCustomPolicy(METALAKE, policyName3, content, false);
 
     MetadataObject catalogObject =
         NameIdentifierUtil.toMetadataObject(
@@ -656,11 +695,11 @@ public class TestPolicyManager {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
     PolicyContent content = PolicyContents.custom(customRules, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
-    Policy policy1 = createCustomPolicy(METALAKE, policyName1, content);
+    Policy policy1 = createCustomPolicy(METALAKE, policyName1, content, false);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
-    Policy policy2 = createCustomPolicy(METALAKE, policyName2, content);
+    Policy policy2 = createCustomPolicy(METALAKE, policyName2, content, false);
     String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
-    Policy policy3 = createCustomPolicy(METALAKE, policyName3, content);
+    Policy policy3 = createCustomPolicy(METALAKE, policyName3, content, false);
 
     MetadataObject catalogObject =
         NameIdentifierUtil.toMetadataObject(
@@ -739,13 +778,27 @@ public class TestPolicyManager {
 
   private Policy createCustomPolicy(
       String metalakeName, String policyName, PolicyContent policyContent) {
+    return createCustomPolicy(metalakeName, policyName, policyContent, true);
+  }
+
+  private Policy createCustomPolicy(
+      String metalakeName, String policyName, PolicyContent policyContent, boolean exclusive) {
+    return createCustomPolicy(metalakeName, policyName, policyContent, "test", exclusive);
+  }
+
+  private Policy createCustomPolicy(
+      String metalakeName,
+      String policyName,
+      PolicyContent policyContent,
+      String policyType,
+      boolean exclusive) {
     return policyManager.createPolicy(
         metalakeName,
         policyName,
-        "test",
+        policyType,
         null,
         true,
-        true,
+        exclusive,
         true,
         SUPPORTS_ALL_OBJECT_TYPES,
         policyContent);

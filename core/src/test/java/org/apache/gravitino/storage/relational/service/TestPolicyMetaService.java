@@ -145,7 +145,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .build();
 
     Assertions.assertThrows(
-        Exception.class, () -> policyMetaService.insertPolicy(PolicyEntity2, false));
+        EntityAlreadyExistsException.class,
+        () -> policyMetaService.insertPolicy(PolicyEntity2, false));
 
     policyMetaService.insertPolicy(PolicyEntity2, true);
 
@@ -153,6 +154,29 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         policyMetaService.getPolicyByIdentifier(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy3"));
     Assertions.assertEquals(PolicyEntity2, resultPolicyEntity2);
+
+    // Test insert same type with different immutable attributes.
+    PolicyEntity policyEntity4 =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("policy4")
+            .withNamespace(PolicyEntity2.namespace())
+            .withComment(PolicyEntity2.comment())
+            .withPolicyType(PolicyEntity2.policyType())
+            .withContent(content)
+            .withExclusive(!PolicyEntity2.exclusive())
+            .withSupportedObjectTypes(PolicyEntity2.supportedObjectTypes())
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> policyMetaService.insertPolicy(policyEntity4, false));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("has inconsistent immutable attributes with existing policy"));
   }
 
   @Test

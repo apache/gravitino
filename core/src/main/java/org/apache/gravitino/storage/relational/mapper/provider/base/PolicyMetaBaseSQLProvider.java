@@ -73,6 +73,37 @@ public class PolicyMetaBaseSQLProvider {
         + "</script>";
   }
 
+  /**
+   * Lists all policy POs that are different from the given policy PO in terms of inheritable,
+   * exclusive, and supported object types. This is used to find policies that are have same policy
+   * type but different immutable attributes.
+   *
+   * @param metalakeId the ID of the metalake to filter policies by
+   * @param policyPO the policy PO to compare against (the policy ID and policy type are used for
+   *     filtering) (the inheritable, exclusive, and supported object types are used for comparison)
+   * @return a SQL query string that selects policy POs
+   */
+  public String listDiffPolicyPOsByMetalakeIdAndPolicy(
+      @Param("metalakeId") Long metalakeId, @Param("policy") PolicyPO policyPO) {
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"
+        + " pm.exclusive, pm.supported_object_types, pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
+        + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm JOIN "
+        + POLICY_VERSION_TABLE_NAME
+        + " pvi ON pm.policy_id = pvi.policy_id"
+        + " AND pm.current_version = pvi.version"
+        + " WHERE pm.metalake_id = #{metalakeId}"
+        + " AND pm.policy_id != #{policy.policyId}"
+        + " AND pm.policy_type = #{policy.policyType}"
+        + " AND (pm.inheritable != #{policy.inheritable} OR"
+        + " pm.exclusive != #{policy.exclusive} OR"
+        + " pm.supported_object_types != #{policy.supportedObjectTypes})"
+        + " AND pm.deleted_at = 0 AND pvi.deleted_at = 0";
+  }
+
   public String insertPolicyMetaOnDuplicateKeyUpdate(@Param("policyMeta") PolicyPO policyPO) {
     return "INSERT INTO "
         + POLICY_META_TABLE_NAME

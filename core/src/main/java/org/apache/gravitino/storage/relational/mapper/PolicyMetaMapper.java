@@ -82,6 +82,33 @@ public interface PolicyMetaMapper {
   List<PolicyPO> listPolicyPOsByMetalakeAndPolicyNames(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames);
 
+  @Results({
+    @Result(property = "policyId", column = "policy_id"),
+    @Result(property = "policyName", column = "policy_name"),
+    @Result(property = "policyType", column = "policy_type"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "inheritable", column = "inheritable"),
+    @Result(property = "exclusive", column = "exclusive"),
+    @Result(property = "supportedObjectTypes", column = "supported_object_types"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at"),
+    @Result(property = "policyVersionPO.id", column = "id"),
+    @Result(property = "policyVersionPO.metalakeId", column = "version_metalake_id"),
+    @Result(property = "policyVersionPO.policyId", column = "version_policy_id"),
+    @Result(property = "policyVersionPO.version", column = "version"),
+    @Result(property = "policyVersionPO.policyComment", column = "policy_comment"),
+    @Result(property = "policyVersionPO.enabled", column = "enabled"),
+    @Result(property = "policyVersionPO.content", column = "content"),
+    @Result(property = "policyVersionPO.deletedAt", column = "version_deleted_at")
+  })
+  @SelectProvider(
+      type = PolicyMetaSQLProviderFactory.class,
+      method = "listDiffPolicyPOsByMetalakeIdAndPolicy")
+  List<PolicyPO> listDiffPolicyPOsByMetalakeIdAndPolicy(
+      @Param("metalakeId") Long metalakeId, @Param("policy") PolicyPO policyPO);
+
   @InsertProvider(
       type = PolicyMetaSQLProviderFactory.class,
       method = "insertPolicyMetaOnDuplicateKeyUpdate")
