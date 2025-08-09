@@ -32,6 +32,7 @@ from fsspec.implementations.local import LocalFileSystem
 
 from gravitino import gvfs, NameIdentifier, Fileset
 from gravitino.auth.auth_constants import AuthConstants
+from gravitino.constants.timeout import TIMEOUT
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
     IllegalArgumentException,
@@ -94,6 +95,25 @@ class TestLocalFilesystem(unittest.TestCase):
         )
         headers = fs._operations._client._rest_client.request_headers
         self.assertEqual(headers["k1"], "v1")
+
+    def test_request_timeout(self, *mock_methods):
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090",
+            metalake_name="metalake_demo",
+            skip_instance_cache=True,
+        )
+        self.assertEqual(fs._operations._client._rest_client.timeout, TIMEOUT)
+
+        options = {
+            f"{GVFSConfig.GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX}request_timeout": 60,
+        }
+        fs = gvfs.GravitinoVirtualFileSystem(
+            server_uri="http://localhost:9090",
+            metalake_name="metalake_demo",
+            options=options,
+            skip_instance_cache=True,
+        )
+        self.assertEqual(fs._operations._client._rest_client.timeout, 60)
 
     def test_cache(self, *mock_methods):
         fileset_storage_location = f"{self._fileset_dir}/test_cache"

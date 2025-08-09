@@ -31,9 +31,8 @@ import json as _json
 
 from gravitino.auth.auth_constants import AuthConstants
 from gravitino.auth.auth_data_provider import AuthDataProvider
+from gravitino.client.gravitino_client_config import GravitinoClientConfig
 from gravitino.typing import JSONType
-
-from gravitino.constants.timeout import TIMEOUT
 
 from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
@@ -86,13 +85,16 @@ class HTTPClient:
         host,
         *,
         request_headers=None,
-        timeout=TIMEOUT,
+        client_config=None,
         is_debug=False,
         auth_data_provider: AuthDataProvider = None,
     ) -> None:
+        gravitino_client_config = GravitinoClientConfig.build_from_properties(
+            client_config
+        )
         self.host = host
         self.request_headers = request_headers or {}
-        self.timeout = timeout
+        self.timeout = gravitino_client_config.get_client_request_timeout()
         self.is_debug = is_debug
         self.auth_data_provider = auth_data_provider
 

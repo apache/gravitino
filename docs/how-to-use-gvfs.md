@@ -387,6 +387,13 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 | `hook_class`                    | The hook class to inject into the Gravitino Virtual File System. Users can implement their own `GravitinoVirtualFileSystemHook` and configure the class name in this conf to inject custom code.                                                                                                             | `gravitino.filesystem.gvfs_hook.NoOpHook`                            | No                                | 0.9.0-incubating |
 | `client_request_header_`        | The configuration key prefix for the Gravitino client request header. You can set the request header for the Gravitino client.                                                                                                                                                                               | (none)                                                               | No                                | 0.9.0-incubating |
 | `enable_credential_vending`     | Whether to enable credential vending for the Gravitino Virtual File System.                                                                                                                                                                                                                                  | `false`                                                              | No                                | 0.9.0-incubating |
+| `gvfs_gravitino_client_`        | The configuration key prefix for the Gravitino client. You can set the config for the Gravitino client.                                                                                                                                                                                                      | (none)                                                               | No                                | 1.0.0            |
+
+To configure the Gravitino Python client, use properties prefixed with `gvfs_gravitino_client_`. These properties undergo automatic transformation: the prefix is replaced with `gravitino_client_` and passed to the Gravitino Python client.
+
+**Example:** Setting `gvfs_gravitino_client_request_timeout` is equivalent to setting `gravitino_client_request_timeout` for the Gravitino Python client.
+
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Python client configurations](./how-to-use-gravitino-client.md#gravitino-python-client-configuration) for more support client configuration.
 
 #### Configurations for S3, GCS, OSS and Azure Blob storage fileset
 
