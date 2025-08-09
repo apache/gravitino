@@ -38,22 +38,28 @@ public class GravitinoCatalogManager {
   private final GravitinoMetalake metalake;
   private final GravitinoAdminClient gravitinoClient;
 
-  private GravitinoCatalogManager(String gravitinoUri, String metalakeName) {
-    this.gravitinoClient = GravitinoAdminClient.builder(gravitinoUri).build();
+  private GravitinoCatalogManager(
+      String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
+    this.gravitinoClient =
+        GravitinoAdminClient.builder(gravitinoUri).withClientConfig(gravitinoClientConfig).build();
     this.metalake = gravitinoClient.loadMetalake(metalakeName);
   }
 
   /**
-   * Create GravitinoCatalogManager with Gravitino server uri and metalake name.
+   * Create GravitinoCatalogManager with Gravitino server uri, metalake name and client properties
+   * map.
    *
    * @param gravitinoUri Gravitino server uri
    * @param metalakeName Metalake name
+   * @param gravitinoClientConfig Gravitino client properties map
    * @return GravitinoCatalogManager
    */
-  public static GravitinoCatalogManager create(String gravitinoUri, String metalakeName) {
+  public static GravitinoCatalogManager create(
+      String gravitinoUri, String metalakeName, Map<String, String> gravitinoClientConfig) {
     Preconditions.checkState(
         gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager = new GravitinoCatalogManager(gravitinoUri, metalakeName);
+    gravitinoCatalogManager =
+        new GravitinoCatalogManager(gravitinoUri, metalakeName, gravitinoClientConfig);
     return gravitinoCatalogManager;
   }
 

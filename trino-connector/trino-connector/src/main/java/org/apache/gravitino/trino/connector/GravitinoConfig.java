@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -126,6 +129,13 @@ public class GravitinoConfig {
           "false",
           false);
 
+  private static final ConfigEntry GRAVITINO_CLIENT_CONFIG =
+      new ConfigEntry(
+          "gravitino.client.config",
+          "The config for Grivitino client, specified as a list of key-value pairs",
+          "",
+          false);
+
   /**
    * Constructs a new GravitinoConfig with the specified configuration.
    *
@@ -165,6 +175,28 @@ public class GravitinoConfig {
    */
   public String getMetalake() {
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
+  }
+
+  /**
+   * Retrieves the config for Grivitino client.
+   *
+   * @return the config properties map
+   */
+  public Map<String, String> getClientConfig() {
+    String configStr =
+        config.getOrDefault(GRAVITINO_CLIENT_CONFIG.key, GRAVITINO_CLIENT_CONFIG.defaultValue);
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    if (!configStr.isEmpty()) {
+      Splitter configEntrySplitter = Splitter.on(',').trimResults().omitEmptyStrings();
+      Splitter nameValueSplitter = Splitter.on('=').trimResults().omitEmptyStrings();
+      for (String configEntry : configEntrySplitter.splitToList(configStr)) {
+        List<String> nameValue = nameValueSplitter.splitToList(configEntry);
+        Preconditions.checkArgument(
+            nameValue.size() == 2, "Invalid client config: %s", configEntry);
+        builder.put(nameValue.get(0), nameValue.get(1));
+      }
+    }
+    return builder.build();
   }
 
   /**
