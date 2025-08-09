@@ -51,6 +51,16 @@ class ShellJobTemplate(JobTemplate):
         """
         return JobType.SHELL
 
+    @staticmethod
+    def builder() -> "ShellJobTemplate.Builder":
+        """
+        Creates a new builder instance for constructing a ShellJobTemplate.
+
+        Returns:
+            ShellJobTemplate.Builder: A new builder instance.
+        """
+        return ShellJobTemplate.Builder()
+
     def __eq__(self, other: Any) -> bool:
         if not super().__eq__(other):
             return False

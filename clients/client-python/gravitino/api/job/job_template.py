@@ -28,10 +28,41 @@ class JobType(Enum):
     required to determine the runtime environment for executing the job.
     """
 
-    SPARK = "SPARK"
+    SPARK = "spark"
     """job type for executing Spark jobs"""
-    SHELL = "SHELL"
+    SHELL = "shell"
     """job type for executing shell commands"""
+
+    @classmethod
+    def job_type_serialize(cls, job_type: "JobType") -> str:
+        """
+        Serializes the JobType to a string.
+
+        Args:
+            job_type: The JobType to serialize.
+
+        Returns:
+            The serialized string representation of the JobType.
+        """
+        return job_type.value.lower()
+
+    @classmethod
+    def job_type_deserialize(cls, job_type_str: str) -> "JobType":
+        """
+        Deserializes a string to a JobType.
+
+        Args:
+            job_type_str: The string representation of the JobType.
+
+        Returns:
+            The JobType corresponding to the string.
+        """
+        for m in cls:
+            if m.value.lower() == job_type_str.lower():
+                return m
+
+        # If no match found, raise an error
+        raise ValueError(f"Invalid job type string: {job_type_str}")
 
 
 T = TypeVar("T", bound="JobTemplate")
