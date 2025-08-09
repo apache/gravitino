@@ -624,12 +624,32 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             ? Collections.emptyMap()
             : IntStream.range(0, tableFromCatalog.columns().length)
                 .mapToObj(i -> Pair.of(i, tableFromCatalog.columns()[i]))
-                .collect(Collectors.toMap(p -> p.getRight().name(), Function.identity()));
+                .collect(
+                    Collectors.toMap(
+                        p -> p.getRight().name(),
+                        Function.identity(),
+                        (existing, replacement) -> {
+                          LOG.warn(
+                              "Duplicate column name '{}' found at position {} and {}, using the first occurrence",
+                              existing.getRight().name(),
+                              existing.getLeft(),
+                              replacement.getLeft());
+                          return existing;
+                        }));
     Map<String, ColumnEntity> columnsFromTableEntity =
         tableFromGravitino.columns() == null
             ? Collections.emptyMap()
             : tableFromGravitino.columns().stream()
-                .collect(Collectors.toMap(ColumnEntity::name, Function.identity()));
+                .collect(
+                    Collectors.toMap(
+                        ColumnEntity::name,
+                        Function.identity(),
+                        (existing, replacement) -> {
+                          LOG.warn(
+                              "Duplicate column name '{}' found in table entity, using the existing one",
+                              existing.name());
+                          return existing;
+                        }));
 
     // Check if columns need to be updated in Gravitino store
     List<ColumnEntity> columnsToInsert = Lists.newArrayList();

@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -254,6 +255,56 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("test", tableImportedEntity.auditInfo().creator());
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTable4.auditInfo().creator());
+
+    // Case 5: Test loading table with duplicate columns
+    NameIdentifier tableIdentDup = NameIdentifier.of(tableNs, "table_dup_cols");
+    Column[] dupColumns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2")
+              .withPosition(1)
+              .withType(Types.StringType.get())
+              .build(),
+          TestColumn.builder()
+              .withName("col2") // Duplicate column
+              .withPosition(2)
+              .withType(Types.IntegerType.get())
+              .build()
+        };
+
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations catalogOps = (TestCatalogOperations) testCatalog.ops();
+
+    // Create table with duplicate columns directly in catalog
+    catalogOps.createTable(
+        tableIdentDup,
+        dupColumns,
+        "table with dup cols",
+        props,
+        new Transform[0],
+        null,
+        null,
+        null);
+
+    // Load the table - should not throw exception due to duplicate columns
+    Table loadedTableDup = tableOperationDispatcher.loadTable(tableIdentDup);
+    Assertions.assertNotNull(loadedTableDup);
+
+    // Verify the table entity in store has correct columns (duplicates handled)
+    TableEntity tableEntityDup = entityStore.get(tableIdentDup, TABLE, TableEntity.class);
+    // Should have only 2 unique columns (col1 and col2)
+    Assertions.assertEquals(2, tableEntityDup.columns().size());
+    Set<String> uniqueColNames =
+        tableEntityDup.columns().stream().map(ColumnEntity::name).collect(Collectors.toSet());
+    Assertions.assertEquals(2, uniqueColNames.size());
+    Assertions.assertTrue(uniqueColNames.contains("col1"));
+    Assertions.assertTrue(uniqueColNames.contains("col2"));
   }
 
   @Test
