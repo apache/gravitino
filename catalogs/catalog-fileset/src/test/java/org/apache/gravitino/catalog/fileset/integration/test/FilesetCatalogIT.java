@@ -451,6 +451,23 @@ public class FilesetCatalogIT extends BaseIT {
         createFileset(filesetName3, "comment", null, storageLocation3, ImmutableMap.of("k1", "v1"));
     assertFilesetExists(filesetName3);
     Assertions.assertEquals(MANAGED, fileset3.type(), "fileset type should be MANAGED by default");
+
+    // Test create fileset with a single file
+    String filesetName7 = "test_create_fileset_with_a_file";
+    String storageLocation7 = storageLocation(filesetName7);
+    String filePath = storageLocation7 + "/file1.txt";
+    fileSystem.createNewFile(new Path(filePath));
+    Assertions.assertTrue(fileSystem.getFileStatus(new Path(filePath)).isFile());
+
+    Throwable throwable =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> {
+              createFileset(
+                  filesetName7, "comment", MANAGED, filePath, ImmutableMap.of("k1", "v1"));
+            });
+
+    Assertions.assertTrue(throwable.getMessage().contains("Fileset location cannot be a file"));
   }
 
   @Test

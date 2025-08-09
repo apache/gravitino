@@ -117,8 +117,10 @@ Refer to [Drop a catalog](./manage-relational-metadata-using-gravitino.md#drop-a
 in relational catalog for more details. For a fileset catalog, the drop operation is the same.
 
 :::note
-Currently, Gravitino doesn't support dropping a catalog with schemas and filesets under it. You have
+- Currently, Gravitino doesn't support dropping a catalog with schemas and filesets under it. You have
 to drop all the schemas and filesets under the catalog before dropping the catalog.
+- The value of location property in a catalog should be a directory on a file system
+  (HDFS) or path prefix on a cloud storage (S3, GCS, etc.).** The same goes for schema and fileset.
 :::
 
 ### List all catalogs in a metalake
