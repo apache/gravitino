@@ -135,8 +135,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         tableIdentifier);
 
     Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
-    LOG.debug(
-        "Inject credential config: {} for Iceberg table: {}", credentialConfig, tableIdentifier);
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())
