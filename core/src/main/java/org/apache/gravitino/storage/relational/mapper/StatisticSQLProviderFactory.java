@@ -74,11 +74,11 @@ public class StatisticSQLProviderFactory {
   }
 
   public static String softDeleteStatisticsByObjectId(@Param("objectId") Long objectId) {
-    return getProvider().softDeleteStatisticsByObjectId(objectId);
+    return getProvider().softDeleteStatisticsByEntityId(objectId);
   }
 
   public static String listStatisticPOsByObjectId(@Param("objectId") Long objectId) {
-    return getProvider().listStatisticPOsByObjectId(objectId);
+    return getProvider().listStatisticPOsByEntityId(objectId);
   }
 
   public static String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {

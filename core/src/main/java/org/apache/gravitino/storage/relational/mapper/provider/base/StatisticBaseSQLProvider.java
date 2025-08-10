@@ -55,7 +55,7 @@ public class StatisticBaseSQLProvider {
   }
 
   public String batchDeleteStatisticPOs(
-      @Param("objectId") Long objectId, @Param("statisticNames") List<String> statisticNames) {
+      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
     String statisticsCondition =
         statisticNames.stream().map(stat -> "'" + stat + "'").collect(Collectors.joining(", "));
     return "UPDATE "
@@ -66,23 +66,23 @@ public class StatisticBaseSQLProvider {
         + "("
         + statisticsCondition
         + ")"
-        + " AND deleted_at = 0 AND metadata_object_id = #{objectId})";
+        + " AND deleted_at = 0 AND metadata_object_id = #{entityId})";
   }
 
-  public String softDeleteStatisticsByObjectId(@Param("objectId") Long objectId) {
+  public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
     return "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
-        + " WHERE metadata_object_id = #{objectId} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0";
   }
 
-  public String listStatisticPOsByObjectId(@Param("objectId") Long objectId) {
+  public String listStatisticPOsByEntityId(@Param("entityId") Long entityId) {
     return "SELECT statistic_id as statisticId, statistic_name as statisticName, metalake_id as metalakeId,"
         + " statistic_value as statisticValue, metadata_object_id as metadataObjectId,"
         + "metadata_object_type as metadataObjectType, audit_info as auditInfo,"
         + "current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
         + STATISTIC_META_TABLE_NAME
-        + " WHERE metadata_object_id = #{objectId} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0";
   }
 
   public String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {

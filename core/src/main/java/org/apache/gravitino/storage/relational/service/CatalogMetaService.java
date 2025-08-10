@@ -315,7 +315,7 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   StatisticMetaMapper.class,
-                  mapper -> mapper.softDeleteStatisticsByObjectId(catalogId)),
+                  mapper -> mapper.softDeleteStatisticsByEntityId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
                   PolicyMetadataObjectRelMapper.class,

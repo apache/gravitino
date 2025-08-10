@@ -244,7 +244,7 @@ public class TableMetaService {
 
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByObjectId(tableId));
+                mapper -> mapper.softDeleteStatisticsByEntityId(tableId));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tableId));

@@ -324,7 +324,7 @@ public class SchemaMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     StatisticMetaMapper.class,
-                    mapper -> mapper.softDeleteStatisticsByObjectId(schemaId)),
+                    mapper -> mapper.softDeleteStatisticsByEntityId(schemaId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     PolicyMetadataObjectRelMapper.class,

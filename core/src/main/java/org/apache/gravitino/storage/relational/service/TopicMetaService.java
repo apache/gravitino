@@ -209,7 +209,7 @@ public class TopicMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByObjectId(topicId)),
+                mapper -> mapper.softDeleteStatisticsByEntityId(topicId)),
         () ->
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,

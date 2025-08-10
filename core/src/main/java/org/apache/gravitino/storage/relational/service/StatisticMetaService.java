@@ -49,11 +49,11 @@ public class StatisticMetaService {
         MetalakeMetaService.getInstance()
             .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
     MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
-    long objectId =
+    long entityId =
         MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
-            StatisticMetaMapper.class, mapper -> mapper.listStatisticPOsByObjectId(objectId));
+            StatisticMetaMapper.class, mapper -> mapper.listStatisticPOsByEntityId(entityId));
     return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
@@ -66,14 +66,9 @@ public class StatisticMetaService {
       return;
     }
     Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-    Long objectId;
     MetadataObject object = NameIdentifierUtil.toMetadataObject(entity, type);
-    if (type == Entity.EntityType.METALAKE) {
-      objectId = metalakeId;
-    } else {
-      objectId =
-          MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
-    }
+    Long objectId =
+        MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
 
     List<StatisticPO> pos =
         StatisticPO.initializeStatisticPOs(statisticEntities, metalakeId, objectId, object.type());
@@ -87,17 +82,12 @@ public class StatisticMetaService {
       return 0;
     }
     Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-    Long objectId;
-    if (object.type() == MetadataObject.Type.METALAKE) {
-      objectId = metalakeId;
-    } else {
-      objectId =
-          MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
-    }
+    Long entityId =
+        MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
 
     return SessionUtils.doWithCommitAndFetchResult(
         StatisticMetaMapper.class,
-        mapper -> mapper.batchDeleteStatisticPOs(objectId, statisticNames));
+        mapper -> mapper.batchDeleteStatisticPOs(entityId, statisticNames));
   }
 
   public int deleteStatisticsByLegacyTimeline(long legacyTimeline, int limit) {

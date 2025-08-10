@@ -30,20 +30,20 @@ public interface StatisticMetaMapper {
 
   String STATISTIC_META_TABLE_NAME = "statistic_meta";
 
-  @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByObjectId")
-  List<StatisticPO> listStatisticPOsByObjectId(@Param("objectId") long objectId);
+  @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByEntityId")
+  List<StatisticPO> listStatisticPOsByEntityId(@Param("entityId") long entityId);
 
   @InsertProvider(type = StatisticSQLProviderFactory.class, method = "batchInsertStatisticPOs")
   void batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);
 
   @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
   Integer batchDeleteStatisticPOs(
-      @Param("objectId") Long objectId, @Param("statisticNames") List<String> statisticNames);
+      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames);
 
   @UpdateProvider(
       type = StatisticSQLProviderFactory.class,
-      method = "softDeleteStatisticsByObjectId")
-  Integer softDeleteStatisticsByObjectId(@Param("objectId") Long objectId);
+      method = "softDeleteStatisticsByEntityId")
+  Integer softDeleteStatisticsByEntityId(@Param("entityId") Long entityId);
 
   @UpdateProvider(
       type = StatisticSQLProviderFactory.class,

@@ -162,7 +162,7 @@ public class ModelMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByObjectId(modelId)),
+                mapper -> mapper.softDeleteStatisticsByEntityId(modelId)),
         () ->
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
