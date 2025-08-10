@@ -86,6 +86,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.RelationalBackend;
@@ -312,7 +313,7 @@ public class TestEntityStorage {
           TestJDBCBackend.createModelVersionEntity(
               model1.nameIdentifier(),
               0,
-              "model_path",
+              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
               ImmutableList.of("alias1", "alias2"),
               null,
               null,
@@ -705,7 +706,7 @@ public class TestEntityStorage {
           TestJDBCBackend.createModelVersionEntity(
               model1.nameIdentifier(),
               0,
-              "model_path",
+              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
               ImmutableList.of("alias1", "alias2"),
               null,
               null,
@@ -745,7 +746,7 @@ public class TestEntityStorage {
           TestJDBCBackend.createModelVersionEntity(
               model1InSchema2.nameIdentifier(),
               0,
-              "model_path",
+              ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
               ImmutableList.of("alias1", "alias2"),
               null,
               null,

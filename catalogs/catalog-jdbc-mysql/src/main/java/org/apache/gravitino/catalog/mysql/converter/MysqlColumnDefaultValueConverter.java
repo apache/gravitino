@@ -24,6 +24,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -49,7 +50,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     }
 
     if (isExpression) {
-      if (columnDefaultValue.equals(CURRENT_TIMESTAMP)) {
+      if (columnDefaultValue.startsWith(CURRENT_TIMESTAMP)) {
         return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
       }
       // The parsing of MySQL expressions is complex, so we are not currently undertaking the
@@ -78,19 +79,26 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.floatLiteral(Float.valueOf(columnDefaultValue));
       case MysqlTypeConverter.DOUBLE:
         return Literals.doubleLiteral(Double.valueOf(columnDefaultValue));
+      case MysqlTypeConverter.DECIMAL_UNSIGNED:
       case MysqlTypeConverter.DECIMAL:
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));
       case JdbcTypeConverter.DATE:
         return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case JdbcTypeConverter.TIME:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
-        return CURRENT_TIMESTAMP.equals(columnDefaultValue)
-            ? DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
-            : Literals.timestampLiteral(
-                LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        if (columnDefaultValue.startsWith(CURRENT_TIMESTAMP)) {
+          return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+        }
+        try {
+          return Literals.timestampLiteral(
+              LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
+        } catch (DateTimeParseException e) {
+          throw new IllegalArgumentException(
+              String.format("Unable to parse datetime value: %s", columnDefaultValue));
+        }
       case JdbcTypeConverter.VARCHAR:
         return Literals.of(columnDefaultValue, Types.VarCharType.of(type.getColumnSize()));
       case MysqlTypeConverter.CHAR:

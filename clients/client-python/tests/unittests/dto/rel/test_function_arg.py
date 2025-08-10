@@ -19,6 +19,8 @@ import unittest
 
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
+from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
+from gravitino.dto.rel.expressions.func_expression_dto import FuncExpressionDTO
 from gravitino.dto.rel.expressions.function_arg import FunctionArg
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 
@@ -32,12 +34,12 @@ class TestFunctionArg(unittest.TestCase):
         ]
         self._column_names = [f"column{i}" for i in range(len(self._data_types))]
         self._columns = [
-            ColumnDTO.builder(
-                name=column_name,
-                data_type=data_type,
-                comment=f"{column_name} comment",
-                nullable=False,
-            )
+            ColumnDTO.builder()
+            .with_name(name=column_name)
+            .with_data_type(data_type=data_type)
+            .with_comment(comment=f"{column_name} comment")
+            .with_nullable(nullable=False)
+            .build()
             for column_name, data_type in zip(self._column_names, self._data_types)
         ]
 
@@ -45,7 +47,21 @@ class TestFunctionArg(unittest.TestCase):
         self.assertEqual(FunctionArg.EMPTY_ARGS, [])
 
     def test_function_arg_validate(self):
-        LiteralDTO(data_type=Types.StringType.get(), value="test").validate(
+        literal_dto = (
+            LiteralDTO.builder()
+            .with_data_type(Types.StringType.get())
+            .with_value("test")
+            .build()
+        )
+        literal_dto.validate(columns=self._columns)
+
+        field_ref_dto = (
+            FieldReferenceDTO.builder().with_column_name(self._column_names).build()
+        )
+        field_ref_dto.validate(columns=self._columns)
+
+        FuncExpressionDTO.builder().with_function_name(
+            "test_function"
+        ).with_function_args([field_ref_dto, literal_dto]).build().validate(
             columns=self._columns
         )
-        # TODO: add unit test for FunctionArg with children

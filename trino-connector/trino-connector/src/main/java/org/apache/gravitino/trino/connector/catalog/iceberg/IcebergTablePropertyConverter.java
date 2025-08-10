@@ -47,4 +47,9 @@ public class IcebergTablePropertyConverter extends PropertyConverter {
     // no matter what the mapping is, the properties will be empty.
     return TRINO_KEY_TO_GRAVITINO_KEY;
   }
+
+  public static String convertTableFormatToTrino(String format) {
+    format = format.replace("iceberg/", "");
+    return format.toUpperCase();
+  }
 }

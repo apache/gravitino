@@ -35,12 +35,29 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 #### S3 IRSA credential
 
-A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments.
+A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments. This provider supports both basic IRSA credentials and fine-grained path-based access control with dynamically generated IAM policies.
 
+**Features:**
+- **Basic IRSA mode**: Returns credentials with full permissions of the associated IAM role (for non-path-based contexts)
+- **Fine-grained mode**: Generates path-specific credentials with minimal required permissions (for table access with `X-Iceberg-Access-Delegation: vended-credentials`)
+- **Automatic policy generation**: Creates custom IAM policies scoped to specific table paths including data, metadata, and write locations
+- **EKS integration**: Leverages existing IRSA setup while providing enhanced security through path-based restrictions
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations  | Description                                  | Default value | Required | Since Version    |
-|-------------------------------------|-----------------------------------------------|----------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers` | `aws-irsa` for AWS IRSA credential provider. | (none)        | Yes      | 0.X.0-incubating |
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations  | Description                                                                                        | Default value | Required | Since Version    |
+|-------------------------------------|-----------------------------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers` | `aws-irsa` for AWS IRSA credential provider.                                                       | (none)        | Yes      | 0.X.0-incubating |
+| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`          | The ARN of the IAM role to assume. Required for fine-grained path-based access control.           | (none)        | Yes*     | 0.X.0-incubating |
+| `s3-region`                         | `gravitino.iceberg-rest.s3-region`            | The AWS region for STS operations. Used for fine-grained access control.                          | (none)        | No       | 0.X.0-incubating |
+| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs` | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       | 0.X.0-incubating |
+| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services. | (none)        | No       | 0.X.0-incubating |
+
+**Note**: `s3-role-arn` is required only when using fine-grained path-based access control with vended credentials. For basic IRSA usage without path restrictions, only `credential-providers=aws-irsa` is needed.
+
+**Prerequisites for fine-grained mode:**
+- EKS cluster with IRSA properly configured
+- `AWS_WEB_IDENTITY_TOKEN_FILE` environment variable pointing to the service account token
+- IAM role with permissions to assume the target role specified in `s3-role-arn`
+- Target IAM role with necessary S3 permissions for the data locations
 
 #### S3 secret key credential
 
@@ -198,3 +215,44 @@ gravitino.iceberg-rest.s3-role-arn = {role_arn}
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/ \
 --conf spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation=vended-credentials
 ```
+
+### Credential vending for Iceberg REST server with AWS IRSA (EKS)
+
+For EKS environments using IRSA with fine-grained path-based access control:
+
+1. Download the [Gravitino AWS bundle jar without hadoop packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws), and place it to the classpath of Iceberg REST server.
+
+2. Configure the Iceberg REST server with AWS IRSA credentials:
+
+```
+gravitino.iceberg-rest.warehouse = s3://{bucket_name}/{warehouse_path}
+gravitino.iceberg-rest.io-impl = org.apache.iceberg.aws.s3.S3FileIO
+gravitino.iceberg-rest.credential-providers = aws-irsa
+gravitino.iceberg-rest.s3-role-arn = arn:aws:iam::{account-id}:role/{role-name}
+gravitino.iceberg-rest.s3-region = {region_name}
+gravitino.iceberg-rest.s3-token-expire-in-secs = 3600
+```
+
+3. Ensure your EKS pod has the proper IRSA configuration:
+   - Service account annotated with the IAM role ARN
+   - `AWS_WEB_IDENTITY_TOKEN_FILE` environment variable set (automatically by EKS)
+   - IAM role with permissions to assume the target role specified in `s3-role-arn`
+
+4. Access Iceberg tables with automatic path-based credential scoping:
+
+```shell
+./bin/spark-sql -v \
+--packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1 \
+--conf spark.jars={path}/iceberg-aws-bundle-1.5.2.jar \
+--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+--conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog  \
+--conf spark.sql.catalog.rest.type=rest  \
+--conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/ \
+--conf spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation=vended-credentials
+```
+
+**Security Benefits:**
+- Each client request receives credentials scoped only to the specific table paths being accessed
+- Automatic policy generation limits access to table location, metadata location, and write data location
+- No need to pre-configure table-specific IAM roles or policies
+- Combines IRSA convenience with fine-grained access control

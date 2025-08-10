@@ -16,7 +16,7 @@ To connect to MySQL, you need:
 
 ## Create table
 
-At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, and comments. However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
+At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, comments, primary keys and indexes. However, it does not support advanced features like default values and auto-increment.
 
 The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
 
@@ -36,7 +36,16 @@ Currently, it doesn't support certain query optimizations, such as indexes and p
 
 ## Table and Schema properties
 
-MySQL's tables and schemas cannot support properties.
+MySQL's schemas cannot support properties.
+
+The following are supported MySQL table properties:
+
+| Property name                      | Type   | Default Value  | Description                                                                                                                             | Required | Since Version |
+|------------------------------------|--------|----------------|-----------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
+| engine                             | string | InnoDB         | The engine that MySQL table uses.                                                                                                       | No       | 0.4.0         |
+| auto_increment_offset              | string | (none)         | The auto increment offset for the table.                                                                                                | No       | 0.4.0         |
+| primary_key                        | list   | (none)         | The primary keys for the table, can choose multi columns as the table primary key. All key columns must be defined as `NOT NULL`.       | No       | 1.0.0         |
+| unique_key                         | list   | (none)         | The unique keys for the table, can choose multi columns for multi unique key. Each unique key should be defined as `keyName:col1,col2`. | No       | 1.0.0         |
 
 ## Basic usage examples
 
@@ -113,6 +122,25 @@ CREATE TABLE mysql_test.database_01.table_01
 (
 name varchar,
 salary int
+);
+```
+
+Create a new table named `table_index` in schema `mysql_test.database_01` with primary keys and indexes.
+
+```sql
+CREATE TABLE mysql_test.database_01.table_index (
+   key1 integer NOT NULL,
+   key2 integer,
+   key3 integer,
+   key4 integer,
+   key5 integer NOT NULL,
+   col1 integer
+)
+COMMENT ''
+WITH (
+   engine = 'InnoDB',
+   primary_key = ARRAY['key5','key1'],
+   unique_key = ARRAY['unique_key1:key2','unique_key2:key4,key3']
 );
 ```
 

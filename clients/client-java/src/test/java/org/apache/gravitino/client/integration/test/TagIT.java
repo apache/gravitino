@@ -434,7 +434,7 @@ public class TagIT extends BaseIT {
 
     // Test list associated tags with details for schema
     Tag[] tags2 = schema.supportsTags().listTagsInfo();
-    Assertions.assertEquals(3, tags2.length);
+    Assertions.assertEquals(2, tags2.length);
 
     Set<Tag> nonInheritedTags =
         Arrays.stream(tags2).filter(tag -> !tag.inherited().get()).collect(Collectors.toSet());
@@ -442,10 +442,9 @@ public class TagIT extends BaseIT {
         Arrays.stream(tags2).filter(tag -> tag.inherited().get()).collect(Collectors.toSet());
 
     Assertions.assertEquals(2, nonInheritedTags.size());
-    Assertions.assertEquals(1, inheritedTags.size());
+    Assertions.assertEquals(0, inheritedTags.size());
     Assertions.assertTrue(nonInheritedTags.contains(tag1));
     Assertions.assertTrue(nonInheritedTags.contains(tag2));
-    Assertions.assertTrue(inheritedTags.contains(tag1));
     Assertions.assertFalse(inheritedTags.contains(tag2));
 
     // Test get associated tag for schema
@@ -671,9 +670,9 @@ public class TagIT extends BaseIT {
     Assertions.assertTrue(tagNames.contains(tag2.name()));
     Assertions.assertFalse(tagNames.contains(tag3.name()));
 
-    Tag retrivedTag = relationalCatalog.supportsTags().getTag(tag2.name());
-    Assertions.assertEquals(tag2.name(), retrivedTag.name());
-    Assertions.assertEquals(tag2.comment(), retrivedTag.comment());
+    Tag retrievedTag = relationalCatalog.supportsTags().getTag(tag2.name());
+    Assertions.assertEquals(tag2.name(), retrievedTag.name());
+    Assertions.assertEquals(tag2.comment(), retrievedTag.comment());
 
     boolean deleted = metalake.deleteTag("null");
     Assertions.assertFalse(deleted);

@@ -102,7 +102,7 @@ public class TestIcebergCatalogPropertyConverter {
             .put("catalog-backend", "hive")
             .put("warehouse", "hdfs://tmp/warehouse")
             .put("unknown-key", "1")
-            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.iceberg.unknown-key", "1")
             .put("trino.bypass.iceberg.table-statistics-enabled", "true")
             .build();
     Catalog mockCatalog =
@@ -121,16 +121,18 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("unknown-key"));
+    Assertions.assertEquals(config.get("iceberg.unknown-key"), "1");
   }
 
   @Test
   @SuppressWarnings("unchecked")
   public void testBuildConnectorPropertiesWithMySqlBackEnd() throws Exception {
     String name = "test_catalog";
+    // trino.bypass properties will be skipped when the catalog properties is defined by Gravitino
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
+            .put("trino.bypass.iceberg.jdbc-catalog.connection-url", "skip_value")
             .put("uri", "jdbc:mysql://%s:3306/metastore_db?createDatabaseIfNotExist=true")
             .put("catalog-backend", "jdbc")
             .put("warehouse", "://tmp/warehouse")
@@ -138,8 +140,9 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-password", "ds123")
             .put("jdbc-driver", "com.mysql.cj.jdbc.Driver")
             .put("unknown-key", "1")
-            .put("trino.bypass.unknown-key", "1")
+            .put("trino.bypass.iceberg.unknown-key", "1")
             .put("trino.bypass.iceberg.table-statistics-enabled", "true")
+            .put("trino.bypass.iceberg.jdbc-catalog.connection-user", "skip_value")
             .build();
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
@@ -163,7 +166,7 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(config.get("iceberg.table-statistics-enabled"), "true");
 
     // test unknown properties
-    Assertions.assertNull(config.get("hive.unknown-key"));
-    Assertions.assertNull(config.get("trino.bypass.unknown-key"));
+    Assertions.assertNull(config.get("unknown-key"));
+    Assertions.assertEquals(config.get("iceberg.unknown-key"), "1");
   }
 }

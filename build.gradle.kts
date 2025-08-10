@@ -286,8 +286,6 @@ subprojects {
         languageVersion.set(JavaLanguageVersion.of(17))
       } else {
         languageVersion.set(JavaLanguageVersion.of(extra["jdkVersion"].toString().toInt()))
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
       }
     }
   }
@@ -853,7 +851,7 @@ tasks {
         dependsOn("${it.name}:build")
         from("${it.name}/build/libs") {
           include("*.jar")
-          exclude("*-jcstress.jar")
+          exclude("*-jcstress.jar", "*-jmh.jar")
         }
         into("distribution/package/libs")
         setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
@@ -869,6 +867,7 @@ tasks {
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-oceanbase:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-starrocks:copyLibAndConfig",
       ":catalogs:catalog-kafka:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-hudi:copyLibAndConfig",
       ":catalogs:catalog-lakehouse-iceberg:copyLibAndConfig",

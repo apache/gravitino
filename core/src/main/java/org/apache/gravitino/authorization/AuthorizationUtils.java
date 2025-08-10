@@ -495,7 +495,7 @@ public class AuthorizationUtils {
                   if (StringUtils.isNotBlank(schemaLocation)) {
                     locations.add(schemaLocation);
                   } else if (catalogObj.properties().containsKey(FILESET_CATALOG_LOCATION)) {
-                    String catalogLocation = schema.properties().get(FILESET_CATALOG_LOCATION);
+                    String catalogLocation = catalogObj.properties().get(FILESET_CATALOG_LOCATION);
                     if (StringUtils.isNotBlank(catalogLocation)) {
                       schemaLocation = catalogLocation + "/" + schema.name();
                       locations.add(schemaLocation);

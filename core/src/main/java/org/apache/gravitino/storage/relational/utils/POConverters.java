@@ -20,12 +20,15 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -48,6 +51,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -55,6 +59,8 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
@@ -71,6 +77,9 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
+import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
+import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
@@ -84,8 +93,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
 public class POConverters {
-  private static final long INIT_VERSION = 1L;
-  private static final long DEFAULT_DELETED_AT = 0L;
+  public static final long INIT_VERSION = 1L;
+  public static final long DEFAULT_DELETED_AT = 0L;
 
   private POConverters() {}
 
@@ -669,6 +678,78 @@ public class POConverters {
       return !oldProperties.equals(newFileset.properties());
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static boolean checkPolicyVersionNeedUpdate(
+      PolicyVersionPO oldPolicyVersionPO, PolicyEntity newPolicy) {
+    if (!StringUtils.equals(oldPolicyVersionPO.getPolicyComment(), newPolicy.comment())
+        || oldPolicyVersionPO.isEnabled() != newPolicy.enabled()) {
+      return true;
+    }
+
+    try {
+      PolicyContent oldContent =
+          JsonUtils.anyFieldMapper()
+              .readValue(
+                  oldPolicyVersionPO.getContent(),
+                  Policy.BuiltInType.fromPolicyType(newPolicy.policyType()).contentClass());
+      if (oldContent == null) {
+        return newPolicy.content() != null;
+      }
+      return !oldContent.equals(newPolicy.content());
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static PolicyPO updatePolicyPOWithVersion(
+      PolicyPO oldPolicyPO, PolicyEntity newPolicy, boolean needUpdateVersion) {
+    try {
+      Long lastVersion = oldPolicyPO.getLastVersion();
+      Long currentVersion;
+      PolicyVersionPO newPolicyVersionPO;
+      // Will set the version to the last version + 1
+      if (needUpdateVersion) {
+        lastVersion++;
+        currentVersion = lastVersion;
+        newPolicyVersionPO =
+            PolicyVersionPO.builder()
+                .withMetalakeId(oldPolicyPO.getMetalakeId())
+                .withPolicyId(newPolicy.id())
+                .withVersion(currentVersion)
+                .withPolicyComment(newPolicy.comment())
+                .withEnabled(newPolicy.enabled())
+                .withContent(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.content()))
+                .withDeletedAt(DEFAULT_DELETED_AT)
+                .build();
+      } else {
+        currentVersion = oldPolicyPO.getCurrentVersion();
+        newPolicyVersionPO = oldPolicyPO.getPolicyVersionPO();
+      }
+      return PolicyPO.builder()
+          .withPolicyId(newPolicy.id())
+          .withPolicyName(newPolicy.name())
+          .withPolicyType(newPolicy.policyType())
+          .withMetalakeId(oldPolicyPO.getMetalakeId())
+          .withInheritable(newPolicy.inheritable())
+          .withExclusive(newPolicy.exclusive())
+          .withSupportedObjectTypes(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      // Sort the supported object types to ensure consistent ordering
+                      newPolicy.supportedObjectTypes().stream()
+                          .map(Enum::name)
+                          .sorted()
+                          .collect(Collectors.toCollection(LinkedHashSet::new))))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
+          .withCurrentVersion(currentVersion)
+          .withLastVersion(lastVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withPolicyVersionPO(newPolicyVersionPO)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
     }
   }
 
@@ -1305,6 +1386,97 @@ public class POConverters {
     }
   }
 
+  public static PolicyEntity fromPolicyPO(PolicyPO policyPO, Namespace namespace) {
+    try {
+      return PolicyEntity.builder()
+          .withId(policyPO.getPolicyId())
+          .withName(policyPO.getPolicyName())
+          .withNamespace(namespace)
+          .withPolicyType(policyPO.getPolicyType())
+          .withComment(policyPO.getPolicyVersionPO().getPolicyComment())
+          .withEnabled(policyPO.getPolicyVersionPO().isEnabled())
+          .withExclusive(policyPO.isExclusive())
+          .withInheritable(policyPO.isInheritable())
+          .withSupportedObjectTypes(
+              JsonUtils.anyFieldMapper()
+                  .readValue(
+                      policyPO.getSupportedObjectTypes(),
+                      new TypeReference<Set<MetadataObject.Type>>() {}))
+          .withContent(
+              JsonUtils.anyFieldMapper()
+                  .readValue(
+                      policyPO.getPolicyVersionPO().getContent(),
+                      Policy.BuiltInType.fromPolicyType(policyPO.getPolicyType()).contentClass()))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(policyPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize json object:", e);
+    }
+  }
+
+  public static PolicyPO initializePolicyPOWithVersion(
+      PolicyEntity policyEntity, PolicyPO.Builder builder) {
+    try {
+      String content = JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.content());
+      PolicyVersionPO policyVersionPO =
+          PolicyVersionPO.builder()
+              .withMetalakeId(builder.getMetalakeId())
+              .withPolicyId(policyEntity.id())
+              .withVersion(INIT_VERSION)
+              .withPolicyComment(policyEntity.comment())
+              .withEnabled(policyEntity.enabled())
+              .withContent(content)
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .build();
+      return builder
+          .withPolicyId(policyEntity.id())
+          .withPolicyName(policyEntity.name())
+          .withPolicyType(policyEntity.policyType())
+          .withInheritable(policyEntity.inheritable())
+          .withExclusive(policyEntity.exclusive())
+          .withSupportedObjectTypes(
+              JsonUtils.anyFieldMapper()
+                  .writeValueAsString(
+                      // Sort the supported object types to ensure consistent ordering
+                      policyEntity.supportedObjectTypes().stream()
+                          .map(Enum::name)
+                          .sorted()
+                          .collect(Collectors.toCollection(LinkedHashSet::new))))
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withPolicyVersionPO(policyVersionPO)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
+  public static PolicyMetadataObjectRelPO initializePolicyMetadataObjectRelPOWithVersion(
+      Long policyId, Long metadataObjectId, String metadataObjectType) {
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder()
+              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+              .withCreateTime(Instant.now())
+              .build();
+
+      return PolicyMetadataObjectRelPO.builder()
+          .withPolicyId(policyId)
+          .withMetadataObjectId(metadataObjectId)
+          .withMetadataObjectType(metadataObjectType)
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize json object:", e);
+    }
+  }
+
   public static OwnerRelPO initializeOwnerRelPOsWithVersion(
       Long metalakeId,
       String ownerType,
@@ -1370,20 +1542,26 @@ public class POConverters {
 
   public static ModelVersionEntity fromModelVersionPO(
       NameIdentifier modelIdent,
-      ModelVersionPO modelVersionPO,
+      List<ModelVersionPO> modelVersionPOs,
       List<ModelVersionAliasRelPO> aliasRelPOs) {
     List<String> aliases =
         aliasRelPOs.stream()
             .map(ModelVersionAliasRelPO::getModelVersionAlias)
             .collect(Collectors.toList());
 
+    Map<String, String> uris =
+        modelVersionPOs.stream()
+            .collect(
+                Collectors.toMap(
+                    ModelVersionPO::getModelVersionUriName, ModelVersionPO::getModelVersionUri));
+    ModelVersionPO modelVersionPO = modelVersionPOs.get(0);
     try {
       return ModelVersionEntity.builder()
           .withModelIdentifier(modelIdent)
           .withVersion(modelVersionPO.getModelVersion())
           .withAliases(aliases)
           .withComment(modelVersionPO.getModelVersionComment())
-          .withUri(modelVersionPO.getModelVersionUri())
+          .withUris(uris)
           .withProperties(
               JsonUtils.anyFieldMapper()
                   .readValue(modelVersionPO.getModelVersionProperties(), Map.class))
@@ -1439,7 +1617,11 @@ public class POConverters {
           .withMetalakeId(oldModelVersionPO.getMetalakeId())
           .withCatalogId(oldModelVersionPO.getCatalogId())
           .withSchemaId(oldModelVersionPO.getSchemaId())
-          .withModelVersionUri(newModelVersion.uri())
+          // TODO The modelVersionUriName and modelVersionUri here are not actually used.
+          // They are only used for occupying positions to avoid verification failures. They will
+          // be removed when the model version with multiple URIs is supported to be modified later
+          .withModelVersionUriName("uriName")
+          .withModelVersionUri("uri")
           .withModelVersion(oldModelVersionPO.getModelVersion())
           .withModelVersionComment(newModelVersion.comment())
           .withModelVersionProperties(
@@ -1474,21 +1656,30 @@ public class POConverters {
     }
   }
 
-  public static ModelVersionPO initializeModelVersionPO(
-      ModelVersionEntity modelVersionEntity, ModelVersionPO.Builder builder) {
+  public static List<ModelVersionPO> initializeModelVersionPO(
+      ModelVersionEntity modelVersionEntity, Long modelId) {
     try {
-      return builder
-          // Note that version set here will not be used when inserting into database, it will
-          // directly use the version from the query to avoid concurrent version conflict.
-          .withModelVersion(modelVersionEntity.version())
-          .withModelVersionComment(modelVersionEntity.comment())
-          .withModelVersionUri(modelVersionEntity.uri())
-          .withModelVersionProperties(
-              JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.properties()))
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.auditInfo()))
-          .withDeletedAt(DEFAULT_DELETED_AT)
-          .build();
+      String modelVersionProperties =
+          JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.properties());
+      String modelVersionAuditInfo =
+          JsonUtils.anyFieldMapper().writeValueAsString(modelVersionEntity.auditInfo());
+      return modelVersionEntity.uris().entrySet().stream()
+          .map(
+              entry ->
+                  ModelVersionPO.builder()
+                      .withModelId(modelId)
+                      // Note that version set here will not be used when inserting into database,
+                      // it will directly use the version from the query to avoid concurrent version
+                      // conflict.
+                      .withModelVersion(modelVersionEntity.version())
+                      .withModelVersionComment(modelVersionEntity.comment())
+                      .withModelVersionUriName(entry.getKey())
+                      .withModelVersionUri(entry.getValue())
+                      .withModelVersionProperties(modelVersionProperties)
+                      .withAuditInfo(modelVersionAuditInfo)
+                      .withDeletedAt(DEFAULT_DELETED_AT)
+                      .build())
+          .collect(Collectors.toList());
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
     }

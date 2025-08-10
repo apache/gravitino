@@ -32,14 +32,18 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -125,6 +129,131 @@ public class TestHTTPClient {
   @Test
   public void testHeadFailure() throws JsonProcessingException {
     testHttpMethodOnFailure(Method.HEAD, false, false);
+  }
+
+  @Test
+  public void testNullHeadersDoNotCauseNPE() throws Exception {
+    Item body = new Item(0L, "hank");
+    int statusCode = 200;
+
+    ErrorHandler onError = mock(ErrorHandler.class);
+    doThrow(new RuntimeException("Failure response")).when(onError).accept(any());
+
+    String path = addRequestTestCaseAndGetPath(Method.GET, body, statusCode, false, true);
+
+    Item response = restClient.get(path, Item.class, (Map<String, String>) null, onError);
+
+    Assertions.assertEquals(body, response);
+    verify(onError, never()).accept(any());
+  }
+
+  @Test
+  public void testSocketAndConnectionTimeoutSet() {
+    // test default value
+    ConnectionConfig connectionConfigWithDefault =
+        HTTPClient.configureConnectionConfig(
+            GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of()));
+    Assertions.assertNotNull(connectionConfigWithDefault);
+    Assertions.assertEquals(
+        connectionConfigWithDefault.getConnectTimeout().getDuration(),
+        GravitinoClientConfiguration.CLIENT_CONNECTION_TIMEOUT_MS_DEFAULT);
+    Assertions.assertEquals(
+        connectionConfigWithDefault.getSocketTimeout().getDuration(),
+        GravitinoClientConfiguration.CLIENT_SOCKET_TIMEOUT_MS_DEFAULT);
+
+    // test custom value
+    long connectionTimeoutMs = 10L;
+    int socketTimeoutMs = 10;
+    Map<String, String> properties =
+        ImmutableMap.of(
+            "gravitino.client.connectionTimeoutMs", String.valueOf(connectionTimeoutMs),
+            "gravitino.client.socketTimeoutMs", String.valueOf(socketTimeoutMs));
+
+    ConnectionConfig connectionConfig =
+        HTTPClient.configureConnectionConfig(
+            GravitinoClientConfiguration.buildFromProperties(properties));
+    Assertions.assertNotNull(connectionConfig);
+    Assertions.assertEquals(
+        connectionConfig.getConnectTimeout().getDuration(), connectionTimeoutMs);
+    Assertions.assertEquals(connectionConfig.getSocketTimeout().getDuration(), socketTimeoutMs);
+
+    // test invalid value
+    Map<String, String> propertiesWithInvalidConnectionTimeoutMs =
+        ImmutableMap.of("gravitino.client.connectionTimeoutMs", "-1");
+    try {
+      HTTPClient.configureConnectionConfig(
+          GravitinoClientConfiguration.buildFromProperties(
+              propertiesWithInvalidConnectionTimeoutMs));
+    } catch (IllegalArgumentException e) {
+      Assertions.assertEquals(
+          "-1 in gravitino.client.connectionTimeoutMs is invalid. The value must be a positive number",
+          e.getMessage());
+    }
+
+    Map<String, String> propertiesWithInvalidSocketTimeoutMs =
+        ImmutableMap.of("gravitino.client.socketTimeoutMs", "aaaa");
+    try {
+      HTTPClient.configureConnectionConfig(
+          GravitinoClientConfiguration.buildFromProperties(propertiesWithInvalidSocketTimeoutMs));
+    } catch (IllegalArgumentException e) {
+      Assertions.assertEquals(
+          "aaaa in gravitino.client.socketTimeoutMs is invalid. The value must be an integer number",
+          e.getMessage());
+    }
+  }
+
+  @Test
+  public void testConnectionTimeout() throws IOException {
+    String path = "test_connection_timeout";
+    long connectionTimeoutMs = 2000;
+    Map<String, String> properties =
+        ImmutableMap.of(
+            "gravitino.client.connectionTimeoutMs", String.valueOf(connectionTimeoutMs));
+    // use error server port to simulate hitting the configured connection timeout of 2 seconds
+    try (HTTPClient client =
+        HTTPClient.builder(properties)
+            .uri(String.format("http://127.0.0.1:%d", mockServer.getPort() + 1))
+            .build()) {
+      HttpRequest mockRequest =
+          request().withPath("/" + path).withMethod(Method.HEAD.name().toUpperCase(Locale.ROOT));
+      HttpResponse mockResponse = response().withStatusCode(200);
+      mockServer.when(mockRequest).respond(mockResponse);
+
+      long start = System.currentTimeMillis();
+      Assertions.assertThrows(
+          RESTException.class, () -> client.head(path, ImmutableMap.of(), response -> {}));
+      long end = System.currentTimeMillis();
+      Assertions.assertTrue((end - start) < 5000);
+    }
+  }
+
+  @Test
+  public void testSocketTimeout() throws IOException {
+    String path = "test_socket_timeout";
+    long socketTimeoutMs = 2000;
+    Map<String, String> properties =
+        ImmutableMap.of("gravitino.client.socketTimeoutMs", String.valueOf(socketTimeoutMs));
+    try (HTTPClient client =
+        HTTPClient.builder(properties)
+            .uri(String.format("http://127.0.0.1:%d", mockServer.getPort()))
+            .build()) {
+      HttpRequest mockRequest =
+          request().withPath("/" + path).withMethod(Method.HEAD.name().toUpperCase(Locale.ROOT));
+      // Setting a response delay of 5 seconds to simulate hitting the configured socket timeout of
+      // 2 seconds
+      HttpResponse mockResponse =
+          response()
+              .withStatusCode(200)
+              .withBody("Delayed response")
+              .withDelay(TimeUnit.MILLISECONDS, 5000);
+      mockServer.when(mockRequest).respond(mockResponse);
+
+      Throwable throwable =
+          Assertions.assertThrows(
+              RESTException.class, () -> client.head(path, ImmutableMap.of(), response -> {}));
+      Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
+      Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
+    }
   }
 
   public static void testHttpMethodOnSuccess(

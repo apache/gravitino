@@ -131,7 +131,7 @@ The signature algorithms that Gravitino supports follows:
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
 
-### Example
+### Example 
 
 You can follow the steps to set up an OAuth mode Gravitino server.
 
@@ -185,3 +185,102 @@ Use the access token to request the Gravitino
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
 ```
+
+### Example: Keycloak as OAuth providers
+
+1. Set up an external Keycloak server, you can refer to [Keycloak document](https://www.keycloak.org/getting-started/getting-started-docker)
+
+```shell
+docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.2.5 start-dev
+```
+
+2. Go to the [Keycloak admin console](http://localhost:8080/), log in with the initial admin user with the username `admin` and password `admin`
+
+3. Create a realm for Gravitino
+   * Click *Manage realms* in the left-hand menu.
+   * Click *Create realm* button
+
+    ![create-realm.png](../assets/security/create-realm.png)
+
+4. Get the `gravitinorealm` public key, which is the <the default signing key> in gravitino.conf
+   Access `http://localhost:8080/realms/gravitinorealm` in browser
+
+   ![realm-public-key.png](../assets/security/realm-public-key.png)
+
+5. Add users
+
+    Initially, the realm has no users. Use these steps to create a user:
+   * Verify that you are still in the gravitinorealm realm, which is next to *Current realm*.
+   * Click Users in the left-hand menu.
+   * Click *Create new user*.
+   * Fill in the form with the following values:  
+   *Username*: usera, *First name*: any first name, *Last name*: any last name, *Email*: any email
+   * Click *credentials*, fill in the *Set password form* with a password.
+   * Toggle Temporary to Off so that the user does not need to update this password at the first login.
+
+    You can now log in to the [Account Console(gravitinorealm)](http://localhost:8080/realms/gravitinorealm/account) to verify this user is configured correctly.
+
+6. Register Gravitino in Keycloak
+
+   * Click *gravitinorealm* next to *Current realm*.
+   *  Click *Clients*.
+   *  Click *Create client*
+   *  Fill in *Client type*: `OpenID Connect` *Client ID*: `gravitino-client`
+   *  Click *Next*
+   *  Confirm that `Client authentication` `Standard flow` `Direct access grants` `Service accounts roles` is enabled.
+   *  Click *Next*
+   *  Set *Valid redirect URIs* to `http://localhost:8090/*`
+   *  Set *Web origins* to `http://localhost:8090`
+   *  Click *Save*.
+   *  Click *Credentials* tab page, get `Client Secret`. 
+
+   ![create-client.png](../assets/security/create-client.png)
+
+7. You can refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+
+```text
+gravitino.authenticators = oauth
+gravitino.authenticator.oauth.serviceAudience = account
+gravitino.authenticator.oauth.defaultSignKey = <the default signing key>
+gravitino.authenticator.oauth.tokenPath = /realms/gravitinorealm/protocol/openid-connect/token
+gravitino.authenticator.oauth.serverUri = http://localhost:8080
+```
+
+8. Use client credentials to authentication. The `access token` is bound to a service account.
+
+Get access token
+
+```shell
+curl \
+  -d "client_id=gravitino-client" \
+  -d "client_secret=FL20ezBgQAOlDQeNifzwliQ56wohhqNo" \
+  -d "grant_type=client_credentials" \
+  "http://localhost:8080/realms/gravitinorealm/protocol/openid-connect/token"
+```
+
+Use the access token to request the Gravitino
+
+```shell
+curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
+```
+
+9. Use password to authenticate users. The openid scope returns an `id_token` which includes users information which we can use for consumer mapping and group mapping in future posts.
+
+Get access token
+
+```shell
+curl \
+  -d "client_id=gravitino-client" \
+  -d "client_secret=FL20ezBgQAOlDQeNifzwliQ56wohhqNo" \
+  -d "username=usera" \
+  -d "password=Admin@123" \
+  -d "grant_type=password" \
+  -d "scope=openid" \
+  "http://localhost:8080/realms/gravitinorealm/protocol/openid-connect/token"
+```
+
+Use the access token to request the Gravitino
+
+```shell
+curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" -H "Authorization: Bearer <access_token>" http://localhost:8090/api/version
+``` 

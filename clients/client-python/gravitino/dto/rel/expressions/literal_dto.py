@@ -71,5 +71,53 @@ class LiteralDTO(Literal[str], FunctionArg):
     def __str__(self) -> str:
         return f"LiteralDTO(value='{self._value}', data_type={self._data_type})"
 
+    @staticmethod
+    def builder() -> Builder:
+        """the builder for creating a new instance of LiteralDTO.
+
+        Returns:
+            Builder: the builder for creating a new instance of LiteralDTO.
+        """
+        return LiteralDTO.Builder()
+
+    class Builder:
+        """Builder for LiteralDTO."""
+
+        def __init__(self):
+            self._data_type = None
+            self._value = None
+
+        def with_value(self, value: str) -> LiteralDTO.Builder:
+            """Set the value of the literal.
+
+            Args:
+                value (str): The value of the literal.
+
+            Returns:
+                Builder: The builder.
+            """
+            self._value = value
+            return self
+
+        def with_data_type(self, data_type: Type) -> LiteralDTO.Builder:
+            """Set the data type of the literal.
+
+            Args:
+                data_type (Type): The data type of the literal.
+
+            Returns:
+                Builder: The builder.
+            """
+            self._data_type = data_type
+            return self
+
+        def build(self) -> LiteralDTO:
+            """Builds a `LiteralDTO` instance.
+
+            Returns:
+                LiteralDTO: The `LiteralDTO` instance.
+            """
+            return LiteralDTO(value=self._value, data_type=self._data_type)
+
 
 LiteralDTO.NULL = LiteralDTO("NULL", Types.NullType.get())

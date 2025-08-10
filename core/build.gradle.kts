@@ -23,6 +23,7 @@ plugins {
   id("java")
   id("idea")
   alias(libs.plugins.jcstress)
+  alias(libs.plugins.jmh)
 }
 
 dependencies {
@@ -82,6 +83,11 @@ tasks.withType<JavaCompile>().configureEach {
   }
 }
 
+tasks.named<JavaCompile>("jmhCompileGeneratedClasses").configure {
+  options.errorprone?.isEnabled = false
+  options.compilerArgs.removeAll { it.contains("Xplugin:ErrorProne") }
+}
+
 jcstress {
   /*
    Available modes:
@@ -92,4 +98,14 @@ jcstress {
     */
   mode = "default"
   jvmArgsPrepend = "-Djdk.stdout.sync=true"
+}
+
+jmh {
+  jmhVersion.set(libs.versions.jmh.asProvider())
+  warmupIterations = 5
+  iterations = 10
+  fork = 1
+  threads = 10
+  resultFormat = "csv"
+  resultsFile = file("$buildDir/reports/jmh/results.csv")
 }

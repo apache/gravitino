@@ -317,11 +317,12 @@ CREATE TABLE IF NOT EXISTS `model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_comment` TEXT DEFAULT NULL COMMENT 'model version comment',
     `model_version_properties` MEDIUMTEXT DEFAULT NULL COMMENT 'model version properties',
+    `model_version_uri_name` VARCHAR(128) NOT NULL COMMENT 'model version uri name',
     `model_version_uri` TEXT NOT NULL COMMENT 'model storage uri',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_mid_ver_del` (`model_id`, `version`, `deleted_at`),
+    UNIQUE KEY `uk_mid_ver_uri_del` (`model_id`, `version`, `model_version_uri_name`, `deleted_at`),
     KEY `idx_vmid` (`metalake_id`),
     KEY `idx_vcid` (`catalog_id`),
     KEY `idx_vsid` (`schema_id`)
@@ -381,4 +382,35 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_pid` (`policy_id`),
     KEY `idx_prmid` (`metadata_object_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `job_template_meta` (
+    `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
+    `job_template_name` VARCHAR(128) NOT NULL COMMENT 'job template name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `job_template_comment` TEXT DEFAULT NULL COMMENT 'job template comment',
+    `job_template_content` MEDIUMTEXT NOT NULL COMMENT 'job template content',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job template audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job template current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job template last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job template deleted at',
+    PRIMARY KEY (`job_template_id`),
+    UNIQUE KEY `uk_mid_jtn_del` (`metalake_id`, `job_template_name`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `job_run_meta` (
+    `job_run_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job run id',
+    `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `job_execution_id` varchar(256) NOT NULL COMMENT 'job execution id',
+    `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
+    `job_finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job finished at',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job run audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job run deleted at',
+    PRIMARY KEY (`job_run_id`),
+    UNIQUE KEY `uk_mid_jei_del` (`metalake_id`, `job_execution_id`, `deleted_at`),
+    KEY `idx_job_template_id` (`job_template_id`),
+    KEY `idx_job_execution_id` (`job_execution_id`)
 ) ENGINE=InnoDB;

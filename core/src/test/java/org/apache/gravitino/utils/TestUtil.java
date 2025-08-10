@@ -48,6 +48,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 
@@ -170,7 +171,8 @@ public class TestUtil {
    * @return The test {@link TableEntity} entity.
    */
   public static ModelEntity getTestModelEntity() {
-    return getTestModelEntity(generator.nextId(), "test_model", Namespace.of("m1", "c1", "s1"));
+    return getTestModelEntity(
+        generator.nextId(), RandomNameUtils.genRandomName("model"), Namespace.of("m1", "c1", "s1"));
   }
 
   /**
@@ -365,6 +367,17 @@ public class TestUtil {
   }
 
   /**
+   * Returns a test user entity with the given ID, name, and roles.
+   *
+   * @param roles The roles of the user entity.
+   * @return The test {@link UserEntity} entity.
+   */
+  public static UserEntity getTestUserEntity(List<Long> roles) {
+    return getTestUserEntity(
+        generator.nextId(), RandomNameUtils.genRandomName("user"), "test_metalake", roles);
+  }
+
+  /**
    * Returns a test user entity with the given ID, name, and metalake.
    *
    * @param id The ID of the user entity.
@@ -420,7 +433,8 @@ public class TestUtil {
    * @return The test {@link RoleEntity} entity.
    */
   public static RoleEntity getTestRoleEntity() {
-    return getTestRoleEntity(generator.nextId(), "test_role", "test_metalake");
+    return getTestRoleEntity(
+        generator.nextId(), RandomNameUtils.genRandomName("role"), "test_metalake");
   }
 
   /**
@@ -464,7 +478,7 @@ public class TestUtil {
     return getTestModelVersionEntity(
         NameIdentifier.of("m1", "c1", "s1", "model-version-test"),
         1,
-        "uri",
+        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "uri"),
         ImmutableMap.of("key1", "value1"),
         "model version entity test",
         ImmutableList.of("alias1", "alias2"));
@@ -476,7 +490,7 @@ public class TestUtil {
    *
    * @param modelIdentifier The model identifier of the model version entity.
    * @param version The version of the model version entity.
-   * @param uri The uri of the model version entity.
+   * @param uris The uri and their names of the model version entity.
    * @param properties The properties of the model version entity.
    * @param comment The comment of the model version entity.
    * @param aliases The aliases of the model version entity.
@@ -485,14 +499,14 @@ public class TestUtil {
   public static ModelVersionEntity getTestModelVersionEntity(
       NameIdentifier modelIdentifier,
       int version,
-      String uri,
+      Map<String, String> uris,
       Map<String, String> properties,
       String comment,
       List<String> aliases) {
     return ModelVersionEntity.builder()
         .withVersion(version)
         .withModelIdentifier(modelIdentifier)
-        .withUri(uri)
+        .withUris(uris)
         .withProperties(properties)
         .withComment(comment)
         .withAuditInfo(getTestAuditInfo())

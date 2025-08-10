@@ -94,6 +94,9 @@ public class RangerFilesetIT extends BaseIT {
     configs.put(Configs.SERVICE_ADMINS.getKey(), RangerITEnv.HADOOP_USER_NAME);
     configs.put(Configs.AUTHENTICATORS.getKey(), AuthenticatorType.SIMPLE.name().toLowerCase());
     configs.put("SimpleAuthUserName", AuthConstants.ANONYMOUS_USER);
+    configs.put(
+        Configs.AUTHORIZATION_IMPL.getKey(),
+        "org.apache.gravitino.server.authorization.PassThroughAuthorizer");
     registerCustomConfigs(configs);
     super.startIntegrationTest();
 

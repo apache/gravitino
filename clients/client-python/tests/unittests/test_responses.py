@@ -21,7 +21,7 @@ from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
-from gravitino.dto.responses.model_vesion_response import ModelVersionResponse
+from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 

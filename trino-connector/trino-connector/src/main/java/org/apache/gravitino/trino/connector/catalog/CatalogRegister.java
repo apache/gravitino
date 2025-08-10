@@ -63,13 +63,22 @@ public class CatalogRegister {
   private void checkTrinoSpiVersion(ConnectorContext context) {
     this.trinoVersion = context.getSpiVersion();
 
-    int version = Integer.parseInt(context.getSpiVersion());
+    int version = Integer.parseInt(trinoVersion);
+
     if (version < MIN_SUPPORT_TRINO_SPI_VERSION || version > MAX_SUPPORT_TRINO_SPI_VERSION) {
-      String errmsg =
-          String.format(
-              "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d",
-              trinoVersion, MIN_SUPPORT_TRINO_SPI_VERSION, MAX_SUPPORT_TRINO_SPI_VERSION);
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      Boolean skipTrinoVersionValidation = config.isSkipTrinoVersionValidation();
+      if (!skipTrinoVersionValidation) {
+        String errmsg =
+            String.format(
+                "Unsupported Trino-%s version. The Supported version for the Gravitino-Trino-connector from Trino-%d to Trino-%d."
+                    + "Maybe you can set gravitino.trino.skip-version-validation to skip version validation.",
+                trinoVersion, MIN_SUPPORT_TRINO_SPI_VERSION, MAX_SUPPORT_TRINO_SPI_VERSION);
+        throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      } else {
+        LOG.warn(
+            "The version %s has not undergone thorough testing with Gravitino, there may be compatiablity problem.",
+            trinoVersion);
+      }
     }
 
     isCoordinator = context.getNodeManager().getCurrentNode().isCoordinator();
