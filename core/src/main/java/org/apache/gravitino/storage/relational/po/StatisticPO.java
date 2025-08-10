@@ -20,7 +20,9 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Preconditions;
 import java.util.Objects;
+import lombok.Getter;
 
+@Getter
 public class StatisticPO {
   private Long metalakeId;
   private Long statisticId;
@@ -42,46 +44,6 @@ public class StatisticPO {
 
   public static Builder builder() {
     return new Builder();
-  }
-
-  public Long getMetalakeId() {
-    return metalakeId;
-  }
-
-  public Long getStatisticId() {
-    return statisticId;
-  }
-
-  public Long getMetadataObjectId() {
-    return metadataObjectId;
-  }
-
-  public String getMetadataObjectType() {
-    return metadataObjectType;
-  }
-
-  public String getStatisticName() {
-    return statisticName;
-  }
-
-  public String getStatisticValue() {
-    return statisticValue;
-  }
-
-  public String getAuditInfo() {
-    return auditInfo;
-  }
-
-  public Long getCurrentVersion() {
-    return currentVersion;
-  }
-
-  public Long getLastVersion() {
-    return lastVersion;
-  }
-
-  public Long getDeletedAt() {
-    return deletedAt;
   }
 
   @Override
