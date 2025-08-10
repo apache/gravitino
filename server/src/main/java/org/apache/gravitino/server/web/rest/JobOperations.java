@@ -22,7 +22,10 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -37,18 +40,23 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.JobListResponse;
+import org.apache.gravitino.dto.responses.JobResponse;
 import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
@@ -87,7 +95,7 @@ public class JobOperations {
           httpRequest,
           () -> {
             List<JobTemplateDTO> jobTemplates =
-                toDTOs(jobOperationDispatcher.listJobTemplates(metalake));
+                toJobTemplateDTOs(jobOperationDispatcher.listJobTemplates(metalake));
             if (details) {
               LOG.info("List {} job templates in metalake: {}", jobTemplates.size(), metalake);
               return Utils.ok(new JobTemplateListResponse(jobTemplates));
@@ -191,7 +199,111 @@ public class JobOperations {
     }
   }
 
-  private static List<JobTemplateDTO> toDTOs(List<JobTemplateEntity> jobTemplateEntities) {
+  @GET
+  @Path("runs")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-jobs." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-jobs", absolute = true)
+  public Response listJobs(
+      @PathParam("metalake") String metalake,
+      @QueryParam("jobTemplateName") String jobTemplateName) {
+    LOG.info(
+        "Received request to list jobs in metalake {}{}",
+        metalake,
+        jobTemplateName != null ? " for job template " + jobTemplateName : "");
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            List<JobEntity> jobEntities =
+                jobOperationDispatcher.listJobs(metalake, Optional.ofNullable(jobTemplateName));
+            List<JobDTO> jobDTOs = toJobDTOs(jobEntities);
+
+            LOG.info("Listed {} jobs in metalake {}", jobEntities.size(), metalake);
+            return Utils.ok(new JobListResponse(jobDTOs));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleJobException(OperationType.LIST, "", metalake, e);
+    }
+  }
+
+  @GET
+  @Path("runs/{jobId}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "get-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-job", absolute = true)
+  public Response getJob(@PathParam("metalake") String metalake, @PathParam("jobId") String jobId) {
+    LOG.info("Received request to get job {} in metalake {}", jobId, metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            JobEntity jobEntity = jobOperationDispatcher.getJob(metalake, jobId);
+            LOG.info("Retrieved job {} in metalake: {}", jobId, metalake);
+            return Utils.ok(new JobResponse(toDTO(jobEntity)));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleJobException(OperationType.GET, jobId, metalake, e);
+    }
+  }
+
+  @POST
+  @Path("runs")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "run-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "run-job", absolute = true)
+  public Response runJob(@PathParam("metalake") String metalake, JobRunRequest request) {
+    LOG.info("Received request to run job in metalake: {}", metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            Map<String, String> jobConf =
+                request.getJobConf() != null ? request.getJobConf() : Collections.emptyMap();
+
+            JobEntity jobEntity =
+                jobOperationDispatcher.runJob(metalake, request.getJobTemplateName(), jobConf);
+
+            LOG.info("Run job {} in metalake: {}", jobEntity.name(), metalake);
+            return Utils.ok(new JobResponse(toDTO(jobEntity)));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleJobException(OperationType.RUN, "", metalake, e);
+    }
+  }
+
+  @POST
+  @Path("runs/{jobId}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "cancel-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  public Response cancelJob(
+      @PathParam("metalake") String metalake, @PathParam("jobId") String jobId) {
+    LOG.info("Received request to cancel job {} in metalake {}", jobId, metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            JobEntity jobEntity = jobOperationDispatcher.cancelJob(metalake, jobId);
+
+            LOG.info("Cancelled job {} in metalake: {}", jobId, metalake);
+            return Utils.ok(new JobResponse(toDTO(jobEntity)));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handleJobException(OperationType.CANCEL, jobId, metalake, e);
+    }
+  }
+
+  private static List<JobTemplateDTO> toJobTemplateDTOs(
+      List<JobTemplateEntity> jobTemplateEntities) {
     return jobTemplateEntities.stream().map(JobOperations::toDTO).collect(Collectors.toList());
   }
 
@@ -249,5 +361,18 @@ public class JobOperations {
                 .withCreateTime(Instant.now())
                 .build())
         .build();
+  }
+
+  @VisibleForTesting
+  static JobDTO toDTO(JobEntity jobEntity) {
+    return new JobDTO(
+        jobEntity.name(),
+        jobEntity.jobTemplateName(),
+        jobEntity.status(),
+        DTOConverters.toDTO(jobEntity.auditInfo()));
+  }
+
+  private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {
+    return jobEntities.stream().map(JobOperations::toDTO).collect(Collectors.toList());
   }
 }

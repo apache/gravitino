@@ -69,7 +69,7 @@ public class JobMetaService {
   public JobEntity getJobByIdentifier(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
     String jobRunId = ident.name();
-    Long jobRunIdLong;
+    long jobRunIdLong;
     try {
       jobRunIdLong = Long.parseLong(jobRunId.substring(JobHandle.JOB_ID_PREFIX.length()));
     } catch (NumberFormatException e) {
@@ -110,6 +110,20 @@ public class JobMetaService {
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB, jobEntity.id().toString());
     }
+  }
+
+  public boolean deleteJob(NameIdentifier jobIdent) {
+    String jobRunId = jobIdent.name();
+    long jobRunIdLong;
+    try {
+      jobRunIdLong = Long.parseLong(jobRunId.substring(JobHandle.JOB_ID_PREFIX.length()));
+    } catch (NumberFormatException e) {
+      throw new NoSuchEntityException("Invalid job run ID format %s", jobRunId);
+    }
+    int result =
+        SessionUtils.doWithCommitAndFetchResult(
+            JobMetaMapper.class, mapper -> mapper.softDeleteJobMetaByRunId(jobRunIdLong));
+    return result > 0;
   }
 
   public int deleteJobsByLegacyTimeline(long legacyTimeline, int limit) {
