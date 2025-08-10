@@ -69,16 +69,16 @@ public class StatisticSQLProviderFactory {
   }
 
   public static String batchDeleteStatisticPOs(
-      @Param("objectId") Long objectId, @Param("statisticNames") List<String> statisticNames) {
-    return getProvider().batchDeleteStatisticPOs(objectId, statisticNames);
+      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
+    return getProvider().batchDeleteStatisticPOs(entityId, statisticNames);
   }
 
-  public static String softDeleteStatisticsByObjectId(@Param("objectId") Long objectId) {
-    return getProvider().softDeleteStatisticsByEntityId(objectId);
+  public static String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
+    return getProvider().softDeleteStatisticsByEntityId(entityId);
   }
 
-  public static String listStatisticPOsByObjectId(@Param("objectId") Long objectId) {
-    return getProvider().listStatisticPOsByEntityId(objectId);
+  public static String listStatisticPOsByEntityId(@Param("entityId") Long entityId) {
+    return getProvider().listStatisticPOsByEntityId(entityId);
   }
 
   public static String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {
