@@ -26,7 +26,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
-import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -55,7 +54,7 @@ public class StatisticMetaService {
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
             StatisticMetaMapper.class, mapper -> mapper.listStatisticPOsByObjectId(objectId));
-    return statisticPOs.stream().map(POConverters::fromStatisticPO).collect(Collectors.toList());
+    return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
   public void batchInsertStatisticPOs(
@@ -77,7 +76,7 @@ public class StatisticMetaService {
     }
 
     List<StatisticPO> pos =
-        POConverters.initializeStatisticPOs(statisticEntities, metalakeId, objectId, object.type());
+        StatisticPO.initializeStatisticPOs(statisticEntities, metalakeId, objectId, object.type());
     SessionUtils.doWithCommit(
         StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(pos));
   }

@@ -18,9 +18,18 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.Getter;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.StatisticEntity;
+import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.storage.relational.utils.POConverters;
 
 @Getter
 public class StatisticPO {
@@ -44,6 +53,52 @@ public class StatisticPO {
 
   public static Builder builder() {
     return new Builder();
+  }
+
+  public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
+    try {
+      return StatisticEntity.builder()
+          .withId(statisticPO.getStatisticId())
+          .withName(statisticPO.getStatisticName())
+          .withValue(
+              JsonUtils.anyFieldMapper()
+                  .readValue(statisticPO.getStatisticValue(), StatisticValue.class))
+          .withAuditInfo(
+              JsonUtils.anyFieldMapper().readValue(statisticPO.getAuditInfo(), AuditInfo.class))
+          .build();
+    } catch (JsonProcessingException je) {
+      throw new RuntimeException(je);
+    }
+  }
+
+  public static List<StatisticPO> initializeStatisticPOs(
+      List<StatisticEntity> statisticEntities,
+      Long metalakeId,
+      Long objectId,
+      MetadataObject.Type objectType) {
+    return statisticEntities.stream()
+        .map(
+            statisticEntity -> {
+              try {
+                return builder()
+                    .withMetalakeId(metalakeId)
+                    .withMetadataObjectId(objectId)
+                    .withMetadataObjectType(objectType.name())
+                    .withStatisticId(statisticEntity.id())
+                    .withStatisticName(statisticEntity.name())
+                    .withStatisticValue(
+                        JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.value()))
+                    .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
+                    .withCurrentVersion(POConverters.INIT_VERSION)
+                    .withLastVersion(POConverters.INIT_VERSION)
+                    .withAuditInfo(
+                        JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.auditInfo()))
+                    .build();
+              } catch (JsonProcessingException e) {
+                throw new RuntimeException("Failed to serialize json object:", e);
+              }
+            })
+        .collect(Collectors.toList());
   }
 
   @Override

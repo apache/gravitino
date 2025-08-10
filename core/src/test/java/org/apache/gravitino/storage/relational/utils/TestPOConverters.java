@@ -1231,7 +1231,7 @@ public class TestPOConverters {
             .build());
 
     List<StatisticPO> statisticPOs =
-        POConverters.initializeStatisticPOs(statisticEntities, 1L, 1L, MetadataObject.Type.CATALOG);
+        StatisticPO.initializeStatisticPOs(statisticEntities, 1L, 1L, MetadataObject.Type.CATALOG);
 
     assertEquals(1, statisticPOs.get(0).getCurrentVersion());
     assertEquals(1, statisticPOs.get(0).getLastVersion());
@@ -1258,7 +1258,7 @@ public class TestPOConverters {
                             .withCreateTime(FIX_INSTANT)
                             .build()))
             .build();
-    StatisticEntity entity = POConverters.fromStatisticPO(statisticPO);
+    StatisticEntity entity = StatisticPO.fromStatisticPO(statisticPO);
     Assertions.assertEquals(1L, entity.id());
     Assertions.assertEquals("test", entity.name());
     Assertions.assertEquals("test", entity.value().value());

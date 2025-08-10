@@ -55,7 +55,6 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
-import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -65,7 +64,6 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
@@ -85,7 +83,6 @@ import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
-import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
@@ -1722,51 +1719,5 @@ public class POConverters {
         .withModelId(entity.id())
         .withDeletedAt(DEFAULT_DELETED_AT)
         .build();
-  }
-
-  public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
-    try {
-      return StatisticEntity.builder()
-          .withId(statisticPO.getStatisticId())
-          .withName(statisticPO.getStatisticName())
-          .withValue(
-              JsonUtils.anyFieldMapper()
-                  .readValue(statisticPO.getStatisticValue(), StatisticValue.class))
-          .withAuditInfo(
-              JsonUtils.anyFieldMapper().readValue(statisticPO.getAuditInfo(), AuditInfo.class))
-          .build();
-    } catch (JsonProcessingException je) {
-      throw new RuntimeException(je);
-    }
-  }
-
-  public static List<StatisticPO> initializeStatisticPOs(
-      List<StatisticEntity> statisticEntities,
-      Long metalakeId,
-      Long objectId,
-      MetadataObject.Type objectType) {
-    return statisticEntities.stream()
-        .map(
-            statisticEntity -> {
-              try {
-                return StatisticPO.builder()
-                    .withMetalakeId(metalakeId)
-                    .withMetadataObjectId(objectId)
-                    .withMetadataObjectType(objectType.name())
-                    .withStatisticId(statisticEntity.id())
-                    .withStatisticName(statisticEntity.name())
-                    .withStatisticValue(
-                        JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.value()))
-                    .withDeletedAt(DEFAULT_DELETED_AT)
-                    .withCurrentVersion(INIT_VERSION)
-                    .withLastVersion(INIT_VERSION)
-                    .withAuditInfo(
-                        JsonUtils.anyFieldMapper().writeValueAsString(statisticEntity.auditInfo()))
-                    .build();
-              } catch (JsonProcessingException e) {
-                throw new RuntimeException("Failed to serialize json object:", e);
-              }
-            })
-        .collect(Collectors.toList());
   }
 }
