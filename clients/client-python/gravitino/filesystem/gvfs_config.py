@@ -73,3 +73,7 @@ class GVFSConfig:
 
     # The configuration key for whether to enable credential vending. The default is false.
     GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING = "enable_credential_vending"
+
+    # The configuration key for storage handler providers.
+    # Multiple providers can be specified, separated by commas.
+    GVFS_FILESYSTEM_STORAGE_HANDLER_PROVIDERS = "storage_handler_providers"
