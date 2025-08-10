@@ -193,4 +193,14 @@ class TestOwnerCommands {
     String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
     assertEquals(ErrorMessages.INVALID_SET_COMMAND, errOutput);
   }
+
+  @Test
+  void testSetOwnerInvalidEntityType() {
+    Main.useExit = false;
+    CommandContext context = new CommandContext(mockCommandLine);
+    SetOwner setOwner = new SetOwner(context, "metalake_demo", "obj", "invalid", "user", false);
+    assertThrows(RuntimeException.class, setOwner::validate);
+    String errOutput = new String(errContent.toByteArray(), StandardCharsets.UTF_8).trim();
+    assertEquals(ErrorMessages.UNKNOWN_ENTITY, errOutput);
+  }
 }
