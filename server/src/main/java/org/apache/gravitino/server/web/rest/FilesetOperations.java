@@ -335,7 +335,7 @@ public class FilesetOperations {
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             boolean dropped = dispatcher.dropFileset(ident);
             if (!dropped) {
-              LOG.warn("Failed to drop fileset {} under schema {}", fileset, schema);
+              LOG.warn("Cannot find to be dropped fileset {} under schema {}", fileset, schema);
             }
 
             Response response = Utils.ok(new DropResponse(dropped));

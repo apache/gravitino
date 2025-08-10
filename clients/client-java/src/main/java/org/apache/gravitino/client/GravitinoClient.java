@@ -41,8 +41,12 @@ import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.InUseException;
+import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchJobException;
+import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
@@ -53,6 +57,9 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobTemplate;
+import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -65,7 +72,7 @@ import org.apache.gravitino.tag.TagOperations;
  * API.
  */
 public class GravitinoClient extends GravitinoClientBase
-    implements SupportsCatalogs, TagOperations {
+    implements SupportsCatalogs, TagOperations, SupportsJobs {
 
   private final GravitinoMetalake metalake;
 
@@ -558,6 +565,53 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public boolean deleteTag(String name) {
     return getMetalake().deleteTag(name);
+  }
+
+  @Override
+  public List<JobTemplate> listJobTemplates() {
+    return getMetalake().listJobTemplates();
+  }
+
+  @Override
+  public void registerJobTemplate(JobTemplate jobTemplate)
+      throws JobTemplateAlreadyExistsException {
+    getMetalake().registerJobTemplate(jobTemplate);
+  }
+
+  @Override
+  public JobTemplate getJobTemplate(String jobTemplateName) throws NoSuchJobTemplateException {
+    return getMetalake().getJobTemplate(jobTemplateName);
+  }
+
+  @Override
+  public boolean deleteJobTemplate(String jobTemplateName) throws InUseException {
+    return getMetalake().deleteJobTemplate(jobTemplateName);
+  }
+
+  @Override
+  public List<JobHandle> listJobs(String jobTemplateName) throws NoSuchJobTemplateException {
+    return getMetalake().listJobs(jobTemplateName);
+  }
+
+  @Override
+  public List<JobHandle> listJobs() {
+    return getMetalake().listJobs();
+  }
+
+  @Override
+  public JobHandle runJob(String jobTemplateName, Map<String, String> jobConf)
+      throws NoSuchJobTemplateException {
+    return getMetalake().runJob(jobTemplateName, jobConf);
+  }
+
+  @Override
+  public JobHandle getJob(String jobId) throws NoSuchJobException {
+    return getMetalake().getJob(jobId);
+  }
+
+  @Override
+  public JobHandle cancelJob(String jobId) throws NoSuchJobException {
+    return getMetalake().cancelJob(jobId);
   }
 
   /** Builder class for constructing a GravitinoClient. */

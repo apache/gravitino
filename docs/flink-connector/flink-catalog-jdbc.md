@@ -23,6 +23,13 @@ Place the following JAR files in the lib directory of your Flink installation:
 - [`gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18)
 - JDBC driver
 
+Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.default-database` property with the value of the default database name.
+
+
+```text
+flink.bypass.default-database=db  
+```
+
 ### SQL Example
 
 ```sql

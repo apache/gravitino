@@ -94,4 +94,8 @@ public class JobMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline) {
     return getProvider().softDeleteJobMetasByLegacyTimeline(legacyTimeline);
   }
+
+  public static String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
+    return getProvider().softDeleteJobMetaByRunId(jobRunId);
+  }
 }
