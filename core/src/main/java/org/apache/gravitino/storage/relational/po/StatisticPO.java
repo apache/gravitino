@@ -67,7 +67,7 @@ public class StatisticPO {
               JsonUtils.anyFieldMapper().readValue(statisticPO.getAuditInfo(), AuditInfo.class))
           .build();
     } catch (JsonProcessingException je) {
-      throw new RuntimeException(je);
+      throw new RuntimeException("Failed to deserialize json object: ", je);
     }
   }
 
