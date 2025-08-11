@@ -51,8 +51,7 @@ public class MysqlCatalogCapability implements Capability {
           String.format("The %s name '%s' is illegal.", scope, name));
     }
 
-    if ((scope == Scope.SCHEMA || scope == Scope.TABLE)
-        && MYSQL_RESERVED_SCHEMAS.contains(name.toLowerCase())) {
+    if (scope == Scope.SCHEMA && MYSQL_RESERVED_SCHEMAS.contains(name.toLowerCase())) {
       return CapabilityResult.unsupported(
           String.format("The %s name '%s' is reserved and cannot be used.", scope, name));
     }
