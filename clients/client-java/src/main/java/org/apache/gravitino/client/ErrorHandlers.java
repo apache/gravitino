@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.InUseException;
+import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
@@ -46,6 +47,8 @@ import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchJobException;
+import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -231,6 +234,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> modelErrorHandler() {
     return ModelErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to job and job template operations.
+   *
+   * @return A Consumer representing the job error handler.
+   */
+  public static Consumer<ErrorResponse> jobErrorHandler() {
+    return JobErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -1067,6 +1079,59 @@ public class ErrorHandlers {
     }
   }
 
+  /** Error handler specific to job and job template operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class JobErrorHandler extends RestErrorHandler {
+
+    private static final JobErrorHandler INSTANCE = new JobErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMsg = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMsg);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMsg);
+          } else if (errorResponse
+              .getType()
+              .equals(NoSuchJobTemplateException.class.getSimpleName())) {
+            throw new NoSuchJobTemplateException(errorMsg);
+          } else if (errorResponse.getType().equals(NoSuchJobException.class.getSimpleName())) {
+            throw new NoSuchJobException(errorMsg);
+          } else {
+            throw new NotFoundException(errorMsg);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new JobTemplateAlreadyExistsException(errorMsg);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMsg);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMsg);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMsg);
+
+          } else {
+            throw new NotInUseException(errorMsg);
+          }
+
+        case ErrorConstants.IN_USE_CODE:
+          throw new InUseException(errorMsg);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
   /** Generic error handler for REST requests. */
   private static class RestErrorHandler extends ErrorHandler {
     private static final ErrorHandler INSTANCE = new RestErrorHandler();
@@ -1085,6 +1150,9 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.FORBIDDEN_CODE) {
+        throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
+      }
       throw new RESTException("Unable to process: %s", formatErrorMessage(errorResponse));
     }
   }

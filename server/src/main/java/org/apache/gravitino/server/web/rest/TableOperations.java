@@ -117,7 +117,7 @@ public class TableOperations {
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
-      accessMetadataType = MetadataObject.Type.TABLE)
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -261,7 +261,7 @@ public class TableOperations {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
             boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
             if (!dropped) {
-              LOG.warn("Failed to drop table {} under schema {}", table, schema);
+              LOG.warn("Cannot find to be dropped table {} under schema {}", table, schema);
             }
 
             Response response = Utils.ok(new DropResponse(dropped));

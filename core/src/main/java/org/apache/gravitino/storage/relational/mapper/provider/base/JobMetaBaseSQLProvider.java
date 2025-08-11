@@ -159,6 +159,14 @@ public class JobMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
+    return "UPDATE "
+        + JobMetaMapper.TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000.0"
+        + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
+  }
+
   public String softDeleteJobMetasByLegacyTimeline(@Param("legacyTimeline") Long legacyTimeline) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
