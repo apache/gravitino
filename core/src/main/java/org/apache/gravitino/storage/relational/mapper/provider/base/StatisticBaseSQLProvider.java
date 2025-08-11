@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper.STATISTIC_META_TABLE_NAME;
 
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -56,15 +55,14 @@ public class StatisticBaseSQLProvider {
 
   public String batchDeleteStatisticPOs(
       @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
-    String statisticsCondition =
-        statisticNames.stream().map(stat -> "'" + stat + "'").collect(Collectors.joining(", "));
     return "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
         + " WHERE "
-        + " statistic_name IN  "
-        + "("
-        + statisticsCondition
+        + " statistic_name IN  ("
+        + "<foreach collection='statisticNames' item='item' separator=','>"
+        + " #{item}"
+        + "</foreach>"
         + ")"
         + " AND deleted_at = 0 AND metadata_object_id = #{entityId}";
   }
