@@ -245,8 +245,8 @@ public class AwsIrsaCredentialProvider implements CredentialProvider {
       Set<String> readLocations,
       Set<String> writeLocations,
       String arnPrefix) {
-    Map<String, IamStatement.Builder> bucketListStatmentBuilder = new HashMap<>();
-    Map<String, IamStatement.Builder> bucketGetLocationStatmentBuilder = new HashMap<>();
+    Map<String, IamStatement.Builder> bucketListStatementBuilder = new HashMap<>();
+    Map<String, IamStatement.Builder> bucketGetLocationStatementBuilder = new HashMap<>();
 
     Stream.concat(readLocations.stream(), writeLocations.stream())
         .distinct()
@@ -257,7 +257,7 @@ public class AwsIrsaCredentialProvider implements CredentialProvider {
               String rawPath = trimLeadingSlash(uri.getPath());
 
               // Add list bucket permissions with prefix conditions
-              bucketListStatmentBuilder
+              bucketListStatementBuilder
                   .computeIfAbsent(
                       bucketArn,
                       key ->
@@ -273,7 +273,7 @@ public class AwsIrsaCredentialProvider implements CredentialProvider {
                           addWildcardToPath(rawPath))); // Listing objects in raw path
 
               // Add get bucket location permissions
-              bucketGetLocationStatmentBuilder.computeIfAbsent(
+              bucketGetLocationStatementBuilder.computeIfAbsent(
                   bucketArn,
                   key ->
                       IamStatement.builder()
@@ -283,10 +283,10 @@ public class AwsIrsaCredentialProvider implements CredentialProvider {
             });
 
     // Add bucket list statements
-    addStatementsToPolicy(policyBuilder, bucketListStatmentBuilder, "s3:ListBucket");
+    addStatementsToPolicy(policyBuilder, bucketListStatementBuilder, "s3:ListBucket");
 
     // Add bucket location statements
-    addStatementsToPolicy(policyBuilder, bucketGetLocationStatmentBuilder, null);
+    addStatementsToPolicy(policyBuilder, bucketGetLocationStatementBuilder, null);
   }
 
   private void addStatementsToPolicy(

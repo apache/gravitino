@@ -25,11 +25,14 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 /** Generic AWS IRSA credential. */
-public class AwsIrsaCredential implements Credential {
-
+public class AwsIrsaCredential implements Credential { //
+  /** The credential type for AWS IRSA credentials. */
   public static final String AWS_IRSA_CREDENTIAL_TYPE = "aws-irsa";
+  /** The key for AWS access key ID in credential info. */
   public static final String ACCESS_KEY_ID = "access-key-id";
+  /** The key for AWS secret access key in credential info. */
   public static final String SECRET_ACCESS_KEY = "secret-access-key";
+  /** The key for AWS session token in credential info. */
   public static final String SESSION_TOKEN = "session-token";
 
   private String accessKeyId;
@@ -37,6 +40,14 @@ public class AwsIrsaCredential implements Credential {
   private String sessionToken;
   private long expireTimeInMs;
 
+  /**
+   * Constructs an AWS IRSA credential with the specified parameters.
+   *
+   * @param accessKeyId the AWS access key ID
+   * @param secretAccessKey the AWS secret access key
+   * @param sessionToken the AWS session token
+   * @param expireTimeInMs the expiration time in milliseconds
+   */
   public AwsIrsaCredential(
       String accessKeyId, String secretAccessKey, String sessionToken, long expireTimeInMs) {
     validate(accessKeyId, secretAccessKey, sessionToken);
@@ -46,6 +57,7 @@ public class AwsIrsaCredential implements Credential {
     this.expireTimeInMs = expireTimeInMs;
   }
 
+  /** Default constructor for AWS IRSA credential. */
   public AwsIrsaCredential() {}
 
   @Override
@@ -79,14 +91,29 @@ public class AwsIrsaCredential implements Credential {
     this.expireTimeInMs = expireTimeInMs;
   }
 
+  /**
+   * Returns the AWS access key ID.
+   *
+   * @return the access key ID
+   */
   public String accessKeyId() {
     return accessKeyId;
   }
 
+  /**
+   * Returns the AWS secret access key.
+   *
+   * @return the secret access key
+   */
   public String secretAccessKey() {
     return secretAccessKey;
   }
 
+  /**
+   * Returns the AWS session token.
+   *
+   * @return the session token
+   */
   public String sessionToken() {
     return sessionToken;
   }

@@ -43,13 +43,14 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 - **Automatic policy generation**: Creates custom IAM policies scoped to specific table paths including data, metadata, and write locations
 - **EKS integration**: Leverages existing IRSA setup while providing enhanced security through path-based restrictions
 
-| Gravitino server catalog properties | Gravitino Iceberg REST server configurations  | Description                                                                                        | Default value | Required | Since Version    |
-|-------------------------------------|-----------------------------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-providers`              | `gravitino.iceberg-rest.credential-providers` | `aws-irsa` for AWS IRSA credential provider.                                                       | (none)        | Yes      | 0.X.0-incubating |
-| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`          | The ARN of the IAM role to assume. Required for fine-grained path-based access control.           | (none)        | Yes*     | 0.X.0-incubating |
-| `s3-region`                         | `gravitino.iceberg-rest.s3-region`            | The AWS region for STS operations. Used for fine-grained access control.                          | (none)        | No       | 0.X.0-incubating |
-| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs` | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       | 0.X.0-incubating |
-| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services. | (none)        | No       | 0.X.0-incubating |
+
+| Gravitino server catalog properties | Gravitino Iceberg REST server configurations       | Description                                                                                               | Default value | Required | Since Version |
+|-------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `credential-providers`              | `gravitino.iceberg-rest.credential-providers`      | `aws-irsa` for AWS IRSA credential provider.                                                              | (none)        | Yes      | 1.0.0         |
+| `s3-role-arn`                       | `gravitino.iceberg-rest.s3-role-arn`               | The ARN of the IAM role to assume. Required for fine-grained path-based access control.                   | (none)        | Yes*     | 1.0.0         |
+| `s3-region`                         | `gravitino.iceberg-rest.s3-region`                 | The AWS region for STS operations. Used for fine-grained access control.                                  | (none)        | No       | 1.0.0         |
+| `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | Token expiration time in seconds for fine-grained credentials. Cannot exceed role's max session duration. | 3600          | No       | 1.0.0         |
+| `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | Alternative STS endpoint for fine-grained credential generation. Useful for S3-compatible services.       | (none)        | No       | 1.0.0         |
 
 **Note**: `s3-role-arn` is required only when using fine-grained path-based access control with vended credentials. For basic IRSA usage without path restrictions, only `credential-providers=aws-irsa` is needed.
 
