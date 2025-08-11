@@ -50,6 +50,12 @@ public class StatisticBaseSQLProvider {
         + "#{item.lastVersion}, "
         + "#{item.deletedAt})"
         + "</foreach>"
+        + " ON DUPLICATE KEY UPDATE "
+        + "  statistic_value = VALUES(statistic_value),"
+        + "  audit_info = VALUES(audit_info),"
+        + "  current_version = VALUES(current_version),"
+        + "  last_version = VALUES(last_version),"
+        + "  deleted_at = VALUES(deleted_at)"
         + "</script>";
   }
 
