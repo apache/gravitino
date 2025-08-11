@@ -26,6 +26,9 @@ from gravitino.exceptions.base import (
     AlreadyExistsException,
     NotEmptyException,
     UnsupportedOperationException,
+    ForbiddenException,
+    NotInUseException,
+    InUseException,
 )
 
 
@@ -56,6 +59,9 @@ class ErrorConstants(IntEnum):
     # Error codes for connect to catalog failed.
     CONNECTION_FAILED_CODE = 1007
 
+    # Error codes for forbidden operation.
+    FORBIDDEN_CODE = 1008
+
     # Error codes for operation on a no in use entity.
     NOT_IN_USE_CODE = 1009
 
@@ -75,6 +81,9 @@ EXCEPTION_MAPPING = {
     NotEmptyException: ErrorConstants.NON_EMPTY_CODE,
     UnsupportedOperationException: ErrorConstants.UNSUPPORTED_OPERATION_CODE,
     ConnectionFailedException: ErrorConstants.CONNECTION_FAILED_CODE,
+    ForbiddenException: ErrorConstants.FORBIDDEN_CODE,
+    NotInUseException: ErrorConstants.NOT_IN_USE_CODE,
+    InUseException: ErrorConstants.IN_USE_CODE,
 }
 
 ERROR_CODE_MAPPING = {v: k for k, v in EXCEPTION_MAPPING.items()}

@@ -98,4 +98,13 @@ public class SetOwner extends Command {
 
     printInformation("Set owner to " + owner);
   }
+
+  @Override
+  public Command validate() {
+    if (entityType == null) {
+      System.err.println(ErrorMessages.UNKNOWN_ENTITY);
+      throw new RuntimeException();
+    }
+    return super.validate();
+  }
 }
