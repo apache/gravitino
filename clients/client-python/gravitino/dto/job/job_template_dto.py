@@ -88,7 +88,7 @@ class JobTemplateDTO(DataClassJsonMixin, ABC):
     def validate(self) -> None:
         """Validates the JobTemplateDTO. Ensures that required fields are not null or empty."""
         if self._job_type is None:
-            raise ValueError('"jobType" is required and cannot be null')
+            raise ValueError('"jobType" is required and cannot be None')
 
         if self._name is None or not self._name.strip():
             raise ValueError('"name" is required and cannot be empty')

@@ -41,6 +41,6 @@ class JobTemplateRegisterRequest(RESTRequest):
             ValueError: If the request is invalid.
         """
         if self._job_template is None:
-            raise ValueError('"jobTemplate" is required and cannot be null')
+            raise ValueError('"jobTemplate" is required and cannot be None')
 
         self._job_template.validate()

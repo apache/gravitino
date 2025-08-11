@@ -60,6 +60,6 @@ class JobDTO(DataClassJsonMixin):
         if self._job_template_name is None or not self._job_template_name.strip():
             raise ValueError('"jobTemplateName" is required and cannot be empty')
         if self._status is None:
-            raise ValueError('"status" must not be null')
+            raise ValueError('"status" must not be None')
         if self._audit is None:
-            raise ValueError('"audit" must not be null')
+            raise ValueError('"audit" must not be None')

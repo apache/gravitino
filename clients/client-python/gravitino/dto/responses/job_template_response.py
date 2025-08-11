@@ -39,7 +39,7 @@ class JobTemplateResponse(BaseResponse):
         super().validate()
 
         if self._job_template is None:
-            raise IllegalArgumentException('"jobTemplate" must not be null')
+            raise IllegalArgumentException('"jobTemplate" must not be None')
 
         self._job_template.validate()
 
