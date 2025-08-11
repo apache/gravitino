@@ -43,7 +43,7 @@ public class StatisticMetaService {
 
   private StatisticMetaService() {}
 
-  public List<StatisticEntity> listStatisticsByObject(
+  public List<StatisticEntity> listStatisticsByEntity(
       NameIdentifier identifier, Entity.EntityType type) {
     long metalakeId =
         MetalakeMetaService.getInstance()
@@ -79,11 +79,14 @@ public class StatisticMetaService {
   }
 
   public int batchDeleteStatisticPOs(
-      String metalake, MetadataObject object, List<String> statisticNames) {
+      NameIdentifier identifier, Entity.EntityType type, List<String> statisticNames) {
     if (statisticNames == null || statisticNames.isEmpty()) {
       return 0;
     }
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    Long metalakeId =
+        MetalakeMetaService.getInstance()
+            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(identifier));
+    MetadataObject object = NameIdentifierUtil.toMetadataObject(identifier, type);
     Long entityId =
         MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
 
