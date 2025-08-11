@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 /** Generic AWS IRSA credential. */
-public class AwsIrsaCredential implements Credential { //
+public class AwsIrsaCredential implements Credential {
   /** The credential type for AWS IRSA credentials. */
   public static final String AWS_IRSA_CREDENTIAL_TYPE = "aws-irsa";
   /** The key for AWS access key ID in credential info. */
