@@ -82,9 +82,9 @@ public class FilesetOperations {
   private final FilesetDispatcher dispatcher;
 
   private static final String loadFilesetAuthorizationExpression =
-      "ANY(OWNER, METALAKE, CATALOG) || "
-          + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-          + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)";
+      """ANY(OWNER, METALAKE, CATALOG) ||
+         SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_READ_FILESET || ANY_WRITE_FILESET)""";
 
   @Context private HttpServletRequest httpRequest;
 
@@ -136,10 +136,10 @@ public class FilesetOperations {
   @Timed(name = "create-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-fileset", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET",
+      expression = """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_FILESET""",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response createFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -275,10 +275,10 @@ public class FilesetOperations {
   @Timed(name = "alter-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-fileset", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)",
+      expression = """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (FILESET::OWNER || ANY_WRITE_FILESET)""",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response alterFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -315,10 +315,10 @@ public class FilesetOperations {
   @Timed(name = "drop-fileset." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-fileset", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER",
+      expression = """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && FILESET::OWNER""",
       accessMetadataType = MetadataObject.Type.FILESET)
   public Response dropFileset(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

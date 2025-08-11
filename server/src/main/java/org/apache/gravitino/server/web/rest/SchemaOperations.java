@@ -67,8 +67,9 @@ public class SchemaOperations {
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperations.class);
 
   private static final String loadSchemaAuthorizationExpression =
-      " ANY(OWNER, METALAKE, CATALOG) || "
-          + "ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA) ";
+          """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA) """;
 
   private final SchemaDispatcher dispatcher;
 
