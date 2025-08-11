@@ -75,13 +75,14 @@ public class StatisticBaseSQLProvider {
         + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0";
   }
 
-  public String listStatisticPOsByEntityId(@Param("entityId") Long entityId) {
+  public String listStatisticPOsByEntityId(
+      @Param("metalakeId") Long metalakeId, @Param("entityId") Long entityId) {
     return "SELECT statistic_id as statisticId, statistic_name as statisticName, metalake_id as metalakeId,"
         + " statistic_value as statisticValue, metadata_object_id as metadataObjectId,"
         + "metadata_object_type as metadataObjectType, audit_info as auditInfo,"
         + "current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM "
         + STATISTIC_META_TABLE_NAME
-        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{entityId} AND deleted_at = 0 AND metalake_id = #{metalakeId}";
   }
 
   public String softDeleteStatisticsByMetalakeId(@Param("metalakeId") Long metalakeId) {

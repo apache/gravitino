@@ -31,7 +31,8 @@ public interface StatisticMetaMapper {
   String STATISTIC_META_TABLE_NAME = "statistic_meta";
 
   @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByEntityId")
-  List<StatisticPO> listStatisticPOsByEntityId(@Param("entityId") long entityId);
+  List<StatisticPO> listStatisticPOsByEntityId(
+      @Param("metalakeId") Long metalakeId, @Param("entityId") long entityId);
 
   @InsertProvider(type = StatisticSQLProviderFactory.class, method = "batchInsertStatisticPOs")
   void batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);

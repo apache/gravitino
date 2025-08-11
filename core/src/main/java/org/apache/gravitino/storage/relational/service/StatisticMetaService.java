@@ -53,7 +53,8 @@ public class StatisticMetaService {
         MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
     List<StatisticPO> statisticPOs =
         SessionUtils.getWithoutCommit(
-            StatisticMetaMapper.class, mapper -> mapper.listStatisticPOsByEntityId(entityId));
+            StatisticMetaMapper.class,
+            mapper -> mapper.listStatisticPOsByEntityId(metalakeId, entityId));
     return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
