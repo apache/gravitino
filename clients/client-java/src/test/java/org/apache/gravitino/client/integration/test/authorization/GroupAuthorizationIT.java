@@ -26,6 +26,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
@@ -41,7 +42,7 @@ public class GroupAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testCreateGroup() {
     assertThrows(
         "Current user access metadata {testMetalake}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).addGroup("group1");
         });
@@ -54,7 +55,7 @@ public class GroupAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testRemoveGroup() {
     assertThrows(
         "Current user access metadata {testMetalake}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).removeGroup("group1");
         });
