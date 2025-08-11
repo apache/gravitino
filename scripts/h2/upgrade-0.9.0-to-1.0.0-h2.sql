@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS `statistic_meta` (
     UNIQUE KEY `uk_si_mi_mo_del` (`statistic_name`, `metadata_object_id`, `deleted_at`),
     KEY `idx_stid` (`statistic_id`),
     KEY `idx_moid` (`metadata_object_id`)
-    ) ENGINE=InnoDB;
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `job_template_meta` (
     `job_template_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'job template id',
