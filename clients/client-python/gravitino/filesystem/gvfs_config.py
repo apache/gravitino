@@ -73,3 +73,6 @@ class GVFSConfig:
 
     # The configuration key for whether to enable credential vending. The default is false.
     GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING = "enable_credential_vending"
+
+    # The configuration key prefix for the client.
+    GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX = "gvfs_gravitino_client_"
