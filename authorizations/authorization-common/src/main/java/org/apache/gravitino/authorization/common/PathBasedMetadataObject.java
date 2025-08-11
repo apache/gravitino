@@ -174,12 +174,13 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
     return Objects.equals(name, that.name)
         && Objects.equals(parent, that.parent)
         && Objects.equals(path, that.path)
-        && Objects.equals(type, that.type);
+        && Objects.equals(type, that.type)
+        && Objects.equals(recursive, that.recursive);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, parent, path, type);
+    return Objects.hash(name, parent, path, type, recursive);
   }
 
   @Override
@@ -191,6 +192,8 @@ public class PathBasedMetadataObject implements AuthorizationMetadataObject {
         + strPath
         + "], [type="
         + type
+        + "], [recursive="
+        + recursive
         + "]";
   }
 }
