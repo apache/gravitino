@@ -106,9 +106,9 @@ ALTER TABLE model_version_info ADD CONSTRAINT uk_mid_ver_uri_del UNIQUE (model_i
 ALTER TABLE model_version_info ALTER COLUMN model_version_uri_name DROP DEFAULT;
 
 CREATE TABLE IF NOT EXISTS statistic_meta (
-                                              id BIGINT NOT NULL,
-                                              statistic_id BIGINT NOT NULL,
-                                              statistic_name VARCHAR(128) NOT NULL,
+    id BIGINT NOT NULL,
+    statistic_id BIGINT NOT NULL,
+    statistic_name VARCHAR(128) NOT NULL,
     metalake_id BIGINT NOT NULL,
     statistic_value TEXT NOT NULL,
     metadata_object_id BIGINT NOT NULL,
