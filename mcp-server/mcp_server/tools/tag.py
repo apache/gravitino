@@ -14,11 +14,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
 from fastmcp import Context, FastMCP
 
 
 def load_tag_tool(mcp: FastMCP):
-    @mcp.tool(tags={"tag"})
+    @mcp.tool(tags={"tag"}, enabled=False)
     async def create_tag(
         ctx: Context, name: str, comment: str, properties: dict
     ) -> str:
