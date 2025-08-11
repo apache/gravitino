@@ -42,12 +42,12 @@ plugins {
   alias(libs.plugins.node) apply false
 
   // Spotless version < 6.19.0 (https://github.com/diffplug/spotless/issues/1819) has an issue running against JDK21.
-  if (JavaVersion.current() >= JavaVersion.VERSION_17) {
+  if (JavaVersion.current() == JavaVersion.VERSION_17) {
     alias(libs.plugins.spotless)
   } else {
     throw GradleException(
       "The Gravitino Gradle toolchain currently does not support " +
-        "Java version ${JavaVersion.current()}. Please use JDK version 17 or higher."
+        "Java version ${JavaVersion.current()}. Please use JDK version 17."
     )
   }
 

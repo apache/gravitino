@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 + Linux or macOS operating system
 + Git
-+ A Java Development Kit, version 17 or higher, installed in your environment to launch Gradle
++ A Java Development Kit, version 17, installed in your environment to launch Gradle
 + Python 3.8, 3.9, 3.10, 3.11, or 3.12 to build the Gravitino Python client
 + Optionally, Docker to run integration tests
 
@@ -94,7 +94,7 @@ license: "This software is licensed under the Apache License version 2."
  
   You can add `-x test` to skip the tests using `./gradlew build -x test`.
 
-  The built Gravitino libraries are Java 8 compatible and verified under the Java 8, 11, and 17 environments. You can use Java 8, 11, or 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
+  The built Gravitino libraries are Java 17 compatible and verified under 17 environments. You can use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
 
   The built jars are under the modules `build/libs` directory. You can publish them in your Maven repository for use in your project.
   :::
@@ -171,7 +171,7 @@ sudo apt install apt-transport-https ca-certificates curl software-properties-co
 
 Updating the package list ensures you have the latest information on the newest versions of packages and dependencies. Installing the necessary packages lets your system download and manage additional software securely.
 
-### Download and setup Java SDK 17 (11 or 8 also works)
+### Download and setup Java SDK 17
 
 **On Ubuntu (WSL):**
 
