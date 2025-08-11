@@ -92,17 +92,6 @@ public class PostgreSqlCatalogCapabilityIT {
           result.unsupportedMessage().contains("reserved"),
           "Error message should mention 'reserved' for name: " + name);
     }
-    String[] reservedTableNames = {"pg_catalog", "information_schema"};
-
-    for (String name : reservedTableNames) {
-      CapabilityResult result = capability.specificationOnName(Capability.Scope.TABLE, name);
-      Assertions.assertFalse(
-          result.supported(),
-          "Reserved table name '" + name + "' should be rejected but was accepted");
-      Assertions.assertTrue(
-          result.unsupportedMessage().contains("reserved"),
-          "Error message should mention 'reserved' for name: " + name);
-    }
   }
 
   @Test

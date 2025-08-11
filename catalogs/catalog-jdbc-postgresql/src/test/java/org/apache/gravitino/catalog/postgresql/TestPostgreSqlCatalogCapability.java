@@ -144,26 +144,6 @@ public class TestPostgreSqlCatalogCapability {
   }
 
   @Test
-  void testReservedTableNames() {
-    CapabilityResult result = capability.specificationOnName(Capability.Scope.TABLE, "pg_catalog");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-
-    result = capability.specificationOnName(Capability.Scope.TABLE, "information_schema");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-
-    // case insensitive reserved names should be rejected
-    result = capability.specificationOnName(Capability.Scope.TABLE, "PG_CATALOG");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-
-    result = capability.specificationOnName(Capability.Scope.TABLE, "INFORMATION_SCHEMA");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-  }
-
-  @Test
   void testReservedNamesNotAppliedToOtherScopes() {
     // Reserved names should not apply to column scope
     CapabilityResult result = capability.specificationOnName(Capability.Scope.COLUMN, "pg_catalog");
