@@ -24,7 +24,7 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 
 /**
  * MetadataObjectStatisticsUpdate represents a collection of statistics updates for a specific
- * MetadataObject.
+ * MetadataObject. The updates include append statistics, overwrite statistics or insert statistics.
  */
 public class MetadataObjectStatisticsUpdate {
 

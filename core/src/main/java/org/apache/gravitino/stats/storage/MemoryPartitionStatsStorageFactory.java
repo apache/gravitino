@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.stats.PartitionRange;
@@ -61,38 +62,18 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
             tableStats.partitionStatistics().values()) {
           String partitionName = partitionStat.partitionName();
           boolean lowerBoundSatisfied =
-              range
-                  .lowerPartitionName()
-                  .flatMap(
-                      fromPartitionName ->
-                          range
-                              .lowerBoundType()
-                              .map(
-                                  type -> {
-                                    if (type == PartitionRange.BoundType.OPEN) {
-                                      return partitionName.compareTo(fromPartitionName) > 0;
-                                    } else {
-                                      return partitionName.compareTo(fromPartitionName) >= 0;
-                                    }
-                                  }))
-                  .orElse(true);
+              isBoundSatisfied(
+                  range.lowerPartitionName(),
+                  range.lowerBoundType(),
+                  partitionName,
+                  BoundDirection.LOWER);
 
           boolean upperBoundSatisfied =
-              range
-                  .upperPartitionName()
-                  .flatMap(
-                      toPartitionName ->
-                          range
-                              .upperBoundType()
-                              .map(
-                                  type -> {
-                                    if (type == PartitionRange.BoundType.OPEN) {
-                                      return partitionName.compareTo(toPartitionName) < 0;
-                                    } else {
-                                      return partitionName.compareTo(toPartitionName) <= 0;
-                                    }
-                                  }))
-                  .orElse(true);
+              isBoundSatisfied(
+                  range.upperPartitionName(),
+                  range.upperBoundType(),
+                  partitionName,
+                  BoundDirection.UPPER);
 
           if (lowerBoundSatisfied && upperBoundSatisfied) {
             resultStats.put(partitionName, Maps.newHashMap(partitionStat.statistics()));
@@ -102,6 +83,19 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
             .map(entry -> PersistedPartitionStatistics.of(entry.getKey(), entry.getValue()))
             .collect(Collectors.toList());
       }
+    }
+
+    private static boolean isBoundSatisfied(
+        Optional<String> boundPartitionName,
+        Optional<PartitionRange.BoundType> boundPartitionType,
+        String partitionName,
+        BoundDirection boundDirection) {
+      return boundPartitionName
+          .flatMap(
+              targetPartitionName ->
+                  boundPartitionType.map(
+                      type -> boundDirection.compare(targetPartitionName, partitionName, type)))
+          .orElse(true);
     }
 
     @Override
@@ -213,6 +207,28 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
       public Map<String, PersistedPartitionStatistics> partitionStatistics() {
         return partitionStatistics;
       }
+    }
+
+    public enum BoundDirection {
+      LOWER {
+        @Override
+        boolean compare(
+            String targetPartitionName, String partitionName, PartitionRange.BoundType type) {
+          int result = targetPartitionName.compareTo(partitionName);
+          return type == PartitionRange.BoundType.OPEN ? result > 0 : result >= 0;
+        }
+      },
+      UPPER {
+        @Override
+        boolean compare(
+            String targetPartitionName, String partitionName, PartitionRange.BoundType type) {
+          int result = targetPartitionName.compareTo(partitionName);
+          return type == PartitionRange.BoundType.OPEN ? result < 0 : result <= 0;
+        }
+      };
+
+      abstract boolean compare(
+          String targetPartitionName, String partitionName, PartitionRange.BoundType boundaryType);
     }
   }
 }
