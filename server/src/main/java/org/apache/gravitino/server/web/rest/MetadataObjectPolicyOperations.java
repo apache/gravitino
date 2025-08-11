@@ -90,8 +90,9 @@ public class MetadataObjectPolicyOperations {
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-            Optional<Policy> policy = getPolicyForObject(metalake, object, policyName);
 
+            // 1. Check if the policy is directly attached to the object.
+            Optional<Policy> policy = getPolicyForObject(metalake, object, policyName);
             if (policy.isPresent()) {
               LOG.info(
                   "Get policy: {} for object type: {}, full name: {} under metalake: {}",
@@ -103,33 +104,42 @@ public class MetadataObjectPolicyOperations {
                   new PolicyResponse(DTOConverters.toDTO(policy.get(), Optional.of(false))));
             }
 
-            // ensure the policy exists and is inheritable
+            // 2. If not found, try to find an inheritable policy from its parents.
+            // First, ensure the target policy exists and is inheritable for this object type.
             Policy targetPolicy = policyDispatcher.getPolicy(metalake, policyName);
             if (!targetPolicy.inheritable()
                 || !targetPolicy.supportedObjectTypes().contains(object.type())) {
               return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
             }
 
-            if (hasConflictExclusivePolicy(metalake, object, targetPolicy)) {
+            // 3. Check for exclusive policy conflicts on the current object.
+            // If an exclusive policy of the same type already exists on this object, the target
+            // policy cannot be inherited.
+            Policy[] currentObjectPolicies =
+                policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
+            if (hasConflictExclusivePolicy(currentObjectPolicies, targetPolicy)) {
               return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
             }
 
+            // 4. Traverse up the hierarchy to find the policy from a parent.
             MetadataObject parentObject = MetadataObjects.parent(object);
             while (parentObject != null) {
               if (!targetPolicy.supportedObjectTypes().contains(parentObject.type())) {
-                // If the parent object type is not supported by the target policy, we skip it.
+                // If the parent object type is not supported by the target policy, skip it.
                 parentObject = MetadataObjects.parent(parentObject);
                 continue;
               }
 
               Policy[] parentPolicies =
                   policyDispatcher.listPolicyInfosForMetadataObject(metalake, parentObject);
+
+              // If another exclusive policy of the same type is found on a parent, it blocks
+              // inheritance from ancestors further up.
               if (hasConflictExclusivePolicy(parentPolicies, targetPolicy)) {
-                // If another same type exclusive policy is found, it means the target policy will
-                // be replaced by the same type policy
                 return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
               }
 
+              // Check if the target policy is attached to this parent.
               Optional<Policy> inheritedPolicy =
                   ArrayUtils.isEmpty(parentPolicies)
                       ? Optional.empty()
@@ -137,7 +147,7 @@ public class MetadataObjectPolicyOperations {
                           .filter(p -> p.name().equals(policyName))
                           .findFirst();
               if (inheritedPolicy.isPresent()) {
-                // If the policy is found in parent object, we convert it to DTO and return.
+                // Policy found. Return it as an inherited policy.
                 LOG.info(
                     "Found policy: {} for object type: {}, full name: {} under metalake: {}",
                     policyName,
@@ -152,6 +162,7 @@ public class MetadataObjectPolicyOperations {
               parentObject = MetadataObjects.parent(parentObject);
             }
 
+            // 5. If no policy is found after checking all parents, return not found.
             return getPolicyNotFoundResponse(metalake, policyName, type, fullName);
           });
 
@@ -186,32 +197,41 @@ public class MetadataObjectPolicyOperations {
 
             Set<PolicyDTO> policies = new HashSet<>();
             Set<String> exclusivePolicyTypes = new HashSet<>();
+
+            // 1. Get policies directly attached to the object.
             Policy[] nonInheritedPolicies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
             for (Policy policy : nonInheritedPolicies) {
               if (policy.exclusive()) {
+                // Record the types of exclusive policies to handle inheritance blocking.
                 exclusivePolicyTypes.add(policy.policyType());
               }
               policies.add(DTOConverters.toDTO(policy, Optional.of(false)));
             }
 
+            // 2. Traverse up the hierarchy to collect all inheritable policies.
             MetadataObject parentObject = MetadataObjects.parent(object);
             while (parentObject != null) {
               Policy[] inheritedPolicies =
                   policyDispatcher.listPolicyInfosForMetadataObject(metalake, parentObject);
               for (Policy policy : inheritedPolicies) {
+                // An inherited policy is collected only if:
+                // a. It is marked as inheritable.
+                // b. It supports the current object's type.
                 if (!policy.supportedObjectTypes().contains(object.type())
                     || !policy.inheritable()) {
-                  // If the policy is not inheritable or does not support the object type,
-                  // we skip it.
                   continue;
                 }
+
+                // c. If it's an exclusive policy, its type must not have been added by a
+                //    closer-level policy (from the child or a lower-level parent). This
+                //    ensures that child's exclusive policies override parent's.
                 if (policy.exclusive()) {
                   if (exclusivePolicyTypes.contains(policy.policyType())) {
-                    // If the policy is exclusive and already exists in the child object, we skip
-                    // it.
                     continue;
                   }
+                  // Record the exclusive policy type to block any further policies of the same
+                  // type from higher-level ancestors.
                   exclusivePolicyTypes.add(policy.policyType());
                 }
                 policies.add(DTOConverters.toDTO(policy, Optional.of(true)));
@@ -219,6 +239,7 @@ public class MetadataObjectPolicyOperations {
               parentObject = MetadataObjects.parent(parentObject);
             }
 
+            // 3. Format and return the response
             if (verbose) {
               LOG.info(
                   "List {} policies info for object type: {}, full name: {} under metalake: {}",
@@ -288,21 +309,16 @@ public class MetadataObjectPolicyOperations {
     }
   }
 
-  private boolean hasConflictExclusivePolicy(
-      String metalake, MetadataObject object, Policy targetPolicy) {
-    if (!targetPolicy.exclusive()) {
-      return false;
-    }
-
-    Policy[] policies = policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);
-    return Arrays.stream(policies)
-        .anyMatch(
-            p ->
-                p.exclusive()
-                    && p.policyType().equalsIgnoreCase(targetPolicy.policyType())
-                    && !p.name().equals(targetPolicy.name()));
-  }
-
+  /**
+   * Checks if the target policy has a conflict with an existing list of policies.
+   *
+   * <p>A conflict is defined as: the target policy is exclusive, and there is another exclusive
+   * policy of the same type but with a different name already in the provided list.
+   *
+   * @param policies The list of policies to check against.
+   * @param targetPolicy The policy to be checked for conflicts.
+   * @return {@code true} if a conflict exists, {@code false} otherwise.
+   */
   private boolean hasConflictExclusivePolicy(Policy[] policies, Policy targetPolicy) {
     if (!targetPolicy.exclusive() || ArrayUtils.isEmpty(policies)) {
       return false;
@@ -310,6 +326,8 @@ public class MetadataObjectPolicyOperations {
     return Arrays.stream(policies)
         .anyMatch(
             p ->
+                // Another exclusive policy with the same type but a different name causes a
+                // conflict.
                 p.exclusive()
                     && p.policyType().equalsIgnoreCase(targetPolicy.policyType())
                     && !p.name().equals(targetPolicy.name()));
