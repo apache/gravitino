@@ -26,12 +26,22 @@ from mcp_server.client import (
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
 )
+from mcp_server.client.plain.plain_rest_client_fileset_operation import (
+    PlainRESTClientFilesetOperation,
+)
+from mcp_server.client.plain.plain_rest_client_model_operation import (
+    PlainRESTClientModelOperation,
+)
 from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
 )
 from mcp_server.client.plain.plain_rest_client_table_operation import (
     PlainRESTClientTableOperation,
 )
+from mcp_server.client.plain.plain_rest_client_topic_operation import (
+    PlainRESTClientTopicOperation,
+)
+from mcp_server.client.topic_operation import TopicOperation
 
 
 class PlainRESTClientOperation(GravitinoOperation):
@@ -51,5 +61,20 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_schema_operation(self) -> SchemaOperation:
         return PlainRESTClientSchemaOperation(
+            metalake_name=self.metalake_name, rest_client=self.rest_client
+        )
+
+    def as_topic_operation(self) -> TopicOperation:
+        return PlainRESTClientTopicOperation(
+            metalake_name=self.metalake_name, rest_client=self.rest_client
+        )
+
+    def as_model_operation(self):
+        return PlainRESTClientModelOperation(
+            metalake_name=self.metalake_name, rest_client=self.rest_client
+        )
+
+    def as_fileset_operation(self):
+        return PlainRESTClientFilesetOperation(
             metalake_name=self.metalake_name, rest_client=self.rest_client
         )

@@ -18,11 +18,17 @@
 from fastmcp import FastMCP
 
 from mcp_server.tools.catalog import load_catalog_tools
+from mcp_server.tools.fileset import load_fileset_tools
+from mcp_server.tools.model import load_model_tools
 from mcp_server.tools.schema import load_schema_tools
 from mcp_server.tools.table import load_table_tools
+from mcp_server.tools.topic import load_topic_tools
 
 
 def load_tools(mcp: FastMCP):
     load_catalog_tools(mcp)
     load_schema_tools(mcp)
     load_table_tools(mcp)
+    load_topic_tools(mcp)
+    load_model_tools(mcp)
+    load_fileset_tools(mcp)
