@@ -67,11 +67,11 @@ public class StatisticMetaService {
     }
     Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
     MetadataObject object = NameIdentifierUtil.toMetadataObject(entity, type);
-    Long objectId =
+    Long entityId =
         MetadataObjectService.getMetadataObjectId(metalakeId, object.fullName(), object.type());
 
     List<StatisticPO> pos =
-        StatisticPO.initializeStatisticPOs(statisticEntities, metalakeId, objectId, object.type());
+        StatisticPO.initializeStatisticPOs(statisticEntities, metalakeId, entityId, object.type());
     SessionUtils.doWithCommit(
         StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(pos));
   }
