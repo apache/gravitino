@@ -55,7 +55,8 @@ public class StatisticBaseSQLProvider {
 
   public String batchDeleteStatisticPOs(
       @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames) {
-    return "UPDATE "
+    return "<script>"
+        + "UPDATE "
         + STATISTIC_META_TABLE_NAME
         + softDeleteSQL()
         + " WHERE "
@@ -63,8 +64,8 @@ public class StatisticBaseSQLProvider {
         + "<foreach collection='statisticNames' item='item' separator=','>"
         + " #{item}"
         + "</foreach>"
-        + ")"
-        + " AND deleted_at = 0 AND metadata_object_id = #{entityId}";
+        + " ) AND deleted_at = 0 AND metadata_object_id = #{entityId}"
+        + "</script>";
   }
 
   public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
