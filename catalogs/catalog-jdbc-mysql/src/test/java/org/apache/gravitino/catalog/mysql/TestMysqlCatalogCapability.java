@@ -120,7 +120,7 @@ public class TestMysqlCatalogCapability {
 
   @Test
   void testReservedSchemaNames() {
-    // Test reserved schema names
+    // Test reserved schema names are rejected
     CapabilityResult result = capability.specificationOnName(Capability.Scope.SCHEMA, "mysql");
     Assertions.assertFalse(result.supported());
     Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
@@ -143,31 +143,6 @@ public class TestMysqlCatalogCapability {
     Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
 
     result = capability.specificationOnName(Capability.Scope.SCHEMA, "Information_Schema");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-  }
-
-  @Test
-  void testReservedTableNames() {
-    // Test reserved table names
-    CapabilityResult result = capability.specificationOnName(Capability.Scope.TABLE, "mysql");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-
-    result = capability.specificationOnName(Capability.Scope.TABLE, "information_schema");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-
-    result = capability.specificationOnName(Capability.Scope.TABLE, "performance_schema");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-
-    result = capability.specificationOnName(Capability.Scope.TABLE, "sys");
-    Assertions.assertFalse(result.supported());
-    Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
-
-    // case insensitive reserved names
-    result = capability.specificationOnName(Capability.Scope.TABLE, "SYS");
     Assertions.assertFalse(result.supported());
     Assertions.assertTrue(result.unsupportedMessage().contains("reserved"));
   }

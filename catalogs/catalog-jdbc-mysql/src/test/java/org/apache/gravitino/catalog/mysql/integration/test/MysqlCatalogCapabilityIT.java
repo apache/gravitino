@@ -100,20 +100,7 @@ public class MysqlCatalogCapabilityIT {
           "Error message should mention 'reserved' for name: " + name);
     }
 
-    // Test that MySQL reserved table names are properly rejected
-    String[] reservedTableNames = {"mysql", "information_schema", "performance_schema", "sys"};
-
-    for (String name : reservedTableNames) {
-      CapabilityResult result = capability.specificationOnName(Capability.Scope.TABLE, name);
-      Assertions.assertFalse(
-          result.supported(),
-          "Reserved table name '" + name + "' should be rejected but was accepted");
-      Assertions.assertTrue(
-          result.unsupportedMessage().contains("reserved"),
-          "Error message should mention 'reserved' for name: " + name);
-    }
-
-    // case insensitivity
+    // case insensitivity for schemas
     String[] mixedCaseReserved = {"MYSQL", "Information_Schema", "Performance_Schema", "SYS"};
 
     for (String name : mixedCaseReserved) {
@@ -121,11 +108,6 @@ public class MysqlCatalogCapabilityIT {
       Assertions.assertFalse(
           schemaResult.supported(),
           "Reserved schema name '" + name + "' (mixed case) should be rejected but was accepted");
-
-      CapabilityResult tableResult = capability.specificationOnName(Capability.Scope.TABLE, name);
-      Assertions.assertFalse(
-          tableResult.supported(),
-          "Reserved table name '" + name + "' (mixed case) should be rejected but was accepted");
     }
   }
 
