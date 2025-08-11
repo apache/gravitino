@@ -431,7 +431,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     if (right != null) {
       osw.write(right);
     }
-    
+
     osw.write(lineSeparator != null ? lineSeparator : System.lineSeparator());
   }
 
