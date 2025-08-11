@@ -34,8 +34,11 @@ public interface StatisticMetaMapper {
   List<StatisticPO> listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") long entityId);
 
-  @InsertProvider(type = StatisticSQLProviderFactory.class, method = "batchInsertStatisticPOs")
-  void batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);
+  @InsertProvider(
+      type = StatisticSQLProviderFactory.class,
+      method = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
+  void batchInsertStatisticPOsOnDuplicateKeyUpdate(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs);
 
   @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
   Integer batchDeleteStatisticPOs(

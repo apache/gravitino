@@ -32,7 +32,8 @@ import org.apache.ibatis.annotations.Param;
 
 public class StatisticBaseSQLProvider {
 
-  public String batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs) {
+  public String batchInsertStatisticPOsOnDuplicateKeyUpdate(
+      @Param("statisticPOs") List<StatisticPO> statisticPOs) {
     return "<script>"
         + "INSERT INTO "
         + STATISTIC_META_TABLE_NAME

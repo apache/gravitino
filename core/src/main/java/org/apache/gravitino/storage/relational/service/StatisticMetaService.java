@@ -58,7 +58,7 @@ public class StatisticMetaService {
     return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
   }
 
-  public void batchInsertStatisticPOs(
+  public void batchInsertStatisticPOsOnDuplicateKeyUpdate(
       List<StatisticEntity> statisticEntities,
       String metalake,
       NameIdentifier entity,
@@ -74,7 +74,8 @@ public class StatisticMetaService {
     List<StatisticPO> pos =
         StatisticPO.initializeStatisticPOs(statisticEntities, metalakeId, entityId, object.type());
     SessionUtils.doWithCommit(
-        StatisticMetaMapper.class, mapper -> mapper.batchInsertStatisticPOs(pos));
+        StatisticMetaMapper.class,
+        mapper -> mapper.batchInsertStatisticPOsOnDuplicateKeyUpdate(pos));
   }
 
   public int batchDeleteStatisticPOs(

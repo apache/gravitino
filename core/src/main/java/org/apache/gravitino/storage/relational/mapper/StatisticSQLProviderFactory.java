@@ -63,9 +63,9 @@ public class StatisticSQLProviderFactory {
     return STATISTIC_SQL_PROVIDERS.get(jdbcBackendType);
   }
 
-  public static String batchInsertStatisticPOs(
+  public static String batchInsertStatisticPOsOnDuplicateKeyUpdate(
       @Param("statisticPOs") List<StatisticPO> statisticPOs) {
-    return getProvider().batchInsertStatisticPOs(statisticPOs);
+    return getProvider().batchInsertStatisticPOsOnDuplicateKeyUpdate(statisticPOs);
   }
 
   public static String batchDeleteStatisticPOs(
