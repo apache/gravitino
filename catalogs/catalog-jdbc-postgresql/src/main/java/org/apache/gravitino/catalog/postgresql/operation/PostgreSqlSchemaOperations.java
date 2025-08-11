@@ -179,9 +179,18 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
         schema);
   }
 
+  //UPDATED VERSION OF GETSHOWSCHEMACOMMENTSQL
+  private String getShowSchemaComment() {
+    return String.format(
+        "SELECT obj_description(n.oid, 'pg_namespace') AS comment\n"
+            + "FROM pg_catalog.pg_namespace n\n"
+            + "WHERE n.nspname = ?;\n");
+  }
+
   private String getSchemaComment(String schema, Connection connection) throws SQLException {
     try (PreparedStatement preparedStatement =
-        connection.prepareStatement(getShowSchemaCommentSql(schema))) {
+        connection.prepareStatement(getShowSchemaComment())) {
+          preparedStatement.setString(1,schema);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         if (resultSet.next()) {
           return resultSet.getString("comment");
