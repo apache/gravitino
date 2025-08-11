@@ -549,13 +549,15 @@ public class NameIdentifierUtil {
   }
 
   /**
-   * Create a statistic {@link NameIdentifier} from the given identifier and name.
+   * Create a statistic {@link NameIdentifier} from the given identifier and name. The statistic
+   * belongs to the given identifier. For example, if the identifier is a table identifier, the
+   * statistic will be created for that table.
    *
-   * @param identifier The identifier to use
+   * @param entityIdent The identifier to use.
    * @param name The name of the statistic
-   * @return The created statistic {@link NameIdentifier}
+   * @return The created statistic of {@link NameIdentifier}
    */
-  public static NameIdentifier ofStatistic(NameIdentifier identifier, String name) {
-    return NameIdentifier.of(Namespace.fromString(identifier.toString()), name);
+  public static NameIdentifier ofStatistic(NameIdentifier entityIdent, String name) {
+    return NameIdentifier.of(Namespace.fromString(entityIdent.toString()), name);
   }
 }
