@@ -66,7 +66,7 @@ public class StatisticBaseSQLProvider {
         + "("
         + statisticsCondition
         + ")"
-        + " AND deleted_at = 0 AND metadata_object_id = #{entityId})";
+        + " AND deleted_at = 0 AND metadata_object_id = #{entityId}";
   }
 
   public String softDeleteStatisticsByEntityId(@Param("entityId") Long entityId) {
