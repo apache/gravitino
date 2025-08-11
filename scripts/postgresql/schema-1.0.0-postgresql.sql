@@ -683,7 +683,7 @@ CREATE TABLE IF NOT EXISTS statistic_meta (
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (statistic_id),
     UNIQUE (statistic_name, metadata_object_id, deleted_at)
-    );
+);
 
 CREATE INDEX IF NOT EXISTS idx_stid ON statistic_meta (statistic_id);
 CREATE INDEX IF NOT EXISTS idx_moid ON statistic_meta (metadata_object_id);

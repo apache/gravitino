@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.provider.base.StatisticBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.StatisticPostgresSQLProvider;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -33,14 +34,6 @@ public class StatisticSQLProviderFactory {
   static class StatisticMySQLProvider extends StatisticBaseSQLProvider {}
 
   static class StatisticH2Provider extends StatisticBaseSQLProvider {}
-
-  static class StatisticPostgresSQLProvider extends StatisticBaseSQLProvider {
-    @Override
-    protected String softDeleteSQL() {
-      return " SET deleted_at = floor(extract(epoch from((current_timestamp -"
-          + " timestamp '1970-01-01 00:00:00')*1000))) ";
-    }
-  }
 
   private static final Map<JDBCBackend.JDBCBackendType, StatisticBaseSQLProvider>
       STATISTIC_SQL_PROVIDERS =
