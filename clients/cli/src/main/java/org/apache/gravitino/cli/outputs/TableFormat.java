@@ -351,9 +351,7 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       osw.write(right);
     }
 
-    if (lineSeparator!=null) {
-      osw.write(lineSeparator);
-    }
+    osw.write(lineSeparator != null ? lineSeparator : System.lineSeparator());
   }
 
   /**
@@ -433,9 +431,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
     if (right != null) {
       osw.write(right);
     }
-    if (lineSeparator != null){
-      osw.write(lineSeparator);
-    }
+    
+    osw.write(lineSeparator != null ? lineSeparator : System.lineSeparator());
   }
 
   /**
