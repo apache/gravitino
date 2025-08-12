@@ -32,11 +32,18 @@ import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MemoryPartitionStatsStorageFactory implements PartitionStatisticStorageFactory {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(MemoryPartitionStatsStorageFactory.class);
 
   @Override
   public PartitionStatisticStorage create(Map<String, String> properties) {
+    LOG.warn(
+        "The memory partition stats storage is only used for the tests,"
+            + "you shouldn't use it in the production environment.");
     return new MemoryPartitionStatsStorage();
   }
 
