@@ -21,6 +21,7 @@ from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
     SerdesUtils as ExpressionsSerdesUtils,
 )
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
+from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.utils.serdes import SerdesUtilsBase
 
@@ -40,13 +41,18 @@ class SerdesUtils(SerdesUtilsBase):
 
         if dto_type is PartitionDTO.Type.IDENTITY:
             dto = cast(IdentityPartitionDTO, value)
-            dto_data = {
-                cls.FIELD_NAMES: dto.field_names(),
-                cls.IDENTITY_PARTITION_VALUES: [
-                    ExpressionsSerdesUtils.write_function_arg(arg=arg)
-                    for arg in dto.values()
-                ],
-            }
+            dto_data[cls.FIELD_NAMES] = dto.field_names()
+            dto_data[cls.IDENTITY_PARTITION_VALUES] = [
+                ExpressionsSerdesUtils.write_function_arg(arg=arg)
+                for arg in dto.values()
+            ]
+
+        if dto_type is PartitionDTO.Type.LIST:
+            dto = cast(ListPartitionDTO, value)
+            dto_data[cls.LIST_PARTITION_LISTS] = [
+                [ExpressionsSerdesUtils.write_function_arg(arg=arg) for arg in args]
+                for args in dto.lists()
+            ]
 
         result.update(dto_data)
         return result
