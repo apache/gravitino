@@ -20,9 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.Arrays;
 import java.util.Locale;
-import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -34,7 +32,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.metrics.MetricNames;
@@ -50,6 +47,8 @@ public class MetadataObjectRoleOperations {
   private final AccessControlDispatcher accessControlDispatcher;
 
   @Context private HttpServletRequest httpRequest;
+
+  private static final String LIST_ROLE_PRIVILEGE = "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF";
 
   public MetadataObjectRoleOperations() {
     // Because accessControlManager may be null when Gravitino doesn't enable authorization,
@@ -77,21 +76,12 @@ public class MetadataObjectRoleOperations {
           () -> {
             String[] names = accessControlDispatcher.listRoleNamesByObject(metalake, object);
             names =
-                Arrays.stream(names)
-                    .filter(
-                        role -> {
-                          NameIdentifier[] nameIdentifiers =
-                              new NameIdentifier[] {NameIdentifierUtil.ofRole(metalake, role)};
-                          return MetadataFilterHelper.filterByExpression(
-                                      metalake,
-                                      "METALAKE::OWNER || ROLE::OWNER || ROLE::SELF",
-                                      Entity.EntityType.ROLE,
-                                      nameIdentifiers)
-                                  .length
-                              > 0;
-                        })
-                    .collect(Collectors.toList())
-                    .toArray(new String[0]);
+                MetadataFilterHelper.filterByExpression(
+                    metalake,
+                    LIST_ROLE_PRIVILEGE,
+                    Entity.EntityType.ROLE,
+                    names,
+                    (roleName) -> NameIdentifierUtil.ofRole(metalake, roleName));
             return Utils.ok(new NameListResponse(names));
           });
     } catch (Exception e) {

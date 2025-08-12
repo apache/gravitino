@@ -16,13 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.client;
 
-package org.apache.gravitino.auth;
+import org.apache.gravitino.dto.job.JobDTO;
+import org.apache.gravitino.job.JobHandle;
 
-/** The type of OAuth provider. */
-public enum ProviderType {
-  /** Default provider. */
-  DEFAULT,
-  /** Azure AD provider. */
-  AZURE
+/** Represents a generic job handle. */
+public class GenericJobHandle implements JobHandle {
+
+  private final JobDTO jobDTO;
+
+  GenericJobHandle(JobDTO jobDTO) {
+    this.jobDTO = jobDTO;
+  }
+
+  @Override
+  public String jobTemplateName() {
+    return jobDTO.jobTemplateName();
+  }
+
+  @Override
+  public String jobId() {
+    return jobDTO.jobId();
+  }
+
+  @Override
+  public Status jobStatus() {
+    return jobDTO.status();
+  }
 }

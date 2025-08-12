@@ -21,9 +21,12 @@ package org.apache.gravitino.policy;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -32,20 +35,24 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.MetadataObjectService;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@SuppressWarnings("unused") // todo: remove this when all the methods are implemented
 public class PolicyManager implements PolicyDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(PolicyManager.class);
@@ -222,17 +229,71 @@ public class PolicyManager implements PolicyDispatcher {
 
   @Override
   public MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName) {
-    throw new UnsupportedOperationException("Not implemented yet");
-  }
+    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
 
-  @Override
-  public String[] listPoliciesForMetadataObject(String metalake, MetadataObject metadataObject) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    return TreeLockUtils.doWithTreeLock(
+        policyIdent,
+        LockType.READ,
+        () -> {
+          try {
+            if (!entityStore.exists(policyIdent, Entity.EntityType.POLICY)) {
+              throw new NoSuchPolicyException(
+                  "Policy with name %s under metalake %s does not exist", policyName, metalake);
+            }
+
+            List<GenericEntity> entities =
+                entityStore
+                    .relationOperations()
+                    .listEntitiesByRelation(
+                        SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+                        policyIdent,
+                        Entity.EntityType.POLICY);
+            return MetadataObjectService.fromGenericEntities(entities)
+                .toArray(new MetadataObject[0]);
+          } catch (IOException e) {
+            LOG.error("Failed to list metadata objects for policy {}", policyName, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   @Override
   public Policy[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    Preconditions.checkArgument(
+        Policy.SUPPORTS_ALL_OBJECT_TYPES.contains(metadataObject.type()),
+        "Cannot list policies for unsupported metadata object type %s",
+        metadataObject.type());
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return entityStore.relationOperations()
+                .listEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+                    entityIdent,
+                    entityType,
+                    true /* allFields */)
+                .stream()
+                .map(entity -> (PolicyEntity) entity)
+                .toArray(PolicyEntity[]::new);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchMetadataObjectException(
+                e,
+                "Failed to list policies for metadata object %s due to not found",
+                metadataObject);
+          } catch (IOException e) {
+            LOG.error("Failed to list policies for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   @Override
@@ -241,13 +302,111 @@ public class PolicyManager implements PolicyDispatcher {
       MetadataObject metadataObject,
       String[] policiesToAdd,
       String[] policiesToRemove) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    Preconditions.checkArgument(
+        Policy.SUPPORTS_ALL_OBJECT_TYPES.contains(metadataObject.type()),
+        "Cannot associate policies for unsupported metadata object type %s",
+        metadataObject.type());
+
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+
+    // Remove all the policies that are both set to add and remove
+    Set<String> policiesToAddSet =
+        policiesToAdd == null ? Sets.newHashSet() : Sets.newHashSet(policiesToAdd);
+    Set<String> policiesToRemoveSet =
+        policiesToRemove == null ? Sets.newHashSet() : Sets.newHashSet(policiesToRemove);
+    Set<String> common = Sets.intersection(policiesToAddSet, policiesToRemoveSet).immutableCopy();
+    policiesToAddSet.removeAll(common);
+    policiesToRemoveSet.removeAll(common);
+
+    NameIdentifier[] policiesToAddIdent =
+        policiesToAddSet.stream()
+            .map(p -> NameIdentifierUtil.ofPolicy(metalake, p))
+            .toArray(NameIdentifier[]::new);
+    NameIdentifier[] policiesToRemoveIdent =
+        policiesToRemoveSet.stream()
+            .map(p -> NameIdentifierUtil.ofPolicy(metalake, p))
+            .toArray(NameIdentifier[]::new);
+
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () ->
+            TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
+                LockType.WRITE,
+                () -> {
+                  try {
+                    List<PolicyEntity> updatedPolicies =
+                        entityStore
+                            .relationOperations()
+                            .updateEntityRelations(
+                                SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+                                entityIdent,
+                                entityType,
+                                policiesToAddIdent,
+                                policiesToRemoveIdent);
+                    return updatedPolicies.stream().map(PolicyEntity::name).toArray(String[]::new);
+                  } catch (NoSuchEntityException e) {
+                    throw new NoSuchMetadataObjectException(
+                        e,
+                        "Failed to associate policies for metadata object %s due to not found",
+                        metadataObject);
+                  } catch (EntityAlreadyExistsException e) {
+                    throw new PolicyAlreadyAssociatedException(
+                        e,
+                        "Failed to associate policies for metadata object due to some policies %s already "
+                            + "associated to the metadata object %s",
+                        Arrays.toString(policiesToAdd),
+                        metadataObject);
+                  } catch (IOException e) {
+                    LOG.error(
+                        "Failed to associate policies for metadata object {}", metadataObject, e);
+                    throw new RuntimeException(e);
+                  }
+                }));
   }
 
   @Override
   public Policy getPolicyForMetadataObject(
       String metalake, MetadataObject metadataObject, String policyName) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
+    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+
+    return TreeLockUtils.doWithTreeLock(
+        entityIdent,
+        LockType.READ,
+        () -> {
+          try {
+            return entityStore
+                .relationOperations()
+                .getEntityByRelation(
+                    SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
+                    entityIdent,
+                    entityType,
+                    policyIdent);
+          } catch (NoSuchEntityException e) {
+            if (e.getMessage().contains("No such policy entity")) {
+              throw new NoSuchPolicyException(
+                  e, "Policy %s does not exist for metadata object %s", policyName, metadataObject);
+            } else {
+              throw new NoSuchMetadataObjectException(
+                  e,
+                  "Failed to get policy for metadata object %s due to not found",
+                  metadataObject);
+            }
+          } catch (IOException e) {
+            LOG.error("Failed to get policy for metadata object {}", metadataObject, e);
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private void changePolicyEnabledState(
@@ -332,6 +491,11 @@ public class PolicyManager implements PolicyDispatcher {
         newComment = ((PolicyChange.UpdatePolicyComment) change).getNewComment();
       } else if (change instanceof PolicyChange.UpdateContent) {
         PolicyChange.UpdateContent updateContent = (PolicyChange.UpdateContent) change;
+        Preconditions.checkArgument(
+            policyEntity.policyType().equalsIgnoreCase(updateContent.getPolicyType()),
+            "Policy type mismatch: expected %s but got %s",
+            policyEntity.policyType(),
+            updateContent.getPolicyType());
         newContent = updateContent.getContent();
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);

@@ -154,17 +154,33 @@ public class ConfigEntry<T> {
 
   /**
    * Split the string to a list, then map each string element to its converted form.
+   * Leading/trailing whitespace of the input and each element will be trimmed, and blank elements
+   * will be ignored before conversion.
+   *
+   * <p>Examples:
+   *
+   * <pre>{@code
+   * strToSeq(null, converter) = []
+   * strToSeq("   ", converter) = []
+   * strToSeq("A,B,C", converter) = ["A", "B", "C"]
+   * strToSeq(" A, B , ,C,   ,D ", converter) = ["A", "B", "C", "D"]
+   * strToSeq(" AB, B C, ,D,   , E F ", converter) = ["AB", "B C", "D", "E F"]
+   * }</pre>
    *
    * @param str The string form of the value list from the conf entry.
    * @param converter The original ConfigEntry valueConverter.
    * @return The list of converted type.
    */
   public List<T> strToSeq(String str, Function<String, T> converter) {
-    if (str == null || str.isEmpty()) {
+    if (str == null || str.trim().isEmpty()) {
       return Collections.emptyList();
     }
     List<String> strList = Arrays.asList(str.split(","));
-    return strList.stream().map(converter).collect(Collectors.toList());
+    return strList.stream()
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .map(converter)
+        .collect(Collectors.toList());
   }
 
   /**

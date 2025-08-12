@@ -67,6 +67,7 @@ import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
@@ -307,6 +308,8 @@ public class JDBCBackend implements RelationalBackend {
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
         return JobTemplateMetaService.getInstance().deleteJobTemplate(ident);
+      case JOB:
+        return JobMetaService.getInstance().deleteJob(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
@@ -372,6 +375,10 @@ public class JDBCBackend implements RelationalBackend {
         return ModelVersionMetaService.getInstance()
             .deleteModelVersionMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case STATISTIC:
+        return StatisticMetaService.getInstance()
+            .deleteStatisticsByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case JOB_TEMPLATE:
         return JobTemplateMetaService.getInstance()
             .deleteJobTemplatesByLegacyTimeline(
@@ -406,6 +413,7 @@ public class JDBCBackend implements RelationalBackend {
       case TAG:
       case MODEL:
       case MODEL_VERSION:
+      case STATISTIC:
       case JOB_TEMPLATE:
       case JOB:
         // These entity types have not implemented multi-versions, so we can skip.
@@ -470,7 +478,8 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields) {
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
+      throws IOException {
     switch (relType) {
       case OWNER_REL:
         List<E> list = Lists.newArrayList();
@@ -507,6 +516,15 @@ public class JDBCBackend implements RelationalBackend {
               String.format("JOB_TEMPLATE_JOB_REL doesn't support type %s", identType.name()));
         }
 
+      case POLICY_METADATA_OBJECT_REL:
+        if (identType == Entity.EntityType.POLICY) {
+          return (List<E>)
+              PolicyMetaService.getInstance().listAssociatedEntitiesForPolicy(nameIdentifier);
+        } else {
+          return (List<E>)
+              PolicyMetaService.getInstance()
+                  .listPoliciesForMetadataObject(nameIdentifier, identType);
+        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -525,6 +543,44 @@ public class JDBCBackend implements RelationalBackend {
       case OWNER_REL:
         OwnerMetaService.getInstance().setOwner(srcIdentifier, srcType, dstIdentifier, dstType);
         break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
+      Type relType,
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      NameIdentifier[] destEntitiesToAdd,
+      NameIdentifier[] destEntitiesToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    switch (relType) {
+      case POLICY_METADATA_OBJECT_REL:
+        return (List<E>)
+            PolicyMetaService.getInstance()
+                .associatePoliciesWithMetadataObject(
+                    srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getEntityByRelation(
+      Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier destEntityIdent)
+      throws IOException, NoSuchEntityException {
+    switch (relType) {
+      case POLICY_METADATA_OBJECT_REL:
+        return (E)
+            PolicyMetaService.getInstance()
+                .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

@@ -44,6 +44,7 @@ import org.apache.iceberg.SortField;
 import org.apache.iceberg.types.Types;
 
 /** Provide some basic usage methods and test classes for basic fields. */
+@SuppressWarnings("deprecation")
 public class TestBaseConvert {
 
   protected static final String TEST_COMMENT = "test_comment";

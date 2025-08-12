@@ -81,6 +81,38 @@ public interface ModelVersionChange {
   }
 
   /**
+   * Create a ModelVersionChange for updating the uri of a model version.
+   *
+   * @param uriName The name of the uri to be updated for the model version.
+   * @param newUri The new uri to be set for the model version.
+   * @return A new ModelVersionChange instance for updating the uri of a model version.
+   */
+  static ModelVersionChange updateUri(String uriName, String newUri) {
+    return new ModelVersionChange.UpdateUri(uriName, newUri);
+  }
+
+  /**
+   * Create a ModelVersionChange for adding the uri of a model version.
+   *
+   * @param uriName The name of the uri to be added for the model version.
+   * @param uri The uri to be added for the model version.
+   * @return A new ModelVersionChange instance for adding the uri of a model version.
+   */
+  static ModelVersionChange addUri(String uriName, String uri) {
+    return new ModelVersionChange.AddUri(uriName, uri);
+  }
+
+  /**
+   * Create a ModelVersionChange for removing the uri of a model version.
+   *
+   * @param uriName The name of the uri to be removed for the model version.
+   * @return A new ModelVersionChange instance for removing the uri of a model version.
+   */
+  static ModelVersionChange removeUri(String uriName) {
+    return new ModelVersionChange.RemoveUri(uriName);
+  }
+
+  /**
    * Create a ModelVersionChange for updating the aliases of a model version.
    *
    * @param aliasesToAdd The new aliases to be added for the model version.
@@ -139,7 +171,7 @@ public interface ModelVersionChange {
      * Generates a hash code for this {@link UpdateComment} instance. The hash code is based on the
      * new comment of the model.
      *
-     * @return A hash code value for this model renaming operation.
+     * @return A hash code value for this comment update operation.
      */
     @Override
     public int hashCode() {
@@ -294,6 +326,7 @@ public interface ModelVersionChange {
 
   /** A ModelVersionChange to update the uri of a model version. */
   final class UpdateUri implements ModelVersionChange {
+    private final String uriName;
     private final String newUri;
 
     /**
@@ -302,6 +335,17 @@ public interface ModelVersionChange {
      * @param newUri The new uri to be set for the model version.
      */
     public UpdateUri(String newUri) {
+      this(ModelVersion.URI_NAME_UNKNOWN, newUri);
+    }
+
+    /**
+     * Creates a new {@link UpdateUri} instance with the specified new uri and its name.
+     *
+     * @param uriName The name of the uri to be updated for the model version.
+     * @param newUri The new uri to be set for the model version.
+     */
+    public UpdateUri(String uriName, String newUri) {
+      this.uriName = uriName;
       this.newUri = newUri;
     }
 
@@ -315,8 +359,17 @@ public interface ModelVersionChange {
     }
 
     /**
+     * Returns the name of the uri to be updated for the model version.
+     *
+     * @return The name of the uri to be updated for the model version.
+     */
+    public String uriName() {
+      return uriName;
+    }
+
+    /**
      * Compares this UpdateUri instance with another object for equality. The comparison is based on
-     * the new uri of the model version.
+     * the new uri and its name of the model version.
      *
      * @param obj The object to compare with this instance.
      * @return {@code true} if the given object represents the same model update operation; {@code
@@ -327,29 +380,163 @@ public interface ModelVersionChange {
       if (obj == this) return true;
       if (!(obj instanceof UpdateUri)) return false;
       UpdateUri other = (UpdateUri) obj;
-      return Objects.equals(newUri, other.newUri);
+      return Objects.equals(newUri, other.newUri) && Objects.equals(uriName, other.uriName);
     }
 
     /**
-     * Generates a hash code for this UpdateUri instance. The hash code is based on the new uri of
-     * the model.
+     * Generates a hash code for this UpdateUri instance. The hash code is based on the new uri and
+     * its name of the model version.
      *
-     * @return A hash code value for this model renaming operation.
+     * @return A hash code value for this URI update operation.
      */
     @Override
     public int hashCode() {
-      return Objects.hash(newUri);
+      return Objects.hash(newUri, uriName);
     }
 
     /**
      * Provides a string representation of the UpdateUri instance. This string format includes the
-     * class name followed by the new uri to be set.
+     * class name followed by the new uri and its name to be updated.
      *
      * @return A string summary of the UpdateUri instance.
      */
     @Override
     public String toString() {
-      return "UpdateUri " + newUri;
+      return "UpdateUri uriName: (" + uriName + ") newUri: (" + newUri + ")";
+    }
+  }
+
+  /** A ModelVersionChange to add a uri of a model version. */
+  final class AddUri implements ModelVersionChange {
+    private final String uriName;
+    private final String uri;
+
+    /**
+     * Creates a new {@link AddUri} instance with the specified uri and uri name.
+     *
+     * @param uriName The name of the uri to be added.
+     * @param uri The uri to be added for the model version.
+     */
+    public AddUri(String uriName, String uri) {
+      this.uriName = uriName;
+      this.uri = uri;
+    }
+
+    /**
+     * Returns the uri to be added for the model version.
+     *
+     * @return The uri to be added for the model version.
+     */
+    public String uri() {
+      return uri;
+    }
+
+    /**
+     * Returns the name of the uri to be added for the model version.
+     *
+     * @return The name of the uri to be added for the model version.
+     */
+    public String uriName() {
+      return uriName;
+    }
+
+    /**
+     * Compares this AddUri instance with another object for equality. The comparison is based on
+     * the uri and its name of the model version.
+     *
+     * @param obj The object to compare with this instance.
+     * @return {@code true} if the given object represents the same model update operation; {@code
+     *     false} otherwise.
+     */
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == this) return true;
+      if (!(obj instanceof AddUri)) return false;
+      AddUri other = (AddUri) obj;
+      return Objects.equals(uri, other.uri) && Objects.equals(uriName, other.uriName);
+    }
+
+    /**
+     * Generates a hash code for this AddUri instance. The hash code is based on the uri and its
+     * name of the model.
+     *
+     * @return A hash code value for this URI addition operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(uri, uriName);
+    }
+
+    /**
+     * Provides a string representation of the AddUri instance. This string format includes the
+     * class name followed by the uri and its name to be added.
+     *
+     * @return A string summary of the AddUri instance.
+     */
+    @Override
+    public String toString() {
+      return "AddUri uriName: (" + uriName + ") uri: (" + uri + ")";
+    }
+  }
+
+  /** A ModelVersionChange to remove a uri of a model version. */
+  final class RemoveUri implements ModelVersionChange {
+    private final String uriName;
+
+    /**
+     * Creates a new {@link RemoveUri} instance with the specified uri name.
+     *
+     * @param uriName The name of the uri to be removed.
+     */
+    public RemoveUri(String uriName) {
+      this.uriName = uriName;
+    }
+
+    /**
+     * Returns the name of the uri to be removed for the model version.
+     *
+     * @return The name of the uri to be removed for the model version.
+     */
+    public String uriName() {
+      return uriName;
+    }
+
+    /**
+     * Compares this RemoveUri instance with another object for equality. The comparison is based on
+     * the uri name of the model version.
+     *
+     * @param obj The object to compare with this instance.
+     * @return {@code true} if the given object represents the same model update operation; {@code
+     *     false} otherwise.
+     */
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == this) return true;
+      if (!(obj instanceof RemoveUri)) return false;
+      RemoveUri other = (RemoveUri) obj;
+      return Objects.equals(uriName, other.uriName);
+    }
+
+    /**
+     * Generates a hash code for this RemoveUri instance. The hash code is based on the uri and its
+     * name of the model.
+     *
+     * @return A hash code value for this URI removal operation.
+     */
+    @Override
+    public int hashCode() {
+      return Objects.hash(uriName);
+    }
+
+    /**
+     * Provides a string representation of the RemoveUri instance. This string format includes the
+     * class name followed by the uri name to be removed.
+     *
+     * @return A string summary of the RemoveUri instance.
+     */
+    @Override
+    public String toString() {
+      return "RemoveUri uriName: (" + uriName + ")";
     }
   }
 
