@@ -142,5 +142,4 @@ See the [LICENSE](LICENSE) file for details.
 
 <sub>Apache®, Apache Gravitino™, Apache Hadoop®, Apache Hive™, Apache Iceberg™, Apache Kafka®, Apache Spark™, Apache Submarine™, Apache Thrift™, and Apache Zeppelin™ are trademarks of the Apache Software Foundation in the United States and/or other countries.</sub>
 
-
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=ReadMe" style="border:0;" alt="" />
