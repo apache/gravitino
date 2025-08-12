@@ -168,7 +168,9 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
     }
 
     @Override
-    public void close() throws IOException {}
+    public void close() throws IOException {
+      totalStatistics.clear();
+    }
 
     private static class MetadataContainerKey {
       private final String metalake;
