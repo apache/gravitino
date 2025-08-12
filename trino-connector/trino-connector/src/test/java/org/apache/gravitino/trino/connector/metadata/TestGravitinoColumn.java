@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.metadata;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
@@ -28,12 +29,17 @@ public class TestGravitinoColumn {
 
   @Test
   public void testGravitinoColumn() {
-    Column column = Column.of("f1", Types.StringType.get(), "test column");
+    Column column =
+        Column.of(
+            "f1", Types.StringType.get(), "test column", false, true, Literals.stringLiteral("1"));
     GravitinoColumn gravitinoColumn = new GravitinoColumn(column, 0);
 
     assertEquals(gravitinoColumn.getName(), column.name());
     assertEquals(gravitinoColumn.getIndex(), 0);
     assertEquals(gravitinoColumn.getComment(), column.comment());
     assertEquals(gravitinoColumn.getType(), column.dataType());
+    assertEquals(gravitinoColumn.isNullable(), column.nullable());
+    assertEquals(gravitinoColumn.isAutoIncrement(), column.autoIncrement());
+    assertEquals(gravitinoColumn.getDefaultValue(), column.defaultValue());
   }
 }
