@@ -87,7 +87,7 @@ public class Namespace {
   }
 
   private Namespace(String[] levels) {
-    this.levels = levels;
+    this.levels = Arrays.copyOf(levels, levels.length);
   }
 
   /**
@@ -96,7 +96,7 @@ public class Namespace {
    * @return The levels of the namespace
    */
   public String[] levels() {
-    return levels;
+    return Arrays.copyOf(levels, levels.length);
   }
 
   /**

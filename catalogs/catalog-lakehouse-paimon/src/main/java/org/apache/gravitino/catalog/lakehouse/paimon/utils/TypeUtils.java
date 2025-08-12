@@ -258,10 +258,17 @@ public class TypeUtils {
           return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
         case LIST:
           Types.ListType listType = (Types.ListType) type;
-          return DataTypes.ARRAY(visit(listType.elementType()));
+          DataType elementType = visit(listType.elementType());
+          DataType elementTypeWithNullability =
+              listType.elementNullable() ? elementType.nullable() : elementType.notNull();
+          return DataTypes.ARRAY(elementTypeWithNullability);
         case MAP:
           Types.MapType mapType = (Types.MapType) type;
-          return DataTypes.MAP(visit(mapType.keyType()), visit(mapType.valueType()));
+          DataType keyType = visit(mapType.keyType());
+          DataType valueType = visit(mapType.valueType());
+          DataType valueTypeWithNullability =
+              mapType.valueNullable() ? valueType.nullable() : valueType.notNull();
+          return DataTypes.MAP(keyType, valueTypeWithNullability);
         case STRUCT:
           RowType.Builder builder = RowType.builder();
           Arrays.stream(((Types.StructType) type).fields())
