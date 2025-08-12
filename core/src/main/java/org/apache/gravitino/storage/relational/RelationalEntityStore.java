@@ -112,7 +112,7 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
-    cache.put(e);
+    cache.invalidate(e.nameIdentifier(), e.type());
   }
 
   @Override
@@ -208,6 +208,10 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
+    if (!allFields) {
+      return backend.listEntitiesByRelation(relType, nameIdentifier, identType, false);
+    }
+
     return cache.withCacheLock(
         () -> {
           Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
@@ -217,7 +221,6 @@ public class RelationalEntityStore
 
           List<E> backendEntities =
               backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
-
           cache.put(nameIdentifier, identType, relType, backendEntities);
 
           return backendEntities;
