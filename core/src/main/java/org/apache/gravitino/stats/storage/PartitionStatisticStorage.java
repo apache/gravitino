@@ -31,7 +31,9 @@ public interface PartitionStatisticStorage extends Closeable {
 
   /**
    * Lists statistics for a given metadata object within a specified range of partition names. The
-   * implementation should guarantee the thread safe.
+   * implementation should guarantee the thread safe. The upper layer will add the parent object
+   * level write lock. For example, if the metadata object is a table, the read lock of the table
+   * level will be held.
    *
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which statistics are being listed
@@ -45,7 +47,8 @@ public interface PartitionStatisticStorage extends Closeable {
   /**
    * Lists statistics for a given metadata object and specific partition names. This interface may
    * be used in the future. The upper logic layer won't call this method now. The implementation
-   * should guarantee the thread safe.
+   * should guarantee the thread safe. The upper layer will add the parent object level write lock.
+   * For example, if the metadata object is a table, the read lock of the table level will be held.
    *
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which statistics are being listed
@@ -61,7 +64,8 @@ public interface PartitionStatisticStorage extends Closeable {
 
   /**
    * Appends statistics to the storage for a given metadata object. The implementation should
-   * guarantee the thread safe.
+   * guarantee the thread safe. The upper layer will add the parent object level write lock. For
+   * example, if the metadata object is a table, the write lock of the schema level will be held.
    *
    * @param metalake the name of the metalake
    * @param statisticsToAppend a list of {@link MetadataObjectStatisticsUpdate} objects, each
@@ -71,7 +75,8 @@ public interface PartitionStatisticStorage extends Closeable {
 
   /**
    * Drops statistics for specified partitions of a metadata object. The implementation should
-   * guarantee the thread safe.
+   * guarantee the thread safe. The upper layer will add the parent object level write lock. For
+   * example, if the metadata object is a table, the write lock of the schema level will be held.
    *
    * @param metalake the name of the metalake
    * @param partitionStatisticsToDrop a map where the key is a {@link MetadataObject} and the value
@@ -83,7 +88,9 @@ public interface PartitionStatisticStorage extends Closeable {
   /**
    * Updates statistics for a given metadata object. The default implementation is to first drop and
    * then append the statistics. Developer can override this logic if needed. The implementation
-   * should guarantee the thread safe.
+   * should guarantee the thread safe. The upper layer will add the parent object level write lock.
+   * For example, if the metadata object is a table, the write lock of the schema level will be
+   * held.
    *
    * @param metalake the name of the metalake
    * @param statisticsToUpdate a list of {@link MetadataObjectStatisticsUpdate} objects, each

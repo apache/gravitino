@@ -38,7 +38,7 @@ public class TestMemoryPartitionStatsStorage {
   @Test
   public void testMemoryPartitionStatsStorage() throws IOException {
     MemoryPartitionStatsStorageFactory factory = new MemoryPartitionStatsStorageFactory();
-    try (PartitionStatisticStorage storage = factory.open(Maps.newHashMap())) {
+    try (PartitionStatisticStorage storage = factory.create(Maps.newHashMap())) {
       MetadataObject metadataObject =
           MetadataObjects.of(
               Lists.newArrayList("catalog", "schema", "table"), MetadataObject.Type.TABLE);

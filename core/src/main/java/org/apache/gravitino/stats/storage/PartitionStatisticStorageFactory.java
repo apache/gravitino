@@ -32,5 +32,5 @@ public interface PartitionStatisticStorageFactory {
    * @param properties additional properties for the storage configuration
    * @return an instance of {@link org.apache.gravitino.stats.storage.PartitionStatisticStorage}
    */
-  PartitionStatisticStorage open(Map<String, String> properties);
+  PartitionStatisticStorage create(Map<String, String> properties);
 }

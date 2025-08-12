@@ -36,7 +36,7 @@ import org.apache.gravitino.stats.StatisticValue;
 public class MemoryPartitionStatsStorageFactory implements PartitionStatisticStorageFactory {
 
   @Override
-  public PartitionStatisticStorage open(Map<String, String> properties) {
+  public PartitionStatisticStorage create(Map<String, String> properties) {
     return new MemoryPartitionStatsStorage();
   }
 
@@ -108,21 +108,20 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
                 key -> new MetadataObjectStatisticsContainer(Maps.newHashMap()));
 
         List<PartitionStatisticsUpdate> stats = update.partitionUpdates();
-        synchronized (tableStats) {
-          for (PartitionStatisticsUpdate updatePartStat : stats) {
-            String partitionName = updatePartStat.partitionName();
-            Map<String, StatisticValue<?>> partitionStats = updatePartStat.statistics();
-            PersistedPartitionStatistics existedPartitionStats =
-                tableStats
-                    .partitionStatistics()
-                    .computeIfAbsent(
-                        partitionName,
-                        k -> PersistedPartitionStatistics.of(partitionName, new HashMap<>()));
-            for (Map.Entry<String, StatisticValue<?>> statEntry : partitionStats.entrySet()) {
-              String statName = statEntry.getKey();
-              StatisticValue<?> statValue = statEntry.getValue();
-              existedPartitionStats.statistics().put(statName, statValue);
-            }
+
+        for (PartitionStatisticsUpdate updatePartStat : stats) {
+          String partitionName = updatePartStat.partitionName();
+          Map<String, StatisticValue<?>> partitionStats = updatePartStat.statistics();
+          PersistedPartitionStatistics existedPartitionStats =
+              tableStats
+                  .partitionStatistics()
+                  .computeIfAbsent(
+                      partitionName,
+                      k -> PersistedPartitionStatistics.of(partitionName, new HashMap<>()));
+          for (Map.Entry<String, StatisticValue<?>> statEntry : partitionStats.entrySet()) {
+            String statName = statEntry.getKey();
+            StatisticValue<?> statValue = statEntry.getValue();
+            existedPartitionStats.statistics().put(statName, statValue);
           }
         }
       }
@@ -151,19 +150,21 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
                 new MetadataContainerKey(metalake, metadataObject),
                 key -> new MetadataObjectStatisticsContainer(Maps.newHashMap()));
 
-        synchronized (tableStats) {
-          for (PartitionStatisticsDrop partStats : partitionsToDrop) {
-            if (tableStats.partitionStatistics().containsKey(partStats.partitionName())) {
-              PersistedPartitionStatistics persistedPartitionStatistics =
-                  tableStats.partitionStatistics().get(partStats.partitionName());
-              for (String statName : partStats.statisticNames()) {
-                persistedPartitionStatistics.statistics().remove(statName);
-              }
-              if (persistedPartitionStatistics.statistics().isEmpty()) {
-                tableStats.partitionStatistics().remove(partStats.partitionName());
-              }
+        for (PartitionStatisticsDrop partStats : partitionsToDrop) {
+          if (tableStats.partitionStatistics().containsKey(partStats.partitionName())) {
+            PersistedPartitionStatistics persistedPartitionStatistics =
+                tableStats.partitionStatistics().get(partStats.partitionName());
+            for (String statName : partStats.statisticNames()) {
+              persistedPartitionStatistics.statistics().remove(statName);
+            }
+            if (persistedPartitionStatistics.statistics().isEmpty()) {
+              tableStats.partitionStatistics().remove(partStats.partitionName());
             }
           }
+        }
+
+        if (tableStats.partitionStatistics().isEmpty()) {
+          totalStatistics.remove(new MetadataContainerKey(metalake, metadataObject));
         }
       }
     }
