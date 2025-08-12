@@ -210,9 +210,12 @@ def load_tag_tool(mcp: FastMCP):
             metadata_full_name (str): Full name of the metadata object to associate tags with.
             It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog".
             or "catalog.schema.fileset". The "model", "topic" are also supported and the format
-            is the same as for "catalog.schema.table".
+            is the same as for "catalog.schema.table". For more, please see tool
+             `get_metadata_fullname_formats`.
+
             metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
-             "fileset", "model", "topic").
+             "fileset", "model", "topic"). For More information, please see
+             tool `list_all_metadata_types`.
             tags_to_associate (list): List of tag names to associate with the metadata.
 
         Example input:
@@ -253,8 +256,10 @@ def load_tag_tool(mcp: FastMCP):
             ctx (Context): The request context object containing lifespan context
                            and connector information.
             metadata_full_name (str): Full name of the metadata object to disassociate tags from.
+            For more, please see tool `get_metadata_fullname_formats`.
             metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
-             "fileset", "model", "topic").
+             "fileset", "model", "topic"). For More information, please see
+             tool `list_all_metadata_types`.
             tags_to_disassociate (list): List of tag names to disassociate from the metadata.
 
         Example input:
@@ -286,8 +291,10 @@ def load_tag_tool(mcp: FastMCP):
         Args:
             ctx (Context): The request context object containing lifespan context
                            and connector information.
-            metadata_full_name (str): Full name of the metadata item (e.g., table, column).
-            metadata_type (str): Type of the metadata (e.g., "table", "column").
+            metadata_full_name (str): Full name of the metadata item (e.g., table, column). For more, please see tool
+             `get_metadata_fullname_formats`.
+            metadata_type (str): Type of the metadata (e.g., "table", "column"). For More information, please see
+             tool `list_all_metadata_types`.
 
         Example input:
             metadata_full_name: "catalog.schema.table"
