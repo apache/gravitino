@@ -1,0 +1,142 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+import unittest
+from enum import Enum
+from unittest.mock import patch
+
+from gravitino.api.types.types import Types
+from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
+from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
+from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
+from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
+from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
+
+
+class MockPartitionDTOType(str, Enum):
+    INVALID_PARTITION_TYPE = "invalid_partition_type"
+
+
+class TestPartitionSerdesUtils(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.literal_values = {
+            "upper": LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value(value="0")
+            .build(),
+            "lower": LiteralDTO.builder()
+            .with_data_type(Types.IntegerType.get())
+            .with_value(value="100")
+            .build(),
+        }
+        cls.field_names = [["upper"], ["lower"]]
+        cls.properties = {"key1": "value1", "key2": "value2"}
+        cls.identity_partition_dto = IdentityPartitionDTO(
+            name="test_identity_partition",
+            values=list(cls.literal_values.values()),
+            field_names=cls.field_names,
+            properties=cls.properties,
+        )
+        cls.range_partition_dto = RangePartitionDTO(
+            name="test_range_partition",
+            properties=cls.properties,
+            **cls.literal_values,
+        )
+        cls.list_partition_dto = ListPartitionDTO(
+            name="test_list_partition",
+            lists=[[literal_value] for literal_value in cls.literal_values.values()],
+            properties=cls.properties,
+        )
+        cls.partition_dtos = {PartitionDTO.Type.IDENTITY: cls.identity_partition_dto}
+
+    def test_write_partition_dto_unknown_type(self):
+        """Test that unknown partition types should raise IOError."""
+
+        with patch.object(
+            self.identity_partition_dto,
+            "type",
+            return_value=MockPartitionDTOType.INVALID_PARTITION_TYPE,
+        ):
+            self.assertRaises(
+                IOError,
+                SerdesUtils.write_partition,
+                value=self.identity_partition_dto,
+            )
+
+    @patch(
+        "gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils.SerdesUtils.write_function_arg"
+    )
+    def test_write_partition_with_mocked_expression_serdes(
+        self, mock_write_function_arg
+    ):
+        """Test write_partition with mocked expression serialization.
+
+        To make sure the number of call to method `ExpressionsSerdesUtils.write_function_arg` are
+        identical to the numbr of `LiteralDTO`s.
+        """
+
+        for partition_dto in self.partition_dtos.values():
+            with self.subTest(partition_dto=partition_dto):
+                mock_write_function_arg.reset_mock()
+                mock_write_function_arg_return = {"mocked": "function_arg"}
+                mock_write_function_arg.return_value = mock_write_function_arg_return
+
+                result = SerdesUtils.write_partition(partition_dto)
+
+                self.assertEqual(
+                    mock_write_function_arg.call_count, len(self.literal_values)
+                )
+                self.assertEqual(
+                    result[SerdesUtils.IDENTITY_PARTITION_VALUES],
+                    [mock_write_function_arg_return] * len(self.literal_values),
+                )
+
+    def test_write_partition_dto(self):
+        for partition_dto_type, partition_dto in self.partition_dtos.items():
+            with self.subTest(
+                partition_dto_type=partition_dto_type, partition_dto=partition_dto
+            ):
+                result = SerdesUtils.write_partition(partition_dto)
+
+                self.assertEqual(
+                    result[SerdesUtils.PARTITION_TYPE], partition_dto_type.value
+                )
+                self.assertEqual(
+                    result[SerdesUtils.PARTITION_NAME],
+                    f"test_{partition_dto_type.value}_partition",
+                )
+                self.assertEqual(result[SerdesUtils.FIELD_NAMES], self.field_names)
+                self.assertIn(SerdesUtils.IDENTITY_PARTITION_VALUES, result)
+                self.assertEqual(
+                    len(result[SerdesUtils.IDENTITY_PARTITION_VALUES]),
+                    len(self.literal_values),
+                )
+
+    def test_write_partition_empty_values(self):
+        """Test writing partition with empty values."""
+
+        empty_partition = IdentityPartitionDTO(
+            name="empty_partition", values=[], field_names=[], properties={}
+        )
+
+        result = SerdesUtils.write_partition(empty_partition)
+
+        self.assertEqual(result[SerdesUtils.PARTITION_NAME], "empty_partition")
+        self.assertEqual(result[SerdesUtils.FIELD_NAMES], [])
+        self.assertEqual(result[SerdesUtils.IDENTITY_PARTITION_VALUES], [])
