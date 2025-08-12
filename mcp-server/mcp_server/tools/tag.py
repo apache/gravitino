@@ -193,7 +193,8 @@ def load_tag_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_tag_operation().delete_tag(name)
 
-    @mcp.tool(tags={"tag"})
+    # Disable the associate_tag_with_metadata tool by default as it will change metadata state.
+    @mcp.tool(tags={"tag"}, enabled=False)
     async def associate_tag_with_metadata(
         ctx: Context,
         metadata_full_name: str,
@@ -237,7 +238,8 @@ def load_tag_tool(mcp: FastMCP):
             [],
         )
 
-    @mcp.tool(tags={"tag"})
+    # Disable the disassociate_tag_from_metadata tool by default as it will change metadata state.
+    @mcp.tool(tags={"tag"}, enabled=False)
     async def disassociate_tag_from_metadata(
         ctx: Context,
         metadata_full_name: str,
