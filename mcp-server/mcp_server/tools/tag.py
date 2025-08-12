@@ -305,8 +305,16 @@ def load_tag_tool(mcp: FastMCP):
 
         Example Return Value:
             [
-              "tag1",
-              "tag2"
+              {
+                "name": "import",
+                "comment": "Import tag for data governance",
+                "properties": {},
+                "audit": {
+                  "creator": "anonymous",
+                  "createTime": "2025-08-12T11:41:09.257235Z"
+                },
+                "inherited": false
+              }
             ]
         """
         client = ctx.request_context.lifespan_context.rest_client()

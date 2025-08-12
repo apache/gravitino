@@ -86,7 +86,7 @@ class PlainRESTClientTagOperation(TagOperation):
         self, metadata_full_name: str, metadata_type: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/objects/{metadata_type}/{metadata_full_name}/tags"
+            f"/api/metalakes/{self.metalake_name}/objects/{metadata_type}/{metadata_full_name}/tags?details=true"
         )
         return extract_content_from_response(response, "names", [])
 
