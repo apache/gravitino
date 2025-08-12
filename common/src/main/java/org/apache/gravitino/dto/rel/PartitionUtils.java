@@ -41,10 +41,16 @@ public class PartitionUtils {
     Preconditions.checkArgument(
         ArrayUtils.isNotEmpty(fieldName), "fieldName cannot be null or empty");
 
+    // Check if nested fields are supported (currently not supported)
+    Preconditions.checkArgument(
+        fieldName.length == 1,
+        "Nested fields are not supported yet. Field name array must contain exactly one element, but got: %s",
+        Arrays.toString(fieldName));
+
     List<ColumnDTO> partitionColumn =
         Arrays.stream(columns)
             // (TODO) Need to consider the case sensitivity issues.
-            //   To be optimized.
+            // To be optimized.
             .filter(c -> c.name().equalsIgnoreCase(fieldName[0]))
             .collect(Collectors.toList());
     Preconditions.checkArgument(
