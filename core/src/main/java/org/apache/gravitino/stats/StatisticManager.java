@@ -59,6 +59,7 @@ public class StatisticManager {
 
   public List<Statistic> listStatistics(String metalake, MetadataObject metadataObject) {
     try {
+      // TODO: we will add lock when we support Iceberg, Hive statistics
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       return store.relationOperations()
@@ -92,6 +93,7 @@ public class StatisticManager {
   public List<Statistic> updateStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
     try {
+      // TODO: we will add lock when we support Iceberg, Hive statistics
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       List<Relation> relations = Lists.newArrayList();
@@ -145,6 +147,7 @@ public class StatisticManager {
       String metalake, MetadataObject metadataObject, List<String> statistics)
       throws UnmodifiableStatisticException {
     try {
+      // TODO: we will add lock when we support Iceberg, Hive statistics
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       List<Relation> relations = Lists.newArrayList();
