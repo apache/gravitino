@@ -20,6 +20,9 @@ from enum import Enum
 from unittest.mock import patch
 
 from gravitino.api.types.types import Types
+from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
+    SerdesUtils as ExpressionSerdesUtils,
+)
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
 from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
@@ -63,7 +66,10 @@ class TestPartitionSerdesUtils(unittest.TestCase):
             lists=[[literal_value] for literal_value in cls.literal_values.values()],
             properties=cls.properties,
         )
-        cls.partition_dtos = {PartitionDTO.Type.IDENTITY: cls.identity_partition_dto}
+        cls.partition_dtos = {
+            PartitionDTO.Type.IDENTITY: cls.identity_partition_dto,
+            PartitionDTO.Type.LIST: cls.list_partition_dto,
+        }
 
     def test_write_partition_dto_unknown_type(self):
         """Test that unknown partition types should raise IOError."""
@@ -96,18 +102,27 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                 mock_write_function_arg.reset_mock()
                 mock_write_function_arg_return = {"mocked": "function_arg"}
                 mock_write_function_arg.return_value = mock_write_function_arg_return
+                partition_dto_type = partition_dto.type()
 
                 result = SerdesUtils.write_partition(partition_dto)
 
                 self.assertEqual(
                     mock_write_function_arg.call_count, len(self.literal_values)
                 )
-                self.assertEqual(
-                    result[SerdesUtils.IDENTITY_PARTITION_VALUES],
-                    [mock_write_function_arg_return] * len(self.literal_values),
-                )
+                if partition_dto_type is PartitionDTO.Type.IDENTITY:
+                    self.assertEqual(
+                        result[SerdesUtils.IDENTITY_PARTITION_VALUES],
+                        [mock_write_function_arg_return] * len(self.literal_values),
+                    )
+                if partition_dto_type is PartitionDTO.Type.LIST:
+                    self.assertEqual(
+                        result[SerdesUtils.LIST_PARTITION_LISTS],
+                        [[mock_write_function_arg_return]] * len(self.literal_values),
+                    )
 
     def test_write_partition_dto(self):
+        """Test writing PartitionDTOs"""
+
         for partition_dto_type, partition_dto in self.partition_dtos.items():
             with self.subTest(
                 partition_dto_type=partition_dto_type, partition_dto=partition_dto
@@ -121,12 +136,24 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                     result[SerdesUtils.PARTITION_NAME],
                     f"test_{partition_dto_type.value}_partition",
                 )
-                self.assertEqual(result[SerdesUtils.FIELD_NAMES], self.field_names)
-                self.assertIn(SerdesUtils.IDENTITY_PARTITION_VALUES, result)
-                self.assertEqual(
-                    len(result[SerdesUtils.IDENTITY_PARTITION_VALUES]),
-                    len(self.literal_values),
-                )
+                if partition_dto_type is PartitionDTO.Type.IDENTITY:
+                    self.assertEqual(result[SerdesUtils.FIELD_NAMES], self.field_names)
+                    self.assertIn(SerdesUtils.IDENTITY_PARTITION_VALUES, result)
+                    self.assertListEqual(
+                        result[SerdesUtils.IDENTITY_PARTITION_VALUES],
+                        [
+                            ExpressionSerdesUtils.write_function_arg(literal_value)
+                            for literal_value in self.literal_values.values()
+                        ],
+                    )
+                if partition_dto_type is PartitionDTO.Type.LIST:
+                    self.assertListEqual(
+                        result[SerdesUtils.LIST_PARTITION_LISTS],
+                        [
+                            [ExpressionSerdesUtils.write_function_arg(literal_value)]
+                            for literal_value in self.literal_values.values()
+                        ],
+                    )
 
     def test_write_partition_empty_values(self):
         """Test writing partition with empty values."""
