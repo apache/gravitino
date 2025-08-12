@@ -502,14 +502,6 @@ public class JDBCBackend implements RelationalBackend {
               String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
         }
 
-      case JOB_TEMPLATE_JOB_REL:
-        if (identType == Entity.EntityType.JOB_TEMPLATE) {
-          return (List<E>) JobMetaService.getInstance().listJobsByTemplateIdent(nameIdentifier);
-        } else {
-          throw new IllegalArgumentException(
-              String.format("JOB_TEMPLATE_JOB_REL doesn't support type %s", identType.name()));
-        }
-
       case POLICY_METADATA_OBJECT_REL:
         if (identType == Entity.EntityType.POLICY) {
           return (List<E>)
