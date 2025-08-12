@@ -234,8 +234,10 @@ public class GravitinoInterceptionService implements InterceptionService {
                     NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset));
                 break;
               case MODEL:
+                String model = entities.get(Entity.EntityType.MODEL);
                 nameIdentifierMap.put(
-                    Entity.EntityType.MODEL, NameIdentifierUtil.ofMetalake(metalake));
+                    Entity.EntityType.MODEL,
+                    NameIdentifierUtil.ofModel(metalake, catalog, schema, model));
                 break;
               case METALAKE:
                 nameIdentifierMap.put(
