@@ -28,10 +28,9 @@ import org.apache.gravitino.stats.PartitionStatisticsDrop;
 public interface PartitionStatisticStorage extends Closeable {
 
   /**
-   * Lists statistics for a given metadata object within a specified range of partition names. The
-   * implementation should guarantee the thread safe. The upper layer will add the parent object
-   * level read lock. For example, if the metadata object is a table, the read lock of the table
-   * level will be held.
+   * Lists statistics for a given metadata object within a specified range of partition names.
+   * Locking guarantee: The upper layer will acquire a read lock at the metadata object level. For
+   * example, if the metadata object is a table, the read lock of the table level will be held.
    *
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which statistics are being listed
@@ -44,9 +43,10 @@ public interface PartitionStatisticStorage extends Closeable {
 
   /**
    * Lists statistics for a given metadata object and specific partition names. This interface may
-   * be used in the future. The upper logic layer won't call this method now. The implementation
-   * should guarantee the thread safe. The upper layer will add the parent object level read lock.
-   * For example, if the metadata object is a table, the read lock of the table level will be held.
+   * be reserved for the future use. The upper logic layer does not currently invoke this
+   * implementation. Locking Guarantee: The upper layer will acquire a read lock at the metadata
+   * object level. For example, if the metadata object is a table, the read lock of the table level
+   * will be held.
    *
    * @param metalake the name of the metalake
    * @param metadataObject the metadata object for which statistics are being listed
@@ -61,9 +61,9 @@ public interface PartitionStatisticStorage extends Closeable {
   }
 
   /**
-   * Drops statistics for specified partitions of a metadata object. The implementation should
-   * guarantee the thread safe. The upper layer will add the parent object level write lock. For
-   * example, if the metadata object is a table, the write lock of the schema level will be held.
+   * Drops statistics for specified partitions of a metadata object. Locking guarantee: The upper
+   * layer will acquire a write lock at the parent object level. For example, if the metadata object
+   * is a table, the write lock of the schema level will be held.
    *
    * @param metalake the name of the metalake
    * @param partitionStatisticsToDrop a map where the key is a {@link MetadataObject} and the value
@@ -73,9 +73,9 @@ public interface PartitionStatisticStorage extends Closeable {
       String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop);
 
   /**
-   * Updates statistics for a given metadata object. The implementation should guarantee the thread
-   * safe. The upper layer will add the parent object level write lock. For example, if the metadata
-   * object is a table, the write lock of the schema level will be held.
+   * Updates statistics for a given metadata object. Locking guarantee: The upper layer will acquire
+   * a write lock at the parent object level. For example, if the metadata object is a table, the
+   * write lock of the schema level will be held.
    *
    * @param metalake the name of the metalake
    * @param statisticsToUpdate a list of {@link MetadataObjectStatisticsUpdate} objects, each
