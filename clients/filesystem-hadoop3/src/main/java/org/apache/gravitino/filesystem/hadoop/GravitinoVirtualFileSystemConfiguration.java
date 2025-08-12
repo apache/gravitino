@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.filesystem.hadoop;
 
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+
 /** Configuration class for Gravitino Virtual File System. */
 public class GravitinoVirtualFileSystemConfiguration {
 
@@ -50,6 +53,8 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The authentication type for kerberos authentication. */
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
   // oauth2
+  /** The configuration key prefix for oauth2 */
+  public static final String FS_GRAVITINO_CLIENT_OAUTH2_PREFIX = "fs.gravitino.client.oauth2.";
   /** The configuration key for the URI of the default OAuth server. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SERVER_URI_KEY =
       "fs.gravitino.client.oauth2.serverUri";
@@ -66,6 +71,8 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY =
       "fs.gravitino.client.oauth2.scope";
 
+  /** The configuration key prefix for kerberos */
+  public static final String FS_GRAVITINO_CLIENT_KERBEROS_PREFIX = "fs.gravitino.client.kerberos.";
   /** The configuration key for the principal. */
   public static final String FS_GRAVITINO_CLIENT_KERBEROS_PRINCIPAL_KEY =
       "fs.gravitino.client.kerberos.principal";
@@ -143,8 +150,15 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING =
       "fs.gravitino.enableCredentialVending";
 
+  /** The configuration key prefix for the Gravitino client config. */
+  public static final String FS_GRAVITINO_CLIENT_CONFIG_PREFIX = "fs.gravitino.client.";
+
   /** The default value for whether to enable credential vending. */
   public static final boolean FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT = false;
+
+  /** The configuration key list which not a Gravitino client config */
+  public static final List<String> NOT_GRAVITINO_CLIENT_CONFIG_LIST =
+      ImmutableList.of(FS_GRAVITINO_CLIENT_METALAKE_KEY, FS_GRAVITINO_CLIENT_AUTH_TYPE_KEY);
 
   private GravitinoVirtualFileSystemConfiguration() {}
 }

@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.trino.connector.metadata;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.types.Type;
 
 /** Help Gravitino connector access ColumnMetadata from gravitino client. */
@@ -31,6 +34,7 @@ public final class GravitinoColumn {
   private final String comment;
   private final boolean nullable;
   private final boolean autoIncrement;
+  private final Expression defaultValue;
 
   // Column properties
   private final Map<String, Object> properties;
@@ -49,7 +53,40 @@ public final class GravitinoColumn {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
+        column.defaultValue(),
         ImmutableMap.of());
+  }
+
+  /**
+   * Constructs a new GravitinoColumn with the specified name, data type, index, comment, nullable,
+   * autoIncrement, defaultValue and properties.
+   *
+   * @param name the name of the column
+   * @param dataType the data type of the column
+   * @param index the index of the column
+   * @param comment the comment of the column
+   * @param nullable whether the column is nullable
+   * @param autoIncrement whether the column is auto increment
+   * @param defaultValue the default value of the column
+   * @param properties the properties of the column
+   */
+  public GravitinoColumn(
+      String name,
+      Type dataType,
+      int index,
+      String comment,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue,
+      Map<String, Object> properties) {
+    this.name = name;
+    this.dataType = dataType;
+    this.index = index;
+    this.comment = comment;
+    this.nullable = nullable;
+    this.autoIncrement = autoIncrement;
+    this.defaultValue = defaultValue;
+    this.properties = properties;
   }
 
   /**
@@ -72,13 +109,8 @@ public final class GravitinoColumn {
       boolean nullable,
       boolean autoIncrement,
       Map<String, Object> properties) {
-    this.name = name;
-    this.dataType = dataType;
-    this.index = index;
-    this.comment = comment;
-    this.nullable = nullable;
-    this.autoIncrement = autoIncrement;
-    this.properties = properties;
+    this(
+        name, dataType, index, comment, nullable, autoIncrement, DEFAULT_VALUE_NOT_SET, properties);
   }
 
   /**
@@ -165,5 +197,14 @@ public final class GravitinoColumn {
    */
   public boolean isAutoIncrement() {
     return autoIncrement;
+  }
+
+  /**
+   * Retrieves the default value of the column.
+   *
+   * @return the default value of the column
+   */
+  public Expression getDefaultValue() {
+    return defaultValue;
   }
 }
