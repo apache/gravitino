@@ -18,10 +18,8 @@
  */
 package org.apache.gravitino.stats.storage;
 
-import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
@@ -32,7 +30,7 @@ public interface PartitionStatisticStorage extends Closeable {
   /**
    * Lists statistics for a given metadata object within a specified range of partition names. The
    * implementation should guarantee the thread safe. The upper layer will add the parent object
-   * level write lock. For example, if the metadata object is a table, the read lock of the table
+   * level read lock. For example, if the metadata object is a table, the read lock of the table
    * level will be held.
    *
    * @param metalake the name of the metalake
@@ -47,7 +45,7 @@ public interface PartitionStatisticStorage extends Closeable {
   /**
    * Lists statistics for a given metadata object and specific partition names. This interface may
    * be used in the future. The upper logic layer won't call this method now. The implementation
-   * should guarantee the thread safe. The upper layer will add the parent object level write lock.
+   * should guarantee the thread safe. The upper layer will add the parent object level read lock.
    * For example, if the metadata object is a table, the read lock of the table level will be held.
    *
    * @param metalake the name of the metalake
@@ -63,17 +61,6 @@ public interface PartitionStatisticStorage extends Closeable {
   }
 
   /**
-   * Appends statistics to the storage for a given metadata object. The implementation should
-   * guarantee the thread safe. The upper layer will add the parent object level write lock. For
-   * example, if the metadata object is a table, the write lock of the schema level will be held.
-   *
-   * @param metalake the name of the metalake
-   * @param statisticsToAppend a list of {@link MetadataObjectStatisticsUpdate} objects, each
-   *     containing the metadata object and its associated statistics updates.
-   */
-  void appendStatistics(String metalake, List<MetadataObjectStatisticsUpdate> statisticsToAppend);
-
-  /**
    * Drops statistics for specified partitions of a metadata object. The implementation should
    * guarantee the thread safe. The upper layer will add the parent object level write lock. For
    * example, if the metadata object is a table, the write lock of the schema level will be held.
@@ -86,34 +73,13 @@ public interface PartitionStatisticStorage extends Closeable {
       String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop);
 
   /**
-   * Updates statistics for a given metadata object. The default implementation is to first drop and
-   * then append the statistics. Developer can override this logic if needed. The implementation
-   * should guarantee the thread safe. The upper layer will add the parent object level write lock.
-   * For example, if the metadata object is a table, the write lock of the schema level will be
-   * held.
+   * Updates statistics for a given metadata object. The implementation should guarantee the thread
+   * safe. The upper layer will add the parent object level write lock. For example, if the metadata
+   * object is a table, the write lock of the schema level will be held.
    *
    * @param metalake the name of the metalake
    * @param statisticsToUpdate a list of {@link MetadataObjectStatisticsUpdate} objects, each
    *     containing the metadata object and its associated statistics updates.
    */
-  default void updateStatistics(
-      String metalake, List<MetadataObjectStatisticsUpdate> statisticsToUpdate) {
-    List<MetadataObjectStatisticsDrop> statisticsToDrop =
-        statisticsToUpdate.stream()
-            .map(
-                update ->
-                    MetadataObjectStatisticsDrop.of(
-                        update.metadataObject(),
-                        update.partitionUpdates().stream()
-                            .map(
-                                partitionUpdate ->
-                                    PartitionStatisticsDrop.of(
-                                        partitionUpdate.partitionName(),
-                                        Lists.newArrayList(partitionUpdate.statistics().keySet())))
-                            .collect(Collectors.toList())))
-            .collect(Collectors.toList());
-
-    dropStatistics(metalake, statisticsToDrop);
-    appendStatistics(metalake, statisticsToUpdate);
-  }
+  void updateStatistics(String metalake, List<MetadataObjectStatisticsUpdate> statisticsToUpdate);
 }

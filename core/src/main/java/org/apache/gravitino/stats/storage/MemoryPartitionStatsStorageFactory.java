@@ -56,33 +56,30 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
         return Lists.newArrayList();
       }
 
-      synchronized (tableStats) {
-        Map<String, Map<String, StatisticValue<?>>> resultStats = Maps.newHashMap();
-        for (PersistedPartitionStatistics partitionStat :
-            tableStats.partitionStatistics().values()) {
-          String partitionName = partitionStat.partitionName();
-          boolean lowerBoundSatisfied =
-              isBoundSatisfied(
-                  range.lowerPartitionName(),
-                  range.lowerBoundType(),
-                  partitionName,
-                  BoundDirection.LOWER);
+      Map<String, Map<String, StatisticValue<?>>> resultStats = Maps.newHashMap();
+      for (PersistedPartitionStatistics partitionStat : tableStats.partitionStatistics().values()) {
+        String partitionName = partitionStat.partitionName();
+        boolean lowerBoundSatisfied =
+            isBoundSatisfied(
+                range.lowerPartitionName(),
+                range.lowerBoundType(),
+                partitionName,
+                BoundDirection.LOWER);
 
-          boolean upperBoundSatisfied =
-              isBoundSatisfied(
-                  range.upperPartitionName(),
-                  range.upperBoundType(),
-                  partitionName,
-                  BoundDirection.UPPER);
+        boolean upperBoundSatisfied =
+            isBoundSatisfied(
+                range.upperPartitionName(),
+                range.upperBoundType(),
+                partitionName,
+                BoundDirection.UPPER);
 
-          if (lowerBoundSatisfied && upperBoundSatisfied) {
-            resultStats.put(partitionName, Maps.newHashMap(partitionStat.statistics()));
-          }
+        if (lowerBoundSatisfied && upperBoundSatisfied) {
+          resultStats.put(partitionName, Maps.newHashMap(partitionStat.statistics()));
         }
-        return resultStats.entrySet().stream()
-            .map(entry -> PersistedPartitionStatistics.of(entry.getKey(), entry.getValue()))
-            .collect(Collectors.toList());
       }
+      return resultStats.entrySet().stream()
+          .map(entry -> PersistedPartitionStatistics.of(entry.getKey(), entry.getValue()))
+          .collect(Collectors.toList());
     }
 
     private static boolean isBoundSatisfied(
@@ -132,12 +129,6 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
         String metalake, MetadataObject metadataObject, List<String> partitionNames) {
       throw new UnsupportedOperationException(
           "Don't support listing statistics by partition names");
-    }
-
-    @Override
-    public void appendStatistics(
-        String metalake, List<MetadataObjectStatisticsUpdate> statisticsToAppend) {
-      throw new UnsupportedOperationException("Don't support appending statistics");
     }
 
     @Override
