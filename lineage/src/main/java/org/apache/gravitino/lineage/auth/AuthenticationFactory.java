@@ -32,7 +32,7 @@ public class AuthenticationFactory {
       case "none":
         return new NoAuthStrategy();
       default:
-        throw new BadRequestException("Unsupported authentication ");
+        throw new BadRequestException("Unsupported authentication " + authType);
     }
   }
 }
