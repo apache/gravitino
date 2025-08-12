@@ -448,7 +448,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           FileSystem fs = getFileSystemWithCache(formalizePath, conf);
 
           if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
-            throw new RuntimeException("Fileset location cannot be a file: " + formalizePath);
+            throw new IllegalArgumentException(
+                "Fileset location cannot be a file: "
+                    + formalizePath
+                    + ", location name: "
+                    + entry.getKey());
           }
 
           if (!fs.exists(formalizePath)) {
@@ -749,8 +753,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             try {
               FileSystem fs = getFileSystemWithCache(schemaPath, conf);
               if (fs.exists(schemaPath) && fs.getFileStatus(schemaPath).isFile()) {
-                throw new RuntimeException(
-                    "Fileset schema location cannot be a file: " + schemaPath);
+                throw new IllegalArgumentException(
+                    "Fileset schema location cannot be a file: "
+                        + schemaPath
+                        + ", location name: "
+                        + locationName);
               }
 
               if (!fs.exists(schemaPath)) {
@@ -1047,7 +1054,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               FileSystem fs = getFileSystemWithCache(path, conf);
               try {
                 if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
-                  throw new RuntimeException("Fileset catalog location cannot be a file: " + v);
+                  throw new IllegalArgumentException(
+                      "Fileset catalog location cannot be a file: "
+                          + v
+                          + ", location name: "
+                          + locationName);
                 }
               } catch (IOException e) {
                 throw new RuntimeException(
