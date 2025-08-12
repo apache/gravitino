@@ -62,8 +62,8 @@ public interface PartitionStatisticStorage extends Closeable {
 
   /**
    * Drops statistics for specified partitions of a metadata object. Locking guarantee: The upper
-   * layer will acquire a write lock at the parent object level. For example, if the metadata object
-   * is a table, the write lock of the schema level will be held.
+   * layer will acquire a write lock at the metadata object level. For example, if the metadata
+   * object is a table, the write lock of the table level will be held.
    *
    * @param metalake the name of the metalake
    * @param partitionStatisticsToDrop a map where the key is a {@link MetadataObject} and the value
@@ -74,8 +74,8 @@ public interface PartitionStatisticStorage extends Closeable {
 
   /**
    * Updates statistics for a given metadata object. Locking guarantee: The upper layer will acquire
-   * a write lock at the parent object level. For example, if the metadata object is a table, the
-   * write lock of the schema level will be held.
+   * a write lock at the metadata object level. For example, if the metadata object is a table, the
+   * write lock of the table level will be held.
    *
    * @param metalake the name of the metalake
    * @param statisticsToUpdate a list of {@link MetadataObjectStatisticsUpdate} objects, each
