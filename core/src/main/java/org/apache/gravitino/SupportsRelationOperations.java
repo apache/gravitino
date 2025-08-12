@@ -159,8 +159,8 @@ public interface SupportsRelationOperations {
    * @param entities The list of entities to be inserted, which must implement the Entity and
    *     HasIdentifier
    * @param relations The list of relations to be established between the entities.
-   * @param overwrite If true, existing relations will be overwritten; if false, new relations will
-   *     be added
+   * @param overwrite If true, existing relations will be overwritten; if false, existing relations
+   *     will throw an exception.
    * @throws IOException If an error occurs during the insertion process, such as a storage issue.
    */
   <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
