@@ -104,8 +104,8 @@ public class MetadataObjectPolicyOperations {
                   new PolicyResponse(DTOConverters.toDTO(policy.get(), Optional.of(false))));
             }
 
-            // 2. If not found, try to find an inheritable policy from its parents.
-            // First, ensure the target policy exists and is inheritable for this object type.
+            // 2. If not found, first ensure the target policy exists and is inheritable for this
+            // object type.
             Policy targetPolicy = policyDispatcher.getPolicy(metalake, policyName);
             if (!targetPolicy.inheritable()
                 || !targetPolicy.supportedObjectTypes().contains(object.type())) {
