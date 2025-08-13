@@ -21,6 +21,7 @@ from mcp_server.client import (
     SchemaOperation,
     TableOperation,
 )
+from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.tag_operation import TagOperation
 
 
@@ -39,6 +40,9 @@ class MockOperation(GravitinoOperation):
 
     def as_tag_operation(self) -> TagOperation:
         return MockTagOperation()
+
+    def as_job_operation(self):
+        return MockJobOperation()
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -97,3 +101,17 @@ class MockTagOperation(TagOperation):
 
     async def list_metadata_by_tag(self, tag_name: str) -> str:
         return f"mock_metadata_by_tag: {tag_name}"
+
+
+class MockJobOperation(JobOperation):
+    async def get_list_of_jobs(self, job_template_name: str = "") -> str:
+        return "mock_jobs"
+
+    async def get_job_by_id(self, job_id: str) -> str:
+        return f"mock_job: {job_id}"
+
+    async def get_list_of_job_templates(self) -> str:
+        return "mock_job_templates"
+
+    async def get_job_template_by_name(self, name: str) -> str:
+        return f"mock_job_template: {name}"
