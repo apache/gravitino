@@ -177,15 +177,16 @@ public interface Entity extends Serializable {
    */
   class SourceRelationEntity<E extends Entity & HasIdentifier> implements RelationalEntity<E> {
     final E sourceVertexEntity;
-    final Relation.VertexType vertexType = Relation.VertexType.SOURCE;
     final List<NameIdentifier> destVertexIdents;
-    final EntityType destEntityType;
+    final EntityType destVertexEntityType;
 
     SourceRelationEntity(
-        E sourceVertexEntity, List<NameIdentifier> destVertexIdents, EntityType destEntityType) {
+        E sourceVertexEntity,
+        List<NameIdentifier> destVertexIdents,
+        EntityType destVertexEntityType) {
       this.sourceVertexEntity = sourceVertexEntity;
       this.destVertexIdents = destVertexIdents;
-      this.destEntityType = destEntityType;
+      this.destVertexEntityType = destVertexEntityType;
     }
 
     @Override
@@ -195,7 +196,7 @@ public interface Entity extends Serializable {
 
     @Override
     public Relation.VertexType vertexType() {
-      return vertexType;
+      return Relation.VertexType.SOURCE;
     }
 
     @Override
@@ -205,7 +206,7 @@ public interface Entity extends Serializable {
 
     @Override
     public EntityType relatedEntityType() {
-      return destEntityType;
+      return destVertexEntityType;
     }
   }
 
@@ -218,15 +219,14 @@ public interface Entity extends Serializable {
    */
   class DestRelationEntity<E extends Entity & HasIdentifier> implements RelationalEntity<E> {
     final E destVertexEntity;
-    final Relation.VertexType vertexType = Relation.VertexType.DESTINATION;
     final List<NameIdentifier> sourceVertexIdents;
-    final EntityType sourceEntityType;
+    final EntityType sourceVertexEntityType;
 
     DestRelationEntity(
         E destVertexEntity, List<NameIdentifier> sourceVertexIdents, EntityType sourceEntityType) {
       this.destVertexEntity = destVertexEntity;
       this.sourceVertexIdents = sourceVertexIdents;
-      this.sourceEntityType = sourceEntityType;
+      this.sourceVertexEntityType = sourceEntityType;
     }
 
     @Override
@@ -236,7 +236,7 @@ public interface Entity extends Serializable {
 
     @Override
     public Relation.VertexType vertexType() {
-      return vertexType;
+      return Relation.VertexType.DESTINATION;
     }
 
     @Override
@@ -246,7 +246,7 @@ public interface Entity extends Serializable {
 
     @Override
     public EntityType relatedEntityType() {
-      return sourceEntityType;
+      return sourceVertexEntityType;
     }
   }
 }
