@@ -23,6 +23,7 @@ from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
+from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.utils.serdes import SerdesUtilsBase
 
 
@@ -54,5 +55,15 @@ class SerdesUtils(SerdesUtilsBase):
                 for args in dto.lists()
             ]
 
+        if dto_type is PartitionDTO.Type.RANGE:
+            dto = cast(RangePartitionDTO, value)
+            dto_data[cls.RANGE_PARTITION_UPPER] = (
+                ExpressionsSerdesUtils.write_function_arg(arg=dto.upper())
+            )
+            dto_data[cls.RANGE_PARTITION_LOWER] = (
+                ExpressionsSerdesUtils.write_function_arg(arg=dto.lower())
+            )
+
+        dto_data[cls.PARTITION_PROPERTIES] = value.properties()
         result.update(dto_data)
         return result
