@@ -67,6 +67,7 @@ import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.storage.relational.service.TagMetaService;
@@ -374,6 +375,10 @@ public class JDBCBackend implements RelationalBackend {
         return ModelVersionMetaService.getInstance()
             .deleteModelVersionMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case STATISTIC:
+        return StatisticMetaService.getInstance()
+            .deleteStatisticsByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case JOB_TEMPLATE:
         return JobTemplateMetaService.getInstance()
             .deleteJobTemplatesByLegacyTimeline(
@@ -408,6 +413,7 @@ public class JDBCBackend implements RelationalBackend {
       case TAG:
       case MODEL:
       case MODEL_VERSION:
+      case STATISTIC:
       case JOB_TEMPLATE:
       case JOB:
         // These entity types have not implemented multi-versions, so we can skip.
@@ -500,14 +506,6 @@ public class JDBCBackend implements RelationalBackend {
         } else {
           throw new IllegalArgumentException(
               String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
-        }
-
-      case JOB_TEMPLATE_JOB_REL:
-        if (identType == Entity.EntityType.JOB_TEMPLATE) {
-          return (List<E>) JobMetaService.getInstance().listJobsByTemplateIdent(nameIdentifier);
-        } else {
-          throw new IllegalArgumentException(
-              String.format("JOB_TEMPLATE_JOB_REL doesn't support type %s", identType.name()));
         }
 
       case POLICY_METADATA_OBJECT_REL:

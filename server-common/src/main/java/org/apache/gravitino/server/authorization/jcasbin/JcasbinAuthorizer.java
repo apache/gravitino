@@ -102,8 +102,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
-    return allowInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, privilege.name());
+    boolean result =
+        allowInternalAuthorizer.authorizeInternal(
+            principal, metalake, metadataObject, privilege.name());
+    LOG.debug(
+        "principal {},metalake {},metadata object {},privilege {}, result {}",
+        principal,
+        metalake,
+        metadataObject,
+        privilege,
+        result);
+    return result;
   }
 
   @Override
@@ -112,14 +121,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
-    return denyInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, privilege.name());
+    boolean result =
+        denyInternalAuthorizer.authorizeInternal(
+            principal, metalake, metadataObject, privilege.name());
+    LOG.debug(
+        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        principal,
+        metalake,
+        metadataObject,
+        privilege,
+        result);
+    return result;
   }
 
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
-    return allowInternalAuthorizer.authorizeInternal(
-        principal, metalake, metadataObject, AuthConstants.OWNER);
+    boolean result =
+        allowInternalAuthorizer.authorizeInternal(
+            principal, metalake, metadataObject, AuthConstants.OWNER);
+    LOG.debug(
+        "principal {},metalake {},metadata object {},privilege {},deny result {}",
+        principal,
+        metalake,
+        metadataObject,
+        "OWNER",
+        result);
+    return result;
   }
 
   @Override
@@ -331,16 +358,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     for (RoleEntity role : entities) {
       Long roleId = role.id();
+      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+      if (loadedRoles.contains(roleId)) {
+        continue;
+      }
       role =
           entityStore.get(
               NameIdentifierUtil.ofRole(metalake, role.name()),
               Entity.EntityType.ROLE,
               RoleEntity.class);
-      if (loadedRoles.contains(roleId)) {
-        continue;
-      }
-      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+
       loadPolicyByRoleEntity(role);
       loadedRoles.add(roleId);
     }
