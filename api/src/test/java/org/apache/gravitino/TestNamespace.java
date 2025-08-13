@@ -62,4 +62,19 @@ public class TestNamespace {
     Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString("a..b"));
     Assertions.assertThrows(IllegalArgumentException.class, () -> Namespace.fromString(" "));
   }
+
+  @Test
+  public void testNamespaceImmutability() {
+    String[] levels = new String[] {"a", "b"};
+    Namespace ns = Namespace.of(levels);
+
+    // Modifying the original array should not affect the namespace
+    levels[0] = "x";
+    Assertions.assertEquals("a", ns.level(0));
+
+    // Modifications to the returned levels array should also not affect the namespace
+    String[] returnedLevels = ns.levels();
+    returnedLevels[1] = "y";
+    Assertions.assertEquals("b", ns.level(1));
+  }
 }
