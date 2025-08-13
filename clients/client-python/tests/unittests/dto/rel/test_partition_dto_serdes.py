@@ -69,6 +69,7 @@ class TestPartitionSerdesUtils(unittest.TestCase):
         cls.partition_dtos = {
             PartitionDTO.Type.IDENTITY: cls.identity_partition_dto,
             PartitionDTO.Type.LIST: cls.list_partition_dto,
+            PartitionDTO.Type.RANGE: cls.range_partition_dto,
         }
 
     def test_write_partition_dto_unknown_type(self):
@@ -94,7 +95,7 @@ class TestPartitionSerdesUtils(unittest.TestCase):
         """Test write_partition with mocked expression serialization.
 
         To make sure the number of call to method `ExpressionsSerdesUtils.write_function_arg` are
-        identical to the numbr of `LiteralDTO`s.
+        identical to the number of `LiteralDTO`s.
         """
 
         for partition_dto in self.partition_dtos.values():
@@ -153,6 +154,19 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                             [ExpressionSerdesUtils.write_function_arg(literal_value)]
                             for literal_value in self.literal_values.values()
                         ],
+                    )
+                if partition_dto_type is PartitionDTO.Type.RANGE:
+                    self.assertEqual(
+                        result[SerdesUtils.RANGE_PARTITION_LOWER],
+                        ExpressionSerdesUtils.write_function_arg(
+                            arg=self.literal_values[SerdesUtils.RANGE_PARTITION_LOWER]
+                        ),
+                    )
+                    self.assertEqual(
+                        result[SerdesUtils.RANGE_PARTITION_UPPER],
+                        ExpressionSerdesUtils.write_function_arg(
+                            arg=self.literal_values[SerdesUtils.RANGE_PARTITION_UPPER]
+                        ),
                     )
 
     def test_write_partition_empty_values(self):
