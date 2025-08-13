@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.EntityAlreadyExistsException;
