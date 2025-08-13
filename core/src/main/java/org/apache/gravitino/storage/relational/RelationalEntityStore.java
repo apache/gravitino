@@ -263,36 +263,52 @@ public class RelationalEntityStore
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<RelationalEntity<E>> relationalEntities, boolean overwrite)
+  public <E extends Entity & HasIdentifier> Void insertEntitiesAndRelations(
+      Type relType, List<Entity.RelationalEntity<E>> relationalEntities, boolean overwrite)
       throws IOException {
-    for (RelationalEntity<E> relationalEntity : relationalEntities) {
+    for (Entity.RelationalEntity<E> relationalEntity : relationalEntities) {
       if (relationalEntity.vertexType() == Relation.VertexType.SOURCE) {
+
+        // If the source vertex is being inserted, we invalidate the relations
+        // The key of the relation is source name identifier and entity type
         cache.invalidate(
             relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type(), relType);
+
+        // If the source vertex is being inserted, we invalidate the cache for the source vertex
         cache.invalidate(
             relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type());
       } else {
-        for (NameIdentifier relatedNameIdent : relationalEntity.relatedIdents()) {
+
+        // If the dest vertex is being inserted, we invalidate the relations
+        // The key of the relation is source name identifier and entity type
+        for (NameIdentifier relatedNameIdent : relationalEntity.relatedNameIdentifiers()) {
           cache.invalidate(relatedNameIdent, relationalEntity.relatedEntityType(), relType);
         }
+
+        // If the dest vertex is being inserted, we invalidate the cache for the dest vertex
         cache.invalidate(
             relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type());
       }
     }
 
     backend.insertEntitiesAndRelations(relType, relationalEntities, overwrite);
+    return null;
   }
 
   @Override
   public int deleteEntitiesAndRelations(
       Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
       throws IOException {
+    // Invalid every relation in the cache before deleting them.
+    // The relation's key is source name identifier and entity type
     for (Relation relation : relations) {
       cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
+
+      // If we delete source vertex, we invalidate the source vertex in the cache
       if (deleteVertexType == Relation.VertexType.SOURCE) {
         cache.invalidate(relation.getSourceIdent(), relation.getSourceType());
       } else {
+        // If we delete dest vertex, we invalidate the dest vertex in the cache
         cache.invalidate(relation.getDestIdent(), relation.getDestType());
       }
     }

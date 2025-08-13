@@ -35,10 +35,11 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.relational.RelationalEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -60,22 +61,24 @@ public class StatisticManager {
 
   public List<Statistic> listStatistics(String metalake, MetadataObject metadataObject) {
     try {
-      // TODO: we will add lock when we support Iceberg, Hive statistics. Because the operations are
-      // only related to entity store now. We don't need to lock the metadata object.
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
-      return store.relationOperations()
-          .listEntitiesByRelation(
-              SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL, identifier, type)
-          .stream()
-          .map(
-              entity -> {
-                StatisticEntity statisticEntity = (StatisticEntity) entity;
-                String name = statisticEntity.name();
-                StatisticValue<?> value = statisticEntity.value();
-                return new CustomStatistic(name, value);
-              })
-          .collect(Collectors.toList());
+      return TreeLockUtils.doWithTreeLock(
+          identifier,
+          LockType.READ,
+          () ->
+              store.relationOperations()
+                  .listEntitiesByRelation(
+                      SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL, identifier, type)
+                  .stream()
+                  .map(
+                      entity -> {
+                        StatisticEntity statisticEntity = (StatisticEntity) entity;
+                        String name = statisticEntity.name();
+                        StatisticValue<?> value = statisticEntity.value();
+                        return new CustomStatistic(name, value);
+                      })
+                  .collect(Collectors.toList()));
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Failed to list statistics for metadata object {} in the metalake {}: {}",
@@ -83,7 +86,7 @@ public class StatisticManager {
           metalake,
           nse.getMessage());
       throw new NoSuchMetadataObjectException(
-          "The metadata object  %s in the metalake %s isn't found",
+          "The metadata object %s in the metalake %s isn't found",
           metadataObject.fullName(), metalake);
     } catch (IOException ioe) {
       LOG.error(
@@ -95,14 +98,12 @@ public class StatisticManager {
     }
   }
 
-  public List<Statistic> updateStatistics(
+  public void updateStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
     try {
-      // TODO: we will add lock when we support Iceberg, Hive statistics.  Because the operations
-      // are only related to entity store now. We don't need to lock the metadata object.
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
-      List<RelationalEntity<StatisticEntity>> relationalEntities = Lists.newArrayList();
+      List<Entity.RelationalEntity<StatisticEntity>> relationalEntities = Lists.newArrayList();
       for (Map.Entry<String, StatisticValue<?>> entry : statistics.entrySet()) {
         String name = entry.getKey();
         StatisticValue<?> value = entry.getValue();
@@ -121,19 +122,22 @@ public class StatisticManager {
                         .withLastModifiedTime(Instant.now())
                         .build())
                 .build();
-        RelationalEntity<StatisticEntity> relationalEntity =
-            RelationalEntity.of(
+        Entity.RelationalEntity<StatisticEntity> relationalEntity =
+            Entity.RelationalEntity.of(
                 statistic, Relation.VertexType.DESTINATION, Lists.newArrayList(identifier), type);
         relationalEntities.add(relationalEntity);
       }
+      TreeLockUtils.doWithTreeLock(
+          identifier,
+          LockType.READ,
+          () ->
+              store
+                  .relationOperations()
+                  .insertEntitiesAndRelations(
+                      SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
+                      relationalEntities,
+                      true));
 
-      store
-          .relationOperations()
-          .insertEntitiesAndRelations(
-              SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL, relationalEntities, true);
-      return statistics.entrySet().stream()
-          .map(entry -> new CustomStatistic(entry.getKey(), entry.getValue()))
-          .collect(Collectors.toList());
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Failed to update statistics for metadata object {} in the metalake {}: {}",
@@ -152,8 +156,6 @@ public class StatisticManager {
       String metalake, MetadataObject metadataObject, List<String> statistics)
       throws UnmodifiableStatisticException {
     try {
-      // TODO: we will add lock when we support Iceberg, Hive statistics.  Because the operations
-      // are only related to entity store now. We don't need to lock the metadata object.
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       List<Relation> relations = Lists.newArrayList();
@@ -163,12 +165,16 @@ public class StatisticManager {
       }
 
       int deleteCount =
-          store
-              .relationOperations()
-              .deleteEntitiesAndRelations(
-                  SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
-                  Relation.VertexType.DESTINATION,
-                  relations);
+          TreeLockUtils.doWithTreeLock(
+              identifier,
+              LockType.WRITE,
+              () ->
+                  store
+                      .relationOperations()
+                      .deleteEntitiesAndRelations(
+                          SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
+                          Relation.VertexType.DESTINATION,
+                          relations));
       // If deleteCount is 0, it means that the statistics were not found.
       return deleteCount != 0;
     } catch (NoSuchEntityException nse) {

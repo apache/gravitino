@@ -21,7 +21,6 @@ package org.apache.gravitino;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.storage.relational.RelationalEntity;
 
 /**
  * This is an extended interface. This is mainly used for strengthen the ability of querying
@@ -165,8 +164,9 @@ public interface SupportsRelationOperations {
    *     will throw an exception.
    * @throws IOException If an error occurs during the insertion process, such as a storage issue.
    */
-  <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<RelationalEntity<E>> entities, boolean overwrite) throws IOException;
+  <E extends Entity & HasIdentifier> Void insertEntitiesAndRelations(
+      Type relType, List<Entity.RelationalEntity<E>> entities, boolean overwrite)
+      throws IOException;
 
   /**
    * Deletes a list of relations and their associated entities based on vertex type.

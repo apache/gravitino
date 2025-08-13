@@ -643,8 +643,9 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<RelationalEntity<E>> entities, boolean overwrite) throws IOException {
+  public <E extends Entity & HasIdentifier> Void insertEntitiesAndRelations(
+      Type relType, List<Entity.RelationalEntity<E>> entities, boolean overwrite)
+      throws IOException {
     switch (relType) {
       case METADATA_OBJECT_STAT_REL:
         Preconditions.checkArgument(
@@ -656,11 +657,11 @@ public class JDBCBackend implements RelationalBackend {
         Set<NameIdentifier> relatedIdents = Sets.newHashSet();
         Set<Entity.EntityType> relatedEntityTypes = Sets.newHashSet();
 
-        for (RelationalEntity<E> relEntity : entities) {
+        for (Entity.RelationalEntity<E> relEntity : entities) {
           Preconditions.checkArgument(
-              relEntity.relatedIdents().size() == 1,
+              relEntity.relatedNameIdentifiers().size() == 1,
               "Each entity must have exactly one related identifier");
-          NameIdentifier relatedIdent = relEntity.relatedIdents().get(0);
+          NameIdentifier relatedIdent = relEntity.relatedNameIdentifiers().get(0);
           relatedIdents.add(relatedIdent);
           relatedEntityTypes.add(relEntity.relatedEntityType());
           Preconditions.checkArgument(
@@ -682,7 +683,7 @@ public class JDBCBackend implements RelationalBackend {
         Entity.EntityType type = relatedEntityTypes.iterator().next();
         metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
             statisticEntities, relatedIdents.iterator().next(), type);
-        break;
+        return null;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

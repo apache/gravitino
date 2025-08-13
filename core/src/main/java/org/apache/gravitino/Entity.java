@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 
@@ -105,4 +106,147 @@ public interface Entity extends Serializable {
    * @return The type of the entity as defined by {@link EntityType}.
    */
   EntityType type();
+
+  /**
+   * Represents a relational entity that contains an entity, its vertex type, related identifiers,
+   * and the type of related entity.
+   *
+   * @param <E> the type of the entity, which must extend {@link Entity} and implement {@link
+   *     HasIdentifier}
+   */
+  interface RelationalEntity<E extends Entity & HasIdentifier> {
+
+    /**
+     * Creates a new instance of {@link RelationalEntity}.
+     *
+     * @param entity the entity to be wrapped
+     * @param vertexType the type of the vertex in the relation
+     * @param relatedIdents the list of related identifiers
+     * @param relatedEntityType the type of the related entity
+     * @return a new instance of {@link RelationalEntity}
+     * @param <E> the type of the entity, which must extend {@link Entity} and implement {@link
+     *     HasIdentifier}
+     */
+    static <E extends Entity & HasIdentifier> RelationalEntity<E> of(
+        E entity,
+        Relation.VertexType vertexType,
+        List<NameIdentifier> relatedIdents,
+        EntityType relatedEntityType) {
+      if (vertexType == Relation.VertexType.SOURCE) {
+        return new SourceRelationEntity<>(entity, relatedIdents, relatedEntityType);
+      } else {
+        return new DestRelationEntity<>(entity, relatedIdents, relatedEntityType);
+      }
+    }
+
+    /**
+     * Returns the entity wrapped by this relational entity.
+     *
+     * @return the entity
+     */
+    E entity();
+
+    /**
+     * Returns the vertex type of the entity in the relation.
+     *
+     * @return the vertex type of the entity
+     */
+    Relation.VertexType vertexType();
+
+    /**
+     * Returns the list of related name identifiers.
+     *
+     * @return the list of related name identifiers
+     */
+    List<NameIdentifier> relatedNameIdentifiers();
+
+    /**
+     * Returns the type of the related entity.
+     *
+     * @return the type of the related entity
+     */
+    EntityType relatedEntityType();
+  }
+
+  /**
+   * Represents a relational entity that contains a source vertex entity, its vertex type, related
+   * destination vertex identifiers, and the type of the destination entity.
+   *
+   * @param <E> the type of the entity, which must extend {@link Entity} and implement {@link
+   *     HasIdentifier}
+   */
+  class SourceRelationEntity<E extends Entity & HasIdentifier> implements RelationalEntity<E> {
+    final E sourceVertexEntity;
+    final Relation.VertexType vertexType = Relation.VertexType.SOURCE;
+    final List<NameIdentifier> destVertexIdents;
+    final EntityType destEntityType;
+
+    SourceRelationEntity(
+        E sourceVertexEntity, List<NameIdentifier> destVertexIdents, EntityType destEntityType) {
+      this.sourceVertexEntity = sourceVertexEntity;
+      this.destVertexIdents = destVertexIdents;
+      this.destEntityType = destEntityType;
+    }
+
+    @Override
+    public E entity() {
+      return sourceVertexEntity;
+    }
+
+    @Override
+    public Relation.VertexType vertexType() {
+      return vertexType;
+    }
+
+    @Override
+    public List<NameIdentifier> relatedNameIdentifiers() {
+      return destVertexIdents;
+    }
+
+    @Override
+    public EntityType relatedEntityType() {
+      return destEntityType;
+    }
+  }
+
+  /**
+   * Represents a relational entity that contains a destination vertex entity, its vertex type,
+   * related source vertex identifiers, and the type of the source entity.
+   *
+   * @param <E> the type of the entity, which must extend {@link Entity} and implement {@link
+   *     HasIdentifier}
+   */
+  class DestRelationEntity<E extends Entity & HasIdentifier> implements RelationalEntity<E> {
+    final E destVertexEntity;
+    final Relation.VertexType vertexType = Relation.VertexType.DESTINATION;
+    final List<NameIdentifier> sourceVertexIdents;
+    final EntityType sourceEntityType;
+
+    DestRelationEntity(
+        E destVertexEntity, List<NameIdentifier> sourceVertexIdents, EntityType sourceEntityType) {
+      this.destVertexEntity = destVertexEntity;
+      this.sourceVertexIdents = sourceVertexIdents;
+      this.sourceEntityType = sourceEntityType;
+    }
+
+    @Override
+    public E entity() {
+      return destVertexEntity;
+    }
+
+    @Override
+    public Relation.VertexType vertexType() {
+      return vertexType;
+    }
+
+    @Override
+    public List<NameIdentifier> relatedNameIdentifiers() {
+      return sourceVertexIdents;
+    }
+
+    @Override
+    public EntityType relatedEntityType() {
+      return sourceEntityType;
+    }
+  }
 }
