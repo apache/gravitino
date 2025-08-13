@@ -59,7 +59,8 @@ public class StatisticManager {
 
   public List<Statistic> listStatistics(String metalake, MetadataObject metadataObject) {
     try {
-      // TODO: we will add lock when we support Iceberg, Hive statistics
+      // TODO: we will add lock when we support Iceberg, Hive statistics. Because the operations are
+      // only related to entity store now. We don't need to lock the metadata object.
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       return store.relationOperations()
@@ -76,15 +77,18 @@ public class StatisticManager {
           .collect(Collectors.toList());
     } catch (NoSuchEntityException nse) {
       LOG.warn(
-          "Failed to list statistics for metadata object {}: {}",
+          "Failed to list statistics for metadata object {} in the metalake {}: {}",
           metadataObject.fullName(),
+          metalake,
           nse.getMessage());
       throw new NoSuchMetadataObjectException(
-          "The metadata object of %s isn't found", metadataObject.fullName());
+          "The metadata object  %s in the metalake %s isn't found",
+          metadataObject.fullName(), metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Failed to list statistics for metadata object {}: {}",
+          "Failed to list statistics for metadata object {} in the metalake {} : {}",
           metadataObject.fullName(),
+          metalake,
           ioe.getMessage());
       throw new RuntimeException(ioe);
     }
@@ -93,7 +97,8 @@ public class StatisticManager {
   public List<Statistic> updateStatistics(
       String metalake, MetadataObject metadataObject, Map<String, StatisticValue<?>> statistics) {
     try {
-      // TODO: we will add lock when we support Iceberg, Hive statistics
+      // TODO: we will add lock when we support Iceberg, Hive statistics.  Because the operations
+      // are only related to entity store now. We don't need to lock the metadata object.
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       List<Relation> relations = Lists.newArrayList();
@@ -133,11 +138,13 @@ public class StatisticManager {
           .collect(Collectors.toList());
     } catch (NoSuchEntityException nse) {
       LOG.warn(
-          "Failed to update statistics for metadata object {}: {}",
+          "Failed to update statistics for metadata object {} in the metalake {}: {}",
           metadataObject.fullName(),
+          metalake,
           nse.getMessage());
       throw new NoSuchMetadataObjectException(
-          "The metadata object of %s isn't found", metadataObject.fullName());
+          "The metadata object %s in the metalake %s isn't found",
+          metadataObject.fullName(), metalake);
     } catch (IOException ioe) {
       throw new RuntimeException(ioe);
     }
@@ -147,35 +154,45 @@ public class StatisticManager {
       String metalake, MetadataObject metadataObject, List<String> statistics)
       throws UnmodifiableStatisticException {
     try {
-      // TODO: we will add lock when we support Iceberg, Hive statistics
+      // TODO: we will add lock when we support Iceberg, Hive statistics.  Because the operations
+      // are only related to entity store now. We don't need to lock the metadata object.
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       List<Relation> relations = Lists.newArrayList();
+      List<NameIdentifier> statsIdents = Lists.newArrayList();
       for (String statisticName : statistics) {
         NameIdentifier statIdent = NameIdentifierUtil.ofStatistic(identifier, statisticName);
+        statsIdents.add(statIdent);
         relations.add(new Relation(identifier, type, statIdent, Entity.EntityType.STATISTIC));
       }
 
       int deleteCount =
           store
               .relationOperations()
-              .deleteRelations(SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL, relations);
-
+              .deleteEntitiesAndRelations(
+                  SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
+                  statsIdents,
+                  Entity.EntityType.STATISTIC,
+                  false,
+                  relations);
       // If deleteCount is 0, it means that the statistics were not found.
       return deleteCount != 0;
     } catch (NoSuchEntityException nse) {
       LOG.warn(
-          "Failed to drop statistics for metadata object {}: {}",
+          "Failed to drop statistics for metadata object {} in the metalake {} : {}",
           metadataObject.fullName(),
+          metalake,
           nse.getMessage());
       throw new NoSuchMetadataObjectException(
-          "The metadata object of %s isn't found", metadataObject.fullName());
+          "The metadata object %s in the metalake %s isn't found",
+          metadataObject.fullName(), metalake);
     } catch (IOException ioe) {
       LOG.error(
-          "Failed to drop statistics for metadata object {}: {}",
+          "Failed to drop statistics for metadata object {} in the metalake {} : {}",
           metadataObject.fullName(),
+          metalake,
           ioe.getMessage());
-      throw new RuntimeException();
+      throw new RuntimeException(ioe);
     }
   }
 

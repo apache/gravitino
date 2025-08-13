@@ -18,12 +18,12 @@
  */
 package org.apache.gravitino;
 
-import java.util.Objects;
+import org.apache.commons.lang3.tuple.Pair;
 
 /** Represents a relation between two entities in the metadata store. */
 public class Relation {
-  private final Vertex sourceVertex;
-  private final Vertex destVertex;
+  private final Pair<NameIdentifier, Entity.EntityType> sourceVertex;
+  private final Pair<NameIdentifier, Entity.EntityType> destVertex;
 
   /**
    * Creates a new Relation instance.
@@ -38,25 +38,25 @@ public class Relation {
       Entity.EntityType sourceType,
       NameIdentifier destIdent,
       Entity.EntityType destType) {
-    this.sourceVertex = new Vertex(sourceIdent, sourceType);
-    this.destVertex = new Vertex(destIdent, destType);
+    this.sourceVertex = Pair.of(sourceIdent, sourceType);
+    this.destVertex = Pair.of(destIdent, destType);
   }
 
   /**
    * Returns the source vertex of the relation.
    *
-   * @return the source vertex
+   * @return the source vertex as a pair of identifier and entity type
    */
-  public Vertex getSourceVertex() {
+  public Pair<NameIdentifier, Entity.EntityType> getSourceVertex() {
     return sourceVertex;
   }
 
   /**
    * Returns the destination vertex of the relation.
    *
-   * @return the destination vertex
+   * @return the destination vertex as a pair of identifier and entity type
    */
-  public Vertex getDestVertex() {
+  public Pair<NameIdentifier, Entity.EntityType> getDestVertex() {
     return destVertex;
   }
 
@@ -66,7 +66,7 @@ public class Relation {
    * @return the source identifier
    */
   public NameIdentifier getSourceIdent() {
-    return sourceVertex.getIdentifier();
+    return sourceVertex.getLeft();
   }
 
   /**
@@ -75,7 +75,7 @@ public class Relation {
    * @return the source entity type
    */
   public Entity.EntityType getSourceType() {
-    return sourceVertex.getType();
+    return sourceVertex.getRight();
   }
 
   /**
@@ -84,7 +84,7 @@ public class Relation {
    * @return the destination identifier
    */
   public NameIdentifier getDestIdent() {
-    return destVertex.getIdentifier();
+    return destVertex.getLeft();
   }
 
   /**
@@ -93,48 +93,6 @@ public class Relation {
    * @return the destination entity type
    */
   public Entity.EntityType getDestType() {
-    return destVertex.getType();
-  }
-
-  /**
-   * Represents a vertex in the relation graph, which consists of an identifier and an entity type.
-   */
-  public static class Vertex {
-    private final NameIdentifier identifier;
-    private final Entity.EntityType type;
-
-    public Vertex(NameIdentifier identifier, Entity.EntityType type) {
-      this.identifier = identifier;
-      this.type = type;
-    }
-
-    public NameIdentifier getIdentifier() {
-      return identifier;
-    }
-
-    public Entity.EntityType getType() {
-      return type;
-    }
-
-    @Override
-    public String toString() {
-      return "Vertex{" + "identifier=" + identifier + ", type=" + type + '}';
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) return true;
-      if (!(o instanceof Vertex)) {
-        return false;
-      }
-      Vertex vertex = (Vertex) o;
-      return Objects.equals(identifier, ((Vertex) o).identifier)
-          && Objects.equals(type, vertex.type);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(identifier, type);
-    }
+    return destVertex.getRight();
   }
 }

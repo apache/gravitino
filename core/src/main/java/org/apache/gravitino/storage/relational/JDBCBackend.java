@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -595,20 +596,79 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public int deleteEntitiesAndRelations(
+      Type relType,
+      List<NameIdentifier> vertexIdents,
+      Entity.EntityType vertexType,
+      boolean isSourceVertex,
+      List<Relation> relations)
+      throws IOException {
+    switch (relType) {
+      case METADATA_OBJECT_STAT_REL:
+        Preconditions.checkArgument(
+            !isSourceVertex, "Only supports to delete relations of destination vertex");
+        Preconditions.checkArgument(
+            vertexType == STATISTIC, "The vertex type must be STATISTIC, but got %s", vertexType);
+
+        AtomicInteger deleteCount = new AtomicInteger(0);
+        Map<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> groupedRelations =
+            relations.stream().collect(Collectors.groupingBy(Relation::getSourceVertex));
+
+        if (groupedRelations.isEmpty()) {
+          return 0; // No relations to delete.
+        }
+
+        Preconditions.checkArgument(
+            groupedRelations.size() == 1,
+            "The relations must have the same source identifier and type, but got %s groups",
+            groupedRelations.size());
+
+        groupedRelations.forEach(
+            (sourceVertex, deleteRelations) -> {
+              List<String> statsToDelete =
+                  deleteRelations.stream()
+                      .map(relation -> relation.getDestIdent().name())
+                      .collect(Collectors.toList());
+
+              deleteRelations.forEach(
+                  relation ->
+                      Preconditions.checkArgument(
+                          relation.getDestType() == STATISTIC,
+                          "The destination type of relation must be STATISTIC, but got %s",
+                          relation.getDestType()));
+
+              Preconditions.checkArgument(
+                  Sets.newHashSet(
+                          vertexIdents.stream()
+                              .map(NameIdentifier::name)
+                              .collect(Collectors.toList()))
+                      .equals(Sets.newHashSet(statsToDelete)),
+                  "The vertexIdents must match the destination identifiers of the relations to delete");
+
+              deleteCount.addAndGet(
+                  StatisticMetaService.getInstance()
+                      .batchDeleteStatisticPOs(
+                          sourceVertex.getLeft(), sourceVertex.getRight(), statsToDelete));
+            });
+        return deleteCount.get();
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
       Type relType, List<E> entities, List<Relation> relations, boolean overwrite)
       throws IOException {
     switch (relType) {
       case METADATA_OBJECT_STAT_REL:
-        if (!overwrite) {
-          throw new IllegalArgumentException(
-              "The overwrite must be true for metadata object stats relation");
-        }
+        Preconditions.checkArgument(
+            overwrite, "The overwrite must be true for metadata object stats relation");
 
         StatisticMetaService metaService = StatisticMetaService.getInstance();
-        Map<Relation.Vertex, List<Relation>> groupedRelations =
-            relations.stream()
-                .collect(Collectors.groupingBy(relation -> relation.getSourceVertex()));
+        Map<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> groupedRelations =
+            relations.stream().collect(Collectors.groupingBy(Relation::getSourceVertex));
 
         if (groupedRelations.isEmpty()) {
           return;
@@ -621,7 +681,7 @@ public class JDBCBackend implements RelationalBackend {
 
         groupedRelations.forEach(
             (sourceVertex, insertRelations) -> {
-              String metalake = NameIdentifierUtil.getMetalake(sourceVertex.getIdentifier());
+              String metalake = NameIdentifierUtil.getMetalake(sourceVertex.getLeft());
               insertRelations.sort(Comparator.comparing(r -> r.getDestIdent().name()));
               entities.sort(Comparator.comparing(HasIdentifier::name));
 
@@ -654,8 +714,8 @@ public class JDBCBackend implements RelationalBackend {
               metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
                   (List<StatisticEntity>) entities,
                   metalake,
-                  sourceVertex.getIdentifier(),
-                  sourceVertex.getType());
+                  sourceVertex.getLeft(),
+                  sourceVertex.getRight());
             });
         break;
       default:
@@ -676,46 +736,6 @@ public class JDBCBackend implements RelationalBackend {
         return (E)
             PolicyMetaService.getInstance()
                 .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
-      default:
-        throw new IllegalArgumentException(
-            String.format("Doesn't support the relation type %s", relType));
-    }
-  }
-
-  public int deleteRelations(Type relType, List<Relation> relations) throws IOException {
-    switch (relType) {
-      case METADATA_OBJECT_STAT_REL:
-        AtomicInteger deleteCount = new AtomicInteger(0);
-        Map<Relation.Vertex, List<Relation>> groupedRelations =
-            relations.stream().collect(Collectors.groupingBy(Relation::getSourceVertex));
-
-        if (groupedRelations.isEmpty()) {
-          return 0; // No relations to delete.
-        }
-
-        Preconditions.checkArgument(
-            groupedRelations.size() == 1,
-            "The relations must have the same source identifier and type, but got %s groups",
-            groupedRelations.size());
-
-        groupedRelations.forEach(
-            (sourceVertex, deleteRelations) -> {
-              List<String> statsToDelete =
-                  deleteRelations.stream()
-                      .map(relation -> relation.getDestIdent().name())
-                      .collect(Collectors.toList());
-              deleteRelations.forEach(
-                  relation ->
-                      Preconditions.checkArgument(
-                          relation.getDestType() == STATISTIC,
-                          "The destination type of relation must be STATISTIC, but got %s",
-                          relation.getDestType()));
-              deleteCount.addAndGet(
-                  StatisticMetaService.getInstance()
-                      .batchDeleteStatisticPOs(
-                          sourceVertex.getIdentifier(), sourceVertex.getType(), statsToDelete));
-            });
-        return deleteCount.get();
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

@@ -269,14 +269,31 @@ public class RelationalEntityStore
     for (Relation relation : relations) {
       cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
     }
+
+    for (E entity : entities) {
+      cache.invalidate(entity.nameIdentifier(), entity.type());
+    }
+
     backend.insertEntitiesAndRelations(relType, entities, relations, overwrite);
   }
 
   @Override
-  public int deleteRelations(Type relType, List<Relation> relations) throws IOException {
+  public int deleteEntitiesAndRelations(
+      Type relType,
+      List<NameIdentifier> vertexIdents,
+      Entity.EntityType vertexType,
+      boolean sourceVertex,
+      List<Relation> relations)
+      throws IOException {
     for (Relation relation : relations) {
       cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
     }
-    return backend.deleteRelations(relType, relations);
+
+    for (NameIdentifier vertexIdent : vertexIdents) {
+      cache.invalidate(vertexIdent, vertexType);
+    }
+
+    return backend.deleteEntitiesAndRelations(
+        relType, vertexIdents, vertexType, sourceVertex, relations);
   }
 }

@@ -171,10 +171,20 @@ public interface SupportsRelationOperations {
    * Deletes a list of relations of a specific type.
    *
    * @param relType The type of relation to be deleted.
+   * @param vertexIdents The list of identifiers of the entities whose relations are to be deleted.
+   * @param vertexType The type of the entities whose relations are to be deleted.
+   * @param sourceVertex If true, the relations are deleted from the source vertex; if false, from
+   *     the destination vertex.
    * @param relations The list of relations to be deleted, which must implement the Relation
    *     interface.
    * @return The number of relations deleted.
    * @throws IOException If an error occurs during the deletion process, such as a storage issue.
    */
-  int deleteRelations(Type relType, List<Relation> relations) throws IOException;
+  int deleteEntitiesAndRelations(
+      Type relType,
+      List<NameIdentifier> vertexIdents,
+      Entity.EntityType vertexType,
+      boolean sourceVertex,
+      List<Relation> relations)
+      throws IOException;
 }
