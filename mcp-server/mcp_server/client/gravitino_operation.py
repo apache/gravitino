@@ -22,6 +22,7 @@ from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.model_operation import ModelOperation
 from mcp_server.client.schema_operation import SchemaOperation
 from mcp_server.client.table_operation import TableOperation
+from mcp_server.client.tag_operation import TagOperation
 from mcp_server.client.topic_operation import TopicOperation
 
 
@@ -87,5 +88,14 @@ class GravitinoOperation(ABC):
 
         Returns:
             FilesetOperation: Interface for performing fileset-level operations
+        pass
+        """
+
+    def as_tag_operation(self) -> TagOperation:
+        """
+        Access the tag operation interface of this Gravitino operation.
+
+        Returns:
+            TagOperation: Interface for performing tag-level operations
         """
         pass

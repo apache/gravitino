@@ -24,7 +24,7 @@ import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 
 /** SupportsPartitionStatistics provides methods to list and update statistics for partitions. */
 @Unstable
-interface SupportsPartitionStatistics {
+public interface SupportsPartitionStatistics {
 
   /**
    * Lists statistics for partitions from one partition name to another partition name.

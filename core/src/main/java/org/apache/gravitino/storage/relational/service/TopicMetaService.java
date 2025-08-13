@@ -33,6 +33,7 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
@@ -205,6 +206,10 @@ public class TopicMetaService {
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         topicId, MetadataObject.Type.TOPIC.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                StatisticMetaMapper.class,
+                mapper -> mapper.softDeleteStatisticsByEntityId(topicId)),
         () ->
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,

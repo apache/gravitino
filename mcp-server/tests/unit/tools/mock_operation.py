@@ -24,6 +24,7 @@ from mcp_server.client import (
     TopicOperation,
 )
 from mcp_server.client.fileset_operation import FilesetOperation
+from mcp_server.client.tag_operation import TagOperation
 
 
 class MockOperation(GravitinoOperation):
@@ -47,6 +48,9 @@ class MockOperation(GravitinoOperation):
 
     def as_model_operation(self) -> ModelOperation:
         return MockModelOperation()
+
+    def as_tag_operation(self) -> TagOperation:
+        return MockTagOperation()
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -140,3 +144,39 @@ class MockTopicOperation(TopicOperation):
         self, catalog_name: str, schema_name: str, topic_name: str
     ) -> str:
         return "mock_topic"
+
+
+class MockTagOperation(TagOperation):
+    async def get_list_of_tags(self) -> str:
+        return "mock_tags"
+
+    async def create_tag(
+        self, name: str, comment: str, properties: dict
+    ) -> str:
+        return f"mock_tag_created: {name}"
+
+    async def get_tag_by_name(self, name: str) -> str:
+        return f"mock_tag: {name}"
+
+    async def alter_tag(self, name: str, updates: list) -> str:
+        return f"mock_tag_altered: {name} with updates {updates}"
+
+    async def delete_tag(self, name: str) -> str:
+        return f"mock_tag_deleted: {name}"
+
+    async def associate_tag_with_metadata(
+        self,
+        metadata_full_name: str,
+        metadata_type: str,
+        tags_to_associate: list,
+        tags_to_disassociate,
+    ) -> str:
+        return f"mock_associated_tags: {tags_to_associate} with metadata {metadata_full_name} of type {metadata_type}"
+
+    async def list_tags_for_metadata(
+        self, metadata_full_name: str, metadata_type: str
+    ) -> str:
+        return f"mock_tags_for_metadata: {metadata_full_name} of type {metadata_type}"
+
+    async def list_metadata_by_tag(self, tag_name: str) -> str:
+        return f"mock_metadata_by_tag: {tag_name}"

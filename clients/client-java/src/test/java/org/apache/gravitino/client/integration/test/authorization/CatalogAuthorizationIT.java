@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.junit.jupiter.api.BeforeAll;
@@ -63,7 +64,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     properties.put("metastore.uris", hmsUri);
     assertThrows(
         "Can not access metadata {" + catalog1 + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
@@ -77,7 +78,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
         .createCatalog(catalog2, Catalog.Type.RELATIONAL, "hive", "comment", properties);
     assertThrows(
         "Can not access metadata {" + catalog1 + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient
               .loadMetalake(METALAKE)
@@ -119,7 +120,7 @@ public class CatalogAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertArrayEquals(new String[] {catalog1, catalog2}, catalogs);
     assertThrows(
         "Can not access metadata {" + catalog1 + "}.",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake(METALAKE).dropCatalog(catalog1, true);
         });

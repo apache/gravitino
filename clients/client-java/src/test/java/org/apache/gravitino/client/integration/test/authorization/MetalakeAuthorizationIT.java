@@ -27,6 +27,7 @@ import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -69,7 +70,7 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testCreateMetalake() {
     assertThrows(
         "Only service admins can create metalakes, current user can't create the metalake,  you should configure it in the server configuration first",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.createMetalake("testMetalake2", "", new HashMap<>());
         });
@@ -102,13 +103,13 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
     normalUserClient.loadMetalake(METALAKE);
     assertThrows(
         "Current user access metadata {testMetalake2}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake("testMetalake2");
         });
     assertThrows(
         "Current user access metadata {testMetalake3}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.loadMetalake("testMetalake3");
         });
@@ -116,7 +117,7 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
     serviceAdminButNotOwnerClient.loadMetalake("testMetalake2");
     assertThrows(
         "Current user access metadata {testMetalake3}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           serviceAdminButNotOwnerClient.loadMetalake("testMetalake3");
         });
@@ -127,14 +128,14 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testSetMetalake() {
     assertThrows(
         "Current user access metadata {testMetalake2}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           serviceAdminButNotOwnerClient.alterMetalake(
               "testMetalake2", MetalakeChange.setProperty("key1", "value1"));
         });
     assertThrows(
         "Current user access metadata {testMetalake2}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.alterMetalake(
               "testMetalake2", MetalakeChange.setProperty("key1", "value1"));
@@ -147,13 +148,13 @@ public class MetalakeAuthorizationIT extends BaseRestApiAuthorizationIT {
   public void testDropMetalake() {
     assertThrows(
         "Current user access metadata {testMetalake2}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           serviceAdminButNotOwnerClient.dropMetalake("testMetalake3", true);
         });
     assertThrows(
         "Current user access metadata {testMetalake2}",
-        RuntimeException.class,
+        ForbiddenException.class,
         () -> {
           normalUserClient.dropMetalake("testMetalake3", true);
         });

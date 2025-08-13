@@ -105,6 +105,32 @@ ALTER TABLE model_version_info ADD CONSTRAINT uk_mid_ver_uri_del UNIQUE (model_i
 -- remove the default value for model_version_uri_name
 ALTER TABLE model_version_info ALTER COLUMN model_version_uri_name DROP DEFAULT;
 
+CREATE TABLE IF NOT EXISTS statistic_meta (
+    id BIGINT NOT NULL,
+    statistic_id BIGINT NOT NULL,
+    statistic_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    statistic_value TEXT NOT NULL,
+    metadata_object_id BIGINT NOT NULL,
+    metadata_object_type VARCHAR(64) NOT NULL,
+    PRIMARY KEY (statistic_id),
+    UNIQUE (statistic_name, metadata_object_id, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stid ON statistic_meta (statistic_id);
+CREATE INDEX IF NOT EXISTS idx_moid ON statistic_meta (metadata_object_id);
+COMMENT ON TABLE statistic_meta IS 'statistic metadata';
+COMMENT ON COLUMN statistic_meta.id IS 'auto increment id';
+COMMENT ON COLUMN statistic_meta.statistic_id IS 'statistic id';
+COMMENT ON COLUMN statistic_meta.statistic_name IS 'statistic name';
+COMMENT ON COLUMN statistic_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN statistic_meta.statistic_value IS 'statistic value';
+COMMENT ON COLUMN statistic_meta.metadata_object_id IS 'metadata object id';
+COMMENT ON COLUMN statistic_meta.metadata_object_type IS 'metadata object type';
+COMMENT ON COLUMN statistic_meta.audit_info IS 'statistic audit info';
+COMMENT ON COLUMN statistic_meta.current_version IS 'statistic current version';
+COMMENT ON COLUMN statistic_meta.last_version IS 'statistic last version';
+COMMENT ON COLUMN statistic_meta.deleted_at IS 'statistic deleted at';
 
 CREATE TABLE IF NOT EXISTS job_template_meta (
     job_template_id BIGINT NOT NULL,

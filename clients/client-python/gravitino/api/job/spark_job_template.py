@@ -95,6 +95,16 @@ class SparkJobTemplate(JobTemplate):
         """
         return JobType.SPARK
 
+    @staticmethod
+    def builder() -> "SparkJobTemplate.Builder":
+        """
+        Creates a new builder instance for constructing a SparkJobTemplate.
+
+        Returns:
+            SparkJobTemplate.Builder: A new builder instance.
+        """
+        return SparkJobTemplate.Builder()
+
     def __eq__(self, other: Any) -> bool:
         if not super().__eq__(other):
             return False

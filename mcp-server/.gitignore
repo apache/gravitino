@@ -32,6 +32,7 @@ gravitino_mcp_server.egg-info
 logs/
 *.log
 *.err
+gravitino_mcp_server.egg-info
 
 # Unit test / coverage reports
 htmlcov/
