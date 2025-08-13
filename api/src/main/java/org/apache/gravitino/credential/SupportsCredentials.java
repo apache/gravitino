@@ -67,7 +67,7 @@ public interface SupportsCredentials {
     if (filteredCredentials.isEmpty()) {
       throw new NoSuchCredentialException(
           "No credential found for the credential type: %s", credentialType);
-    } else if (credentials.length > 1) {
+    } else if (filteredCredentials.size() > 1) {
       throw new IllegalStateException(
           "Multiple credentials found for the credential type:" + credentialType);
     }
