@@ -27,6 +27,7 @@ venv
 .uv
 dist
 build
+gravitino_mcp_server.egg-info
 
 logs/
 *.log
@@ -51,3 +52,4 @@ cover/
 # Documentation Related
 docs/build
 docs/source/generated
+
