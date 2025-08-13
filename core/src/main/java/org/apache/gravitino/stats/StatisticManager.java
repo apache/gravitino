@@ -38,6 +38,7 @@ import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.RelationalEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -101,8 +102,7 @@ public class StatisticManager {
       // are only related to entity store now. We don't need to lock the metadata object.
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
-      List<Relation> relations = Lists.newArrayList();
-      List<StatisticEntity> statisticEntities = Lists.newArrayList();
+      List<RelationalEntity<StatisticEntity>> relationalEntities = Lists.newArrayList();
       for (Map.Entry<String, StatisticValue<?>> entry : statistics.entrySet()) {
         String name = entry.getKey();
         StatisticValue<?> value = entry.getValue();
@@ -121,19 +121,16 @@ public class StatisticManager {
                         .withLastModifiedTime(Instant.now())
                         .build())
                 .build();
-        statisticEntities.add(statistic);
-        relations.add(
-            new Relation(
-                identifier, type, statistic.nameIdentifier(), Entity.EntityType.STATISTIC));
+        RelationalEntity<StatisticEntity> relationalEntity =
+            RelationalEntity.of(
+                statistic, Relation.VertexType.DESTINATION, Lists.newArrayList(identifier), type);
+        relationalEntities.add(relationalEntity);
       }
+
       store
           .relationOperations()
           .insertEntitiesAndRelations(
-              SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
-              statisticEntities,
-              false,
-              relations,
-              true);
+              SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL, relationalEntities, true);
       return statistics.entrySet().stream()
           .map(entry -> new CustomStatistic(entry.getKey(), entry.getValue()))
           .collect(Collectors.toList());
@@ -160,10 +157,8 @@ public class StatisticManager {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
       List<Relation> relations = Lists.newArrayList();
-      List<NameIdentifier> statsIdents = Lists.newArrayList();
       for (String statisticName : statistics) {
         NameIdentifier statIdent = NameIdentifierUtil.ofStatistic(identifier, statisticName);
-        statsIdents.add(statIdent);
         relations.add(new Relation(identifier, type, statIdent, Entity.EntityType.STATISTIC));
       }
 
@@ -172,9 +167,7 @@ public class StatisticManager {
               .relationOperations()
               .deleteEntitiesAndRelations(
                   SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
-                  statsIdents,
-                  Entity.EntityType.STATISTIC,
-                  false,
+                  Relation.VertexType.DESTINATION,
                   relations);
       // If deleteCount is 0, it means that the statistics were not found.
       return deleteCount != 0;

@@ -76,7 +76,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticEntities.add(statisticEntity);
 
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
+        statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     List<StatisticEntity> listEntities =
         statisticMetaService.listStatisticsByEntity(
@@ -90,7 +90,7 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticEntities.clear();
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
+        statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     listEntities =
         statisticMetaService.listStatisticsByEntity(
@@ -165,25 +165,25 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     StatisticEntity statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
+        statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, topic.nameIdentifier(), Entity.EntityType.TOPIC);
+        statisticEntities, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
+        statisticEntities, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, model.nameIdentifier(), Entity.EntityType.MODEL);
+        statisticEntities, model.nameIdentifier(), Entity.EntityType.MODEL);
 
     // assert stats
     Assertions.assertEquals(4, countActiveStats(metalake.id()));
@@ -278,25 +278,25 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
+        statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, topic.nameIdentifier(), Entity.EntityType.TOPIC);
+        statisticEntities, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
+        statisticEntities, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, model.nameIdentifier(), Entity.EntityType.MODEL);
+        statisticEntities, model.nameIdentifier(), Entity.EntityType.MODEL);
 
     // assert stats
     Assertions.assertEquals(4, countActiveStats(metalake.id()));
@@ -359,25 +359,25 @@ public class TestStatisticMetaService extends TestJDBCBackend {
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, table.nameIdentifier(), Entity.EntityType.TABLE);
+        statisticEntities, table.nameIdentifier(), Entity.EntityType.TABLE);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, topic.nameIdentifier(), Entity.EntityType.TOPIC);
+        statisticEntities, topic.nameIdentifier(), Entity.EntityType.TOPIC);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, fileset.nameIdentifier(), Entity.EntityType.FILESET);
+        statisticEntities, fileset.nameIdentifier(), Entity.EntityType.FILESET);
 
     statisticEntities.clear();
     statisticEntity = createStatisticEntity(auditInfo, 100L);
     statisticEntities.add(statisticEntity);
     statisticMetaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-        statisticEntities, metalakeName, model.nameIdentifier(), Entity.EntityType.MODEL);
+        statisticEntities, model.nameIdentifier(), Entity.EntityType.MODEL);
 
     // assert stats count
     Assertions.assertEquals(4, countActiveStats(metalake.id()));

@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.RelationalEntity;
 
 /**
  * This is an extended interface. This is mainly used for strengthen the ability of querying
@@ -156,41 +157,28 @@ public interface SupportsRelationOperations {
    * @param <E> The type of entities being inserted, which must extend Entity and implement
    *     HasIdentifier.
    * @param relType The type of relation to be established between the entities.
-   * @param vertexEntities The list of entities to be inserted, which must implement the Entity and
-   *     HasIdentifier
-   * @param isSourceVertex If true, the entities are considered as source vertices in the relation;
-   *     if false,
-   * @param relations The list of relations to be established between the entities.
+   * @param entities The list of entities to be inserted along with their relations. Each entity has
+   *     the entity, vertex type in the relation, related entity name identifiers, and related
+   *     entity type
    * @param overwrite If true, existing relations will be overwritten; if false, existing relations
    *     will throw an exception.
    * @throws IOException If an error occurs during the insertion process, such as a storage issue.
    */
   <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType,
-      List<E> vertexEntities,
-      boolean isSourceVertex,
-      List<Relation> relations,
-      boolean overwrite)
-      throws IOException;
+      Type relType, List<RelationalEntity<E>> entities, boolean overwrite) throws IOException;
 
   /**
-   * Deletes a list of relations of a specific type.
+   * Deletes a list of relations and their associated entities based on vertex type.
    *
    * @param relType The type of relation to be deleted.
-   * @param vertexIdents The list of identifiers of the entities whose relations are to be deleted.
-   * @param vertexType The type of the entities whose relations are to be deleted.
-   * @param sourceVertex If true, the relations are deleted from the source vertex; if false, from
-   *     the destination vertex.
+   * @param deleteVertexType The vertex type in the relation need to be deleted, which can be either
+   *     SOURCE or DESTINATION.
    * @param relations The list of relations to be deleted, which must implement the Relation
    *     interface.
    * @return The number of relations deleted.
    * @throws IOException If an error occurs during the deletion process, such as a storage issue.
    */
   int deleteEntitiesAndRelations(
-      Type relType,
-      List<NameIdentifier> vertexIdents,
-      Entity.EntityType vertexType,
-      boolean sourceVertex,
-      List<Relation> relations)
+      Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
       throws IOException;
 }

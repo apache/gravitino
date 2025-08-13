@@ -264,41 +264,39 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType,
-      List<E> vertexEntities,
-      boolean isSourceVertex,
-      List<Relation> relations,
-      boolean overwrite)
+      Type relType, List<RelationalEntity<E>> relationalEntities, boolean overwrite)
       throws IOException {
-    for (Relation relation : relations) {
-      cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
+    for (RelationalEntity<E> relationalEntity : relationalEntities) {
+      if (relationalEntity.vertexType() == Relation.VertexType.SOURCE) {
+        cache.invalidate(
+            relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type(), relType);
+        cache.invalidate(
+            relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type());
+      } else {
+        for (NameIdentifier relatedNameIdent : relationalEntity.relatedIdents()) {
+          cache.invalidate(relatedNameIdent, relationalEntity.relatedEntityType(), relType);
+        }
+        cache.invalidate(
+            relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type());
+      }
     }
 
-    for (E entity : vertexEntities) {
-      cache.invalidate(entity.nameIdentifier(), entity.type());
-    }
-
-    backend.insertEntitiesAndRelations(
-        relType, vertexEntities, isSourceVertex, relations, overwrite);
+    backend.insertEntitiesAndRelations(relType, relationalEntities, overwrite);
   }
 
   @Override
   public int deleteEntitiesAndRelations(
-      Type relType,
-      List<NameIdentifier> vertexIdents,
-      Entity.EntityType vertexType,
-      boolean sourceVertex,
-      List<Relation> relations)
+      Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
       throws IOException {
     for (Relation relation : relations) {
       cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
+      if (deleteVertexType == Relation.VertexType.SOURCE) {
+        cache.invalidate(relation.getSourceIdent(), relation.getSourceType());
+      } else {
+        cache.invalidate(relation.getDestIdent(), relation.getDestType());
+      }
     }
 
-    for (NameIdentifier vertexIdent : vertexIdents) {
-      cache.invalidate(vertexIdent, vertexType);
-    }
-
-    return backend.deleteEntitiesAndRelations(
-        relType, vertexIdents, vertexType, sourceVertex, relations);
+    return backend.deleteEntitiesAndRelations(relType, deleteVertexType, relations);
   }
 }

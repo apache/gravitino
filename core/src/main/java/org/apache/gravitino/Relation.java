@@ -95,4 +95,15 @@ public class Relation {
   public Entity.EntityType getDestType() {
     return destVertex.getRight();
   }
+
+  /**
+   * Enum representing the type of vertex in a relation. This is used to distinguish between source
+   * and destination vertices.
+   */
+  public enum VertexType {
+    /** Represents the source vertex in a relation. */
+    SOURCE,
+    /** Represents the destination vertex in a relation. */
+    DESTINATION
+  }
 }

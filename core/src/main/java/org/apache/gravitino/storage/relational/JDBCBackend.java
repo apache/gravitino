@@ -31,7 +31,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,7 +87,6 @@ import org.apache.gravitino.storage.relational.service.TagMetaService;
 import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -597,18 +595,13 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public int deleteEntitiesAndRelations(
-      Type relType,
-      List<NameIdentifier> vertexIdents,
-      Entity.EntityType vertexType,
-      boolean isSourceVertex,
-      List<Relation> relations)
+      Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
       throws IOException {
     switch (relType) {
       case METADATA_OBJECT_STAT_REL:
         Preconditions.checkArgument(
-            !isSourceVertex, "Only supports to delete relations of destination vertex");
-        Preconditions.checkArgument(
-            vertexType == STATISTIC, "The vertex type must be STATISTIC, but got %s", vertexType);
+            deleteVertexType == Relation.VertexType.DESTINATION,
+            "Only supports to delete relations of destination vertex");
 
         AtomicInteger deleteCount = new AtomicInteger(0);
         Map<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> groupedRelations =
@@ -637,14 +630,6 @@ public class JDBCBackend implements RelationalBackend {
                           "The destination type of relation must be STATISTIC, but got %s",
                           relation.getDestType()));
 
-              Preconditions.checkArgument(
-                  Sets.newHashSet(
-                          vertexIdents.stream()
-                              .map(NameIdentifier::name)
-                              .collect(Collectors.toList()))
-                      .equals(Sets.newHashSet(statsToDelete)),
-                  "The vertexIdents must match the destination identifiers of the relations to delete");
-
               deleteCount.addAndGet(
                   StatisticMetaService.getInstance()
                       .batchDeleteStatisticPOs(
@@ -659,70 +644,44 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType,
-      List<E> vertexEntities,
-      boolean isSourceVertex,
-      List<Relation> relations,
-      boolean overwrite)
-      throws IOException {
+      Type relType, List<RelationalEntity<E>> entities, boolean overwrite) throws IOException {
     switch (relType) {
       case METADATA_OBJECT_STAT_REL:
         Preconditions.checkArgument(
             overwrite, "The overwrite must be true for metadata object stats relation");
-        Preconditions.checkArgument(
-            !isSourceVertex, "Only supports to insert relations of destination vertex");
 
         StatisticMetaService metaService = StatisticMetaService.getInstance();
-        Map<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> groupedRelations =
-            relations.stream().collect(Collectors.groupingBy(Relation::getSourceVertex));
+        List<StatisticEntity> statisticEntities = Lists.newArrayList();
 
-        if (groupedRelations.isEmpty()) {
-          return;
+        Set<NameIdentifier> relatedIdents = Sets.newHashSet();
+        Set<Entity.EntityType> relatedEntityTypes = Sets.newHashSet();
+
+        for (RelationalEntity<E> relEntity : entities) {
+          Preconditions.checkArgument(
+              relEntity.relatedIdents().size() == 1,
+              "Each entity must have exactly one related identifier");
+          NameIdentifier relatedIdent = relEntity.relatedIdents().get(0);
+          relatedIdents.add(relatedIdent);
+          relatedEntityTypes.add(relEntity.relatedEntityType());
+          Preconditions.checkArgument(
+              relEntity.entity() instanceof StatisticEntity,
+              "The entity must be a StatisticEntity");
+          statisticEntities.add((StatisticEntity) relEntity.entity());
         }
 
         Preconditions.checkArgument(
-            groupedRelations.size() == 1,
-            "The relations must have the same source identifier and type, but got %s groups",
-            groupedRelations.size());
+            relatedIdents.size() == 1,
+            "All entities must have the same related identifier, but got %s",
+            relatedIdents.size());
 
-        groupedRelations.forEach(
-            (sourceVertex, insertRelations) -> {
-              String metalake = NameIdentifierUtil.getMetalake(sourceVertex.getLeft());
-              insertRelations.sort(Comparator.comparing(r -> r.getDestIdent().name()));
-              vertexEntities.sort(Comparator.comparing(HasIdentifier::name));
+        Preconditions.checkArgument(
+            relatedEntityTypes.size() == 1,
+            "All entities must have the same related entity type, but got %s",
+            relatedEntityTypes.size());
 
-              Preconditions.checkArgument(
-                  vertexEntities.size() == insertRelations.size(),
-                  "The size of entities and relations must be the same, but got %s and %s",
-                  vertexEntities.size(),
-                  insertRelations.size());
-
-              for (int index = 0; index < vertexEntities.size(); index++) {
-                E entity = vertexEntities.get(index);
-                Relation relation = insertRelations.get(index);
-
-                Preconditions.checkArgument(
-                    entity.nameIdentifier().equals(relation.getDestIdent()),
-                    "The identifier of entity %s must match the destination identifier of relation %s",
-                    entity.nameIdentifier(),
-                    relation.getDestIdent());
-
-                Preconditions.checkArgument(
-                    entity.type() == STATISTIC,
-                    "The entity type must be STATISTIC, but got %s",
-                    entity.type());
-                Preconditions.checkArgument(
-                    relation.getDestType() == STATISTIC,
-                    "The destination type of relation must be STATISTIC, but got %s",
-                    relation.getDestType());
-              }
-
-              metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-                  (List<StatisticEntity>) vertexEntities,
-                  metalake,
-                  sourceVertex.getLeft(),
-                  sourceVertex.getRight());
-            });
+        Entity.EntityType type = relatedEntityTypes.iterator().next();
+        metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
+            statisticEntities, relatedIdents.iterator().next(), type);
         break;
       default:
         throw new IllegalArgumentException(
