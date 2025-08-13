@@ -122,7 +122,10 @@ public class JobOperations {
   @ResponseMetered(name = "register-job-template", absolute = true)
   public Response registerJobTemplate(
       @PathParam("metalake") String metalake, JobTemplateRegisterRequest request) {
-    LOG.info("Received request to register job template in metalake: {}", metalake);
+    LOG.info(
+        "Received request to register job template {} in metalake: {}",
+        request.getJobTemplate().name(),
+        metalake);
 
     try {
       return Utils.doAs(
@@ -257,7 +260,8 @@ public class JobOperations {
   @Timed(name = "run-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "run-job", absolute = true)
   public Response runJob(@PathParam("metalake") String metalake, JobRunRequest request) {
-    LOG.info("Received request to run job in metalake: {}", metalake);
+    LOG.info(
+        "Received request to run job {} in metalake: {}", request.getJobTemplateName(), metalake);
 
     try {
       return Utils.doAs(
@@ -270,7 +274,11 @@ public class JobOperations {
             JobEntity jobEntity =
                 jobOperationDispatcher.runJob(metalake, request.getJobTemplateName(), jobConf);
 
-            LOG.info("Run job {} in metalake: {}", jobEntity.name(), metalake);
+            LOG.info(
+                "Run job[{}] {} in metalake: {}",
+                jobEntity.jobTemplateName(),
+                jobEntity.name(),
+                metalake);
             return Utils.ok(new JobResponse(toDTO(jobEntity)));
           });
 

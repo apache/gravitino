@@ -40,6 +40,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -49,7 +50,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
@@ -361,18 +361,11 @@ public class TestJobManager {
     JobEntity job1 = newJobEntity("shell_job", JobHandle.Status.QUEUED);
     JobEntity job2 = newJobEntity("spark_job", JobHandle.Status.QUEUED);
 
-    SupportsRelationOperations supportsRelationOperations =
-        Mockito.mock(SupportsRelationOperations.class);
-    when(supportsRelationOperations.listEntitiesByRelation(
-            SupportsRelationOperations.Type.JOB_TEMPLATE_JOB_REL,
-            NameIdentifierUtil.ofJobTemplate(metalake, shellJobTemplate.name()),
-            Entity.EntityType.JOB_TEMPLATE))
+    String[] levels =
+        ArrayUtils.add(shellJobTemplate.namespace().levels(), shellJobTemplate.name());
+    Namespace jobTemplateIdentNs = Namespace.of(levels);
+    when(entityStore.list(jobTemplateIdentNs, JobEntity.class, Entity.EntityType.JOB))
         .thenReturn(Lists.newArrayList(job1));
-    when(entityStore.relationOperations()).thenReturn(supportsRelationOperations);
-
-    // Mock the listJobs method to return a list of jobs associated with the job template
-    when(entityStore.list(NamespaceUtil.ofJob(metalake), JobEntity.class, Entity.EntityType.JOB))
-        .thenReturn(Lists.newArrayList(job1, job2));
 
     List<JobEntity> jobs = jobManager.listJobs(metalake, Optional.of(shellJobTemplate.name()));
     Assertions.assertEquals(1, jobs.size());
@@ -380,6 +373,10 @@ public class TestJobManager {
     Assertions.assertFalse(jobs.contains(job2));
 
     // List all jobs without filtering by job template
+    // Mock the listJobs method to return a list of jobs associated with the job template
+    when(entityStore.list(NamespaceUtil.ofJob(metalake), JobEntity.class, Entity.EntityType.JOB))
+        .thenReturn(Lists.newArrayList(job1, job2));
+
     jobs = jobManager.listJobs(metalake, Optional.empty());
     Assertions.assertEquals(2, jobs.size());
     Assertions.assertTrue(jobs.contains(job1));
