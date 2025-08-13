@@ -16,23 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.lineage.auth;
+package org.apache.gravitino.stats.storage;
 
-import javax.ws.rs.BadRequestException;
+import java.util.Map;
 
-public class AuthenticationFactory {
-  public static LineageServerAuthenticationStrategy createStrategy(String authType) {
-    if (authType == null || authType.trim().isEmpty()) {
-      return new NoAuthStrategy();
-    }
+/**
+ * Factory interface for creating instances of {@link
+ * org.apache.gravitino.stats.storage.PartitionStatisticStorage}.
+ */
+public interface PartitionStatisticStorageFactory {
 
-    switch (authType) {
-      case "apiKey":
-        return new ApiKeyAuthStrategy();
-      case "none":
-        return new NoAuthStrategy();
-      default:
-        throw new BadRequestException("Unsupported authentication " + authType);
-    }
-  }
+  /**
+   * Creates an instance of {@link org.apache.gravitino.stats.storage.PartitionStatisticStorage}.
+   *
+   * @param properties additional properties for the storage configuration
+   * @return an instance of {@link org.apache.gravitino.stats.storage.PartitionStatisticStorage}
+   */
+  PartitionStatisticStorage create(Map<String, String> properties);
 }
