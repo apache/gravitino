@@ -30,6 +30,9 @@ dependencies {
   compileOnly(project(":catalogs:catalog-fileset"))
   compileOnly(project(":core"))
   compileOnly(libs.hadoop3.aws)
+  compileOnly(libs.aws.iam)
+  compileOnly(libs.aws.policy)
+  compileOnly(libs.aws.sts)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
 
@@ -40,15 +43,12 @@ dependencies {
     exclude("*")
   }
 
-  implementation(libs.aws.iam)
-  implementation(libs.aws.policy)
-  implementation(libs.aws.sts)
   implementation(libs.commons.lang3)
-  implementation(libs.hadoop3.aws)
   implementation(libs.guava)
 
   testImplementation(project(":api"))
   testImplementation(project(":core"))
+  testImplementation(libs.aws.s3)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -63,19 +63,10 @@ tasks.withType(ShadowJar::class.java) {
     exclude(dependency("org.slf4j:slf4j-api"))
   }
 
-  relocate("com.amazonaws", "org.apache.gravitino.aws.shaded.com.amazonaws")
-  relocate("com.fasterxml.jackson", "org.apache.gravitino.aws.shaded.com.fasterxml.jackson")
   relocate("com.google.common", "org.apache.gravitino.aws.shaded.com.google.common")
   relocate("com.google.errorprone", "org.apache.gravitino.aws.shaded.com.google.errorprone")
-  relocate("com.google.thirdparty", "org.apache.gravitino.aws.shaded.com.google.thirdparty")
-  relocate("io.netty", "org.apache.gravitino.aws.shaded.io.netty")
   relocate("org.apache.commons", "org.apache.gravitino.aws.shaded.org.apache.commons")
-  relocate("org.apache.hadoop.fs.s3a", "org.apache.gravitino.aws.shaded.org.apache.hadoop.fs.s3a")
-  relocate("org.apache.http", "org.apache.gravitino.aws.shaded.org.apache.http")
   relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
-  relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
-  relocate("org.wildfly.openssl", "org.apache.gravitino.aws.shaded.org.wildfly.openssl")
-  relocate("software.amazon", "org.apache.gravitino.aws.shaded.software.amazon")
 
   mergeServiceFiles()
 }

@@ -26,6 +26,9 @@ plugins {
 
 dependencies {
   implementation(project(":bundles:gcp"))
+  implementation(libs.commons.logging)
+  implementation(libs.google.auth.credentials)
+  implementation(libs.google.auth.http)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
   implementation(libs.hadoop3.gcs)
@@ -41,6 +44,7 @@ tasks.withType(ShadowJar::class.java) {
   }
 
   // Relocate dependencies to avoid conflicts
+  relocate("com.google.api", "org.apache.gravitino.gcp.shaded.com.google.api")
   relocate("com.fasterxml", "org.apache.gravitino.gcp.shaded.com.fasterxml")
   relocate("com.google.auto", "org.apache.gravitino.gcp.shaded.com.google.auto")
   relocate("com.google.common", "org.apache.gravitino.gcp.shaded.com.google.common")

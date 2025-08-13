@@ -368,11 +368,15 @@ If your Spark **without Hadoop environment**, you can use the following code sni
 os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar --master local[1] pyspark-shell"
 ```
 
-- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is the Gravitino AWS jar with Hadoop environment(3.3.1) and `hadoop-aws` jar.
-- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is a condensed version of the Gravitino AWS bundle jar without Hadoop environment and `hadoop-aws` jar.
-- `hadoop-aws-3.2.0.jar` and `aws-java-sdk-bundle-1.11.375.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory. 
+- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) is a bundle that 
+  contains all the dependencies needed to access S3. It is recommended to use this JAR when your environment does not include cloud storage dependencies. 
+  You can use this bundle to access cloud storage through Gravitino directly without downloading extra dependencies.
+- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws) is a condensed JAR. 
+  It is recommended to use this JAR when your environment can already access cloud storage. It only contains Gravitino's own code and shaded basic dependencies,
+  which can ensure that there will be no conflicts with the dependencies of cloud storage.
+- `hadoop-aws-3.2.0.jar` and `aws-java-sdk-bundle-1.11.375.jar` can be found in the Hadoop distribution in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
 
-Please choose the correct jar according to your environment.
+- Please choose the correct jar according to your environment.
 
 :::note
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.

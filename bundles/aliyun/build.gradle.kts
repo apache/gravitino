@@ -29,6 +29,7 @@ dependencies {
   compileOnly(project(":catalogs:catalog-common"))
   compileOnly(project(":catalogs:catalog-fileset"))
   compileOnly(project(":core"))
+  compileOnly(libs.aliyun.credentials.sdk)
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.oss)
@@ -40,7 +41,6 @@ dependencies {
     exclude("*")
   }
 
-  implementation(libs.aliyun.credentials.sdk)
   implementation(libs.commons.collections3)
 
   // oss needs StringUtils from commons-lang3 or the following error will occur in 3.3.0
@@ -79,20 +79,12 @@ tasks.withType(ShadowJar::class.java) {
   }
 
   // Relocate dependencies to avoid conflicts
-  relocate("com.aliyun", "org.apache.gravitino.aliyun.shaded.com.aliyun")
   relocate("com.fasterxml.jackson", "org.apache.gravitino.aliyun.shaded.com.fasterxml.jackson")
-  relocate("com.google", "org.apache.gravitino.aliyun.shaded.com.google.common")
+  relocate("com.google.common", "org.apache.gravitino.aliyun.shaded.com.google.common")
   relocate("com.sun.activation", "org.apache.gravitino.aliyun.shaded.com.sun.activation")
-  relocate("com.sun.istack", "org.apache.gravitino.aliyun.shaded.com.sun.istack")
-  relocate("com.sun.jersey", "org.apache.gravitino.aliyun.shaded.com.sun.jersey")
-  relocate("com.sun.xml", "org.apache.gravitino.aliyun.shaded.com.sun.xml")
-  relocate("okhttp3", "org.apache.gravitino.aliyun.shaded.okhttp3")
-  relocate("okio", "org.apache.gravitino.aliyun.shaded.okio")
   relocate("org.apache.commons", "org.apache.gravitino.aliyun.shaded.org.apache.commons")
   relocate("org.apache.http", "org.apache.gravitino.aliyun.shaded.org.apache.http")
   relocate("org.checkerframework", "org.apache.gravitino.aliyun.shaded.org.checkerframework")
-  relocate("org.jacoco.agent.rt", "org.apache.gravitino.aliyun.shaded.org.jacoco.agent.rt")
-  relocate("org.jdom", "org.apache.gravitino.aliyun.shaded.org.jdom")
 
   mergeServiceFiles()
 }
