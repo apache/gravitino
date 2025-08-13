@@ -70,6 +70,8 @@ public interface PartitionStatisticStorage extends Closeable {
    * @param metalake the name of the metalake
    * @param partitionStatisticsToDrop a map where the key is a {@link MetadataObject} and the value
    *     is a list of {@link PartitionStatisticsDrop}
+   * @return the number of statistics dropped, which may be less than the size of the input list if
+   *     some statistics do not exist or cannot be dropped.
    */
   int dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop);
 
