@@ -63,14 +63,6 @@ public class DefaultGVFSOperations extends BaseGVFSOperations {
     FileSystem actualFs = getActualFileSystem(gvfsPath, currentLocationName());
     Path actualFilePath =
         getActualFilePath(gvfsPath, currentLocationName(), FilesetDataOperation.OPEN);
-    if (actualFs.getFileStatus(actualFilePath).isDirectory()) {
-      String message =
-          "Cannot open a directory path: "
-              + gvfsPath
-              + ". Please use listStatus or getFileStatus to access directory.";
-      throw new IOException(message);
-    }
-
     return actualFs.open(actualFilePath, bufferSize);
   }
 
