@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,8 +38,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -325,10 +324,7 @@ public class JobManager implements JobOperationDispatcher {
               // Using a mock namespace from job template identifier to get the jobs associated
               // with job template.
               String[] elements =
-                  Stream.concat(
-                          Arrays.stream(jobTemplateIdent.namespace().levels()),
-                          Stream.of(jobTemplateIdent.name()))
-                      .toArray(String[]::new);
+                  ArrayUtils.add(jobTemplateIdent.namespace().levels(), jobTemplateIdent.name());
               Namespace jobTemplateIdentNs = Namespace.of(elements);
 
               // Lock the job template to ensure no concurrent modifications/deletions

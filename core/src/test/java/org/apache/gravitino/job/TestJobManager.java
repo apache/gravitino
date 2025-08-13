@@ -34,14 +34,13 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -363,10 +362,7 @@ public class TestJobManager {
     JobEntity job2 = newJobEntity("spark_job", JobHandle.Status.QUEUED);
 
     String[] levels =
-        Stream.concat(
-                Arrays.stream(shellJobTemplate.namespace().levels()),
-                Stream.of(shellJobTemplate.name()))
-            .toArray(String[]::new);
+        ArrayUtils.add(shellJobTemplate.namespace().levels(), shellJobTemplate.name());
     Namespace jobTemplateIdentNs = Namespace.of(levels);
     when(entityStore.list(jobTemplateIdentNs, JobEntity.class, Entity.EntityType.JOB))
         .thenReturn(Lists.newArrayList(job1));
