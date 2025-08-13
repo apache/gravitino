@@ -16,35 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.dto.requests;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
-import org.apache.gravitino.rest.RESTRequest;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-/** Represents a several request to update a model version. */
-@Getter
-@EqualsAndHashCode
-@AllArgsConstructor
-@NoArgsConstructor(force = true)
-@ToString
-public class ModelVersionUpdatesRequest implements RESTRequest {
-  @JsonProperty("updates")
-  private final List<ModelVersionUpdateRequest> updates;
+public class TestModelVersionUpdatesRequest {
 
-  /** {@inheritDoc} */
-  @Override
-  public void validate() throws IllegalArgumentException {
-    if (updates == null) {
-      throw new IllegalArgumentException("updates cannot be null");
-    }
+  @Test
+  public void testModelVersionUpdatesRequestWithUpdatesNull() {
+    ModelVersionUpdatesRequest modelVersionUpdatesRequest = new ModelVersionUpdatesRequest(null);
 
-    updates.forEach(ModelVersionUpdateRequest::validate);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        modelVersionUpdatesRequest::validate,
+        "updates cannot be null");
   }
 }
