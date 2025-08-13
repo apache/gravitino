@@ -14,11 +14,3 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
-from mcp_server.client.catalog_operation import CatalogOperation
-from mcp_server.client.gravitino_operation import GravitinoOperation
-from mcp_server.client.model_operation import ModelOperation
-from mcp_server.client.schema_operation import SchemaOperation
-from mcp_server.client.table_operation import TableOperation
-from mcp_server.client.tag_operation import TagOperation
-from mcp_server.client.topic_operation import TopicOperation

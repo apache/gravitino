@@ -57,7 +57,7 @@ public class FilesetMetaBaseSQLProvider {
         + " fm.type, fm.audit_info, fm.current_version, fm.last_version, fm.deleted_at,"
         + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
         + " vi.schema_id as version_schema_id, vi.fileset_id as version_fileset_id,"
-        + " vi.version, vi.fileset_comment, vi.properties, vi.storage_location,"
+        + " vi.version, vi.fileset_comment, vi.properties, vi.storage_location_name, vi.storage_location,"
         + " vi.deleted_at as version_deleted_at"
         + " FROM "
         + META_TABLE_NAME
