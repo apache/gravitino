@@ -51,16 +51,3 @@ class PlainRESTClientFilesetOperation(FilesetOperation):
             f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}/files?sub_path={sub_path}&location_name={location_name}"
         )
         return response.json().get("files", [])
-
-    async def get_fileset_location(
-        self,
-        catalog_name: str,
-        schema_name: str,
-        fileset_name: str,
-        sub_path: str,
-        location_name: str,
-    ) -> str:
-        response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}/location?sub_path={sub_path}&location_name={location_name}"
-        )
-        return response.json().get("fileLocation", {})

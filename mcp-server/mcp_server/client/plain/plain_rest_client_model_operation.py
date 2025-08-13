@@ -47,9 +47,9 @@ class PlainRESTClientModelOperation(ModelOperation):
         self, catalog_name: str, schema_name: str, model_name: str
     ) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions"
+            f"/api/metalakes/{self.metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions?details=true"
         )
-        return response.json().get("versions", [])
+        return response.json().get("infos", [])
 
     async def load_model_version(
         self, catalog_name: str, schema_name: str, model_name: str, version: int

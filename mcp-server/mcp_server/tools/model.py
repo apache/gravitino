@@ -121,10 +121,24 @@ def load_model_tools(mcp: FastMCP):
             model_name (str): The name of the model to list versions for.
 
         Returns:
-            str: A JSON string containing model version information. The string represents an array of version numbers.
+            str: A JSON string containing model version information. The string represents an array of version information.
 
         Example Return Value:
-            [0,1]
+            [
+              {
+                "version": 1,
+                "comment": "this is version2",
+                "aliases": [
+                  "alias2"
+                ],
+                "uri": "/tmp/version2",
+                "properties": {},
+                "audit": {
+                  "creator": "anonymous",
+                  "createTime": "2025-08-11T06:56:06.340031Z"
+                }
+              }
+            ]
 
         """
         client = ctx.request_context.lifespan_context.rest_client()

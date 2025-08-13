@@ -96,16 +96,6 @@ class MockFilesetOperation(FilesetOperation):
     ) -> str:
         return "mock_files_in_fileset"
 
-    async def get_fileset_location(
-        self,
-        catalog_name: str,
-        schema_name: str,
-        fileset_name: str,
-        sub_path: str,
-        location_name: str,
-    ) -> str:
-        return "mock_fileset_location"
-
 
 class MockModelOperation(ModelOperation):
     async def get_list_of_models(

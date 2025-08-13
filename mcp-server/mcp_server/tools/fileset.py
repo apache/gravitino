@@ -142,36 +142,3 @@ def load_fileset_tools(mcp: FastMCP):
         return await client.as_fileset_operation().list_files_in_fileset(
             catalog_name, schema_name, fileset_name, location_name, sub_path
         )
-
-    @mcp.tool(tags={"fileset"})
-    async def get_fileset_location(
-        ctx: Context,
-        catalog_name: str,
-        schema_name: str,
-        fileset_name: str,
-        sub_path: str,
-        location_name: str,
-    ):
-        """
-        Get the location of a specific fileset.
-
-        Parameters:
-            ctx (Context): The request context object containing lifespan context
-                           and connector information.
-            catalog_name (str): The name of the catalog containing the fileset.
-            schema_name (str): The name of the schema containing the fileset.
-            fileset_name (str): The name of the fileset to get the location for.
-            sub_path (str): Sub-path within the fileset.
-            location_name (str): The name of the location within the fileset.
-
-        Returns:
-            str: A JSON string containing the location information of the specified fileset.
-
-        Example Return Value:
-            file:/tmp/fileset1
-
-        """
-        client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_fileset_operation().get_fileset_location(
-            catalog_name, schema_name, fileset_name, sub_path, location_name
-        )

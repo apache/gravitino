@@ -79,24 +79,3 @@ class FilesetOperation(ABC):
             str: JSON-formatted string containing list of files in the fileset
         """
         pass
-
-    @abstractmethod
-    async def get_fileset_location(
-        self,
-        catalog_name: str,
-        schema_name: str,
-        fileset_name: str,
-        sub_path: str,
-        location_name: str,
-    ) -> str:
-        """
-        Get the location of a specific fileset.
-        Args:
-            catalog_name: Name of the catalog
-            schema_name: Name of the schema
-            fileset_name: Name of the fileset
-            sub_path: Sub-path within the fileset
-            location_name: Name of the location
-        Returns:
-            str: JSON-formatted string containing the location of the fileset
-        """
