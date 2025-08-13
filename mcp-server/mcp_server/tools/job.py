@@ -19,7 +19,7 @@ from fastmcp import Context, FastMCP
 
 
 def load_job_tool(mcp: FastMCP):
-    @mcp.tool(tags={"tag"})
+    @mcp.tool(tags={"job"})
     async def get_list_of_jobs(
         ctx: Context,
         job_template_name: str = "",
@@ -53,7 +53,7 @@ def load_job_tool(mcp: FastMCP):
             job_template_name
         )
 
-    @mcp.tool(tags={"tag"})
+    @mcp.tool(tags={"job"})
     async def get_job_by_id(
         ctx: Context,
         job_id: str,
@@ -81,7 +81,7 @@ def load_job_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().get_job_by_id(job_id)
 
-    @mcp.tool(tags={"tag"})
+    @mcp.tool(tags={"job"})
     async def get_list_of_job_templates(
         ctx: Context,
     ) -> str:
@@ -113,7 +113,7 @@ def load_job_tool(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().get_list_of_job_templates()
 
-    @mcp.tool(tags={"tag"})
+    @mcp.tool(tags={"job"})
     async def get_job_template_by_name(
         ctx: Context,
         name: str,

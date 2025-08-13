@@ -39,6 +39,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -47,7 +48,6 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.connector.job.JobExecutor;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
@@ -252,7 +252,14 @@ public class JobManager implements JobOperationDispatcher {
   public boolean deleteJobTemplate(String metalake, String jobTemplateName) throws InUseException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
 
-    List<JobEntity> jobs = listJobs(metalake, Optional.of(jobTemplateName));
+    List<JobEntity> jobs;
+    try {
+      jobs = listJobs(metalake, Optional.of(jobTemplateName));
+    } catch (NoSuchJobTemplateException e) {
+      // If the job template does not exist, we can safely return false.
+      return false;
+    }
+
     boolean hasActiveJobs =
         jobs.stream()
             .anyMatch(
@@ -313,6 +320,13 @@ public class JobManager implements JobOperationDispatcher {
               NameIdentifier jobTemplateIdent =
                   NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateName.get());
 
+              // If jobTemplateName is present, we need to list the jobs associated with the job.
+              // Using a mock namespace from job template identifier to get the jobs associated
+              // with job template.
+              String[] elements =
+                  ArrayUtils.add(jobTemplateIdent.namespace().levels(), jobTemplateIdent.name());
+              Namespace jobTemplateIdentNs = Namespace.of(elements);
+
               // Lock the job template to ensure no concurrent modifications/deletions
               jobEntities =
                   TreeLockUtils.doWithTreeLock(
@@ -320,12 +334,8 @@ public class JobManager implements JobOperationDispatcher {
                       LockType.READ,
                       () ->
                           // List all the jobs associated with the job template
-                          entityStore
-                              .relationOperations()
-                              .listEntitiesByRelation(
-                                  SupportsRelationOperations.Type.JOB_TEMPLATE_JOB_REL,
-                                  jobTemplateIdent,
-                                  Entity.EntityType.JOB_TEMPLATE));
+                          entityStore.list(
+                              jobTemplateIdentNs, JobEntity.class, Entity.EntityType.JOB));
             } else {
               jobEntities = entityStore.list(jobNs, JobEntity.class, Entity.EntityType.JOB);
             }
@@ -527,6 +537,12 @@ public class JobManager implements JobOperationDispatcher {
                           e);
                     }
                   });
+
+              LOG.info(
+                  "Updated the job {} with execution id {} status to {}",
+                  job.name(),
+                  job.jobExecutionId(),
+                  newStatus);
             }
           });
     }
