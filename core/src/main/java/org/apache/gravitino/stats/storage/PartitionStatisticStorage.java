@@ -63,20 +63,23 @@ public interface PartitionStatisticStorage extends Closeable {
   /**
    * Drops statistics for specified partitions of a metadata object. Locking guarantee: The upper
    * layer will acquire a write lock at the metadata object level. For example, if the metadata
-   * object is a table, the write lock of the table level will be held.
+   * object is a table, the write lock of the table level will be held. The concrete implementation
+   * may perform partial drops, meaning that the underlying storage system may not support
+   * transactional delete.
    *
    * @param metalake the name of the metalake
    * @param partitionStatisticsToDrop a map where the key is a {@link MetadataObject} and the value
    *     is a list of {@link PartitionStatisticsDrop}
    */
-  void dropStatistics(
-      String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop);
+  int dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> partitionStatisticsToDrop);
 
   /**
    * Updates statistics for a given metadata object. If the statistic exists, it will be updated; If
    * the statistic doesn't exist, it will be created. Locking guarantee: The upper layer will
    * acquire a write lock at the metadata object level. For example, if the metadata object is a
-   * table, the write lock of the table level will be held.
+   * table, the write lock of the table level will be held. The concrete implementation * may
+   * perform partial drops, meaning that the underlying storage system may not support transactional
+   * update.
    *
    * @param metalake the name of the metalake
    * @param statisticsToUpdate a list of {@link MetadataObjectStatisticsUpdate} objects, each

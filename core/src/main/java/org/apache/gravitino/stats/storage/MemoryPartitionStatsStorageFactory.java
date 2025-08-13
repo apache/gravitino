@@ -139,7 +139,8 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
     }
 
     @Override
-    public void dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> drops) {
+    public int dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> drops) {
+      int deleteCount = 0;
       for (MetadataObjectStatisticsDrop drop : drops) {
         MetadataObject metadataObject = drop.metadataObject();
         List<PartitionStatisticsDrop> partitionsToDrop = drop.drops();
@@ -153,7 +154,12 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
             PersistedPartitionStatistics persistedPartitionStatistics =
                 tableStats.partitionStatistics().get(partStats.partitionName());
             for (String statName : partStats.statisticNames()) {
-              persistedPartitionStatistics.statistics().remove(statName);
+              Map<String, StatisticValue<?>> statisticValueMap =
+                  persistedPartitionStatistics.statistics();
+              if (statisticValueMap.containsKey(statName)) {
+                statisticValueMap.remove(statName);
+                deleteCount++;
+              }
             }
             if (persistedPartitionStatistics.statistics().isEmpty()) {
               tableStats.partitionStatistics().remove(partStats.partitionName());
@@ -165,6 +171,7 @@ public class MemoryPartitionStatsStorageFactory implements PartitionStatisticSto
           totalStatistics.remove(new MetadataContainerKey(metalake, metadataObject));
         }
       }
+      return deleteCount;
     }
 
     @Override
