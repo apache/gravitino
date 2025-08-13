@@ -131,6 +131,7 @@ public class StatisticManager {
           .insertEntitiesAndRelations(
               SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
               statisticEntities,
+              false,
               relations,
               true);
       return statistics.entrySet().stream()

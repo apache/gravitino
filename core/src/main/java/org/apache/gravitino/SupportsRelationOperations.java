@@ -156,15 +156,21 @@ public interface SupportsRelationOperations {
    * @param <E> The type of entities being inserted, which must extend Entity and implement
    *     HasIdentifier.
    * @param relType The type of relation to be established between the entities.
-   * @param entities The list of entities to be inserted, which must implement the Entity and
+   * @param vertexEntities The list of entities to be inserted, which must implement the Entity and
    *     HasIdentifier
+   * @param isSourceVertex If true, the entities are considered as source vertices in the relation;
+   *     if false,
    * @param relations The list of relations to be established between the entities.
    * @param overwrite If true, existing relations will be overwritten; if false, existing relations
    *     will throw an exception.
    * @throws IOException If an error occurs during the insertion process, such as a storage issue.
    */
   <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<E> entities, List<Relation> relations, boolean overwrite)
+      Type relType,
+      List<E> vertexEntities,
+      boolean isSourceVertex,
+      List<Relation> relations,
+      boolean overwrite)
       throws IOException;
 
   /**

@@ -659,12 +659,18 @@ public class JDBCBackend implements RelationalBackend {
 
   @Override
   public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<E> entities, List<Relation> relations, boolean overwrite)
+      Type relType,
+      List<E> vertexEntities,
+      boolean isSourceVertex,
+      List<Relation> relations,
+      boolean overwrite)
       throws IOException {
     switch (relType) {
       case METADATA_OBJECT_STAT_REL:
         Preconditions.checkArgument(
             overwrite, "The overwrite must be true for metadata object stats relation");
+        Preconditions.checkArgument(
+            !isSourceVertex, "Only supports to insert relations of destination vertex");
 
         StatisticMetaService metaService = StatisticMetaService.getInstance();
         Map<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> groupedRelations =
@@ -683,16 +689,16 @@ public class JDBCBackend implements RelationalBackend {
             (sourceVertex, insertRelations) -> {
               String metalake = NameIdentifierUtil.getMetalake(sourceVertex.getLeft());
               insertRelations.sort(Comparator.comparing(r -> r.getDestIdent().name()));
-              entities.sort(Comparator.comparing(HasIdentifier::name));
+              vertexEntities.sort(Comparator.comparing(HasIdentifier::name));
 
               Preconditions.checkArgument(
-                  entities.size() == insertRelations.size(),
+                  vertexEntities.size() == insertRelations.size(),
                   "The size of entities and relations must be the same, but got %s and %s",
-                  entities.size(),
+                  vertexEntities.size(),
                   insertRelations.size());
 
-              for (int index = 0; index < entities.size(); index++) {
-                E entity = entities.get(index);
+              for (int index = 0; index < vertexEntities.size(); index++) {
+                E entity = vertexEntities.get(index);
                 Relation relation = insertRelations.get(index);
 
                 Preconditions.checkArgument(
@@ -712,7 +718,7 @@ public class JDBCBackend implements RelationalBackend {
               }
 
               metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-                  (List<StatisticEntity>) entities,
+                  (List<StatisticEntity>) vertexEntities,
                   metalake,
                   sourceVertex.getLeft(),
                   sourceVertex.getRight());

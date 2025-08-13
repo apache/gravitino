@@ -264,17 +264,22 @@ public class RelationalEntityStore
 
   @Override
   public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<E> entities, List<Relation> relations, boolean overwrite)
+      Type relType,
+      List<E> vertexEntities,
+      boolean isSourceVertex,
+      List<Relation> relations,
+      boolean overwrite)
       throws IOException {
     for (Relation relation : relations) {
       cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
     }
 
-    for (E entity : entities) {
+    for (E entity : vertexEntities) {
       cache.invalidate(entity.nameIdentifier(), entity.type());
     }
 
-    backend.insertEntitiesAndRelations(relType, entities, relations, overwrite);
+    backend.insertEntitiesAndRelations(
+        relType, vertexEntities, isSourceVertex, relations, overwrite);
   }
 
   @Override
