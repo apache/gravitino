@@ -99,7 +99,9 @@ public class IndexDTO implements Index {
   @Override
   public int hashCode() {
     int result = Objects.hash(indexType, name);
-    result = 31 * result + Arrays.hashCode(fieldNames);
+    for (String[] fieldName : fieldNames) {
+      result = 31 * result + Arrays.hashCode(fieldName);
+    }
     return result;
   }
 
