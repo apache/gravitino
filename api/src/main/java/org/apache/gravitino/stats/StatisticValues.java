@@ -292,7 +292,11 @@ public class StatisticValues {
     private ObjectValue(Map<String, StatisticValue<?>> valueMap) {
       Preconditions.checkArgument(
           valueMap != null && !valueMap.isEmpty(), "Values cannot be null or empty");
-      this.valueMap = new TreeMap<>(valueMap);
+      if (valueMap instanceof TreeMap) {
+        this.valueMap = valueMap;
+      } else {
+        this.valueMap = new TreeMap<>(valueMap);
+      }
     }
 
     @Override
