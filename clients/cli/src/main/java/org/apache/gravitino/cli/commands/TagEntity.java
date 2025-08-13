@@ -88,14 +88,14 @@ public class TagEntity extends Command {
             entity = fileset;
             Fileset gFileset =
                 catalogObject.asFilesetCatalog().loadFileset(FullNameUtil.toFileset(name));
-            gFileset.supportsTags().associateTags(tags, null);
+            tagsToAdd = gFileset.supportsTags().associateTags(tags, null);
             break;
 
           case MESSAGING:
             String topic = name.getTopicName();
             entity = topic;
             Topic gTopic = catalogObject.asTopicCatalog().loadTopic(FullNameUtil.toTopic(name));
-            gTopic.supportsTags().associateTags(tags, null);
+            tagsToAdd = gTopic.supportsTags().associateTags(tags, null);
             break;
 
           default:
