@@ -240,6 +240,12 @@ public class CatalogConnectorManager {
                     loadCatalog(gravitinoCatalog);
                   }
                 }
+              } catch (UnsupportedOperationException e) {
+                LOG.warn(
+                    "Unsupported catalog type for catalog {} in metalake {}: {}",
+                    catalogName,
+                    metalake.name(),
+                    e.getMessage());
               } catch (Exception e) {
                 LOG.error(
                     "Failed to load metalake {}'s catalog {}.", metalake.name(), catalogName, e);
