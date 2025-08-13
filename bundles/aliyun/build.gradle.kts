@@ -30,7 +30,7 @@ dependencies {
   compileOnly(libs.hadoop3.client.runtime)
   compileOnly(libs.hadoop3.oss)
 
-  implementation(project(":common")) {
+  compileOnly(project(":common")) {
     exclude("*")
   }
   implementation(project(":catalogs:catalog-common")) {
