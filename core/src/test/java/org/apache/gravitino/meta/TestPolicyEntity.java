@@ -18,11 +18,11 @@
  */
 package org.apache.gravitino.meta;
 
-import static org.apache.gravitino.policy.Policy.SUPPORTS_ALL_OBJECT_TYPES;
-
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -39,7 +39,11 @@ public class TestPolicyEntity {
 
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
     Namespace namespace = Namespace.of("m1", "c1", "s1");
-    PolicyContent content = PolicyContents.custom(contentFields, properties);
+    PolicyContent content =
+        PolicyContents.custom(
+            contentFields,
+            ImmutableSet.of(MetadataObject.Type.MODEL, MetadataObject.Type.TOPIC),
+            properties);
     PolicyEntity policyEntity =
         PolicyEntity.builder()
             .withId(1L)
@@ -48,9 +52,6 @@ public class TestPolicyEntity {
             .withComment("test comment")
             .withPolicyType("my_compaction")
             .withEnabled(false)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -61,9 +62,6 @@ public class TestPolicyEntity {
     Assertions.assertEquals("test comment", policyEntity.comment());
     Assertions.assertEquals("my_compaction", policyEntity.policyType());
     Assertions.assertFalse(policyEntity.enabled());
-    Assertions.assertTrue(policyEntity.exclusive());
-    Assertions.assertTrue(policyEntity.inheritable());
-    Assertions.assertEquals(SUPPORTS_ALL_OBJECT_TYPES, policyEntity.supportedObjectTypes());
     Assertions.assertEquals(content, policyEntity.content());
     Assertions.assertEquals(auditInfo, policyEntity.auditInfo());
 
@@ -74,9 +72,6 @@ public class TestPolicyEntity {
             .withNamespace(namespace)
             .withPolicyType("my_compaction")
             .withEnabled(false)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -117,7 +112,6 @@ public class TestPolicyEntity {
                 .withName("test")
                 .withNamespace(Namespace.of("m1", "c1", "s1"))
                 .withPolicyType("my_compaction")
-                .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());

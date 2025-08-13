@@ -20,7 +20,6 @@
 package org.apache.gravitino.policy;
 
 import java.util.Arrays;
-import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -73,51 +72,12 @@ public interface PolicyDispatcher {
    * @return The created policy
    * @throws PolicyAlreadyExistsException If the policy already exists
    */
-  default Policy createPolicy(
+  Policy createPolicy(
       String metalake,
       String name,
       String type,
       String comment,
       boolean enabled,
-      PolicyContent content)
-      throws PolicyAlreadyExistsException {
-    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(type);
-    return createPolicy(
-        metalake,
-        name,
-        type,
-        comment,
-        enabled,
-        builtInType.exclusive(),
-        builtInType.inheritable(),
-        builtInType.supportedObjectTypes(),
-        content);
-  }
-
-  /**
-   * Create a new type policy under a metalake.
-   *
-   * @param metalake the name of the metalake
-   * @param policyName the name of the policy
-   * @param type the type of the policy
-   * @param comment the comment of the policy
-   * @param enabled whether the policy is enabled or not
-   * @param exclusive whether the policy is exclusive or not
-   * @param inheritable whether the policy is inheritable or not
-   * @param supportedObjectTypes the set of supported object types for the policy
-   * @param content the content of the policy
-   * @return The created policy.
-   * @throws PolicyAlreadyExistsException If the policy already exists.
-   */
-  Policy createPolicy(
-      String metalake,
-      String policyName,
-      String type,
-      String comment,
-      boolean enabled,
-      boolean exclusive,
-      boolean inheritable,
-      Set<MetadataObject.Type> supportedObjectTypes,
       PolicyContent content)
       throws PolicyAlreadyExistsException;
 

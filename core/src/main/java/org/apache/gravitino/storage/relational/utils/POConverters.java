@@ -20,15 +20,12 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
@@ -732,16 +729,6 @@ public class POConverters {
           .withPolicyName(newPolicy.name())
           .withPolicyType(newPolicy.policyType())
           .withMetalakeId(oldPolicyPO.getMetalakeId())
-          .withInheritable(newPolicy.inheritable())
-          .withExclusive(newPolicy.exclusive())
-          .withSupportedObjectTypes(
-              JsonUtils.anyFieldMapper()
-                  .writeValueAsString(
-                      // Sort the supported object types to ensure consistent ordering
-                      newPolicy.supportedObjectTypes().stream()
-                          .map(Enum::name)
-                          .sorted()
-                          .collect(Collectors.toCollection(LinkedHashSet::new))))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
           .withCurrentVersion(currentVersion)
           .withLastVersion(lastVersion)
@@ -1395,13 +1382,6 @@ public class POConverters {
           .withPolicyType(policyPO.getPolicyType())
           .withComment(policyPO.getPolicyVersionPO().getPolicyComment())
           .withEnabled(policyPO.getPolicyVersionPO().isEnabled())
-          .withExclusive(policyPO.isExclusive())
-          .withInheritable(policyPO.isInheritable())
-          .withSupportedObjectTypes(
-              JsonUtils.anyFieldMapper()
-                  .readValue(
-                      policyPO.getSupportedObjectTypes(),
-                      new TypeReference<Set<MetadataObject.Type>>() {}))
           .withContent(
               JsonUtils.anyFieldMapper()
                   .readValue(
@@ -1433,16 +1413,6 @@ public class POConverters {
           .withPolicyId(policyEntity.id())
           .withPolicyName(policyEntity.name())
           .withPolicyType(policyEntity.policyType())
-          .withInheritable(policyEntity.inheritable())
-          .withExclusive(policyEntity.exclusive())
-          .withSupportedObjectTypes(
-              JsonUtils.anyFieldMapper()
-                  .writeValueAsString(
-                      // Sort the supported object types to ensure consistent ordering
-                      policyEntity.supportedObjectTypes().stream()
-                          .map(Enum::name)
-                          .sorted()
-                          .collect(Collectors.toCollection(LinkedHashSet::new))))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)

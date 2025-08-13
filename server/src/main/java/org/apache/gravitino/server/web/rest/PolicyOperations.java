@@ -122,25 +122,13 @@ public class PolicyOperations {
           () -> {
             request.validate();
             Policy policy =
-                Policy.BuiltInType.fromPolicyType(request.getPolicyType())
-                        == Policy.BuiltInType.CUSTOM
-                    ? policyDispatcher.createPolicy(
-                        metalake,
-                        request.getName(),
-                        request.getPolicyType(),
-                        request.getComment(),
-                        request.getEnabled(),
-                        request.getExclusive(),
-                        request.getInheritable(),
-                        request.getSupportedObjectTypes(),
-                        fromDTO(request.getPolicyContent()))
-                    : policyDispatcher.createPolicy(
-                        metalake,
-                        request.getName(),
-                        request.getPolicyType(),
-                        request.getComment(),
-                        request.getEnabled(),
-                        fromDTO(request.getPolicyContent()));
+                policyDispatcher.createPolicy(
+                    metalake,
+                    request.getName(),
+                    request.getPolicyType(),
+                    request.getComment(),
+                    request.getEnabled(),
+                    fromDTO(request.getPolicyContent()));
 
             LOG.info("Created policy: {} under metalake: {}", policy.name(), metalake);
             return Utils.ok(new PolicyResponse(DTOConverters.toDTO(policy, Optional.empty())));

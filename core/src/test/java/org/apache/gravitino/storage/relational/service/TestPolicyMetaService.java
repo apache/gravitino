@@ -62,8 +62,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   private final AuditInfo auditInfo =
       AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-  private final PolicyContent content = PolicyContents.custom(ImmutableMap.of("filed1", 123), null);
-
   private final Set<MetadataObject.Type> supportedObjectTypes =
       ImmutableSet.of(
           MetadataObject.Type.CATALOG,
@@ -72,6 +70,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
           MetadataObject.Type.FILESET,
           MetadataObject.Type.MODEL,
           MetadataObject.Type.TOPIC);
+  private final PolicyContent content =
+      PolicyContents.custom(ImmutableMap.of("filed1", 123), supportedObjectTypes, null);
 
   @Test
   public void testInsertAndGetPolicyByIdentifier() throws IOException {
@@ -99,7 +99,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withPolicyType("test")
             .withContent(content)
             .withEnabled(true)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity, false);
@@ -117,7 +116,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withPolicyType("test")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withAuditInfo(auditInfo)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .build();
 
@@ -128,7 +126,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     Assertions.assertEquals(PolicyEntity1, resultPolicyEntity1);
     Assertions.assertTrue(resultPolicyEntity1.enabled());
     Assertions.assertNull(resultPolicyEntity1.comment());
-    Assertions.assertEquals(supportedObjectTypes, resultPolicyEntity1.supportedObjectTypes());
     Assertions.assertNull(resultPolicyEntity1.content().properties());
 
     // Test insert with overwrite.
@@ -139,7 +136,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
             .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -170,7 +166,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withComment("comment")
             .withPolicyType("test")
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity1, false);
@@ -183,7 +178,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withComment("comment")
             .withPolicyType("test")
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity2, false);
@@ -209,7 +203,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
             .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -233,7 +226,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment1")
             .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -255,7 +247,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment1")
             .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -295,7 +286,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
             .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -331,7 +321,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
             .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -357,7 +346,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName + "1"))
             .withComment("comment")
             .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -409,7 +397,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withComment("comment")
             .withPolicyType("test")
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity1, false);
@@ -422,7 +409,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withComment("comment")
             .withPolicyType("test")
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity2, false);
@@ -435,7 +421,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withComment("comment")
             .withPolicyType("test")
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity3, false);
@@ -741,7 +726,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withComment("comment")
             .withPolicyType("test")
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity1, false);

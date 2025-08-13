@@ -34,7 +34,6 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.policy.Policy.BUILT_IN_TYPE_PREFIX;
-import static org.apache.gravitino.policy.Policy.SUPPORTS_ALL_OBJECT_TYPES;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -102,6 +101,9 @@ public class TestPolicyManager {
   private static final String JDBC_STORE_PATH =
       "/tmp/gravitino_jdbc_entityStore_" + UUID.randomUUID().toString().replace("-", "");
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static final Set<MetadataObject.Type> SUPPORTS_OBJECT_TYPES =
+      ImmutableSet.of(
+          MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
 
   private static PolicyManager policyManager;
 
@@ -222,16 +224,13 @@ public class TestPolicyManager {
   public void testCreateAndGetPolicy() {
     String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     Policy policy = createCustomPolicy(METALAKE, policyName, content);
 
     Assertions.assertEquals(policyName, policy.name());
     Assertions.assertEquals("test", policy.policyType());
     Assertions.assertNull(policy.comment());
     Assertions.assertTrue(policy.enabled());
-    Assertions.assertTrue(policy.exclusive());
-    Assertions.assertTrue(policy.inheritable());
-    Assertions.assertEquals(SUPPORTS_ALL_OBJECT_TYPES, policy.supportedObjectTypes());
     Assertions.assertNotNull(policy.content());
     Assertions.assertEquals(content, policy.content());
 
@@ -256,7 +255,7 @@ public class TestPolicyManager {
                     BUILT_IN_TYPE_PREFIX + "abc",
                     null,
                     true,
-                    PolicyContents.custom(null, null)));
+                    PolicyContents.custom(null, SUPPORTS_OBJECT_TYPES, null)));
     Assertions.assertEquals(
         "Unknown built-in policy type: " + BUILT_IN_TYPE_PREFIX + "abc", e.getMessage());
 
@@ -287,7 +286,7 @@ public class TestPolicyManager {
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
     String policyName3 = "policy3" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     Set<String> expectedPolicyNames = ImmutableSet.of(policyName1, policyName2, policyName3);
     expectedPolicyNames.forEach(policyName -> createCustomPolicy(METALAKE, policyName, content));
 
@@ -308,7 +307,7 @@ public class TestPolicyManager {
   public void testAlterPolicy() {
     String policyName = "policy1" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     createCustomPolicy(METALAKE, policyName, content);
 
     // test rename policy
@@ -320,9 +319,6 @@ public class TestPolicyManager {
     Assertions.assertEquals("test", renamedPolicy.policyType());
     Assertions.assertNull(renamedPolicy.comment());
     Assertions.assertTrue(renamedPolicy.enabled());
-    Assertions.assertTrue(renamedPolicy.exclusive());
-    Assertions.assertTrue(renamedPolicy.inheritable());
-    Assertions.assertEquals(SUPPORTS_ALL_OBJECT_TYPES, renamedPolicy.supportedObjectTypes());
     Assertions.assertEquals(content, renamedPolicy.content());
 
     // test change comment
@@ -333,7 +329,7 @@ public class TestPolicyManager {
 
     // test update content
     Map<String, Object> newCustomRules = ImmutableMap.of("rule3", 1, "rule4", "value2");
-    PolicyContent newContent = PolicyContents.custom(newCustomRules, null);
+    PolicyContent newContent = PolicyContents.custom(newCustomRules, SUPPORTS_OBJECT_TYPES, null);
     PolicyChange contentChange = PolicyChange.updateContent("test", newContent);
     Policy updatedContentPolicy =
         policyManager.alterPolicy(METALAKE, changedCommentPolicy.name(), contentChange);
@@ -364,7 +360,7 @@ public class TestPolicyManager {
   public void testDeletePolicy() {
     String policyName = "policy1" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     createCustomPolicy(METALAKE, policyName, content);
 
     // delete the policy
@@ -387,7 +383,7 @@ public class TestPolicyManager {
   @Test
   public void testAssociatePoliciesForMetadataObject() {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
     createCustomPolicy(METALAKE, policyName1, content);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
@@ -474,16 +470,6 @@ public class TestPolicyManager {
         e2.getMessage().contains("Cannot associate policies for unsupported metadata object type"),
         "Actual message: " + e2.getMessage());
 
-    MetadataObject columnObject =
-        NameIdentifierUtil.toMetadataObject(
-            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN),
-            Entity.EntityType.COLUMN);
-    e2 =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                policyManager.associatePoliciesForMetadataObject(
-                    METALAKE, columnObject, policiesToAdd, null));
     Assertions.assertTrue(
         e2.getMessage().contains("Cannot associate policies for unsupported metadata object type"),
         "Actual message: " + e2.getMessage());
@@ -527,7 +513,7 @@ public class TestPolicyManager {
   @Test
   public void testListMetadataObjectsForPolicy() {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
     createCustomPolicy(METALAKE, policyName1, content);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
@@ -582,7 +568,7 @@ public class TestPolicyManager {
   @Test
   public void testListPoliciesForMetadataObject() {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
     Policy policy1 = createCustomPolicy(METALAKE, policyName1, content);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
@@ -654,7 +640,7 @@ public class TestPolicyManager {
   @Test
   public void testGetPolicyForMetadataObject() {
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");
-    PolicyContent content = PolicyContents.custom(customRules, null);
+    PolicyContent content = PolicyContents.custom(customRules, SUPPORTS_OBJECT_TYPES, null);
     String policyName1 = "policy1" + UUID.randomUUID().toString().replace("-", "");
     Policy policy1 = createCustomPolicy(METALAKE, policyName1, content);
     String policyName2 = "policy2" + UUID.randomUUID().toString().replace("-", "");
@@ -739,15 +725,6 @@ public class TestPolicyManager {
 
   private Policy createCustomPolicy(
       String metalakeName, String policyName, PolicyContent policyContent) {
-    return policyManager.createPolicy(
-        metalakeName,
-        policyName,
-        "test",
-        null,
-        true,
-        true,
-        true,
-        SUPPORTS_ALL_OBJECT_TYPES,
-        policyContent);
+    return policyManager.createPolicy(metalakeName, policyName, "test", null, true, policyContent);
   }
 }

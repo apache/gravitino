@@ -550,9 +550,6 @@ public class DTOConverters {
             .withComment(policy.comment())
             .withPolicyType(policy.policyType())
             .withEnabled(policy.enabled())
-            .withExclusive(policy.exclusive())
-            .withInheritable(policy.inheritable())
-            .withSupportedObjectTypes(policy.supportedObjectTypes())
             .withContent(toDTO(policy.content()))
             .withInherited(inherited)
             .withAudit(toDTO(policy.auditInfo()))
@@ -580,6 +577,7 @@ public class DTOConverters {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
       return PolicyContentDTO.CustomContentDTO.builder()
           .withCustomRules(customContent.customRules())
+          .withSupportedObjectTypes(customContent.supportedObjectTypes())
           .withProperties(customContent.properties())
           .build();
     }
@@ -1259,7 +1257,10 @@ public class DTOConverters {
     if (policyContentDTO instanceof PolicyContentDTO.CustomContentDTO) {
       PolicyContentDTO.CustomContentDTO customContentDTO =
           (PolicyContentDTO.CustomContentDTO) policyContentDTO;
-      return PolicyContents.custom(customContentDTO.customRules(), customContentDTO.properties());
+      return PolicyContents.custom(
+          customContentDTO.customRules(),
+          customContentDTO.supportedObjectTypes(),
+          customContentDTO.properties());
     }
 
     throw new IllegalArgumentException(
