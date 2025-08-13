@@ -43,6 +43,7 @@ public interface SupportsRelationOperations {
     JOB_TEMPLATE_JOB_REL,
     /** Policy and metadata object relationship */
     POLICY_METADATA_OBJECT_REL,
+    /** Metadata object and statistics relationship */
     METADATA_OBJECT_STAT_REL
   }
 
