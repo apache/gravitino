@@ -41,9 +41,7 @@ public interface SupportsRelationOperations {
     /** Job template and job relationship */
     JOB_TEMPLATE_JOB_REL,
     /** Policy and metadata object relationship */
-    POLICY_METADATA_OBJECT_REL,
-    /** Metadata object and statistics relationship */
-    METADATA_OBJECT_STAT_REL
+    POLICY_METADATA_OBJECT_REL
   }
 
   /**

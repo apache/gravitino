@@ -605,7 +605,6 @@ public class JDBCBackend implements RelationalBackend {
               PolicyMetaService.getInstance()
                   .listPoliciesForMetadataObject(nameIdentifier, identType);
         }
-
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
