@@ -19,19 +19,19 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -39,11 +39,13 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -61,15 +63,16 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   private final AuditInfo auditInfo =
       AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
-  private final PolicyContent content = PolicyContents.custom(ImmutableMap.of("filed1", 123), null);
-
   private final Set<MetadataObject.Type> supportedObjectTypes =
-      new HashSet<MetadataObject.Type>() {
-        {
-          add(MetadataObject.Type.CATALOG);
-          add(MetadataObject.Type.SCHEMA);
-        }
-      };
+      ImmutableSet.of(
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.TOPIC);
+  private final PolicyContent content =
+      PolicyContents.custom(ImmutableMap.of("filed1", 123), supportedObjectTypes, null);
 
   @Test
   public void testInsertAndGetPolicyByIdentifier() throws IOException {
@@ -94,10 +97,9 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withEnabled(true)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity, false);
@@ -112,10 +114,9 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         PolicyEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("policy2")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withAuditInfo(auditInfo)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withContent(content)
             .build();
 
@@ -126,7 +127,6 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     Assertions.assertEquals(PolicyEntity1, resultPolicyEntity1);
     Assertions.assertTrue(resultPolicyEntity1.enabled());
     Assertions.assertNull(resultPolicyEntity1.comment());
-    Assertions.assertEquals(supportedObjectTypes, resultPolicyEntity1.supportedObjectTypes());
     Assertions.assertNull(resultPolicyEntity1.content().properties());
 
     // Test insert with overwrite.
@@ -136,8 +136,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy3")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -166,9 +165,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity1, false);
@@ -179,9 +177,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy2")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity2, false);
@@ -206,8 +203,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -230,8 +226,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment1")
-            .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -252,8 +247,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment1")
-            .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -292,8 +286,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -328,8 +321,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -354,8 +346,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy2")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName + "1"))
             .withComment("comment")
-            .withPolicyType("test")
-            .withSupportedObjectTypes(supportedObjectTypes)
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -405,9 +396,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity1, false);
@@ -418,9 +408,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy2")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity2, false);
@@ -431,9 +420,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy3")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity3, false);
@@ -652,46 +640,40 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @Test
-  public void testListAssociatedMetadataObjectsForPolicy() throws IOException {
+  public void testListAssociatedEntitiesForPolicy() throws IOException {
     testAssociateAndDisassociatePoliciesWithMetadataObject();
 
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
 
-    // Test list associated metadata objects for policy2
-    List<MetadataObject> metadataObjects =
-        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+    // Test list associated dummy entities for policy2
+    List<GenericEntity> entities =
+        policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 
-    Assertions.assertEquals(3, metadataObjects.size());
-    Assertions.assertTrue(
-        metadataObjects.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
-    Assertions.assertTrue(
-        metadataObjects.contains(
-            MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA)));
-    Assertions.assertTrue(
-        metadataObjects.contains(
-            MetadataObjects.parse("catalog1.schema1.table1", MetadataObject.Type.TABLE)));
+    Assertions.assertEquals(3, entities.size());
+    Set<Entity.EntityType> actualTypes =
+        entities.stream().map(GenericEntity::type).collect(Collectors.toSet());
+    Assertions.assertTrue(actualTypes.contains(Entity.EntityType.CATALOG));
+    Assertions.assertTrue(actualTypes.contains(Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(actualTypes.contains(Entity.EntityType.TABLE));
 
-    // Test list associated metadata objects for policy3
-    List<MetadataObject> metadataObjects1 =
-        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+    // Test list associated dummy entities for policy3
+    List<GenericEntity> entities1 =
+        policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy3"));
 
-    Assertions.assertEquals(3, metadataObjects1.size());
-    Assertions.assertTrue(
-        metadataObjects1.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
-    Assertions.assertTrue(
-        metadataObjects1.contains(
-            MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA)));
-    Assertions.assertTrue(
-        metadataObjects1.contains(
-            MetadataObjects.parse("catalog1.schema1.table1", MetadataObject.Type.TABLE)));
+    Assertions.assertEquals(3, entities1.size());
+    Set<Entity.EntityType> actualTypes1 =
+        entities1.stream().map(GenericEntity::type).collect(Collectors.toSet());
+    Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.CATALOG));
+    Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(actualTypes1.contains(Entity.EntityType.TABLE));
 
-    // Test list associated metadata objects for non-existent policy
-    List<MetadataObject> metadataObjects2 =
-        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+    // Test list associated dummy entities for non-existent policy
+    List<GenericEntity> entities2 =
+        policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy4"));
-    Assertions.assertEquals(0, metadataObjects2.size());
+    Assertions.assertEquals(0, entities2.size());
 
     // Test metadata object non-exist scenario.
     backend.delete(
@@ -699,35 +681,35 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         Entity.EntityType.TABLE,
         false);
 
-    List<MetadataObject> metadataObjects3 =
-        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+    List<GenericEntity> entities3 =
+        policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 
-    Assertions.assertEquals(2, metadataObjects3.size());
-    Assertions.assertTrue(
-        metadataObjects3.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
-    Assertions.assertTrue(
-        metadataObjects3.contains(
-            MetadataObjects.parse("catalog1.schema1", MetadataObject.Type.SCHEMA)));
+    Assertions.assertEquals(2, entities3.size());
+    Set<Entity.EntityType> actualTypes3 =
+        entities3.stream().map(GenericEntity::type).collect(Collectors.toSet());
+    Assertions.assertTrue(actualTypes3.contains(Entity.EntityType.CATALOG));
+    Assertions.assertTrue(actualTypes3.contains(Entity.EntityType.SCHEMA));
 
     backend.delete(
         NameIdentifier.of(metalakeName, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
 
-    List<MetadataObject> metadataObjects4 =
-        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+    List<GenericEntity> entities4 =
+        policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 
-    Assertions.assertEquals(1, metadataObjects4.size());
-    Assertions.assertTrue(
-        metadataObjects4.contains(MetadataObjects.parse("catalog1", MetadataObject.Type.CATALOG)));
+    Assertions.assertEquals(1, entities4.size());
+    Set<Entity.EntityType> actualTypes4 =
+        entities4.stream().map(GenericEntity::type).collect(Collectors.toSet());
+    Assertions.assertTrue(actualTypes4.contains(Entity.EntityType.CATALOG));
 
     backend.delete(NameIdentifier.of(metalakeName, "catalog1"), Entity.EntityType.CATALOG, false);
 
-    List<MetadataObject> metadataObjects5 =
-        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+    List<GenericEntity> entities5 =
+        policyMetaService.listAssociatedEntitiesForPolicy(
             NameIdentifierUtil.ofPolicy(metalakeName, "policy2"));
 
-    Assertions.assertEquals(0, metadataObjects5.size());
+    Assertions.assertEquals(0, entities5.size());
   }
 
   @Test
@@ -743,9 +725,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("test")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
-            .withSupportedObjectTypes(supportedObjectTypes)
             .withAuditInfo(auditInfo)
             .build();
     policyMetaService.insertPolicy(policyEntity1, false);

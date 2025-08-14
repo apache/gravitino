@@ -34,6 +34,7 @@ from gravitino.audit.fileset_data_operation import FilesetDataOperation
 from gravitino.audit.internal_client_type import InternalClientType
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_fileset import GenericFileset
+from gravitino.client.gravitino_client_config import GravitinoClientConfig
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
     NoSuchLocationNameException,
@@ -101,8 +102,22 @@ class BaseGVFSOperations(ABC):
                 )
             }
         )
+
+        client_config = (
+            None
+            if options is None
+            else {
+                key.replace(
+                    GVFSConfig.GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX,
+                    GravitinoClientConfig.GRAVITINO_CLIENT_CONFIG_PREFIX,
+                ): value
+                for key, value in options.items()
+                if key.startswith(GVFSConfig.GVFS_FILESYSTEM_CLIENT_CONFIG_PREFIX)
+            }
+        )
+
         self._client = create_client(
-            options, server_uri, metalake_name, request_headers
+            options, server_uri, metalake_name, request_headers, client_config
         )
 
         cache_size = (

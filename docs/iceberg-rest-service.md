@@ -12,9 +12,11 @@ The Apache Gravitino Iceberg REST Server follows the [Apache Iceberg REST API sp
 
 ### Capabilities
 
-- Supports the Apache Iceberg REST API defined in Iceberg 1.5, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
+- Supports the Apache Iceberg REST API defined in Iceberg 1.9, and supports all namespace and table interfaces. The following interfaces are not implemented yet:
   - multi table transaction
   - pagination
+  - scan planning
+  - load table credentials
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Supports credential vending for `S3`、`GCS`、`OSS` and `ADLS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS`, `ADLS` and provides the capability to support other storages.
@@ -288,6 +290,7 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 
 :::caution
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
+If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
 
 #### Custom backend configuration
@@ -336,7 +339,7 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 ...
 ```
 
-You can access different catalogs by setting the `prefix` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `prefix`. For instance, consider the case of SparkSQL.
+You can access different catalogs by setting the `warehouse` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `warehouse`. For instance, consider the case of SparkSQL.
 
 ```shell
 ./bin/spark-sql -v \
@@ -346,11 +349,11 @@ You can access different catalogs by setting the `prefix` to the specific catalo
 ...
 --conf spark.sql.catalog.hive_backend_catalog.type=rest  \
 --conf spark.sql.catalog.hive_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.hive_backend_catalog.prefix=hive_backend \
+--conf spark.sql.catalog.hive_backend_catalog.warehouse=hive_backend \
 ...
 --conf spark.sql.catalog.jdbc_backend_catalog.type=rest  \
 --conf spark.sql.catalog.jdbc_backend_catalog.uri=http://127.0.0.1:9001/iceberg/ \
---conf spark.sql.catalog.jdbc_backend_catalog.prefix=jdbc_backend \
+--conf spark.sql.catalog.jdbc_backend_catalog.warehouse=jdbc_backend \
 ...
 ```
 
@@ -371,6 +374,8 @@ gravitino.iceberg-rest.gravitino-uri = http://127.0.0.1:8090
 gravitino.iceberg-rest.gravitino-metalake = test
 ```
 
+You can access different catalogs by setting the `warehouse` to the catalog name in Gravitino server in the client side.
+
 ### Other Apache Iceberg catalog properties
 
 You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.6.1/configuration/#catalog-properties).
@@ -383,7 +388,6 @@ The `clients` property for example:
 :::info
 `catalog-impl` has no effect.
 :::
-
 
 ### Event listener
 
@@ -482,7 +486,6 @@ connector.name=iceberg
 iceberg.catalog.type=rest
 iceberg.rest-catalog.uri=http://localhost:9001/iceberg/
 fs.hadoop.enabled=true
-iceberg.rest-catalog.view-endpoints-enabled=false
 ```
 
 Please refer to [Trino Iceberg document](https://trino.io/docs/current/connector/iceberg.html) for more details.
@@ -560,7 +563,7 @@ SELECT * FROM t;
 You could run Gravitino Iceberg REST server though docker container:
 
 ```shell
-docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:0.8.0-incubating
+docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 ```
 
 Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
@@ -606,7 +609,7 @@ The below environment is deprecated, please use the corresponding configuration 
 Or build it manually to add custom configuration or logics:
 
 ```shell
-sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag 0.7.0-incubating
+sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag $tag
 ```
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).

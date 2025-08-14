@@ -291,7 +291,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return ALTER_TABLE + PG_QUOTE + oldTableName + PG_QUOTE + " RENAME TO " + newTableName;
+    return ALTER_TABLE
+        + PG_QUOTE
+        + oldTableName
+        + PG_QUOTE
+        + " RENAME TO "
+        + PG_QUOTE
+        + newTableName
+        + PG_QUOTE;
   }
 
   @Override

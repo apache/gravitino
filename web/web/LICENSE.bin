@@ -217,6 +217,7 @@
    doctrine
    eslint-visitor-keys
    human-signals
+   oidc-client-ts
    ts-interface-checker
    typescript
 

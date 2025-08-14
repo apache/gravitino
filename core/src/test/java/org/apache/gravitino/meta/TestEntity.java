@@ -23,9 +23,11 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Field;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.file.Fileset;
@@ -338,5 +340,56 @@ public class TestEntity {
         TagEntity.builder().withId(1L).withName("tag2").withAuditInfo(auditInfo).build();
     Assertions.assertNull(tag2.comment());
     Assertions.assertNull(tag2.properties());
+  }
+
+  @Test
+  public void testHashCodeIncludesNamespace() {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+
+    TableEntity table1 =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(Namespace.of("catalog", "schema1"))
+            .withColumns(Collections.emptyList())
+            .withAuditInfo(audit)
+            .build();
+
+    TableEntity table2 =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("t")
+            .withNamespace(Namespace.of("catalog", "schema2"))
+            .withColumns(Collections.emptyList())
+            .withAuditInfo(audit)
+            .build();
+
+    Assertions.assertNotEquals(
+        table1.hashCode(), table2.hashCode(), "hashCode should include namespace");
+  }
+
+  @Test
+  public void testHashCodeWithDifferentNamespaceHavingSameValues() {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+
+    TableEntity table1 =
+        TableEntity.builder()
+            .withId(2L)
+            .withName("t")
+            .withNamespace(Namespace.of("catalog", "schema1"))
+            .withColumns(Collections.emptyList())
+            .withAuditInfo(audit)
+            .build();
+
+    TableEntity table2 =
+        TableEntity.builder()
+            .withId(2L)
+            .withName("t")
+            .withNamespace(Namespace.of("catalog", "schema1"))
+            .withColumns(Collections.emptyList())
+            .withAuditInfo(audit)
+            .build();
+
+    Assertions.assertEquals(table1.hashCode(), table2.hashCode(), "hashCode should be the same");
   }
 }

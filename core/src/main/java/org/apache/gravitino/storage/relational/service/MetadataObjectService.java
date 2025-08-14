@@ -21,12 +21,16 @@ package org.apache.gravitino.storage.relational.service;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -72,6 +76,38 @@ public class MetadataObjectService {
               MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName);
 
   private MetadataObjectService() {}
+
+  public static List<MetadataObject> fromGenericEntities(List<GenericEntity> entities) {
+    if (entities == null || entities.isEmpty()) {
+      return Lists.newArrayList();
+    }
+
+    Map<Entity.EntityType, List<Long>> groupIdsByType =
+        entities.stream()
+            .collect(
+                Collectors.groupingBy(
+                    GenericEntity::type,
+                    Collectors.mapping(GenericEntity::id, Collectors.toList())));
+
+    List<MetadataObject> metadataObjects = Lists.newArrayList();
+    for (Map.Entry<Entity.EntityType, List<Long>> entry : groupIdsByType.entrySet()) {
+      MetadataObject.Type objectType = MetadataObject.Type.valueOf(entry.getKey().name());
+      Map<Long, String> metadataObjectNames =
+          TYPE_TO_FULLNAME_FUNCTION_MAP.get(objectType).apply(entry.getValue());
+
+      for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
+        String fullName = metadataObjectName.getValue();
+
+        // Metadata object may be deleted asynchronously when we query the name, so it will
+        // return null, we should skip this metadata object.
+        if (fullName != null) {
+          metadataObjects.add(MetadataObjects.parse(fullName, objectType));
+        }
+      }
+    }
+
+    return metadataObjects;
+  }
 
   public static long getMetadataObjectId(
       long metalakeId, String fullName, MetadataObject.Type type) {

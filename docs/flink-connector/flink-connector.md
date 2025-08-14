@@ -27,6 +27,7 @@ This capability allows users to perform federation queries, accessing data from 
 ## How to use it
 
 1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
+
 2. Configure the Flink configuration to use the Gravitino flink connector.
 
 | Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
@@ -38,28 +39,34 @@ This capability allows users to perform federation queries, accessing data from 
 Set the flink configuration in flink-conf.yaml.
 ```yaml
 table.catalog-store.kind: gravitino
-table.catalog-store.gravitino.gravitino.metalake: test
+table.catalog-store.gravitino.gravitino.metalake: metalake_demo
 table.catalog-store.gravitino.gravitino.uri: http://localhost:8090
 ```
 Or you can set the flink configuration in the `TableEnvironment`.
 ```java
 final Configuration configuration = new Configuration();
 configuration.setString("table.catalog-store.kind", "gravitino");
-configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "test");
+configuration.setString("table.catalog-store.gravitino.gravitino.metalake", "metalake_demo");
 configuration.setString("table.catalog-store.gravitino.gravitino.uri", "http://localhost:8090");
 EnvironmentSettings.Builder builder = EnvironmentSettings.newInstance().withConfiguration(configuration);
 TableEnvironment tableEnv = TableEnvironment.create(builder.inBatchMode().build());
 ```
 
-3. Execute the Flink SQL query.
+3. Add necessary jar files to Flink's classpath.
 
-Suppose there is only one hive catalog with the name `hive` in the metalake `test`.
+To run Flink with Gravitino connector and then access the data source like Hive, you may need to put additional jars to Flink's classpath. You can refer to the [Flink document](https://nightlies.apache.org/flink/flink-docs-master/docs/connectors/table/hive/overview/#dependencies) for more information.
+
+4. Execute the Flink SQL query.
+
+Suppose there is only one hive catalog with the name `catalog_hive` in the metalake `metalake_demo`.
 
 ```sql
 // use hive catalog
-USE hive;
+USE CATALOG catalog_hive;
 CREATE DATABASE db;
 USE db;
+SET 'execution.runtime-mode' = 'batch';
+SET 'sql-client.execution.result-mode' = 'tableau';
 CREATE TABLE hive_students (id INT, name STRING);
 INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
 SELECT * FROM hive_students;

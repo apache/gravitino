@@ -35,6 +35,7 @@ import com.fasterxml.jackson.databind.cfg.EnumFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.annotations.VisibleForTesting;
@@ -44,6 +45,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -85,6 +87,8 @@ import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.StatisticValues;
 
 /** Utility class for working with JSON data. */
 public class JsonUtils {
@@ -301,7 +305,9 @@ public class JsonUtils {
                     .addDeserializer(Type.class, new TypeDeserializer())
                     .addSerializer(Type.class, new TypeSerializer())
                     .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
-                    .addSerializer(Expression.class, new ColumnDefaultValueSerializer()));
+                    .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
+                    .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
+                    .addSerializer(StatisticValue.class, new StatisticValueSerializer()));
   }
 
   /**
@@ -1340,6 +1346,94 @@ public class JsonUtils {
         return Column.DEFAULT_VALUE_NOT_SET;
       }
       return readFunctionArg(node);
+    }
+  }
+
+  /** Custom JSON deserializer for StatisticValue objects. */
+  public static class StatisticValueDeserializer extends JsonDeserializer<StatisticValue> {
+    @Override
+    public StatisticValue<?> deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      return getStatisticValue(node);
+    }
+  }
+
+  private static StatisticValue<?> getStatisticValue(JsonNode node) throws IOException {
+    Preconditions.checkArgument(
+        node != null && !node.isNull(), "Cannot parse statistic value from invalid JSON: %s", node);
+    if (node.isIntegralNumber()) {
+      return StatisticValues.longValue(node.asLong());
+    } else if (node.isFloatingPointNumber()) {
+      return StatisticValues.doubleValue(node.asDouble());
+    } else if (node.isTextual()) {
+      return StatisticValues.stringValue(node.asText());
+    } else if (node.isBoolean()) {
+      return StatisticValues.booleanValue(node.asBoolean());
+    } else if (node.isArray()) {
+      ArrayNode arrayNode = (ArrayNode) node;
+      List<StatisticValue<Object>> values = Lists.newArrayListWithCapacity(arrayNode.size());
+      for (JsonNode arrayElement : arrayNode) {
+        StatisticValue<?> value = getStatisticValue(arrayElement);
+        if (value != null) {
+          values.add((StatisticValue<Object>) value);
+        }
+      }
+      return StatisticValues.listValue(values);
+    } else if (node.isObject()) {
+      ObjectNode objectNode = (ObjectNode) node;
+      Map<String, StatisticValue<?>> map = Maps.newHashMap();
+      objectNode
+          .fields()
+          .forEachRemaining(
+              entry -> {
+                try {
+                  StatisticValue<?> value = getStatisticValue(entry.getValue());
+                  if (value != null) {
+                    map.put(entry.getKey(), value);
+                  }
+                } catch (IOException e) {
+                  throw new RuntimeException(e);
+                }
+              });
+      return StatisticValues.objectValue(map);
+    } else {
+      throw new UnsupportedEncodingException(
+          String.format("Don't support json node type %s", node.getNodeType()));
+    }
+  }
+
+  /** Custom JSON serializer for StatisticValue objects. */
+  public static class StatisticValueSerializer extends JsonSerializer<StatisticValue> {
+
+    @Override
+    public void serialize(StatisticValue value, JsonGenerator gen, SerializerProvider serializers)
+        throws IOException {
+      if (value.dataType().name() == Type.Name.BOOLEAN) {
+        gen.writeBoolean((Boolean) value.value());
+      } else if (value.dataType().name() == Type.Name.STRING) {
+        gen.writeString((String) value.value());
+      } else if (value.dataType().name() == Type.Name.DOUBLE) {
+        gen.writeNumber((Double) value.value());
+      } else if (value.dataType().name() == Type.Name.LONG) {
+        gen.writeNumber((Long) value.value());
+      } else if (value.dataType().name() == Type.Name.LIST) {
+        gen.writeStartArray();
+        for (StatisticValue<?> element : (List<StatisticValue<?>>) value.value()) {
+          serialize(element, gen, serializers);
+        }
+        gen.writeEndArray();
+      } else if (value.dataType().name() == Type.Name.STRUCT) {
+        gen.writeStartObject();
+        for (Map.Entry<String, StatisticValue<?>> entry :
+            ((Map<String, StatisticValue<?>>) value.value()).entrySet()) {
+          gen.writeFieldName(entry.getKey());
+          serialize(entry.getValue(), gen, serializers);
+        }
+        gen.writeEndObject();
+      } else {
+        throw new IOException("Unsupported statistic value type: " + value.dataType());
+      }
     }
   }
 

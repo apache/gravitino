@@ -21,7 +21,9 @@ package org.apache.gravitino.storage.relational.service;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.AuditInfo;
@@ -70,17 +72,18 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertTrue(jobs.contains(job2));
 
     // Test listing jobs by job template identifier
+    String[] levels = ArrayUtils.add(jobTemplate.namespace().levels(), jobTemplate.name());
+    Namespace jobTemplateIdentNs = Namespace.of(levels);
     List<JobEntity> jobsByTemplate =
-        JobMetaService.getInstance().listJobsByTemplateIdent(jobTemplate.nameIdentifier());
+        JobMetaService.getInstance().listJobsByNamespace(jobTemplateIdentNs);
     Assertions.assertEquals(2, jobsByTemplate.size());
     Assertions.assertTrue(jobsByTemplate.contains(job1));
     Assertions.assertTrue(jobsByTemplate.contains(job2));
 
     // Test listing jobs by non-existing template identifier
+    levels = ArrayUtils.add(jobTemplate.namespace().levels(), "non_existing_template");
     List<JobEntity> emptyJobs =
-        JobMetaService.getInstance()
-            .listJobsByTemplateIdent(
-                NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "non_existing_template"));
+        JobMetaService.getInstance().listJobsByNamespace(Namespace.of(levels));
     Assertions.assertTrue(emptyJobs.isEmpty());
   }
 
@@ -132,6 +135,17 @@ public class TestJobMetaService extends TestJDBCBackend {
         JobMetaService.getInstance()
             .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobOverwrite.name()));
     Assertions.assertEquals(jobOverwrite, updatedJob);
+
+    // Test insert and get job with finishedAt
+    JobEntity finishedJob =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.SUCCEEDED, METALAKE_NAME);
+    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(finishedJob, false));
+
+    JobEntity retrievedFinishedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, finishedJob.name()));
+    Assertions.assertTrue(retrievedFinishedJob.finishedAt() > 0);
   }
 
   @Test
@@ -179,5 +193,36 @@ public class TestJobMetaService extends TestJDBCBackend {
     List<JobEntity> jobs =
         JobMetaService.getInstance().listJobsByNamespace(NamespaceUtil.ofJob(METALAKE_NAME));
     Assertions.assertTrue(jobs.isEmpty(), "Jobs should be deleted by legacy timeline");
+  }
+
+  @Test
+  public void testDeleteJobByIdentifier() throws IOException {
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
+
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "test_job_template", "test_comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    JobEntity job =
+        TestJobTemplateMetaService.newJobEntity(
+            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
+    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(job, false));
+
+    JobEntity retrievedJob =
+        JobMetaService.getInstance()
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
+    Assertions.assertEquals(job, retrievedJob);
+
+    Assertions.assertTrue(
+        JobMetaService.getInstance()
+            .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
+
+    // Verify that the job is deleted
+    Assertions.assertFalse(
+        JobMetaService.getInstance()
+            .deleteJob(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name())));
   }
 }

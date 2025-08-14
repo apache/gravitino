@@ -187,3 +187,7 @@ class NoSuchJobTemplateException(NotFoundException):
 
 class NoSuchJobException(NotFoundException):
     """An exception thrown when a job with specified name is not found."""
+
+
+class ForbiddenException(GravitinoRuntimeException):
+    """An exception thrown when a user is forbidden to perform an action."""

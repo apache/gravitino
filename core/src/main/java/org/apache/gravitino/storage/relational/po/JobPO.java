@@ -135,6 +135,7 @@ public class JobPO {
           .withStatus(JobHandle.Status.valueOf(jobPO.jobRunStatus))
           .withJobTemplateName(jobPO.jobTemplateName)
           .withAuditInfo(JsonUtils.anyFieldMapper().readValue(jobPO.auditInfo, AuditInfo.class))
+          .withFinishedAt(jobPO.jobFinishedAt())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize job PO", e);
