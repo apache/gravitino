@@ -249,6 +249,34 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                 data=data,
             )
 
+    def test_read_partition_invalid_list(self):
+        list_data_base = {
+            SerdesUtils.PARTITION_TYPE: PartitionDTO.Type.LIST.value,
+            SerdesUtils.PARTITION_NAME: "list_partition",
+        }
+        invalid_partition_name = {
+            SerdesUtils.PARTITION_TYPE: PartitionDTO.Type.LIST.value
+        }
+        invalid_lists_data = (
+            list_data_base,
+            dict(
+                ChainMap(list_data_base, {SerdesUtils.LIST_PARTITION_LISTS: "invalid"})
+            ),
+        )
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "List partition must have name",
+            SerdesUtils.read_partition,
+            data=invalid_partition_name,
+        )
+        for invalid_data in invalid_lists_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "List partition must have array of lists",
+                SerdesUtils.read_partition,
+                data=invalid_data,
+            )
+
     def test_read_partition_dto(self):
         for partition_dto_type, partition_dto in self.partition_dtos.items():
             with self.subTest(
@@ -263,4 +291,9 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                     dto = cast(IdentityPartitionDTO, partition_dto_read)
                     self.assertListEqual(partition_dto.field_names(), dto.field_names())
                     self.assertListEqual(partition_dto.values(), dto.values())
+                    self.assertEqual(partition_dto.properties(), dto.properties())
+
+                if partition_dto_type is PartitionDTO.Type.LIST:
+                    dto = cast(ListPartitionDTO, partition_dto_read)
+                    self.assertListEqual(partition_dto.lists(), dto.lists())
                     self.assertEqual(partition_dto.properties(), dto.properties())
