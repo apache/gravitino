@@ -45,6 +45,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -96,7 +97,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withEnabled(true)
             .withAuditInfo(auditInfo)
@@ -113,7 +114,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         PolicyEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName("policy2")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withAuditInfo(auditInfo)
             .withContent(content)
@@ -135,7 +136,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy3")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -164,7 +165,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -176,7 +177,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy2")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -202,7 +203,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -225,7 +226,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment1")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -246,7 +247,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment1")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -285,7 +286,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -320,7 +321,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -345,7 +346,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy2")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName + "1"))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -395,7 +396,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -407,7 +408,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy2")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -419,7 +420,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy3")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();
@@ -724,7 +725,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .withName("policy1")
             .withNamespace(NamespaceUtil.ofPolicy(metalakeName))
             .withComment("comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withContent(content)
             .withAuditInfo(auditInfo)
             .build();

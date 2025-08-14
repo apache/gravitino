@@ -192,7 +192,7 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
@@ -202,13 +202,13 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy2")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
 
-    Policy[] policies = new Policy[] {policy1, policy2};
+    PolicyEntity[] policies = new PolicyEntity[] {policy1, policy2};
     when(policyManager.listPolicyInfos(metalake)).thenReturn(policies);
 
     Response resp =
@@ -234,7 +234,7 @@ public class TestPolicyOperations extends JerseyTest {
     Assertions.assertEquals(Optional.empty(), policyListResp.getPolicies()[1].inherited());
 
     // Test return empty array
-    when(policyManager.listPolicyInfos(metalake)).thenReturn(new Policy[0]);
+    when(policyManager.listPolicyInfos(metalake)).thenReturn(new PolicyEntity[0]);
     Response resp2 =
         target(policyPath(metalake))
             .queryParam("details", true)
@@ -258,12 +258,13 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
-    when(policyManager.createPolicy(metalake, "policy1", "custom", null, false, content))
+    when(policyManager.createPolicy(
+            metalake, "policy1", Policy.BuiltInType.CUSTOM, null, false, content))
         .thenReturn(policy1);
 
     PolicyCreateRequest request =
@@ -330,7 +331,7 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
@@ -400,7 +401,7 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("new_policy1")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withComment("new policy1 comment")
             .withEnabled(false)
             .withContent(content)

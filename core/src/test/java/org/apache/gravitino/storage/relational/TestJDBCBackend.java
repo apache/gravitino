@@ -85,6 +85,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -1560,7 +1561,7 @@ public class TestJDBCBackend {
         .withId(id)
         .withNamespace(ns)
         .withName(name)
-        .withPolicyType("custom")
+        .withPolicyType(Policy.BuiltInType.CUSTOM)
         .withComment("")
         .withEnabled(true)
         .withContent(

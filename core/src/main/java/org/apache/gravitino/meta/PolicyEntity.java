@@ -37,14 +37,14 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 
 @ToString
-public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
+public class PolicyEntity implements Entity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the policy entity.");
   public static final Field NAME =
       Field.required("name", String.class, "The name of the policy entity.");
   public static final Field POLICY_TYPE =
-      Field.required("policyType", String.class, "The type of the policy entity.");
+      Field.required("policyType", Policy.BuiltInType.class, "The type of the policy entity.");
   public static final Field COMMENT =
       Field.optional("comment", String.class, "The comment of the policy entity.");
   public static final Field ENABLED =
@@ -61,7 +61,7 @@ public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
   private Long id;
   private String name;
   private Namespace namespace;
-  private String policyType;
+  private Policy.BuiltInType policyType;
   private String comment;
   private boolean enabled;
   private PolicyContent content;
@@ -108,27 +108,22 @@ public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
     return auditInfo;
   }
 
-  @Override
-  public String policyType() {
+  public Policy.BuiltInType policyType() {
     return policyType;
   }
 
-  @Override
   public String comment() {
     return comment;
   }
 
-  @Override
   public boolean enabled() {
     return enabled;
   }
 
-  @Override
   public PolicyContent content() {
     return content;
   }
 
-  @Override
   public Optional<Boolean> inherited() {
     return Optional.empty();
   }
@@ -161,13 +156,12 @@ public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
 
   private void validatePolicy() {
     Preconditions.checkArgument(StringUtils.isNotBlank(name()), "Policy name cannot be blank");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(policyType()), "Policy type cannot be blank");
+
     Preconditions.checkArgument(content() != null, "Policy content cannot be null");
 
-    BuiltInType builtInType = BuiltInType.fromPolicyType(policyType());
     Preconditions.checkArgument(
-        builtInType != BuiltInType.CUSTOM || content() instanceof PolicyContents.CustomContent,
+        policyType != Policy.BuiltInType.CUSTOM
+            || content() instanceof PolicyContents.CustomContent,
         "Expected CustomContent for custom policy type, but got %s",
         content().getClass().getName());
     content().validate();
@@ -177,7 +171,7 @@ public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
     private Long id;
     private String name;
     private Namespace namespace;
-    private String policyType;
+    private Policy.BuiltInType policyType;
     private String comment;
     private boolean enabled = true;
     private PolicyContent content;
@@ -198,7 +192,7 @@ public class PolicyEntity implements Policy, Entity, Auditable, HasIdentifier {
       return this;
     }
 
-    public Builder withPolicyType(String policyType) {
+    public Builder withPolicyType(Policy.BuiltInType policyType) {
       this.policyType = policyType;
       return this;
     }

@@ -60,6 +60,7 @@ import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -791,7 +792,7 @@ public class TestPOConverters {
             1L,
             "test",
             NamespaceUtil.ofPolicy("test_metalake"),
-            "custom",
+            Policy.BuiltInType.CUSTOM,
             "test comment",
             true,
             content);
@@ -1582,7 +1583,7 @@ public class TestPOConverters {
       Long id,
       String name,
       Namespace namespace,
-      String type,
+      Policy.BuiltInType type,
       String comment,
       boolean enabled,
       PolicyContent content) {

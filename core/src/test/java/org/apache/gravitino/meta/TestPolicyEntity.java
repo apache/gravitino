@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.junit.jupiter.api.Assertions;
@@ -50,7 +51,7 @@ public class TestPolicyEntity {
             .withName("test")
             .withNamespace(namespace)
             .withComment("test comment")
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(auditInfo)
@@ -60,7 +61,7 @@ public class TestPolicyEntity {
     Assertions.assertEquals("test", policyEntity.name());
     Assertions.assertEquals(namespace, policyEntity.namespace());
     Assertions.assertEquals("test comment", policyEntity.comment());
-    Assertions.assertEquals("custom", policyEntity.policyType());
+    Assertions.assertEquals(Policy.BuiltInType.CUSTOM, policyEntity.policyType());
     Assertions.assertFalse(policyEntity.enabled());
     Assertions.assertEquals(content, policyEntity.content());
     Assertions.assertEquals(auditInfo, policyEntity.auditInfo());
@@ -70,7 +71,7 @@ public class TestPolicyEntity {
             .withId(1L)
             .withName("test")
             .withNamespace(namespace)
-            .withPolicyType("custom")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(auditInfo)
@@ -99,7 +100,7 @@ public class TestPolicyEntity {
                 .withId(1L)
                 .withName("test")
                 .withNamespace(Namespace.of("m1", "c1", "s1"))
-                .withPolicyType("custom")
+                .withPolicyType(Policy.BuiltInType.CUSTOM)
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());
@@ -111,7 +112,7 @@ public class TestPolicyEntity {
                 .withId(1L)
                 .withName("test")
                 .withNamespace(Namespace.of("m1", "c1", "s1"))
-                .withPolicyType("custom")
+                .withPolicyType(Policy.BuiltInType.CUSTOM)
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());

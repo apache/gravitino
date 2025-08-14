@@ -24,6 +24,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.meta.PolicyEntity;
 
 /**
  * The interface provides functionalities for managing policies within a metalake. It includes a
@@ -47,7 +48,7 @@ public interface PolicyDispatcher {
    * @param metalake the name of the metalake
    * @return The list of policies.
    */
-  Policy[] listPolicyInfos(String metalake);
+  PolicyEntity[] listPolicyInfos(String metalake);
 
   /**
    * Get a policy by its name under a metalake.
@@ -57,7 +58,7 @@ public interface PolicyDispatcher {
    * @return The policy.
    * @throws NoSuchPolicyException If the policy does not exist.
    */
-  Policy getPolicy(String metalake, String policyName) throws NoSuchPolicyException;
+  PolicyEntity getPolicy(String metalake, String policyName) throws NoSuchPolicyException;
 
   /**
    * Create a built-in type policy under a metalake. The exclusive, inheritable, and supported
@@ -72,10 +73,10 @@ public interface PolicyDispatcher {
    * @return The created policy
    * @throws PolicyAlreadyExistsException If the policy already exists
    */
-  Policy createPolicy(
+  PolicyEntity createPolicy(
       String metalake,
       String name,
-      String type,
+      Policy.BuiltInType type,
       String comment,
       boolean enabled,
       PolicyContent content)
@@ -89,7 +90,7 @@ public interface PolicyDispatcher {
    * @param changes the changes to apply to the policy
    * @return The updated policy.
    */
-  Policy alterPolicy(String metalake, String policyName, PolicyChange... changes);
+  PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes);
 
   /**
    * Enable an existing policy under a metalake.
@@ -134,7 +135,7 @@ public interface PolicyDispatcher {
    */
   default String[] listPoliciesForMetadataObject(String metalake, MetadataObject metadataObject) {
     return Arrays.stream(listPolicyInfosForMetadataObject(metalake, metadataObject))
-        .map(Policy::name)
+        .map(PolicyEntity::name)
         .toArray(String[]::new);
   }
 
@@ -145,7 +146,7 @@ public interface PolicyDispatcher {
    * @param metadataObject the metadata object for which associated policies
    * @return The array of policies associated with the specified metadata object.
    */
-  Policy[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject);
+  PolicyEntity[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject);
 
   /**
    * Associate policies to a metadata object under a metalake.
@@ -170,6 +171,6 @@ public interface PolicyDispatcher {
    * @param policyName the name of the policy to retrieve
    * @return The policy associated with the metadata object.
    */
-  Policy getPolicyForMetadataObject(
+  PolicyEntity getPolicyForMetadataObject(
       String metalake, MetadataObject metadataObject, String policyName);
 }

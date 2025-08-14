@@ -688,9 +688,7 @@ public class POConverters {
     try {
       PolicyContent oldContent =
           JsonUtils.anyFieldMapper()
-              .readValue(
-                  oldPolicyVersionPO.getContent(),
-                  Policy.BuiltInType.fromPolicyType(newPolicy.policyType()).contentClass());
+              .readValue(oldPolicyVersionPO.getContent(), newPolicy.policyType().contentClass());
       if (oldContent == null) {
         return newPolicy.content() != null;
       }
@@ -727,7 +725,7 @@ public class POConverters {
       return PolicyPO.builder()
           .withPolicyId(newPolicy.id())
           .withPolicyName(newPolicy.name())
-          .withPolicyType(newPolicy.policyType())
+          .withPolicyType(newPolicy.policyType().name())
           .withMetalakeId(oldPolicyPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
           .withCurrentVersion(currentVersion)
@@ -1375,18 +1373,17 @@ public class POConverters {
 
   public static PolicyEntity fromPolicyPO(PolicyPO policyPO, Namespace namespace) {
     try {
+      Policy.BuiltInType policyType = Policy.BuiltInType.fromPolicyType(policyPO.getPolicyType());
       return PolicyEntity.builder()
           .withId(policyPO.getPolicyId())
           .withName(policyPO.getPolicyName())
           .withNamespace(namespace)
-          .withPolicyType(policyPO.getPolicyType())
+          .withPolicyType(policyType)
           .withComment(policyPO.getPolicyVersionPO().getPolicyComment())
           .withEnabled(policyPO.getPolicyVersionPO().isEnabled())
           .withContent(
               JsonUtils.anyFieldMapper()
-                  .readValue(
-                      policyPO.getPolicyVersionPO().getContent(),
-                      Policy.BuiltInType.fromPolicyType(policyPO.getPolicyType()).contentClass()))
+                  .readValue(policyPO.getPolicyVersionPO().getContent(), policyType.contentClass()))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(policyPO.getAuditInfo(), AuditInfo.class))
           .build();
@@ -1412,7 +1409,7 @@ public class POConverters {
       return builder
           .withPolicyId(policyEntity.id())
           .withPolicyName(policyEntity.name())
-          .withPolicyType(policyEntity.policyType())
+          .withPolicyType(policyEntity.policyType().name())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
