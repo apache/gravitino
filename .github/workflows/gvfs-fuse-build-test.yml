@@ -23,7 +23,7 @@ jobs:
           filters: |
             source_changes:
               included:
-                #- .github/**
+                - .github/**
                 - api/**
                 - bin/**
                 - catalogs/hadoop/**

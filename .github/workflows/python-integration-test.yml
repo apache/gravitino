@@ -22,7 +22,7 @@ jobs:
           filters: |
             source_changes:
               included:
-                #- .github/**            
+                - .github/**            
                 - api/**
                 - authorizations/**
                 - bin/**

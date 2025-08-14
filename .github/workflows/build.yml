@@ -24,7 +24,7 @@ jobs:
           filters: |
             source_changes:
               included:
-                #- '.github/**'
+                - '.github/**'
                 - 'catalogs/**'
                 - 'clients/**'
                 - 'conf/**'
