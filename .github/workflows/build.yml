@@ -36,13 +36,13 @@ jobs:
               - '**/*.java'
               - '**/*.kts'
               - '**/*.py'
-              - '!mcp-server/**'
               - '**/*.rs'
               - '**/resources/**'
               - '**/src/**'
               - '!**/*.md'
               - '!**/*.png'
               - '!**/*.svg'
+                - '!mcp-server/**'
             
             spark_connector_changes:
               - spark-connector/**
