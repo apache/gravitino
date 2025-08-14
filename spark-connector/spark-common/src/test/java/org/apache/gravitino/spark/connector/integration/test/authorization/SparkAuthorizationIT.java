@@ -21,41 +21,55 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.expressions.GenericRow;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 @Tag("gravitino-docker-test")
-public class SparkAuthorizationIT extends BaseIT {
+public abstract class SparkAuthorizationIT extends BaseIT {
 
-  protected static final String METALAKE = "metalake";
+  private static final String METALAKE = "metalake";
 
-  protected static final String USER = "tester";
+  private static final String ADMIN_USER = "tester";
 
-  protected static final String NORMAL_USER = "tester2";
+  private static final String NORMAL_USER = "tester2";
 
-  protected static final String JDBC_CATALOG = "jdbcCatalog";
+  private static final String JDBC_CATALOG = "jdbcCatalog";
 
-  protected static final String JDBC_DATABASE = "jdbcDatabase";
+  private static final String JDBC_DATABASE = "jdbcDatabase";
+
+  private static final String ROLE = "role";
 
   private String gravitinoUri;
 
@@ -66,8 +80,6 @@ public class SparkAuthorizationIT extends BaseIT {
   protected String mysqlPassword;
 
   protected String mysqlDriver;
-
-  private SparkSession adminUserSparkSession;
 
   private SparkSession normalUserSparkSession;
 
@@ -80,7 +92,7 @@ public class SparkAuthorizationIT extends BaseIT {
     customConfigs.putAll(
         ImmutableMap.of(
             "SimpleAuthUserName",
-            USER,
+            ADMIN_USER,
             Configs.ENABLE_AUTHORIZATION.getKey(),
             "true",
             Configs.CACHE_ENABLED.getKey(),
@@ -91,7 +103,7 @@ public class SparkAuthorizationIT extends BaseIT {
     initMysqlContainer();
     super.startIntegrationTest();
     gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
-    initMetalakeAndCatalogs();
+    initTables();
     initSparkEnv();
   }
 
@@ -103,7 +115,7 @@ public class SparkAuthorizationIT extends BaseIT {
     mysqlDriver = containerSuite.getMySQLContainer().getDriverClassName(MYSQL_CATALOG_MYSQL_IT);
   }
 
-  private void initMetalakeAndCatalogs() {
+  private void initTables() {
     client.createMetalake(METALAKE, "", new HashMap<>());
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.addUser(NORMAL_USER);
@@ -112,13 +124,27 @@ public class SparkAuthorizationIT extends BaseIT {
     properties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, mysqlUsername);
     properties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, mysqlPassword);
     properties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, mysqlDriver);
-    client
-        .loadMetalake(METALAKE)
-        .createCatalog(JDBC_CATALOG, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", properties);
+    Catalog catalog =
+        client
+            .loadMetalake(METALAKE)
+            .createCatalog(
+                JDBC_CATALOG, Catalog.Type.RELATIONAL, "jdbc-mysql", "comment", properties);
+    SupportsSchemas schemas = catalog.asSchemas();
+    schemas.createSchema(JDBC_DATABASE, "", new HashMap<>());
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog(
+            JDBC_CATALOG,
+            ImmutableList.of(
+                Privileges.UseCatalog.allow(),
+                Privileges.UseSchema.allow(),
+                Privileges.SelectTable.allow(),
+                Privileges.CreateTable.allow()));
+    gravitinoMetalake.createRole(ROLE, new HashMap<>(), ImmutableList.of(securableObject));
+    gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
   }
 
   protected void putServiceAdmin() {
-    customConfigs.put(Configs.SERVICE_ADMINS.getKey(), USER);
+    customConfigs.put(Configs.SERVICE_ADMINS.getKey(), ADMIN_USER);
   }
 
   private void initSparkEnv() {
@@ -128,53 +154,94 @@ public class SparkAuthorizationIT extends BaseIT {
             .set(GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri)
             .set(GravitinoSparkConfig.GRAVITINO_METALAKE, METALAKE)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
-    setEnv("HADOOP_USER_NAME", USER);
-    adminUserSparkSession =
-        SparkSession.builder()
-            .master("local[1]")
-            .appName("Spark connector integration test")
-            .config(sparkConf)
-            .getOrCreate();
     setEnv("HADOOP_USER_NAME", NORMAL_USER);
     normalUserSparkSession =
         SparkSession.builder()
             .master("local[1]")
             .appName("Spark connector integration test")
             .config(sparkConf)
-            .enableHiveSupport()
             .getOrCreate();
   }
 
   @Test
-  public void testCreateSchema() {
-    List<Row> catalogs =
-        executeSqlByUser(NORMAL_USER, () -> normalUserSparkSession.sql("show catalogs"))
-            .collectAsList();
-    assertListEquals(List.of(), catalogs);
-    catalogs =
-        executeSqlByUser(USER, () -> adminUserSparkSession.sql("show catalogs")).collectAsList();
-    assertListEquals(List.of(new GenericRow(new String[] {JDBC_CATALOG})), catalogs);
+  public void testTable() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
+    normalUserSparkSession.sql("use " + JDBC_CATALOG);
+    normalUserSparkSession.sql("use " + JDBC_DATABASE);
+    List<Row> tables = normalUserSparkSession.sql("show tables").collectAsList();
+    assertEqualsRows(new ArrayList<>(), tables);
+    normalUserSparkSession.sql("CREATE TABLE table_a(a STRING)");
+    TableCatalog tableCatalog = gravitinoMetalake.loadCatalog(JDBC_CATALOG).asTableCatalog();
+    tableCatalog.createTable(
+        NameIdentifier.of(JDBC_DATABASE, "table_b"),
+        new Column[] {Column.of("col1", Types.StringType.get())},
+        "",
+        new HashMap<>());
+    tableCatalog.createTable(
+        NameIdentifier.of(JDBC_DATABASE, "table_c"),
+        new Column[] {Column.of("col1", Types.StringType.get())},
+        "",
+        new HashMap<>());
+    tables = normalUserSparkSession.sql("show tables").collectAsList();
+    assertEqualsRows(
+        ImmutableList.of(
+            RowFactory.create("jdbcDatabase", "table_a", false),
+            RowFactory.create("jdbcDatabase", "table_b", false),
+            RowFactory.create("jdbcDatabase", "table_c", false)),
+        tables);
+    gravitinoMetalake.grantPrivilegesToRole(
+        ROLE,
+        MetadataObjects.of(
+            ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE), MetadataObject.Type.SCHEMA),
+        ImmutableList.of(Privileges.CreateTable.deny()));
     assertThrows(
-        String.format(
-            "%s is not authorized to perform operation 'loadMetalake' on metadata 'metalake'",
-            NORMAL_USER),
-        RuntimeException.class,
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
+        ForbiddenException.class,
         () -> {
-          executeSqlByUser(
-              NORMAL_USER, () -> normalUserSparkSession.sql("create database " + JDBC_DATABASE));
+          normalUserSparkSession.sql("CREATE TABLE table_d(a STRING)");
         });
-    executeSqlByUser(USER, () -> adminUserSparkSession.sql("create database " + JDBC_DATABASE));
+    tables = normalUserSparkSession.sql("show tables").collectAsList();
+    assertEqualsRows(
+        ImmutableList.of(
+            RowFactory.create("jdbcDatabase", "table_a", false),
+            RowFactory.create("jdbcDatabase", "table_b", false),
+            RowFactory.create("jdbcDatabase", "table_c", false)),
+        tables);
+    gravitinoMetalake.grantPrivilegesToRole(
+        ROLE,
+        MetadataObjects.of(
+            ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE, "table_b"), MetadataObject.Type.TABLE),
+        ImmutableList.of(Privileges.SelectTable.deny()));
+    tables = normalUserSparkSession.sql("show tables").collectAsList();
+    assertEqualsRows(
+        ImmutableList.of(
+            RowFactory.create("jdbcDatabase", "table_a", false),
+            RowFactory.create("jdbcDatabase", "table_c", false)),
+        tables);
+    assertThrows(
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
+        ForbiddenException.class,
+        () -> {
+          normalUserSparkSession.sql("ALTER TABLE table_c ADD COLUMNS (b STRING);");
+        });
+    assertThrows(
+        "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
+        ForbiddenException.class,
+        () -> {
+          normalUserSparkSession.sql("DROP TABLE table_c");
+        });
+    normalUserSparkSession.sql("DROP TABLE table_a");
   }
 
-  private <E> void assertListEquals(List<E> expected, List<E> actual) {
-    assertEquals(expected.size(), actual.size());
-    for (int i = 0; i < expected.size(); i++) {
-      assertEquals(expected.get(i), actual.get(i));
+  private void assertEqualsRows(List<Row> exceptRows, List<Row> actualRows) {
+    assertEquals(exceptRows.size(), actualRows.size());
+    for (int i = 0; i < exceptRows.size(); i++) {
+      Row exceptRow = exceptRows.get(i);
+      Row actualRow = actualRows.get(i);
+      assertEquals(exceptRow.length(), actualRow.length());
+      for (int j = 0; j < exceptRow.length(); j++) {
+        assertEquals(exceptRow.get(j), actualRow.get(j));
+      }
     }
-  }
-
-  private <R> R executeSqlByUser(String user, Supplier<R> supplier) {
-    setEnv("HADOOP_USER_NAME", user);
-    return supplier.get();
   }
 }
