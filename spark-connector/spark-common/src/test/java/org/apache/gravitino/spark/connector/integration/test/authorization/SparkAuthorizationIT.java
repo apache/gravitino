@@ -24,6 +24,8 @@ import static org.junit.Assert.assertThrows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+
+import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -105,6 +107,12 @@ public abstract class SparkAuthorizationIT extends BaseIT {
     gravitinoUri = String.format("http://127.0.0.1:%d", getGravitinoServerPort());
     initTables();
     initSparkEnv();
+  }
+
+  @Override
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    client.dropMetalake(METALAKE);
+    super.stopIntegrationTest();
   }
 
   private void initMysqlContainer() throws SQLException {
