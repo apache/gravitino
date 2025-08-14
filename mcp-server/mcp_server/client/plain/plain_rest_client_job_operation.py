@@ -51,3 +51,22 @@ class PlainRESTClientJobOperation(JobOperation):
             f"/api/metalakes/{self.metalake_name}/jobs/templates?details=true"
         )
         return extract_content_from_response(response, "jobTemplates", [])
+
+    async def run_job(self, job_template_name: str, job_config: dict) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{self.metalake_name}/jobs/runs",
+            json={
+                "jobTemplateName": job_template_name,
+                "jobConf": job_config,
+            },
+        )
+        return extract_content_from_response(response, "job", {})
+
+    async def cancel_job(self, job_id: str) -> str:
+        response = await self.rest_client.post(
+            f"/api/metalakes/{self.metalake_name}/jobs/runs/{job_id}"
+        )
+        if response.status_code != 200:
+            raise Exception(f"Failed to cancel job {job_id}: {response.text}")
+
+        return extract_content_from_response(response, "job", {})

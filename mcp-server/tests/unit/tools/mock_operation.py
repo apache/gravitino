@@ -188,3 +188,9 @@ class MockJobOperation(JobOperation):
 
     async def get_job_template_by_name(self, name: str) -> str:
         return f"mock_job_template: {name}"
+
+    async def run_job(self, job_template_name: str, job_config: dict) -> str:
+        return f"mock_job_run: {job_template_name} with parameters {job_config}"
+
+    async def cancel_job(self, job_id: str) -> str:
+        return f"mock_job_cancelled: {job_id}"

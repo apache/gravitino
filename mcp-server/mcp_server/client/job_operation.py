@@ -72,3 +72,31 @@ class JobOperation(ABC):
             str: JSON-formatted string containing the job template information
         """
         pass
+
+    @abstractmethod
+    async def run_job(self, job_template_name: str, job_config: dict) -> str:
+        """
+        Run a job based on the specified job template and parameters.
+
+        Args:
+            job_template_name: Name of the job template to run.
+            job_config: Dictionary of parameters to configure the job run.
+
+        Returns:
+            str: JSON-formatted string containing the result ID of the job to run.
+        """
+        pass
+
+    @abstractmethod
+    async def cancel_job(self, job_id: str) -> str:
+        """
+        Cancel a running job by its ID. The ID should be the one returned by
+         the `run_job` method.
+
+        Args:
+            job_id: ID of the job to cancel.
+
+        Returns:
+            str: JSON-formatted string containing the result of the cancellation.
+        """
+        pass

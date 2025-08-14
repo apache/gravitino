@@ -175,3 +175,79 @@ def load_job_tool(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().get_job_template_by_name(name)
+
+    @mcp.tool(tags={"job"})
+    async def run_job(
+        ctx: Context,
+        job_template_name: str,
+        job_config: dict,
+    ) -> str:
+        """
+        Run a job using a specified job template and configuration.
+
+        Parameters:
+            ctx (Context): The context object containing Gravitino context.
+            job_template_name (str): The name of the job template to use for running the job.
+            job_config (dict): A dictionary containing the configuration for the job.
+
+        Returns:
+            str: A JSON string representing the created job object.
+
+        Example Return Value:
+            {
+              "jobId": "job-3650896936678278254",
+              "jobTemplateName": "shell_test",
+              "status": "queued",
+              "audit": {
+                "creator": "anonymous",
+                "createTime": "2025-08-14T08:50:33.098029Z"
+              }
+            }
+            jobId: The unique identifier of the job.
+            jobTemplateName: The name of the job template used to create the job.
+            status: The current status of the job (e.g., "queued", "running").
+            audit: An object containing audit information, including creator and creation time.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_job_operation().run_job(
+            job_template_name, job_config
+        )
+
+    @mcp.tool(tags={"job"})
+    async def cancel_job(
+        ctx: Context,
+        job_id: str,
+    ) -> str:
+        """
+        Cancel a job by its ID. The ID should be the one returned by the `run_job` method.
+
+        Parameters:
+            ctx (Context): The context object containing Gravitino context.
+            job_id (str): The ID of the job to cancel.
+
+        Returns:
+            str: A JSON string representing the current status of the job to be cancelled.
+
+        Example Return Value:
+            {
+              "jobId": "job-3650896936678278254",
+              "jobTemplateName": "shell_test",
+              "status": "succeeded",
+              "audit": {
+                "creator": "anonymous",
+                "createTime": "2025-08-14T08:50:33.098029Z",
+                "lastModifier": "anonymous",
+                "lastModifiedTime": "2025-08-14T08:52:10.965113Z"
+              }
+            }
+            jobId: The unique identifier of the job.
+            jobTemplateName: The name of the job template used to create the job.
+            status: The current status of the job (e.g., "succeeded", "failed", "cancelled").
+                    If the job was successfully cancelled, the status will be "cancelled". If the
+                    job was already completed, the status will reflect that.
+            audit: An object containing audit information, including creator, creation time,
+                    last modifier, and last modified time.
+
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_job_operation().cancel_job(job_id)
