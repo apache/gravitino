@@ -16,7 +16,9 @@
 # under the License.
 
 import unittest
+from collections import ChainMap
 from enum import Enum
+from typing import cast
 from unittest.mock import patch
 
 from gravitino.api.types.types import Types
@@ -29,6 +31,7 @@ from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import Serdes
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 class MockPartitionDTOType(str, Enum):
@@ -168,6 +171,9 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                             arg=self.literal_values[SerdesUtils.RANGE_PARTITION_UPPER]
                         ),
                     )
+                self.assertDictEqual(
+                    result[SerdesUtils.PARTITION_PROPERTIES], partition_dto.properties()
+                )
 
     def test_write_partition_empty_values(self):
         """Test writing partition with empty values."""
@@ -181,3 +187,80 @@ class TestPartitionSerdesUtils(unittest.TestCase):
         self.assertEqual(result[SerdesUtils.PARTITION_NAME], "empty_partition")
         self.assertEqual(result[SerdesUtils.FIELD_NAMES], [])
         self.assertEqual(result[SerdesUtils.IDENTITY_PARTITION_VALUES], [])
+
+    def test_read_partition_dto_invalid_type(self):
+        data = {SerdesUtils.PARTITION_TYPE: "invalid_type"}
+        with self.assertRaises(IllegalArgumentException):
+            SerdesUtils.read_partition(data=data)
+
+    def test_read_partition_dto_invalid_data(self):
+        invalid_json_data = (None, {})
+        for data in invalid_json_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "Partition must be a valid JSON object",
+                SerdesUtils.read_partition,
+                data=data,
+            )
+
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Partition must have a type field",
+            SerdesUtils.read_partition,
+            data={"invalid_field": "invalid_value"},
+        )
+
+    def test_read_partition_invalid_identity(self):
+        identity_data_base = {
+            SerdesUtils.PARTITION_TYPE: PartitionDTO.Type.IDENTITY.value
+        }
+        invalid_field_names_data = (
+            identity_data_base,
+            dict(
+                ChainMap(
+                    identity_data_base, {SerdesUtils.FIELD_NAMES: "invalid_field_names"}
+                )
+            ),
+        )
+        invalid_values_data = (
+            dict(ChainMap(identity_data_base, {SerdesUtils.FIELD_NAMES: []})),
+            dict(
+                ChainMap(
+                    identity_data_base,
+                    {
+                        SerdesUtils.FIELD_NAMES: [],
+                        SerdesUtils.IDENTITY_PARTITION_VALUES: "invalid_values",
+                    },
+                )
+            ),
+        )
+        for data in invalid_field_names_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "Identity partition must have array of fieldNames",
+                SerdesUtils.read_partition,
+                data=data,
+            )
+        for data in invalid_values_data:
+            self.assertRaisesRegex(
+                IllegalArgumentException,
+                "Identity partition must have array of values",
+                SerdesUtils.read_partition,
+                data=data,
+            )
+
+    def test_read_partition_dto(self):
+        for partition_dto_type, partition_dto in self.partition_dtos.items():
+            with self.subTest(
+                partition_dto_type=partition_dto_type, partition_dto=partition_dto
+            ):
+                result = SerdesUtils.write_partition(partition_dto)
+                partition_dto_read = SerdesUtils.read_partition(result)
+
+                self.assertEqual(partition_dto.name(), partition_dto_read.name())
+                self.assertEqual(partition_dto.type(), partition_dto_read.type())
+                if partition_dto_type is PartitionDTO.Type.IDENTITY:
+                    dto = cast(IdentityPartitionDTO, partition_dto_read)
+                    self.assertListEqual(partition_dto.field_names(), dto.field_names())
+                    self.assertListEqual(partition_dto.values(), dto.values())
+                    self.assertEqual(partition_dto.properties(), dto.properties())
