@@ -190,23 +190,56 @@ public interface EntityStore extends Closeable {
    */
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
 
+  /**
+   * Batch delete entities in the specified namespace.
+   *
+   * @param namespace the namespace in which the entities are located
+   * @param namespaceEntityType the detailed type of the namespace entity
+   * @param deleteEntityNames the names of the entities to be deleted
+   * @param entityType the general type of the entities to be deleted
+   * @param cascade if true, cascade delete the entities, otherwise just delete the entities
+   * @return the number of entities deleted
+   * @throws IOException if the batch delete operation fails
+   */
   default int batchDeleteInNamespace(
       Namespace namespace,
-      EntityType namspaceEntityType,
-      List<String> names,
+      EntityType namespaceEntityType,
+      List<String> deleteEntityNames,
       EntityType entityType,
       boolean cascade)
       throws IOException {
     throw new UnsupportedOperationException("batch delete is not supported");
   }
 
+  /**
+   * Batch put entities into the underlying storage.
+   *
+   * @param e the list of entities to be stored
+   * @param overwritten if true, overwrite the existing entities, otherwise throw an
+   * @param <E> the type of the entities
+   * @throws IOException if the batch put operation fails
+   * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
+   *     false
+   */
   default <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     throw new UnsupportedOperationException("batch put is not supported");
   }
 
+  /**
+   * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
+   * deserialize them into the specified {@link Entity} object.
+   *
+   * @param namespace the namespace of the entities
+   * @param namespaceEntityType the detailed type of the namespace entity
+   * @param type the detailed type of the entity
+   * @param entityType the general type of the entity
+   * @return the list of entities
+   * @param <E> the class of the entity
+   * @throws IOException if the list operation fails
+   */
   default <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, EntityType namespaceEntityTYpe, Class<E> type, EntityType entityType)
+      Namespace namespace, EntityType namespaceEntityType, Class<E> type, EntityType entityType)
       throws IOException {
     throw new UnsupportedOperationException(
         "list is not supported when specifying namespace entity type");

@@ -265,12 +265,12 @@ public class RelationalEntityStore
   public int batchDeleteInNamespace(
       Namespace namespace,
       Entity.EntityType namespaceEntityType,
-      List<String> names,
+      List<String> deleteEntityNames,
       Entity.EntityType entityType,
       boolean cascade)
       throws IOException {
     return backend.batchDeleteInNamespace(
-        namespace, namespaceEntityType, names, entityType, cascade);
+        namespace, namespaceEntityType, deleteEntityNames, entityType, cascade);
   }
 
   @Override

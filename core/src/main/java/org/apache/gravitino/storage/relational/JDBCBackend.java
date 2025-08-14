@@ -483,7 +483,7 @@ public class JDBCBackend implements RelationalBackend {
   public int batchDeleteInNamespace(
       Namespace namespace,
       Entity.EntityType namespaceEntityType,
-      List<String> names,
+      List<String> deleteEntityNames,
       Entity.EntityType entityType,
       boolean cascade)
       throws IOException {
@@ -491,7 +491,7 @@ public class JDBCBackend implements RelationalBackend {
       case STATISTIC:
         return StatisticMetaService.getInstance()
             .batchDeleteStatisticPOs(
-                NameIdentifier.parse(namespace.toString()), namespaceEntityType, names);
+                NameIdentifier.parse(namespace.toString()), namespaceEntityType, deleteEntityNames);
       default:
         throw new IllegalArgumentException(
             String.format("Batch delete is not supported for entity type %s", entityType.name()));

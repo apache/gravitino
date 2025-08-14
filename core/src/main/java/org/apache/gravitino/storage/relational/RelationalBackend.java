@@ -126,17 +126,48 @@ public interface RelationalBackend
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException;
 
+  /**
+   * Deletes the entities in the specified namespace and entity type.
+   *
+   * @param namespace The parent namespace of these entities.
+   * @param namespaceEntityType The type of the parent namespace entity.
+   * @param deleteEntityNames The names of the entities to be deleted.
+   * @param entityType The type of the entities to be deleted.
+   * @param cascade True, If you need to cascade delete entities, else false.
+   * @return The count of the deleted entities.
+   * @throws IOException If the store operation fails
+   */
   int batchDeleteInNamespace(
       Namespace namespace,
       Entity.EntityType namespaceEntityType,
-      List<String> names,
+      List<String> deleteEntityNames,
       Entity.EntityType entityType,
       boolean cascade)
       throws IOException;
 
+  /**
+   * Stores a batch of entities, possibly overwriting existing entities if specified.
+   *
+   * @param e The list of entities to be stored.
+   * @param overwritten If true, overwrites existing entities with the same identifier.
+   * @param <E> The type of the entities in the list.
+   * @throws IOException If the store operation fails
+   * @throws EntityAlreadyExistsException If an entity already exists and overwrite is false.
+   */
   <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
 
+  /**
+   * Lists the entities in the specified namespace and entity type.
+   *
+   * @param namespace The parent namespace of these entities.
+   * @param namespaceEntityTYpe The type of the parent namespace entity.
+   * @param type The type of the entities to be listed.
+   * @param entityType The type of the entities to be listed.
+   * @return A list of entities in the specified namespace and entity type.
+   * @param <E> The type of the entities in the list.
+   * @throws IOException If the store operation fails
+   */
   <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace,
       Entity.EntityType namespaceEntityTYpe,
