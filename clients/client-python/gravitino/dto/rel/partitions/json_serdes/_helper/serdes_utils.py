@@ -20,6 +20,7 @@ from typing import Any, Dict, List, cast
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
     SerdesUtils as ExpressionsSerdesUtils,
 )
+from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
@@ -100,8 +101,34 @@ class SerdesUtils(SerdesUtilsBase):
                 name=data[cls.PARTITION_NAME],
                 field_names=data[cls.FIELD_NAMES],
                 values=[
-                    ExpressionsSerdesUtils.read_function_arg(data=value)
+                    cast(
+                        LiteralDTO, ExpressionsSerdesUtils.read_function_arg(data=value)
+                    )
                     for value in data[cls.IDENTITY_PARTITION_VALUES]
+                ],
+                properties=data.get(cls.PARTITION_PROPERTIES, {}),
+            )
+
+        if dto_type is PartitionDTO.Type.LIST:
+            Precondition.check_argument(
+                cls.PARTITION_NAME in data,
+                f"List partition must have name, but found: {data}",
+            )
+            Precondition.check_argument(
+                isinstance(data.get(cls.LIST_PARTITION_LISTS), List),
+                f"List partition must have array of lists, but found: {data}",
+            )
+            return ListPartitionDTO(
+                name=data[cls.PARTITION_NAME],
+                lists=[
+                    [
+                        cast(
+                            LiteralDTO,
+                            ExpressionsSerdesUtils.read_function_arg(data=value),
+                        )
+                        for value in values
+                    ]
+                    for values in data[cls.LIST_PARTITION_LISTS]
                 ],
                 properties=data.get(cls.PARTITION_PROPERTIES, {}),
             )
