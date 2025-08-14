@@ -360,7 +360,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     ThreadLocalAuthorizationCache.loadPrivilege(
         () -> {
           try {
-
             loadRolePrivilege(metalake, username, userId);
             loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
           } catch (Exception e) {

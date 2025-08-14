@@ -155,7 +155,7 @@ public class ThreadLocalAuthorizationCache {
       return Objects.equals(username, that.username)
           && Objects.equals(metalake, that.metalake)
           && Objects.equals(metadataObject, that.metadataObject)
-          && privilege == that.privilege;
+          && Objects.equals(privilege, that.privilege);
     }
 
     @Override
