@@ -22,7 +22,6 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**
               - api/**
               - authorizations/**
               - bin/**

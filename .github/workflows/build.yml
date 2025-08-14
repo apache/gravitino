@@ -23,7 +23,6 @@ jobs:
         with:
           filters: |
             source_changes:
-              - '.github/**'
               - 'catalogs/**'
               - 'clients/**'
               - 'conf/**'
