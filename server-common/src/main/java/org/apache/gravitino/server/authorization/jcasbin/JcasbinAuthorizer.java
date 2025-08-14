@@ -130,7 +130,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       Privilege.Name privilege) {
     boolean result =
-        ThreadLocalAuthorizationCache.authorizeAllow(
+        ThreadLocalAuthorizationCache.authorizeDeny(
             principal.getName(),
             metalake,
             metadataObject,

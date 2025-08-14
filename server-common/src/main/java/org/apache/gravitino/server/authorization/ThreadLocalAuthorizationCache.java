@@ -24,7 +24,12 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.gravitino.MetadataObject;
 
-/** Used to avoid duplicate authorization checks for the same metadata within the same thread. */
+/**
+ * Used to avoid duplicate authorization checks for the same metadata within the same thread.
+ *
+ * <p>The time complexity of Jcasbin's enforce method is O(n). Further caching of authorization
+ * results can reduce the time spent on authorization.
+ */
 public class ThreadLocalAuthorizationCache {
 
   private ThreadLocalAuthorizationCache() {}
@@ -39,12 +44,6 @@ public class ThreadLocalAuthorizationCache {
 
   /** Used to determine whether the privilege has already been loaded. */
   private static final ThreadLocal<Boolean> hasLoadedPrivilegeThreadLocal = new ThreadLocal<>();
-
-  private static void start() {
-    allowAuthorizerThreadCache.set(new HashMap<>());
-    denyAuthorizerThreadCache.set(new HashMap<>());
-    hasLoadedPrivilegeThreadLocal.set(false);
-  }
 
   /**
    * Wrap the authorization method with this method to prevent threadlocal leakage.
@@ -124,6 +123,12 @@ public class ThreadLocalAuthorizationCache {
       return authorizer.apply(context);
     }
     return authorizationContextBooleanMap.computeIfAbsent(context, authorizer);
+  }
+
+  private static void start() {
+    allowAuthorizerThreadCache.set(new HashMap<>());
+    denyAuthorizerThreadCache.set(new HashMap<>());
+    hasLoadedPrivilegeThreadLocal.set(false);
   }
 
   private static void end() {
