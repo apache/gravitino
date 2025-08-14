@@ -36,6 +36,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -114,6 +115,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   public void stopIntegrationTest() throws IOException, InterruptedException {
     containerSuite.close();
     client.dropMetalake(METALAKE);
+    setEnv("HADOOP_USER_NAME", AuthConstants.ANONYMOUS_USER);
     super.stopIntegrationTest();
   }
 
