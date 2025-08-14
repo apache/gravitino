@@ -269,29 +269,8 @@ public class RelationalEntityStore
       throws IOException {
 
     List<Relation> relations = Lists.newArrayList();
-    for (Entity.RelationalEntity<E> relationEntity : relationalEntities) {
-      if (relationEntity.vertexType() == Relation.VertexType.SOURCE) {
-        for (NameIdentifier destIdentifier : relationEntity.relatedNameIdentifiers()) {
-          Relation relation =
-              new Relation(
-                  relationEntity.entity().nameIdentifier(),
-                  relationEntity.entity().type(),
-                  destIdentifier,
-                  relationEntity.relatedEntityType());
-          relations.add(relation);
-        }
-      }
-      if (relationEntity.vertexType() == Relation.VertexType.DESTINATION) {
-        for (NameIdentifier srcIdentifier : relationEntity.relatedNameIdentifiers()) {
-          Relation relation =
-              new Relation(
-                  srcIdentifier,
-                  relationEntity.relatedEntityType(),
-                  relationEntity.entity().nameIdentifier(),
-                  relationEntity.entity().type());
-          relations.add(relation);
-        }
-      }
+    for (Entity.RelationalEntity<E> relationalEntity : relationalEntities) {
+      relations.addAll(relationalEntity.toRelations());
     }
     cache.invalidate(relType, relations);
 

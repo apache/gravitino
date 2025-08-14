@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino;
 
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
 
 /** Represents a relation between two entities in the metadata store. */
@@ -94,6 +95,24 @@ public class Relation {
    */
   public Entity.EntityType getDestType() {
     return destVertex.getRight();
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(sourceVertex, destVertex);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null || getClass() != obj.getClass()) {
+      return false;
+    }
+    Relation other = (Relation) obj;
+    return Objects.equals(sourceVertex, other.sourceVertex)
+        && Objects.equals(destVertex, other.destVertex);
   }
 
   /**

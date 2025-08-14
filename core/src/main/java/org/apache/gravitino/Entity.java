@@ -143,5 +143,13 @@ public interface Entity extends Serializable {
      * @return the type of the related entity
      */
     EntityType relatedEntityType();
+
+    /**
+     * Converts this relational entity to a list of {@link Relation} objects that represent the
+     * relationship between the entity and its related identifiers.
+     *
+     * @return a list of {@link Relation} objects representing the relationships
+     */
+    List<Relation> toRelations();
   }
 }

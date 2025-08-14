@@ -19,6 +19,7 @@
 
 package org.apache.gravitino;
 
+import com.google.common.collect.Lists;
 import java.util.List;
 
 /**
@@ -92,6 +93,20 @@ public class RelationalEntityHelper {
     public Entity.EntityType relatedEntityType() {
       return destVertexEntityType;
     }
+
+    @Override
+    public List<Relation> toRelations() {
+      List<Relation> relations = Lists.newArrayList();
+      for (NameIdentifier destIdent : destVertexIdents) {
+        relations.add(
+            new Relation(
+                sourceVertexEntity.nameIdentifier(),
+                sourceVertexEntity.type(),
+                destIdent,
+                destVertexEntityType));
+      }
+      return relations;
+    }
   }
 
   /**
@@ -134,6 +149,20 @@ public class RelationalEntityHelper {
     @Override
     public Entity.EntityType relatedEntityType() {
       return sourceVertexEntityType;
+    }
+
+    @Override
+    public List<Relation> toRelations() {
+      List<Relation> relations = Lists.newArrayList();
+      for (NameIdentifier sourceIdent : sourceVertexIdents) {
+        relations.add(
+            new Relation(
+                sourceIdent,
+                sourceVertexEntityType,
+                destVertexEntity.nameIdentifier(),
+                destVertexEntity.type()));
+      }
+      return relations;
     }
   }
 }
