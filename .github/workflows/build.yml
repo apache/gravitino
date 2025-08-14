@@ -68,7 +68,7 @@ jobs:
           cache: 'gradle'
 
       - name: Build with Gradle
-        run: ./gradlew build -x test -PjdkVersion=8
+        run: ./gradlew build -x test -PjdkVersion=17
 
   # To check the spark-connector is compatible with scala2.13
   spark-connector-build:
