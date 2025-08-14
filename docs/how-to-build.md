@@ -181,10 +181,10 @@ Updating the package list ensures you have the latest information on the newest 
    vim ~/.bashrc
    ```
 
-2. Add the following lines at the end of the file. Replace `/usr/lib/jvm/java-11-openjdk-amd64` with your actual Java installation path:
+2. Add the following lines at the end of the file. Replace `/usr/lib/jvm/java-17-openjdk-amd64` with your actual Java installation path:
 
    ```sh
-   export JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"
+   export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
    export PATH=$PATH:$JAVA_HOME/bin
    ```
 
