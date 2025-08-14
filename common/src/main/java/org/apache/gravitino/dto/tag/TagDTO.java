@@ -83,12 +83,13 @@ public class TagDTO implements Tag {
     return Objects.equal(name, tagDTO.name)
         && Objects.equal(comment, tagDTO.comment)
         && Objects.equal(properties, tagDTO.properties)
-        && Objects.equal(audit, tagDTO.audit);
+        && Objects.equal(audit, tagDTO.audit)
+        && Objects.equal(inherited, tagDTO.inherited);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(name, comment, properties, audit);
+    return Objects.hashCode(name, comment, properties, audit, inherited);
   }
 
   /** @return a new builder for constructing a Tag DTO. */
