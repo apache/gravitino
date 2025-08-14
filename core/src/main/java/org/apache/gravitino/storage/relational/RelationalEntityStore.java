@@ -264,7 +264,7 @@ public class RelationalEntityStore
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> Void insertEntitiesAndRelations(
+  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
       Type relType, List<Entity.RelationalEntity<E>> relationalEntities, boolean overwrite)
       throws IOException {
 
@@ -275,7 +275,6 @@ public class RelationalEntityStore
     cache.invalidate(relType, relations);
 
     backend.insertEntitiesAndRelations(relType, relationalEntities, overwrite);
-    return null;
   }
 
   @Override

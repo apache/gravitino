@@ -640,7 +640,7 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> Void insertEntitiesAndRelations(
+  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
       Type relType, List<Entity.RelationalEntity<E>> entities, boolean overwrite)
       throws IOException {
     switch (relType) {
@@ -680,7 +680,7 @@ public class JDBCBackend implements RelationalBackend {
         Entity.EntityType type = relatedEntityTypes.iterator().next();
         metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
             statisticEntities, relatedIdents.iterator().next(), type);
-        return null;
+        return;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

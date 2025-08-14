@@ -41,6 +41,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -131,13 +132,16 @@ public class StatisticManager {
       TreeLockUtils.doWithTreeLock(
           identifier,
           LockType.WRITE,
-          () ->
-              store
-                  .relationOperations()
-                  .insertEntitiesAndRelations(
-                      SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
-                      relationalEntities,
-                      true));
+          (Executable<Void, IOException>)
+              () -> {
+                store
+                    .relationOperations()
+                    .insertEntitiesAndRelations(
+                        SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
+                        relationalEntities,
+                        true);
+                return null;
+              });
 
     } catch (NoSuchEntityException nse) {
       LOG.warn(

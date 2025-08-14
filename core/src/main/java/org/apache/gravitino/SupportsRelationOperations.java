@@ -164,7 +164,7 @@ public interface SupportsRelationOperations {
    *     will throw an exception.
    * @throws IOException If an error occurs during the insertion process, such as a storage issue.
    */
-  <E extends Entity & HasIdentifier> Void insertEntitiesAndRelations(
+  <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
       Type relType, List<Entity.RelationalEntity<E>> entities, boolean overwrite)
       throws IOException;
 
