@@ -55,7 +55,7 @@ class TestJdbcAuthorizationProperties {
     properties.put(JdbcAuthorizationProperties.JDBC_PASSWORD, "pwd");
     properties.put(JdbcAuthorizationProperties.JDBC_DRIVER, "driver");
 
-    Assertions.assertThrows(
-        NullPointerException.class, () -> new JdbcAuthorizationProperties(properties));
+    JdbcAuthorizationProperties jdbcProps = new JdbcAuthorizationProperties(properties);
+    Assertions.assertThrows(IllegalArgumentException.class, jdbcProps::validate);
   }
 }
