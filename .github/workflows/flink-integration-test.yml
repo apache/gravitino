@@ -21,29 +21,32 @@ jobs:
         with:
           filters: |
             source_changes:
-              - api/**
-              - bin/**
-              - catalogs/**
-              - clients/client-java/**
-              - clients/client-java-runtime/**
-              - common/**
-              - conf/**
-              - core/**
-              - dev/**
-              - flink-connector/**
-              - gradle/**
-              # todo: uncomment the following line after the flink-connector support Iceberg
-              # - iceberg/**
-              - integration-test-common/**
-              - meta/**
-              - scripts/**
-              - server/**
-              - server-common/**
-              - build.gradle.kts
-              - gradle.properties
-              - gradlew
-              - setting.gradle.kts
-              - '!mcp-server/**'
+              included:
+                - api/**
+                - bin/**
+                - catalogs/**
+                - clients/client-java/**
+                - clients/client-java-runtime/**
+                - common/**
+                - conf/**
+                - core/**
+                - dev/**
+                - flink-connector/**
+                - gradle/**
+                # todo: uncomment the following line after the flink-connector support Iceberg
+                # - iceberg/**
+                - integration-test-common/**
+                - meta/**
+                - scripts/**
+                - server/**
+                - server-common/**
+                - build.gradle.kts
+                - gradle.properties
+                - gradlew
+                - setting.gradle.kts
+              excluded:
+                - mcp-server/**
+                - .github/**
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
