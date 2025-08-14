@@ -58,7 +58,7 @@ public class JwksTokenValidator implements OAuthTokenValidator {
   public void initialize(Config config) {
     this.jwksUri = config.get(OAuthConfig.JWKS_URI);
     this.expectedIssuer = config.get(OAuthConfig.AUTHORITY);
-    this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELD);
+    this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
 
     LOG.info("Initializing JWKS token validator");

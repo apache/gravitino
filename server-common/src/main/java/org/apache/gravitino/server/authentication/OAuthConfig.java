@@ -129,8 +129,8 @@ public interface OAuthConfig {
           .stringConf()
           .create();
 
-  ConfigEntry<List<String>> PRINCIPAL_FIELD =
-      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalField")
+  ConfigEntry<List<String>> PRINCIPAL_FIELDS =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "principalFields")
           .doc(
               "JWT claim field(s) to use as principal identity. Comma-separated list for fallback in order (e.g., 'preferred_username,email,sub').")
           .version(ConfigConstants.VERSION_1_0_0)

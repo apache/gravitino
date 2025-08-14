@@ -75,7 +75,7 @@ public class TestJwksTokenValidator {
     Map<String, String> properties = new HashMap<>();
     properties.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
     properties.put("gravitino.authenticator.oauth.authority", "https://login.microsoftonline.com");
-    properties.put("gravitino.authenticator.oauth.principalField", "sub");
+    properties.put("gravitino.authenticator.oauth.principalFields", "sub");
     properties.put("gravitino.authenticator.oauth.allowSkewSecs", "60");
 
     validator.initialize(createConfig(properties));
@@ -117,7 +117,7 @@ public class TestJwksTokenValidator {
   }
 
   @Test
-  public void testCustomPrincipalField() throws Exception {
+  public void testCustomPrincipalFields() throws Exception {
     // Generate a test RSA key pair
     RSAKey rsaKey =
         new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
@@ -162,7 +162,7 @@ public class TestJwksTokenValidator {
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
       config.put(
-          "gravitino.authenticator.oauth.principalField",
+          "gravitino.authenticator.oauth.principalFields",
           "client_id"); // Use client_id instead of default 'sub'
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
@@ -221,7 +221,7 @@ public class TestJwksTokenValidator {
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
       config.put(
-          "gravitino.authenticator.oauth.principalField",
+          "gravitino.authenticator.oauth.principalFields",
           "non_existent_field,email"); // Should fall back to email since first field doesn't exist
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
@@ -278,7 +278,7 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.principalField", "sub");
+      config.put("gravitino.authenticator.oauth.principalFields", "sub");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "60");
 
       validator.initialize(createConfig(config));
@@ -318,7 +318,7 @@ public class TestJwksTokenValidator {
     Map<String, String> properties = new HashMap<>();
     properties.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
     properties.put("gravitino.authenticator.oauth.authority", "https://login.microsoftonline.com");
-    properties.put("gravitino.authenticator.oauth.principalField", "custom_field");
+    properties.put("gravitino.authenticator.oauth.principalFields", "custom_field");
     properties.put("gravitino.authenticator.oauth.allowSkewSecs", "300");
 
     validator.initialize(createConfig(properties));
