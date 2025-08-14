@@ -20,23 +20,15 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
-import static org.apache.gravitino.Entity.EntityType.FILESET;
-import static org.apache.gravitino.Entity.EntityType.MODEL;
-import static org.apache.gravitino.Entity.EntityType.STATISTIC;
-import static org.apache.gravitino.Entity.EntityType.TABLE;
-import static org.apache.gravitino.Entity.EntityType.TOPIC;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -45,7 +37,6 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -489,6 +480,83 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public int batchDeleteInNamespace(
+      Namespace namespace,
+      Entity.EntityType namespaceEntityType,
+      List<String> names,
+      Entity.EntityType entityType,
+      boolean cascade)
+      throws IOException {
+    switch (entityType) {
+      case STATISTIC:
+        return StatisticMetaService.getInstance()
+            .batchDeleteStatisticPOs(
+                NameIdentifier.parse(namespace.toString()), namespaceEntityType, names);
+      default:
+        throw new IllegalArgumentException(
+            String.format("Batch delete is not supported for entity type %s", entityType.name()));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    if (entities.isEmpty()) {
+      return;
+    }
+
+    Preconditions.checkArgument(
+        1 == entities.stream().collect(Collectors.groupingBy(Entity::type)).size(),
+        "All entities must be of the same type for batchPut operation.");
+    Entity.EntityType entityType = entities.get(0).type();
+
+    switch (entityType) {
+      case STATISTIC:
+        Preconditions.checkArgument(overwritten, "Batch put for statistics must be overwritten.");
+        List<StatisticEntity> statisticEntities =
+            entities.stream().map(e -> (StatisticEntity) e).collect(Collectors.toList());
+        Preconditions.checkArgument(
+            1 == entities.stream().collect(Collectors.groupingBy(HasIdentifier::namespace)).size(),
+            "All entities must be in the same namespace for batchPut operation.");
+        Preconditions.checkArgument(
+            1
+                == statisticEntities.stream()
+                    .collect(Collectors.groupingBy(StatisticEntity::parentEntityType))
+                    .size(),
+            "All entities must have the same parent entity type for batchPut operation.");
+
+        StatisticMetaService.getInstance()
+            .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+                statisticEntities,
+                NameIdentifier.parse(statisticEntities.get(0).namespace().toString()),
+                statisticEntities.get(0).parentEntityType());
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Batch put is not supported for entity type %s", entityType.name()));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace,
+      Entity.EntityType namespaceEntityTYpe,
+      Class<E> type,
+      Entity.EntityType entityType)
+      throws IOException {
+    switch (entityType) {
+      case STATISTIC:
+        return (List<E>)
+            StatisticMetaService.getInstance()
+                .listStatisticsByEntity(
+                    NameIdentifier.of(namespace.toString()), namespaceEntityTYpe);
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the entity type %s for list operation", entityType));
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
@@ -538,16 +606,6 @@ public class JDBCBackend implements RelationalBackend {
                   .listPoliciesForMetadataObject(nameIdentifier, identType);
         }
 
-      case METADATA_OBJECT_STAT_REL:
-        Set<Entity.EntityType> allowTypes = Sets.newHashSet(FILESET, TABLE, TOPIC, MODEL);
-
-        if (allowTypes.contains(identType)) {
-          return (List<E>)
-              StatisticMetaService.getInstance().listStatisticsByEntity(nameIdentifier, identType);
-        } else {
-          throw new IllegalArgumentException(
-              String.format("METADATA_OBJECT_STAT_REL doesn't support type %s", identType.name()));
-        }
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -586,101 +644,6 @@ public class JDBCBackend implements RelationalBackend {
             PolicyMetaService.getInstance()
                 .associatePoliciesWithMetadataObject(
                     srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
-      default:
-        throw new IllegalArgumentException(
-            String.format("Doesn't support the relation type %s", relType));
-    }
-  }
-
-  @Override
-  public int deleteEntitiesAndRelations(
-      Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
-      throws IOException {
-    switch (relType) {
-      case METADATA_OBJECT_STAT_REL:
-        Preconditions.checkArgument(
-            deleteVertexType == Relation.VertexType.DESTINATION,
-            "Only supports to delete relations of destination vertex");
-
-        Map<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> groupedRelations =
-            relations.stream().collect(Collectors.groupingBy(Relation::getSourceVertex));
-
-        if (groupedRelations.isEmpty()) {
-          return 0; // No relations to delete.
-        }
-
-        Preconditions.checkArgument(
-            groupedRelations.size() == 1,
-            "The relations must have the same source identifier and type, but got %s groups",
-            groupedRelations.size());
-
-        Map.Entry<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> entry =
-            groupedRelations.entrySet().iterator().next();
-        List<String> statsToDelete =
-            entry.getValue().stream()
-                .map(relation -> relation.getDestIdent().name())
-                .collect(Collectors.toList());
-
-        entry
-            .getValue()
-            .forEach(
-                relation ->
-                    Preconditions.checkArgument(
-                        relation.getDestType() == STATISTIC,
-                        "The destination type of relation must be STATISTIC, but got %s",
-                        relation.getDestType()));
-
-        return StatisticMetaService.getInstance()
-            .batchDeleteStatisticPOs(
-                entry.getKey().getLeft(), entry.getKey().getRight(), statsToDelete);
-      default:
-        throw new IllegalArgumentException(
-            String.format("Doesn't support the relation type %s", relType));
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<Entity.RelationalEntity<E>> entities, boolean overwrite)
-      throws IOException {
-    switch (relType) {
-      case METADATA_OBJECT_STAT_REL:
-        Preconditions.checkArgument(
-            overwrite, "The overwrite must be true for metadata object stats relation");
-
-        StatisticMetaService metaService = StatisticMetaService.getInstance();
-        List<StatisticEntity> statisticEntities = Lists.newArrayList();
-
-        Set<NameIdentifier> relatedIdents = Sets.newHashSet();
-        Set<Entity.EntityType> relatedEntityTypes = Sets.newHashSet();
-
-        for (Entity.RelationalEntity<E> relEntity : entities) {
-          Preconditions.checkArgument(
-              relEntity.relatedNameIdentifiers().size() == 1,
-              "Each entity must have exactly one related identifier");
-          NameIdentifier relatedIdent = relEntity.relatedNameIdentifiers().get(0);
-          relatedIdents.add(relatedIdent);
-          relatedEntityTypes.add(relEntity.relatedEntityType());
-          Preconditions.checkArgument(
-              relEntity.entity() instanceof StatisticEntity,
-              "The entity must be a StatisticEntity");
-          statisticEntities.add((StatisticEntity) relEntity.entity());
-        }
-
-        Preconditions.checkArgument(
-            relatedIdents.size() == 1,
-            "All entities must have the same related identifier, but got %s",
-            relatedIdents.size());
-
-        Preconditions.checkArgument(
-            relatedEntityTypes.size() == 1,
-            "All entities must have the same related entity type, but got %s",
-            relatedEntityTypes.size());
-
-        Entity.EntityType type = relatedEntityTypes.iterator().next();
-        metaService.batchInsertStatisticPOsOnDuplicateKeyUpdate(
-            statisticEntities, relatedIdents.iterator().next(), type);
-        return;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

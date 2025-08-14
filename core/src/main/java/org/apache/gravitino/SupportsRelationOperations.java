@@ -150,36 +150,4 @@ public interface SupportsRelationOperations {
     throw new UnsupportedOperationException(
         "updateEntityRelations is not supported by this implementation");
   }
-
-  /**
-   * Inserts a list of entities and their associated relations into the storage.
-   *
-   * @param <E> The type of entities being inserted, which must extend Entity and implement
-   *     HasIdentifier.
-   * @param relType The type of relation to be established between the entities.
-   * @param entities The list of entities to be inserted along with their relations. Each entity has
-   *     the entity, vertex type in the relation, related entity name identifiers, and related
-   *     entity type
-   * @param overwrite If true, existing relations will be overwritten; if false, existing relations
-   *     will throw an exception.
-   * @throws IOException If an error occurs during the insertion process, such as a storage issue.
-   */
-  <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<Entity.RelationalEntity<E>> entities, boolean overwrite)
-      throws IOException;
-
-  /**
-   * Deletes a list of relations and their associated entities based on vertex type.
-   *
-   * @param relType The type of relation to be deleted.
-   * @param deleteVertexType The vertex type in the relation need to be deleted, which can be either
-   *     SOURCE or DESTINATION.
-   * @param relations The list of relations to be deleted, which must implement the Relation
-   *     interface.
-   * @return The number of relations deleted.
-   * @throws IOException If an error occurs during the deletion process, such as a storage issue.
-   */
-  int deleteEntitiesAndRelations(
-      Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
-      throws IOException;
 }

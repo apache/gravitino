@@ -35,6 +35,8 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
       Field.required("name", String.class, "The name of the statistic entity.");
   public static final Field VALUE =
       Field.required("value", StatisticValue.class, "The value of the statistic entity.");
+  public static final Field PARENT_ENTITY_TYPE =
+      Field.required("parent_entity_type", EntityType.class, "The type of the parent entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the statistic entity.");
 
@@ -43,6 +45,7 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
   private StatisticValue<?> value;
   private AuditInfo auditInfo;
   private Namespace namespace;
+  private EntityType parentEntityType;
 
   @Override
   public Audit auditInfo() {
@@ -56,6 +59,7 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     fields.put(NAME, name);
     fields.put(VALUE, value);
     fields.put(AUDIT_INFO, auditInfo);
+    fields.put(PARENT_ENTITY_TYPE, parentEntityType);
     return fields;
   }
 
@@ -81,6 +85,10 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
 
   public StatisticValue<?> value() {
     return value;
+  }
+
+  public EntityType parentEntityType() {
+    return parentEntityType;
   }
 
   public static Builder builder() {
@@ -116,6 +124,11 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
 
     public Builder withNamespace(Namespace namespace) {
       statisticEntity.namespace = namespace;
+      return this;
+    }
+
+    public Builder withParentEntityType(EntityType parentEntityType) {
+      statisticEntity.parentEntityType = parentEntityType;
       return this;
     }
 

@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +34,6 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.EntityCache;
@@ -264,25 +262,30 @@ public class RelationalEntityStore
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> void insertEntitiesAndRelations(
-      Type relType, List<Entity.RelationalEntity<E>> relationalEntities, boolean overwrite)
+  public int batchDeleteInNamespace(
+      Namespace namespace,
+      Entity.EntityType namespaceEntityType,
+      List<String> names,
+      Entity.EntityType entityType,
+      boolean cascade)
       throws IOException {
-
-    List<Relation> relations = Lists.newArrayList();
-    for (Entity.RelationalEntity<E> relationalEntity : relationalEntities) {
-      relations.addAll(relationalEntity.toRelations());
-    }
-    cache.invalidate(relType, relations);
-
-    backend.insertEntitiesAndRelations(relType, relationalEntities, overwrite);
+    return backend.batchDeleteInNamespace(
+        namespace, namespaceEntityType, names, entityType, cascade);
   }
 
   @Override
-  public int deleteEntitiesAndRelations(
-      Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
-      throws IOException {
-    cache.invalidate(relType, relations);
+  public <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    backend.batchPut(e, overwritten);
+  }
 
-    return backend.deleteEntitiesAndRelations(relType, deleteVertexType, relations);
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace,
+      Entity.EntityType namespaceEntityType,
+      Class<E> type,
+      Entity.EntityType entityType)
+      throws IOException {
+    return backend.list(namespace, namespaceEntityType, type, entityType);
   }
 }

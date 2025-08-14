@@ -190,6 +190,28 @@ public interface EntityStore extends Closeable {
    */
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
 
+  default int batchDeleteInNamespace(
+      Namespace namespace,
+      EntityType namspaceEntityType,
+      List<String> names,
+      EntityType entityType,
+      boolean cascade)
+      throws IOException {
+    throw new UnsupportedOperationException("batch delete is not supported");
+  }
+
+  default <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    throw new UnsupportedOperationException("batch put is not supported");
+  }
+
+  default <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, EntityType namespaceEntityTYpe, Class<E> type, EntityType entityType)
+      throws IOException {
+    throw new UnsupportedOperationException(
+        "list is not supported when specifying namespace entity type");
+  }
+
   /**
    * Execute the specified {@link Executable} in a transaction.
    *

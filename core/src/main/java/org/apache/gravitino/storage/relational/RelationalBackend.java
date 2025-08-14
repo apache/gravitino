@@ -126,6 +126,24 @@ public interface RelationalBackend
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException;
 
+  int batchDeleteInNamespace(
+      Namespace namespace,
+      Entity.EntityType namespaceEntityType,
+      List<String> names,
+      Entity.EntityType entityType,
+      boolean cascade)
+      throws IOException;
+
+  <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException;
+
+  <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace,
+      Entity.EntityType namespaceEntityTYpe,
+      Class<E> type,
+      Entity.EntityType entityType)
+      throws IOException;
+
   /**
    * Permanently deletes the legacy data that has been marked as deleted before the given legacy
    * timeline.

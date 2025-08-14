@@ -1225,6 +1225,7 @@ public class TestPOConverters {
                 NameIdentifierUtil.ofStatistic(
                         NameIdentifierUtil.ofTable("test", "test", "test", "test"), "test")
                     .namespace())
+            .withParentEntityType(Entity.EntityType.TABLE)
             .withValue(StatisticValues.stringValue("test"))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build())

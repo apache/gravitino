@@ -30,8 +30,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.Relation;
-import org.apache.gravitino.RelationalEntityHelper;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -43,7 +41,6 @@ import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,7 +102,7 @@ public class StatisticManager {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
-      List<Entity.RelationalEntity<StatisticEntity>> relationalEntities = Lists.newArrayList();
+      List<StatisticEntity> statisticEntities = Lists.newArrayList();
       for (Map.Entry<String, StatisticValue<?>> entry : statistics.entrySet()) {
         String name = entry.getKey();
         StatisticValue<?> value = entry.getValue();
@@ -116,6 +113,7 @@ public class StatisticManager {
                 .withName(name)
                 .withValue(value)
                 .withNamespace(Namespace.fromString(identifier.toString()))
+                .withParentEntityType(type)
                 .withAuditInfo(
                     AuditInfo.builder()
                         .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -124,22 +122,14 @@ public class StatisticManager {
                         .withLastModifiedTime(Instant.now())
                         .build())
                 .build();
-        Entity.RelationalEntity<StatisticEntity> relationalEntity =
-            RelationalEntityHelper.of(
-                statistic, Relation.VertexType.DESTINATION, Lists.newArrayList(identifier), type);
-        relationalEntities.add(relationalEntity);
+        statisticEntities.add(statistic);
       }
       TreeLockUtils.doWithTreeLock(
           identifier,
           LockType.WRITE,
           (Executable<Void, IOException>)
               () -> {
-                store
-                    .relationOperations()
-                    .insertEntitiesAndRelations(
-                        SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
-                        relationalEntities,
-                        true);
+                store.batchPut(statisticEntities, true);
                 return null;
               });
 
@@ -163,23 +153,15 @@ public class StatisticManager {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
-      List<Relation> relations = Lists.newArrayList();
-      for (String statisticName : statistics) {
-        NameIdentifier statIdent = NameIdentifierUtil.ofStatistic(identifier, statisticName);
-        relations.add(new Relation(identifier, type, statIdent, Entity.EntityType.STATISTIC));
-      }
+      Namespace namespace = Namespace.fromString(identifier.toString());
 
       int deleteCount =
           TreeLockUtils.doWithTreeLock(
               identifier,
               LockType.WRITE,
               () ->
-                  store
-                      .relationOperations()
-                      .deleteEntitiesAndRelations(
-                          SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL,
-                          Relation.VertexType.DESTINATION,
-                          relations));
+                  store.batchDeleteInNamespace(
+                      namespace, type, statistics, Entity.EntityType.STATISTIC, true));
       // If deleteCount is 0, it means that the statistics were not found.
       return deleteCount != 0;
     } catch (NoSuchEntityException nse) {
