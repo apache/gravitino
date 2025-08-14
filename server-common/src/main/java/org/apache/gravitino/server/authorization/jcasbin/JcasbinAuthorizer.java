@@ -44,6 +44,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.server.authorization.ThreadLocalAuthorizationCache;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -292,7 +293,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     private boolean authorizeInternal(
         Principal principal, String metalake, MetadataObject metadataObject, String privilege) {
       String username = principal.getName();
-      return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
+      return ThreadLocalAuthorizationCache.authorize(
+          username,
+          metalake,
+          metadataObject,
+          privilege,
+          (context ->
+              loadPrivilegeAndAuthorize(
+                  context.getUsername(),
+                  context.getMetalake(),
+                  context.getMetadataObject(),
+                  context.getPrivilege())));
     }
 
     private boolean loadPrivilegeAndAuthorize(
@@ -337,12 +348,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Long userId,
       MetadataObject metadataObject,
       Long metadataObjectId) {
-    try {
-      loadRolePrivilege(metalake, username, userId);
-      loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
-    } catch (Exception e) {
-      LOG.error(e.getMessage(), e);
-    }
+    ThreadLocalAuthorizationCache.loadPrivilege(
+        () -> {
+          try {
+
+            loadRolePrivilege(metalake, username, userId);
+            loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
+          } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+          }
+        });
   }
 
   private void loadRolePrivilege(String metalake, String username, Long userId) throws IOException {
