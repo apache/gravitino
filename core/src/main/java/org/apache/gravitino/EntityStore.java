@@ -212,14 +212,14 @@ public interface EntityStore extends Closeable {
   /**
    * Batch put entities into the underlying storage.
    *
-   * @param e the list of entities to be stored
+   * @param entities the list of entities to be stored
    * @param overwritten if true, overwrite the existing entities, otherwise throw an
    * @param <E> the type of the entities
    * @throws IOException if the batch put operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
    *     false
    */
-  <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+  <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
 
   /**

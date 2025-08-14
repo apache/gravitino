@@ -274,9 +274,9 @@ public class RelationalEntityStore
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+  public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
-    backend.batchPut(e, overwritten);
+    backend.batchPut(entities, overwritten);
   }
 
   @Override

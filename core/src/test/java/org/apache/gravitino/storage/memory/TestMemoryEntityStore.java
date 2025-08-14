@@ -183,7 +183,7 @@ public class TestMemoryEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+    public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
         throws IOException, EntityAlreadyExistsException {
       throw new UnsupportedOperationException("Batch put is not supported in InMemoryEntityStore.");
     }
