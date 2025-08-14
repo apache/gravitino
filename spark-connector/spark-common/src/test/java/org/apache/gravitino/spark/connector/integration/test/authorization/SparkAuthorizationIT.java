@@ -53,6 +53,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -108,6 +109,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
     initSparkEnv();
   }
 
+  @AfterAll
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
     containerSuite.close();
