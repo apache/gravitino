@@ -36,6 +36,7 @@ jobs:
               - '**/*.java'
               - '**/*.kts'
               - '**/*.py'
+              - '!mcp-server/**'
               - '**/*.rs'
               - '**/resources/**'
               - '**/src/**'
