@@ -18,7 +18,6 @@
 package org.apache.gravitino.spark.connector.integration.test.authorization;
 
 import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_CATALOG_MYSQL_IT;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
@@ -55,6 +54,7 @@ import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -116,6 +116,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
     containerSuite.close();
     client.dropMetalake(METALAKE);
     setEnv("HADOOP_USER_NAME", AuthConstants.ANONYMOUS_USER);
+    normalUserSparkSession.close();
     super.stopIntegrationTest();
   }
 
@@ -246,13 +247,13 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   }
 
   private void assertEqualsRows(List<Row> exceptRows, List<Row> actualRows) {
-    assertEquals(exceptRows.size(), actualRows.size());
+    Assertions.assertEquals(exceptRows.size(), actualRows.size());
     for (int i = 0; i < exceptRows.size(); i++) {
       Row exceptRow = exceptRows.get(i);
       Row actualRow = actualRows.get(i);
-      assertEquals(exceptRow.length(), actualRow.length());
+      Assertions.assertEquals(exceptRow.length(), actualRow.length());
       for (int j = 0; j < exceptRow.length(); j++) {
-        assertEquals(exceptRow.get(j), actualRow.get(j));
+        Assertions.assertEquals(exceptRow.get(j), actualRow.get(j));
       }
     }
   }
