@@ -130,7 +130,7 @@ public class StatisticManager {
       }
       TreeLockUtils.doWithTreeLock(
           identifier,
-          LockType.READ,
+          LockType.WRITE,
           () ->
               store
                   .relationOperations()
