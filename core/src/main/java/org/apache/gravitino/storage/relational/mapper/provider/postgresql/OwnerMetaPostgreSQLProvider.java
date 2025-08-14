@@ -55,7 +55,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + OWNER_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at =0";
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   @Override
