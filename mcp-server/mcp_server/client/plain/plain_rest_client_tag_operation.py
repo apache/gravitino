@@ -15,9 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.client.plain.utils import extract_content_from_response
 from mcp_server.client.tag_operation import TagOperation
-from mcp_server.core.exception import GravitinoException
 
 
 class PlainRESTClientTagOperation(TagOperation):

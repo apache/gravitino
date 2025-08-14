@@ -18,7 +18,7 @@
 import json
 import logging
 
-from mcp_server.core.exception import GravitinoException
+from mcp_server.client.plain.exception import GravitinoException
 
 
 def extract_content_from_response(response, field: str, default="") -> str:
