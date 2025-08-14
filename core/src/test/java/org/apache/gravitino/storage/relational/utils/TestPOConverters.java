@@ -784,14 +784,14 @@ public class TestPOConverters {
     PolicyContent content = PolicyContents.custom(null, supportedObjectTypes, null);
     PolicyVersionPO policyVersionPO =
         createPolicyVersionPO(1L, 1L, 1L, "test comment", true, content);
-    PolicyPO policyPO = createPolicyPO(1L, "test", "my_type", 1L, policyVersionPO);
+    PolicyPO policyPO = createPolicyPO(1L, "test", "custom", 1L, policyVersionPO);
 
     PolicyEntity expectedPolicy =
         createPolicy(
             1L,
             "test",
             NamespaceUtil.ofPolicy("test_metalake"),
-            "my_type",
+            "custom",
             "test comment",
             true,
             content);

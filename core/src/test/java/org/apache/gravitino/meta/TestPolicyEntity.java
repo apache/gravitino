@@ -50,7 +50,7 @@ public class TestPolicyEntity {
             .withName("test")
             .withNamespace(namespace)
             .withComment("test comment")
-            .withPolicyType("my_compaction")
+            .withPolicyType("custom")
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(auditInfo)
@@ -60,7 +60,7 @@ public class TestPolicyEntity {
     Assertions.assertEquals("test", policyEntity.name());
     Assertions.assertEquals(namespace, policyEntity.namespace());
     Assertions.assertEquals("test comment", policyEntity.comment());
-    Assertions.assertEquals("my_compaction", policyEntity.policyType());
+    Assertions.assertEquals("custom", policyEntity.policyType());
     Assertions.assertFalse(policyEntity.enabled());
     Assertions.assertEquals(content, policyEntity.content());
     Assertions.assertEquals(auditInfo, policyEntity.auditInfo());
@@ -70,7 +70,7 @@ public class TestPolicyEntity {
             .withId(1L)
             .withName("test")
             .withNamespace(namespace)
-            .withPolicyType("my_compaction")
+            .withPolicyType("custom")
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(auditInfo)
@@ -99,7 +99,7 @@ public class TestPolicyEntity {
                 .withId(1L)
                 .withName("test")
                 .withNamespace(Namespace.of("m1", "c1", "s1"))
-                .withPolicyType("my_compaction")
+                .withPolicyType("custom")
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());
@@ -111,7 +111,7 @@ public class TestPolicyEntity {
                 .withId(1L)
                 .withName("test")
                 .withNamespace(Namespace.of("m1", "c1", "s1"))
-                .withPolicyType("my_compaction")
+                .withPolicyType("custom")
                 .withAuditInfo(
                     AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
                 .build());

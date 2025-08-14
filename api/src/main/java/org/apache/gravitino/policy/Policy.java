@@ -44,8 +44,8 @@ public interface Policy extends Auditable {
     //    PolicyContent.DataCompactionContent.class)
 
     /**
-     * Custom policy type. "custom" is a dummy type for custom policies, all non-built-in types are
-     * custom types.
+     * Custom policy type. "custom" is a fixed string that indicates the policy is a non-built-in
+     * type.
      */
     CUSTOM("custom", PolicyContents.CustomContent.class);
 
@@ -76,8 +76,10 @@ public interface Policy extends Auditable {
             String.format("Unknown built-in policy type: %s", policyType));
       }
 
-      // If the policy type is not a built-in type, it is a custom type.
-      return CUSTOM;
+      throw new IllegalArgumentException(
+          String.format(
+              "Unknown policy type: %s, it should start with '%s' or be 'custom'",
+              policyType, BUILT_IN_TYPE_PREFIX));
     }
 
     /**

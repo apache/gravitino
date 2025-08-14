@@ -192,7 +192,7 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType("custom")
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
@@ -202,7 +202,7 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy2")
-            .withPolicyType("my_compaction")
+            .withPolicyType("custom")
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
@@ -258,16 +258,16 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType("custom")
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
-    when(policyManager.createPolicy(metalake, "policy1", "my_compaction", null, false, content))
+    when(policyManager.createPolicy(metalake, "policy1", "custom", null, false, content))
         .thenReturn(policy1);
 
     PolicyCreateRequest request =
-        new PolicyCreateRequest("policy1", "my_compaction", null, false, toDTO(content));
+        new PolicyCreateRequest("policy1", "custom", null, false, toDTO(content));
     Response resp =
         target(policyPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -330,7 +330,7 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType("custom")
             .withEnabled(false)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
@@ -400,7 +400,7 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("new_policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType("custom")
             .withComment("new policy1 comment")
             .withEnabled(false)
             .withContent(content)
@@ -411,7 +411,7 @@ public class TestPolicyOperations extends JerseyTest {
         new PolicyChange[] {
           PolicyChange.rename("new_policy1"),
           PolicyChange.updateComment("new policy1 comment"),
-          PolicyChange.updateContent("my_compaction", content)
+          PolicyChange.updateContent("custom", content)
         };
 
     when(policyManager.alterPolicy(metalake, "policy1", changes)).thenReturn(newPolicy);
@@ -420,7 +420,7 @@ public class TestPolicyOperations extends JerseyTest {
         new PolicyUpdateRequest[] {
           new PolicyUpdateRequest.RenamePolicyRequest("new_policy1"),
           new PolicyUpdateRequest.UpdatePolicyCommentRequest("new policy1 comment"),
-          new PolicyUpdateRequest.UpdatePolicyContentRequest("my_compaction", toDTO(content))
+          new PolicyUpdateRequest.UpdatePolicyContentRequest("custom", toDTO(content))
         };
     PolicyUpdatesRequest request = new PolicyUpdatesRequest(Lists.newArrayList(requests));
     Response resp =

@@ -1560,7 +1560,7 @@ public class TestJDBCBackend {
         .withId(id)
         .withNamespace(ns)
         .withName(name)
-        .withPolicyType("test")
+        .withPolicyType("custom")
         .withComment("")
         .withEnabled(true)
         .withContent(

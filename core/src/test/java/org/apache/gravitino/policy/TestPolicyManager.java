@@ -228,7 +228,7 @@ public class TestPolicyManager {
     Policy policy = createCustomPolicy(METALAKE, policyName, content);
 
     Assertions.assertEquals(policyName, policy.name());
-    Assertions.assertEquals("test", policy.policyType());
+    Assertions.assertEquals("custom", policy.policyType());
     Assertions.assertNull(policy.comment());
     Assertions.assertTrue(policy.enabled());
     Assertions.assertNotNull(policy.content());
@@ -316,7 +316,7 @@ public class TestPolicyManager {
     Policy renamedPolicy = policyManager.alterPolicy(METALAKE, policyName, rename);
 
     Assertions.assertEquals(newName, renamedPolicy.name());
-    Assertions.assertEquals("test", renamedPolicy.policyType());
+    Assertions.assertEquals("custom", renamedPolicy.policyType());
     Assertions.assertNull(renamedPolicy.comment());
     Assertions.assertTrue(renamedPolicy.enabled());
     Assertions.assertEquals(content, renamedPolicy.content());
@@ -330,7 +330,7 @@ public class TestPolicyManager {
     // test update content
     Map<String, Object> newCustomRules = ImmutableMap.of("rule3", 1, "rule4", "value2");
     PolicyContent newContent = PolicyContents.custom(newCustomRules, SUPPORTS_OBJECT_TYPES, null);
-    PolicyChange contentChange = PolicyChange.updateContent("test", newContent);
+    PolicyChange contentChange = PolicyChange.updateContent("custom", newContent);
     Policy updatedContentPolicy =
         policyManager.alterPolicy(METALAKE, changedCommentPolicy.name(), contentChange);
     Assertions.assertEquals(newContent, updatedContentPolicy.content());
@@ -342,7 +342,7 @@ public class TestPolicyManager {
             IllegalArgumentException.class,
             () -> policyManager.alterPolicy(METALAKE, updatedContentPolicy.name(), typeChange));
     Assertions.assertEquals(
-        "Policy type mismatch: expected test but got mismatch_type", e.getMessage());
+        "Policy type mismatch: expected custom but got mismatch_type", e.getMessage());
 
     // test disable policy
     Assertions.assertDoesNotThrow(
@@ -725,6 +725,7 @@ public class TestPolicyManager {
 
   private Policy createCustomPolicy(
       String metalakeName, String policyName, PolicyContent policyContent) {
-    return policyManager.createPolicy(metalakeName, policyName, "test", null, true, policyContent);
+    return policyManager.createPolicy(
+        metalakeName, policyName, "custom", null, true, policyContent);
   }
 }
