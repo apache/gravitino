@@ -40,6 +40,7 @@ public class GravitinoCatalogStoreFactoryOptions {
           .stringType()
           .noDefaultValue()
           .withDescription("The name of Gravitino metalake");
+
   public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
       ConfigOptions.key("gravitino.client")
           .mapType()

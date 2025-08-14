@@ -38,9 +38,9 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 | spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       | 0.5.1         |
 | spark.sql.gravitino.client.              | string | (none)        | The configuration key prefix for the Gravitino client config.                                   | No       | 1.0.0         |
 
-To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties undergo automatic transformation: the prefix is replaced with `gravitino.client.` and passed to the `GravitinoClient`.
+To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
 
-**Example:** Setting `spark.sql.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the `GravitinoClient`.
+**Example:** Setting `spark.sql.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
 

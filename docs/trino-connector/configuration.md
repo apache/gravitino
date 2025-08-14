@@ -16,6 +16,6 @@ license: "This software is licensed under the Apache License version 2."
 | gravitino.trino.skip-version-validation     | boolean | false                 | The `gravitino.trino.skip-version-validation` defines whether skip Trino version validation or not. Note that Gravitino only supports Trino which version between 435 and 439, other versions of Trino have not undergone thorough testing, so there may be compatiablity problem if true.                          | No       | 1.0.0         |
 | gravitino.client.                           | string  | (none)                | The configuration key prefix for the Gravitino client config.                                                                                                                                                                                                                                                       | No       | 1.0.0         |
 
-To configure the Gravitino client, use properties prefixed with `gravitino.client.`. These properties will directly passed to the `GravitinoClient`.
+To configure the Gravitino client, use properties prefixed with `gravitino.client.`. These properties will directly passed to the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
