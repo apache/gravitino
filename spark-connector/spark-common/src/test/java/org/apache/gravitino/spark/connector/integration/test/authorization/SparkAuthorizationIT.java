@@ -24,7 +24,6 @@ import static org.junit.Assert.assertThrows;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -111,6 +110,7 @@ public abstract class SparkAuthorizationIT extends BaseIT {
 
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
+    containerSuite.close();
     client.dropMetalake(METALAKE);
     super.stopIntegrationTest();
   }
