@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from contextlib import suppress
 from typing import Any, Dict, List, cast
 
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
@@ -81,12 +82,9 @@ class SerdesUtils(SerdesUtilsBase):
             data.get(cls.PARTITION_TYPE) is not None,
             f"Partition must have a type field, but found: {data}",
         )
-        try:
+        dto_type = None
+        with suppress(ValueError):
             dto_type = PartitionDTO.Type(data[cls.PARTITION_TYPE])
-        except ValueError as ve:
-            raise IllegalArgumentException(
-                f"Unknown partition type: {data[cls.PARTITION_TYPE]}"
-            ) from ve
 
         if dto_type is PartitionDTO.Type.IDENTITY:
             Precondition.check_argument(
@@ -132,3 +130,39 @@ class SerdesUtils(SerdesUtilsBase):
                 ],
                 properties=data.get(cls.PARTITION_PROPERTIES, {}),
             )
+
+        if dto_type is PartitionDTO.Type.RANGE:
+            Precondition.check_argument(
+                cls.PARTITION_NAME in data,
+                f"Range partition must have name, but found: {data}",
+            )
+            Precondition.check_argument(
+                cls.RANGE_PARTITION_UPPER in data,
+                f"Range partition must have upper, but found: {data}",
+            )
+            Precondition.check_argument(
+                cls.RANGE_PARTITION_LOWER in data,
+                f"Range partition must have lower, but found: {data}",
+            )
+            upper = cast(
+                LiteralDTO,
+                ExpressionsSerdesUtils.read_function_arg(
+                    data[cls.RANGE_PARTITION_UPPER]
+                ),
+            )
+            lower = cast(
+                LiteralDTO,
+                ExpressionsSerdesUtils.read_function_arg(
+                    data[cls.RANGE_PARTITION_LOWER]
+                ),
+            )
+            return RangePartitionDTO(
+                name=data[cls.PARTITION_NAME],
+                upper=upper,
+                lower=lower,
+                properties=data.get(cls.PARTITION_PROPERTIES, {}),
+            )
+
+        raise IllegalArgumentException(
+            f"Unknown partition type: {data[cls.PARTITION_TYPE]}"
+        )
