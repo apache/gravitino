@@ -107,7 +107,7 @@ public class Relation {
     if (this == obj) {
       return true;
     }
-    if (obj == null || getClass() != obj.getClass()) {
+    if (!(obj instanceof Relation)) {
       return false;
     }
     Relation other = (Relation) obj;
