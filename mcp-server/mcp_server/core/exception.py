@@ -15,23 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import json
-import logging
 
-from mcp_server.core.exception import GravitinoException
+class GravitinoException(Exception):
+    """Custom exception for Gravitino-related errors."""
 
-
-def extract_content_from_response(response, field: str, default="") -> str:
-    response_json = response.json()
-    _handle_gravitino_exception(response_json)
-    return json.dumps(response_json.get(field, default))
-
-
-def _handle_gravitino_exception(response: dict):
-    error_code = response.get("code", 0)
-    if error_code != 0:
-        t = response.get("type", "")
-        message = response.get("message", "")
-        error_message = f"Error code: {error_code}, Error type: {t}, Error message: {message}"
-        logging.warning(error_message)
-        raise GravitinoException(error_message)
+    pass

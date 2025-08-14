@@ -86,6 +86,8 @@ class MockFilesetOperation(FilesetOperation):
     ) -> str:
         return "mock_fileset"
 
+    # pylint: disable=R0917
+    # This method has too many arguments, but it's a mock and we want to keep the signature similar to the real one.
     async def list_files_in_fileset(
         self,
         catalog_name: str,
@@ -141,15 +143,15 @@ class MockTagOperation(TagOperation):
         return "mock_tags"
 
     async def create_tag(
-        self, name: str, comment: str, properties: dict
+        self, tag_name: str, tag_comment: str, tag_properties: dict
     ) -> str:
-        return f"mock_tag_created: {name}"
+        return f"mock_tag_created: {tag_name}"
 
-    async def get_tag_by_name(self, name: str) -> str:
-        return f"mock_tag: {name}"
+    async def get_tag_by_name(self, tag_name: str) -> str:
+        return f"mock_tag: {tag_name}"
 
-    async def alter_tag(self, name: str, updates: list) -> str:
-        return f"mock_tag_altered: {name} with updates {updates}"
+    async def alter_tag(self, tag_name: str, updates: list) -> str:
+        return f"mock_tag_altered: {tag_name} with updates {updates}"
 
     async def delete_tag(self, name: str) -> str:
         return f"mock_tag_deleted: {name}"
