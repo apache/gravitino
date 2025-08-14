@@ -63,6 +63,7 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 
 :::caution
 You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-iceberg/libs` directory If you are using JDBC backend.
+If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
 
 #### S3

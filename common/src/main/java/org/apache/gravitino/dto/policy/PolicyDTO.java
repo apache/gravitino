@@ -22,14 +22,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import lombok.ToString;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.policy.Policy;
 
@@ -48,15 +44,6 @@ public class PolicyDTO implements Policy {
 
   @JsonProperty("enabled")
   private boolean enabled;
-
-  @JsonProperty("exclusive")
-  private boolean exclusive;
-
-  @JsonProperty("inheritable")
-  private boolean inheritable;
-
-  @JsonProperty("supportedObjectTypes")
-  private Set<MetadataObject.Type> supportedObjectTypes = Collections.emptySet();
 
   @JsonProperty("content")
   @JsonTypeInfo(
@@ -84,28 +71,16 @@ public class PolicyDTO implements Policy {
     if (!(o instanceof PolicyDTO)) return false;
     PolicyDTO policyDTO = (PolicyDTO) o;
     return enabled == policyDTO.enabled
-        && exclusive == policyDTO.exclusive
-        && inheritable == policyDTO.inheritable
         && Objects.equals(name, policyDTO.name)
         && Objects.equals(comment, policyDTO.comment)
         && Objects.equals(policyType, policyDTO.policyType)
-        && Objects.equals(supportedObjectTypes, policyDTO.supportedObjectTypes)
         && Objects.equals(content, policyDTO.content)
         && Objects.equals(audit, policyDTO.audit);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        name,
-        comment,
-        policyType,
-        enabled,
-        exclusive,
-        inheritable,
-        supportedObjectTypes,
-        content,
-        audit);
+    return Objects.hash(name, comment, policyType, enabled, content, audit);
   }
 
   /** @return a new builder for constructing a PolicyDTO. */
@@ -131,21 +106,6 @@ public class PolicyDTO implements Policy {
   @Override
   public boolean enabled() {
     return enabled;
-  }
-
-  @Override
-  public boolean exclusive() {
-    return exclusive;
-  }
-
-  @Override
-  public boolean inheritable() {
-    return inheritable;
-  }
-
-  @Override
-  public Set<MetadataObject.Type> supportedObjectTypes() {
-    return supportedObjectTypes;
   }
 
   @Override
@@ -216,39 +176,6 @@ public class PolicyDTO implements Policy {
     }
 
     /**
-     * Sets whether the policy is exclusive or not.
-     *
-     * @param exclusive Whether the policy is exclusive.
-     * @return The builder instance.
-     */
-    public Builder withExclusive(boolean exclusive) {
-      policyDTO.exclusive = exclusive;
-      return this;
-    }
-
-    /**
-     * Sets whether the policy is inheritable or not.
-     *
-     * @param inheritable Whether the policy is inheritable.
-     * @return The builder instance.
-     */
-    public Builder withInheritable(boolean inheritable) {
-      policyDTO.inheritable = inheritable;
-      return this;
-    }
-
-    /**
-     * Sets the set of supported metadata object types for the policy.
-     *
-     * @param supportedObjectTypes The set of supported metadata object types.
-     * @return The builder instance.
-     */
-    public Builder withSupportedObjectTypes(Set<MetadataObject.Type> supportedObjectTypes) {
-      policyDTO.supportedObjectTypes = supportedObjectTypes;
-      return this;
-    }
-
-    /**
      * Sets the content of the policy.
      *
      * @param content The content of the policy.
@@ -288,9 +215,6 @@ public class PolicyDTO implements Policy {
       Preconditions.checkArgument(
           StringUtils.isNotBlank(policyDTO.policyType), "policy type cannot be empty");
       Preconditions.checkArgument(policyDTO.content != null, "policy content cannot be null");
-      Preconditions.checkArgument(
-          CollectionUtils.isNotEmpty(policyDTO.supportedObjectTypes),
-          "supported objectTypes cannot be empty");
       policyDTO.content.validate();
       return policyDTO;
     }

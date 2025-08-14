@@ -290,6 +290,7 @@ If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to
 
 :::caution
 You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
+If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
 
 #### Custom backend configuration
