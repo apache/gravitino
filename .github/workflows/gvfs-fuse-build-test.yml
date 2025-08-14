@@ -22,25 +22,28 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**
-              - api/**
-              - bin/**
-              - catalogs/hadoop/**
-              - clients/filesystem-fuse/**
-              - common/**
-              - conf/**
-              - core/**
-              - dev/**
-              - gradle/**
-              - meta/**
-              - scripts/**
-              - server/**
-              - server-common/**
-              - build.gradle.kts
-              - gradle.properties
-              - gradlew
-              - setting.gradle.kts
-              - '!mcp-server/**'
+              included:
+                - .github/**
+                - api/**
+                - bin/**
+                - catalogs/hadoop/**
+                - clients/filesystem-fuse/**
+                - common/**
+                - conf/**
+                - core/**
+                - dev/**
+                - gradle/**
+                - meta/**
+                - scripts/**
+                - server/**
+                - server-common/**
+                - build.gradle.kts
+                - gradle.properties
+                - gradlew
+                - setting.gradle.kts
+              excluded:
+                - mcp-server/**
+
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 

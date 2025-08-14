@@ -21,31 +21,29 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**
-              - api/**
-              - bin/**
-              - catalogs/**
-              - clients/client-java/**
-              - clients/client-java-runtime/**
-              - clients/filesystem-hadoop3/**
-              - clients/cli/**
-              - common/**
-              - conf/**
-              - core/**
-              - dev/**
-              - gradle/**
-              - iceberg/**
-              - integration-test-common/**
-              - meta/**
-              - scripts/**
-              - server/**
-              - bundles/**
-              - server-common/**
-              - build.gradle.kts
-              - gradle.properties
-              - gradlew
-              - setting.gradle.kts
-                - '!mcp-server/**'
+              included:
+                - .github/**            
+                - api/**
+                - bin/**
+                - catalogs/**
+                - clients/client-java/**
+                - clients/client-java-runtime/**
+                - clients/filesystem-hadoop3/**
+                - clients/cli/**
+                - common/**
+                - conf/**
+                - core/**
+                - dev/**
+                - gradle/**
+                - iceberg/**
+                - integration-test-common/**
+                - meta/**
+                - scripts/**
+                - server/**
+                - bundles/**
+                - server-common/**
+              excluded:
+                - mcp-server/**
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 

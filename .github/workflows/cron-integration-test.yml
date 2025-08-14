@@ -20,7 +20,6 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**
               - api/**
               - bin/**
               - catalogs/**

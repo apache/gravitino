@@ -48,8 +48,7 @@ def load_tag_tool(mcp: FastMCP):
                 "creator": "anonymous",
                 "createTime": "2025-08-07T06:20:18.330570Z"
               },
-              "inherited": null,
-              "fullName": "tag1"
+              "inherited": null
             }
         """
         client = ctx.request_context.lifespan_context.rest_client()
