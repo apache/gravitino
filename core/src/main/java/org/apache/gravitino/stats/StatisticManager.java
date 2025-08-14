@@ -31,6 +31,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Relation;
+import org.apache.gravitino.RelationalEntityHelper;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -123,7 +124,7 @@ public class StatisticManager {
                         .build())
                 .build();
         Entity.RelationalEntity<StatisticEntity> relationalEntity =
-            Entity.RelationalEntity.of(
+            RelationalEntityHelper.of(
                 statistic, Relation.VertexType.DESTINATION, Lists.newArrayList(identifier), type);
         relationalEntities.add(relationalEntity);
       }
