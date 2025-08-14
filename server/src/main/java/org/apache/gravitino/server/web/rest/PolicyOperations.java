@@ -23,6 +23,7 @@ import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -49,6 +50,7 @@ import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
@@ -86,10 +88,10 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             if (verbose) {
-              Policy[] policies = policyDispatcher.listPolicyInfos(metalake);
+              PolicyEntity[] policies = policyDispatcher.listPolicyInfos(metalake);
               PolicyDTO[] policyDTOs =
                   Arrays.stream(policies)
-                      .map(p -> DTOConverters.toDTO(p, Optional.empty()))
+                      .map(p -> toDTO(p, Optional.empty()))
                       .toArray(PolicyDTO[]::new);
 
               LOG.info("List {} policies info under metalake: {}", policyDTOs.length, metalake);
@@ -121,29 +123,17 @@ public class PolicyOperations {
           httpRequest,
           () -> {
             request.validate();
-            Policy policy =
-                Policy.BuiltInType.fromPolicyType(request.getPolicyType())
-                        == Policy.BuiltInType.CUSTOM
-                    ? policyDispatcher.createPolicy(
-                        metalake,
-                        request.getName(),
-                        request.getPolicyType(),
-                        request.getComment(),
-                        request.getEnabled(),
-                        request.getExclusive(),
-                        request.getInheritable(),
-                        request.getSupportedObjectTypes(),
-                        fromDTO(request.getPolicyContent()))
-                    : policyDispatcher.createPolicy(
-                        metalake,
-                        request.getName(),
-                        request.getPolicyType(),
-                        request.getComment(),
-                        request.getEnabled(),
-                        fromDTO(request.getPolicyContent()));
+            PolicyEntity policy =
+                policyDispatcher.createPolicy(
+                    metalake,
+                    request.getName(),
+                    Policy.BuiltInType.fromPolicyType(request.getPolicyType()),
+                    request.getComment(),
+                    request.getEnabled(),
+                    fromDTO(request.getPolicyContent()));
 
             LOG.info("Created policy: {} under metalake: {}", policy.name(), metalake);
-            return Utils.ok(new PolicyResponse(DTOConverters.toDTO(policy, Optional.empty())));
+            return Utils.ok(new PolicyResponse(toDTO(policy, Optional.empty())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(
@@ -164,9 +154,9 @@ public class PolicyOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Policy policy = policyDispatcher.getPolicy(metalake, name);
+            PolicyEntity policy = policyDispatcher.getPolicy(metalake, name);
             LOG.info("Get policy: {} under metalake: {}", name, metalake);
-            return Utils.ok(new PolicyResponse(DTOConverters.toDTO(policy, Optional.empty())));
+            return Utils.ok(new PolicyResponse(toDTO(policy, Optional.empty())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(OperationType.GET, name, metalake, e);
@@ -194,10 +184,10 @@ public class PolicyOperations {
                 request.getUpdates().stream()
                     .map(PolicyUpdateRequest::policyChange)
                     .toArray(PolicyChange[]::new);
-            Policy policy = policyDispatcher.alterPolicy(metalake, name, changes);
+            PolicyEntity policy = policyDispatcher.alterPolicy(metalake, name, changes);
 
             LOG.info("Altered policy: {} under metalake: {}", name, metalake);
-            return Utils.ok(new PolicyResponse(DTOConverters.toDTO(policy, Optional.empty())));
+            return Utils.ok(new PolicyResponse(toDTO(policy, Optional.empty())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(OperationType.ALTER, name, metalake, e);
@@ -263,5 +253,20 @@ public class PolicyOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(OperationType.DELETE, name, metalake, e);
     }
+  }
+
+  private PolicyDTO toDTO(PolicyEntity policy, Optional<Boolean> inherited) {
+    PolicyDTO.Builder builder =
+        PolicyDTO.builder()
+            .withName(policy.name())
+            .withComment(policy.comment())
+            .withPolicyType(policy.policyType().name().toLowerCase(Locale.ROOT))
+            .withEnabled(policy.enabled())
+            .withContent(DTOConverters.toDTO(policy.content()))
+            .withInherited(inherited)
+            .withAudit(DTOConverters.toDTO(policy.auditInfo()))
+            .withInherited(inherited);
+
+    return builder.build();
   }
 }
