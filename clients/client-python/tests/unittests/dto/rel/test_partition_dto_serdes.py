@@ -277,6 +277,38 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                 data=invalid_data,
             )
 
+    def test_read_partition_invalid_range(self):
+        invalid_partition_name = {
+            SerdesUtils.PARTITION_TYPE: PartitionDTO.Type.RANGE.value
+        }
+        invalid_range_data_upper = {
+            SerdesUtils.PARTITION_TYPE: PartitionDTO.Type.RANGE.value,
+            SerdesUtils.PARTITION_NAME: "range_partition",
+        }
+        invalid_range_data_lower = {
+            SerdesUtils.PARTITION_TYPE: PartitionDTO.Type.RANGE.value,
+            SerdesUtils.PARTITION_NAME: "range_partition",
+            SerdesUtils.RANGE_PARTITION_UPPER: "upper",
+        }
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Range partition must have name",
+            SerdesUtils.read_partition,
+            data=invalid_partition_name,
+        )
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Range partition must have upper",
+            SerdesUtils.read_partition,
+            data=invalid_range_data_upper,
+        )
+        self.assertRaisesRegex(
+            IllegalArgumentException,
+            "Range partition must have lower",
+            SerdesUtils.read_partition,
+            data=invalid_range_data_lower,
+        )
+
     def test_read_partition_dto(self):
         for partition_dto_type, partition_dto in self.partition_dtos.items():
             with self.subTest(
@@ -296,4 +328,10 @@ class TestPartitionSerdesUtils(unittest.TestCase):
                 if partition_dto_type is PartitionDTO.Type.LIST:
                     dto = cast(ListPartitionDTO, partition_dto_read)
                     self.assertListEqual(partition_dto.lists(), dto.lists())
+                    self.assertEqual(partition_dto.properties(), dto.properties())
+
+                if partition_dto_type is PartitionDTO.Type.RANGE:
+                    dto = cast(RangePartitionDTO, partition_dto_read)
+                    self.assertEqual(partition_dto.lower(), dto.lower())
+                    self.assertEqual(partition_dto.upper(), dto.upper())
                     self.assertEqual(partition_dto.properties(), dto.properties())
