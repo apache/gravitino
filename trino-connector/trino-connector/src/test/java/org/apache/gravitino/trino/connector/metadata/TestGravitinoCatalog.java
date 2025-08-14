@@ -50,7 +50,7 @@ public class TestGravitinoCatalog {
   }
 
   @Test
-  public void testUnSupportedCatalog() throws Exception {
+  public void testUnSupportedCatalogType() throws Exception {
     String json = "\"xxxx\"";
     Catalog.Type t = ObjectMapperProvider.objectMapper().readValue(json, Catalog.Type.class);
     assertNull(t);
