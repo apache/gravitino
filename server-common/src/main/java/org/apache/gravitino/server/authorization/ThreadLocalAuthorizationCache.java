@@ -29,17 +29,30 @@ public class ThreadLocalAuthorizationCache {
 
   private ThreadLocalAuthorizationCache() {}
 
-  private static final ThreadLocal<Map<AuthorizationContext, Boolean>> threadCache =
+  /** Used to cache the results of metadata authorization. */
+  private static final ThreadLocal<Map<AuthorizationContext, Boolean>> allowAuthorizerThreadCache =
+      new ThreadLocal<>();
+
+  /** Used to cache the results of metadata authorization. */
+  private static final ThreadLocal<Map<AuthorizationContext, Boolean>> denyAuthorizerThreadCache =
       new ThreadLocal<>();
 
   /** Used to determine whether the privilege has already been loaded. */
   private static final ThreadLocal<Boolean> hasLoadedPrivilegeThreadLocal = new ThreadLocal<>();
 
   private static void start() {
-    threadCache.set(new HashMap<>());
+    allowAuthorizerThreadCache.set(new HashMap<>());
+    denyAuthorizerThreadCache.set(new HashMap<>());
     hasLoadedPrivilegeThreadLocal.set(false);
   }
 
+  /**
+   * Wrap the authorization method with this method to prevent threadlocal leakage.
+   *
+   * @param supplier authorization method
+   * @return authorization result
+   * @param <T> authorization method
+   */
   public static <T> T executeWithThreadCache(Supplier<T> supplier) {
     start();
     T result = supplier.get();
@@ -47,6 +60,11 @@ public class ThreadLocalAuthorizationCache {
     return result;
   }
 
+  /**
+   * Wrap with this method to avoid repeatedly loading permissions within a single request.
+   *
+   * @param runnable load privilege method
+   */
   public static void loadPrivilege(Runnable runnable) {
     Boolean hasLoadedPrivilege = hasLoadedPrivilegeThreadLocal.get();
     if (hasLoadedPrivilege != null && hasLoadedPrivilege) {
@@ -56,7 +74,17 @@ public class ThreadLocalAuthorizationCache {
     hasLoadedPrivilegeThreadLocal.set(true);
   }
 
-  public static boolean authorize(
+  /**
+   * check allow
+   *
+   * @param username username
+   * @param metalake metalake
+   * @param metadataObject metadata object
+   * @param privilege privilege
+   * @param authorizer authorizer
+   * @return authorization result
+   */
+  public static boolean authorizeAllow(
       String username,
       String metalake,
       MetadataObject metadataObject,
@@ -64,7 +92,34 @@ public class ThreadLocalAuthorizationCache {
       Function<AuthorizationContext, Boolean> authorizer) {
     AuthorizationContext context =
         new AuthorizationContext(username, metalake, metadataObject, privilege);
-    Map<AuthorizationContext, Boolean> authorizationContextBooleanMap = threadCache.get();
+    Map<AuthorizationContext, Boolean> authorizationContextBooleanMap =
+        allowAuthorizerThreadCache.get();
+    if (authorizationContextBooleanMap == null) {
+      return authorizer.apply(context);
+    }
+    return authorizationContextBooleanMap.computeIfAbsent(context, authorizer);
+  }
+
+  /**
+   * check deny
+   *
+   * @param username username
+   * @param metalake metalake
+   * @param metadataObject metadata object
+   * @param privilege privilege
+   * @param authorizer authorizer
+   * @return authorization result
+   */
+  public static boolean authorizeDeny(
+      String username,
+      String metalake,
+      MetadataObject metadataObject,
+      String privilege,
+      Function<AuthorizationContext, Boolean> authorizer) {
+    AuthorizationContext context =
+        new AuthorizationContext(username, metalake, metadataObject, privilege);
+    Map<AuthorizationContext, Boolean> authorizationContextBooleanMap =
+        denyAuthorizerThreadCache.get();
     if (authorizationContextBooleanMap == null) {
       return authorizer.apply(context);
     }
@@ -72,7 +127,8 @@ public class ThreadLocalAuthorizationCache {
   }
 
   private static void end() {
-    threadCache.remove();
+    allowAuthorizerThreadCache.remove();
+    denyAuthorizerThreadCache.remove();
     hasLoadedPrivilegeThreadLocal.remove();
   }
 

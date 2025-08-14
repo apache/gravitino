@@ -103,9 +103,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       Privilege.Name privilege) {
+    String username = principal.getName();
     boolean result =
-        allowInternalAuthorizer.authorizeInternal(
-            principal, metalake, metadataObject, privilege.name());
+        ThreadLocalAuthorizationCache.authorizeAllow(
+            username,
+            metalake,
+            metadataObject,
+            privilege.name(),
+            (context) ->
+                allowInternalAuthorizer.authorizeInternal(
+                    principal.getName(), metalake, metadataObject, privilege.name()));
     LOG.debug(
         "principal {},metalake {},metadata object {},privilege {}, result {}",
         principal,
@@ -123,8 +130,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       Privilege.Name privilege) {
     boolean result =
-        denyInternalAuthorizer.authorizeInternal(
-            principal, metalake, metadataObject, privilege.name());
+        ThreadLocalAuthorizationCache.authorizeAllow(
+            principal.getName(),
+            metalake,
+            metadataObject,
+            privilege.name(),
+            (context) ->
+                denyInternalAuthorizer.authorizeInternal(
+                    principal.getName(), metalake, metadataObject, privilege.name()));
     LOG.debug(
         "principal {},metalake {},metadata object {},privilege {},deny result {}",
         principal,
@@ -138,8 +151,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
     boolean result =
-        allowInternalAuthorizer.authorizeInternal(
-            principal, metalake, metadataObject, AuthConstants.OWNER);
+        ThreadLocalAuthorizationCache.authorizeAllow(
+            principal.getName(),
+            metalake,
+            metadataObject,
+            AuthConstants.OWNER,
+            (context) ->
+                allowInternalAuthorizer.authorizeInternal(
+                    principal.getName(), metalake, metadataObject, AuthConstants.OWNER));
+
     LOG.debug(
         "principal {},metalake {},metadata object {},privilege {},deny result {}",
         principal,
@@ -291,19 +311,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
 
     private boolean authorizeInternal(
-        Principal principal, String metalake, MetadataObject metadataObject, String privilege) {
-      String username = principal.getName();
-      return ThreadLocalAuthorizationCache.authorize(
-          username,
-          metalake,
-          metadataObject,
-          privilege,
-          (context ->
-              loadPrivilegeAndAuthorize(
-                  context.getUsername(),
-                  context.getMetalake(),
-                  context.getMetadataObject(),
-                  context.getPrivilege())));
+        String username, String metalake, MetadataObject metadataObject, String privilege) {
+      return loadPrivilegeAndAuthorize(username, metalake, metadataObject, privilege);
     }
 
     private boolean loadPrivilegeAndAuthorize(
