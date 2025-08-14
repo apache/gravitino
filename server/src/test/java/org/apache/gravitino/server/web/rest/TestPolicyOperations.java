@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
-import static org.apache.gravitino.policy.Policy.SUPPORTS_ALL_OBJECT_TYPES;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
@@ -28,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -37,6 +37,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
@@ -185,16 +186,14 @@ public class TestPolicyOperations extends JerseyTest {
   @Test
   public void testListPolicyInfos() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
-    PolicyContent content = PolicyContents.custom(contentFields, null);
+    PolicyContent content =
+        PolicyContents.custom(contentFields, ImmutableSet.of(MetadataObject.Type.TABLE), null);
     PolicyEntity policy1 =
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
@@ -203,16 +202,13 @@ public class TestPolicyOperations extends JerseyTest {
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy2")
-            .withPolicyType("my_compaction")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
 
-    Policy[] policies = new Policy[] {policy1, policy2};
+    PolicyEntity[] policies = new PolicyEntity[] {policy1, policy2};
     when(policyManager.listPolicyInfos(metalake)).thenReturn(policies);
 
     Response resp =
@@ -238,7 +234,7 @@ public class TestPolicyOperations extends JerseyTest {
     Assertions.assertEquals(Optional.empty(), policyListResp.getPolicies()[1].inherited());
 
     // Test return empty array
-    when(policyManager.listPolicyInfos(metalake)).thenReturn(new Policy[0]);
+    when(policyManager.listPolicyInfos(metalake)).thenReturn(new PolicyEntity[0]);
     Response resp2 =
         target(policyPath(metalake))
             .queryParam("details", true)
@@ -256,41 +252,23 @@ public class TestPolicyOperations extends JerseyTest {
   @Test
   public void testCreatePolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
-    PolicyContent content = PolicyContents.custom(contentFields, null);
+    PolicyContent content =
+        PolicyContents.custom(contentFields, ImmutableSet.of(MetadataObject.Type.TABLE), null);
     PolicyEntity policy1 =
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
     when(policyManager.createPolicy(
-            metalake,
-            "policy1",
-            "my_compaction",
-            null,
-            false,
-            true,
-            true,
-            SUPPORTS_ALL_OBJECT_TYPES,
-            content))
+            metalake, "policy1", Policy.BuiltInType.CUSTOM, null, false, content))
         .thenReturn(policy1);
 
     PolicyCreateRequest request =
-        new PolicyCreateRequest(
-            "policy1",
-            "my_compaction",
-            null,
-            false,
-            true,
-            true,
-            SUPPORTS_ALL_OBJECT_TYPES,
-            toDTO(content));
+        new PolicyCreateRequest("policy1", "custom", null, false, toDTO(content));
     Response resp =
         target(policyPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -311,8 +289,7 @@ public class TestPolicyOperations extends JerseyTest {
     // Test throw PolicyAlreadyExistsException
     doThrow(new PolicyAlreadyExistsException("mock error"))
         .when(policyManager)
-        .createPolicy(
-            any(), any(), any(), any(), anyBoolean(), anyBoolean(), anyBoolean(), any(), any());
+        .createPolicy(any(), any(), any(), any(), anyBoolean(), any());
     Response resp1 =
         target(policyPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -329,8 +306,7 @@ public class TestPolicyOperations extends JerseyTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(policyManager)
-        .createPolicy(
-            any(), any(), any(), any(), anyBoolean(), anyBoolean(), anyBoolean(), any(), any());
+        .createPolicy(any(), any(), any(), any(), anyBoolean(), any());
 
     Response resp2 =
         target(policyPath(metalake))
@@ -349,16 +325,14 @@ public class TestPolicyOperations extends JerseyTest {
   @Test
   public void testGetPolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
-    PolicyContent content = PolicyContents.custom(contentFields, null);
+    PolicyContent content =
+        PolicyContents.custom(contentFields, ImmutableSet.of(MetadataObject.Type.TABLE), null);
     PolicyEntity policy1 =
         PolicyEntity.builder()
             .withId(1L)
             .withName("policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withEnabled(false)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
@@ -421,17 +395,15 @@ public class TestPolicyOperations extends JerseyTest {
   @Test
   public void testAlterPolicy() {
     ImmutableMap<String, Object> contentFields = ImmutableMap.of("target_file_size_bytes", 1000);
-    PolicyContent content = PolicyContents.custom(contentFields, null);
+    PolicyContent content =
+        PolicyContents.custom(contentFields, ImmutableSet.of(MetadataObject.Type.TABLE), null);
     PolicyEntity newPolicy =
         PolicyEntity.builder()
             .withId(1L)
             .withName("new_policy1")
-            .withPolicyType("my_compaction")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
             .withComment("new policy1 comment")
             .withEnabled(false)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(content)
             .withAuditInfo(testAuditInfo1)
             .build();
@@ -440,7 +412,7 @@ public class TestPolicyOperations extends JerseyTest {
         new PolicyChange[] {
           PolicyChange.rename("new_policy1"),
           PolicyChange.updateComment("new policy1 comment"),
-          PolicyChange.updateContent("my_compaction", content)
+          PolicyChange.updateContent("custom", content)
         };
 
     when(policyManager.alterPolicy(metalake, "policy1", changes)).thenReturn(newPolicy);
@@ -449,7 +421,7 @@ public class TestPolicyOperations extends JerseyTest {
         new PolicyUpdateRequest[] {
           new PolicyUpdateRequest.RenamePolicyRequest("new_policy1"),
           new PolicyUpdateRequest.UpdatePolicyCommentRequest("new policy1 comment"),
-          new PolicyUpdateRequest.UpdatePolicyContentRequest("my_compaction", toDTO(content))
+          new PolicyUpdateRequest.UpdatePolicyContentRequest("custom", toDTO(content))
         };
     PolicyUpdatesRequest request = new PolicyUpdatesRequest(Lists.newArrayList(requests));
     Response resp =

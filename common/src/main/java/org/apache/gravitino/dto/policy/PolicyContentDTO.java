@@ -20,10 +20,12 @@ package org.apache.gravitino.dto.policy;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.policy.PolicyContent;
 
 /** Represents a Policy Content Data Transfer Object (DTO). */
@@ -42,6 +44,9 @@ public interface PolicyContentDTO extends PolicyContent {
     @JsonProperty("properties")
     private Map<String, String> properties;
 
+    @JsonProperty("supportedObjectTypes")
+    private Set<MetadataObject.Type> supportedObjectTypes;
+
     // Default constructor for Jackson deserialization only.
     private CustomContentDTO() {}
 
@@ -55,13 +60,13 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
-    public Map<String, String> properties() {
-      return properties;
+    public Set<MetadataObject.Type> supportedObjectTypes() {
+      return supportedObjectTypes;
     }
 
     @Override
-    public void validate() throws IllegalArgumentException {
-      // no validation needed for custom content
+    public Map<String, String> properties() {
+      return properties;
     }
   }
 }
