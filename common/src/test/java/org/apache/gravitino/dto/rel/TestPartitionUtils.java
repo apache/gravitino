@@ -72,4 +72,60 @@ public class TestPartitionUtils {
             () -> PartitionUtils.validateFieldExistence(columns, new String[] {"c"}));
     Assertions.assertEquals("Field 'c' not found in table", ex.getMessage());
   }
+
+  @Test
+  void testValidateFieldExistence_nestedFieldsNotSupported() {
+    ColumnDTO[] columns = new ColumnDTO[] {column("a"), column("b")};
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.validateFieldExistence(columns, new String[] {"a", "b"}));
+    Assertions.assertEquals(
+        "Nested fields are not supported yet. Field name array must contain exactly one element, but got: [a, b]",
+        ex.getMessage());
+  }
+
+  @Test
+  void testValidateFieldExistence_singleElementArray() {
+    ColumnDTO[] columns = new ColumnDTO[] {column("a"), column("b")};
+    String[] field = new String[] {"a"};
+
+    Assertions.assertDoesNotThrow(() -> PartitionUtils.validateFieldExistence(columns, field));
+  }
+
+  @Test
+  void testValidateFieldExistence_multipleNestedFieldsNotSupported() {
+    ColumnDTO[] columns = new ColumnDTO[] {column("a"), column("b")};
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.validateFieldExistence(columns, new String[] {"a", "b", "c"}));
+    Assertions.assertEquals(
+        "Nested fields are not supported yet. Field name array must contain exactly one element, but got: [a, b, c]",
+        ex.getMessage());
+  }
+
+  @Test
+  void testValidateFieldExistence_emptyFieldNameArray() {
+    ColumnDTO[] columns = new ColumnDTO[] {column("a"), column("b")};
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.validateFieldExistence(columns, new String[] {}));
+    Assertions.assertEquals("fieldName cannot be null or empty", ex.getMessage());
+  }
+
+  @Test
+  void testValidateFieldExistence_nestedFieldValidationOrder() {
+    ColumnDTO[] columns = new ColumnDTO[] {column("a"), column("b")};
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PartitionUtils.validateFieldExistence(
+                    columns, new String[] {"nonexistent", "field"}));
+    Assertions.assertEquals(
+        "Nested fields are not supported yet. Field name array must contain exactly one element, but got: [nonexistent, field]",
+        ex.getMessage());
+  }
 }

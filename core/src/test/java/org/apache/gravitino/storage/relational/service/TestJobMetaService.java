@@ -21,7 +21,9 @@ package org.apache.gravitino.storage.relational.service;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.AuditInfo;
@@ -70,17 +72,18 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertTrue(jobs.contains(job2));
 
     // Test listing jobs by job template identifier
+    String[] levels = ArrayUtils.add(jobTemplate.namespace().levels(), jobTemplate.name());
+    Namespace jobTemplateIdentNs = Namespace.of(levels);
     List<JobEntity> jobsByTemplate =
-        JobMetaService.getInstance().listJobsByTemplateIdent(jobTemplate.nameIdentifier());
+        JobMetaService.getInstance().listJobsByNamespace(jobTemplateIdentNs);
     Assertions.assertEquals(2, jobsByTemplate.size());
     Assertions.assertTrue(jobsByTemplate.contains(job1));
     Assertions.assertTrue(jobsByTemplate.contains(job2));
 
     // Test listing jobs by non-existing template identifier
+    levels = ArrayUtils.add(jobTemplate.namespace().levels(), "non_existing_template");
     List<JobEntity> emptyJobs =
-        JobMetaService.getInstance()
-            .listJobsByTemplateIdent(
-                NameIdentifierUtil.ofJobTemplate(METALAKE_NAME, "non_existing_template"));
+        JobMetaService.getInstance().listJobsByNamespace(Namespace.of(levels));
     Assertions.assertTrue(emptyJobs.isEmpty());
   }
 
