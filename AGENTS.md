@@ -1,6 +1,9 @@
 # Gravitino Project
 Apache Gravitino is an open-source metadata lakehouse that unifies metadata across data lakes, warehouses, and catalogs. The core Java code lives under module src/ folders, with major components grouped under core, server, and connectors.
 
+## Safety & Workflow
+Do **not** compile or run any build on checkout.
+Never infer build commands from heuristics; follow the commands below.
 
 ## Build & Commands
 Fast Building: ./gradlew build -x web:web:build -x clients:client-python:build -x test -x spotlessCheck -x rat -x javadoc
