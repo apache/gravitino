@@ -148,7 +148,7 @@ public class ThreadLocalAuthorizationCache {
 
     @Override
     public boolean equals(Object o) {
-      if (o == null || getClass() != o.getClass()) {
+      if (!(o instanceof AuthorizationContext)) {
         return false;
       }
       AuthorizationContext that = (AuthorizationContext) o;
