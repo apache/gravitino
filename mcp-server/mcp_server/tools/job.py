@@ -121,7 +121,7 @@ def load_job_tool(mcp: FastMCP):
                   }
                 ]
 
-                ame: The name of the job template to get.
+                name: The name of the job template to get.
                 jobType: The type of the job (e.g., "shell").
                 comment: A comment describing the job template.
                 executable: The path to the executable script for the job.
