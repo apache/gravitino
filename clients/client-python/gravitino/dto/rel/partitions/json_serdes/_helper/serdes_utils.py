@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Any, Dict, cast
+from typing import Any, Dict, List, cast
 
 from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
     SerdesUtils as ExpressionsSerdesUtils,
@@ -24,6 +24,8 @@ from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitio
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
+from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.utils.precondition import Precondition
 from gravitino.utils.serdes import SerdesUtilsBase
 
 
@@ -67,3 +69,39 @@ class SerdesUtils(SerdesUtilsBase):
         dto_data[cls.PARTITION_PROPERTIES] = value.properties()
         result.update(dto_data)
         return result
+
+    @classmethod
+    def read_partition(cls, data: Dict[str, Any]) -> PartitionDTO:
+        Precondition.check_argument(
+            isinstance(data, Dict) and len(data) > 0,
+            f"Partition must be a valid JSON object, but found: {data}",
+        )
+        Precondition.check_argument(
+            data.get(cls.PARTITION_TYPE) is not None,
+            f"Partition must have a type field, but found: {data}",
+        )
+        try:
+            dto_type = PartitionDTO.Type(data[cls.PARTITION_TYPE])
+        except ValueError as ve:
+            raise IllegalArgumentException(
+                f"Unknown partition type: {data[cls.PARTITION_TYPE]}"
+            ) from ve
+
+        if dto_type is PartitionDTO.Type.IDENTITY:
+            Precondition.check_argument(
+                isinstance(data.get(cls.FIELD_NAMES), List),
+                f"Identity partition must have array of fieldNames, but found: {data}",
+            )
+            Precondition.check_argument(
+                isinstance(data.get(cls.IDENTITY_PARTITION_VALUES), List),
+                f"Identity partition must have array of values, but found: {data}",
+            )
+            return IdentityPartitionDTO(
+                name=data[cls.PARTITION_NAME],
+                field_names=data[cls.FIELD_NAMES],
+                values=[
+                    ExpressionsSerdesUtils.read_function_arg(data=value)
+                    for value in data[cls.IDENTITY_PARTITION_VALUES]
+                ],
+                properties=data.get(cls.PARTITION_PROPERTIES, {}),
+            )
