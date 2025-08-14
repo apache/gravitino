@@ -44,7 +44,7 @@ jobs:
               - gradle.properties
               - gradlew
               - setting.gradle.kts
-                - '!mcp-server/**'
+              - '!mcp-server/**'
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
