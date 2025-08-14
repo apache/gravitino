@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -603,7 +602,6 @@ public class JDBCBackend implements RelationalBackend {
             deleteVertexType == Relation.VertexType.DESTINATION,
             "Only supports to delete relations of destination vertex");
 
-        AtomicInteger deleteCount = new AtomicInteger(0);
         Map<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> groupedRelations =
             relations.stream().collect(Collectors.groupingBy(Relation::getSourceVertex));
 
@@ -616,26 +614,25 @@ public class JDBCBackend implements RelationalBackend {
             "The relations must have the same source identifier and type, but got %s groups",
             groupedRelations.size());
 
-        groupedRelations.forEach(
-            (sourceVertex, deleteRelations) -> {
-              List<String> statsToDelete =
-                  deleteRelations.stream()
-                      .map(relation -> relation.getDestIdent().name())
-                      .collect(Collectors.toList());
+        Map.Entry<Pair<NameIdentifier, Entity.EntityType>, List<Relation>> entry =
+            groupedRelations.entrySet().iterator().next();
+        List<String> statsToDelete =
+            entry.getValue().stream()
+                .map(relation -> relation.getDestIdent().name())
+                .collect(Collectors.toList());
 
-              deleteRelations.forEach(
-                  relation ->
-                      Preconditions.checkArgument(
-                          relation.getDestType() == STATISTIC,
-                          "The destination type of relation must be STATISTIC, but got %s",
-                          relation.getDestType()));
+        entry
+            .getValue()
+            .forEach(
+                relation ->
+                    Preconditions.checkArgument(
+                        relation.getDestType() == STATISTIC,
+                        "The destination type of relation must be STATISTIC, but got %s",
+                        relation.getDestType()));
 
-              deleteCount.addAndGet(
-                  StatisticMetaService.getInstance()
-                      .batchDeleteStatisticPOs(
-                          sourceVertex.getLeft(), sourceVertex.getRight(), statsToDelete));
-            });
-        return deleteCount.get();
+        return StatisticMetaService.getInstance()
+            .batchDeleteStatisticPOs(
+                entry.getKey().getLeft(), entry.getKey().getRight(), statsToDelete);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

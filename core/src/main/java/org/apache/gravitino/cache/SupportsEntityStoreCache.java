@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.cache;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Relation;
+import org.apache.gravitino.SupportsRelationOperations;
 
 /**
  * {@code StoreEntityCache} defines caching operations for direct entity access. It supports
@@ -49,6 +52,15 @@ public interface SupportsEntityStoreCache {
    * @return true if the cache entry was removed
    */
   boolean invalidate(NameIdentifier ident, Entity.EntityType type);
+
+  /**
+   * Invalidates the cache entries for the given relations of a specific relation type.
+   *
+   * @param relType the type of relation to invalidate
+   * @param relations the list of relations to invalidate
+   * @return true if any cache entries were removed, false otherwise
+   */
+  boolean invalidate(SupportsRelationOperations.Type relType, List<Relation> relations);
 
   /**
    * Checks whether an entity with the given name identifier and type is present in the cache.

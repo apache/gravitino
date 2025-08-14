@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -266,30 +267,33 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> Void insertEntitiesAndRelations(
       Type relType, List<Entity.RelationalEntity<E>> relationalEntities, boolean overwrite)
       throws IOException {
-    for (Entity.RelationalEntity<E> relationalEntity : relationalEntities) {
-      if (relationalEntity.vertexType() == Relation.VertexType.SOURCE) {
 
-        // If the source vertex is being inserted, we invalidate the relations
-        // The key of the relation is source name identifier and entity type
-        cache.invalidate(
-            relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type(), relType);
-
-        // If the source vertex is being inserted, we invalidate the cache for the source vertex
-        cache.invalidate(
-            relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type());
-      } else {
-
-        // If the dest vertex is being inserted, we invalidate the relations
-        // The key of the relation is source name identifier and entity type
-        for (NameIdentifier relatedNameIdent : relationalEntity.relatedNameIdentifiers()) {
-          cache.invalidate(relatedNameIdent, relationalEntity.relatedEntityType(), relType);
+    List<Relation> relations = Lists.newArrayList();
+    for (Entity.RelationalEntity<E> relationEntity : relationalEntities) {
+      if (relationEntity.vertexType() == Relation.VertexType.SOURCE) {
+        for (NameIdentifier destIdentifier : relationEntity.relatedNameIdentifiers()) {
+          Relation relation =
+              new Relation(
+                  relationEntity.entity().nameIdentifier(),
+                  relationEntity.entity().type(),
+                  destIdentifier,
+                  relationEntity.relatedEntityType());
+          relations.add(relation);
         }
-
-        // If the dest vertex is being inserted, we invalidate the cache for the dest vertex
-        cache.invalidate(
-            relationalEntity.entity().nameIdentifier(), relationalEntity.entity().type());
+      }
+      if (relationEntity.vertexType() == Relation.VertexType.DESTINATION) {
+        for (NameIdentifier srcIdentifier : relationEntity.relatedNameIdentifiers()) {
+          Relation relation =
+              new Relation(
+                  srcIdentifier,
+                  relationEntity.relatedEntityType(),
+                  relationEntity.entity().nameIdentifier(),
+                  relationEntity.entity().type());
+          relations.add(relation);
+        }
       }
     }
+    cache.invalidate(relType, relations);
 
     backend.insertEntitiesAndRelations(relType, relationalEntities, overwrite);
     return null;
@@ -299,19 +303,7 @@ public class RelationalEntityStore
   public int deleteEntitiesAndRelations(
       Type relType, Relation.VertexType deleteVertexType, List<Relation> relations)
       throws IOException {
-    // Invalid every relation in the cache before deleting them.
-    // The relation's key is source name identifier and entity type
-    for (Relation relation : relations) {
-      cache.invalidate(relation.getSourceIdent(), relation.getSourceType(), relType);
-
-      // If we delete source vertex, we invalidate the source vertex in the cache
-      if (deleteVertexType == Relation.VertexType.SOURCE) {
-        cache.invalidate(relation.getSourceIdent(), relation.getSourceType());
-      } else {
-        // If we delete dest vertex, we invalidate the dest vertex in the cache
-        cache.invalidate(relation.getDestIdent(), relation.getDestType());
-      }
-    }
+    cache.invalidate(relType, relations);
 
     return backend.deleteEntitiesAndRelations(relType, deleteVertexType, relations);
   }
