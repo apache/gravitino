@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Set;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -59,8 +57,7 @@ public interface PolicyOperations {
   Policy getPolicy(String name) throws NoSuchPolicyException;
 
   /**
-   * Create a built-in type policy under a metalake. The exclusive, inheritable, and supported
-   * object types parameters attributes are determined by the type of the policy.
+   * Create a policy under a metalake.
    *
    * @param name The name of the policy.
    * @param type The type of the policy.
@@ -72,38 +69,6 @@ public interface PolicyOperations {
    */
   Policy createPolicy(
       String name, String type, String comment, boolean enabled, PolicyContent content)
-      throws PolicyAlreadyExistsException;
-
-  /**
-   * Create a new policy under a metalake.
-   *
-   * @param name The name of the policy.
-   * @param type The type of the policy.
-   * @param comment The comment of the policy.
-   * @param enabled Whether the policy is enabled or not.
-   * @param exclusive Whether the policy is exclusive or not. If the policy is exclusive, only one
-   *     of the same type policy can be associated with the same object, and the same type of policy
-   *     on a metadata object will override the one inherited from the parent object. If the policy
-   *     is not exclusive, multiple policies of the same type can be associated with the same
-   *     object.
-   * @param inheritable Whether the policy is inheritable or not. If the policy is inheritable, it
-   *     will be inherited automatically by child objects. If the policy is not inheritable, it can
-   *     only be associated with the metadata object itself.
-   * @param supportedObjectTypes The set of the metadata object types that the policy can be
-   *     associated with
-   * @param content The content of the policy.
-   * @return The created policy.
-   * @throws PolicyAlreadyExistsException If the policy already exists.
-   */
-  Policy createPolicy(
-      String name,
-      String type,
-      String comment,
-      boolean enabled,
-      boolean exclusive,
-      boolean inheritable,
-      Set<MetadataObject.Type> supportedObjectTypes,
-      PolicyContent content)
       throws PolicyAlreadyExistsException;
 
   /**

@@ -29,8 +29,8 @@ import org.apache.ibatis.annotations.Param;
 public class PolicyMetaBaseSQLProvider {
 
   public String listPolicyPOsByMetalake(@Param("metalakeName") String metalakeName) {
-    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"
-        + " pm.exclusive, pm.supported_object_types, pm.audit_info, pm.current_version, pm.last_version,"
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -50,8 +50,8 @@ public class PolicyMetaBaseSQLProvider {
   public String listPolicyPOsByMetalakeAndPolicyNames(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return "<script>"
-        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"
-        + " pm.exclusive, pm.supported_object_types, pm.audit_info, pm.current_version, pm.last_version,"
+        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -76,19 +76,15 @@ public class PolicyMetaBaseSQLProvider {
   public String insertPolicyMetaOnDuplicateKeyUpdate(@Param("policyMeta") PolicyPO policyPO) {
     return "INSERT INTO "
         + POLICY_META_TABLE_NAME
-        + " (policy_id, policy_name, policy_type, metalake_id, inheritable, exclusive,"
-        + " supported_object_types, audit_info, current_version, last_version, deleted_at)"
+        + " (policy_id, policy_name, policy_type, metalake_id,"
+        + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES (#{policyMeta.policyId}, #{policyMeta.policyName}, #{policyMeta.policyType},"
-        + " #{policyMeta.metalakeId}, #{policyMeta.inheritable}, #{policyMeta.exclusive},"
-        + " #{policyMeta.supportedObjectTypes}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
+        + " #{policyMeta.metalakeId}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
         + " #{policyMeta.lastVersion}, #{policyMeta.deletedAt})"
         + " ON DUPLICATE KEY UPDATE"
         + " policy_name = #{policyMeta.policyName},"
         + " policy_type = #{policyMeta.policyType},"
         + " metalake_id = #{policyMeta.metalakeId},"
-        + " inheritable = #{policyMeta.inheritable},"
-        + " exclusive = #{policyMeta.exclusive},"
-        + " supported_object_types = #{policyMeta.supportedObjectTypes},"
         + " audit_info = #{policyMeta.auditInfo},"
         + " current_version = #{policyMeta.currentVersion},"
         + " last_version = #{policyMeta.lastVersion},"
@@ -98,18 +94,17 @@ public class PolicyMetaBaseSQLProvider {
   public String insertPolicyMeta(@Param("policyMeta") PolicyPO policyPO) {
     return "INSERT INTO "
         + POLICY_META_TABLE_NAME
-        + " (policy_id, policy_name, policy_type, metalake_id, inheritable, exclusive,"
-        + " supported_object_types, audit_info, current_version, last_version, deleted_at)"
+        + " (policy_id, policy_name, policy_type, metalake_id,"
+        + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES (#{policyMeta.policyId}, #{policyMeta.policyName}, #{policyMeta.policyType},"
-        + " #{policyMeta.metalakeId}, #{policyMeta.inheritable}, #{policyMeta.exclusive},"
-        + " #{policyMeta.supportedObjectTypes}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
+        + " #{policyMeta.metalakeId}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
         + " #{policyMeta.lastVersion}, #{policyMeta.deletedAt})";
   }
 
   public String selectPolicyMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
-    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id, pm.inheritable,"
-        + " pm.exclusive, pm.supported_object_types, pm.audit_info, pm.current_version, pm.last_version,"
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -135,9 +130,6 @@ public class PolicyMetaBaseSQLProvider {
         + " SET policy_name = #{newPolicyMeta.policyName},"
         + " policy_type = #{newPolicyMeta.policyType},"
         + " metalake_id = #{newPolicyMeta.metalakeId},"
-        + " inheritable = #{newPolicyMeta.inheritable},"
-        + " exclusive = #{newPolicyMeta.exclusive},"
-        + " supported_object_types = #{newPolicyMeta.supportedObjectTypes},"
         + " audit_info = #{newPolicyMeta.auditInfo},"
         + " current_version = #{newPolicyMeta.currentVersion},"
         + " last_version = #{newPolicyMeta.lastVersion},"
@@ -146,9 +138,6 @@ public class PolicyMetaBaseSQLProvider {
         + " AND policy_name = #{oldPolicyMeta.policyName}"
         + " AND policy_type = #{oldPolicyMeta.policyType}"
         + " AND metalake_id = #{oldPolicyMeta.metalakeId}"
-        + " AND inheritable = #{oldPolicyMeta.inheritable}"
-        + " AND exclusive = #{oldPolicyMeta.exclusive}"
-        + " AND supported_object_types = #{oldPolicyMeta.supportedObjectTypes}"
         + " AND audit_info = #{oldPolicyMeta.auditInfo}"
         + " AND current_version = #{oldPolicyMeta.currentVersion}"
         + " AND last_version = #{oldPolicyMeta.lastVersion}"
