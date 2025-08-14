@@ -26,7 +26,6 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 
 /** A cache implementation that does not cache anything. */
@@ -101,11 +100,6 @@ public class NoOpsCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public boolean invalidate(NameIdentifier ident, Entity.EntityType type) {
-    return false;
-  }
-
-  @Override
-  public boolean invalidate(SupportsRelationOperations.Type relType, List<Relation> relations) {
     return false;
   }
 

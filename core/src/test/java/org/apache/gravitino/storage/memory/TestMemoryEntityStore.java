@@ -171,6 +171,32 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public int batchDeleteInNamespace(
+        Namespace namespace,
+        EntityType namespaceEntityType,
+        List<String> deleteEntityNames,
+        EntityType entityType,
+        boolean cascade)
+        throws IOException {
+      throw new UnsupportedOperationException(
+          "Batch delete is not supported in InMemoryEntityStore.");
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+        throws IOException, EntityAlreadyExistsException {
+      throw new UnsupportedOperationException("Batch put is not supported in InMemoryEntityStore.");
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> List<E> list(
+        Namespace namespace, EntityType namespaceEntityType, Class<E> type, EntityType entityType)
+        throws IOException {
+      throw new UnsupportedOperationException(
+          "List with entity type is not supported in InMemoryEntityStore.");
+    }
+
+    @Override
     public void close() throws IOException {
       entityMap.clear();
     }

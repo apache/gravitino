@@ -19,7 +19,6 @@
 package org.apache.gravitino;
 
 import java.io.Serializable;
-import java.util.List;
 import java.util.Map;
 import lombok.Getter;
 
@@ -106,50 +105,4 @@ public interface Entity extends Serializable {
    * @return The type of the entity as defined by {@link EntityType}.
    */
   EntityType type();
-
-  /**
-   * Represents a relational entity that contains an entity, its vertex type, related identifiers,
-   * and the type of related entity.
-   *
-   * @param <E> the type of the entity, which must extend {@link Entity} and implement {@link
-   *     HasIdentifier}
-   */
-  interface RelationalEntity<E extends Entity & HasIdentifier> {
-
-    /**
-     * Returns the entity wrapped by this relational entity.
-     *
-     * @return the entity
-     */
-    E entity();
-
-    /**
-     * Returns the vertex type of the entity in the relation.
-     *
-     * @return the vertex type of the entity
-     */
-    Relation.VertexType vertexType();
-
-    /**
-     * Returns the list of related name identifiers.
-     *
-     * @return the list of related name identifiers
-     */
-    List<NameIdentifier> relatedNameIdentifiers();
-
-    /**
-     * Returns the type of the related entity.
-     *
-     * @return the type of the related entity
-     */
-    EntityType relatedEntityType();
-
-    /**
-     * Converts this relational entity to a list of {@link Relation} objects that represent the
-     * relationship between the entity and its related identifiers.
-     *
-     * @return a list of {@link Relation} objects representing the relationships
-     */
-    List<Relation> toRelations();
-  }
 }

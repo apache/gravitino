@@ -44,13 +44,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Relation;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.slf4j.Logger;
@@ -167,30 +165,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
     checkArguments(ident, type);
 
     return withLock(() -> invalidateEntities(ident));
-  }
-
-  @Override
-  public boolean invalidate(SupportsRelationOperations.Type relType, List<Relation> relations) {
-    checkArguments(relType, relations);
-
-    return withLock(
-        () -> {
-          Set<Pair<NameIdentifier, Entity.EntityType>> entities = Sets.newHashSet();
-          for (Relation relation : relations) {
-            Pair<NameIdentifier, Entity.EntityType> sourcePair = relation.getSourceVertex();
-            Pair<NameIdentifier, Entity.EntityType> destPair = relation.getDestVertex();
-            entities.add(sourcePair);
-            entities.add(destPair);
-          }
-
-          boolean removed = false;
-          for (Pair<NameIdentifier, Entity.EntityType> entity : entities) {
-            NameIdentifier ident = entity.getLeft();
-            // Only one indent is existed, removed will be true
-            removed |= invalidateEntities(ident);
-          }
-          return removed;
-        });
   }
 
   /** {@inheritDoc} */
@@ -495,17 +469,5 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private void checkArguments(NameIdentifier ident, Entity.EntityType type) {
     Preconditions.checkArgument(ident != null, "NameIdentifier cannot be null");
     Preconditions.checkArgument(type != null, "EntityType cannot be null");
-  }
-
-  /**
-   * Checks the arguments for the methods. All arguments must not be null.
-   *
-   * @param relType the relation type to check
-   * @param relations the list of relations to check
-   */
-  private void checkArguments(SupportsRelationOperations.Type relType, List<Relation> relations) {
-    Preconditions.checkArgument(relType != null, "relType cannot be null");
-    Preconditions.checkArgument(relations != null, "relations cannot be null");
-    Preconditions.checkArgument(!relations.isEmpty(), "relations cannot be empty");
   }
 }

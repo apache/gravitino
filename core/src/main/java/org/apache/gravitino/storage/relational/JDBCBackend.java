@@ -549,7 +549,7 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>)
             StatisticMetaService.getInstance()
                 .listStatisticsByEntity(
-                    NameIdentifier.of(namespace.toString()), namespaceEntityTYpe);
+                    NameIdentifier.parse(namespace.toString()), namespaceEntityTYpe);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the entity type %s for list operation", entityType));

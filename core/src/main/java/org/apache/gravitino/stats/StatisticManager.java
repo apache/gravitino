@@ -30,7 +30,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
@@ -66,15 +65,17 @@ public class StatisticManager {
           identifier,
           LockType.READ,
           () ->
-              store.relationOperations()
-                  .listEntitiesByRelation(
-                      SupportsRelationOperations.Type.METADATA_OBJECT_STAT_REL, identifier, type)
+              store
+                  .list(
+                      Namespace.fromString(identifier.toString()),
+                      type,
+                      StatisticEntity.class,
+                      Entity.EntityType.STATISTIC)
                   .stream()
                   .map(
                       entity -> {
-                        StatisticEntity statisticEntity = (StatisticEntity) entity;
-                        String name = statisticEntity.name();
-                        StatisticValue<?> value = statisticEntity.value();
+                        String name = entity.name();
+                        StatisticValue<?> value = entity.value();
                         return new CustomStatistic(name, value);
                       })
                   .collect(Collectors.toList()));

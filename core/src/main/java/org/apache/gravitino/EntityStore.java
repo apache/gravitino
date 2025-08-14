@@ -201,15 +201,13 @@ public interface EntityStore extends Closeable {
    * @return the number of entities deleted
    * @throws IOException if the batch delete operation fails
    */
-  default int batchDeleteInNamespace(
+  int batchDeleteInNamespace(
       Namespace namespace,
       EntityType namespaceEntityType,
       List<String> deleteEntityNames,
       EntityType entityType,
       boolean cascade)
-      throws IOException {
-    throw new UnsupportedOperationException("batch delete is not supported");
-  }
+      throws IOException;
 
   /**
    * Batch put entities into the underlying storage.
@@ -221,10 +219,8 @@ public interface EntityStore extends Closeable {
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
    *     false
    */
-  default <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
-      throws IOException, EntityAlreadyExistsException {
-    throw new UnsupportedOperationException("batch put is not supported");
-  }
+  <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException;
 
   /**
    * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
@@ -238,12 +234,9 @@ public interface EntityStore extends Closeable {
    * @param <E> the class of the entity
    * @throws IOException if the list operation fails
    */
-  default <E extends Entity & HasIdentifier> List<E> list(
+  <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, EntityType namespaceEntityType, Class<E> type, EntityType entityType)
-      throws IOException {
-    throw new UnsupportedOperationException(
-        "list is not supported when specifying namespace entity type");
-  }
+      throws IOException;
 
   /**
    * Execute the specified {@link Executable} in a transaction.
