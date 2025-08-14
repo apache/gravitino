@@ -119,8 +119,8 @@ GravitinoClient client = GravitinoClient.builder(uri)
 | `gravitino.authenticator.oauth.clientId`           | OAuth client ID for Web UI authentication.                                                                                                                                                                    | (none)            | Yes if provider is `oidc`                 | 1.0.0            |
 | `gravitino.authenticator.oauth.authority`          | OAuth authority/issuer URL for OIDC providers for web UI authentication. (e.g., Azure AD tenant URL).                                                                                                                                   | (none)            | Yes if provider is `oidc`                 | 1.0.0            |
 | `gravitino.authenticator.oauth.scope`              | OAuth scopes for Web UI authentication (space-separated).                                                                                                                                                      | (none)            | Yes if provider is `oidc`                 | 1.0.0            |
-| `gravitino.authenticator.oauth.jwksUri`            | JWKS URI for server-side OAuth token validation. Required when using JWKS-based validation.                                                                                                                                                               | (none)            | No                                         | 1.0.0            |
-| `gravitino.authenticator.oauth.principalField`     | JWT claim field(s) to use as principal identity. Comma-separated list for fallback in order (e.g., 'preferred_username,email,sub').                                                                                                                       | `sub`             | No                                         | 1.0.0            |
+| `gravitino.authenticator.oauth.jwksUri`            | JWKS URI for server-side OAuth token validation. Required when using JWKS-based validation.                                                                                                                                                               | (none)            | Yes if `tokenValidatorClass` is `org.apache.gravitino.server.authentication.JwksTokenValidator` | 1.0.0            |
+| `gravitino.authenticator.oauth.principalFields`     | JWT claim field(s) to use as principal identity. Comma-separated list for fallback in order (e.g., 'preferred_username,email,sub').                                                                                                                       | `sub`             | No                                         | 1.0.0            |
 | `gravitino.authenticator.oauth.tokenValidatorClass`| Fully qualified class name of the OAuth token validator implementation. Use `org.apache.gravitino.server.authentication.JwksTokenValidator` for JWKS-based validation or `org.apache.gravitino.server.authentication.StaticSignKeyValidator` for static key validation. | `org.apache.gravitino.server.authentication.StaticSignKeyValidator` | No | 1.0.0 |
 | `gravitino.authenticator.kerberos.principal`      | Indicates the Kerberos principal to be used for HTTP endpoint. Principal should start with `HTTP/`.                                                                                                                                                        | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0            |
 | `gravitino.authenticator.kerberos.keytab`         | Location of the keytab file with the credentials for the principal.                                                                                                                                                                                        | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0            |
@@ -169,7 +169,7 @@ gravitino.authenticator.oauth.scope = openid profile email
 gravitino.authenticator.oauth.jwksUri = https://login.microsoftonline.com/<your-tenant-id>/discovery/v2.0/keys
 gravitino.authenticator.oauth.tokenValidatorClass = org.apache.gravitino.server.authentication.JwksTokenValidator
 gravitino.authenticator.oauth.serviceAudience = <your-azure-app-client-id-or-api-identifier>
-gravitino.authenticator.oauth.principalField = preferred_username,email,sub
+gravitino.authenticator.oauth.principalFields = preferred_username,email,sub
 ```
 
 **Usage:**
@@ -179,7 +179,7 @@ gravitino.authenticator.oauth.principalField = preferred_username,email,sub
 :::note
 The `serviceAudience` should match the `aud` claim in your Azure AD tokens. This is typically your Azure AD application's client ID, but could be a custom API identifier if you've configured custom API scopes (e.g., `api://<client-id>`).
 
-The `principalField` supports multiple fallback options. Gravitino will try each field in order (e.g., first `preferred_username`, then `email`, then `sub`) until it finds a non-null value to use as the user identity.
+The `principalFields` supports multiple fallback options. Gravitino will try each field in order (e.g., first `preferred_username`, then `email`, then `sub`) until it finds a non-null value to use as the user identity.
 
 With JWKS validation, you don't need to configure `defaultSignKey`, `serverUri`, or `tokenPath` as the validator dynamically fetches public keys from Azure AD's JWKS endpoint.
 :::
