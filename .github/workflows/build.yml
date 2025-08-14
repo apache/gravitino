@@ -24,6 +24,7 @@ jobs:
           filters: |
             source_changes:
               included:
+                #- '.github/**'
                 - 'catalogs/**'
                 - 'clients/**'
                 - 'conf/**'
@@ -40,13 +41,12 @@ jobs:
                 - '**/*.rs'
                 - '**/resources/**'
                 - '**/src/**'
-                - '!**/*.md'
-                - '!**/*.png'
-                - '!**/*.svg'
               excluded:
                 - 'mcp-server/**'
-                - '.github/**'
-            
+                - '**/*.md'
+                - '**/*.png'
+                - '**/*.svg'
+  
             spark_connector_changes:
               - spark-connector/**
             

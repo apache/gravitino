@@ -23,7 +23,7 @@ jobs:
           filters: |
             source_changes:
               included:
-                - .github/**
+                #- .github/**
                 - api/**
                 - bin/**
                 - catalogs/hadoop/**
@@ -43,7 +43,6 @@ jobs:
                 - setting.gradle.kts
               excluded:
                 - mcp-server/**
-                - .github/** 
 
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
