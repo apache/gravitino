@@ -28,9 +28,6 @@ public class PolicyPO {
   private String policyName;
   private String policyType;
   private Long metalakeId;
-  private boolean inheritable;
-  private boolean exclusive;
-  private String supportedObjectTypes;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -54,9 +51,6 @@ public class PolicyPO {
         && Objects.equal(policyName, policyPO.policyName)
         && Objects.equal(policyType, policyPO.policyType)
         && Objects.equal(metalakeId, policyPO.metalakeId)
-        && Objects.equal(inheritable, policyPO.inheritable)
-        && Objects.equal(exclusive, policyPO.exclusive)
-        && Objects.equal(supportedObjectTypes, policyPO.supportedObjectTypes)
         && Objects.equal(auditInfo, policyPO.auditInfo)
         && Objects.equal(currentVersion, policyPO.currentVersion)
         && Objects.equal(lastVersion, policyPO.lastVersion)
@@ -71,9 +65,6 @@ public class PolicyPO {
         policyName,
         policyType,
         metalakeId,
-        inheritable,
-        exclusive,
-        supportedObjectTypes,
         auditInfo,
         currentVersion,
         lastVersion,
@@ -86,9 +77,6 @@ public class PolicyPO {
     private String policyName;
     private String policyType;
     private Long metalakeId;
-    private boolean inheritable;
-    private boolean exclusive;
-    private String supportedObjectTypes;
     private String auditInfo;
     private Long currentVersion;
     private Long lastVersion;
@@ -112,21 +100,6 @@ public class PolicyPO {
 
     public Builder withPolicyType(String policyType) {
       this.policyType = policyType;
-      return this;
-    }
-
-    public Builder withInheritable(boolean inheritable) {
-      this.inheritable = inheritable;
-      return this;
-    }
-
-    public Builder withExclusive(boolean exclusive) {
-      this.exclusive = exclusive;
-      return this;
-    }
-
-    public Builder withSupportedObjectTypes(String supportedObjectTypes) {
-      this.supportedObjectTypes = supportedObjectTypes;
       return this;
     }
 
@@ -167,9 +140,6 @@ public class PolicyPO {
       policyPO.policyName = policyName;
       policyPO.metalakeId = metalakeId;
       policyPO.policyType = policyType;
-      policyPO.inheritable = inheritable;
-      policyPO.exclusive = exclusive;
-      policyPO.supportedObjectTypes = supportedObjectTypes;
       policyPO.auditInfo = auditInfo;
       policyPO.currentVersion = currentVersion;
       policyPO.lastVersion = lastVersion;
@@ -183,8 +153,6 @@ public class PolicyPO {
       Preconditions.checkArgument(policyName != null, "Policy name is required");
       Preconditions.checkArgument(metalakeId != null, "Metalake id is required");
       Preconditions.checkArgument(policyType != null, "Policy type is required");
-      Preconditions.checkArgument(
-          supportedObjectTypes != null, "Supported object types is required");
       Preconditions.checkArgument(currentVersion != null, "Current version is required");
       Preconditions.checkArgument(lastVersion != null, "Last version is required");
       Preconditions.checkArgument(deletedAt != null, "Deleted at is required");

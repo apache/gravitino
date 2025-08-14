@@ -58,7 +58,6 @@ import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
-import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
@@ -94,7 +93,6 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
-import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
@@ -537,31 +535,6 @@ public class DTOConverters {
   }
 
   /**
-   * Converts a Policy to a PolicyDTO.
-   *
-   * @param policy The policy to be converted.
-   * @param inherited The inherited flag.
-   * @return The policy DTO.
-   */
-  public static PolicyDTO toDTO(Policy policy, Optional<Boolean> inherited) {
-    PolicyDTO.Builder builder =
-        PolicyDTO.builder()
-            .withName(policy.name())
-            .withComment(policy.comment())
-            .withPolicyType(policy.policyType())
-            .withEnabled(policy.enabled())
-            .withExclusive(policy.exclusive())
-            .withInheritable(policy.inheritable())
-            .withSupportedObjectTypes(policy.supportedObjectTypes())
-            .withContent(toDTO(policy.content()))
-            .withInherited(inherited)
-            .withAudit(toDTO(policy.auditInfo()))
-            .withInherited(inherited);
-
-    return builder.build();
-  }
-
-  /**
    * Converts a PolicyContent to a PolicyContentDTO.
    *
    * @param policyContent The policyContent to be converted.
@@ -580,6 +553,7 @@ public class DTOConverters {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
       return PolicyContentDTO.CustomContentDTO.builder()
           .withCustomRules(customContent.customRules())
+          .withSupportedObjectTypes(customContent.supportedObjectTypes())
           .withProperties(customContent.properties())
           .build();
     }
@@ -1259,7 +1233,10 @@ public class DTOConverters {
     if (policyContentDTO instanceof PolicyContentDTO.CustomContentDTO) {
       PolicyContentDTO.CustomContentDTO customContentDTO =
           (PolicyContentDTO.CustomContentDTO) policyContentDTO;
-      return PolicyContents.custom(customContentDTO.customRules(), customContentDTO.properties());
+      return PolicyContents.custom(
+          customContentDTO.customRules(),
+          customContentDTO.supportedObjectTypes(),
+          customContentDTO.properties());
     }
 
     throw new IllegalArgumentException(
