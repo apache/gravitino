@@ -208,20 +208,28 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
-    return cache.withCacheLock(
-        () -> {
-          Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
-          if (entities.isPresent()) {
-            return entities.get();
-          }
+    // We only cache the result for OWNER_REL. It is because the relation cache has
+    // consistency issue when updating the entity by non-relation operations. But for OWNER_REL,
+    // all the operations are done through relation operations, so we can cache the result.
+    if (relType == Type.OWNER_REL) {
+      return cache.withCacheLock(
+          () -> {
+            Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
+            if (entities.isPresent()) {
+              return entities.get();
+            }
 
-          List<E> backendEntities =
-              backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
+            List<E> backendEntities =
+                backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
 
-          cache.put(nameIdentifier, identType, relType, backendEntities);
+            cache.put(nameIdentifier, identType, relType, backendEntities);
 
-          return backendEntities;
-        });
+            return backendEntities;
+          });
+    }
+
+    // For other relation types, we do not cache the result.
+    return backend.listEntitiesByRelation(relType, nameIdentifier, identType, allFields);
   }
 
   @Override
@@ -231,7 +239,6 @@ public class RelationalEntityStore
       Entity.EntityType srcType,
       NameIdentifier destEntityIdent)
       throws IOException, NoSuchEntityException {
-    // todo: support cache
     return backend.getEntityByRelation(relType, srcIdentifier, srcType, destEntityIdent);
   }
 
@@ -244,7 +251,12 @@ public class RelationalEntityStore
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
-    cache.invalidate(srcIdentifier, srcType, relType);
+    // Current cache for relation operation has consistency issue, if the entity is updated by
+    // non-relation operation, the cache will not be updated. The only exception is OWNER_REL, so
+    // we only enable relation cache for OWNER_REL.
+    if (relType == Type.OWNER_REL) {
+      cache.invalidate(srcIdentifier, srcType, relType);
+    }
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
   }
 
@@ -256,7 +268,6 @@ public class RelationalEntityStore
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    cache.invalidate(srcEntityIdent, srcEntityType, relType);
     return backend.updateEntityRelations(
         relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
   }
