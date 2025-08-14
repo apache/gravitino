@@ -22,10 +22,11 @@ def load_job_tool(mcp: FastMCP):
     @mcp.tool(tags={"job"})
     async def get_list_of_jobs(
         ctx: Context,
-        job_template_name: str = "",
+        job_template_name: str = None,
     ) -> str:
         """
-        Get a list of jobs in the metalake. Optionally filter by job template name.
+        Get a list of jobs in the metalake. If `job_template_name` is provided,
+        the method will only return jobs that created from that specific job template.
         If no job template name is provided, all jobs will be returned.
 
         Parameters:
@@ -47,6 +48,11 @@ def load_job_tool(mcp: FastMCP):
                     }
                   }
                 ]
+
+                jobId: The unique identifier of the job.
+                jobTemplateName: The name of the job template used to create the job.
+                status: The current status of the job (e.g., "succeeded", "failed").
+                audit: An object containing audit information, including creator and creation time.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().get_list_of_jobs(
@@ -77,6 +83,11 @@ def load_job_tool(mcp: FastMCP):
                     "lastModifiedTime": "2025-08-13T11:51:43.038661Z"
                   }
                 }
+
+                jobId: The unique identifier of the job.
+                jobTemplateName: The name of the job template used to create the job.
+                status: The current status of the job (e.g., "succeeded", "failed").
+                audit: An object containing audit information, including creator and creation time.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().get_job_by_id(job_id)
@@ -109,6 +120,16 @@ def load_job_tool(mcp: FastMCP):
                     "scripts": []
                   }
                 ]
+
+                ame: The name of the job template to get.
+                jobType: The type of the job (e.g., "shell").
+                comment: A comment describing the job template.
+                executable: The path to the executable script for the job.
+                arguments: A list of arguments for the job.
+                environments: A dictionary of environment variables for the job.
+                customFields: A dictionary of custom fields for the job.
+                audit: An object containing audit information, including creator and creation time.
+                scripts: A list of scripts associated with the job template and can be called by the executable.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().get_list_of_job_templates()
@@ -141,6 +162,16 @@ def load_job_tool(mcp: FastMCP):
                   },
                   "scripts": []
                 }
+
+                name: The name of the job template to get.
+                jobType: The type of the job (e.g., "shell").
+                comment: A comment describing the job template.
+                executable: The path to the executable script for the job.
+                arguments: A list of arguments for the job.
+                environments: A dictionary of environment variables for the job.
+                customFields: A dictionary of custom fields for the job.
+                audit: An object containing audit information, including creator and creation time.
+                scripts: A list of scripts associated with the job template and can be called by the executable.
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_job_operation().get_job_template_by_name(name)
