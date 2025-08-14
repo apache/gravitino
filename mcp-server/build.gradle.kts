@@ -252,7 +252,7 @@ tasks {
 
 tasks.register<Exec>("pylint") {
   mustRunAfter("buildPython")
-  commandLine("uv", "run", "pylint", "./tests", "./mcp_server")
+  commandLine(venvPython, "-m", "pylint", "./tests", "./mcp_server")
 }
 
 tasks.named("test") {
