@@ -75,8 +75,10 @@ public class Namespace {
    */
   public static Namespace fromString(String namespace) {
     Preconditions.checkArgument(namespace != null, "Cannot create a namespace with null input");
-    Preconditions.checkArgument(!namespace.contains(" "), "Cannot create a namespace containing whitespace");
-    Preconditions.checkArgument(!namespace.endsWith("."), "Cannot create a namespace ending with a dot");
+    Preconditions.checkArgument(
+        !namespace.contains(" "), "Cannot create a namespace containing whitespace");
+    Preconditions.checkArgument(
+        !namespace.endsWith("."), "Cannot create a namespace ending with a dot");
     Preconditions.checkArgument(
         !namespace.startsWith("."), "Cannot create a namespace starting with a dot");
     Preconditions.checkArgument(
