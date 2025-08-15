@@ -26,6 +26,7 @@ import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.rest.RESTUtils;
 
 /** Represents a generic policy. */
 class GenericPolicy implements Policy, Policy.AssociatedObjects {
@@ -86,7 +87,9 @@ class GenericPolicy implements Policy, Policy.AssociatedObjects {
   public MetadataObject[] objects() {
     MetadataObjectListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/policies/%s/objects", metalake, name()),
+            String.format(
+                "api/metalakes/%s/policies/%s/objects",
+                RESTUtils.encodeString(metalake), RESTUtils.encodeString(name())),
             MetadataObjectListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.policyErrorHandler());
