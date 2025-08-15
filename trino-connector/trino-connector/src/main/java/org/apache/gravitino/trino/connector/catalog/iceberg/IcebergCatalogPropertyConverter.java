@@ -41,8 +41,7 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
 
   private static final Set<String> HIVE_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
-  private static final Set<String> REST_BACKEND_REQUIRED_PROPERTIES =
-      HIVE_BACKEND_REQUIRED_PROPERTIES;
+  private static final Set<String> REST_BACKEND_REQUIRED_PROPERTIES = Set.of("uri");
 
   @Override
   public Map<String, String> gravitinoToEngineProperties(Map<String, String> properties) {
