@@ -17,7 +17,6 @@
 
 import asyncio
 import logging
-import re
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 from urllib.parse import urlparse
@@ -38,7 +37,7 @@ def _create_lifespan_manager(gravitino_context: GravitinoContext):
 
     @asynccontextmanager
     async def app_lifespan(server: FastMCP) -> AsyncIterator[GravitinoContext]:
-        logging.info(f"Add Gravitino context: {gravitino_context}")
+        logging.info("Add Gravitino context: %s", gravitino_context)
         yield gravitino_context
 
     return app_lifespan

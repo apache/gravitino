@@ -205,7 +205,8 @@ public class MetalakeOperations {
 
     } catch (Exception e) {
       LOG.info("Failed to {} metalake: {}", request.isInUse() ? "enable" : "disable", metalakeName);
-      return ExceptionHandlers.handleMetalakeException(OperationType.LOAD, metalakeName, e);
+      return ExceptionHandlers.handleMetalakeException(
+          request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE, metalakeName, e);
     }
   }
 

@@ -594,9 +594,6 @@ CREATE TABLE IF NOT EXISTS policy_meta (
     policy_name VARCHAR(128) NOT NULL,
     policy_type VARCHAR(64) NOT NULL,
     metalake_id BIGINT NOT NULL,
-    inheritable SMALLINT NOT NULL,
-    exclusive SMALLINT NOT NULL,
-    supported_object_types TEXT NOT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
@@ -610,9 +607,6 @@ COMMENT ON COLUMN policy_meta.policy_id IS 'policy id';
 COMMENT ON COLUMN policy_meta.policy_name IS 'policy name';
 COMMENT ON COLUMN policy_meta.policy_type IS 'policy type';
 COMMENT ON COLUMN policy_meta.metalake_id IS 'metalake id';
-COMMENT ON COLUMN policy_meta.inheritable IS 'whether the policy is inheritable, 0 is not inheritable, 1 is inheritable';
-COMMENT ON COLUMN policy_meta.exclusive IS 'whether the policy is exclusive, 0 is not exclusive, 1 is exclusive';
-COMMENT ON COLUMN policy_meta.supported_object_types IS 'supported object types';
 COMMENT ON COLUMN policy_meta.audit_info IS 'policy audit info';
 COMMENT ON COLUMN policy_meta.current_version IS 'policy current version';
 COMMENT ON COLUMN policy_meta.last_version IS 'policy last version';
@@ -625,7 +619,7 @@ CREATE TABLE IF NOT EXISTS policy_version_info (
     policy_id BIGINT NOT NULL,
     version INT NOT NULL,
     policy_comment TEXT DEFAULT NULL,
-    enabled SMALLINT DEFAULT 1,
+    enabled BOOLEAN DEFAULT TRUE,
     content TEXT DEFAULT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
@@ -669,6 +663,36 @@ COMMENT ON COLUMN policy_relation_meta.current_version IS 'policy relation curre
 COMMENT ON COLUMN policy_relation_meta.last_version IS 'policy relation last version';
 COMMENT ON COLUMN policy_relation_meta.deleted_at IS 'policy relation deleted at';
 
+CREATE TABLE IF NOT EXISTS statistic_meta (
+    id BIGINT NOT NULL,
+    statistic_id BIGINT NOT NULL,
+    statistic_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    statistic_value TEXT NOT NULL,
+    metadata_object_id BIGINT NOT NULL,
+    metadata_object_type VARCHAR(64) NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (statistic_id),
+    UNIQUE (statistic_name, metadata_object_id, deleted_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stid ON statistic_meta (statistic_id);
+CREATE INDEX IF NOT EXISTS idx_moid ON statistic_meta (metadata_object_id);
+COMMENT ON TABLE statistic_meta IS 'statistic metadata';
+COMMENT ON COLUMN statistic_meta.id IS 'auto increment id';
+COMMENT ON COLUMN statistic_meta.statistic_id IS 'statistic id';
+COMMENT ON COLUMN statistic_meta.statistic_name IS 'statistic name';
+COMMENT ON COLUMN statistic_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN statistic_meta.statistic_value IS 'statistic value';
+COMMENT ON COLUMN statistic_meta.metadata_object_id IS 'metadata object id';
+COMMENT ON COLUMN statistic_meta.metadata_object_type IS 'metadata object type';
+COMMENT ON COLUMN statistic_meta.audit_info IS 'statistic audit info';
+COMMENT ON COLUMN statistic_meta.current_version IS 'statistic current version';
+COMMENT ON COLUMN statistic_meta.last_version IS 'statistic last version';
+COMMENT ON COLUMN statistic_meta.deleted_at IS 'statistic deleted at';
 
 CREATE TABLE IF NOT EXISTS job_template_meta (
     job_template_id BIGINT NOT NULL,

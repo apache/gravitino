@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -259,5 +260,18 @@ public class RelationalEntityStore
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
     return backend.updateEntityRelations(
         relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+  }
+
+  @Override
+  public int batchDelete(
+      List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
+      throws IOException {
+    return backend.batchDelete(entitiesToDelete, cascade);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    backend.batchPut(entities, overwritten);
   }
 }
