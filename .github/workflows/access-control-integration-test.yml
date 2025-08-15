@@ -22,7 +22,7 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**            
+              - .github/**    
               - api/**
               - authorizations/**
               - bin/**
@@ -44,7 +44,6 @@ jobs:
               - gradle.properties
               - gradlew
               - setting.gradle.kts
-
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
