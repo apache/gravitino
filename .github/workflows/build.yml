@@ -126,7 +126,7 @@ jobs:
 
       - name: Build MCP Server
         run: |
-          ./gradlew -PjdkVersion=${{ matrix.java-version }} -PpythonVersion=${{ matrix.python-version }} -PskipDockerTests=false :mcp-server:build           
+          ./gradlew :mcp-server:build           
 
   build:
     # The type of runner that the job will run on
