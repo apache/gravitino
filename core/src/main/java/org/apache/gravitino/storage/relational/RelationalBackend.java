@@ -130,24 +130,24 @@ public interface RelationalBackend
   /**
    * Deletes the entities in the specified namespace and entity type.
    *
-   * @param idents The list of identifiers and their entity types to be deleted.
+   * @param entitiesToDelete The list of identifiers and their entity types to be deleted.
    * @param cascade True, If you need to cascade delete entities, else false.
    * @return The count of the deleted entities.
    * @throws IOException If the store operation fails
    */
-  int batchDelete(List<Pair<NameIdentifier, Entity.EntityType>> idents, boolean cascade)
+  int batchDelete(List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException;
 
   /**
    * Stores a batch of entities, possibly overwriting existing entities if specified.
    *
-   * @param e The list of entities to be stored.
+   * @param entities The list of entities to be stored.
    * @param overwritten If true, overwrites existing entities with the same identifier.
    * @param <E> The type of the entities in the list.
    * @throws IOException If the store operation fails
    * @throws EntityAlreadyExistsException If an entity already exists and overwrite is false.
    */
-  <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
+  <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
 
   /**

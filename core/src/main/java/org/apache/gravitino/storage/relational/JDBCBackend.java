@@ -487,27 +487,30 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public int batchDelete(List<Pair<NameIdentifier, Entity.EntityType>> idents, boolean cascade)
+  public int batchDelete(
+      List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
-    if (idents == null || idents.isEmpty()) {
+    if (entitiesToDelete == null || entitiesToDelete.isEmpty()) {
       return 0;
     }
     Preconditions.checkArgument(
-        1 == idents.stream().collect(Collectors.groupingBy(Pair::getRight)).size(),
+        1 == entitiesToDelete.stream().collect(Collectors.groupingBy(Pair::getRight)).size(),
         "All entities must be of the same type for batch delete operation.");
-    Entity.EntityType entityType = idents.get(0).getRight();
+    Entity.EntityType entityType = entitiesToDelete.get(0).getRight();
     switch (entityType) {
       case TABLE_STATISTIC:
         Preconditions.checkArgument(
             cascade, "Batch delete for statistics must be cascade deleted.");
         List<NameIdentifier> deleteIdents =
-            idents.stream().map(Pair::getLeft).collect(Collectors.toList());
+            entitiesToDelete.stream().map(Pair::getLeft).collect(Collectors.toList());
+        int namespaceSize =
+            entitiesToDelete.stream()
+                .collect(Collectors.groupingBy(ident -> ident.getLeft().namespace()))
+                .size();
         Preconditions.checkArgument(
-            1
-                == idents.stream()
-                    .collect(Collectors.groupingBy(ident -> ident.getLeft().namespace()))
-                    .size(),
+            1 == namespaceSize,
             "All entities must be in the same namespace for batch delete operation.");
+
         Namespace namespace = deleteIdents.get(0).namespace();
         return StatisticMetaService.getInstance()
             .batchDeleteStatisticPOs(

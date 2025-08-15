@@ -195,12 +195,12 @@ public interface EntityStore extends Closeable {
    * Batch delete entities from the underlying storage by the specified list of {@link
    * org.apache.gravitino.NameIdentifier} and {@link EntityType}.
    *
-   * @param idents the list of pairs of name identifiers and entity types to be deleted
+   * @param entitiesToDelete the list of pairs of name identifiers and entity types to be deleted
    * @param cascade if true, cascade delete the entities, otherwise just delete the entities
    * @return the number of entities deleted
    * @throws IOException if the batch delete operation fails
    */
-  int batchDelete(List<Pair<NameIdentifier, EntityType>> idents, boolean cascade)
+  int batchDelete(List<Pair<NameIdentifier, EntityType>> entitiesToDelete, boolean cascade)
       throws IOException;
 
   /**

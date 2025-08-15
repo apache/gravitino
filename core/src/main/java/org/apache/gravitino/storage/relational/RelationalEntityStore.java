@@ -263,9 +263,10 @@ public class RelationalEntityStore
   }
 
   @Override
-  public int batchDelete(List<Pair<NameIdentifier, Entity.EntityType>> idents, boolean cascade)
+  public int batchDelete(
+      List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
-    return backend.batchDelete(idents, cascade);
+    return backend.batchDelete(entitiesToDelete, cascade);
   }
 
   @Override

@@ -172,7 +172,7 @@ public class TestMemoryEntityStore {
     }
 
     @Override
-    public int batchDelete(List<Pair<NameIdentifier, EntityType>> idents, boolean cascade)
+    public int batchDelete(List<Pair<NameIdentifier, EntityType>> entitiesToDelete, boolean cascade)
         throws IOException {
       throw new UnsupportedOperationException(
           "Batch delete is not supported in InMemoryEntityStore.");
