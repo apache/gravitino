@@ -48,6 +48,7 @@ import org.apache.gravitino.cli.commands.SetFilesetProperty;
 import org.apache.gravitino.cli.commands.UpdateFilesetComment;
 import org.apache.gravitino.cli.commands.UpdateFilesetName;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -151,6 +152,27 @@ class TestFilesetCommands {
     doReturn(mockCreate).when(mockCreate).validate();
     commandLine.handleCommandLine();
     verify(mockCreate).handle();
+  }
+
+  @Test
+  void testCreateFilesetCommandWithoutManagedType() {
+    Main.useExit = false;
+    when(mockCommandLine.hasOption(GravitinoOptions.METALAKE)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.METALAKE)).thenReturn("metalake_demo");
+    when(mockCommandLine.hasOption(GravitinoOptions.NAME)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.NAME))
+        .thenReturn("catalog.schema.fileset");
+    when(mockCommandLine.hasOption(GravitinoOptions.COMMENT)).thenReturn(true);
+    when(mockCommandLine.getOptionValue(GravitinoOptions.COMMENT)).thenReturn("comment");
+    when(mockCommandLine.hasOption(GravitinoOptions.PROPERTIES)).thenReturn(true);
+    when(mockCommandLine.getOptionValues(GravitinoOptions.PROPERTIES))
+        .thenReturn(new String[] {"key1=value1", "key2=value2"});
+    GravitinoCommandLine commandLine =
+        spy(
+            new GravitinoCommandLine(
+                mockCommandLine, mockOptions, CommandEntities.FILESET, CommandActions.CREATE));
+
+    Assertions.assertThrowsExactly(RuntimeException.class, commandLine::handleCommandLine);
   }
 
   @Test
