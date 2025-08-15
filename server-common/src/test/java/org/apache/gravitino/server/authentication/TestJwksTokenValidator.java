@@ -22,6 +22,7 @@ package org.apache.gravitino.server.authentication;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -74,7 +75,7 @@ public class TestJwksTokenValidator {
     Map<String, String> properties = new HashMap<>();
     properties.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
     properties.put("gravitino.authenticator.oauth.authority", "https://login.microsoftonline.com");
-    properties.put("gravitino.authenticator.oauth.principalField", "sub");
+    properties.put("gravitino.authenticator.oauth.principalFields", "sub");
     properties.put("gravitino.authenticator.oauth.allowSkewSecs", "60");
 
     validator.initialize(createConfig(properties));
@@ -116,7 +117,7 @@ public class TestJwksTokenValidator {
   }
 
   @Test
-  public void testCustomPrincipalField() throws Exception {
+  public void testCustomPrincipalFields() throws Exception {
     // Generate a test RSA key pair
     RSAKey rsaKey =
         new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
@@ -161,7 +162,7 @@ public class TestJwksTokenValidator {
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
       config.put(
-          "gravitino.authenticator.oauth.principalField",
+          "gravitino.authenticator.oauth.principalFields",
           "client_id"); // Use client_id instead of default 'sub'
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
@@ -180,11 +181,13 @@ public class TestJwksTokenValidator {
     RSAKey rsaKey =
         new RSAKeyGenerator(2048).keyID("test-key-id").algorithm(JWSAlgorithm.RS256).generate();
 
-    // Create a signed JWT token without the configured principal field, but with fallback fields
+    // Create a signed JWT token without the first configured principal field, but with other
+    // configured fields
     JWTClaimsSet claimsSet =
         new JWTClaimsSet.Builder()
             .subject("fallback-subject")
-            .claim("email", "user@example.com") // This should be used as fallback
+            .claim(
+                "email", "user@example.com") // This should be used as fallback from configuration
             .audience("test-service")
             .issuer("https://test-issuer.com")
             .expirationTime(Date.from(Instant.now().plusSeconds(3600)))
@@ -213,19 +216,17 @@ public class TestJwksTokenValidator {
       // Configure the mock to return our test key
       when(mockJwkSource.get(any(), any())).thenReturn(Arrays.asList(rsaKey));
 
-      // Initialize validator with principal field that doesn't exist in token
       Map<String, String> config = new HashMap<>();
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
       config.put(
-          "gravitino.authenticator.oauth.principalField",
-          "non_existent_field"); // This field doesn't exist
+          "gravitino.authenticator.oauth.principalFields",
+          "non_existent_field,email"); // Should fall back to email since first field doesn't exist
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "120");
 
       validator.initialize(createConfig(config));
 
-      // Test token validation - should fall back to 'email' field (which is in fallback list)
       Principal result = validator.validateToken(tokenString, "test-service");
 
       assertNotNull(result);
@@ -277,7 +278,7 @@ public class TestJwksTokenValidator {
       config.put(
           "gravitino.authenticator.oauth.jwksUri", "https://test-jwks.com/.well-known/jwks.json");
       config.put("gravitino.authenticator.oauth.authority", "https://test-issuer.com");
-      config.put("gravitino.authenticator.oauth.principalField", "sub");
+      config.put("gravitino.authenticator.oauth.principalFields", "sub");
       config.put("gravitino.authenticator.oauth.allowSkewSecs", "60");
 
       validator.initialize(createConfig(config));
@@ -317,7 +318,7 @@ public class TestJwksTokenValidator {
     Map<String, String> properties = new HashMap<>();
     properties.put("gravitino.authenticator.oauth.jwksUri", validJwksUri);
     properties.put("gravitino.authenticator.oauth.authority", "https://login.microsoftonline.com");
-    properties.put("gravitino.authenticator.oauth.principalField", "custom_field");
+    properties.put("gravitino.authenticator.oauth.principalFields", "custom_field");
     properties.put("gravitino.authenticator.oauth.allowSkewSecs", "300");
 
     validator.initialize(createConfig(properties));
@@ -332,6 +333,6 @@ public class TestJwksTokenValidator {
     // The exception should indicate JWT parsing/validation error, not initialization error
     assertNotNull(exception.getMessage());
     // The message should not contain "not initialized" or similar
-    assertEquals(true, exception.getMessage().toLowerCase().contains("jwt"));
+    assertTrue(exception.getMessage().toLowerCase().contains("jwt"));
   }
 }
