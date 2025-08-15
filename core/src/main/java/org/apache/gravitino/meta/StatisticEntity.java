@@ -25,10 +25,11 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.stats.StatisticValue;
 
-public class StatisticEntity implements Entity, HasIdentifier, Auditable {
+public abstract class StatisticEntity implements Entity, HasIdentifier, Auditable {
   public static final Field ID =
       Field.required("id", Long.class, "The unique identifier of the statistic entity.");
   public static final Field NAME =
@@ -38,11 +39,11 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the statistic entity.");
 
-  private Long id;
-  private String name;
-  private StatisticValue<?> value;
-  private AuditInfo auditInfo;
-  private Namespace namespace;
+  protected Long id;
+  protected String name;
+  protected StatisticValue<?> value;
+  protected AuditInfo auditInfo;
+  protected Namespace namespace;
 
   @Override
   public Audit auditInfo() {
@@ -57,11 +58,6 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     fields.put(VALUE, value);
     fields.put(AUDIT_INFO, auditInfo);
     return fields;
-  }
-
-  @Override
-  public EntityType type() {
-    return EntityType.STATISTIC;
   }
 
   @Override
@@ -83,45 +79,74 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     return value;
   }
 
-  public static Builder builder() {
-    return new Builder();
+  public static EntityType getStatisticType(MetadataObject.Type type) {
+    switch (type) {
+      case TABLE:
+        return EntityType.TABLE_STATISTIC;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported metadata object type for statistics: " + type);
+    }
   }
 
-  public static class Builder {
-    private final StatisticEntity statisticEntity;
+  public static <S extends StatisticEntityBuilder<S, E>, E extends StatisticEntity> S builder(
+      Entity.EntityType type) {
+    switch (type) {
+      case TABLE_STATISTIC:
+        return (S) TableStatisticEntity.builder();
+      default:
+        throw new IllegalArgumentException("Unsupported statistic entity type: " + type);
+    }
+  }
 
-    private Builder() {
-      statisticEntity = new StatisticEntity();
+  interface Builder<SELF extends Builder<SELF, T>, T extends StatisticEntity> {
+    T build();
+  }
+
+  public abstract static class StatisticEntityBuilder<
+          SELF extends Builder<SELF, T>, T extends StatisticEntity>
+      implements Builder<SELF, T> {
+
+    protected Long id;
+    protected String name;
+    protected StatisticValue<?> value;
+    protected AuditInfo auditInfo;
+    protected Namespace namespace;
+
+    public SELF withId(Long id) {
+      this.id = id;
+      return self();
     }
 
-    public Builder withId(Long id) {
-      statisticEntity.id = id;
-      return this;
+    public SELF withName(String name) {
+      this.name = name;
+      return self();
     }
 
-    public Builder withName(String name) {
-      statisticEntity.name = name;
-      return this;
+    public SELF withValue(StatisticValue<?> value) {
+      this.value = value;
+      return self();
     }
 
-    public Builder withValue(StatisticValue<?> value) {
-      statisticEntity.value = value;
-      return this;
+    public SELF withAuditInfo(AuditInfo auditInfo) {
+      this.auditInfo = auditInfo;
+      return self();
     }
 
-    public Builder withAuditInfo(AuditInfo auditInfo) {
-      statisticEntity.auditInfo = auditInfo;
-      return this;
+    public SELF withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return self();
     }
 
-    public Builder withNamespace(Namespace namespace) {
-      statisticEntity.namespace = namespace;
-      return this;
+    private SELF self() {
+      return (SELF) this;
     }
 
-    public StatisticEntity build() {
-      statisticEntity.validate();
-      return statisticEntity;
+    protected abstract T internalBuild();
+
+    public T build() {
+      T t = internalBuild();
+      return t;
     }
   }
 }
