@@ -16,24 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization.common;
+package org.apache.gravitino.rel.expressions;
 
-import java.util.Map;
-import java.util.stream.Collectors;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public abstract class AuthorizationProperties {
-  protected Map<String, String> properties;
-
-  protected AuthorizationProperties(Map<String, String> properties) {
-    this.properties =
-        properties.entrySet().stream()
-            .filter(
-                entry ->
-                    entry.getKey().startsWith(getPropertiesPrefix()) && entry.getValue() != null)
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+class TestFunctionExpression {
+  @Test
+  public void testToStringWithArguments() {
+    FunctionExpression expr =
+        FunctionExpression.of("func", NamedReference.field("a"), NamedReference.field("b"));
+    Assertions.assertEquals("func(a, b)", expr.toString());
   }
 
-  public abstract String getPropertiesPrefix();
-
-  public abstract void validate();
+  @Test
+  public void testToStringWithoutArguments() {
+    FunctionExpression expr = FunctionExpression.of("func");
+    Assertions.assertEquals("func()", expr.toString());
+  }
 }

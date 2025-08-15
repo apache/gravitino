@@ -101,9 +101,9 @@ public class CompatibilityUtils {
   }
 
   static Status toAuditLogStatus(OperationStatus operationStatus) {
-    if (operationStatus.equals(OperationStatus.SUCCESS)) {
+    if (operationStatus == OperationStatus.SUCCESS) {
       return Status.SUCCESS;
-    } else if (operationStatus.equals(OperationStatus.FAILURE)) {
+    } else if (operationStatus == OperationStatus.FAILURE) {
       return Status.FAILURE;
     } else {
       return Status.UNKNOWN;

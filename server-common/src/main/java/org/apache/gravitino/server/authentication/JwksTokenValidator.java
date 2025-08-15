@@ -31,6 +31,7 @@ import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import java.net.URL;
 import java.security.Principal;
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
@@ -50,14 +51,14 @@ public class JwksTokenValidator implements OAuthTokenValidator {
 
   private String jwksUri;
   private String expectedIssuer;
-  private String principalField;
+  private List<String> principalFields;
   private long allowSkewSeconds;
 
   @Override
   public void initialize(Config config) {
     this.jwksUri = config.get(OAuthConfig.JWKS_URI);
     this.expectedIssuer = config.get(OAuthConfig.AUTHORITY);
-    this.principalField = config.get(OAuthConfig.PRINCIPAL_FIELD);
+    this.principalFields = config.get(OAuthConfig.PRINCIPAL_FIELDS);
     this.allowSkewSeconds = config.get(OAuthConfig.ALLOW_SKEW_SECONDS);
 
     LOG.info("Initializing JWKS token validator");
@@ -147,23 +148,17 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     }
   }
 
-  /** Extracts the principal from the validated JWT claims using configured field or fallbacks. */
+  /** Extracts the principal from the validated JWT claims using configured field(s). */
   private String extractPrincipal(JWTClaimsSet validatedClaims) {
-    // Try the configured principal field first
-    if (StringUtils.isNotBlank(principalField)) {
-      String principal = (String) validatedClaims.getClaim(principalField);
-      if (principal != null) {
-        return principal;
-      }
-    }
-
-    // Fallback to common user identity fields
-    // TODO: Consider making this configurable
-    String[] fallbackFields = {"unique_name", "upn", "email", "preferred_username", "sub"};
-    for (String field : fallbackFields) {
-      String principal = (String) validatedClaims.getClaim(field);
-      if (principal != null) {
-        return principal;
+    // Try the principal field(s) one by one in order
+    if (principalFields != null && !principalFields.isEmpty()) {
+      for (String field : principalFields) {
+        if (StringUtils.isNotBlank(field)) {
+          String principal = (String) validatedClaims.getClaim(field);
+          if (principal != null) {
+            return principal;
+          }
+        }
       }
     }
 

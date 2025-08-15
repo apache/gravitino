@@ -142,7 +142,8 @@ public class TestPolicyMetaService extends TestJDBCBackend {
             .build();
 
     Assertions.assertThrows(
-        Exception.class, () -> policyMetaService.insertPolicy(PolicyEntity2, false));
+        EntityAlreadyExistsException.class,
+        () -> policyMetaService.insertPolicy(PolicyEntity2, false));
 
     policyMetaService.insertPolicy(PolicyEntity2, true);
 

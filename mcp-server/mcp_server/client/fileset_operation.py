@@ -56,6 +56,7 @@ class FilesetOperation(ABC):
         """
         pass
 
+    # pylint: disable=too-many-positional-arguments
     @abstractmethod
     async def list_files_in_fileset(
         self,

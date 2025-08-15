@@ -39,6 +39,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
@@ -46,9 +47,11 @@ import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
@@ -255,7 +258,40 @@ public class PolicyOperations {
     }
   }
 
-  private PolicyDTO toDTO(PolicyEntity policy, Optional<Boolean> inherited) {
+  @GET
+  @Path("{policy}/objects")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-objects-for-policy." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-objects-for-policy", absolute = true)
+  public Response listMetadataObjectsForPolicy(
+      @PathParam("metalake") String metalake, @PathParam("policy") String policyName) {
+    LOG.info("Received list objects for policy: {} under metalake: {}", policyName, metalake);
+
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            MetadataObject[] objects =
+                policyDispatcher.listMetadataObjectsForPolicy(metalake, policyName);
+            objects = objects == null ? new MetadataObject[0] : objects;
+
+            LOG.info(
+                "List {} objects for policy: {} under metalake: {}",
+                objects.length,
+                policyName,
+                metalake);
+
+            MetadataObjectDTO[] objectDTOs =
+                Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
+            return Utils.ok(new MetadataObjectListResponse(objectDTOs));
+          });
+
+    } catch (Exception e) {
+      return ExceptionHandlers.handlePolicyException(OperationType.LIST, "", policyName, e);
+    }
+  }
+
+  static PolicyDTO toDTO(PolicyEntity policy, Optional<Boolean> inherited) {
     PolicyDTO.Builder builder =
         PolicyDTO.builder()
             .withName(policy.name())

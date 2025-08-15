@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import static org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper.META_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.POLICY_META_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
@@ -28,7 +28,7 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   @Override
   public String softDeletePolicyByMetalakeAndPolicyName(String metalakeName, String policyName) {
     return "UPDATE "
-        + META_TABLE_NAME
+        + POLICY_META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE metalake_id = (SELECT metalake_id FROM "
@@ -39,7 +39,7 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   @Override
   public String softDeletePolicyMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
-        + META_TABLE_NAME
+        + POLICY_META_TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000)))"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
@@ -48,16 +48,16 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   @Override
   public String deletePolicyMetasByLegacyTimeline(Long legacyTimeline, int limit) {
     return "DELETE FROM "
-        + META_TABLE_NAME
+        + POLICY_META_TABLE_NAME
         + " WHERE policy_id IN (SELECT policy_id FROM "
-        + META_TABLE_NAME
+        + POLICY_META_TABLE_NAME
         + " WHERE deleted_at = 0 AND legacy_timeline < #{legacyTimeline} LIMIT #{limit})";
   }
 
   @Override
   public String insertPolicyMetaOnDuplicateKeyUpdate(PolicyPO policyPO) {
     return "INSERT INTO "
-        + META_TABLE_NAME
+        + POLICY_META_TABLE_NAME
         + " (policy_id, policy_name, policy_type, metalake_id,"
         + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("

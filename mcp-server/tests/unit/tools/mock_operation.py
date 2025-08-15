@@ -21,10 +21,11 @@ from mcp_server.client import (
     ModelOperation,
     SchemaOperation,
     TableOperation,
+    TagOperation,
     TopicOperation,
 )
 from mcp_server.client.fileset_operation import FilesetOperation
-from mcp_server.client.tag_operation import TagOperation
+from mcp_server.client.job_operation import JobOperation
 
 
 class MockOperation(GravitinoOperation):
@@ -51,6 +52,9 @@ class MockOperation(GravitinoOperation):
 
     def as_tag_operation(self) -> TagOperation:
         return MockTagOperation()
+
+    def as_job_operation(self) -> JobOperation:
+        return MockJobOperation()
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -86,6 +90,8 @@ class MockFilesetOperation(FilesetOperation):
     ) -> str:
         return "mock_fileset"
 
+    # pylint: disable=R0917
+    # This method has too many arguments, but it's a mock and we want to keep the signature similar to the real one.
     async def list_files_in_fileset(
         self,
         catalog_name: str,
@@ -141,15 +147,15 @@ class MockTagOperation(TagOperation):
         return "mock_tags"
 
     async def create_tag(
-        self, name: str, comment: str, properties: dict
+        self, tag_name: str, tag_comment: str, tag_properties: dict
     ) -> str:
-        return f"mock_tag_created: {name}"
+        return f"mock_tag_created: {tag_name}"
 
-    async def get_tag_by_name(self, name: str) -> str:
-        return f"mock_tag: {name}"
+    async def get_tag_by_name(self, tag_name: str) -> str:
+        return f"mock_tag: {tag_name}"
 
-    async def alter_tag(self, name: str, updates: list) -> str:
-        return f"mock_tag_altered: {name} with updates {updates}"
+    async def alter_tag(self, tag_name: str, updates: list) -> str:
+        return f"mock_tag_altered: {tag_name} with updates {updates}"
 
     async def delete_tag(self, name: str) -> str:
         return f"mock_tag_deleted: {name}"
@@ -170,3 +176,23 @@ class MockTagOperation(TagOperation):
 
     async def list_metadata_by_tag(self, tag_name: str) -> str:
         return f"mock_metadata_by_tag: {tag_name}"
+
+
+class MockJobOperation(JobOperation):
+    async def get_list_of_jobs(self, job_template_name: str = "") -> str:
+        return "mock_jobs"
+
+    async def get_job_by_id(self, job_id: str) -> str:
+        return f"mock_job: {job_id}"
+
+    async def get_list_of_job_templates(self) -> str:
+        return "mock_job_templates"
+
+    async def get_job_template_by_name(self, name: str) -> str:
+        return f"mock_job_template: {name}"
+
+    async def run_job(self, job_template_name: str, job_config: dict) -> str:
+        return f"mock_job_run: {job_template_name} with parameters {job_config}"
+
+    async def cancel_job(self, job_id: str) -> str:
+        return f"mock_job_cancelled: {job_id}"
