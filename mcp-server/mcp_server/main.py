@@ -23,6 +23,9 @@ from mcp_server.server import GravitinoMCPServer
 
 
 def do_main():
+    """
+    :return: None
+    """
     args = _parse_args()
     setting = Setting(
         metalake=args.metalake,
