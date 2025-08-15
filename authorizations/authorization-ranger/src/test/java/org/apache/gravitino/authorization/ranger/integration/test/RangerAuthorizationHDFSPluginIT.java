@@ -341,12 +341,8 @@ public class RangerAuthorizationHDFSPluginIT {
                   "/test/schema1",
                   PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA));
 
-          // This should not throw an exception and should call removeSchemaMetadataObject
-          // We can't directly test the private method, but we can verify the behavior
-          // by checking that the method handles different metadata object types correctly
           Assertions.assertDoesNotThrow(
               () -> {
-                // Use reflection to call the protected method
                 try {
                   java.lang.reflect.Method removeMethod =
                       RangerAuthorizationPlugin.class.getDeclaredMethod(
@@ -355,8 +351,6 @@ public class RangerAuthorizationHDFSPluginIT {
                   removeMethod.setAccessible(true);
                   removeMethod.invoke(rangerAuthPlugin, schemaObject);
                 } catch (Exception e) {
-                  // Expected to fail in test environment, but the important thing is
-                  // that the method doesn't crash due to incorrect comparison
                   Assertions.assertTrue(e.getCause() instanceof RuntimeException);
                 }
               });
@@ -379,8 +373,6 @@ public class RangerAuthorizationHDFSPluginIT {
                   removeMethod.setAccessible(true);
                   removeMethod.invoke(rangerAuthPlugin, tableObject);
                 } catch (Exception e) {
-                  // Expected to fail in test environment, but the important thing is
-                  // that the method doesn't crash due to incorrect comparison
                   Assertions.assertTrue(e.getCause() instanceof RuntimeException);
                 }
               });
@@ -403,8 +395,6 @@ public class RangerAuthorizationHDFSPluginIT {
                   removeMethod.setAccessible(true);
                   removeMethod.invoke(rangerAuthPlugin, filesetObject);
                 } catch (Exception e) {
-                  // Expected to fail in test environment, but the important thing is
-                  // that the method doesn't crash due to incorrect comparison
                   Assertions.assertTrue(e.getCause() instanceof RuntimeException);
                 }
               });
@@ -427,8 +417,6 @@ public class RangerAuthorizationHDFSPluginIT {
                   removeMethod.setAccessible(true);
                   removeMethod.invoke(rangerAuthPlugin, metalakeObject);
                 } catch (Exception e) {
-                  // Expected to fail in test environment, but the important thing is
-                  // that the method doesn't crash due to incorrect comparison
                   Assertions.assertTrue(e.getCause() instanceof RuntimeException);
                 }
               });
@@ -451,61 +439,33 @@ public class RangerAuthorizationHDFSPluginIT {
                   removeMethod.setAccessible(true);
                   removeMethod.invoke(rangerAuthPlugin, catalogObject);
                 } catch (Exception e) {
-                  // Expected to fail in test environment, but the important thing is
-                  // that the method doesn't crash due to incorrect comparison
                   Assertions.assertTrue(e.getCause() instanceof RuntimeException);
                 }
               });
 
-          // Test unsupported type (should throw IllegalArgumentException)
-          PathBasedMetadataObject unsupportedObject =
-              new PathBasedMetadataObject(
-                  "catalog1.schema1.table1",
-                  "column1",
-                  "/test/schema1/table1/column1",
-                  PathBasedMetadataObject.PathType.get(MetadataObject.Type.COLUMN));
-
+          // Test unsupported type (should throw IllegalArgumentException when creating PathType)
           Assertions.assertThrows(
-              Exception.class,
-              () -> {
-                try {
-                  java.lang.reflect.Method removeMethod =
-                      RangerAuthorizationPlugin.class.getDeclaredMethod(
-                          "removeMetadataObject",
-                          org.apache.gravitino.authorization.AuthorizationMetadataObject.class);
-                  removeMethod.setAccessible(true);
-                  removeMethod.invoke(rangerAuthPlugin, unsupportedObject);
-                } catch (Exception e) {
-                  // Should throw IllegalArgumentException for unsupported type
-                  if (e.getCause() instanceof IllegalArgumentException) {
-                    throw e.getCause();
-                  }
-                  throw e;
-                }
-              });
+              IllegalArgumentException.class,
+              () -> PathBasedMetadataObject.PathType.get(MetadataObject.Type.COLUMN));
         });
   }
 
   @Test
   public void testPathTypeComparison() {
-    // Test that PathType.equals() works correctly with MetadataObject.Type
     PathBasedMetadataObject.PathType schemaPathType =
         PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA);
     PathBasedMetadataObject.PathType tablePathType =
         PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE);
 
-    // Test equals method works correctly
     Assertions.assertTrue(
         schemaPathType.equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.SCHEMA)));
     Assertions.assertFalse(
         schemaPathType.equals(PathBasedMetadataObject.PathType.get(MetadataObject.Type.TABLE)));
     Assertions.assertFalse(schemaPathType.equals(tablePathType));
 
-    // Test that the comparison in removeMetadataObject works correctly
     PathBasedMetadataObject schemaObject =
         new PathBasedMetadataObject("catalog1", "schema1", "/test/schema1", schemaPathType);
 
-    // This should not throw an exception due to incorrect comparison
     Assertions.assertDoesNotThrow(
         () -> {
           try {
@@ -516,8 +476,6 @@ public class RangerAuthorizationHDFSPluginIT {
             removeMethod.setAccessible(true);
             removeMethod.invoke(rangerAuthPlugin, schemaObject);
           } catch (Exception e) {
-            // Expected to fail in test environment, but the important thing is
-            // that the method doesn't crash due to incorrect comparison
             Assertions.assertTrue(e.getCause() instanceof RuntimeException);
           }
         });
