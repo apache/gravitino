@@ -34,7 +34,7 @@ public class JdbcAuthorizationProperties extends AuthorizationProperties {
   }
 
   private void check(String key, String errorMsg) {
-    if (!properties.containsKey(key) && properties.get(key) != null) {
+    if (!properties.containsKey(key)) {
       throw new IllegalArgumentException(String.format(errorMsg, key));
     }
   }

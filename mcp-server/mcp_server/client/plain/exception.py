@@ -15,27 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-[project]
-name = "gravitino_mcp_server"
-version = "1.0.0"
-description = "Gravitino MCP server"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "fastmcp>=2.10.6",
-    "parameterized>=0.9.0",
-    "pytest>=8.4.1",
-    "pylint>=2.20.0",
-]
 
-[tool.isort]
-profile = "black"
-line_length = 80
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
+class GravitinoException(Exception):
+    """Custom exception for Gravitino-related errors."""
 
-[tool.black]
-line-length = 80
-target-version = ['py38']
+    pass
