@@ -42,8 +42,8 @@ public class ThreadLocalAuthorizationCache {
   private static final ThreadLocal<Map<AuthorizationContext, Boolean>> denyAuthorizerThreadCache =
       new ThreadLocal<>();
 
-  /** Used to determine whether the privilege has already been loaded. */
-  private static final ThreadLocal<Boolean> hasLoadedPrivilegeThreadLocal = new ThreadLocal<>();
+  /** Used to determine whether the role has already been loaded. */
+  private static final ThreadLocal<Boolean> hasLoadedRoleThreadLocal = new ThreadLocal<>();
 
   /**
    * Wrap the authorization method with this method to prevent threadlocal leakage.
@@ -59,18 +59,17 @@ public class ThreadLocalAuthorizationCache {
     return result;
   }
 
-  /**
-   * Wrap with this method to avoid repeatedly loading permissions within a single request.
-   *
-   * @param runnable load privilege method
-   */
-  public static void loadPrivilege(Runnable runnable) {
-    Boolean hasLoadedPrivilege = hasLoadedPrivilegeThreadLocal.get();
-    if (hasLoadedPrivilege != null && hasLoadedPrivilege) {
+  public static void loadRole(Runnable runnable) {
+    Boolean hasLoadedRole = hasLoadedRoleThreadLocal.get();
+    if (hasLoadedRole == null) {
+      runnable.run();
+      return;
+    }
+    if (hasLoadedRole) {
       return;
     }
     runnable.run();
-    hasLoadedPrivilegeThreadLocal.set(true);
+    hasLoadedRoleThreadLocal.set(true);
   }
 
   /**
@@ -128,13 +127,13 @@ public class ThreadLocalAuthorizationCache {
   private static void start() {
     allowAuthorizerThreadCache.set(new HashMap<>());
     denyAuthorizerThreadCache.set(new HashMap<>());
-    hasLoadedPrivilegeThreadLocal.set(false);
+    hasLoadedRoleThreadLocal.set(false);
   }
 
   private static void end() {
     allowAuthorizerThreadCache.remove();
     denyAuthorizerThreadCache.remove();
-    hasLoadedPrivilegeThreadLocal.remove();
+    hasLoadedRoleThreadLocal.remove();
   }
 
   public static class AuthorizationContext {

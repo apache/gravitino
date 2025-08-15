@@ -31,7 +31,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
-import org.apache.gravitino.server.authorization.ThreadLocalAuthorizationCache;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -91,16 +90,11 @@ public class AuthorizationExpressionEvaluator {
     NameIdentifier nameIdentifier = metadataNames.get(Entity.EntityType.METALAKE);
     ognlContext.put(
         "METALAKE_NAME", Optional.ofNullable(nameIdentifier).map(NameIdentifier::name).orElse(""));
-    Object result =
-        ThreadLocalAuthorizationCache.executeWithThreadCache(
-            () -> {
-              try {
-                return Ognl.getValue(ognlAuthorizationExpression, ognlContext);
-              } catch (OgnlException e) {
-                throw new RuntimeException(e);
-              }
-            });
-    return (boolean) result;
+    try {
+      return (boolean) Ognl.getValue(ognlAuthorizationExpression, ognlContext);
+    } catch (OgnlException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static boolean isMetadataType(Entity.EntityType type) {

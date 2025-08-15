@@ -357,44 +357,48 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Long userId,
       MetadataObject metadataObject,
       Long metadataObjectId) {
-    ThreadLocalAuthorizationCache.loadPrivilege(
-        () -> {
-          try {
-            loadRolePrivilege(metalake, username, userId);
-            loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
-          } catch (Exception e) {
-            LOG.error(e.getMessage(), e);
-          }
-        });
+    try {
+      loadRolePrivilege(metalake, username, userId);
+      loadOwnerPolicy(metalake, metadataObject, metadataObjectId);
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
   }
 
-  private void loadRolePrivilege(String metalake, String username, Long userId) throws IOException {
-    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
-    List<RoleEntity> entities =
-        entityStore
-            .relationOperations()
-            .listEntitiesByRelation(
-                SupportsRelationOperations.Type.ROLE_USER_REL,
-                userNameIdentifier,
-                Entity.EntityType.USER);
+  private void loadRolePrivilege(String metalake, String username, Long userId) {
+    ThreadLocalAuthorizationCache.loadRole(
+        () -> {
+          EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+          NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
+          List<RoleEntity> entities;
+          try {
+            entities =
+                entityStore
+                    .relationOperations()
+                    .listEntitiesByRelation(
+                        SupportsRelationOperations.Type.ROLE_USER_REL,
+                        userNameIdentifier,
+                        Entity.EntityType.USER);
+            for (RoleEntity role : entities) {
+              Long roleId = role.id();
+              allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+              denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+              if (loadedRoles.contains(roleId)) {
+                continue;
+              }
+              role =
+                  entityStore.get(
+                      NameIdentifierUtil.ofRole(metalake, role.name()),
+                      Entity.EntityType.ROLE,
+                      RoleEntity.class);
 
-    for (RoleEntity role : entities) {
-      Long roleId = role.id();
-      allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-      denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-      if (loadedRoles.contains(roleId)) {
-        continue;
-      }
-      role =
-          entityStore.get(
-              NameIdentifierUtil.ofRole(metalake, role.name()),
-              Entity.EntityType.ROLE,
-              RoleEntity.class);
-
-      loadPolicyByRoleEntity(role);
-      loadedRoles.add(roleId);
-    }
+              loadPolicyByRoleEntity(role);
+              loadedRoles.add(roleId);
+            }
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
