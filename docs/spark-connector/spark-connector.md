@@ -36,6 +36,13 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 | spark.sql.gravitino.metalake             | string | (none)        | The metalake name that spark connector used to request to Gravitino.                            | Yes      | 0.5.0         |
 | spark.sql.gravitino.uri                  | string | (none)        | The uri of Gravitino server address.                                                            | Yes      | 0.5.0         |
 | spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       | 0.5.1         |
+| spark.sql.gravitino.client.              | string | (none)        | The configuration key prefix for the Gravitino client config.                                   | No       | 1.0.0         |
+
+To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
+
+**Example:** Setting `spark.sql.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
+
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
 
 ```shell
 ./bin/spark-sql -v \
@@ -43,6 +50,8 @@ Gravitino Spark connector doesn't support Scala 2.13 for Spark3.3.
 --conf spark.sql.gravitino.uri=http://127.0.0.1:8090 \
 --conf spark.sql.gravitino.metalake=test \
 --conf spark.sql.gravitino.enableIcebergSupport=true \
+--conf spark.sql.gravitino.client.socketTimeoutMs=60000 \
+--conf spark.sql.gravitino.client.connectionTimeoutMs=60000 \
 --conf spark.sql.warehouse.dir=hdfs://127.0.0.1:9000/user/hive/warehouse-hive
 ```
 

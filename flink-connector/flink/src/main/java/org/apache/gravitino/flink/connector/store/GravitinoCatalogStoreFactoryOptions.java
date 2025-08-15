@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.flink.connector.store;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 
@@ -38,4 +40,10 @@ public class GravitinoCatalogStoreFactoryOptions {
           .stringType()
           .noDefaultValue()
           .withDescription("The name of Gravitino metalake");
+
+  public static final ConfigOption<Map<String, String>> GRAVITINO_CLIENT_CONFIG =
+      ConfigOptions.key("gravitino.client")
+          .mapType()
+          .defaultValue(ImmutableMap.of())
+          .withDescription("The config of Gravitino client");
 }
