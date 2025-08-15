@@ -20,6 +20,7 @@
 package org.apache.gravitino.credential.config;
 
 import java.util.Map;
+import javax.validation.constraints.NotNull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -83,26 +84,32 @@ public class AzureCredentialConfig extends Config {
     loadFromMap(properties, k -> true);
   }
 
+  @NotNull
   public String storageAccountName() {
     return this.get(AZURE_STORAGE_ACCOUNT_NAME);
   }
 
+  @NotNull
   public String storageAccountKey() {
     return this.get(AZURE_STORAGE_ACCOUNT_KEY);
   }
 
+  @NotNull
   public String tenantId() {
     return this.get(AZURE_TENANT_ID);
   }
 
+  @NotNull
   public String clientId() {
     return this.get(AZURE_CLIENT_ID);
   }
 
+  @NotNull
   public String clientSecret() {
     return this.get(AZURE_CLIENT_SECRET);
   }
 
+  @NotNull
   public Integer adlsTokenExpireInSecs() {
     return this.get(ADLS_TOKEN_EXPIRE_IN_SECS);
   }
