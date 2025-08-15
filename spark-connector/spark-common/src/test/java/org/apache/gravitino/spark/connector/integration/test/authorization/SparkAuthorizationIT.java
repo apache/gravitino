@@ -56,10 +56,14 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 
 @Tag("gravitino-docker-test")
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public abstract class SparkAuthorizationIT extends BaseIT {
 
   private static final String METALAKE = "metalake";
@@ -114,7 +118,6 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
     containerSuite.close();
-    client.dropMetalake(METALAKE);
     setEnv("HADOOP_USER_NAME", AuthConstants.ANONYMOUS_USER);
     normalUserSparkSession.close();
     super.stopIntegrationTest();
@@ -177,7 +180,8 @@ public abstract class SparkAuthorizationIT extends BaseIT {
   }
 
   @Test
-  public void testTable() {
+  @Order(1)
+  public void testCreateTable() {
     GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     normalUserSparkSession.sql("use " + JDBC_CATALOG);
     normalUserSparkSession.sql("use " + JDBC_DATABASE);
@@ -202,6 +206,12 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             RowFactory.create("jdbcDatabase", "table_b", false),
             RowFactory.create("jdbcDatabase", "table_c", false)),
         tables);
+  }
+
+  @Test
+  @Order(2)
+  public void testListTable() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         ROLE,
         MetadataObjects.of(
@@ -213,19 +223,25 @@ public abstract class SparkAuthorizationIT extends BaseIT {
         () -> {
           normalUserSparkSession.sql("CREATE TABLE table_d(a STRING)");
         });
-    tables = normalUserSparkSession.sql("show tables").collectAsList();
+    List<Row> tables = normalUserSparkSession.sql("show tables").collectAsList();
     assertEqualsRows(
         ImmutableList.of(
             RowFactory.create("jdbcDatabase", "table_a", false),
             RowFactory.create("jdbcDatabase", "table_b", false),
             RowFactory.create("jdbcDatabase", "table_c", false)),
         tables);
+  }
+
+  @Test
+  @Order(3)
+  public void testAlterLoad() {
+    GravitinoMetalake gravitinoMetalake = client.loadMetalake(METALAKE);
     gravitinoMetalake.grantPrivilegesToRole(
         ROLE,
         MetadataObjects.of(
             ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE, "table_b"), MetadataObject.Type.TABLE),
         ImmutableList.of(Privileges.SelectTable.deny()));
-    tables = normalUserSparkSession.sql("show tables").collectAsList();
+    List<Row> tables = normalUserSparkSession.sql("show tables").collectAsList();
     assertEqualsRows(
         ImmutableList.of(
             RowFactory.create("jdbcDatabase", "table_a", false),
@@ -237,6 +253,11 @@ public abstract class SparkAuthorizationIT extends BaseIT {
         () -> {
           normalUserSparkSession.sql("ALTER TABLE table_c ADD COLUMNS (b STRING);");
         });
+  }
+
+  @Test
+  @Order(4)
+  public void testDropTable() {
     assertThrows(
         "Can not access metadata {" + JDBC_CATALOG + "." + JDBC_DATABASE + "}.",
         ForbiddenException.class,
