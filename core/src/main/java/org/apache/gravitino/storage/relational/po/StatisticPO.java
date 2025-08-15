@@ -58,15 +58,14 @@ public class StatisticPO {
 
   public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
     try {
-      return StatisticEntity.builder()
+      return StatisticEntity.builder(
+              MetadataObjectUtil.toEntityType(
+                  MetadataObject.Type.valueOf(statisticPO.metadataObjectType)))
           .withId(statisticPO.getStatisticId())
           .withName(statisticPO.getStatisticName())
           .withValue(
               JsonUtils.anyFieldMapper()
                   .readValue(statisticPO.getStatisticValue(), StatisticValue.class))
-          .withParentEntityType(
-              MetadataObjectUtil.toEntityType(
-                  MetadataObject.Type.valueOf(statisticPO.metadataObjectType)))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(statisticPO.getAuditInfo(), AuditInfo.class))
           .build();

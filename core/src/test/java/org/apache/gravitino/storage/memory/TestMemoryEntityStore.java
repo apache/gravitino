@@ -31,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
@@ -171,12 +172,7 @@ public class TestMemoryEntityStore {
     }
 
     @Override
-    public int batchDeleteInNamespace(
-        Namespace namespace,
-        EntityType namespaceEntityType,
-        List<String> deleteEntityNames,
-        EntityType entityType,
-        boolean cascade)
+    public int batchDelete(List<Pair<NameIdentifier, EntityType>> idents, boolean cascade)
         throws IOException {
       throw new UnsupportedOperationException(
           "Batch delete is not supported in InMemoryEntityStore.");

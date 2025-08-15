@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.tag.SupportsTagOperations;
@@ -191,22 +192,15 @@ public interface EntityStore extends Closeable {
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
 
   /**
-   * Batch delete entities in the specified namespace.
+   * Batch delete entities from the underlying storage by the specified list of {@link
+   * org.apache.gravitino.NameIdentifier} and {@link EntityType}.
    *
-   * @param namespace the namespace in which the entities are located
-   * @param namespaceEntityType the detailed type of the namespace entity
-   * @param deleteEntityNames the names of the entities to be deleted
-   * @param entityType the general type of the entities to be deleted
+   * @param idents the list of pairs of name identifiers and entity types to be deleted
    * @param cascade if true, cascade delete the entities, otherwise just delete the entities
    * @return the number of entities deleted
    * @throws IOException if the batch delete operation fails
    */
-  int batchDeleteInNamespace(
-      Namespace namespace,
-      EntityType namespaceEntityType,
-      List<String> deleteEntityNames,
-      EntityType entityType,
-      boolean cascade)
+  int batchDelete(List<Pair<NameIdentifier, EntityType>> idents, boolean cascade)
       throws IOException;
 
   /**
@@ -221,22 +215,6 @@ public interface EntityStore extends Closeable {
    */
   <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
-
-  /**
-   * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
-   * deserialize them into the specified {@link Entity} object.
-   *
-   * @param namespace the namespace of the entities
-   * @param namespaceEntityType the detailed type of the namespace entity
-   * @param type the detailed type of the entity
-   * @param entityType the general type of the entity
-   * @return the list of entities
-   * @param <E> the class of the entity
-   * @throws IOException if the list operation fails
-   */
-  <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, EntityType namespaceEntityType, Class<E> type, EntityType entityType)
-      throws IOException;
 
   /**
    * Execute the specified {@link Executable} in a transaction.

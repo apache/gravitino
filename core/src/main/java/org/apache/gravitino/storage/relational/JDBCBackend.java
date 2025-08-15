@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+import static org.apache.gravitino.Entity.EntityType.TABLE;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -141,6 +143,11 @@ public class JDBCBackend implements RelationalBackend {
             JobTemplateMetaService.getInstance().listJobTemplatesByNamespace(namespace);
       case JOB:
         return (List<E>) JobMetaService.getInstance().listJobsByNamespace(namespace);
+      case TABLE_STATISTIC:
+        return (List<E>)
+            StatisticMetaService.getInstance()
+                .listStatisticsByEntity(
+                    NameIdentifier.parse(namespace.toString()), Entity.EntityType.TABLE);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -378,7 +385,7 @@ public class JDBCBackend implements RelationalBackend {
         return ModelVersionMetaService.getInstance()
             .deleteModelVersionMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-      case STATISTIC:
+      case TABLE_STATISTIC:
         return StatisticMetaService.getInstance()
             .deleteStatisticsByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
@@ -416,7 +423,7 @@ public class JDBCBackend implements RelationalBackend {
       case TAG:
       case MODEL:
       case MODEL_VERSION:
-      case STATISTIC:
+      case TABLE_STATISTIC:
       case JOB_TEMPLATE:
       case JOB:
         // These entity types have not implemented multi-versions, so we can skip.
@@ -480,18 +487,30 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
-  public int batchDeleteInNamespace(
-      Namespace namespace,
-      Entity.EntityType namespaceEntityType,
-      List<String> deleteEntityNames,
-      Entity.EntityType entityType,
-      boolean cascade)
+  public int batchDelete(List<Pair<NameIdentifier, Entity.EntityType>> idents, boolean cascade)
       throws IOException {
+    if (idents == null || idents.isEmpty()) {
+      return 0;
+    }
+    Preconditions.checkArgument(
+        1 == idents.stream().collect(Collectors.groupingBy(Pair::getRight)).size(),
+        "All entities must be of the same type for batch delete operation.");
+    Entity.EntityType entityType = idents.get(0).getRight();
     switch (entityType) {
-      case STATISTIC:
+      case TABLE_STATISTIC:
+        Preconditions.checkArgument(
+            cascade, "Batch delete for statistics must be cascade deleted.");
+        List<NameIdentifier> deleteIdents =
+            idents.stream().map(Pair::getLeft).collect(Collectors.toList());
+        Preconditions.checkArgument(
+            1 == idents.stream().collect(Collectors.groupingBy(Pair::getLeft)).size(),
+            "All entities must be in the same namespace for batch delete operation.");
+        Namespace namespace = deleteIdents.get(0).namespace();
         return StatisticMetaService.getInstance()
             .batchDeleteStatisticPOs(
-                NameIdentifier.parse(namespace.toString()), namespaceEntityType, deleteEntityNames);
+                NameIdentifier.parse(namespace.toString()),
+                TABLE,
+                deleteIdents.stream().map(NameIdentifier::name).collect(Collectors.toList()));
       default:
         throw new IllegalArgumentException(
             String.format("Batch delete is not supported for entity type %s", entityType.name()));
@@ -511,48 +530,23 @@ public class JDBCBackend implements RelationalBackend {
     Entity.EntityType entityType = entities.get(0).type();
 
     switch (entityType) {
-      case STATISTIC:
+      case TABLE_STATISTIC:
         Preconditions.checkArgument(overwritten, "Batch put for statistics must be overwritten.");
         List<StatisticEntity> statisticEntities =
             entities.stream().map(e -> (StatisticEntity) e).collect(Collectors.toList());
         Preconditions.checkArgument(
             1 == entities.stream().collect(Collectors.groupingBy(HasIdentifier::namespace)).size(),
             "All entities must be in the same namespace for batchPut operation.");
-        Preconditions.checkArgument(
-            1
-                == statisticEntities.stream()
-                    .collect(Collectors.groupingBy(StatisticEntity::parentEntityType))
-                    .size(),
-            "All entities must have the same parent entity type for batchPut operation.");
 
         StatisticMetaService.getInstance()
             .batchInsertStatisticPOsOnDuplicateKeyUpdate(
                 statisticEntities,
                 NameIdentifier.parse(statisticEntities.get(0).namespace().toString()),
-                statisticEntities.get(0).parentEntityType());
+                Entity.EntityType.TABLE);
         break;
       default:
         throw new IllegalArgumentException(
             String.format("Batch put is not supported for entity type %s", entityType.name()));
-    }
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace,
-      Entity.EntityType namespaceEntityTYpe,
-      Class<E> type,
-      Entity.EntityType entityType)
-      throws IOException {
-    switch (entityType) {
-      case STATISTIC:
-        return (List<E>)
-            StatisticMetaService.getInstance()
-                .listStatisticsByEntity(
-                    NameIdentifier.parse(namespace.toString()), namespaceEntityTYpe);
-      default:
-        throw new IllegalArgumentException(
-            String.format("Doesn't support the entity type %s for list operation", entityType));
     }
   }
 

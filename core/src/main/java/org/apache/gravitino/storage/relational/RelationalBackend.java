@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.Function;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -129,20 +130,12 @@ public interface RelationalBackend
   /**
    * Deletes the entities in the specified namespace and entity type.
    *
-   * @param namespace The parent namespace of these entities.
-   * @param namespaceEntityType The type of the parent namespace entity.
-   * @param deleteEntityNames The names of the entities to be deleted.
-   * @param entityType The type of the entities to be deleted.
+   * @param idents The list of identifiers and their entity types to be deleted.
    * @param cascade True, If you need to cascade delete entities, else false.
    * @return The count of the deleted entities.
    * @throws IOException If the store operation fails
    */
-  int batchDeleteInNamespace(
-      Namespace namespace,
-      Entity.EntityType namespaceEntityType,
-      List<String> deleteEntityNames,
-      Entity.EntityType entityType,
-      boolean cascade)
+  int batchDelete(List<Pair<NameIdentifier, Entity.EntityType>> idents, boolean cascade)
       throws IOException;
 
   /**
@@ -156,24 +149,6 @@ public interface RelationalBackend
    */
   <E extends Entity & HasIdentifier> void batchPut(List<E> e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
-
-  /**
-   * Lists the entities in the specified namespace and entity type.
-   *
-   * @param namespace The parent namespace of these entities.
-   * @param namespaceEntityTYpe The type of the parent namespace entity.
-   * @param type The type of the entities to be listed.
-   * @param entityType The type of the entities to be listed.
-   * @return A list of entities in the specified namespace and entity type.
-   * @param <E> The type of the entities in the list.
-   * @throws IOException If the store operation fails
-   */
-  <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace,
-      Entity.EntityType namespaceEntityTYpe,
-      Class<E> type,
-      Entity.EntityType entityType)
-      throws IOException;
 
   /**
    * Permanently deletes the legacy data that has been marked as deleted before the given legacy

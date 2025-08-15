@@ -28,24 +28,21 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.stats.StatisticValue;
 
-public class StatisticEntity implements Entity, HasIdentifier, Auditable {
+public abstract class StatisticEntity implements Entity, HasIdentifier, Auditable {
   public static final Field ID =
       Field.required("id", Long.class, "The unique identifier of the statistic entity.");
   public static final Field NAME =
       Field.required("name", String.class, "The name of the statistic entity.");
   public static final Field VALUE =
       Field.required("value", StatisticValue.class, "The value of the statistic entity.");
-  public static final Field PARENT_ENTITY_TYPE =
-      Field.required("parent_entity_type", EntityType.class, "The type of the parent entity.");
   public static final Field AUDIT_INFO =
       Field.required("audit_info", Audit.class, "The audit details of the statistic entity.");
 
-  private Long id;
-  private String name;
-  private StatisticValue<?> value;
-  private AuditInfo auditInfo;
-  private Namespace namespace;
-  private EntityType parentEntityType;
+  protected Long id;
+  protected String name;
+  protected StatisticValue<?> value;
+  protected AuditInfo auditInfo;
+  protected Namespace namespace;
 
   @Override
   public Audit auditInfo() {
@@ -59,13 +56,7 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     fields.put(NAME, name);
     fields.put(VALUE, value);
     fields.put(AUDIT_INFO, auditInfo);
-    fields.put(PARENT_ENTITY_TYPE, parentEntityType);
     return fields;
-  }
-
-  @Override
-  public EntityType type() {
-    return EntityType.STATISTIC;
   }
 
   @Override
@@ -87,54 +78,64 @@ public class StatisticEntity implements Entity, HasIdentifier, Auditable {
     return value;
   }
 
-  public EntityType parentEntityType() {
-    return parentEntityType;
+  public static <S extends StatisticEntityBuilder<S, E>, E extends StatisticEntity> S builder(
+      Entity.EntityType type) {
+    switch (type) {
+      case TABLE_STATISTIC:
+        return (S) TableStatisticEntity.builder();
+      default:
+        throw new IllegalArgumentException("Unsupported statistic entity type: " + type);
+    }
   }
 
-  public static Builder builder() {
-    return new Builder();
+  interface Builder<SELF extends Builder<SELF, T>, T extends StatisticEntity> {
+    T build();
   }
 
-  public static class Builder {
-    private final StatisticEntity statisticEntity;
+  public abstract static class StatisticEntityBuilder<
+          SELF extends Builder<SELF, T>, T extends StatisticEntity>
+      implements Builder<SELF, T> {
 
-    private Builder() {
-      statisticEntity = new StatisticEntity();
+    protected Long id;
+    protected String name;
+    protected StatisticValue<?> value;
+    protected AuditInfo auditInfo;
+    protected Namespace namespace;
+
+    public SELF withId(Long id) {
+      this.id = id;
+      return self();
     }
 
-    public Builder withId(Long id) {
-      statisticEntity.id = id;
-      return this;
+    public SELF withName(String name) {
+      this.name = name;
+      return self();
     }
 
-    public Builder withName(String name) {
-      statisticEntity.name = name;
-      return this;
+    public SELF withValue(StatisticValue<?> value) {
+      this.value = value;
+      return self();
     }
 
-    public Builder withValue(StatisticValue<?> value) {
-      statisticEntity.value = value;
-      return this;
+    public SELF withAuditInfo(AuditInfo auditInfo) {
+      this.auditInfo = auditInfo;
+      return self();
     }
 
-    public Builder withAuditInfo(AuditInfo auditInfo) {
-      statisticEntity.auditInfo = auditInfo;
-      return this;
+    public SELF withNamespace(Namespace namespace) {
+      this.namespace = namespace;
+      return self();
     }
 
-    public Builder withNamespace(Namespace namespace) {
-      statisticEntity.namespace = namespace;
-      return this;
+    private SELF self() {
+      return (SELF) this;
     }
 
-    public Builder withParentEntityType(EntityType parentEntityType) {
-      statisticEntity.parentEntityType = parentEntityType;
-      return this;
-    }
+    protected abstract T internalBuild();
 
-    public StatisticEntity build() {
-      statisticEntity.validate();
-      return statisticEntity;
+    public T build() {
+      T t = internalBuild();
+      return t;
     }
   }
 }

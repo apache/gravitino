@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -40,6 +41,7 @@ import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,17 +62,12 @@ public class StatisticManager {
   public List<Statistic> listStatistics(String metalake, MetadataObject metadataObject) {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
+      Entity.EntityType type = getStatisticType(metadataObject.type());
       return TreeLockUtils.doWithTreeLock(
           identifier,
           LockType.READ,
           () ->
-              store
-                  .list(
-                      Namespace.fromString(identifier.toString()),
-                      type,
-                      StatisticEntity.class,
-                      Entity.EntityType.STATISTIC)
+              store.list(Namespace.fromString(identifier.toString()), StatisticEntity.class, type)
                   .stream()
                   .map(
                       entity -> {
@@ -109,12 +106,11 @@ public class StatisticManager {
         StatisticValue<?> value = entry.getValue();
 
         StatisticEntity statistic =
-            StatisticEntity.builder()
+            StatisticEntity.builder(type)
                 .withId(idGenerator.nextId())
                 .withName(name)
                 .withValue(value)
                 .withNamespace(Namespace.fromString(identifier.toString()))
-                .withParentEntityType(type)
                 .withAuditInfo(
                     AuditInfo.builder()
                         .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -153,16 +149,17 @@ public class StatisticManager {
       throws UnmodifiableStatisticException {
     try {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      Entity.EntityType type = MetadataObjectUtil.toEntityType(metadataObject);
-      Namespace namespace = Namespace.fromString(identifier.toString());
+      Entity.EntityType type = getStatisticType(metadataObject.type());
+      List<Pair<NameIdentifier, Entity.EntityType>> idents = Lists.newArrayList();
 
+      for (String statistic : statistics) {
+        Pair<NameIdentifier, Entity.EntityType> pair =
+            Pair.of(NameIdentifierUtil.ofStatistic(identifier, statistic), type);
+        idents.add(pair);
+      }
       int deleteCount =
           TreeLockUtils.doWithTreeLock(
-              identifier,
-              LockType.WRITE,
-              () ->
-                  store.batchDeleteInNamespace(
-                      namespace, type, statistics, Entity.EntityType.STATISTIC, true));
+              identifier, LockType.WRITE, () -> store.batchDelete(idents, true));
       // If deleteCount is 0, it means that the statistics were not found.
       return deleteCount != 0;
     } catch (NoSuchEntityException nse) {
@@ -181,6 +178,17 @@ public class StatisticManager {
           metalake,
           ioe.getMessage());
       throw new RuntimeException(ioe);
+    }
+  }
+
+  private Entity.EntityType getStatisticType(MetadataObject.Type type) {
+    switch (type) {
+      case TABLE:
+        return Entity.EntityType.TABLE_STATISTIC;
+      default:
+        LOG.warn("Unsupported metadata object type for statistics: {}", type);
+        throw new IllegalArgumentException(
+            "Unsupported metadata object type for statistics: " + type);
     }
   }
 

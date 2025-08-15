@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -262,30 +263,14 @@ public class RelationalEntityStore
   }
 
   @Override
-  public int batchDeleteInNamespace(
-      Namespace namespace,
-      Entity.EntityType namespaceEntityType,
-      List<String> deleteEntityNames,
-      Entity.EntityType entityType,
-      boolean cascade)
+  public int batchDelete(List<Pair<NameIdentifier, Entity.EntityType>> idents, boolean cascade)
       throws IOException {
-    return backend.batchDeleteInNamespace(
-        namespace, namespaceEntityType, deleteEntityNames, entityType, cascade);
+    return backend.batchDelete(idents, cascade);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace,
-      Entity.EntityType namespaceEntityType,
-      Class<E> type,
-      Entity.EntityType entityType)
-      throws IOException {
-    return backend.list(namespace, namespaceEntityType, type, entityType);
   }
 }
