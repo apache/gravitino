@@ -21,10 +21,11 @@ from mcp_server.client import (
     ModelOperation,
     SchemaOperation,
     TableOperation,
+    TagOperation,
     TopicOperation,
 )
 from mcp_server.client.fileset_operation import FilesetOperation
-from mcp_server.client.tag_operation import TagOperation
+from mcp_server.client.job_operation import JobOperation
 
 
 class MockOperation(GravitinoOperation):
@@ -51,6 +52,9 @@ class MockOperation(GravitinoOperation):
 
     def as_tag_operation(self) -> TagOperation:
         return MockTagOperation()
+
+    def as_job_operation(self) -> JobOperation:
+        return MockJobOperation()
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -172,3 +176,23 @@ class MockTagOperation(TagOperation):
 
     async def list_metadata_by_tag(self, tag_name: str) -> str:
         return f"mock_metadata_by_tag: {tag_name}"
+
+
+class MockJobOperation(JobOperation):
+    async def get_list_of_jobs(self, job_template_name: str = "") -> str:
+        return "mock_jobs"
+
+    async def get_job_by_id(self, job_id: str) -> str:
+        return f"mock_job: {job_id}"
+
+    async def get_list_of_job_templates(self) -> str:
+        return "mock_job_templates"
+
+    async def get_job_template_by_name(self, name: str) -> str:
+        return f"mock_job_template: {name}"
+
+    async def run_job(self, job_template_name: str, job_config: dict) -> str:
+        return f"mock_job_run: {job_template_name} with parameters {job_config}"
+
+    async def cancel_job(self, job_id: str) -> str:
+        return f"mock_job_cancelled: {job_id}"
