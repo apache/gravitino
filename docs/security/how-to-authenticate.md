@@ -35,13 +35,17 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 ### OAuth mode
 
-Gravitino only supports external OAuth 2.0 servers. To enable OAuth mode, users should follow the steps below.
+Gravitino supports external OAuth 2.0 servers with two token validation methods:
 
-- First, users need to guarantee that the external correctly configured OAuth 2.0 server supports Bearer JWT.
+1. **Static signing key validation** - Uses a pre-configured signing key to validate JWT tokens
+2. **JWKS-based validation** - Dynamically fetches public keys from OAuth provider's JWKS endpoint (supports OIDC providers like Azure AD, and other JWKS-compatible providers)
 
-- Then, on the server side, users should set `gravitino.authenticators` as `oauth` and give
-  `gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and
-  `gravitino.authenticator.oauth.tokenPath`  a proper value.
+To enable OAuth mode:
+
+- First, ensure the external OAuth 2.0 server supports Bearer JWT tokens.
+- For **static key validation**: Configure `gravitino.authenticator.oauth.defaultSignKey`, `gravitino.authenticator.oauth.serverUri` and `gravitino.authenticator.oauth.tokenPath`.
+- For **JWKS validation**: Configure `gravitino.authenticator.oauth.jwksUri` and `gravitino.authenticator.oauth.tokenValidatorClass=org.apache.gravitino.server.authentication.JwksTokenValidator`. You can use either `gravitino.authenticator.oauth.provider=default` or `gravitino.authenticator.oauth.provider=oidc` depending on whether you want Web UI OIDC login flow.
+- For **Web UI OIDC authentication**: Set `gravitino.authenticator.oauth.provider=oidc` and configure `gravitino.authenticator.oauth.clientId`, `gravitino.authenticator.oauth.authority`, and `gravitino.authenticator.oauth.scope`. These settings are exposed to the Web UI via the `/configs` endpoint to enable OAuth login flow. Configure your OAuth provider with the callback redirect URI: `https://your-gravitino-server/ui/oauth/callback`.
 - Next, for the client side, users can enable `OAuth` mode by the following code:
 
 ```java
@@ -111,6 +115,13 @@ GravitinoClient client = GravitinoClient.builder(uri)
 | `gravitino.authenticator.oauth.signAlgorithmType` | The signature algorithm when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                    | `RS256`           | No                                         | 0.3.0            |
 | `gravitino.authenticator.oauth.serverUri`         | The URI of the default OAuth server.                                                                                                                                                                                                                       | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0            |
 | `gravitino.authenticator.oauth.tokenPath`         | The path for token of the default OAuth server.                                                                                                                                                                                                            | (none)            | Yes if use `oauth` as the authenticator    | 0.3.0            |
+| `gravitino.authenticator.oauth.provider`           | OAuth provider type (default, oidc). Determines the Web UI authentication flow. Use 'oidc' for Web UI OIDC login, 'default' for legacy login or API-only authentication.                                   | `default`         | No                                         | 1.0.0            |
+| `gravitino.authenticator.oauth.clientId`           | OAuth client ID for Web UI authentication.                                                                                                                                                                    | (none)            | Yes if provider is `oidc`                 | 1.0.0            |
+| `gravitino.authenticator.oauth.authority`          | OAuth authority/issuer URL for OIDC providers for web UI authentication. (e.g., Azure AD tenant URL).                                                                                                                                   | (none)            | Yes if provider is `oidc`                 | 1.0.0            |
+| `gravitino.authenticator.oauth.scope`              | OAuth scopes for Web UI authentication (space-separated).                                                                                                                                                      | (none)            | Yes if provider is `oidc`                 | 1.0.0            |
+| `gravitino.authenticator.oauth.jwksUri`            | JWKS URI for server-side OAuth token validation. Required when using JWKS-based validation.                                                                                                                                                               | (none)            | Yes if `tokenValidatorClass` is `org.apache.gravitino.server.authentication.JwksTokenValidator` | 1.0.0            |
+| `gravitino.authenticator.oauth.principalFields`     | JWT claim field(s) to use as principal identity. Comma-separated list for fallback in order (e.g., 'preferred_username,email,sub').                                                                                                                       | `sub`             | No                                         | 1.0.0            |
+| `gravitino.authenticator.oauth.tokenValidatorClass`| Fully qualified class name of the OAuth token validator implementation. Use `org.apache.gravitino.server.authentication.JwksTokenValidator` for JWKS-based validation or `org.apache.gravitino.server.authentication.StaticSignKeyValidator` for static key validation. | `org.apache.gravitino.server.authentication.StaticSignKeyValidator` | No | 1.0.0 |
 | `gravitino.authenticator.kerberos.principal`      | Indicates the Kerberos principal to be used for HTTP endpoint. Principal should start with `HTTP/`.                                                                                                                                                        | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0            |
 | `gravitino.authenticator.kerberos.keytab`         | Location of the keytab file with the credentials for the principal.                                                                                                                                                                                        | (none)            | Yes if use `kerberos` as the authenticator | 0.4.0            |
 
@@ -130,6 +141,76 @@ The signature algorithms that Gravitino supports follows:
 | PS256 | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+
+### Example: Azure AD as OIDC Provider with JWKS Validation
+
+This example shows how to configure Gravitino with Azure AD using JWKS-based token validation.
+
+**Prerequisites:**
+- Azure AD tenant with an application registration
+- Application configured with:
+  - Client ID (Application ID)
+  - Redirect URI: `https://your-gravitino-server/ui/oauth/callback`
+  - Required API permissions/scopes (typically `openid`, `profile`, `email`)
+
+**Configuration:**
+
+```text
+# Enable OAuth authentication
+gravitino.authenticators = oauth
+
+# OIDC Provider Configuration for Web UI
+gravitino.authenticator.oauth.provider = oidc
+gravitino.authenticator.oauth.clientId = <your-azure-app-client-id>
+gravitino.authenticator.oauth.authority = https://sts.windows.net/<your-tenant-id>/
+gravitino.authenticator.oauth.scope = openid profile email
+
+# JWKS-based Token Validation
+gravitino.authenticator.oauth.jwksUri = https://login.microsoftonline.com/<your-tenant-id>/discovery/v2.0/keys
+gravitino.authenticator.oauth.tokenValidatorClass = org.apache.gravitino.server.authentication.JwksTokenValidator
+gravitino.authenticator.oauth.serviceAudience = <your-azure-app-client-id-or-api-identifier>
+gravitino.authenticator.oauth.principalFields = preferred_username,email,sub
+```
+
+**Usage:**
+- **Web UI**: Navigate to Gravitino Web UI, which will redirect to Azure AD for authentication
+- **API Access**: Use Azure AD tokens in the `Authorization: Bearer <token>` header
+
+:::note
+The `serviceAudience` should match the `aud` claim in your Azure AD tokens. This is typically your Azure AD application's client ID, but could be a custom API identifier if you've configured custom API scopes (e.g., `api://<client-id>`).
+
+The `principalFields` supports multiple fallback options. Gravitino will try each field in order (e.g., first `preferred_username`, then `email`, then `sub`) until it finds a non-null value to use as the user identity.
+
+With JWKS validation, you don't need to configure `defaultSignKey`, `serverUri`, or `tokenPath` as the validator dynamically fetches public keys from Azure AD's JWKS endpoint.
+:::
+
+### Example: Static Key OAuth Provider
+
+For compatibility with existing OAuth servers that don't support JWKS:
+
+```text
+gravitino.authenticators = oauth
+gravitino.authenticator.oauth.provider = default
+gravitino.authenticator.oauth.clientId = test
+gravitino.authenticator.oauth.scope = test
+gravitino.authenticator.oauth.serviceAudience = test
+gravitino.authenticator.oauth.tokenValidatorClass = org.apache.gravitino.server.authentication.StaticSignKeyValidator
+gravitino.authenticator.oauth.serverUri = http://your-oauth-server
+gravitino.authenticator.oauth.tokenPath = /oauth2/token
+gravitino.authenticator.oauth.defaultSignKey = <your-static-signing-key>
+```
+
+### Example: JWKS Validation with Default Provider
+
+For JWKS-based token validation without Web UI OIDC workflow:
+
+```text
+gravitino.authenticators = oauth
+gravitino.authenticator.oauth.provider = default
+gravitino.authenticator.oauth.serviceAudience = <your-audience>
+gravitino.authenticator.oauth.tokenValidatorClass = org.apache.gravitino.server.authentication.JwksTokenValidator
+gravitino.authenticator.oauth.jwksUri = https://your-oauth-provider/.well-known/jwks.json
+```
 
 ### Example 
 
