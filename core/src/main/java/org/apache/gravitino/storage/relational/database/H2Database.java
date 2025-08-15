@@ -90,6 +90,10 @@ public class H2Database implements JDBCDatabase {
       originURI = originURI + ";MODE=MYSQL";
     }
 
+    if (!originURI.contains("AUTO_SERVER")) {
+      originURI = originURI + ";AUTO_SERVER=TRUE";
+    }
+
     return originURI;
   }
 
