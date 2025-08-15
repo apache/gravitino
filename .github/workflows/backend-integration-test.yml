@@ -21,7 +21,7 @@ jobs:
         with:
           filters: |
             source_changes:
-              - .github/**        
+              - .github/**  
               - api/**
               - bin/**
               - catalogs/**
@@ -41,6 +41,10 @@ jobs:
               - server/**
               - bundles/**
               - server-common/**
+              - build.gradle.kts
+              - gradle.properties
+              - gradlew
+              - setting.gradle.kts
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
 
