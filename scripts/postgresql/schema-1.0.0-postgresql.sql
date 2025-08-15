@@ -619,7 +619,7 @@ CREATE TABLE IF NOT EXISTS policy_version_info (
     policy_id BIGINT NOT NULL,
     version INT NOT NULL,
     policy_comment TEXT DEFAULT NULL,
-    enabled SMALLINT DEFAULT 1,
+    enabled BOOLEAN DEFAULT TRUE,
     content TEXT DEFAULT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),

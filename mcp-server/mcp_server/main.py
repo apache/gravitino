@@ -32,7 +32,7 @@ def do_main():
         mcp_url=args.mcp_url,
     )
     _init_logging(setting)
-    logging.info(f"Gravitino MCP server setting: {setting}")
+    logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
     server.run()
 
@@ -47,7 +47,6 @@ def _init_logging(setting: Setting):
 
 
 def _comma_separated_set(value) -> set:
-    print(f"value={value}")
     if not value:
         return set()
     return set(item.strip() for item in value.split(",") if item.strip())
@@ -76,7 +75,8 @@ def _parse_args():
         "--include-tool-tags",
         type=_comma_separated_set,
         default=set(),
-        help="The tool tags to include, separated by commas, support tags:[catalog, schema, table]. (default: empty, all tools will be included).",
+        help="The tool tags to include, separated by commas, support tags:[catalog, schema, table]. "
+        "(default: empty, all tools will be included).",
     )
 
     parser.add_argument(
@@ -84,7 +84,8 @@ def _parse_args():
         type=str,
         choices=["stdio", "http"],
         default=DefaultSetting.default_transport,
-        help=f"Transport protocol type: stdio (local), http (Streamable HTTP). (default: {DefaultSetting.default_transport})",
+        help=f"Transport protocol type: stdio (local), http (Streamable HTTP). "
+        f"(default: {DefaultSetting.default_transport})",
     )
 
     parser.add_argument(

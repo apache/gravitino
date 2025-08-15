@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 
 /** Gravitino config. */
@@ -126,6 +127,9 @@ public class GravitinoConfig {
           "false",
           false);
 
+  private static final ConfigEntry GRAVITINO_CLIENT_CONFIG_PREFIX =
+      new ConfigEntry("gravitino.client.", "The config prefix for Grivitino client", "", false);
+
   /**
    * Constructs a new GravitinoConfig with the specified configuration.
    *
@@ -165,6 +169,17 @@ public class GravitinoConfig {
    */
   public String getMetalake() {
     return config.getOrDefault(GRAVITINO_METALAKE.key, GRAVITINO_METALAKE.defaultValue);
+  }
+
+  /**
+   * Retrieves the config for Grivitino client.
+   *
+   * @return the config properties map
+   */
+  public Map<String, String> getClientConfig() {
+    return config.entrySet().stream()
+        .filter(entry -> entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   /**

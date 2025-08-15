@@ -21,19 +21,23 @@ package org.apache.gravitino.flink.connector.store;
 
 import static org.apache.flink.table.factories.FactoryUtil.createCatalogStoreFactoryHelper;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO;
+import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_CLIENT_CONFIG;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_METALAKE;
 import static org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions.GRAVITINO_URI;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.CatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogStoreFactory;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.flink.connector.catalog.GravitinoCatalogManager;
 
 /** The Factory for creating {@link GravitinoCatalogStore}. */
@@ -58,7 +62,8 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
     String gravitinoName =
         Preconditions.checkNotNull(
             options.get(GRAVITINO_METALAKE), "The %s must be set.", GRAVITINO_METALAKE.key());
-    this.catalogManager = GravitinoCatalogManager.create(gravitinoUri, gravitinoName);
+    this.catalogManager =
+        GravitinoCatalogManager.create(gravitinoUri, gravitinoName, extractClientConfig(options));
   }
 
   @Override
@@ -80,6 +85,17 @@ public class GravitinoCatalogStoreFactory implements CatalogStoreFactory {
 
   @Override
   public Set<ConfigOption<?>> optionalOptions() {
-    return Collections.emptySet();
+    return ImmutableSet.of(GRAVITINO_CLIENT_CONFIG);
+  }
+
+  @VisibleForTesting
+  static Map<String, String> extractClientConfig(ReadableConfig options) {
+    return options.get(GRAVITINO_CLIENT_CONFIG).entrySet().stream()
+        .collect(
+            Collectors.toMap(
+                entry ->
+                    GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + entry.getKey(),
+                Map.Entry::getValue,
+                (oldVal, newVal) -> newVal));
   }
 }
