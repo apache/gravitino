@@ -119,9 +119,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     User grantedUser = dispatcher.grantRolesToUser(metalake, roles, user);
-
-    if(removeUser(metalake,user))
-    notifyRoleUserRelChange(metalake, roles);
     
     return grantedUser;
   }
@@ -146,7 +143,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     User revokedUser = dispatcher.revokeRolesFromUser(metalake, roles, user);
-    notifyRoleUserRelChange(metalake, roles);
     return revokedUser;
   }
 
@@ -195,9 +191,10 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       log.debug(e.getMessage());
     }
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
-    if (oldRole != null) {
-      notifyRoleUserRelChange(((RoleEntity) oldRole).id());
-    }
+
+    if(resultOfDeleteRole && oldRole!= null) 
+      notifyRoleUserRelChange(metalake,role)
+
     return resultOfDeleteRole;
   }
 
