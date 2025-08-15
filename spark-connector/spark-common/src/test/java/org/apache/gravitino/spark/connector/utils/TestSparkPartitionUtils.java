@@ -150,4 +150,45 @@ public class TestSparkPartitionUtils {
             SparkPartitionUtils.getSparkPartitionValue(
                 "1970-01-01 00:00:00", DataTypes.TimestampType));
   }
+
+  @Test
+  void testToGravitinoLiteralWithNull() {
+    GenericInternalRow rowWithNull = new GenericInternalRow(new Object[] {null});
+    Assertions.assertEquals(
+        Literals.NULL,
+        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.IntegerType));
+  }
+
+  @Test
+  void testToGravitinoLiteralWithNullForDifferentTypes() {
+    GenericInternalRow rowWithNull = new GenericInternalRow(new Object[] {null});
+
+    Assertions.assertEquals(
+        Literals.NULL,
+        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.StringType));
+
+    Assertions.assertEquals(
+        Literals.NULL,
+        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.BooleanType));
+
+    Assertions.assertEquals(
+        Literals.NULL,
+        SparkPartitionUtils.toGravitinoLiteral(rowWithNull, 0, DataTypes.DoubleType));
+  }
+
+  @Test
+  void testToGravitinoLiteralWithMixedNullAndNonNull() {
+    GenericInternalRow mixedRow = new GenericInternalRow(new Object[] {null, "test", 42});
+
+    Assertions.assertEquals(
+        Literals.NULL, SparkPartitionUtils.toGravitinoLiteral(mixedRow, 0, DataTypes.StringType));
+
+    Assertions.assertEquals(
+        Literals.stringLiteral("test"),
+        SparkPartitionUtils.toGravitinoLiteral(mixedRow, 1, DataTypes.StringType));
+
+    Assertions.assertEquals(
+        Literals.integerLiteral(42),
+        SparkPartitionUtils.toGravitinoLiteral(mixedRow, 2, DataTypes.IntegerType));
+  }
 }
