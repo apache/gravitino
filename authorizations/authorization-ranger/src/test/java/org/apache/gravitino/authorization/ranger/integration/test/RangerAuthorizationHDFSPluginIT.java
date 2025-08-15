@@ -503,11 +503,7 @@ public class RangerAuthorizationHDFSPluginIT {
 
     // Test that the comparison in removeMetadataObject works correctly
     PathBasedMetadataObject schemaObject =
-        new PathBasedMetadataObject(
-            "catalog1",
-            "schema1",
-            "/test/schema1",
-            schemaPathType);
+        new PathBasedMetadataObject("catalog1", "schema1", "/test/schema1", schemaPathType);
 
     // This should not throw an exception due to incorrect comparison
     Assertions.assertDoesNotThrow(
