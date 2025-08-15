@@ -50,7 +50,6 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
-import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -453,7 +452,7 @@ public class StarRocksTableOperations extends JdbcTableOperations {
     } else if (distribution.strategy() == Strategy.EVEN) {
       sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY ").append("RANDOM");
     }
-    if (distribution.number() != Distributions.AUTO) {
+    if (distribution.number() != -1) {
       sqlBuilder
           .append(" BUCKETS ")
           .append(StarRocksUtils.toBucketNumberString(distribution.number()));

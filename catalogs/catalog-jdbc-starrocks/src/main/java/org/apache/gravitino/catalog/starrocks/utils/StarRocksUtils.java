@@ -249,7 +249,7 @@ public class StarRocksUtils {
   }
 
   private static int extractBucketNum(Matcher matcher) {
-    int bucketNum = Distributions.AUTO;
+    int bucketNum = -1;
     if (matcher.find(5)) {
       String bucketValue = matcher.group(5);
       if (bucketValue == null) {
