@@ -1248,7 +1248,7 @@ public class TestPOConverters {
             .withStatisticName("test")
             .withStatisticValue("\"test\"")
             .withMetadataObjectId(1L)
-            .withMetadataObjectType("CATALOG")
+            .withMetadataObjectType("TABLE")
             .withDeletedAt(0L)
             .withMetalakeId(1L)
             .withAuditInfo(

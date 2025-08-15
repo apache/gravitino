@@ -25,6 +25,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.stats.StatisticValue;
 
@@ -76,6 +77,16 @@ public abstract class StatisticEntity implements Entity, HasIdentifier, Auditabl
 
   public StatisticValue<?> value() {
     return value;
+  }
+
+  public static EntityType getStatisticType(MetadataObject.Type type) {
+    switch (type) {
+      case TABLE:
+        return EntityType.TABLE_STATISTIC;
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported metadata object type for statistics: " + type);
+    }
   }
 
   public static <S extends StatisticEntityBuilder<S, E>, E extends StatisticEntity> S builder(

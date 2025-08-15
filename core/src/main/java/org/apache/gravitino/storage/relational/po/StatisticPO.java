@@ -30,7 +30,6 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.storage.relational.utils.POConverters;
-import org.apache.gravitino.utils.MetadataObjectUtil;
 
 @Getter
 public class StatisticPO {
@@ -59,7 +58,7 @@ public class StatisticPO {
   public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
     try {
       return StatisticEntity.builder(
-              MetadataObjectUtil.toEntityType(
+              StatisticEntity.getStatisticType(
                   MetadataObject.Type.valueOf(statisticPO.metadataObjectType)))
           .withId(statisticPO.getStatisticId())
           .withName(statisticPO.getStatisticName())

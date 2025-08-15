@@ -503,7 +503,10 @@ public class JDBCBackend implements RelationalBackend {
         List<NameIdentifier> deleteIdents =
             idents.stream().map(Pair::getLeft).collect(Collectors.toList());
         Preconditions.checkArgument(
-            1 == idents.stream().collect(Collectors.groupingBy(Pair::getLeft)).size(),
+            1
+                == idents.stream()
+                    .collect(Collectors.groupingBy(ident -> ident.getLeft().namespace()))
+                    .size(),
             "All entities must be in the same namespace for batch delete operation.");
         Namespace namespace = deleteIdents.get(0).namespace();
         return StatisticMetaService.getInstance()

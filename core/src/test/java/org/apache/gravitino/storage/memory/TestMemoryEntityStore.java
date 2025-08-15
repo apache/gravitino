@@ -185,14 +185,6 @@ public class TestMemoryEntityStore {
     }
 
     @Override
-    public <E extends Entity & HasIdentifier> List<E> list(
-        Namespace namespace, EntityType namespaceEntityType, Class<E> type, EntityType entityType)
-        throws IOException {
-      throw new UnsupportedOperationException(
-          "List with entity type is not supported in InMemoryEntityStore.");
-    }
-
-    @Override
     public void close() throws IOException {
       entityMap.clear();
     }
