@@ -45,6 +45,9 @@ public class ThreadLocalAuthorizationCache {
   /** Used to determine whether the role has already been loaded. */
   private static final ThreadLocal<Boolean> hasLoadedRoleThreadLocal = new ThreadLocal<>();
 
+  /** Used to determine whether the owner has already been loaded. */
+  private static final ThreadLocal<Boolean> hasLoadedOwnerThreadLocal = new ThreadLocal<>();
+
   /**
    * Wrap the authorization method with this method to prevent threadlocal leakage.
    *
@@ -70,6 +73,19 @@ public class ThreadLocalAuthorizationCache {
     }
     runnable.run();
     hasLoadedRoleThreadLocal.set(true);
+  }
+
+  public static void loadOwner(Runnable runnable) {
+    Boolean hasLoadedOwner = hasLoadedOwnerThreadLocal.get();
+    if (hasLoadedOwner == null) {
+      runnable.run();
+      return;
+    }
+    if (hasLoadedOwner) {
+      return;
+    }
+    runnable.run();
+    hasLoadedOwnerThreadLocal.set(true);
   }
 
   /**

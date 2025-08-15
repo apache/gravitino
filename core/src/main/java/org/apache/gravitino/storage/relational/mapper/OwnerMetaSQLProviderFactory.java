@@ -96,4 +96,8 @@ public class OwnerMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteOwnerMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String selectOwnerRelByOwnerId(@Param("ownerId") Long ownerId) {
+    return getProvider().selectOwnerRelByOwnerId(ownerId);
+  }
 }
