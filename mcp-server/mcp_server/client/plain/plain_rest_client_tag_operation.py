@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.client.plain.utils import extract_content_from_response
 from mcp_server.client.tag_operation import TagOperation
 
@@ -63,7 +64,9 @@ class PlainRESTClientTagOperation(TagOperation):
             f"/api/metalakes/{self.metalake_name}/tags/{name}"
         )
         if response.status_code != 200:
-            raise Exception(f"Failed to delete tag {name}: {response.text}")
+            raise GravitinoException(
+                f"Failed to delete tag {name}: {response.text}"
+            )
         return None
 
     async def associate_tag_with_metadata(

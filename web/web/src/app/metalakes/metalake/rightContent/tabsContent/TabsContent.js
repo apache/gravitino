@@ -34,6 +34,7 @@ import { useAppSelector } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 import TableView from './tableView/TableView'
 import DetailsView from './detailsView/DetailsView'
+import FilesetView from './filesetView/FilesetView'
 
 import Icon from '@/components/Icon'
 
@@ -89,6 +90,7 @@ const TabsContent = () => {
   const isNotNeedTableTab =
     (type && ['fileset', 'messaging'].includes(type) && paramsSize === 5) ||
     (paramsSize === 6 && searchParams.get('version'))
+  const isFilesetFilesView = type === 'fileset' && paramsSize === 5
   const isShowTableProps = paramsSize === 5 && !['fileset', 'messaging'].includes(type)
 
   const handleChangeTab = (event, newValue) => {
@@ -133,7 +135,9 @@ const TabsContent = () => {
   }
 
   useEffect(() => {
-    if (isNotNeedTableTab) {
+    if (isFilesetFilesView) {
+      setTab('files')
+    } else if (isNotNeedTableTab) {
       setTab('details')
     } else {
       setTab('table')
@@ -159,6 +163,9 @@ const TabsContent = () => {
           {!isNotNeedTableTab ? (
             <CustomTab icon='mdi:list-box-outline' label={tableTitle} value='table' data-refer='tab-table' />
           ) : null}
+          {isFilesetFilesView && (
+            <CustomTab icon='mdi:folder-multiple' label='Files' value='files' data-refer='tab-files' />
+          )}
           <CustomTab icon='mdi:clipboard-text-outline' label='Details' value='details' data-refer='tab-details' />
         </TabList>
         {isShowTableProps && (
@@ -308,6 +315,12 @@ const TabsContent = () => {
           <TableView />
         </CustomTabPanel>
       ) : null}
+
+      {isFilesetFilesView && (
+        <CustomTabPanel value='files' data-refer='tab-files-panel'>
+          <FilesetView />
+        </CustomTabPanel>
+      )}
 
       <CustomTabPanel value='details' data-refer='tab-details-panel'>
         <DetailsView />
