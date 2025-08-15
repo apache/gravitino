@@ -43,11 +43,9 @@ public interface SupportsPartitionStatistics {
    * @param statisticsToUpdate a list of PartitionUpdateStatistics, where each
    *     PartitionStatisticsUpdate contains the partition name and a map of statistic names to their
    *     values to be updated.
-   * @return a list of updated PartitionStatistics, where each PartitionStatistics contains the
-   *     partition name and a list of statistics applicable to that partition.
    * @throws UnmodifiableStatisticException if any of the statistics to be updated are unmodifiable
    */
-  List<PartitionStatistics> updateStatistics(List<PartitionStatisticsUpdate> statisticsToUpdate)
+  void updateStatistics(List<PartitionStatisticsUpdate> statisticsToUpdate)
       throws UnmodifiableStatisticException;
 
   /**

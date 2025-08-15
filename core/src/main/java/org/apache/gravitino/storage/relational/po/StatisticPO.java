@@ -57,7 +57,9 @@ public class StatisticPO {
 
   public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
     try {
-      return StatisticEntity.builder()
+      return StatisticEntity.builder(
+              StatisticEntity.getStatisticType(
+                  MetadataObject.Type.valueOf(statisticPO.metadataObjectType)))
           .withId(statisticPO.getStatisticId())
           .withName(statisticPO.getStatisticName())
           .withValue(
