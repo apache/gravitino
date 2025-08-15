@@ -899,7 +899,7 @@ public class CatalogStarRocksIT extends BaseIT {
   @Test
   void testAllDistributionWithAuto() {
     Distribution distribution =
-        Distributions.auto(Strategy.HASH, NamedReference.field(STARROCKS_COL_NAME1));
+        Distributions.of(Strategy.HASH, -1, NamedReference.field(STARROCKS_COL_NAME1));
 
     String tableName = GravitinoITUtils.genRandomName("test_distribution_table");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
