@@ -121,7 +121,8 @@ def load_model_tools(mcp: FastMCP):
             model_name (str): The name of the model to list versions for.
 
         Returns:
-            str: A JSON string containing model version information. The string represents an array of version information.
+            str: A JSON string containing model version information. The string
+                represents an array of version information.
 
         Example Return Value:
             [
