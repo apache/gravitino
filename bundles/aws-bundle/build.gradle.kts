@@ -51,7 +51,6 @@ tasks.withType(ShadowJar::class.java) {
   relocate("org.checkerframework", "org.apache.gravitino.aws.shaded.org.checkerframework")
   relocate("org.reactivestreams", "org.apache.gravitino.aws.shaded.org.reactivestreams")
   relocate("org.wildfly.openssl", "org.apache.gravitino.aws.shaded.org.wildfly.openssl")
-  relocate("software.amazon", "org.apache.gravitino.aws.shaded.software.amazon")
 
   mergeServiceFiles()
 }
