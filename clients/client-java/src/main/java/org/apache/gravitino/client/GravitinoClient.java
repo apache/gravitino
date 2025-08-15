@@ -49,17 +49,23 @@ import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyChange;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -72,7 +78,7 @@ import org.apache.gravitino.tag.TagOperations;
  * API.
  */
 public class GravitinoClient extends GravitinoClientBase
-    implements SupportsCatalogs, TagOperations, SupportsJobs {
+    implements SupportsCatalogs, TagOperations, SupportsJobs, PolicyOperations {
 
   private final GravitinoMetalake metalake;
 
@@ -612,6 +618,49 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public JobHandle cancelJob(String jobId) throws NoSuchJobException {
     return getMetalake().cancelJob(jobId);
+  }
+
+  @Override
+  public String[] listPolicies() throws NoSuchMetalakeException {
+    return getMetalake().listPolicies();
+  }
+
+  @Override
+  public Policy[] listPolicyInfos() throws NoSuchMetalakeException {
+    return getMetalake().listPolicyInfos();
+  }
+
+  @Override
+  public Policy getPolicy(String name) throws NoSuchPolicyException {
+    return getMetalake().getPolicy(name);
+  }
+
+  @Override
+  public Policy createPolicy(
+      String name, String type, String comment, boolean enabled, PolicyContent content)
+      throws PolicyAlreadyExistsException {
+    return getMetalake().createPolicy(name, type, comment, enabled, content);
+  }
+
+  @Override
+  public void enablePolicy(String name) throws NoSuchPolicyException {
+    getMetalake().enablePolicy(name);
+  }
+
+  @Override
+  public void disablePolicy(String name) throws NoSuchPolicyException {
+    getMetalake().disablePolicy(name);
+  }
+
+  @Override
+  public Policy alterPolicy(String name, PolicyChange... changes)
+      throws NoSuchPolicyException, IllegalArgumentException {
+    return getMetalake().alterPolicy(name, changes);
+  }
+
+  @Override
+  public boolean deletePolicy(String name) {
+    return getMetalake().deletePolicy(name);
   }
 
   /** Builder class for constructing a GravitinoClient. */
