@@ -18,15 +18,14 @@
  */
 package org.apache.gravitino.catalog.jdbc.operation;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /** Tests for {@link org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations}. */
 public class TestSqliteTableOperations {
