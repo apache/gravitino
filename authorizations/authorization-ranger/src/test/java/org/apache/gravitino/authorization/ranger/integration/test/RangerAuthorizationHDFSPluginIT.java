@@ -150,7 +150,7 @@ public class RangerAuthorizationHDFSPluginIT {
                         (PathBasedMetadataObject) securableObject;
                     Assertions.assertEquals(fileset.fullName(), pathBasedMetadataObject.fullName());
                     Assertions.assertEquals(
-                        PathBasedMetadataObject.FILESET_PATH, pathBasedMetadataObject.type());
+                        PathBasedMetadataObject.FILESET_PATH, securableObject.type());
                     Assertions.assertEquals("/test", pathBasedMetadataObject.path());
                   });
         });
