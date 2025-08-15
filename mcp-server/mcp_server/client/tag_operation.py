@@ -25,15 +25,15 @@ class TagOperation(ABC):
 
     @abstractmethod
     async def create_tag(
-        self, name: str, comment: str, properties: dict
+        self, tag_name: str, tag_comment: str, tag_properties: dict
     ) -> str:
         """
         Create a new tag within the specified metalake.
 
         Args:
-            name: Name of the tag to be created
-            comment: Description or comment for the tag
-            properties: Dictionary of key-value pairs representing tag properties
+            tag_name: Name of the tag to be created
+            tag_comment: Description or comment for the tag
+            tag_properties: Dictionary of key-value pairs representing tag properties
 
         Returns:
             str: JSON-formatted string containing the created tag information
@@ -41,12 +41,12 @@ class TagOperation(ABC):
         pass
 
     @abstractmethod
-    async def get_tag_by_name(self, name: str) -> str:
+    async def get_tag_by_name(self, tag_name: str) -> str:
         """
         Load a tag by its name.
 
         Args:
-            name: Name of the tag to get
+            tag_name: Name of the tag to get
 
         Returns:
             str: JSON-formatted string containing the tag information
@@ -64,12 +64,12 @@ class TagOperation(ABC):
         pass
 
     @abstractmethod
-    async def alter_tag(self, name: str, updates: list) -> str:
+    async def alter_tag(self, tag_name: str, updates: list) -> str:
         """
         Alter an existing tag within the specified metalake.
 
         Args:
-            name: Name of the tag to be altered
+            tag_name: Name of the tag to be altered
             updates: List of update operations to be applied to the tag
 
         Returns:

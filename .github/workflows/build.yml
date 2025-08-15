@@ -23,31 +23,39 @@ jobs:
         with:
           filters: |
             source_changes:
-              - '.github/**'
-              - 'catalogs/**'
-              - 'clients/**'
-              - 'conf/**'
-              - 'dev/**'
-              - 'docs/open-api/**'
-              - 'gradle/**'
-              - 'gradle.properties'
-              - 'meta/**'
-              - 'scripts/**'
-              - 'web/**'
-              - '**/*.java'
-              - '**/*.kts'
-              - '**/*.py'
-              - '**/*.rs'
-              - '**/resources/**'
-              - '**/src/**'
-              - '!**/*.md'
-              - '!**/*.png'
-              - '!**/*.svg'
+              included:
+                - '.github/**'
+                - 'catalogs/**'
+                - 'clients/**'
+                - 'conf/**'
+                - 'dev/**'
+                - 'docs/open-api/**'
+                - 'gradle/**'
+                - 'gradle.properties'
+                - 'meta/**'
+                - 'scripts/**'
+                - 'web/**'
+                - '**/*.java'
+                - '**/*.kts'
+                - '**/*.py'
+                - '**/*.rs'
+                - '**/resources/**'
+                - '**/src/**'
+              excluded:
+                - 'mcp-server/**'
+                - '**/*.md'
+                - '**/*.png'
+                - '**/*.svg'
+  
             spark_connector_changes:
               - spark-connector/**
+            
+            mcp_server_changes:
+              - mcp-server/**
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
+      mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
 
   compile-check:
     runs-on: ubuntu-latest
@@ -63,7 +71,7 @@ jobs:
           cache: 'gradle'
 
       - name: Build with Gradle
-        run: ./gradlew build -x test -PjdkVersion=8
+        run: ./gradlew build -x test -PjdkVersion=17
 
   # To check the spark-connector is compatible with scala2.13
   spark-connector-build:
@@ -97,6 +105,24 @@ jobs:
           path: |
             build/reports
             spark-connector/**/*.log
+
+  mcp-server-build:
+    needs: changes
+    if: needs.changes.outputs.mcp_server_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Build MCP Server
+        run: |
+          ./gradlew :mcp-server:build           
 
   build:
     # The type of runner that the job will run on

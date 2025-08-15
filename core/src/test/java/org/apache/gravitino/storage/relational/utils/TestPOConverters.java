@@ -58,6 +58,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TableStatisticEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.policy.Policy;
@@ -1212,7 +1213,7 @@ public class TestPOConverters {
   public void testStatisticPO() throws JsonProcessingException {
     List<StatisticEntity> statisticEntities = Lists.newArrayList();
     statisticEntities.add(
-        StatisticEntity.builder()
+        TableStatisticEntity.builder()
             .withId(1L)
             .withName("test_statistic")
             .withNamespace(
@@ -1241,7 +1242,7 @@ public class TestPOConverters {
             .withStatisticName("test")
             .withStatisticValue("\"test\"")
             .withMetadataObjectId(1L)
-            .withMetadataObjectType("CATALOG")
+            .withMetadataObjectType("TABLE")
             .withDeletedAt(0L)
             .withMetalakeId(1L)
             .withAuditInfo(
