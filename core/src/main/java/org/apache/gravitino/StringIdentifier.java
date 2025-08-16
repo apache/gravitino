@@ -219,7 +219,7 @@ public class StringIdentifier {
       }
 
       if (indexOf != -1) {
-        return comment.substring(0, indexOf);
+        return comment.substring(0, indexOf).trim();
       }
     }
     return comment;
