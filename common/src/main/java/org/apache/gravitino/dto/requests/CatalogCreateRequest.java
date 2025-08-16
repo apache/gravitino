@@ -86,11 +86,16 @@ public class CatalogCreateRequest implements RESTRequest {
               + " that doesn't support managed catalog");
     }
 
-    if (this.provider.equalsIgnoreCase("hadoop")) {
+    if (this.provider != null && this.provider.equalsIgnoreCase("hadoop")) {
       // For backward compatibility, if the provider is "hadoop" (legacy case), we set the
       // provider to "fileset". This is because provider "hadoop" was previously used as a
       // "fileset" catalog. This is a special case to maintain compatibility.
-      this.provider = CatalogProvider.shortNameForManagedCatalog(type);
+      if (type != null) {
+        this.provider = CatalogProvider.shortNameForManagedCatalog(type);
+      } else {
+        throw new IllegalArgumentException(
+            "Catalog type cannot be null when provider is \"hadoop\"");
+      }
     }
   }
 

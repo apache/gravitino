@@ -77,4 +77,18 @@ public class TestCatalogCreateRequest {
         JsonMappingException.class,
         () -> JsonUtils.objectMapper().readValue(json1, CatalogCreateRequest.class));
   }
+
+  @Test
+  public void testCatalogCreateRequestNullTypeHadoopProvider() {
+    // Test NPE case when type is null and provider is "hadoop"
+    // This should throw IllegalArgumentException instead of NPE in constructor
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> new CatalogCreateRequest("catalog_test", null, "hadoop", null, null));
+
+    // Verify the exception message
+    Assertions.assertEquals(
+        "Catalog type cannot be null when provider is \"hadoop\"", exception.getMessage());
+  }
 }
