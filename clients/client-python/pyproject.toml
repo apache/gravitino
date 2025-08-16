@@ -15,6 +15,52 @@
 # specific language governing permissions and limitations
 # under the License.
 
+[project]
+name = "apache-gravitino"
+dynamic = [
+    "version",
+    "readme",
+    "license",
+    "authors",
+    "maintainers",
+    "keywords",
+    "classifiers",
+    "urls",
+]
+description = "Python client for Apache Gravitino"
+requires-python = ">=3.8.1"
+dependencies = [
+    "requests==2.32.3",
+    "dataclasses-json==0.6.7",
+    "readerwriterlock==1.0.9",
+    "fsspec==2024.3.1",
+    "pyarrow==15.0.2",
+    "cachetools==5.5.2",
+    "gcsfs==2024.3.1",
+    "s3fs==2024.3.1",
+    "ossfs==2023.12.0",
+    "adlfs==2023.12.0",
+    "black==24.4.2",
+    "flake8==7.0.0",
+    "pre-commit==3.5.0",
+]
+
+[dependency-groups]
+dev = [
+    "pylint==3.2.2",
+    "twine==5.1.1",
+    "coverage==7.5.1",
+    "pandas==2.0.3 ; python_version == '3.8'",
+    "pandas==2.2.3 ; python_version > '3.8'",
+    "llama-index==0.11.18",
+    "tenacity==8.3.0",
+    "docker==7.1.0",
+    "pyjwt[crypto]==2.8.0",
+    "jwcrypto==1.5.6",
+    "sphinx==7.1.2",
+    "furo==2024.8.6",
+]
+
 [tool.ruff]
 line-length = 88
 
