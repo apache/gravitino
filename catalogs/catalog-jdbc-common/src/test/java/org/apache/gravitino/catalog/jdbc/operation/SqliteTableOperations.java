@@ -72,18 +72,17 @@ public class SqliteTableOperations extends JdbcTableOperations {
     if (columns.length > 0) {
       sqlBuilder.deleteCharAt(sqlBuilder.length() - 1);
     }
-
+    sqlBuilder.append(")");
     if (comment != null && !comment.isEmpty()) {
-      sqlBuilder.append(") COMMENT '").append(comment).append("'");
-    } else {
-      sqlBuilder.append(")");
-      if (properties != null && !properties.isEmpty()) {
-        for (Map.Entry<String, String> entry : properties.entrySet()) {
-          sqlBuilder.append(" ").append(entry.getKey()).append("=").append(entry.getValue());
-        }
-      }
-      sqlBuilder.append(";");
+      sqlBuilder.append(" COMMENT '").append(comment).append("'");
     }
+
+    if (properties != null && !properties.isEmpty()) {
+      for (Map.Entry<String, String> entry : properties.entrySet()) {
+        sqlBuilder.append(" ").append(entry.getKey()).append("=").append(entry.getValue());
+      }
+    }
+    sqlBuilder.append(";");
     return sqlBuilder.toString();
   }
 

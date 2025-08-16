@@ -23,6 +23,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -56,6 +57,14 @@ public interface Schema extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Schema does not support tag operations.");
+  }
+
+  /**
+   * @return the {@link SupportsPolicies} if the schema supports policy operations.
+   * @throws UnsupportedOperationException if the schema does not support policy operations.
+   */
+  default SupportsPolicies supportsPolicies() {
+    throw new UnsupportedOperationException("Schema does not support policy operations.");
   }
 
   /**

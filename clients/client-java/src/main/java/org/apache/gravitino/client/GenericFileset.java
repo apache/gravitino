@@ -30,19 +30,25 @@ import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic fileset. */
-class GenericFileset implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials {
+class GenericFileset
+    implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials, SupportsPolicies {
 
   private final FilesetDTO filesetDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectCredentialOperations objectCredentialOperations;
+  private final MetadataObjectPolicyOperations objectPolicyOperations;
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
     this.filesetDTO = filesetDTO;
@@ -55,6 +61,8 @@ class GenericFileset implements Fileset, SupportsTags, SupportsRoles, SupportsCr
         new MetadataObjectRoleOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectPolicyOperations =
+        new MetadataObjectPolicyOperations(filesetNs.level(0), filesetObject, restClient);
   }
 
   @Override
@@ -94,6 +102,11 @@ class GenericFileset implements Fileset, SupportsTags, SupportsRoles, SupportsCr
   }
 
   @Override
+  public SupportsPolicies supportsPolicies() {
+    return this;
+  }
+
+  @Override
   public SupportsRoles supportsRoles() {
     return this;
   }
@@ -121,6 +134,27 @@ class GenericFileset implements Fileset, SupportsTags, SupportsRoles, SupportsCr
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] listPolicies() {
+    return objectPolicyOperations.listPolicies();
+  }
+
+  @Override
+  public Policy[] listPolicyInfos() {
+    return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public Policy getPolicy(String name) throws NoSuchPolicyException {
+    return objectPolicyOperations.getPolicy(name);
+  }
+
+  @Override
+  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
+      throws PolicyAlreadyAssociatedException {
+    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
   }
 
   @Override
