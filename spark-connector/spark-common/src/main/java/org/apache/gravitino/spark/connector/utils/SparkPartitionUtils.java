@@ -46,6 +46,10 @@ public class SparkPartitionUtils {
   private SparkPartitionUtils() {}
 
   public static Literal<?> toGravitinoLiteral(InternalRow ident, int ordinal, DataType sparkType) {
+    if (ident.isNullAt(ordinal)) {
+      return Literals.NULL;
+    }
+
     if (sparkType instanceof ByteType) {
       return Literals.byteLiteral(ident.getByte(ordinal));
     } else if (sparkType instanceof ShortType) {
