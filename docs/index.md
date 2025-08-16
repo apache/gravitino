@@ -139,6 +139,8 @@ Gravitino provides governance features to manage metadata in a unified way. See:
 
 * [Manage tags in Gravitino](./manage-tags-in-gravitino.md): a complete guide to using Gravitino
   to manage tags.
+* [Manage jobs in Gravitino](./manage-jobs-in-gravitino.md): a complete guide to using Gravitino
+  to manage jobs.
 
 ### Gravitino Iceberg REST catalog service
 
