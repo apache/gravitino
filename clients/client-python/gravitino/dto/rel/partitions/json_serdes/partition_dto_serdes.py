@@ -15,32 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Any, Dict
 
-from abc import abstractmethod
-from enum import Enum, unique
+from gravitino.api.types.json_serdes.base import JsonSerializable
+from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 
-from gravitino.api.expressions.partitions.partition import Partition
 
+class PartitionDTOSerdes(JsonSerializable[PartitionDTO]):
+    @classmethod
+    def serialize(cls, data_type: PartitionDTO) -> Dict[str, Any]:
+        return SerdesUtils.write_partition(data_type)
 
-class PartitionDTO(Partition):
-    """Represents a Partition Data Transfer Object (DTO) that implements the Partition interface."""
-
-    @unique
-    class Type(str, Enum):
-        """Type of the partition."""
-
-        RANGE = "range"
-        """The range partition type."""
-        LIST = "list"
-        """The list partition type."""
-        IDENTITY = "identity"
-        """The identity partition type."""
-
-    @abstractmethod
-    def type(self) -> Type:
-        """Gets the type of the partition.
-
-        Returns:
-            Type: The type of the partition.
-        """
-        pass  # pragma: no cover
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any]) -> PartitionDTO:
+        return SerdesUtils.read_partition(data)

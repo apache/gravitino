@@ -22,8 +22,9 @@ from dataclasses_json.core import Json
 
 from gravitino.api.expressions.expression import Expression
 from gravitino.api.types.types import Type
+from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 
-GravitinoTypeT = TypeVar("GravitinoTypeT", bound=Union[Expression, Type])
+GravitinoTypeT = TypeVar("GravitinoTypeT", bound=Union[Expression, Type, PartitionDTO])
 
 
 class JsonSerializable(ABC, Generic[GravitinoTypeT]):
