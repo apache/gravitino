@@ -37,7 +37,7 @@ public class TestNamespace {
     Namespace ns = Namespace.of("a", "b", "c");
 
     Assertions.assertEquals(3, ns.length());
-    Assertions.assertArrayEquals(new String[] { "a", "b", "c" }, ns.levels());
+    Assertions.assertArrayEquals(new String[] {"a", "b", "c"}, ns.levels());
     Assertions.assertEquals("a", ns.level(0));
     Assertions.assertThrows(IllegalArgumentException.class, () -> ns.level(3));
     Assertions.assertEquals(false, ns.isEmpty());
