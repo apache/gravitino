@@ -16,7 +16,6 @@
 # under the License.
 
 import unittest
-from collections import ChainMap
 from enum import Enum
 from typing import cast
 from unittest.mock import patch
@@ -102,78 +101,82 @@ class TestPartitionSerdesUtils(unittest.TestCase):
         """
 
         for partition_dto in self.partition_dtos.values():
-            with self.subTest(partition_dto=partition_dto):
-                mock_write_function_arg.reset_mock()
-                mock_write_function_arg_return = {"mocked": "function_arg"}
-                mock_write_function_arg.return_value = mock_write_function_arg_return
-                partition_dto_type = partition_dto.type()
+            mock_write_function_arg.reset_mock()
+            mock_write_function_arg_return = {"mocked": "function_arg"}
+            mock_write_function_arg.return_value = mock_write_function_arg_return
+            partition_dto_type = partition_dto.type()
 
-                result = SerdesUtils.write_partition(partition_dto)
+            result = SerdesUtils.write_partition(partition_dto)
 
+            self.assertEqual(
+                mock_write_function_arg.call_count, len(self.literal_values)
+            )
+            if partition_dto_type is PartitionDTO.Type.IDENTITY:
                 self.assertEqual(
-                    mock_write_function_arg.call_count, len(self.literal_values)
+                    result[SerdesUtils.IDENTITY_PARTITION_VALUES],
+                    [mock_write_function_arg_return] * len(self.literal_values),
                 )
-                if partition_dto_type is PartitionDTO.Type.IDENTITY:
-                    self.assertEqual(
-                        result[SerdesUtils.IDENTITY_PARTITION_VALUES],
-                        [mock_write_function_arg_return] * len(self.literal_values),
-                    )
-                if partition_dto_type is PartitionDTO.Type.LIST:
-                    self.assertEqual(
-                        result[SerdesUtils.LIST_PARTITION_LISTS],
-                        [[mock_write_function_arg_return]] * len(self.literal_values),
-                    )
+            if partition_dto_type is PartitionDTO.Type.LIST:
+                self.assertEqual(
+                    result[SerdesUtils.LIST_PARTITION_LISTS],
+                    [[mock_write_function_arg_return]] * len(self.literal_values),
+                )
+            if partition_dto_type is PartitionDTO.Type.RANGE:
+                self.assertEqual(
+                    [
+                        result[SerdesUtils.RANGE_PARTITION_LOWER],
+                        result[SerdesUtils.RANGE_PARTITION_UPPER],
+                    ],
+                    [mock_write_function_arg_return] * len(self.literal_values),
+                )
 
     def test_write_partition_dto(self):
         """Test writing PartitionDTOs"""
 
         for partition_dto_type, partition_dto in self.partition_dtos.items():
-            with self.subTest(
-                partition_dto_type=partition_dto_type, partition_dto=partition_dto
-            ):
-                result = SerdesUtils.write_partition(partition_dto)
+            result = SerdesUtils.write_partition(partition_dto)
 
+            self.assertEqual(
+                result[SerdesUtils.PARTITION_TYPE], partition_dto_type.value
+            )
+            self.assertEqual(
+                result[SerdesUtils.PARTITION_NAME],
+                f"test_{partition_dto_type.value}_partition",
+            )
+            if partition_dto_type is PartitionDTO.Type.IDENTITY:
+                self.assertEqual(result[SerdesUtils.FIELD_NAMES], self.field_names)
+                self.assertIn(SerdesUtils.IDENTITY_PARTITION_VALUES, result)
+                self.assertListEqual(
+                    result[SerdesUtils.IDENTITY_PARTITION_VALUES],
+                    [
+                        ExpressionSerdesUtils.write_function_arg(literal_value)
+                        for literal_value in self.literal_values.values()
+                    ],
+                )
+            if partition_dto_type is PartitionDTO.Type.LIST:
+                self.assertListEqual(
+                    result[SerdesUtils.LIST_PARTITION_LISTS],
+                    [
+                        [ExpressionSerdesUtils.write_function_arg(literal_value)]
+                        for literal_value in self.literal_values.values()
+                    ],
+                )
+            if partition_dto_type is PartitionDTO.Type.RANGE:
                 self.assertEqual(
-                    result[SerdesUtils.PARTITION_TYPE], partition_dto_type.value
+                    result[SerdesUtils.RANGE_PARTITION_LOWER],
+                    ExpressionSerdesUtils.write_function_arg(
+                        arg=self.literal_values[SerdesUtils.RANGE_PARTITION_LOWER]
+                    ),
                 )
                 self.assertEqual(
-                    result[SerdesUtils.PARTITION_NAME],
-                    f"test_{partition_dto_type.value}_partition",
+                    result[SerdesUtils.RANGE_PARTITION_UPPER],
+                    ExpressionSerdesUtils.write_function_arg(
+                        arg=self.literal_values[SerdesUtils.RANGE_PARTITION_UPPER]
+                    ),
                 )
-                if partition_dto_type is PartitionDTO.Type.IDENTITY:
-                    self.assertEqual(result[SerdesUtils.FIELD_NAMES], self.field_names)
-                    self.assertIn(SerdesUtils.IDENTITY_PARTITION_VALUES, result)
-                    self.assertListEqual(
-                        result[SerdesUtils.IDENTITY_PARTITION_VALUES],
-                        [
-                            ExpressionSerdesUtils.write_function_arg(literal_value)
-                            for literal_value in self.literal_values.values()
-                        ],
-                    )
-                if partition_dto_type is PartitionDTO.Type.LIST:
-                    self.assertListEqual(
-                        result[SerdesUtils.LIST_PARTITION_LISTS],
-                        [
-                            [ExpressionSerdesUtils.write_function_arg(literal_value)]
-                            for literal_value in self.literal_values.values()
-                        ],
-                    )
-                if partition_dto_type is PartitionDTO.Type.RANGE:
-                    self.assertEqual(
-                        result[SerdesUtils.RANGE_PARTITION_LOWER],
-                        ExpressionSerdesUtils.write_function_arg(
-                            arg=self.literal_values[SerdesUtils.RANGE_PARTITION_LOWER]
-                        ),
-                    )
-                    self.assertEqual(
-                        result[SerdesUtils.RANGE_PARTITION_UPPER],
-                        ExpressionSerdesUtils.write_function_arg(
-                            arg=self.literal_values[SerdesUtils.RANGE_PARTITION_UPPER]
-                        ),
-                    )
-                self.assertDictEqual(
-                    result[SerdesUtils.PARTITION_PROPERTIES], partition_dto.properties()
-                )
+            self.assertDictEqual(
+                result[SerdesUtils.PARTITION_PROPERTIES], partition_dto.properties()
+            )
 
     def test_write_partition_empty_values(self):
         """Test writing partition with empty values."""
@@ -216,23 +219,17 @@ class TestPartitionSerdesUtils(unittest.TestCase):
         }
         invalid_field_names_data = (
             identity_data_base,
-            dict(
-                ChainMap(
-                    identity_data_base, {SerdesUtils.FIELD_NAMES: "invalid_field_names"}
-                )
-            ),
+            {**identity_data_base, **{SerdesUtils.FIELD_NAMES: "invalid_field_names"}},
         )
         invalid_values_data = (
-            dict(ChainMap(identity_data_base, {SerdesUtils.FIELD_NAMES: []})),
-            dict(
-                ChainMap(
-                    identity_data_base,
-                    {
-                        SerdesUtils.FIELD_NAMES: [],
-                        SerdesUtils.IDENTITY_PARTITION_VALUES: "invalid_values",
-                    },
-                )
-            ),
+            {**identity_data_base, **{SerdesUtils.FIELD_NAMES: []}},
+            {
+                **identity_data_base,
+                **{
+                    SerdesUtils.FIELD_NAMES: [],
+                    SerdesUtils.IDENTITY_PARTITION_VALUES: "invalid_values",
+                },
+            },
         )
         for data in invalid_field_names_data:
             self.assertRaisesRegex(
@@ -259,9 +256,7 @@ class TestPartitionSerdesUtils(unittest.TestCase):
         }
         invalid_lists_data = (
             list_data_base,
-            dict(
-                ChainMap(list_data_base, {SerdesUtils.LIST_PARTITION_LISTS: "invalid"})
-            ),
+            {**list_data_base, **{SerdesUtils.LIST_PARTITION_LISTS: "invalid"}},
         )
         self.assertRaisesRegex(
             IllegalArgumentException,
@@ -311,27 +306,24 @@ class TestPartitionSerdesUtils(unittest.TestCase):
 
     def test_read_partition_dto(self):
         for partition_dto_type, partition_dto in self.partition_dtos.items():
-            with self.subTest(
-                partition_dto_type=partition_dto_type, partition_dto=partition_dto
-            ):
-                result = SerdesUtils.write_partition(partition_dto)
-                partition_dto_read = SerdesUtils.read_partition(result)
+            result = SerdesUtils.write_partition(partition_dto)
+            partition_dto_read = SerdesUtils.read_partition(result)
 
-                self.assertEqual(partition_dto.name(), partition_dto_read.name())
-                self.assertEqual(partition_dto.type(), partition_dto_read.type())
-                if partition_dto_type is PartitionDTO.Type.IDENTITY:
-                    dto = cast(IdentityPartitionDTO, partition_dto_read)
-                    self.assertListEqual(partition_dto.field_names(), dto.field_names())
-                    self.assertListEqual(partition_dto.values(), dto.values())
-                    self.assertEqual(partition_dto.properties(), dto.properties())
+            self.assertEqual(partition_dto.name(), partition_dto_read.name())
+            self.assertEqual(partition_dto.type(), partition_dto_read.type())
+            if partition_dto_type is PartitionDTO.Type.IDENTITY:
+                dto = cast(IdentityPartitionDTO, partition_dto_read)
+                self.assertListEqual(partition_dto.field_names(), dto.field_names())
+                self.assertListEqual(partition_dto.values(), dto.values())
+                self.assertEqual(partition_dto.properties(), dto.properties())
 
-                if partition_dto_type is PartitionDTO.Type.LIST:
-                    dto = cast(ListPartitionDTO, partition_dto_read)
-                    self.assertListEqual(partition_dto.lists(), dto.lists())
-                    self.assertEqual(partition_dto.properties(), dto.properties())
+            if partition_dto_type is PartitionDTO.Type.LIST:
+                dto = cast(ListPartitionDTO, partition_dto_read)
+                self.assertListEqual(partition_dto.lists(), dto.lists())
+                self.assertEqual(partition_dto.properties(), dto.properties())
 
-                if partition_dto_type is PartitionDTO.Type.RANGE:
-                    dto = cast(RangePartitionDTO, partition_dto_read)
-                    self.assertEqual(partition_dto.lower(), dto.lower())
-                    self.assertEqual(partition_dto.upper(), dto.upper())
-                    self.assertEqual(partition_dto.properties(), dto.properties())
+            if partition_dto_type is PartitionDTO.Type.RANGE:
+                dto = cast(RangePartitionDTO, partition_dto_read)
+                self.assertEqual(partition_dto.lower(), dto.lower())
+                self.assertEqual(partition_dto.upper(), dto.upper())
+                self.assertEqual(partition_dto.properties(), dto.properties())
