@@ -91,10 +91,9 @@ public class AuthorizationExpressionEvaluator {
     ognlContext.put(
         "METALAKE_NAME", Optional.ofNullable(nameIdentifier).map(NameIdentifier::name).orElse(""));
     try {
-      Object value = Ognl.getValue(ognlAuthorizationExpression, ognlContext);
-      return (boolean) value;
+      return (boolean) Ognl.getValue(ognlAuthorizationExpression, ognlContext);
     } catch (OgnlException e) {
-      throw new RuntimeException("ognl evaluate error", e);
+      throw new RuntimeException(e);
     }
   }
 

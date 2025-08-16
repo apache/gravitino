@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -41,6 +42,11 @@ public class OwnerMetaService {
 
   public static OwnerMetaService getInstance() {
     return INSTANCE;
+  }
+
+  public List<OwnerRelPO> listOwnerByOwnerId(Long ownerId) {
+    return SessionUtils.getWithoutCommit(
+        OwnerMetaMapper.class, mapper -> mapper.selectOwnerRelByOwnerId(ownerId));
   }
 
   public Optional<Entity> getOwner(NameIdentifier identifier, Entity.EntityType type) {

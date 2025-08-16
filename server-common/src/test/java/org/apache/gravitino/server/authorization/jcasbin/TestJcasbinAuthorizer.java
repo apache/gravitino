@@ -51,6 +51,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.server.authorization.ThreadLocalAuthorizationCache;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -229,18 +230,22 @@ public class TestJcasbinAuthorizer {
   }
 
   private boolean doAuthorize(Principal currentPrincipal) {
-    return jcasbinAuthorizer.authorize(
-        currentPrincipal,
-        "testMetalake",
-        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
-        USE_CATALOG);
+    return ThreadLocalAuthorizationCache.executeWithThreadCache(
+        () ->
+            jcasbinAuthorizer.authorize(
+                currentPrincipal,
+                "testMetalake",
+                MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+                USE_CATALOG));
   }
 
   private boolean doAuthorizeOwner(Principal currentPrincipal) {
-    return jcasbinAuthorizer.isOwner(
-        currentPrincipal,
-        "testMetalake",
-        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG));
+    return ThreadLocalAuthorizationCache.executeWithThreadCache(
+        () ->
+            jcasbinAuthorizer.isOwner(
+                currentPrincipal,
+                "testMetalake",
+                MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG)));
   }
 
   private static UserEntity getUserEntity() {
