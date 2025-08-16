@@ -77,9 +77,11 @@ const AuthProvider = ({ children }) => {
       const [authConfigsErr, resAuthConfigs] = await to(dispatch(getAuthConfigs()))
       const authType = resAuthConfigs?.payload?.authType
 
+      // Always fetch GitHub info since it's a public API call
+      dispatch(fetchGitHubInfo())
+
       if (authType === 'simple') {
         dispatch(initialVersion())
-        dispatch(fetchGitHubInfo())
         goToMetalakeListPage()
       } else if (authType === 'oauth') {
         const tokenToUse = await oauthProviderFactory.getAccessToken()
@@ -90,7 +92,6 @@ const AuthProvider = ({ children }) => {
         if (tokenToUse) {
           dispatch(setAuthToken(tokenToUse))
           dispatch(initialVersion())
-          dispatch(fetchGitHubInfo())
           goToMetalakeListPage()
         } else {
           // Don't redirect to login if we're on the OAuth callback page
