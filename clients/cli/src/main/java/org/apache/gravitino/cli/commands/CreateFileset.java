@@ -70,9 +70,8 @@ public class CreateFileset extends Command {
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, fileset);
-    boolean managed = Optional.ofNullable(properties.get("managed"))
-                          .map("true"::equals)
-                          .orElse(false);
+    boolean managed =
+        Optional.ofNullable(properties.get("managed")).map("true"::equals).orElse(false);
     String location = properties.get("location");
     Fileset.Type filesetType = managed ? Fileset.Type.MANAGED : Fileset.Type.EXTERNAL;
 
