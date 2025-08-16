@@ -41,7 +41,9 @@ import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.google.common.collect.Lists;
@@ -665,5 +667,228 @@ public class TestTableColumnMetaService extends TestJDBCBackend {
       }
     }
     return count;
+  }
+
+  @Test
+  public void testUpdateColumnPOsFromTableDiff() throws IOException {
+    String catalogName = "catalog_for_update_test";
+    String schemaName = "schema_for_update_test";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+
+    // Create initial table with 3 columns
+    List<ColumnEntity> columns = new ArrayList<>();
+    for (int i = 1; i <= 4; i++) {
+      columns.add(
+          ColumnEntity.builder()
+              .withId((long) i) // Use simple IDs for easier tracking
+              .withName("col" + i)
+              .withPosition(i - 1)
+              .withComment("initial comment " + i)
+              .withDataType(Types.IntegerType.get()) // Use different types for variety
+              .withNullable(true) // Alternate nullable
+              .withAutoIncrement(false)
+              .withAuditInfo(auditInfo)
+              .build());
+    }
+
+    TableEntity oldTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("test_update_table")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withAuditInfo(auditInfo)
+            .withColumns(columns.subList(0, 3)) // Use first 3 columns
+            .build();
+
+    TableMetaService.getInstance().insertTable(oldTable, false);
+
+    // Create updated table with:
+    // - col1 removed (DELETE)
+    // - col2 modified (UPDATE)
+    // - col3 unchanged (remains as CREATE from version 1)
+    // - col4 added (CREATE in version 2)
+
+    ColumnEntity modifiedColumn2 =
+        ColumnEntity.builder()
+            .withId(columns.get(1).id()) // Use the same ID as col2
+            .withName(columns.get(1).name() + " modified") // Change name to indicate modification
+            .withPosition(columns.get(1).position())
+            .withComment("modified comment 2") // Changed comment
+            .withDataType(Types.StringType.get())
+            .withNullable(false)
+            .withAutoIncrement(false)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity newTable =
+        TableEntity.builder()
+            .withId(oldTable.id())
+            .withName(oldTable.name())
+            .withNamespace(oldTable.namespace())
+            .withAuditInfo(oldTable.auditInfo())
+            .withColumns(
+                Lists.newArrayList(
+                    modifiedColumn2,
+                    columns.get(2), // col3 unchanged
+                    columns.get(3))) // col4 added
+            .build();
+
+    // Simulate the update process
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(METALAKE_NAME);
+    Long catalogId =
+        CatalogMetaService.getInstance().getCatalogIdByName(METALAKE_NAME, catalogName);
+    Long schemaId =
+        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+
+    TablePO tablePO =
+        TablePO.builder()
+            .withTableId(newTable.id())
+            .withTableName(newTable.name())
+            .withMetalakeId(metalakeId)
+            .withCatalogId(catalogId)
+            .withSchemaId(schemaId)
+            .withCurrentVersion(2L) // New version
+            .withLastVersion(1L) // Previous version
+            .withAuditInfo(newTable.auditInfo().creator())
+            .withDeletedAt(0L) // Not deleted
+            .build();
+
+    // Test the method
+
+    TableColumnMetaService.getInstance().updateColumnPOsFromTableDiff(oldTable, newTable, tablePO);
+
+    // Verify the results by checking the database
+    List<ColumnPO> allColumnPOs =
+        SessionUtils.getWithoutCommit(
+            TableColumnMapper.class,
+            mapper -> mapper.listColumnPOsByTableIdAndVersion(newTable.id(), 2L));
+
+    // Group by operation type
+    Map<Byte, List<ColumnPO>> opGroups =
+        allColumnPOs.stream().collect(Collectors.groupingBy(ColumnPO::getColumnOpType));
+
+    // Verify CREATE operations:
+    // - Column 3 (from version 1, unchanged)
+    // - Column 4 (from version 2, newly added)
+    List<ColumnPO> createOps = opGroups.get(ColumnPO.ColumnOpType.CREATE.value());
+
+    Assertions.assertNotNull(createOps);
+    Assertions.assertEquals(2, createOps.size());
+    // Group CREATE operations by column ID for easier verification
+    Map<Long, ColumnPO> createOpsMap =
+        createOps.stream().collect(Collectors.toMap(ColumnPO::getColumnId, Function.identity()));
+
+    // Verify column 3 (unchanged from version 1)
+    Assertions.assertTrue(createOpsMap.containsKey(3L));
+    ColumnPO col3CreateOp = createOpsMap.get(3L);
+    Assertions.assertEquals(1L, col3CreateOp.getTableVersion());
+    Assertions.assertEquals("col3", col3CreateOp.getColumnName());
+
+    // Verify column 4 (newly added in version 2)
+    Assertions.assertTrue(createOpsMap.containsKey(4L));
+    ColumnPO col4CreateOp = createOpsMap.get(4L);
+    Assertions.assertEquals(2L, col4CreateOp.getTableVersion());
+    Assertions.assertEquals("col4", col4CreateOp.getColumnName());
+
+    // Verify UPDATE operation for modified column
+    List<ColumnPO> updateOps = opGroups.get(ColumnPO.ColumnOpType.UPDATE.value());
+    Assertions.assertNotNull(updateOps);
+    Assertions.assertEquals(1, updateOps.size());
+    Assertions.assertEquals(2L, updateOps.get(0).getColumnId());
+    Assertions.assertEquals(2L, updateOps.get(0).getTableVersion());
+    Assertions.assertEquals("col2 modified", updateOps.get(0).getColumnName());
+    Assertions.assertEquals("modified comment 2", updateOps.get(0).getColumnComment());
+
+    // Verify DELETE operation for removed column
+    List<ColumnPO> deleteOps = opGroups.get(ColumnPO.ColumnOpType.DELETE.value());
+    Assertions.assertNotNull(deleteOps);
+    Assertions.assertEquals(1, deleteOps.size());
+    Assertions.assertEquals(1L, deleteOps.get(0).getColumnId());
+    Assertions.assertEquals(2L, deleteOps.get(0).getTableVersion());
+
+    // Clean up
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(NameIdentifier.of(METALAKE_NAME), true));
+  }
+
+  @Test
+  public void testUpdateColumnPOsFromTableDiffNoChanges() throws IOException {
+    String catalogName = "catalog_for_no_change_test";
+    String schemaName = "schema_for_no_change_test";
+    createParentEntities(METALAKE_NAME, catalogName, schemaName, auditInfo);
+
+    // Create table with 1 column
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(1L)
+            .withName("col1")
+            .withPosition(0)
+            .withComment("unchanged")
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(auditInfo)
+            .build();
+
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("test_no_change_table")
+            .withNamespace(Namespace.of(METALAKE_NAME, catalogName, schemaName))
+            .withAuditInfo(auditInfo)
+            .withColumns(Lists.newArrayList(column))
+            .build();
+
+    TableMetaService.getInstance().insertTable(table, false);
+
+    // Create identical table (no changes)
+    TableEntity identicalTable =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(table.namespace())
+            .withAuditInfo(table.auditInfo())
+            .withColumns(Lists.newArrayList(column))
+            .build();
+
+    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(METALAKE_NAME);
+    Long catalogId =
+        CatalogMetaService.getInstance().getCatalogIdByName(METALAKE_NAME, catalogName);
+    Long schemaId =
+        SchemaMetaService.getInstance().getSchemaIdByCatalogIdAndName(catalogId, schemaName);
+
+    TablePO tablePO =
+        TablePO.builder()
+            .withTableId(identicalTable.id())
+            .withTableName(identicalTable.name())
+            .withMetalakeId(metalakeId)
+            .withCatalogId(catalogId)
+            .withSchemaId(schemaId)
+            .withCurrentVersion(2L) // New version
+            .withLastVersion(1L) // Previous version
+            .withAuditInfo(identicalTable.auditInfo().creator())
+            .withDeletedAt(0L) // Not deleted
+            .build();
+
+    // Test the method - should not insert any new column operations
+    TableColumnMetaService.getInstance()
+        .updateColumnPOsFromTableDiff(table, identicalTable, tablePO);
+
+    // Verify the results by checking what columns exist at version 2
+    List<ColumnPO> allVersionPOs =
+        SessionUtils.getWithoutCommit(
+            TableColumnMapper.class,
+            mapper -> mapper.listColumnPOsByTableIdAndVersion(identicalTable.id(), 2L));
+
+    // Should have 1 column (the original one from version 1, since no changes were made)
+    Assertions.assertEquals(1, allVersionPOs.size());
+    ColumnPO columnPO = allVersionPOs.get(0);
+    Assertions.assertEquals(1L, columnPO.getColumnId());
+    Assertions.assertEquals(1L, columnPO.getTableVersion());
+    Assertions.assertEquals(ColumnPO.ColumnOpType.CREATE.value(), columnPO.getColumnOpType());
+
+    // Clean up
+    Assertions.assertTrue(
+        MetalakeMetaService.getInstance().deleteMetalake(NameIdentifier.of(METALAKE_NAME), true));
   }
 }

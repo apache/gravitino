@@ -143,8 +143,12 @@ public class TableColumnMetaService {
     List<ColumnPO> columnPOsToInsert = Lists.newArrayList();
     for (ColumnEntity newColumn : newColumns.values()) {
       ColumnEntity oldColumn = oldColumns.get(newColumn.id());
-      // If the column is not existed in old columns, or if the column is updated, mark it as UPDATE
-      if (oldColumn == null || !oldColumn.equals(newColumn)) {
+      // If the column is not existed in old columns mark it as CREATE,
+      // if the column is updated, mark it as UPDATE
+      if (oldColumn == null) {
+        columnPOsToInsert.add(
+            POConverters.initializeColumnPO(newTablePO, newColumn, ColumnPO.ColumnOpType.CREATE));
+      } else if (!oldColumn.equals(newColumn)) {
         columnPOsToInsert.add(
             POConverters.initializeColumnPO(newTablePO, newColumn, ColumnPO.ColumnOpType.UPDATE));
       }
