@@ -27,6 +27,9 @@ from gravitino.dto.rel.expressions.json_serdes._helper.serdes_utils import (
 from gravitino.dto.rel.expressions.literal_dto import LiteralDTO
 from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitionDTO
 from gravitino.dto.rel.partitions.json_serdes._helper.serdes_utils import SerdesUtils
+from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
+    PartitionDTOSerdes,
+)
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
@@ -324,6 +327,30 @@ class TestPartitionSerdesUtils(unittest.TestCase):
 
             if partition_dto_type is PartitionDTO.Type.RANGE:
                 dto = cast(RangePartitionDTO, partition_dto_read)
+                self.assertEqual(partition_dto.lower(), dto.lower())
+                self.assertEqual(partition_dto.upper(), dto.upper())
+                self.assertEqual(partition_dto.properties(), dto.properties())
+
+    def test_partition_dto_serdes(self):
+        for partition_dto_type, partition_dto in self.partition_dtos.items():
+            serialized_data = PartitionDTOSerdes.serialize(partition_dto)
+            deserialized_partition_dto = PartitionDTOSerdes.deserialize(serialized_data)
+
+            self.assertEqual(partition_dto.name(), deserialized_partition_dto.name())
+            self.assertEqual(partition_dto.type(), deserialized_partition_dto.type())
+            if partition_dto_type is PartitionDTO.Type.IDENTITY:
+                dto = cast(IdentityPartitionDTO, deserialized_partition_dto)
+                self.assertListEqual(partition_dto.field_names(), dto.field_names())
+                self.assertListEqual(partition_dto.values(), dto.values())
+                self.assertEqual(partition_dto.properties(), dto.properties())
+
+            if partition_dto_type is PartitionDTO.Type.LIST:
+                dto = cast(ListPartitionDTO, deserialized_partition_dto)
+                self.assertListEqual(partition_dto.lists(), dto.lists())
+                self.assertEqual(partition_dto.properties(), dto.properties())
+
+            if partition_dto_type is PartitionDTO.Type.RANGE:
+                dto = cast(RangePartitionDTO, deserialized_partition_dto)
                 self.assertEqual(partition_dto.lower(), dto.lower())
                 self.assertEqual(partition_dto.upper(), dto.upper())
                 self.assertEqual(partition_dto.properties(), dto.properties())
