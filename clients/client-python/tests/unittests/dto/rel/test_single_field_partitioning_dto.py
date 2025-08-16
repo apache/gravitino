@@ -23,6 +23,7 @@ from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
 )
+from gravitino.dto.rel.partitioning.month_partitioning_dto import MonthPartitioningDTO
 from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.partitioning.year_partitioning_dto import YearPartitioningDTO
 from gravitino.exceptions.base import IllegalArgumentException
@@ -35,6 +36,7 @@ class TestSingleFieldPartitioningDTO(unittest.TestCase):
         cls.partitioning_dto = {
             Partitioning.Strategy.IDENTITY: IdentityPartitioningDTO,
             Partitioning.Strategy.YEAR: YearPartitioningDTO,
+            Partitioning.Strategy.MONTH: MonthPartitioningDTO,
         }
 
     def test_single_field_partitioning_dto_empty_field_name(self):
