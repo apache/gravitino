@@ -40,6 +40,7 @@ public class ObjectMapperProvider {
             .configure(EnumFeature.WRITE_ENUMS_TO_LOWERCASE, true)
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL, true)
             .build()
             .registerModule(new JavaTimeModule())
             .registerModule(new Jdk8Module());

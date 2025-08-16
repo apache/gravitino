@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.metadata;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.client.ObjectMapperProvider;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoCatalog {
@@ -45,6 +47,13 @@ public class TestGravitinoCatalog {
     assertEquals(catalogName, catalog.getName());
     assertEquals(provider, catalog.getProvider());
     assertEquals(catalog.getRegion(), "");
+  }
+
+  @Test
+  public void testUnSupportedCatalogType() throws Exception {
+    String json = "\"xxxx\"";
+    Catalog.Type t = ObjectMapperProvider.objectMapper().readValue(json, Catalog.Type.class);
+    assertNull(t);
   }
 
   @Test

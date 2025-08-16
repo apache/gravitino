@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.dto;
 
+import static org.apache.gravitino.Catalog.Type.UNSUPPORTED;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -98,6 +100,9 @@ public class CatalogDTO implements Catalog {
    */
   @Override
   public Type type() {
+    if (type == null) {
+      return UNSUPPORTED;
+    }
     return type;
   }
 
