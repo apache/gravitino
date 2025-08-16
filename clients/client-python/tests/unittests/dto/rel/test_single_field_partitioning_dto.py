@@ -20,6 +20,7 @@ import unittest
 from gravitino.api.expressions.named_reference import NamedReference
 from gravitino.api.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
+from gravitino.dto.rel.partitioning.day_partitioning_dto import DayPartitioningDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
 )
@@ -37,6 +38,7 @@ class TestSingleFieldPartitioningDTO(unittest.TestCase):
             Partitioning.Strategy.IDENTITY: IdentityPartitioningDTO,
             Partitioning.Strategy.YEAR: YearPartitioningDTO,
             Partitioning.Strategy.MONTH: MonthPartitioningDTO,
+            Partitioning.Strategy.DAY: DayPartitioningDTO,
         }
 
     def test_single_field_partitioning_dto_empty_field_name(self):
