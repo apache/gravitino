@@ -130,9 +130,13 @@ public class SecureFilesetCatalogOperations
             ident, properties, null, filesetCatalogOperations.getCatalogInfo());
     return userContext.doAs(
         () -> {
-          setUser(apiUser);
-          return filesetCatalogOperations.createMultipleLocationFileset(
-              ident, comment, type, storageLocations, properties);
+          try {
+            setUser(apiUser);
+            return filesetCatalogOperations.createMultipleLocationFileset(
+                ident, comment, type, storageLocations, properties);
+          } finally {
+            unsetUser(apiUser);
+          }
         },
         ident);
   }
@@ -169,8 +173,12 @@ public class SecureFilesetCatalogOperations
             ident, properties, null, filesetCatalogOperations.getCatalogInfo());
     return userContext.doAs(
         () -> {
-          setUser(apiUser);
-          return filesetCatalogOperations.createSchema(ident, comment, properties);
+          try {
+            setUser(apiUser);
+            return filesetCatalogOperations.createSchema(ident, comment, properties);
+          } finally {
+            unsetUser(apiUser);
+          }
         },
         ident);
   }
@@ -354,5 +362,17 @@ public class SecureFilesetCatalogOperations
     java.security.AccessControlContext context = java.security.AccessController.getContext();
     Subject subject = Subject.getSubject(context);
     subject.getPrincipals().add(new UserPrincipal(apiUser));
+  }
+
+  /**
+   * Unset the user from the subject. This is used to remove the api user from the subject after the
+   * operation is done.
+   *
+   * @param apiUser the username to unset.
+   */
+  private void unsetUser(String apiUser) {
+    java.security.AccessControlContext context = java.security.AccessController.getContext();
+    Subject subject = Subject.getSubject(context);
+    subject.getPrincipals().removeIf(principal -> principal.getName().equals(apiUser));
   }
 }
