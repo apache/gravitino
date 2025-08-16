@@ -100,4 +100,27 @@ public class TestTagDTO {
     TagDTO deserTagDTO4 = JsonUtils.objectMapper().readValue(serJson, TagDTO.class);
     Assertions.assertEquals(Optional.of(true), deserTagDTO4.inherited());
   }
+
+  @Test
+  public void testEqualsConsidersInherited() {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+
+    TagDTO ownedTag =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withInherited(Optional.of(false))
+            .build();
+
+    TagDTO inheritedTag =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withInherited(Optional.of(true))
+            .build();
+
+    Assertions.assertNotEquals(ownedTag, inheritedTag);
+  }
 }

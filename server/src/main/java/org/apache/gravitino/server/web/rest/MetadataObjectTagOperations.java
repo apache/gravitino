@@ -20,11 +20,14 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DefaultValue;
@@ -50,7 +53,6 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
-import org.glassfish.jersey.internal.guava.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,7 +165,7 @@ public class MetadataObjectTagOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
-            Set<TagDTO> tags = Sets.newHashSet();
+            List<TagDTO> tags = new ArrayList<>();
             Tag[] nonInheritedTags = tagDispatcher.listTagsInfoForMetadataObject(metalake, object);
             if (ArrayUtils.isNotEmpty(nonInheritedTags)) {
               Collections.addAll(
@@ -187,18 +189,34 @@ public class MetadataObjectTagOperations {
               parentObject = MetadataObjects.parent(parentObject);
             }
 
+            // Deduplicate by tag name, prefer direct(inherited==false) over inherited(true)
+            Map<String, TagDTO> byName = new LinkedHashMap<>();
+            for (TagDTO t : tags) {
+              TagDTO prev = byName.get(t.name());
+              if (prev == null) {
+                byName.put(t.name(), t);
+              } else {
+                boolean prevDirect = !prev.inherited().orElse(false);
+                boolean currDirect = !t.inherited().orElse(false);
+                if (!prevDirect && currDirect) {
+                  byName.put(t.name(), t);
+                }
+              }
+            }
+
             if (verbose) {
+              TagDTO[] deduped = byName.values().toArray(new TagDTO[0]);
               LOG.info(
                   "List {} tags info for object type: {}, full name: {} under metalake: {}",
-                  tags.size(),
+                  deduped.length,
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new TagListResponse(tags.toArray(new TagDTO[0])));
+              return Utils.ok(new TagListResponse(deduped));
 
             } else {
-              // We have used Set to avoid duplicate tag names
-              String[] tagNames = tags.stream().map(TagDTO::name).toArray(String[]::new);
+              // names only: unique by tag name
+              String[] tagNames = byName.keySet().toArray(new String[0]);
 
               LOG.info(
                   "List {} tags for object type: {}, full name: {} under metalake: {}",
