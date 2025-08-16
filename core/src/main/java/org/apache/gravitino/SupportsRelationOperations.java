@@ -39,7 +39,7 @@ public interface SupportsRelationOperations {
     /** Role and group relationship */
     ROLE_GROUP_REL,
     /** Policy and metadata object relationship */
-    POLICY_METADATA_OBJECT_REL,
+    POLICY_METADATA_OBJECT_REL
   }
 
   /**

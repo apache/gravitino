@@ -190,6 +190,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     } catch (NoSuchRoleException e) {
       log.debug(e.getMessage());
     }
+    
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
 
     if(resultOfDeleteRole && oldRole!= null) {
