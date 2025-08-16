@@ -1,0 +1,95 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+
+[MESSAGES CONTROL]
+
+# Only show warnings with the listed confidence levels. Leave empty to show
+# all. Valid levels: HIGH, INFERENCE, INFERENCE_FAILURE, UNDEFINED.
+confidence=
+
+# Enable the message, report, category or checker with the given id(s).
+# enable=logging
+
+# Disable the message, report, category or checker with the given id(s). 
+disable=missing-class-docstring,
+        missing-function-docstring,
+        missing-module-docstring,
+        global-variable-not-assigned,
+        too-many-public-methods,
+        too-few-public-methods,       
+        unused-argument,
+        no-else-break,
+        no-member,
+        fixme,          
+        unnecessary-pass,               
+        duplicate-code,                 #TODO-fix
+        too-many-arguments,             #TODO-fix
+
+[LOGGING]
+
+# The type of string formatting that logging methods do. `old` means using %
+# formatting, `new` is for `{}` formatting.
+logging-format-style=old
+
+# Logging modules to check that the string format arguments are in logging
+# function parameter format.
+logging-modules=logging
+
+[TYPECHECK]
+
+# List of members which are set dynamically and missed by pylint inference
+# system, and so shouldn't trigger E1101 when accessed. Python regular
+# expressions are accepted.
+generated-members=gravitino.utils.http_client.Response
+
+[FORMAT]
+
+# Maximum number of characters on a single line.
+max-line-length=120
+
+# Regexp for a line that is allowed to be longer than the limit.
+ignore-long-lines=^\s*(# )?<?https?://\S+>?$
+
+# maximum number of lines in a file
+max-module-lines=1100
+
+# Number of spaces of indent required inside a hanging or continued line.
+indent-after-paren=4
+
+# String used as indentation unit.
+indent-string='    '
+
+[BASIC]
+
+# Naming Style for Const
+const-naming-style=UPPER_CASE
+
+# Naming Style for Class
+class-naming-style=PascalCase
+class-const-naming-style=UPPER_CASE
+class-attribute-naming-style=any
+attr-naming-style=snake_case
+
+# Naming Style for Function and Method
+function-naming-style=snake_case
+method-naming-style=snake_case
+argument-naming-style=snake_case
+variable-naming-style=snake_case
+
+# Naming Style for Module
+module-naming-style=snake_case

@@ -22,9 +22,6 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `policy_name` VARCHAR(128) NOT NULL COMMENT 'policy name',
     `policy_type` VARCHAR(64) NOT NULL COMMENT 'policy type',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `inheritable` TINYINT(1) NOT NULL COMMENT 'whether the policy is inheritable, 0 is not inheritable, 1 is inheritable',
-    `exclusive` TINYINT(1) NOT NULL COMMENT 'whether the policy is exclusive, 0 is not exclusive, 1 is exclusive',
-    `supported_object_types` TEXT NOT NULL COMMENT 'supported object types',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy last version',
@@ -44,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_pod_ver_del` (`policy_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
+    KEY `idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `policy_relation_meta` (

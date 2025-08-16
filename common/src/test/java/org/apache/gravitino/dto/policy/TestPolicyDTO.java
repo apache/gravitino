@@ -18,12 +18,12 @@
  */
 package org.apache.gravitino.dto.policy;
 
-import static org.apache.gravitino.policy.Policy.SUPPORTS_ALL_OBJECT_TYPES;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Optional;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
@@ -37,6 +37,8 @@ public class TestPolicyDTO {
     PolicyContentDTO.CustomContentDTO customContent =
         PolicyContentDTO.CustomContentDTO.builder()
             .withCustomRules(ImmutableMap.of("key1", "value1"))
+            .withSupportedObjectTypes(
+                ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.TABLE))
             .withProperties(ImmutableMap.of("prop1", "value1"))
             .build();
 
@@ -46,10 +48,6 @@ public class TestPolicyDTO {
             .withComment("policy comment")
             .withPolicyType("my_compaction")
             .withEnabled(true)
-            .withInheritable(true)
-            .withExclusive(true)
-            .withInheritable(true)
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(customContent)
             .withAudit(audit)
             .build();
@@ -62,9 +60,6 @@ public class TestPolicyDTO {
     Assertions.assertEquals("policy comment", deserPolicyDTO.comment());
     Assertions.assertEquals("my_compaction", deserPolicyDTO.policyType());
     Assertions.assertTrue(deserPolicyDTO.enabled());
-    Assertions.assertTrue(deserPolicyDTO.inheritable());
-    Assertions.assertTrue(deserPolicyDTO.exclusive());
-    Assertions.assertEquals(SUPPORTS_ALL_OBJECT_TYPES, deserPolicyDTO.supportedObjectTypes());
     Assertions.assertEquals(customContent, deserPolicyDTO.content());
     Assertions.assertEquals(audit, deserPolicyDTO.auditInfo());
 
@@ -74,7 +69,6 @@ public class TestPolicyDTO {
             .withName("policy_test")
             .withComment("policy comment")
             .withPolicyType("my_compaction")
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(customContent)
             .withAudit(audit)
             .withInherited(Optional.empty())
@@ -90,7 +84,6 @@ public class TestPolicyDTO {
             .withName("policy_test")
             .withComment("policy comment")
             .withPolicyType("my_compaction")
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(customContent)
             .withAudit(audit)
             .withInherited(Optional.of(false))
@@ -105,7 +98,6 @@ public class TestPolicyDTO {
             .withName("policy_test")
             .withComment("policy comment")
             .withPolicyType("my_compaction")
-            .withSupportedObjectTypes(SUPPORTS_ALL_OBJECT_TYPES)
             .withContent(customContent)
             .withAudit(audit)
             .withInherited(Optional.of(true))

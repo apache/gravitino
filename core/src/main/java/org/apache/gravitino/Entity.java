@@ -77,7 +77,7 @@ public interface Entity extends Serializable {
     MODEL,
     MODEL_VERSION,
     POLICY,
-    STATISTIC,
+    TABLE_STATISTIC,
     JOB_TEMPLATE,
     JOB,
     AUDIT;

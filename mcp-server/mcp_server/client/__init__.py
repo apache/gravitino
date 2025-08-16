@@ -17,6 +17,7 @@
 
 from mcp_server.client.catalog_operation import CatalogOperation
 from mcp_server.client.gravitino_operation import GravitinoOperation
+from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.model_operation import ModelOperation
 from mcp_server.client.schema_operation import SchemaOperation
 from mcp_server.client.table_operation import TableOperation

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
 import java.util.Collection;
@@ -43,6 +44,7 @@ import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
@@ -54,6 +56,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersionChange;
+import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -359,6 +362,27 @@ class DTOConverters {
     } else if (change instanceof TagChange.RemoveProperty) {
       return new TagUpdateRequest.RemoveTagPropertyRequest(
           ((TagChange.RemoveProperty) change).getProperty());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static PolicyUpdateRequest toPolicyUpdateRequest(PolicyChange change) {
+    if (change instanceof PolicyChange.RenamePolicy) {
+      return new PolicyUpdateRequest.RenamePolicyRequest(
+          ((PolicyChange.RenamePolicy) change).getNewName());
+
+    } else if (change instanceof PolicyChange.UpdatePolicyComment) {
+      return new PolicyUpdateRequest.UpdatePolicyCommentRequest(
+          ((PolicyChange.UpdatePolicyComment) change).getNewComment());
+
+    } else if (change instanceof PolicyChange.UpdateContent) {
+      PolicyChange.UpdateContent updateContent = (PolicyChange.UpdateContent) change;
+      String policyType = updateContent.getPolicyType();
+      return new PolicyUpdateRequest.UpdatePolicyContentRequest(
+          policyType, toDTO(updateContent.getContent()));
 
     } else {
       throw new IllegalArgumentException(

@@ -172,7 +172,7 @@ public class JobMetaBaseSQLProvider {
         + JobMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000.0"
-        + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0";
+        + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0 AND deleted_at = 0";
   }
 
   public String deleteJobMetasByLegacyTimeline(

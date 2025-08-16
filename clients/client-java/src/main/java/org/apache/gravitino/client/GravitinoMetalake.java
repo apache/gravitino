@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
@@ -55,6 +57,10 @@ import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
+import org.apache.gravitino.dto.requests.PolicyCreateRequest;
+import org.apache.gravitino.dto.requests.PolicySetRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.PrivilegeRevokeRequest;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
@@ -79,6 +85,8 @@ import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
+import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
@@ -100,17 +108,23 @@ import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyChange;
+import org.apache.gravitino.policy.PolicyContent;
+import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -122,7 +136,7 @@ import org.apache.gravitino.tag.TagOperations;
  * create, load, alter and drop a catalog with specified identifier.
  */
 public class GravitinoMetalake extends MetalakeDTO
-    implements SupportsCatalogs, TagOperations, SupportsRoles, SupportsJobs {
+    implements SupportsCatalogs, TagOperations, SupportsRoles, SupportsJobs, PolicyOperations {
   private static final String API_METALAKES_CATALOGS_PATH = "api/metalakes/%s/catalogs/%s";
   private static final String API_PERMISSION_PATH = "api/metalakes/%s/permissions/%s";
   private static final String API_METALAKES_USERS_PATH = "api/metalakes/%s/users/%s";
@@ -132,6 +146,7 @@ public class GravitinoMetalake extends MetalakeDTO
   private static final String API_METALAKES_TAGS_PATH = "api/metalakes/%s/tags";
   private static final String API_METALAKES_JOB_TEMPLATES_PATH = "api/metalakes/%s/jobs/templates";
   private static final String API_METALAKES_JOB_PATH = "api/metalakes/%s/jobs/runs";
+  private static final String API_METALAKES_POLICIES_PATH = "api/metalakes/%s/policies";
   private static final String BLANK_PLACEHOLDER = "";
 
   private final RESTClient restClient;
@@ -556,6 +571,184 @@ public class GravitinoMetalake extends MetalakeDTO
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
+    resp.validate();
+    return resp.dropped();
+  }
+
+  /**
+   * List all the policies under the current metalake.
+   *
+   * @return A list of the policy names under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  @Override
+  public String[] listPolicies() throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name())),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    resp.validate();
+    return resp.getNames();
+  }
+
+  /**
+   * List all the policies with detailed information under the current metalake.
+   *
+   * @return A list of {@link Policy} under the current metalake.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  @Override
+  public Policy[] listPolicyInfos() throws NoSuchMetalakeException {
+    Map<String, String> params = ImmutableMap.of("details", "true");
+    PolicyListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name())),
+            params,
+            PolicyListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    resp.validate();
+
+    return Arrays.stream(resp.getPolicies())
+        .map(p -> new GenericPolicy(p, restClient, this.name()))
+        .toArray(Policy[]::new);
+  }
+
+  /**
+   * Get a policy by its name under the current metalake.
+   *
+   * @param name The name of the policy.
+   * @return The policy.
+   * @throws NoSuchPolicyException If the policy does not exist.
+   */
+  @Override
+  public Policy getPolicy(String name) throws NoSuchPolicyException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "policy name must not be null or empty");
+
+    PolicyResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(name),
+            PolicyResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    resp.validate();
+
+    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+  }
+
+  /**
+   * Create a new policy under the current metalake.
+   *
+   * @param name The name of the policy.
+   * @param type The type of the policy.
+   * @param comment The comment of the policy.
+   * @param enabled Whether the policy is enabled or not.
+   * @param content The content of the policy.
+   * @return The created policy.
+   * @throws PolicyAlreadyExistsException If the policy already exists.
+   */
+  @Override
+  public Policy createPolicy(
+      String name, String type, String comment, boolean enabled, PolicyContent content)
+      throws PolicyAlreadyExistsException {
+    PolicyCreateRequest req = new PolicyCreateRequest(name, type, comment, enabled, toDTO(content));
+    req.validate();
+
+    PolicyResponse resp =
+        restClient.post(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name())),
+            req,
+            PolicyResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    resp.validate();
+
+    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+  }
+
+  /**
+   * Enable a policy under the current metalake. If the policy is already enabled, this method does
+   * nothing.
+   *
+   * @param name The name of the policy to enable.
+   * @throws NoSuchPolicyException If the policy does not exist.
+   */
+  @Override
+  public void enablePolicy(String name) throws NoSuchPolicyException {
+    setPolicyEnabled(name, true);
+  }
+
+  /**
+   * Disable a policy under the current metalake. If the policy is already disabled, this method
+   * does nothing.
+   *
+   * @param name The name of the policy to disable.
+   * @throws NoSuchPolicyException If the policy does not exist.
+   */
+  @Override
+  public void disablePolicy(String name) throws NoSuchPolicyException {
+    setPolicyEnabled(name, false);
+  }
+
+  /**
+   * Alter a policy under the current metalake by applying the changes.
+   *
+   * @param name The name of the policy.
+   * @param changes The changes to apply to the policy.
+   * @return The altered policy.
+   * @throws NoSuchPolicyException If the policy does not exist.
+   * @throws IllegalArgumentException If the changes cannot be applied to the policy.
+   */
+  @Override
+  public Policy alterPolicy(String name, PolicyChange... changes)
+      throws NoSuchPolicyException, IllegalArgumentException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "policy name must not be null or empty");
+    List<PolicyUpdateRequest> updates =
+        Arrays.stream(changes)
+            .map(DTOConverters::toPolicyUpdateRequest)
+            .collect(Collectors.toList());
+    PolicyUpdatesRequest req = new PolicyUpdatesRequest(updates);
+    req.validate();
+
+    PolicyResponse resp =
+        restClient.put(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(name),
+            req,
+            PolicyResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    resp.validate();
+
+    return new GenericPolicy(resp.getPolicy(), restClient, this.name());
+  }
+
+  /**
+   * Deletes a policy under the current metalake.
+   *
+   * @param name The name of the policy.
+   * @return True if the policy was deleted, false if the policy does not exist.
+   */
+  @Override
+  public boolean deletePolicy(String name) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "policy name must not be null or empty");
+
+    DropResponse resp =
+        restClient.delete(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(name),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
     resp.validate();
     return resp.dropped();
   }
@@ -1397,5 +1590,25 @@ public class GravitinoMetalake extends MetalakeDTO
   /** @return the builder for creating a new instance of GravitinoMetaLake. */
   public static Builder builder() {
     return new Builder();
+  }
+
+  private void setPolicyEnabled(String policyName, boolean enabled) {
+    PolicySetRequest req = new PolicySetRequest(enabled);
+
+    ErrorResponse resp =
+        restClient.patch(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name()))
+                + "/"
+                + RESTUtils.encodeString(policyName),
+            req,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.policyErrorHandler().accept(resp);
   }
 }

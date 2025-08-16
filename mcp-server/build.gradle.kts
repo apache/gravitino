@@ -250,6 +250,11 @@ tasks {
   }
 }
 
+tasks.register<Exec>("pylint") {
+  mustRunAfter("buildPython")
+  commandLine(venvPython, "-m", "pylint", "./tests", "./mcp_server")
+}
+
 tasks.named("test") {
   val skipUTs = project.hasProperty("skipTests")
   if (!skipUTs) {
@@ -259,6 +264,7 @@ tasks.named("test") {
 
 tasks.named("build") {
   dependsOn("buildPython")
+  dependsOn("pylint")
 }
 
 tasks.named("clean") {
