@@ -178,7 +178,8 @@ public class TestSparkPartitionUtils {
 
   @Test
   void testToGravitinoLiteralWithMixedNullAndNonNull() {
-    GenericInternalRow mixedRow = new GenericInternalRow(new Object[] {null, "test", 42});
+    GenericInternalRow mixedRow =
+        new GenericInternalRow(new Object[] {null, UTF8String.fromString("test"), 42});
 
     Assertions.assertEquals(
         Literals.NULL, SparkPartitionUtils.toGravitinoLiteral(mixedRow, 0, DataTypes.StringType));
