@@ -192,8 +192,8 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       log.debug(e.getMessage());
     }
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
-    if (oldRole != null) {
-      notifyRoleUserRelChange(((RoleEntity) oldRole).id());
+    if (resultOfDeleteRole && oldRole != null) {
+      notifyRoleUserRelChange(metalake, role);
     }
     return resultOfDeleteRole;
   }
@@ -214,7 +214,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
     Role grantedRole = dispatcher.grantPrivilegeToRole(metalake, role, object, privileges);
-    notifyRoleUserRelChange(metalake, role);
     return grantedRole;
   }
 
@@ -223,7 +222,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       String metalake, String role, MetadataObject object, Set<Privilege> privileges)
       throws NoSuchMetalakeException, NoSuchRoleException {
     Role revokedRole = dispatcher.revokePrivilegesFromRole(metalake, role, object, privileges);
-    notifyRoleUserRelChange(metalake, role);
     return revokedRole;
   }
 
