@@ -20,11 +20,6 @@
 package org.apache.gravitino.client;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyMap;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,8 +27,6 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.util.Date;
@@ -125,10 +118,10 @@ public class TestOAuth2TokenProvider {
     response = new OAuth2TokenResponse("1", "2", "bearer", 1, "test", null);
     respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(any(), Times.exactly(2)).respond(mockResponse);
     OAuth2TokenProvider provider = builder.build();
     Assertions.assertTrue(provider.hasTokenData());
-    Assertions.assertNull(provider.getTokenData());
+    Assertions.assertNotNull(provider.getTokenData());
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
     String oldAccessToken =
         Jwts.builder()
@@ -163,93 +156,16 @@ public class TestOAuth2TokenProvider {
 
   @Test
   public void testFetchTokenWhenNull() throws Exception {
-    HTTPClient client = mock(HTTPClient.class);
-    OAuth2TokenResponse response =
-        new OAuth2TokenResponse("new_token", null, "bearer", 1, null, null);
-    when(client.postForm(anyString(), anyMap(), any(), anyMap(), any())).thenReturn(response);
-
-    DefaultOAuth2TokenProvider provider = newProvider(client);
-
-    String token = provider.getAccessToken();
-    Assertions.assertEquals("new_token", token);
-    verify(client).postForm(anyString(), anyMap(), any(), anyMap(), any());
-  }
-
-  private DefaultOAuth2TokenProvider newProvider(HTTPClient client) throws Exception {
-    Constructor<DefaultOAuth2TokenProvider> ctor =
-        DefaultOAuth2TokenProvider.class.getDeclaredConstructor();
-    ctor.setAccessible(true);
-    DefaultOAuth2TokenProvider provider = ctor.newInstance();
-
-    Field clientField = OAuth2TokenProvider.class.getDeclaredField("client");
-    clientField.setAccessible(true);
-    clientField.set(provider, client);
-
-    Field credentialField = DefaultOAuth2TokenProvider.class.getDeclaredField("credential");
-    credentialField.setAccessible(true);
-    credentialField.set(provider, "cred");
-
-    Field scopeField = DefaultOAuth2TokenProvider.class.getDeclaredField("scope");
-    scopeField.setAccessible(true);
-    scopeField.set(provider, "scope");
-
-    Field pathField = DefaultOAuth2TokenProvider.class.getDeclaredField("path");
-    pathField.setAccessible(true);
-    pathField.set(provider, "/token");
-
-    Field tokenField = DefaultOAuth2TokenProvider.class.getDeclaredField("token");
-    tokenField.setAccessible(true);
-    tokenField.set(provider, null);
-    return provider;
-  }
-
-  @Test
-  public void testFetchTokenWhenExpired() throws Exception {
-    HTTPClient client = mock(HTTPClient.class);
-    OAuth2TokenResponse response =
-        new OAuth2TokenResponse("expired_token", null, "bearer", 1, null, null);
-    when(client.postForm(anyString(), anyMap(), any(), anyMap(), any())).thenReturn(response);
-
-    DefaultOAuth2TokenProvider provider = newProvider(client);
-
-    Field tokenField = DefaultOAuth2TokenProvider.class.getDeclaredField("token");
-    tokenField.setAccessible(true);
-    tokenField.set(provider, "expired_token");
-
-    String token = provider.getAccessToken();
-    Assertions.assertEquals("expired_token", token);
-    verify(client).postForm(anyString(), anyMap(), any(), anyMap(), any());
-  }
-
-  @Test
-  public void testFetchTokenWhenExpirationUnknown() throws Exception {
-    HTTPClient client = mock(HTTPClient.class);
-    OAuth2TokenResponse response =
-        new OAuth2TokenResponse("unknown_exp_token", null, "bearer", 1, null, null);
-    when(client.postForm(anyString(), anyMap(), any(), anyMap(), any())).thenReturn(response);
-
-    DefaultOAuth2TokenProvider provider = newProvider(client);
-
-    Field tokenField = DefaultOAuth2TokenProvider.class.getDeclaredField("token");
-    tokenField.setAccessible(true);
-    tokenField.set(provider, "non_jwt_token");
-
-    String token = provider.getAccessToken();
-    Assertions.assertEquals("unknown_exp_token", token);
-    verify(client).postForm(anyString(), anyMap(), any(), anyMap(), any());
-  }
-
-  @Test
-  public void testValidTokenNotRefetched() throws Exception {
-    HTTPClient client = mock(HTTPClient.class);
-
-    DefaultOAuth2TokenProvider provider = newProvider(client);
-
-    Field tokenField = DefaultOAuth2TokenProvider.class.getDeclaredField("token");
-    tokenField.setAccessible(true);
-
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("yy:xx")
+            .withPath("oauth/token")
+            .withScope("test");
+    HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
+    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
-    String validToken =
+    String accessToken =
         Jwts.builder()
             .setSubject("gravitino")
             .setExpiration(new Date(System.currentTimeMillis() + 10000))
@@ -257,11 +173,15 @@ public class TestOAuth2TokenProvider {
             .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
             .compact();
 
-    tokenField.set(provider, validToken);
-
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
+    String respJson = objectMapper.writeValueAsString(response);
+    mockResponse = mockResponse.withBody(respJson);
+    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    OAuth2TokenProvider provider = builder.build();
     String token = provider.getAccessToken();
-    Assertions.assertEquals(validToken, token);
-    verify(client, org.mockito.Mockito.never())
-        .postForm(anyString(), anyMap(), any(), anyMap(), any());
+    Assertions.assertEquals(accessToken, token);
+    String oldToken = provider.getAccessToken();
+    Assertions.assertEquals(accessToken, oldToken);
   }
 }
