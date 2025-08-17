@@ -30,7 +30,7 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class StatisticsListResponse extends BaseResponse {
+public class StatisticListResponse extends BaseResponse {
 
   @JsonProperty("statistics")
   private StatisticDTO[] statistics;
@@ -40,13 +40,13 @@ public class StatisticsListResponse extends BaseResponse {
    *
    * @param statistics Array of StatisticDTO objects representing the statistics.
    */
-  public StatisticsListResponse(StatisticDTO[] statistics) {
+  public StatisticListResponse(StatisticDTO[] statistics) {
     super(0);
     this.statistics = statistics;
   }
 
   /** Default constructor for StatisticsListResponse (used by Jackson deserializer). */
-  public StatisticsListResponse() {
+  public StatisticListResponse() {
     this(null);
   }
 

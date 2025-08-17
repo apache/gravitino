@@ -23,6 +23,7 @@ import com.codahale.metrics.annotation.Timed;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -39,12 +40,11 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.dto.requests.StatisticsDropRequest;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.StatisticsListResponse;
+import org.apache.gravitino.dto.responses.StatisticListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.metrics.MetricNames;
@@ -56,7 +56,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path("/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/statistics")
+@Path("/metalakes/{metalake}/objects/{type}/{fullName}/statistics")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 public class StatisticOperations {
@@ -66,73 +66,75 @@ public class StatisticOperations {
   @Context private HttpServletRequest httpRequest;
 
   private final StatisticManager statisticManager;
-  private final TableDispatcher tableDispatcher;
 
   @Inject
-  public StatisticOperations(StatisticManager statisticManager, TableDispatcher tableDispatcher) {
+  public StatisticOperations(StatisticManager statisticManager) {
     this.statisticManager = statisticManager;
-    this.tableDispatcher = tableDispatcher;
   }
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "list-table-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "list-table-stats", absolute = true)
-  public Response listTableStatistics(
+  @Timed(name = "list-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-stats", absolute = true)
+  public Response listStatistics(
       @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table) {
+      @PathParam("type") String type,
+      @PathParam("fullName") String fullName) {
     LOG.info(
-        "Received list statistics request for table: {}.{}.{}.{}",
-        metalake,
-        catalog,
-        schema,
-        table);
+        "Received list statistics request for object full name: {} type: {} in the metalake {}",
+        fullName,
+        type,
+        metalake);
     try {
-      MetadataObject metadataObject =
-          MetadataObjects.of(Lists.newArrayList(catalog, schema, table), MetadataObject.Type.TABLE);
+      MetadataObject object =
+          MetadataObjects.parse(
+              fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+      if (object.type() != MetadataObject.Type.TABLE) {
+        throw new UnsupportedOperationException(
+            "Listing statistics is only supported for tables now.");
+      }
+
       return Utils.doAs(
           httpRequest,
           () -> {
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            // Load the table to import the tables metadata if the table is not created by Gravitino
-            tableDispatcher.loadTable(MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-
-            List<Statistic> statistics = statisticManager.listStatistics(metalake, metadataObject);
+            List<Statistic> statistics = statisticManager.listStatistics(metalake, object);
             return Utils.ok(
-                new StatisticsListResponse(
+                new StatisticListResponse(
                     DTOConverters.toDTOs(statistics.toArray(new Statistic[0]))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleStatisticException(OperationType.LIST, table, schema, e);
+      return ExceptionHandlers.handleStatisticException(OperationType.LIST, fullName, metalake, e);
     }
   }
 
   @PUT
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "update-table-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "update-table-stats", absolute = true)
-  public Response updateTableStatistics(
+  @Timed(name = "update-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "update-stats", absolute = true)
+  public Response updateStatistics(
       @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("type") String type,
+      @PathParam("fullName") String fullName,
       StatisticsUpdateRequest request) {
     try {
       LOG.info(
-          "Received update statistics request for table: {}.{}.{}.{}",
-          metalake,
-          catalog,
-          schema,
-          table);
+          "Received update statistics request for object full name: {} type: {} in the metalake {}",
+          fullName,
+          type,
+          metalake);
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
-            MetadataObject metadataObject =
-                MetadataObjects.of(
-                    Lists.newArrayList(catalog, schema, table), MetadataObject.Type.TABLE);
+            MetadataObject object =
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            if (object.type() != MetadataObject.Type.TABLE) {
+              throw new UnsupportedOperationException(
+                  "Listing statistics is only supported for tables now.");
+            }
             Map<String, StatisticValue<?>> statisticMaps = Maps.newHashMap();
             for (Map.Entry<String, StatisticValue<?>> entry : request.getUpdates().entrySet()) {
               // Current we only support custom statistics
@@ -145,53 +147,54 @@ public class StatisticOperations {
               statisticMaps.put(entry.getKey(), entry.getValue());
             }
 
-            // Load the table to import the tables metadata if the table is not created by Gravitino
-            tableDispatcher.loadTable(MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            statisticManager.updateStatistics(metalake, metadataObject, statisticMaps);
+            statisticManager.updateStatistics(metalake, object, statisticMaps);
             return Utils.ok(new BaseResponse(0));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE, StringUtils.join(request.getUpdates().keySet(), ","), table, e);
+          OperationType.UPDATE, StringUtils.join(request.getUpdates().keySet(), ","), fullName, e);
     }
   }
 
   @POST
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "drop-table-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "drop-table-stats", absolute = true)
-  public Response dropTableStatistics(
+  @Timed(name = "drop-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "drop-stats", absolute = true)
+  public Response dropStatistics(
       @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("table") String table,
+      @PathParam("type") String type,
+      @PathParam("fullName") String fullName,
       StatisticsDropRequest request) {
     try {
       LOG.info(
-          "Received drop statistics request for table: {}.{}.{}.{}",
-          metalake,
-          catalog,
-          schema,
-          table);
+          "Received drop statistics request for object full name: {} type: {} in the metalake {}",
+          fullName,
+          type,
+          metalake);
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
 
-            MetadataObject metadataObject =
-                MetadataObjects.of(
-                    Lists.newArrayList(catalog, schema, table), MetadataObject.Type.TABLE);
-            // Load the table to import the tables metadata if the table is not created by Gravitino
-            tableDispatcher.loadTable(MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
+            MetadataObject object =
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            if (object.type() != MetadataObject.Type.TABLE) {
+              throw new UnsupportedOperationException(
+                  "Listing statistics is only supported for tables now.");
+            }
+
+            MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             statisticManager.dropStatistics(
-                metalake, metadataObject, Lists.newArrayList(request.getNames()));
+                metalake, object, Lists.newArrayList(request.getNames()));
             return Utils.ok(new DropResponse(true));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.DROP, StringUtils.join(request.getNames(), ","), table, e);
+          OperationType.DROP, StringUtils.join(request.getNames(), ","), fullName, e);
     }
   }
 }

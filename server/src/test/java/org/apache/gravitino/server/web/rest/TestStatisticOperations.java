@@ -39,6 +39,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.dto.requests.StatisticsDropRequest;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
@@ -46,7 +48,7 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.StatisticsListResponse;
+import org.apache.gravitino.dto.responses.StatisticListResponse;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockManager;
@@ -75,8 +77,8 @@ public class TestStatisticOperations extends JerseyTest {
     }
   }
 
+  private static TableDispatcher tableDispatcher = mock(TableDispatcher.class);
   private StatisticManager manager = mock(StatisticManager.class);
-  private TableDispatcher tableDispatcher = mock(TableDispatcher.class);
 
   private final String metalake = "metalake1";
 
@@ -93,6 +95,7 @@ public class TestStatisticOperations extends JerseyTest {
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
   }
 
   @Override
@@ -111,7 +114,6 @@ public class TestStatisticOperations extends JerseyTest {
           @Override
           protected void configure() {
             bind(manager).to(StatisticManager.class).ranked(2);
-            bind(tableDispatcher).to(TableDispatcher.class).ranked(2);
             bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
           }
         });
@@ -137,16 +139,19 @@ public class TestStatisticOperations extends JerseyTest {
             .withModifiable(false)
             .build();
     when(manager.listStatistics(any(), any())).thenReturn(Lists.newArrayList(stat1, stat2));
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
     Response resp =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -155,7 +160,7 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    StatisticsListResponse listResp = resp.readEntity(StatisticsListResponse.class);
+    StatisticListResponse listResp = resp.readEntity(StatisticListResponse.class);
     Assertions.assertEquals(0, listResp.getCode());
 
     StatisticDTO[] statisticDTOS = listResp.getStatistics();
@@ -166,19 +171,16 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(stat2.value().get(), statisticDTOS[1].value().get());
 
     // Test throw NoSuchMetadataObjectException
-    doThrow(new NoSuchMetadataObjectException("mock error"))
-        .when(manager)
-        .listStatistics(any(), any());
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
+
     Response resp1 =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -193,17 +195,16 @@ public class TestStatisticOperations extends JerseyTest {
         NoSuchMetadataObjectException.class.getSimpleName(), errorResp.getType());
 
     // Test throw RuntimeException
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
     doThrow(new RuntimeException("mock error")).when(manager).listStatistics(any(), any());
     Response resp2 =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -241,17 +242,20 @@ public class TestStatisticOperations extends JerseyTest {
     statsMap.put(stat2.name(), stat2.value().get());
 
     StatisticsUpdateRequest req = new StatisticsUpdateRequest(statsMap);
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
 
     Response resp =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -264,19 +268,15 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(0, updateResp.getCode());
 
     // Test throw NoSuchMetadataObjectException
-    doThrow(new NoSuchMetadataObjectException("mock error"))
-        .when(manager)
-        .updateStatistics(any(), any(), any());
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
     Response resp1 =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -291,17 +291,16 @@ public class TestStatisticOperations extends JerseyTest {
         NoSuchMetadataObjectException.class.getSimpleName(), errorResp.getType());
 
     // Test throw RuntimeException
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
     doThrow(new RuntimeException("mock error")).when(manager).updateStatistics(any(), any(), any());
     Response resp2 =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -323,12 +322,10 @@ public class TestStatisticOperations extends JerseyTest {
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -347,17 +344,19 @@ public class TestStatisticOperations extends JerseyTest {
   public void testDropTableStatistics() {
     StatisticsDropRequest req = new StatisticsDropRequest(new String[] {"test1", "test2"});
     when(manager.dropStatistics(any(), any(), any())).thenReturn(true);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
 
     Response resp =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -371,19 +370,15 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertTrue(dropResp.dropped());
 
     // Test throw NoSuchMetadataObjectException
-    doThrow(new NoSuchMetadataObjectException("mock error"))
-        .when(manager)
-        .dropStatistics(any(), any(), any());
+    when(tableDispatcher.tableExists(any())).thenReturn(false);
     Response resp1 =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
@@ -398,17 +393,16 @@ public class TestStatisticOperations extends JerseyTest {
         NoSuchMetadataObjectException.class.getSimpleName(), errorResp.getType());
 
     // Test throw RuntimeException
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
     doThrow(new RuntimeException("mock error")).when(manager).dropStatistics(any(), any(), any());
     Response resp2 =
         target(
                 "/metalakes/"
                     + metalake
-                    + "/catalogs/"
-                    + catalog
-                    + "/schemas/"
-                    + schema
-                    + "/tables/"
-                    + table
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
                     + "/statistics")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")

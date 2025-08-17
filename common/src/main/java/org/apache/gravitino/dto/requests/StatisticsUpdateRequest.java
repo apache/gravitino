@@ -28,6 +28,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.stats.StatisticValue;
@@ -66,7 +67,7 @@ public class StatisticsUpdateRequest implements RESTRequest {
     updates.forEach(
         (name, value) -> {
           Preconditions.checkArgument(
-              name != null && !name.isEmpty(), "statistic \"name\" must not be null or empty");
+              StringUtils.isNotBlank(name), "statistic \"name\" must not be null or empty");
           Preconditions.checkArgument(
               value != null, "statistic \"value\" for '%s' must not be null", name);
         });

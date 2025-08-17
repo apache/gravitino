@@ -25,6 +25,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.jackson.Jacksonized;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to drop statistics for specified names. */
@@ -57,7 +58,7 @@ public class StatisticsDropRequest implements RESTRequest {
         names != null && names.length > 0, "\"names\" must not be null or empty");
     for (String name : names) {
       Preconditions.checkArgument(
-          name != null && !name.isEmpty(), "Each name must be a non-empty string");
+          StringUtils.isNotBlank(name), "Each name must be a non-empty string");
     }
   }
 }
