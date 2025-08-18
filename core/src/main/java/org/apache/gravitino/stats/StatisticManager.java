@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.stats;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
@@ -181,13 +182,14 @@ public class StatisticManager {
     }
   }
 
-  private static class CustomStatistic implements Statistic {
+  @VisibleForTesting
+  public static class CustomStatistic implements Statistic {
 
     private final String name;
     private final StatisticValue<?> value;
     private final Audit auditInfo;
 
-    CustomStatistic(String name, StatisticValue<?> value, Audit auditInfo) {
+    public CustomStatistic(String name, StatisticValue<?> value, Audit auditInfo) {
       this.name = name;
       this.value = value;
       this.auditInfo = auditInfo;

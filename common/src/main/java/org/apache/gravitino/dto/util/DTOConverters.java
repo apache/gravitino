@@ -862,6 +862,7 @@ public class DTOConverters {
                     .withValue(statistic.value())
                     .withModifiable(statistic.modifiable())
                     .withReserved(statistic.reserved())
+                    .withAudit(toDTO(statistic.auditInfo()))
                     .build())
         .toArray(StatisticDTO[]::new);
   }

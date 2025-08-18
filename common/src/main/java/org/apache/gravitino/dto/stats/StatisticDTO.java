@@ -85,6 +85,9 @@ public class StatisticDTO implements Statistic {
   public void validate() {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" is required and cannot be empty");
+
+    Preconditions.checkArgument(
+        audit != null, "\"audit\" information is required and cannot be null");
   }
 
   @Override

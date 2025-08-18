@@ -30,8 +30,8 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Map;
-import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -50,8 +50,10 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.StatisticListResponse;
 import org.apache.gravitino.dto.stats.StatisticDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticManager;
@@ -124,20 +126,21 @@ public class TestStatisticOperations extends JerseyTest {
   @Test
   public void testListTableStatistics() {
 
-    StatisticDTO stat1 =
-        StatisticDTO.builder()
-            .withName("test1")
-            .withValue(Optional.of(StatisticValues.stringValue("test")))
-            .withReserved(true)
-            .withModifiable(false)
+    AuditInfo auditInfo =
+        AuditInfo.builder()
+            .withCreateTime(Instant.now())
+            .withCreator("test")
+            .withLastModifiedTime(Instant.now())
+            .withLastModifier("test")
             .build();
-    StatisticDTO stat2 =
-        StatisticDTO.builder()
-            .withName("test1")
-            .withValue(Optional.of(StatisticValues.longValue(1L)))
-            .withReserved(true)
-            .withModifiable(false)
-            .build();
+
+    Statistic stat1 =
+        new StatisticManager.CustomStatistic(
+            "test", StatisticValues.stringValue("test"), auditInfo);
+
+    Statistic stat2 =
+        new StatisticManager.CustomStatistic("test2", StatisticValues.longValue(1L), auditInfo);
+
     when(manager.listStatistics(any(), any())).thenReturn(Lists.newArrayList(stat1, stat2));
     when(tableDispatcher.tableExists(any())).thenReturn(true);
 
@@ -166,9 +169,11 @@ public class TestStatisticOperations extends JerseyTest {
     StatisticDTO[] statisticDTOS = listResp.getStatistics();
     Assertions.assertEquals(2, statisticDTOS.length);
     Assertions.assertEquals(stat1.name(), statisticDTOS[0].name());
+    Assertions.assertEquals(DTOConverters.toDTO(auditInfo), statisticDTOS[0].auditInfo());
     Assertions.assertEquals(stat1.value().get(), statisticDTOS[0].value().get());
     Assertions.assertEquals(stat2.name(), statisticDTOS[1].name());
     Assertions.assertEquals(stat2.value().get(), statisticDTOS[1].value().get());
+    Assertions.assertEquals(DTOConverters.toDTO(auditInfo), statisticDTOS[1].auditInfo());
 
     // Test throw NoSuchMetadataObjectException
     when(tableDispatcher.tableExists(any())).thenReturn(false);
@@ -221,25 +226,9 @@ public class TestStatisticOperations extends JerseyTest {
 
   @Test
   public void testUpdateTableStatistics() {
-
-    StatisticDTO stat1 =
-        StatisticDTO.builder()
-            .withName(Statistic.CUSTOM_PREFIX + "test1")
-            .withValue(Optional.of(StatisticValues.stringValue("test")))
-            .withReserved(true)
-            .withModifiable(false)
-            .build();
-    StatisticDTO stat2 =
-        StatisticDTO.builder()
-            .withName(Statistic.CUSTOM_PREFIX + "test1")
-            .withValue(Optional.of(StatisticValues.longValue(1L)))
-            .withReserved(true)
-            .withModifiable(false)
-            .build();
-
     Map<String, StatisticValue<?>> statsMap = Maps.newHashMap();
-    statsMap.put(stat1.name(), stat1.value().get());
-    statsMap.put(stat2.name(), stat2.value().get());
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.stringValue("test"));
+    statsMap.put(Statistic.CUSTOM_PREFIX + "test2", StatisticValues.longValue(1L));
 
     StatisticsUpdateRequest req = new StatisticsUpdateRequest(statsMap);
     MetadataObject tableObject =
@@ -315,7 +304,7 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
 
     // Test throw IllegalStatisticNameException
-    statsMap.put("test1", stat1.value().get());
+    statsMap.put("test1", StatisticValues.longValue(1L));
 
     req = new StatisticsUpdateRequest(statsMap);
     Response resp3 =
