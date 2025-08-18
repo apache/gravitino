@@ -106,6 +106,13 @@ public class TestStatisticDTO {
                             StatisticValues.stringValue("value2")))))
             .withReserved(false)
             .withModifiable(true)
+            .withAudit(
+                AuditDTO.builder()
+                    .withCreator("test_user")
+                    .withCreateTime(Instant.now())
+                    .withLastModifier("test_user")
+                    .withLastModifiedTime(Instant.now())
+                    .build())
             .build();
     serJson = JsonUtils.objectMapper().writeValueAsString(statisticDTO);
     deserStatisticDTO = JsonUtils.objectMapper().readValue(serJson, StatisticDTO.class);
