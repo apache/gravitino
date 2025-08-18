@@ -187,7 +187,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return conf.equals(that.conf)
-          && (scheme == null ? that.authority == null : scheme.equals(that.scheme))
+          && (scheme == null ? that.scheme == null : scheme.equals(that.scheme))
           && (authority == null ? that.authority == null : authority.equals(that.authority))
           && currentUser.equals(that.currentUser);
     }
