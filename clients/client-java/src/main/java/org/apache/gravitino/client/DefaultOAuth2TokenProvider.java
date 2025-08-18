@@ -35,21 +35,12 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
   @Override
   protected String getAccessToken() {
     synchronized (this) {
-      if (token == null) {
-        token =
-            OAuth2ClientUtil.fetchToken(client, Collections.emptyMap(), credential, scope, path)
-                .getAccessToken();
-        return token;
-      }
-
       Long expires = OAuth2ClientUtil.expiresAtMillis(token);
       if (expires == null || expires <= System.currentTimeMillis()) {
         token =
             OAuth2ClientUtil.fetchToken(client, Collections.emptyMap(), credential, scope, path)
                 .getAccessToken();
-        return token;
       }
-
       return token;
     }
   }

@@ -155,7 +155,7 @@ public class TestOAuth2TokenProvider {
   }
 
   @Test
-  public void testFetchTokenWhenNull() throws Exception {
+  public void testTokenNotFetchedWhenValid() throws Exception {
     OAuth2TokenProvider.Builder builder =
         DefaultOAuth2TokenProvider.builder()
             .withUri(String.format("http://127.0.0.1:%d", PORT))
