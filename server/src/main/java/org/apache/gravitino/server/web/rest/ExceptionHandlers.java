@@ -933,6 +933,7 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
       } else {
         return super.handle(op, name, object, e);
       }

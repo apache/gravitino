@@ -133,7 +133,7 @@ public class StatisticOperations {
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
               throw new UnsupportedOperationException(
-                  "Listing statistics is only supported for tables now.");
+                  "Update statistics is only supported for tables now.");
             }
             Map<String, StatisticValue<?>> statisticMaps = Maps.newHashMap();
             for (Map.Entry<String, StatisticValue<?>> entry : request.getUpdates().entrySet()) {
@@ -183,14 +183,15 @@ public class StatisticOperations {
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (object.type() != MetadataObject.Type.TABLE) {
               throw new UnsupportedOperationException(
-                  "Listing statistics is only supported for tables now.");
+                  "Dropping statistics is only supported for tables now.");
             }
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
-            statisticManager.dropStatistics(
-                metalake, object, Lists.newArrayList(request.getNames()));
-            return Utils.ok(new DropResponse(true));
+            boolean dropped =
+                statisticManager.dropStatistics(
+                    metalake, object, Lists.newArrayList(request.getNames()));
+            return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(

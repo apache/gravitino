@@ -21,8 +21,10 @@ package org.apache.gravitino.dto.stats;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
@@ -39,6 +41,13 @@ public class TestStatisticDTO {
             .withValue(Optional.of(StatisticValues.longValue(100L)))
             .withReserved(false)
             .withModifiable(false)
+            .withAudit(
+                AuditDTO.builder()
+                    .withCreator("test_user")
+                    .withCreateTime(Instant.now())
+                    .withLastModifier("test_user")
+                    .withLastModifiedTime(Instant.now())
+                    .build())
             .build();
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(statisticDTO);
@@ -54,6 +63,13 @@ public class TestStatisticDTO {
             .withValue(Optional.of(StatisticValues.stringValue("test_value")))
             .withReserved(true)
             .withModifiable(true)
+            .withAudit(
+                AuditDTO.builder()
+                    .withCreator("test_user")
+                    .withCreateTime(Instant.now())
+                    .withLastModifier("test_user")
+                    .withLastModifiedTime(Instant.now())
+                    .build())
             .build();
     serJson = JsonUtils.objectMapper().writeValueAsString(statisticDTO);
     deserStatisticDTO = JsonUtils.objectMapper().readValue(serJson, StatisticDTO.class);
@@ -65,6 +81,13 @@ public class TestStatisticDTO {
             .withName("statistic_test")
             .withReserved(false)
             .withModifiable(true)
+            .withAudit(
+                AuditDTO.builder()
+                    .withCreator("test_user")
+                    .withCreateTime(Instant.now())
+                    .withLastModifier("test_user")
+                    .withLastModifiedTime(Instant.now())
+                    .build())
             .build();
     serJson = JsonUtils.objectMapper().writeValueAsString(statisticDTO);
     Assertions.assertTrue(serJson.contains("null"));
@@ -95,6 +118,13 @@ public class TestStatisticDTO {
             .withValue(Optional.of(StatisticValues.doubleValue(99.99)))
             .withReserved(true)
             .withModifiable(false)
+            .withAudit(
+                AuditDTO.builder()
+                    .withCreator("test_user")
+                    .withCreateTime(Instant.now())
+                    .withLastModifier("test_user")
+                    .withLastModifiedTime(Instant.now())
+                    .build())
             .build();
     serJson = JsonUtils.objectMapper().writeValueAsString(statisticDTO);
     deserStatisticDTO = JsonUtils.objectMapper().readValue(serJson, StatisticDTO.class);
@@ -107,6 +137,13 @@ public class TestStatisticDTO {
             .withValue(Optional.of(StatisticValues.booleanValue(true)))
             .withReserved(false)
             .withModifiable(true)
+            .withAudit(
+                AuditDTO.builder()
+                    .withCreator("test_user")
+                    .withCreateTime(Instant.now())
+                    .withLastModifier("test_user")
+                    .withLastModifiedTime(Instant.now())
+                    .build())
             .build();
     serJson = JsonUtils.objectMapper().writeValueAsString(statisticDTO);
     deserStatisticDTO = JsonUtils.objectMapper().readValue(serJson, StatisticDTO.class);
@@ -122,6 +159,13 @@ public class TestStatisticDTO {
             .withValue(Optional.of(StatisticValues.objectValue(map)))
             .withReserved(false)
             .withModifiable(true)
+            .withAudit(
+                AuditDTO.builder()
+                    .withCreator("test_user")
+                    .withCreateTime(Instant.now())
+                    .withLastModifier("test_user")
+                    .withLastModifiedTime(Instant.now())
+                    .build())
             .build();
     serJson = JsonUtils.objectMapper().writeValueAsString(complexStatisticDTO);
     StatisticDTO deserComplexStatisticDTO =

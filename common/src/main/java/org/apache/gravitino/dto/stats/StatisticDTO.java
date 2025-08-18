@@ -22,10 +22,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.google.common.base.Preconditions;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticValue;
@@ -51,6 +54,9 @@ public class StatisticDTO implements Statistic {
   @JsonProperty("modifiable")
   private boolean modifiable;
 
+  @JsonProperty("audit")
+  private AuditDTO audit;
+
   @Override
   public String name() {
     return name;
@@ -72,6 +78,21 @@ public class StatisticDTO implements Statistic {
   }
 
   /**
+   * Validates the StatisticDTO.
+   *
+   * @throws IllegalArgumentException if any of the required fields are invalid.
+   */
+  public void validate() {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "\"name\" is required and cannot be empty");
+  }
+
+  @Override
+  public AuditDTO auditInfo() {
+    return audit;
+  }
+
+  /**
    * Creates a new builder for constructing instances of {@link StatisticDTO}.
    *
    * @return a new instance of {@link Builder}
@@ -86,6 +107,7 @@ public class StatisticDTO implements Statistic {
     private StatisticValue<?> value;
     private boolean reserved;
     private boolean modifiable;
+    private AuditDTO audit;
 
     /**
      * Sets the name of the statistic.
@@ -132,6 +154,17 @@ public class StatisticDTO implements Statistic {
     }
 
     /**
+     * Sets the audit information for the statistic.
+     *
+     * @param audit the audit information
+     * @return the builder instance
+     */
+    public Builder withAudit(AuditDTO audit) {
+      this.audit = audit;
+      return this;
+    }
+
+    /**
      * Builds an instance of {@link StatisticDTO} with the provided values.
      *
      * @return a new instance of {@link StatisticDTO}
@@ -142,6 +175,7 @@ public class StatisticDTO implements Statistic {
       statisticDTO.value = this.value;
       statisticDTO.reserved = this.reserved;
       statisticDTO.modifiable = this.modifiable;
+      statisticDTO.audit = this.audit;
       return statisticDTO;
     }
   }

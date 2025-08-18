@@ -19,6 +19,7 @@
 package org.apache.gravitino.stats;
 
 import java.util.Optional;
+import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -27,7 +28,7 @@ import org.apache.gravitino.annotation.Evolving;
  * statistics, fileset statistics, etc.
  */
 @Evolving
-public interface Statistic {
+public interface Statistic extends Auditable {
 
   /** The prefix for custom statistics. Custom statistics are user-defined statistics. */
   String CUSTOM_PREFIX = "custom-";

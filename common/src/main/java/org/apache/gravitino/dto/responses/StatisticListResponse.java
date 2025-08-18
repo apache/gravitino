@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 
 /** Represents a response containing a list of statistics. */
@@ -56,8 +55,7 @@ public class StatisticListResponse extends BaseResponse {
 
     for (StatisticDTO statistic : statistics) {
       Preconditions.checkArgument(statistic != null, "\"statistic\" must not be null");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(statistic.name()), "statistic \"name\" must not be null or empty");
+      statistic.validate();
     }
   }
 }

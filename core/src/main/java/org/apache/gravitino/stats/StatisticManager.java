@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -73,7 +74,7 @@ public class StatisticManager {
                       entity -> {
                         String name = entity.name();
                         StatisticValue<?> value = entity.value();
-                        return new CustomStatistic(name, value);
+                        return new CustomStatistic(name, value, entity.auditInfo());
                       })
                   .collect(Collectors.toList()));
     } catch (NoSuchEntityException nse) {
@@ -184,10 +185,12 @@ public class StatisticManager {
 
     private final String name;
     private final StatisticValue<?> value;
+    private final Audit auditInfo;
 
-    CustomStatistic(String name, StatisticValue<?> value) {
+    CustomStatistic(String name, StatisticValue<?> value, Audit auditInfo) {
       this.name = name;
       this.value = value;
+      this.auditInfo = auditInfo;
     }
 
     @Override
@@ -208,6 +211,11 @@ public class StatisticManager {
     @Override
     public boolean modifiable() {
       return true;
+    }
+
+    @Override
+    public Audit auditInfo() {
+      return auditInfo;
     }
   }
 }
