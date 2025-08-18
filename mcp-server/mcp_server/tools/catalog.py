@@ -34,16 +34,16 @@ def load_catalog_tools(mcp: FastMCP):
             str: A JSON string representing an array of catalog objects with the following structure:
                 [
                     {
-                        "name": "catalog-name",            # A unique name for the catalog
-                        "type": "catalog-type",             # Type of catalog (e.g., "relational", "fileset", "message", "model")
-                        "provider": "provider-name",       # The catalog provider. One catalog type may have different providers, for "relational" catalog type, the provider may be "jdbc-postgresql", "jdbc-mysql", "lakehouse-iceberg", etc.
-                        "comment": "description-text",      # Human-readable description
-                        "properties": {                     # Configuration properties, the property key may differ for different catalog types and providers
+                        "name": "catalog-name",
+                        "type": "catalog-type",
+                        "provider": "provider-name",
+                        "comment": "description-text",
+                        "properties": {
                             "key1": "value1",
                             "key2": "value2",
                             ...
                         },
-                        "audit": {                         # Audit metadata
+                        "audit": {
                             "creator": "creator-name",
                             "createTime": "ISO-8601-timestamp",
                             "lastModifier": "modifier-name",
@@ -52,6 +52,13 @@ def load_catalog_tools(mcp: FastMCP):
                     },
                     ...
                 ]
+
+                name: The unique name of the catalog.
+                type: The type of the catalog, such as "relational", "fileset", "message", or "model".
+                provider: The specific provider of the catalog, which can vary based on the catalog type.
+                comment: A human-readable description of the catalog.
+                properties: A dictionary of configuration properties for the catalog,
+                            which may vary based on the catalog type and provider.
 
         Example Return Value:
             [

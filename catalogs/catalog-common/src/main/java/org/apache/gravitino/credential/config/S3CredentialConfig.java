@@ -20,6 +20,7 @@
 package org.apache.gravitino.credential.config;
 
 import java.util.Map;
+import javax.validation.constraints.NotNull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.config.ConfigBuilder;
@@ -87,14 +88,17 @@ public class S3CredentialConfig extends Config {
     loadFromMap(properties, k -> true);
   }
 
+  @NotNull
   public String s3RoleArn() {
     return this.get(S3_ROLE_ARN);
   }
 
+  @NotNull
   public String accessKeyID() {
     return this.get(S3_ACCESS_KEY_ID);
   }
 
+  @NotNull
   public String secretAccessKey() {
     return this.get(S3_SECRET_ACCESS_KEY);
   }

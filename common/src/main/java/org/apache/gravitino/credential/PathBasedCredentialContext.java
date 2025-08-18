@@ -22,6 +22,7 @@ package org.apache.gravitino.credential;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 import java.util.Set;
+import javax.validation.constraints.NotNull;
 
 /**
  * LocationContext is generated when user requesting resources associated with storage location like
@@ -29,9 +30,9 @@ import java.util.Set;
  */
 public class PathBasedCredentialContext implements CredentialContext {
 
-  private final Set<String> writePaths;
-  private final Set<String> readPaths;
-  private final String userName;
+  @NotNull private final Set<String> writePaths;
+  @NotNull private final Set<String> readPaths;
+  @NotNull private final String userName;
 
   /**
    * Constructor for PathBasedCredentialContext.

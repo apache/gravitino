@@ -41,6 +41,9 @@ public enum InternalClientType {
    * @return true if the client type is valid, false otherwise
    */
   public static boolean checkValid(String clientType) {
+    if (clientType == null) {
+      return false;
+    }
     try {
       InternalClientType.valueOf(clientType);
       return true;

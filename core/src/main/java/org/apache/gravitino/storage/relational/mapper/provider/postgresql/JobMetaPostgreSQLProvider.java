@@ -100,7 +100,7 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + JobMetaMapper.TABLE_NAME
         + " SET deleted_at = floor(extract(epoch from((current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')*1000))) "
-        + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0";
+        + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0 AND deleted_at = 0";
   }
 
   @Override

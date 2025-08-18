@@ -27,7 +27,9 @@ public abstract class AuthorizationProperties {
   protected AuthorizationProperties(Map<String, String> properties) {
     this.properties =
         properties.entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith(getPropertiesPrefix()))
+            .filter(
+                entry ->
+                    entry.getKey().startsWith(getPropertiesPrefix()) && entry.getValue() != null)
             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
