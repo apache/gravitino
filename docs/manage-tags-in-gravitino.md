@@ -32,7 +32,7 @@ the future versions.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
    the tags of its parent `Schema` and `Catalog`.
-4. Same tag can be associated to both parent and child metadata objects. But when you list the
+4. The same tag can be associated with both parent and child metadata objects. But when you list the
    associated tags of a child metadata object, this tag will be included only once in the result
    list with `inherited` value `false`.
 :::

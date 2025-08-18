@@ -13,9 +13,9 @@ import TabItem from '@theme/TabItem';
 
 Starting from 1.0.0, Gravitino introduces a new policy system that allows you to manage policies for
 metadata objects. Policies are a set of rules that can be associated with a metadata
-object for data governance and so on.
+object for data governance and similar purposes.
 
-This document briefly introduces how to use policies in Gravitino by both Gravitino Java client and
+This document provides a brief introduction to using policies in Gravitino, covering both the Gravitino Java client and 
 REST APIs. If you want to know more about the policy system in Gravitino, please refer to the
 Javadoc and REST API documentation.
 
@@ -27,10 +27,10 @@ Javadoc and REST API documentation.
    "catalog1.schema1.table1" with type "TABLE".
 2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can be
    associated with policies. 
-3. Policies in Gravitino is inheritable, so listing policies of a metadata object will also list the
+3. Policies in Gravitino are inheritable, so listing policies of a metadata object will also list the
    policies of its parent metadata objects. For example, listing policies of a `Table` will also list
    the policies of its parent `Schema` and `Catalog`.
-4. Same policy can be associated to both parent and child metadata objects. But when you list the
+4. The same policy can be associated with both parent and child metadata objects. But when you list the
    associated policies of a child metadata object, this policy will be included only once in the result
    list with `inherited` value `false`.
 :::
@@ -39,15 +39,15 @@ Javadoc and REST API documentation.
 
 ### Create new policies
 
-The first step to manage policies is to create new policies. You can create a new policy by providing a policy
+The first step to managing policies is to create new policies. You can create a new policy by providing a policy
 name, type, and other optional fields like comment, enabled, etc.
 
 Gravitino supports two kinds of policies: built-in policies and custom policies. 
-For built-in policies, the `policyType` is starting with `system.` and the `supportedObjectTypes` in the policy content is predefined.
+For built-in policies, the `policyType` starts with `system.` and the `supportedObjectTypes` in the policy content is predefined.
 For custom policies, the `policyType` must be `custom` and the `supportedObjectTypes` can be any combination of metadata object types.
 
 :::note
-1. The fields `supportedObjectTypes` in the content is immutable after the policy is created.
+1. The field `supportedObjectTypes` in the content is immutable after the policy is created.
 :::
 
 <Tabs groupId='language' queryString>
