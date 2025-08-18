@@ -90,6 +90,7 @@ function-naming-style=snake_case
 method-naming-style=snake_case
 argument-naming-style=snake_case
 variable-naming-style=snake_case
+# Naming Style for Instance Variable
 
 # Naming Style for Module
 module-naming-style=snake_case
