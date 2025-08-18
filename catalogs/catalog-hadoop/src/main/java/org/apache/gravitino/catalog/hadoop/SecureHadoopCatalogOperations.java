@@ -132,7 +132,7 @@ public class SecureHadoopCatalogOperations
         () -> {
           try {
             setUser(apiUser);
-            return filesetCatalogOperations.createMultipleLocationFileset(
+            return hadoopCatalogOperations.createMultipleLocationFileset(
                 ident, comment, type, storageLocations, properties);
           } finally {
             unsetUser(apiUser);
@@ -175,7 +175,7 @@ public class SecureHadoopCatalogOperations
         () -> {
           try {
             setUser(apiUser);
-            return filesetCatalogOperations.createSchema(ident, comment, properties);
+            return hadoopCatalogOperations.createSchema(ident, comment, properties);
           } finally {
             unsetUser(apiUser);
           }
