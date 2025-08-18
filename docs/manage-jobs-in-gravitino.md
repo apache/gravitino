@@ -11,24 +11,24 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Apache Gravitino introduces a new submodule called job system for users to
-register, run, and manage jobs. This job system collaborates with the existing metadata
-management, brings users the ability to execute the jobs or actions based on the metadata, which
-we call metadata-driven actions, for example, running a job to compact some Iceberg tables,
-running a job to clean old data based on the TTL properties, etc.
+Starting from 1.0.0, Apache Gravitino introduces a new submodule called the job system for users to
+register, run, and manage jobs. This job system integrates with the existing metadata
+management, enabling users to execute the jobs or actions based on the metadata, 
+known as metadata-driven actions. For instance, this allows users to run jobs for tasks such as 
+compacting Iceberg tables or cleaning old data based on TTL properties.
 
 The aim of the job system is to provide a unified way to manage job templates and jobs,
-including registering job templates, running jobs based on the job templates, etc. The job
-system itself is a unified job submitter, allowing users to run jobs through the job system
-itself, but it doesn't provide the actual job execution capabilities. Instead, it relies on the
-existing job executors (schedulers) like Apache Airflow, Apache Livy to execute the jobs.
+including registering job templates, running jobs based on the job templates, and other related 
+tasks. The job system itself is a unified job submitter that allows users to run jobs through it,
+but it doesn't provide the actual job execution capabilities. Instead, it relies on the
+existing job executors (schedulers), such as Apache Airflow, Apache Livy, to execute the jobs.
 Gravitino's job system provides an extensible way to connect to different job executors.
 
 :::note
 1. The job system is a new feature introduced in Gravitino 1.0.0, and it is still under
    development, so some features may not be fully implemented yet.
 2. The aim of the job system is not to replace the existing job executors. So, it can only
-   supports running a single job at a time, and it doesn't support job scheduling for now.
+   support running a single job at a time, and it doesn't support job scheduling for now.
    :::
 
 ## Job operations
@@ -66,9 +66,9 @@ script. The template is defined as follows:
 Here is a brief description of the fields in the job template:
 
 - `name`: The name of the job template, must be unique.
-- `jobType`: The type of the job template, use `shell` for shell job template.
+- `jobType`: The type of the job template, use `shell` for a shell job template.
 - `comment`: A comment for the job template, can be used to describe the job template.
-- `executable`: The path to the executable script, can be a shell script or any executable script.
+- `executable`: The path to the executable script, which can be a shell script or any executable script.
 - `arguments`: The arguments to pass to the executable script, can use placeholders like `{{arg1}}`
   and `{{arg2}}` to be replaced with actual values when running the job.
 - `environments`: The environment variables to set when running the job, can use placeholders like
@@ -76,7 +76,7 @@ Here is a brief description of the fields in the job template:
 - `customFields`: Custom fields for the job template, can be used to store additional
   information, can use placeholders like `{{value1}}` and `{{value2}}` to be replaced with actual
   values when running the job.
-- `scripts`: A list of scripts that can be used by the main executable script.
+- `scripts`: A list of scripts that the main executable script can use.
 
 Please note that:
 
@@ -132,8 +132,8 @@ Here is a brief description of the fields in the Spark job template:
 - `name`: The name of the job template, must be unique.
 - `jobType`: The type of the job template, use `spark` for Spark job template.
 - `comment`: A comment for the job template, can be used to describe the job template.
-- `executable`: The path to the Spark application JAR file, can be a local file path or a URL
-  with supported scheme.
+- `executable`: The path to the Spark application JAR file, which can be a local file path or a URL
+  with a supported scheme.
 - `arguments`: The arguments to pass to the Spark application, can use placeholders like
   `{{arg1}}` and `{{arg2}}` to be replaced with actual values when running the job.
 - `environments`: The environment variables to set when running the job, can use placeholders like
@@ -143,11 +143,11 @@ Here is a brief description of the fields in the Spark job template:
   when running the job.
 - `className`: The main class of the Spark application, required for Spark job template.
 - `jars`: A list of JAR files to add to the Spark job classpath, can be a local file path or a URL
-  with supported scheme.
+  with a supported scheme.
 - `files`: A list of files to be copied to the working directory of the Spark job, can be a local
-  file path or a URL with supported scheme.
+  file path or a URL with a supported scheme.
 - `archives`: A list of archives to be extracted to the working directory of the Spark job, can be a
-  local file path or a URL with supported scheme.
+  local file path or a URL with a supported scheme.
 - `configs`: A map of Spark configurations to set when running the Spark job, can use placeholders
   like `{{value1}}` to be replaced with actual values when running the job.
 
@@ -165,10 +165,10 @@ Note that:
 3. Gravitino will copy the `executable`, `jars`, `files`, and `archives` files to the job working
    directory when running the job, so you can use the relative path in the `executable`, `jars`,
    `files`, and `archives` to refer to other files in the job working directory.
-4. The `className` is required for Spark job template, it is the main class of the Spark application
-   to be executed.
+4. The `className` is required for the Spark job template, it is the main class of the Spark 
+   application to be executed.
 
-To register a job template, you can use REST API or the Java and Python SDKs, here is the
+To register a job template, you can use REST API or the Java and Python SDKs. Here is the
 example to register a shell job template:
 
 <Tabs groupId='language' queryString>
@@ -312,7 +312,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 You can delete a registered job template by its name using the REST API or the Java and Python SDKs.
 
 Note that deleting a job template will also delete all the jobs that are using this job template.
-If there are queued, started, or cancelling jobs that are using this job template, the deletion
+If there are queued, started, or to be cancelled jobs that are using this job template, the deletion
 will fail with an `InUseException` error.
 
 <Tabs groupId='language' queryString>
@@ -350,8 +350,8 @@ placeholders in the job template.
 
 Gravitino leverages the job executor to run the job, so you need to specify the job executor
 through configuration `gravitino.job.executor`. By default, it is set to "local", which means
-the job will be launched as a process within the same machine that runs Gravitino server. Note that
-the local job executor is only for testing. If you want to run the job in a distributed environment,
+the job will be launched as a process within the same machine that runs the Gravitino server. Note 
+that the local job executor is only for testing. If you want to run the job in a distributed environment,
 you need to implement your own `JobExecutor` and set the configuration, please see
 [Implement a custom job executor](#implement-a-custom-job-executor) section below.
 
@@ -404,7 +404,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 </Tabs>
 
 The returned `JobHandle` contains the job ID and other information about the job. You can use the job ID to
-check the job status, cancel the job.
+check the job status and cancel the job.
 
 The runJob API will return immediately after the job is submitted to the job executor, and the job will be
 executed asynchronously. You can check the job status using the job ID returned by the runJob API.
@@ -493,7 +493,7 @@ then to `CANCELLED` when the cancellation is completed. If the job is already in
 
 The cancellation will be done by the job executor with the best effort, it relies on the job
 executor that supports cancellation. Also, because of the asynchronous nature of the job
-cancellation, the job may not be cancelled in actual.
+cancellation, the job may not be actually cancelled.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -576,10 +576,10 @@ These properties will be passed to the airflow job executor when it is instantia
 The job system is a new feature introduced in Gravitino 1.0.0, and it still needs more work:
 
 1. Support modification of job templates.
-2. Support running Spark jobs (Java and PySpark) based on the Spark job template in local job
+2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job
    executor.
 3. Support more job templates, like Python, SQL, etc.
 4. Support more job executors, like Apache Airflow, Apache Livy, etc.
-5. Support uploading job template related artifacts to Gravitino server, also support
+5. Support uploading job template related artifacts to the Gravitino server, also support
    downloading the artifacts from more distributed file systems like HDFS, S3, etc.
 6. Support job scheduling, like running jobs periodically, or based on some events.
