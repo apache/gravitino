@@ -39,7 +39,6 @@ jobs:
               - '**/*.rs'
               - '**/resources/**'
               - '**/src/**'
-              - '!mcp-server/**'
               - '!**/*.md'
               - '!**/*.png'
               - '!**/*.svg'
@@ -52,7 +51,7 @@ jobs:
     outputs:
       source_changes: ${{ steps.filter.outputs.source_changes }}
       spark_connector_changes: ${{ steps.filter.outputs.spark_connector_changes }}
-      mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }}
+      mcp_server_changes: ${{ steps.filter.outputs.mcp_server_changes }} && ${{ steps.filter.outputs.source_changes == 'false' }}
 
   compile-check:
     runs-on: ubuntu-latest
