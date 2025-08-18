@@ -67,14 +67,14 @@ Here is a brief description of the fields in the job template:
 
 - `name`: The name of the job template, must be unique.
 - `jobType`: The type of the job template, use `shell` for a shell job template.
-- `comment`: A comment for the job template, can be used to describe the job template.
+- `comment`: A comment for the job template, which can be used to describe the job template.
 - `executable`: The path to the executable script, which can be a shell script or any executable script.
-- `arguments`: The arguments to pass to the executable script, can use placeholders like `{{arg1}}`
+- `arguments`: The arguments to pass to the executable script, you can use placeholders like `{{arg1}}`
   and `{{arg2}}` to be replaced with actual values when running the job.
-- `environments`: The environment variables to set when running the job, can use placeholders like
+- `environments`: The environment variables to set when running the job, you can use placeholders like
   `{{value1}}` and `{{value2}}` to be replaced with actual values when running the job.
-- `customFields`: Custom fields for the job template, can be used to store additional
-  information, can use placeholders like `{{value1}}` and `{{value2}}` to be replaced with actual
+- `customFields`: Custom fields for the job template, which can be used to store additional
+  information, you can use placeholders like `{{value1}}` and `{{value2}}` to be replaced with actual
   values when running the job.
 - `scripts`: A list of scripts that the main executable script can use.
 
@@ -129,32 +129,32 @@ The template is defined as follows:
 
 Here is a brief description of the fields in the Spark job template:
 
-- `name`: The name of the job template, must be unique.
+- `name`: The name of the job template, which must be unique.
 - `jobType`: The type of the job template, use `spark` for Spark job template.
-- `comment`: A comment for the job template, can be used to describe the job template.
+- `comment`: A comment for the job template, which can be used to describe the job template.
 - `executable`: The path to the Spark application JAR file, which can be a local file path or a URL
   with a supported scheme.
-- `arguments`: The arguments to pass to the Spark application, can use placeholders like
+- `arguments`: The arguments to pass to the Spark application, you can use placeholders like
   `{{arg1}}` and `{{arg2}}` to be replaced with actual values when running the job.
-- `environments`: The environment variables to set when running the job, can use placeholders like
+- `environments`: The environment variables to set when running the job, you can use placeholders like
   `{{value1}}` and `{{value2}}` to be replaced with actual values when running the job.
-- `customFields`: Custom fields for the job template, can be used to store additional information.
+- `customFields`: Custom fields for the job template, which can be used to store additional information.
   It can use placeholders like `{{value1}}` and `{{value2}}` to be replaced with actual values
   when running the job.
-- `className`: The main class of the Spark application, required for Spark job template.
-- `jars`: A list of JAR files to add to the Spark job classpath, can be a local file path or a URL
+- `className`: The main class of the Spark application, it is required for Spark job template.
+- `jars`: A list of JAR files to add to the Spark job classpath, which can be a local file path or a URL
   with a supported scheme.
-- `files`: A list of files to be copied to the working directory of the Spark job, can be a local
+- `files`: A list of files to be copied to the working directory of the Spark job, which can be a local
   file path or a URL with a supported scheme.
-- `archives`: A list of archives to be extracted to the working directory of the Spark job, can be a
-  local file path or a URL with a supported scheme.
-- `configs`: A map of Spark configurations to set when running the Spark job, can use placeholders
+- `archives`: A list of archives to be extracted to the working directory of the Spark job, which
+  can be a local file path or a URL with a supported scheme.
+- `configs`: A map of Spark configurations to set when running the Spark job, which can use placeholders
   like `{{value1}}` to be replaced with actual values when running the job.
 
 Note that:
 
 1. The `executable`, `jars`, `files`, and `archives` must be accessible by the Gravitino server.
-   Currently, Gravitino supports accessing files from the local file system, HTTP(S) URLs, and
+   Currently, Gravitino support accessing files from the local file system, HTTP(S) URLs, and
    FTP(S) URLs (more distributed file system supports will be added in the future). So the
    `executable`, `jars`, `files`, and `archives` can be a local file path, or a URL like
    `http://example.com/my_spark_app.jar`.
