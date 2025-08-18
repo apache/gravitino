@@ -39,6 +39,7 @@ fun getUvExecutable(): String {
   }
 }
 
+// Determine the Python executable path in the virtual environment
 val venvPython = when {
   System.getProperty("os.name").contains("win", ignoreCase = true) ->
     venvDir.resolve("Scripts/python.exe").absolutePath
