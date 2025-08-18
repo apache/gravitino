@@ -79,6 +79,14 @@ Support for the following alter table operations:
 The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
+### Update
+
+Not support.
+
+### Delete
+
+Not support.
+
 ## Schema and table properties
 
 You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
