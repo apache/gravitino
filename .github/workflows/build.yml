@@ -46,7 +46,7 @@ jobs:
                 - '**/*.md'
                 - '**/*.png'
                 - '**/*.svg'
-            
+  
             spark_connector_changes:
               - spark-connector/**
             
