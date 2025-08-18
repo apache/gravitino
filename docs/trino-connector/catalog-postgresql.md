@@ -35,6 +35,10 @@ Gravitino Trino connector supports the following alter table operations:
 The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
 
+## Update
+
+Only `UPDATE` statements with constant assignments and predicates are supported. See also [UPDATE limitation](https://trino.io/docs/current/connector/postgresql.html#update-limitation).
+
 ## Table and Schema properties
 
 PostgreSQL's tables and schemas cannot support properties.
@@ -128,6 +132,12 @@ Insert data into the table `table_01` from select:
 
 ```sql
 INSERT INTO postgresql_test.database_01.table_01 (name, salary) SELECT * FROM postgresql_test.database_01.table_01;
+```
+
+Update the table `table_01`:
+
+```sql
+UPDATE postgresql_test.database_01.table_01 SET name = 'ice_update' WHERE salary = 12
 ```
 
 ### Querying data
