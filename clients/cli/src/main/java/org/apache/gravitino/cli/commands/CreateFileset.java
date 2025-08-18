@@ -20,6 +20,7 @@
 package org.apache.gravitino.cli.commands;
 
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.ErrorMessages;
@@ -71,7 +72,8 @@ public class CreateFileset extends Command {
   @Override
   public void handle() {
     NameIdentifier name = NameIdentifier.of(schema, fileset);
-    boolean managed = "true".equals(properties.get("managed"));
+    boolean managed =
+        Optional.ofNullable(properties.get("managed")).map("true"::equals).orElse(false);
     Map<String, String> storageLocations = MapUtils.getPrefixMap(properties, "location-", true);
     Map<String, String> propertiesWithoutLocation =
         MapUtils.getMapWithoutPrefix(properties, "location-");
