@@ -260,6 +260,12 @@ subprojects {
   }
 
   fun CompatibleWithJDK8(project: Project): Boolean {
+    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it.endsWith(":release") }
+    println("isReleaseRun: $isReleaseRun")
+    if (!isReleaseRun) {
+      return true
+    }
+
     val name = project.name.lowercase()
     val path = project.path.lowercase()
 
@@ -319,13 +325,12 @@ subprojects {
       // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
       // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
       // Trino-connector on macOS.
-      val clientCompatibleWithJDK8 = project.hasProperty("clientCompatibleWithJDK8")
       if (project.name == "trino-connector") {
         if (OperatingSystem.current().isMacOsX) {
           vendor.set(JvmVendorSpec.AMAZON)
         }
         languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (clientCompatibleWithJDK8 && CompatibleWithJDK8(project)) {
+      } else if (CompatibleWithJDK8(project)) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -1067,3 +1072,17 @@ fun checkOrbStackStatus() {
 }
 
 printDockerCheckInfo()
+
+tasks.register("release") {
+  group = "release"
+  description = "Builds and package a release version."
+  doFirst {
+    println("Releasing project...")
+  }
+
+  doLast {
+    println("Release build completed")
+  }
+
+  dependsOn(subprojects.map { it.tasks.named("build") })
+}
