@@ -261,9 +261,8 @@ subprojects {
 
   fun CompatibleWithJDK8(project: Project): Boolean {
     val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it.endsWith(":release") }
-    println("isReleaseRun: $isReleaseRun")
     if (!isReleaseRun) {
-      return true
+      return false
     }
 
     val name = project.name.lowercase()
