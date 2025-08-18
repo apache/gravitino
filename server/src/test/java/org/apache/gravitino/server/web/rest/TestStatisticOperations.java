@@ -164,6 +164,7 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     StatisticListResponse listResp = resp.readEntity(StatisticListResponse.class);
+    listResp.validate();
     Assertions.assertEquals(0, listResp.getCode());
 
     StatisticDTO[] statisticDTOS = listResp.getStatistics();
