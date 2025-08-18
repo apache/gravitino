@@ -31,14 +31,3 @@ rm -rf "${mcp_server_dir}/packages"
 mkdir -p "${mcp_server_dir}/packages"
 
 cp -r ${gravitino_home}/mcp-server ${mcp_server_dir}/packages/mcp-server
-
-#cd ${gravitino_home}
-
-#cp start-mcp-server.sh ${mcp_server_dir}/packages/start_mcp_server.sh
-
-# Keeping the container running at all times
-#cat <<EOF >> "${mcp_server_dir}/packages/gravitino-iceberg-rest-server/bin/gravitino-iceberg-rest-server.sh"
-
-# Keeping a process running in the background
-#tail -f /dev/null
-#EOF
