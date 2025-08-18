@@ -23,30 +23,28 @@ jobs:
         with:
           filters: |
             source_changes:
-              included:
-                - '.github/**'
-                - 'catalogs/**'
-                - 'clients/**'
-                - 'conf/**'
-                - 'dev/**'
-                - 'docs/open-api/**'
-                - 'gradle/**'
-                - 'gradle.properties'
-                - 'meta/**'
-                - 'scripts/**'
-                - 'web/**'
-                - '**/*.java'
-                - '**/*.kts'
-                - '**/*.py'
-                - '**/*.rs'
-                - '**/resources/**'
-                - '**/src/**'
-              excluded:
-                - 'mcp-server/**'
-                - '**/*.md'
-                - '**/*.png'
-                - '**/*.svg'
-  
+              # - '.github/**'
+              - 'catalogs/**'
+              - 'clients/**'
+              - 'conf/**'
+              - 'dev/**'
+              - 'docs/open-api/**'
+              - 'gradle/**'
+              - 'gradle.properties'
+              - 'meta/**'
+              - 'scripts/**'
+              - 'web/**'
+              - '**/*.java'
+              - '**/*.kts'
+              - '**/*.py'
+              - '**/*.rs'
+              - '**/resources/**'
+              - '**/src/**'
+              - '!mcp-server/**'
+              - '!**/*.md'
+              - '!**/*.png'
+              - '!**/*.svg'
+
             spark_connector_changes:
               - spark-connector/**
             
