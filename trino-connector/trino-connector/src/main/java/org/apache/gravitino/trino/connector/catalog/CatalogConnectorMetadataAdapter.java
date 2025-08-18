@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import io.trino.spi.StandardErrorCode;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
@@ -290,5 +292,15 @@ public class CatalogConnectorMetadataAdapter {
         column.isNullable(),
         false,
         column.getProperties());
+  }
+
+  /**
+   * Get the column handle name that will generate row IDs for the merge operation.
+   *
+   * @return the column handle name for row IDs
+   */
+  public String getMergeRowIdColumnHandleName() {
+    throw new TrinoException(
+        StandardErrorCode.NOT_SUPPORTED, "This connector does not support modifying table rows");
   }
 }

@@ -55,10 +55,18 @@ Support for the following alter table operations:
 - Change a column type
 - Set a table property
 
-## Select
+### Select
 
 The Apache Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
 Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
+
+### Update
+
+Not support.
+
+### Delete
+
+Not support.
 
 ## Table and Schema properties
 
