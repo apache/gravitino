@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.iceberg.common;
 
+import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
-import org.apache.commons.compress.utils.Lists;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
