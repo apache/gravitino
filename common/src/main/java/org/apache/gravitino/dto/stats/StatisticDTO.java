@@ -179,6 +179,7 @@ public class StatisticDTO implements Statistic {
       statisticDTO.reserved = this.reserved;
       statisticDTO.modifiable = this.modifiable;
       statisticDTO.audit = this.audit;
+      statisticDTO.validate();
       return statisticDTO;
     }
   }
