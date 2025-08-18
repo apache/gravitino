@@ -20,7 +20,11 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -407,9 +411,15 @@ public class ModelOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            Map<String, String> tmpUris =
+                Optional.ofNullable(request.getUris()).orElse(Collections.emptyMap());
+            ImmutableMap.Builder<String, String> uris =
+                ImmutableMap.<String, String>builder().putAll(tmpUris);
+            Optional.ofNullable(request.getUri())
+                .ifPresent(uri -> uris.put(ModelVersion.URI_NAME_UNKNOWN, uri));
             modelDispatcher.linkModelVersion(
                 modelId,
-                request.getUri(),
+                uris.buildKeepingLast(),
                 request.getAliases(),
                 request.getComment(),
                 request.getProperties());

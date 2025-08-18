@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.model;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
@@ -39,7 +40,7 @@ public class TestModelVersionDTO {
             .withVersion(0)
             .withComment("model version comment")
             .withAliases(new String[] {"alias1", "alias2"})
-            .withUri("uri")
+            .withUris(ImmutableMap.of("n1", "u1"))
             .withProperties(props)
             .withAudit(audit)
             .build();
@@ -55,7 +56,7 @@ public class TestModelVersionDTO {
         ModelVersionDTO.builder()
             .withVersion(0)
             .withComment("model version comment")
-            .withUri("uri")
+            .withUris(ImmutableMap.of("n1", "u1"))
             .withProperties(props)
             .withAudit(audit)
             .build();
@@ -73,7 +74,7 @@ public class TestModelVersionDTO {
             .withVersion(0)
             .withComment("model version comment")
             .withAliases(new String[] {})
-            .withUri("uri")
+            .withUris(ImmutableMap.of("n1", "u1"))
             .withProperties(props)
             .withAudit(audit)
             .build();
@@ -87,7 +88,11 @@ public class TestModelVersionDTO {
 
     // Test with null comment and properties
     ModelVersionDTO modelVersionDTO3 =
-        ModelVersionDTO.builder().withVersion(0).withUri("uri").withAudit(audit).build();
+        ModelVersionDTO.builder()
+            .withVersion(0)
+            .withUris(ImmutableMap.of("n1", "u1"))
+            .withAudit(audit)
+            .build();
 
     String serJson3 = JsonUtils.objectMapper().writeValueAsString(modelVersionDTO3);
     ModelVersionDTO deserModelVersionDTO3 =
@@ -101,33 +106,21 @@ public class TestModelVersionDTO {
   @Test
   public void testInvalidModelVersionDTO() {
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          ModelVersionDTO.builder().build();
-        });
+        IllegalArgumentException.class, () -> ModelVersionDTO.builder().build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ModelVersionDTO.builder().withVersion(-1).build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ModelVersionDTO.builder().withVersion(0).build());
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          ModelVersionDTO.builder().withVersion(-1).build();
-        });
+        () -> ModelVersionDTO.builder().withVersion(0).withUris(Collections.emptyMap()).build());
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> {
-          ModelVersionDTO.builder().withVersion(0).build();
-        });
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          ModelVersionDTO.builder().withVersion(0).withUri("").build();
-        });
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> {
-          ModelVersionDTO.builder().withVersion(0).withUri("uri").build();
-        });
+        () ->
+            ModelVersionDTO.builder().withVersion(0).withUris(ImmutableMap.of("n1", "u1")).build());
   }
 }
