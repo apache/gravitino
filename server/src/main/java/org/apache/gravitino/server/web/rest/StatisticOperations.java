@@ -86,17 +86,18 @@ public class StatisticOperations {
         type,
         metalake);
     try {
-      MetadataObject object =
-          MetadataObjects.parse(
-              fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
-      if (object.type() != MetadataObject.Type.TABLE) {
-        throw new UnsupportedOperationException(
-            "Listing statistics is only supported for tables now.");
-      }
 
       return Utils.doAs(
           httpRequest,
           () -> {
+            MetadataObject object =
+                MetadataObjects.parse(
+                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            if (object.type() != MetadataObject.Type.TABLE) {
+              throw new UnsupportedOperationException(
+                  "Listing statistics is only supported for tables now.");
+            }
+
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             List<Statistic> statistics = statisticManager.listStatistics(metalake, object);
@@ -135,6 +136,7 @@ public class StatisticOperations {
               throw new UnsupportedOperationException(
                   "Update statistics is only supported for tables now.");
             }
+
             Map<String, StatisticValue<?>> statisticMaps = Maps.newHashMap();
             for (Map.Entry<String, StatisticValue<?>> entry : request.getUpdates().entrySet()) {
               // Current we only support custom statistics
