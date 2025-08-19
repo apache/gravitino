@@ -34,6 +34,8 @@ import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -53,6 +55,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.ThreadLocalAuthorizationCache;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -92,18 +95,26 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<MetadataIdConverter> metadataIdConverterMockedStatic;
 
+  private static MockedStatic<OwnerMetaService> ownerMetaServiceMockedStatic;
+
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
 
   @BeforeAll
   public static void setup() throws IOException {
+    OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
+    when(ownerMetaService.countAllOwner()).thenReturn(0L);
+    ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
+    ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
     jcasbinAuthorizer = new JcasbinAuthorizer();
     jcasbinAuthorizer.initialize();
+
     principalUtilsMockedStatic = mockStatic(PrincipalUtils.class);
     metadataIdConverterMockedStatic = mockStatic(MetadataIdConverter.class);
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
+
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(new UserPrincipal(USERNAME));
@@ -138,6 +149,12 @@ public class TestJcasbinAuthorizer {
     }
     if (metadataIdConverterMockedStatic != null) {
       metadataIdConverterMockedStatic.close();
+    }
+    if (ownerMetaServiceMockedStatic != null) {
+      ownerMetaServiceMockedStatic.close();
+    }
+    if (gravitinoEnvMockedStatic != null) {
+      gravitinoEnvMockedStatic.close();
     }
   }
 

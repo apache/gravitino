@@ -17,35 +17,27 @@
 
 package org.apache.gravitino.server.authorization.policy;
 
-import java.util.ArrayList;
+import static org.junit.Assert.assertEquals;
+
 import java.util.List;
+import org.junit.jupiter.api.Test;
 
-/** PageRequestGenerator for building the list of CompletableFuture needed for paginated queries */
-public class PageRequestGenerator {
+public class TestPageRequestGenerator {
 
-  public static List<PageRequest> generate(long totalSize, long pageSize) {
-    List<PageRequest> pageRequests = new ArrayList<>();
-    for (int i = 1; i <= (int) Math.ceil((double) totalSize / pageSize); i++) {
-      pageRequests.add(new PageRequest(i, pageSize));
-    }
-    return pageRequests;
+  @Test
+  public void test() {
+    List<PageRequestGenerator.PageRequest> result = PageRequestGenerator.generate(100, 10);
+    checkPageRequestList(10, result);
+    result = PageRequestGenerator.generate(99, 10);
+    checkPageRequestList(10, result);
+    result = PageRequestGenerator.generate(101, 10);
+    checkPageRequestList(11, result);
+    result = PageRequestGenerator.generate(101, 1);
+    checkPageRequestList(101, result);
   }
 
-  public static class PageRequest {
-    private final long pageNum;
-    private final long pageSize;
-
-    public PageRequest(long pageNum, long pageSize) {
-      this.pageSize = pageSize;
-      this.pageNum = pageNum;
-    }
-
-    public Long getPageNum() {
-      return pageNum;
-    }
-
-    public Long getPageSize() {
-      return pageSize;
-    }
+  private void checkPageRequestList(long pageNum, List<PageRequestGenerator.PageRequest> list) {
+    assertEquals(pageNum, list.size());
+    assertEquals(pageNum, (long) list.get((int) (pageNum - 1)).getPageNum());
   }
 }

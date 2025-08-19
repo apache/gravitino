@@ -19,9 +19,15 @@ package org.apache.gravitino.server.authorization;
 
 import java.lang.reflect.Array;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -42,6 +48,15 @@ import org.apache.gravitino.utils.PrincipalUtils;
 public class MetadataFilterHelper {
 
   private MetadataFilterHelper() {}
+
+  private static ExecutorService executor =
+      Executors.newFixedThreadPool(
+          50,
+          runable -> {
+            Thread thread = new Thread(runable);
+            thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
+            return thread;
+          });
 
   /**
    * Call {@link GravitinoAuthorizer} to filter the metadata list
@@ -95,15 +110,31 @@ public class MetadataFilterHelper {
       return nameIdentifiers;
     }
     return ThreadLocalAuthorizationCache.executeWithThreadCache(
-        () ->
-            Arrays.stream(nameIdentifiers)
-                .filter(
-                    metaDataName -> {
-                      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                          spiltMetadataNames(metalake, entityType, metaDataName);
-                      return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
-                    })
-                .toArray(NameIdentifier[]::new));
+            () -> {
+              List<CompletableFuture<NameIdentifier>> futures = new ArrayList<>();
+              for (NameIdentifier nameIdentifier : nameIdentifiers) {
+                futures.add(
+                    CompletableFuture.supplyAsync(() -> nameIdentifier)
+                        .thenApplyAsync(
+                            metaDataName -> {
+                              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                                  spiltMetadataNames(metalake, entityType, metaDataName);
+                              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
+                                  ? metaDataName
+                                  : null;
+                            },
+                            executor));
+              }
+              return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                  .thenApplyAsync(
+                      v ->
+                          futures.stream()
+                              .map(CompletableFuture::join) // 获取每个结果
+                              .filter(Objects::nonNull)
+                              .toArray(NameIdentifier[]::new),
+                      executor);
+            })
+        .join();
   }
 
   /**
@@ -129,17 +160,36 @@ public class MetadataFilterHelper {
     AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
         new AuthorizationExpressionEvaluator(expression);
     return ThreadLocalAuthorizationCache.executeWithThreadCache(
-        () ->
-            Arrays.stream(entities)
-                .filter(
-                    entity -> {
-                      NameIdentifier nameIdentifier = toNameIdentifier.apply(entity);
-                      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-                          spiltMetadataNames(metalake, entityType, nameIdentifier);
-                      return authorizationExpressionEvaluator.evaluate(nameIdentifierMap);
-                    })
-                .toArray(
-                    size -> (E[]) Array.newInstance(entities.getClass().getComponentType(), size)));
+            () -> {
+              List<CompletableFuture<E>> futures = new ArrayList<>();
+              for (E entity : entities) {
+                futures.add(
+                    CompletableFuture.supplyAsync(() -> entity)
+                        .thenApplyAsync(
+                            tempEntity -> {
+                              NameIdentifier nameIdentifier = toNameIdentifier.apply(tempEntity);
+                              Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                                  spiltMetadataNames(metalake, entityType, nameIdentifier);
+                              return authorizationExpressionEvaluator.evaluate(nameIdentifierMap)
+                                  ? tempEntity
+                                  : null;
+                            },
+                            executor));
+              }
+              return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                  .thenApplyAsync(
+                      v ->
+                          futures.stream()
+                              .map(CompletableFuture::join) // 获取每个结果
+                              .filter(Objects::nonNull)
+                              .toArray(
+                                  size ->
+                                      (E[])
+                                          Array.newInstance(
+                                              entities.getClass().getComponentType(), size)),
+                      executor);
+            })
+        .join();
   }
 
   /**
