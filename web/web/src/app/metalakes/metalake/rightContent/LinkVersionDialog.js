@@ -263,7 +263,7 @@ const LinkVersionDialog = props => {
       setValue('uri', data.uri)
       setValue('comment', data.comment)
 
-      const aliases = data.aliases.map((alias) => ({ name: alias }))
+      const aliases = data.aliases.map(alias => ({ name: alias }))
       setValue(`aliases`, aliases)
 
       const propsItems = Object.entries(properties).map(([key, value]) => {
