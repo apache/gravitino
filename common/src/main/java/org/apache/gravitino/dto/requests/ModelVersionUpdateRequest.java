@@ -162,6 +162,11 @@ public interface ModelVersionUpdateRequest extends RESTRequest {
     @JsonProperty("newUri")
     private final String newUri;
 
+    /**
+     * Constructor for UpdateModelVersionUriRequest.
+     *
+     * @param newUri the new uri of the model version.
+     */
     public UpdateModelVersionUriRequest(String newUri) {
       this(null, newUri);
     }

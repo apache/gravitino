@@ -56,11 +56,27 @@ public class ModelVersionLinkRequest implements RESTRequest {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
+  /**
+   * Constructor for ModelVersionLinkRequest.
+   *
+   * @param uri the uri of the model version.
+   * @param aliases the aliases of the model version.
+   * @param comment the comment of the model version.
+   * @param properties the properties of the model version.
+   */
   public ModelVersionLinkRequest(
       String uri, String[] aliases, String comment, Map<String, String> properties) {
     this(uri, null, aliases, comment, properties);
   }
 
+  /**
+   * Constructor for ModelVersionLinkRequest
+   *
+   * @param uris the uris of the model version.
+   * @param aliases the aliases of the model version.
+   * @param comment the comment of the model version.
+   * @param properties the properties of the model version.
+   */
   public ModelVersionLinkRequest(
       Map<String, String> uris, String[] aliases, String comment, Map<String, String> properties) {
     this(null, uris, aliases, comment, properties);
