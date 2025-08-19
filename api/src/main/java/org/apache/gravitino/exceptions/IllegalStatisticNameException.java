@@ -22,7 +22,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** An exception thrown when statistic has an illegal name */
-public class IllegalStatisticNameException extends  IllegalArgumentException {
+public class IllegalStatisticNameException extends IllegalArgumentException {
   /**
    * Constructs a new exception with the specified detail message.
    *

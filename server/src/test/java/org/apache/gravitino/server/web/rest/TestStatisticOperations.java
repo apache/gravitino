@@ -58,6 +58,7 @@ import org.apache.gravitino.dto.stats.PartitionStatisticsDropDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsUpdateDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -330,13 +331,13 @@ public class TestStatisticOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
 
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        IllegalStatisticNameException.class.getSimpleName(), errorResp3.getType());
   }
 
   @Test
@@ -637,13 +638,13 @@ public class TestStatisticOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
 
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
-    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        IllegalStatisticNameException.class.getSimpleName(), errorResp3.getType());
   }
 
   @Test
