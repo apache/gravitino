@@ -18,23 +18,34 @@
  */
 package org.apache.gravitino.client;
 
+import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
+import org.apache.gravitino.dto.requests.PolicyCreateRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
+import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
@@ -45,15 +56,22 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyChange;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.hc.core5.http.HttpStatus;
@@ -700,6 +718,408 @@ public class TestGravitinoMetalake extends TestBase {
     buildMockResource(Method.DELETE, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
     Throwable ex1 =
         Assertions.assertThrows(RuntimeException.class, () -> gravitinoClient.deleteTag(tagName));
+    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testListPolicies() throws JsonProcessingException {
+    String path = "/api/metalakes/" + metalakeName + "/policies";
+
+    String[] policyNames = new String[] {"policy1", "policy2"};
+    NameListResponse resp = new NameListResponse(policyNames);
+    buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
+
+    String[] policies = gravitinoClient.listPolicies();
+    Assertions.assertEquals(2, policies.length);
+    Assertions.assertArrayEquals(policyNames, policies);
+
+    // Test return empty policy list
+    NameListResponse resp1 = new NameListResponse(new String[] {});
+    buildMockResource(Method.GET, path, null, resp1, HttpStatus.SC_OK);
+    String[] policies1 = gravitinoClient.listPolicies();
+    Assertions.assertEquals(0, policies1.length);
+
+    // Test throw MetalakeNotFoundException
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.GET, path, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex =
+        Assertions.assertThrows(NoSuchMetalakeException.class, gravitinoClient::listPolicies);
+    Assertions.assertTrue(ex.getMessage().contains("mock error"));
+
+    // Test throw internal error
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
+    buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Throwable ex1 = Assertions.assertThrows(RuntimeException.class, gravitinoClient::listPolicies);
+    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testListPolicyInfos() throws JsonProcessingException {
+    String path = "/api/metalakes/" + metalakeName + "/policies";
+    Map<String, String> params = Collections.singletonMap("details", "true");
+    Set<MetadataObject.Type> supportedTypes = Collections.singleton(MetadataObject.Type.TABLE);
+
+    PolicyDTO policy1 =
+        PolicyDTO.builder()
+            .withName("policy1")
+            .withComment("comment1")
+            .withPolicyType("custom")
+            .withContent(
+                PolicyContentDTO.CustomContentDTO.builder()
+                    .withSupportedObjectTypes(supportedTypes)
+                    .build())
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    PolicyDTO policy2 =
+        PolicyDTO.builder()
+            .withName("policy2")
+            .withComment("comment2")
+            .withPolicyType("custom")
+            .withContent(
+                PolicyContentDTO.CustomContentDTO.builder()
+                    .withSupportedObjectTypes(supportedTypes)
+                    .build())
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    PolicyDTO[] policies = new PolicyDTO[] {policy1, policy2};
+    PolicyListResponse resp = new PolicyListResponse(policies);
+    buildMockResource(Method.GET, path, params, null, resp, HttpStatus.SC_OK);
+
+    Policy[] policyInfos = gravitinoClient.listPolicyInfos();
+    Assertions.assertEquals(2, policyInfos.length);
+    Assertions.assertEquals(policy1.name(), policyInfos[0].name());
+    Assertions.assertEquals(policy1.comment(), policyInfos[0].comment());
+    Assertions.assertEquals(fromDTO(policy1.content()), policyInfos[0].content());
+    Assertions.assertEquals(policy2.name(), policyInfos[1].name());
+    Assertions.assertEquals(policy2.comment(), policyInfos[1].comment());
+    Assertions.assertEquals(fromDTO(policy2.content()), policyInfos[1].content());
+
+    // Test empty policy list
+    PolicyListResponse resp1 = new PolicyListResponse(new PolicyDTO[] {});
+    buildMockResource(Method.GET, path, params, null, resp1, HttpStatus.SC_OK);
+    Policy[] policyInfos1 = gravitinoClient.listPolicyInfos();
+    Assertions.assertEquals(0, policyInfos1.length);
+
+    // Test throw NoSuchMetalakeException
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.GET, path, params, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex =
+        Assertions.assertThrows(NoSuchMetalakeException.class, gravitinoClient::listPolicyInfos);
+    Assertions.assertTrue(ex.getMessage().contains("mock error"));
+
+    // Test throw internal error
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
+    buildMockResource(
+        Method.GET, path, params, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Throwable ex1 =
+        Assertions.assertThrows(RuntimeException.class, gravitinoClient::listPolicyInfos);
+    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testGetPolicy() throws JsonProcessingException {
+    String policyName = "policy1";
+    String path = "/api/metalakes/" + metalakeName + "/policies/" + policyName;
+
+    Set<MetadataObject.Type> supportedTypes = Collections.singleton(MetadataObject.Type.TABLE);
+    PolicyDTO policy1 =
+        PolicyDTO.builder()
+            .withName(policyName)
+            .withComment("comment1")
+            .withPolicyType("custom")
+            .withContent(
+                PolicyContentDTO.CustomContentDTO.builder()
+                    .withSupportedObjectTypes(supportedTypes)
+                    .build())
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    PolicyResponse resp = new PolicyResponse(policy1);
+    buildMockResource(Method.GET, path, null, resp, HttpStatus.SC_OK);
+
+    Policy policy = gravitinoClient.getPolicy(policyName);
+    Assertions.assertEquals(policyName, policy.name());
+    Assertions.assertEquals((policy1.comment()), policy.comment());
+    Assertions.assertEquals(fromDTO(policy1.content()), policy.content());
+
+    // Test throw NoSuchMetalakeException
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.GET, path, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> gravitinoClient.getPolicy(policyName));
+    Assertions.assertTrue(ex.getMessage().contains("mock error"));
+
+    // Test throw NoSuchPolicyException
+    ErrorResponse errorResponse1 =
+        ErrorResponse.notFound(NoSuchPolicyException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.GET, path, null, errorResponse1, HttpStatus.SC_NOT_FOUND);
+    Throwable ex1 =
+        Assertions.assertThrows(
+            NoSuchPolicyException.class, () -> gravitinoClient.getPolicy(policyName));
+    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+
+    // Test throw internal error
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
+    buildMockResource(Method.GET, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Throwable ex2 =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> gravitinoClient.getPolicy(policyName));
+    Assertions.assertTrue(ex2.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testCreatePolicy() throws JsonProcessingException {
+    String policyName = "policy1";
+    String path = "/api/metalakes/" + metalakeName + "/policies";
+
+    Set<MetadataObject.Type> supportedTypes = ImmutableSet.of(MetadataObject.Type.TABLE);
+    PolicyDTO policy1 =
+        PolicyDTO.builder()
+            .withName(policyName)
+            .withPolicyType("custom")
+            .withContent(
+                PolicyContentDTO.CustomContentDTO.builder()
+                    .withSupportedObjectTypes(supportedTypes)
+                    .build())
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    PolicyResponse resp = new PolicyResponse(policy1);
+
+    PolicyCreateRequest req =
+        new PolicyCreateRequest(
+            policyName, "custom", policy1.comment(), policy1.enabled(), policy1.content());
+    buildMockResource(Method.POST, path, req, resp, HttpStatus.SC_OK);
+
+    Policy policy =
+        gravitinoClient.createPolicy(
+            policyName,
+            "custom",
+            policy1.comment(),
+            policy1.enabled(),
+            PolicyContents.custom(null, supportedTypes, null));
+    Assertions.assertEquals(policyName, policy.name());
+    Assertions.assertNull(policy.comment());
+
+    // Test with null name
+    Throwable ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                gravitinoClient.createPolicy(
+                    null,
+                    "custom",
+                    policy1.comment(),
+                    policy1.enabled(),
+                    PolicyContents.custom(null, supportedTypes, null)));
+    Assertions.assertEquals("\"name\" is required and cannot be empty", ex.getMessage());
+
+    // Test throw NoSuchMetalakeException
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.POST, path, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex1 =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class,
+            () ->
+                gravitinoClient.createPolicy(
+                    policyName,
+                    "custom",
+                    policy1.comment(),
+                    policy1.enabled(),
+                    PolicyContents.custom(null, supportedTypes, null)));
+    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+
+    // Test throw PolicyAlreadyExistsException
+    ErrorResponse errorResponse1 =
+        ErrorResponse.alreadyExists(
+            PolicyAlreadyExistsException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.POST, path, null, errorResponse1, HttpStatus.SC_CONFLICT);
+    Throwable ex2 =
+        Assertions.assertThrows(
+            PolicyAlreadyExistsException.class,
+            () ->
+                gravitinoClient.createPolicy(
+                    policyName,
+                    "custom",
+                    policy1.comment(),
+                    policy1.enabled(),
+                    PolicyContents.custom(null, supportedTypes, null)));
+    Assertions.assertTrue(ex2.getMessage().contains("mock error"));
+
+    // Test throw internal error
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
+    buildMockResource(Method.POST, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Throwable ex3 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                gravitinoClient.createPolicy(
+                    policyName,
+                    "custom",
+                    policy1.comment(),
+                    policy1.enabled(),
+                    PolicyContents.custom(null, supportedTypes, null)));
+    Assertions.assertTrue(ex3.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testAlterPolicy() throws JsonProcessingException {
+    String policyName = "policy1";
+    String path = "/api/metalakes/" + metalakeName + "/policies/" + policyName;
+
+    Set<MetadataObject.Type> supportedTypes = ImmutableSet.of(MetadataObject.Type.TABLE);
+    PolicyDTO policy2 =
+        PolicyDTO.builder()
+            .withName("policy2")
+            .withComment("comment2")
+            .withPolicyType("custom")
+            .withContent(
+                PolicyContentDTO.CustomContentDTO.builder()
+                    .withSupportedObjectTypes(supportedTypes)
+                    .build())
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    PolicyResponse resp = new PolicyResponse(policy2);
+
+    PolicyContentDTO newContent =
+        PolicyContentDTO.CustomContentDTO.builder()
+            .withCustomRules(ImmutableMap.of("rule1", "value1"))
+            .withSupportedObjectTypes(supportedTypes)
+            .build();
+    List<PolicyUpdateRequest> reqs =
+        Arrays.asList(
+            new PolicyUpdateRequest.RenamePolicyRequest("policy2"),
+            new PolicyUpdateRequest.UpdatePolicyCommentRequest("comment2"),
+            new PolicyUpdateRequest.UpdatePolicyContentRequest("custom", newContent));
+    PolicyUpdatesRequest request = new PolicyUpdatesRequest(reqs);
+    buildMockResource(Method.PUT, path, request, resp, HttpStatus.SC_OK);
+
+    Policy policy =
+        gravitinoClient.alterPolicy(
+            policyName,
+            PolicyChange.rename("policy2"),
+            PolicyChange.updateComment("comment2"),
+            PolicyChange.updateContent(
+                "custom",
+                PolicyContents.custom(ImmutableMap.of("rule1", "value1"), supportedTypes, null)));
+    Assertions.assertEquals("policy2", policy.name());
+    Assertions.assertEquals("comment2", policy.comment());
+
+    // Test throw NoSuchMetalakeException
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.PUT, path, request, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class,
+            () ->
+                gravitinoClient.alterPolicy(
+                    policyName,
+                    PolicyChange.rename("policy2"),
+                    PolicyChange.updateComment("comment2"),
+                    PolicyChange.updateContent(
+                        "custom",
+                        PolicyContents.custom(
+                            ImmutableMap.of("rule1", "value1"), supportedTypes, null))));
+    Assertions.assertTrue(ex.getMessage().contains("mock error"));
+
+    // Test throw NoSuchPolicyException
+    ErrorResponse errorResponse1 =
+        ErrorResponse.notFound(NoSuchPolicyException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.PUT, path, request, errorResponse1, HttpStatus.SC_NOT_FOUND);
+    Throwable ex1 =
+        Assertions.assertThrows(
+            NoSuchPolicyException.class,
+            () ->
+                gravitinoClient.alterPolicy(
+                    policyName,
+                    PolicyChange.rename("policy2"),
+                    PolicyChange.updateComment("comment2"),
+                    PolicyChange.updateContent(
+                        "custom",
+                        PolicyContents.custom(
+                            ImmutableMap.of("rule1", "value1"), supportedTypes, null))));
+    Assertions.assertTrue(ex1.getMessage().contains("mock error"));
+
+    // Test throw IllegalArgumentException
+    ErrorResponse errorResponse2 = ErrorResponse.illegalArguments("mock error");
+    buildMockResource(Method.PUT, path, request, errorResponse2, HttpStatus.SC_BAD_REQUEST);
+    Throwable ex2 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                gravitinoClient.alterPolicy(
+                    policyName,
+                    PolicyChange.rename("policy2"),
+                    PolicyChange.updateComment("comment2"),
+                    PolicyChange.updateContent(
+                        "custom",
+                        PolicyContents.custom(
+                            ImmutableMap.of("rule1", "value1"), supportedTypes, null))));
+    Assertions.assertTrue(ex2.getMessage().contains("mock error"));
+
+    // Test throw internal error
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
+    buildMockResource(Method.PUT, path, request, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Throwable ex3 =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                gravitinoClient.alterPolicy(
+                    policyName,
+                    PolicyChange.rename("policy2"),
+                    PolicyChange.updateComment("comment2"),
+                    PolicyChange.updateContent(
+                        "custom",
+                        PolicyContents.custom(
+                            ImmutableMap.of("rule1", "value1"),
+                            ImmutableSet.of(MetadataObject.Type.TABLE),
+                            null))));
+    Assertions.assertTrue(ex3.getMessage().contains("mock error"));
+  }
+
+  @Test
+  public void testDeletePolicy() throws JsonProcessingException {
+    String policyName = "policy1";
+    String path = "/api/metalakes/" + metalakeName + "/policies/" + policyName;
+
+    DropResponse resp = new DropResponse(true);
+    buildMockResource(Method.DELETE, path, null, resp, HttpStatus.SC_OK);
+    boolean dropped = gravitinoClient.deletePolicy(policyName);
+    Assertions.assertTrue(dropped);
+
+    // Test return false
+    DropResponse resp1 = new DropResponse(false);
+    buildMockResource(Method.DELETE, path, null, resp1, HttpStatus.SC_OK);
+    boolean dropped1 = gravitinoClient.deletePolicy(policyName);
+    Assertions.assertFalse(dropped1);
+
+    // Test throw NoSuchMetalakeException
+    ErrorResponse errorResponse =
+        ErrorResponse.notFound(NoSuchMetalakeException.class.getSimpleName(), "mock error");
+    buildMockResource(Method.DELETE, path, null, errorResponse, HttpStatus.SC_NOT_FOUND);
+    Throwable ex =
+        Assertions.assertThrows(
+            NoSuchMetalakeException.class, () -> gravitinoClient.deletePolicy(policyName));
+    Assertions.assertTrue(ex.getMessage().contains("mock error"));
+
+    // Test internal error
+    ErrorResponse errorResp = ErrorResponse.internalError("mock error");
+    buildMockResource(Method.DELETE, path, null, errorResp, HttpStatus.SC_INTERNAL_SERVER_ERROR);
+    Throwable ex1 =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> gravitinoClient.deletePolicy(policyName));
     Assertions.assertTrue(ex1.getMessage().contains("mock error"));
   }
 

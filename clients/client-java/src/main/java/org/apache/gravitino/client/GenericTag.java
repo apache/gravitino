@@ -25,6 +25,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
+import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 
 /** Represents a generic tag. */
@@ -76,7 +77,9 @@ class GenericTag implements Tag, Tag.AssociatedObjects {
   public MetadataObject[] objects() {
     MetadataObjectListResponse resp =
         restClient.get(
-            String.format("api/metalakes/%s/tags/%s/objects", metalake, name()),
+            String.format(
+                "api/metalakes/%s/tags/%s/objects",
+                RESTUtils.encodeString(metalake), RESTUtils.encodeString(name())),
             MetadataObjectListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());

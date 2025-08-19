@@ -118,10 +118,10 @@ public class TestOAuth2TokenProvider {
     response = new OAuth2TokenResponse("1", "2", "bearer", 1, "test", null);
     respJson = objectMapper.writeValueAsString(response);
     mockResponse = mockResponse.withBody(respJson);
-    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    mockServer.when(any(), Times.exactly(2)).respond(mockResponse);
     OAuth2TokenProvider provider = builder.build();
     Assertions.assertTrue(provider.hasTokenData());
-    Assertions.assertNull(provider.getTokenData());
+    Assertions.assertNotNull(provider.getTokenData());
     KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
     String oldAccessToken =
         Jwts.builder()
@@ -152,5 +152,36 @@ public class TestOAuth2TokenProvider {
     Assertions.assertEquals(
         AuthConstants.AUTHORIZATION_BEARER_HEADER + accessToken,
         new String(provider.getTokenData(), StandardCharsets.UTF_8));
+  }
+
+  @Test
+  public void testTokenNotFetchedWhenValid() throws Exception {
+    OAuth2TokenProvider.Builder builder =
+        DefaultOAuth2TokenProvider.builder()
+            .withUri(String.format("http://127.0.0.1:%d", PORT))
+            .withCredential("yy:xx")
+            .withPath("oauth/token")
+            .withScope("test");
+    HttpResponse mockResponse = HttpResponse.response().withStatusCode(HttpStatus.SC_OK);
+    ObjectMapper objectMapper = ObjectMapperProvider.objectMapper();
+    KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
+    String accessToken =
+        Jwts.builder()
+            .setSubject("gravitino")
+            .setExpiration(new Date(System.currentTimeMillis() + 10000))
+            .setAudience("service1")
+            .signWith(keyPair.getPrivate(), SignatureAlgorithm.RS256)
+            .compact();
+
+    OAuth2TokenResponse response =
+        new OAuth2TokenResponse(accessToken, "2", "bearer", 1, "test", null);
+    String respJson = objectMapper.writeValueAsString(response);
+    mockResponse = mockResponse.withBody(respJson);
+    mockServer.when(any(), Times.exactly(1)).respond(mockResponse);
+    OAuth2TokenProvider provider = builder.build();
+    String token = provider.getAccessToken();
+    Assertions.assertEquals(accessToken, token);
+    String oldToken = provider.getAccessToken();
+    Assertions.assertEquals(accessToken, oldToken);
   }
 }

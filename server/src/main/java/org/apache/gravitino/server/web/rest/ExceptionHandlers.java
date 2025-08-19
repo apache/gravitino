@@ -42,6 +42,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
+import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -124,6 +126,11 @@ public class ExceptionHandlers {
     return TagExceptionHandler.INSTANCE.handle(op, tag, parent, e);
   }
 
+  public static Response handlePolicyException(
+      OperationType op, String policy, String parent, Exception e) {
+    return PolicyExceptionHandler.INSTANCE.handle(op, policy, parent, e);
+  }
+
   public static Response handleCredentialException(
       OperationType op, String metadataObjectName, Exception e) {
     return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
@@ -179,6 +186,11 @@ public class ExceptionHandlers {
   public static Response handleRolePermissionOperationException(
       OperationType type, String name, String parent, Exception e) {
     return RolePermissionOperationHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
+  public static Response handleStatisticException(
+      OperationType type, String name, String parent, Exception e) {
+    return StatisticExceptionHandler.INSTANCE.handle(type, name, parent, e);
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -715,6 +727,44 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class PolicyExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new PolicyExceptionHandler();
+
+    private static String getPolicyErrorMsg(
+        String policy, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate policy(s)%s operation [%s] under object [%s], reason [%s]",
+          policy, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String policy, String parent, Exception e) {
+      String formatted = StringUtil.isBlank(policy) ? "" : " [" + policy + "]";
+      String errorMsg = getPolicyErrorMsg(formatted, op.name(), parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof PolicyAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof PolicyAlreadyAssociatedException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, policy, parent, e);
+      }
+    }
+  }
+
   private static class OwnerExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new OwnerExceptionHandler();
@@ -857,6 +907,35 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, jobTemplate, parent, e);
+      }
+    }
+  }
+
+  private static class StatisticExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new StatisticExceptionHandler();
+
+    private static String getStatisticErrorMsg(
+        String name, String operation, String parent, String reason) {
+      return String.format(
+          "Failed to operate statistic(s)%s operation [%s] on parent [%s], reason [%s]",
+          name, operation, parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String name, String object, Exception e) {
+      String formatted = StringUtil.isBlank(name) ? "" : " [" + name + "]";
+      String errorMsg = getStatisticErrorMsg(formatted, op.name(), object, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else {
+        return super.handle(op, name, object, e);
       }
     }
   }

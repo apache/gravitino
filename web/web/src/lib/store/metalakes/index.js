@@ -50,6 +50,7 @@ import { getTablesApi, getTableDetailsApi, createTableApi, updateTableApi, delet
 import {
   getFilesetsApi,
   getFilesetDetailsApi,
+  listFilesetFilesApi,
   createFilesetApi,
   updateFilesetApi,
   deleteFilesetApi
@@ -1047,6 +1048,32 @@ export const deleteFileset = createAsyncThunk(
   }
 )
 
+export const getFilesetFiles = createAsyncThunk(
+  'appMetalakes/getFilesetFiles',
+  async ({ metalake, catalog, schema, fileset, subPath = '/', locationName }, { getState, dispatch }) => {
+    dispatch(setTableLoading(true))
+    const [err, res] = await to(listFilesetFilesApi({ metalake, catalog, schema, fileset, subPath, locationName }))
+    dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      dispatch(resetTableData())
+      throw new Error(err)
+    }
+
+    const { files = [] } = res
+
+    dispatch(
+      setExpandedNodes([
+        `{{${metalake}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}`,
+        `{{${metalake}}}{{${catalog}}}{{${'fileset'}}}{{${schema}}}`
+      ])
+    )
+
+    return { files, subPath, locationName }
+  }
+)
+
 export const fetchTopics = createAsyncThunk(
   'appMetalakes/fetchTopics',
   async ({ init, page, metalake, catalog, schema }, { getState, dispatch }) => {
@@ -1465,6 +1492,7 @@ export const appMetalakesSlice = createSlice({
     tables: [],
     columns: [],
     filesets: [],
+    filesetFiles: [],
     topics: [],
     models: [],
     versions: [],
@@ -1745,6 +1773,15 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(deleteFileset.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(getFilesetFiles.fulfilled, (state, action) => {
+      state.filesetFiles = action.payload.files
+      state.tableData = action.payload.files
+    })
+    builder.addCase(getFilesetFiles.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }

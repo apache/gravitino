@@ -173,6 +173,8 @@ public class PartitionOperations {
     Preconditions.checkArgument(
         request.getPartitions().length == 1, "Only one partition is supported");
 
+    request.validate();
+
     try {
       return Utils.doAs(
           httpRequest,

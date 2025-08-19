@@ -35,7 +35,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
@@ -188,7 +187,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
       FileSystemCacheKey that = (FileSystemCacheKey) o;
       return conf.equals(that.conf)
-          && (scheme == null ? that.authority == null : scheme.equals(that.scheme))
+          && (scheme == null ? that.scheme == null : scheme.equals(that.scheme))
           && (authority == null ? that.authority == null : authority.equals(that.authority))
           && currentUser.equals(that.currentUser);
     }
@@ -447,6 +446,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
           FileSystem fs = getFileSystemWithCache(formalizePath, conf);
+
+          if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
+            throw new IllegalArgumentException(
+                "Fileset location cannot be a file: "
+                    + formalizePath
+                    + ", location name: "
+                    + entry.getKey());
+          }
+
           if (!fs.exists(formalizePath)) {
             if (!fs.mkdirs(formalizePath)) {
               throw new RuntimeException(
@@ -680,24 +688,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           "Location name %s does not exist in fileset %s", targetLocationName, ident);
     }
 
-    boolean isSingleFile = false;
-    if (disableFSOps) {
-      LOG.warn(
-          "Filesystem operations are disabled in the server side, we cannot check if the "
-              + "storage location mounts to a directory or single file, we assume it is a directory"
-              + "(in most of the cases). If it happens to be a single file, then the generated "
-              + "file location may be a wrong path. Please avoid using Fileset to manage a single"
-              + " file path.");
-    } else {
-      isSingleFile = checkSingleFile(fileset, targetLocationName);
-    }
-
-    // if the storage location is a single file, it cannot have sub path to access.
-    if (isSingleFile && StringUtils.isNotBlank(processedSubPath)) {
-      throw new GravitinoRuntimeException(
-          "Sub path should always be blank, because the fileset only mounts a single file.");
-    }
-
     // do checks for some data operations.
     if (hasCallerContext()) {
       Map<String, String> contextMap = CallerContext.CallerContextHolder.get().context();
@@ -713,14 +703,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         FilesetDataOperation dataOperation = FilesetDataOperation.valueOf(operation);
         switch (dataOperation) {
           case RENAME:
-            // Fileset only mounts a single file, the storage location of the fileset cannot be
-            // renamed; Otherwise the metadata in the Gravitino server may be inconsistent.
-            if (isSingleFile) {
-              throw new GravitinoRuntimeException(
-                  "Cannot rename the fileset: %s which only mounts to a single file.", ident);
-            }
-            // if the sub path is blank, it cannot be renamed,
-            // otherwise the metadata in the Gravitino server may be inconsistent.
+            // if the sub path is blank, it cannot be renamed otherwise the metadata in the
+            // Gravitino server may be inconsistent.
             if (StringUtils.isBlank(processedSubPath)
                 || (processedSubPath.startsWith(SLASH) && processedSubPath.length() == 1)) {
               throw new GravitinoRuntimeException(
@@ -734,13 +718,12 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     String fileLocation;
-    // 1. if the storage location is a single file, we pass the storage location directly
-    // 2. if the processed sub path is blank, we pass the storage location directly
-    if (isSingleFile || StringUtils.isBlank(processedSubPath)) {
+    // If the processed sub path is blank, we pass the storage location directly
+    if (StringUtils.isBlank(processedSubPath)) {
       fileLocation = fileset.storageLocations().get(targetLocationName);
     } else {
       // the processed sub path always starts with "/" if it is not blank,
-      // so we can safely remove the tailing slash if storage location ends with "/".
+      // so we can safely remove the tailing slash if the storage location ends with "/".
       String storageLocation =
           removeTrailingSlash(fileset.storageLocations().get(targetLocationName));
       fileLocation = String.format("%s%s", storageLocation, processedSubPath);
@@ -769,6 +752,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           if (schemaPath != null && !containsPlaceholder(schemaPath.toString())) {
             try {
               FileSystem fs = getFileSystemWithCache(schemaPath, conf);
+              if (fs.exists(schemaPath) && fs.getFileStatus(schemaPath).isFile()) {
+                throw new IllegalArgumentException(
+                    "Fileset schema location cannot be a file: "
+                        + schemaPath
+                        + ", location name: "
+                        + locationName);
+              }
+
               if (!fs.exists(schemaPath)) {
                 if (!fs.mkdirs(schemaPath)) {
                   // Fail the operation when failed to create the schema path.
@@ -1057,6 +1048,24 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             }
 
             checkPlaceholderValue(v);
+
+            if (!disableFSOps && !containsPlaceholder(v)) {
+              Path path = new Path(v);
+              FileSystem fs = getFileSystemWithCache(path, conf);
+              try {
+                if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
+                  throw new IllegalArgumentException(
+                      "Fileset catalog location cannot be a file: "
+                          + v
+                          + ", location name: "
+                          + locationName);
+                }
+              } catch (IOException e) {
+                throw new RuntimeException(
+                    "Failed to check if fileset catalog location exists: " + v, e);
+              }
+            }
+
             catalogStorageLocations.put(locationName, new Path((ensureTrailingSlash(v))));
           }
         });
@@ -1319,24 +1328,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
           }
         });
-  }
-
-  private boolean checkSingleFile(Fileset fileset, String locationName) {
-    try {
-      Path locationPath = new Path(fileset.storageLocations().get(locationName));
-      FileSystem fileSystem = getFileSystemWithCache(locationPath, conf);
-      return fileSystem.getFileStatus(locationPath).isFile();
-    } catch (FileNotFoundException e) {
-      // We should always return false here, same with the logic in `FileSystem.isFile(Path f)`.
-      return false;
-    } catch (IOException e) {
-      throw new GravitinoRuntimeException(
-          e,
-          "Exception occurs when checking whether fileset: %s "
-              + "mounts a single file with location name: %s",
-          fileset.name(),
-          locationName);
-    }
   }
 
   private String buildGVFSFilePath(

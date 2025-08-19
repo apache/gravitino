@@ -37,7 +37,7 @@ import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.RoleDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
-import org.apache.gravitino.dto.responses.DeleteResponse;
+import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
@@ -197,13 +197,13 @@ public class TestRole extends TestBase {
     String roleName = "role";
     String rolePath = withSlash(String.format(API_METALAKES_ROLES_PATH, metalakeName, roleName));
 
-    DeleteResponse deleteResponse = new DeleteResponse(true);
-    buildMockResource(Method.DELETE, rolePath, null, deleteResponse, SC_OK);
+    DropResponse dropResponse = new DropResponse(true, true);
+    buildMockResource(Method.DELETE, rolePath, null, dropResponse, SC_OK);
 
     Assertions.assertTrue(gravitinoClient.deleteRole(roleName));
 
-    deleteResponse = new DeleteResponse(false);
-    buildMockResource(Method.DELETE, rolePath, null, deleteResponse, SC_OK);
+    dropResponse = new DropResponse(false, false);
+    buildMockResource(Method.DELETE, rolePath, null, dropResponse, SC_OK);
     Assertions.assertFalse(gravitinoClient.deleteRole(roleName));
 
     // test RuntimeException
