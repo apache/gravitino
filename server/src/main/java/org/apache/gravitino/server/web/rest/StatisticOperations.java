@@ -51,7 +51,7 @@ import org.apache.gravitino.dto.requests.StatisticsDropRequest;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
-import org.apache.gravitino.dto.responses.PartitionStatListResponse;
+import org.apache.gravitino.dto.responses.PartitionStatisticsListResponse;
 import org.apache.gravitino.dto.responses.StatisticListResponse;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDropDTO;
@@ -283,7 +283,7 @@ public class StatisticOperations {
                                 DTOConverters.toDTOs(partitionStatistic.statistics())))
                     .toArray(PartitionStatisticsDTO[]::new);
 
-            return Utils.ok(new PartitionStatListResponse(partitionStatistics));
+            return Utils.ok(new PartitionStatisticsListResponse(partitionStatistics));
           });
     } catch (Exception e) {
       LOG.error(

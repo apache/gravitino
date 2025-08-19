@@ -26,13 +26,13 @@ import lombok.ToString;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
 
 /**
- * Represents a response for a list of partition statistics. This response contains a map of
- * statistics keyed by partition names.
+ * PartitionStatisticsListResponse is a response object that contains an array of
+ * PartitionStatisticsDTO.
  */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class PartitionStatListResponse extends BaseResponse {
+public class PartitionStatisticsListResponse extends BaseResponse {
 
   @JsonProperty("partitionStatistics")
   private PartitionStatisticsDTO[] partitionStatistics;
@@ -42,13 +42,13 @@ public class PartitionStatListResponse extends BaseResponse {
    *
    * @param partitionStatistics The updated statistics for the partition.
    */
-  public PartitionStatListResponse(PartitionStatisticsDTO[] partitionStatistics) {
+  public PartitionStatisticsListResponse(PartitionStatisticsDTO[] partitionStatistics) {
     super(0);
     this.partitionStatistics = partitionStatistics;
   }
 
   /** This is the constructor that is used by Jackson deserializer */
-  public PartitionStatListResponse() {
+  public PartitionStatisticsListResponse() {
     this(null);
   }
 

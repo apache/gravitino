@@ -52,7 +52,7 @@ import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.PartitionStatListResponse;
+import org.apache.gravitino.dto.responses.PartitionStatisticsListResponse;
 import org.apache.gravitino.dto.responses.StatisticListResponse;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDropDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsUpdateDTO;
@@ -469,7 +469,8 @@ public class TestStatisticOperations extends JerseyTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
-    PartitionStatListResponse listResp = resp.readEntity(PartitionStatListResponse.class);
+    PartitionStatisticsListResponse listResp =
+        resp.readEntity(PartitionStatisticsListResponse.class);
     Assertions.assertEquals(0, listResp.getCode());
 
     Statistic[] statisticDTOS = listResp.getPartitionStatistics()[0].statistics();
