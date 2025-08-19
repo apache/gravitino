@@ -34,7 +34,8 @@ class PlainRESTClientPolicyOperation(PolicyOperation):
         return response.json().get("names", [])
 
     async def load_policy(
-        self, policy_name: str,
+        self,
+        policy_name: str,
     ) -> str:
         response = await self.rest_client.get(
             f"/api/metalakes/{self.metalake_name}/policies/{policy_name}"

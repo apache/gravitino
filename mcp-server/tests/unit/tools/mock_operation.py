@@ -19,10 +19,11 @@ from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
     ModelOperation,
+    PolicyOperation,
     SchemaOperation,
     TableOperation,
     TagOperation,
-    TopicOperation, PolicyOperation,
+    TopicOperation,
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
@@ -58,6 +59,7 @@ class MockOperation(GravitinoOperation):
 
     def as_policy_operation(self) -> PolicyOperation:
         return MockPolicyOperation()
+
 
 class MockCatalogOperation(CatalogOperation):
     async def get_list_of_catalogs(self) -> str:
@@ -104,14 +106,14 @@ class MockFilesetOperation(FilesetOperation):
     ) -> str:
         return "mock_files_in_fileset"
 
+
 class MockPolicyOperation(PolicyOperation):
     async def get_list_of_policies(self) -> str:
         return "mock_policies"
 
-    async def load_policy(
-        self, policy_name: str
-    ) -> str:
+    async def load_policy(self, policy_name: str) -> str:
         return f"mock_policy: {policy_name}"
+
 
 class MockModelOperation(ModelOperation):
     async def get_list_of_models(

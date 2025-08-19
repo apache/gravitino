@@ -20,9 +20,11 @@ import httpx
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
+    ModelOperation,
+    PolicyOperation,
     SchemaOperation,
     TableOperation,
-    TagOperation, ModelOperation, PolicyOperation,
+    TagOperation,
 )
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
@@ -37,8 +39,9 @@ from mcp_server.client.plain.plain_rest_client_job_operation import (
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
 )
-from mcp_server.client.plain.plain_rest_client_policy_operation import \
-    PlainRESTClientPolicyOperation
+from mcp_server.client.plain.plain_rest_client_policy_operation import (
+    PlainRESTClientPolicyOperation,
+)
 from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
 )

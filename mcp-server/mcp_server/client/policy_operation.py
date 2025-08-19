@@ -26,17 +26,15 @@ class PolicyOperation(ABC):
     @abstractmethod
     async def get_list_of_policies(self) -> str:
         """
-        Retrieve the list of models within a specified catalog.
+        Retrieve the list of policies.
 
         Returns:
-            str: JSON-formatted string containing model list information
+            str: JSON-formatted string containing policy list information
         """
         pass
 
     @abstractmethod
-    async def load_policy(
-        self, policy_name: str
-    ) -> str:
+    async def load_policy(self, policy_name: str) -> str:
         """
         Load detailed information of a specific policy.
 
