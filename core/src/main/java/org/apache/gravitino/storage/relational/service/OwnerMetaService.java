@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
@@ -120,5 +121,15 @@ public class OwnerMetaService {
         return MetadataObjectService.getMetadataObjectId(
             metalakeId, object.fullName(), object.type());
     }
+  }
+
+  public List<OwnerRelPO> listAllOwner(long pageNum, long pageSize) {
+    return SessionUtils.getWithoutCommit(
+        OwnerMetaMapper.class,
+        (mapper) -> mapper.selectAllOwner((pageNum - 1) + pageSize, pageSize));
+  }
+
+  public Long countAllOwner() {
+    return SessionUtils.getWithoutCommit(OwnerMetaMapper.class, OwnerMetaMapper::countAllOwner);
   }
 }

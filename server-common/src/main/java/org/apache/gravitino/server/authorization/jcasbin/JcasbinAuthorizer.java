@@ -23,11 +23,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
@@ -45,6 +49,8 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.ThreadLocalAuthorizationCache;
+import org.apache.gravitino.server.authorization.policy.OwnerPolicyAsyncLoader;
+import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -77,12 +83,29 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Set<Long> loadedRoles = ConcurrentHashMap.newKeySet();
 
+  /**
+   * loadedOwners is used to cache owners that have loaded permissions. When the permissions of a
+   * role are updated, they should be removed from it.
+   */
+  private Set<Long> loadedOwners = ConcurrentHashMap.newKeySet();
+
+  private static ExecutorService executor =
+      Executors.newFixedThreadPool(
+          50,
+          runable -> {
+            Thread thread = new Thread(runable);
+            thread.setName("GravitinoAuthorizer-ThreadPool-" + thread.getId());
+            return thread;
+          });
+
   @Override
   public void initialize() {
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     allowInternalAuthorizer = new InternalAuthorizer(allowEnforcer);
     denyEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
     denyInternalAuthorizer = new InternalAuthorizer(denyEnforcer);
+    initializeOwnerAsync();
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> executor.shutdown()));
   }
 
   private Model getModel(String modelFilePath) {
@@ -297,6 +320,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             AuthConstants.OWNER,
             AuthConstants.ALLOW);
     allowEnforcer.removePolicy(policy);
+    loadedOwners.remove(metadataId);
   }
 
   @Override
@@ -379,6 +403,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                         SupportsRelationOperations.Type.ROLE_USER_REL,
                         userNameIdentifier,
                         Entity.EntityType.USER);
+            List<CompletableFuture<Void>> loadRoleFutures = new ArrayList<>();
             for (RoleEntity role : entities) {
               Long roleId = role.id();
               allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
@@ -386,15 +411,28 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               if (loadedRoles.contains(roleId)) {
                 continue;
               }
-              role =
-                  entityStore.get(
-                      NameIdentifierUtil.ofRole(metalake, role.name()),
-                      Entity.EntityType.ROLE,
-                      RoleEntity.class);
-
-              loadPolicyByRoleEntity(role);
-              loadedRoles.add(roleId);
+              CompletableFuture<Void> loadRoleFuture =
+                  CompletableFuture.supplyAsync(
+                          () -> {
+                            try {
+                              return entityStore.get(
+                                  NameIdentifierUtil.ofRole(metalake, role.name()),
+                                  Entity.EntityType.ROLE,
+                                  RoleEntity.class);
+                            } catch (Exception e) {
+                              throw new RuntimeException("Failed to load role: " + role.name(), e);
+                            }
+                          },
+                          executor)
+                      .thenAcceptAsync(
+                          roleEntity -> {
+                            loadPolicyByRoleEntity(roleEntity);
+                            loadedRoles.add(roleId);
+                          },
+                          executor);
+              loadRoleFutures.add(loadRoleFuture);
             }
+            CompletableFuture.allOf(loadRoleFutures.toArray(new CompletableFuture[0])).join();
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
@@ -402,6 +440,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
+    if (loadedOwners.contains(metadataId)) {
+      return;
+    }
     try {
       NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
       EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
@@ -423,11 +464,37 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   AuthConstants.OWNER,
                   AuthConstants.ALLOW);
           allowEnforcer.addPolicy(policy);
+          loadedOwners.add(metadataId);
         }
       }
     } catch (IOException e) {
       LOG.warn("Can not load metadata owner", e);
     }
+  }
+
+  /** Async initialize owner */
+  private void initializeOwnerAsync() {
+    OwnerPolicyAsyncLoader loader = OwnerPolicyAsyncLoader.create(executor);
+    CompletableFuture<List<OwnerRelPO>> ownerFuture = loader.loadAllOwnerAsync(100);
+    ownerFuture.thenAcceptAsync(
+        ownerRels -> {
+          for (OwnerRelPO ownerRel : ownerRels) {
+            String ownerType = ownerRel.getOwnerType();
+            if ("user".equalsIgnoreCase(ownerType)) {
+              Long metadataObjectId = ownerRel.getMetadataObjectId();
+              ImmutableList<String> policy =
+                  ImmutableList.of(
+                      String.valueOf(ownerRel.getOwnerId()),
+                      ownerRel.getMetadataObjectType(),
+                      String.valueOf(metadataObjectId),
+                      AuthConstants.OWNER,
+                      AuthConstants.ALLOW);
+              allowEnforcer.addPolicy(policy);
+              loadedOwners.add(metadataObjectId);
+            }
+          }
+        },
+        executor);
   }
 
   private void loadPolicyByRoleEntity(RoleEntity roleEntity) {
