@@ -1264,6 +1264,121 @@ public class TestModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(uris, modelVersion.uris());
   }
 
+  @Test
+  void testUpdateModelVersionUri() {
+    String modelName = "model1";
+    String comment = "comment";
+    Map<String, String> uris = ImmutableMap.of("n1", "u2");
+    int version = 0;
+    String[] alias = new String[] {"alias1"};
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    ModelVersion mockModelVersion = mockModelVersion(version, uris, alias, comment);
+
+    when(modelDispatcher.alterModelVersion(
+            modelId, version, ModelVersionChange.updateUri("n1", "u2")))
+        .thenReturn(mockModelVersion);
+
+    ModelVersionUpdatesRequest req =
+        new ModelVersionUpdatesRequest(
+            Collections.singletonList(
+                new ModelVersionUpdateRequest.UpdateModelVersionUriRequest("n1", "u2")));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelVersionResponse modelVersionResponse = resp.readEntity(ModelVersionResponse.class);
+    ModelVersionDTO modelVersion = modelVersionResponse.getModelVersion();
+
+    Assertions.assertEquals(comment, modelVersion.comment());
+    Assertions.assertArrayEquals(alias, modelVersion.aliases());
+    Assertions.assertEquals(version, modelVersion.version());
+    Assertions.assertEquals(uris, modelVersion.uris());
+  }
+
+  @Test
+  void testAddModelVersionUri() {
+    String modelName = "model1";
+    String comment = "comment";
+    Map<String, String> uris = ImmutableMap.of("n1", "u1", "n2", "u2");
+    int version = 0;
+    String[] alias = new String[] {"alias1"};
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    ModelVersion mockModelVersion = mockModelVersion(version, uris, alias, comment);
+
+    when(modelDispatcher.alterModelVersion(modelId, version, ModelVersionChange.addUri("n2", "u2")))
+        .thenReturn(mockModelVersion);
+
+    ModelVersionUpdatesRequest req =
+        new ModelVersionUpdatesRequest(
+            Collections.singletonList(
+                new ModelVersionUpdateRequest.AddModelVersionUriRequest("n2", "u2")));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelVersionResponse modelVersionResponse = resp.readEntity(ModelVersionResponse.class);
+    ModelVersionDTO modelVersion = modelVersionResponse.getModelVersion();
+
+    Assertions.assertEquals(comment, modelVersion.comment());
+    Assertions.assertArrayEquals(alias, modelVersion.aliases());
+    Assertions.assertEquals(version, modelVersion.version());
+    Assertions.assertEquals(uris, modelVersion.uris());
+  }
+
+  @Test
+  void testRemoveModelVersionUri() {
+    String modelName = "model1";
+    String comment = "comment";
+    Map<String, String> uris = ImmutableMap.of("n2", "u2");
+    int version = 0;
+    String[] alias = new String[] {"alias1"};
+
+    NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, modelName);
+    ModelVersion mockModelVersion = mockModelVersion(version, uris, alias, comment);
+
+    when(modelDispatcher.alterModelVersion(modelId, version, ModelVersionChange.removeUri("n1")))
+        .thenReturn(mockModelVersion);
+
+    ModelVersionUpdatesRequest req =
+        new ModelVersionUpdatesRequest(
+            Collections.singletonList(
+                new ModelVersionUpdateRequest.RemoveModelVersionUriRequest("n1")));
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ModelVersionResponse modelVersionResponse = resp.readEntity(ModelVersionResponse.class);
+    ModelVersionDTO modelVersion = modelVersionResponse.getModelVersion();
+
+    Assertions.assertEquals(comment, modelVersion.comment());
+    Assertions.assertArrayEquals(alias, modelVersion.aliases());
+    Assertions.assertEquals(version, modelVersion.version());
+    Assertions.assertEquals(uris, modelVersion.uris());
+  }
+
   private String modelPath() {
     return "/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/" + schema + "/models";
   }
