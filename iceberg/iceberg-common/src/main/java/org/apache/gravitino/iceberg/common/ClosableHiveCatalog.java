@@ -101,13 +101,16 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
     }
 
     public Transaction createOrReplaceTransaction() {
-
       boolean viewExists =
           proxy != null
               ? proxy.viewExists(this.identifier)
               : ClosableHiveCatalog.this.viewExists(this.identifier);
       if (viewExists) {
         throw new AlreadyExistsException("View with same name already exists: %s", this.identifier);
+      }
+
+      if (proxy != null) {
+        return proxy.execute(() -> super.createOrReplaceTransaction());
       }
 
       return super.createOrReplaceTransaction();
@@ -122,7 +125,11 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
         throw new AlreadyExistsException("View with same name already exists: %s", this.identifier);
       }
 
-      return proxy.execute(() -> super.create());
+      if (proxy != null) {
+        return proxy.execute(() -> super.create());
+      }
+
+      return super.create();
     }
   }
 }
