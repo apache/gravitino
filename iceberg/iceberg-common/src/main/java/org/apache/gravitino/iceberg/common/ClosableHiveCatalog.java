@@ -101,19 +101,25 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
     }
 
     public Transaction createOrReplaceTransaction() {
-      if (proxy.viewExists(this.identifier)) {
-        throw new AlreadyExistsException(
-            "View with same name already exists: %s", new Object[] {this.identifier});
-      } else {
-        return super.createOrReplaceTransaction();
+
+      boolean viewExists =
+          proxy != null
+              ? proxy.viewExists(this.identifier)
+              : ClosableHiveCatalog.this.viewExists(this.identifier);
+      if (viewExists) {
+        throw new AlreadyExistsException("View with same name already exists: %s", this.identifier);
       }
+
+      return super.createOrReplaceTransaction();
     }
 
     public org.apache.iceberg.Table create() {
-      boolean viewExists = proxy.viewExists(this.identifier);
+      boolean viewExists =
+          proxy != null
+              ? proxy.viewExists(this.identifier)
+              : ClosableHiveCatalog.this.viewExists(this.identifier);
       if (viewExists) {
-        throw new AlreadyExistsException(
-            "View with same name already exists: %s", new Object[] {this.identifier});
+        throw new AlreadyExistsException("View with same name already exists: %s", this.identifier);
       }
 
       return proxy.execute(() -> super.create());
