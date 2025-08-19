@@ -172,7 +172,7 @@ const CreateCatalogDialog = props => {
     const parentField = innerProps.find(i => i.key === field.parentField)
 
     const check =
-      (parentField && field.hide.includes(parentField.value)) ||
+      (parentField && field.hide?.includes(parentField.value)) ||
       (field.parentField === 'authentication.type' && parentField === undefined)
 
     return check
