@@ -56,7 +56,7 @@ public class RoleDetails extends Command {
     } catch (NoSuchMetalakeException err) {
       exitWithError(ErrorMessages.UNKNOWN_METALAKE);
     } catch (NoSuchUserException err) {
-      exitWithError(ErrorMessages.UNKNOWN_GROUP);
+      exitWithError(ErrorMessages.UNKNOWN_ROLE);
     } catch (Exception exp) {
       exitWithError(exp.getMessage());
     }
