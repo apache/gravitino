@@ -37,7 +37,7 @@ In order to use the Ranger Hadoop SQL Plugin, you need to configure the followin
 The Gravitino Ranger authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
 :::
 
-Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-roles-to-a-user).
+Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-role-to-user).
 
 Gravitino will initially create three roles in Apache Ranger:
 

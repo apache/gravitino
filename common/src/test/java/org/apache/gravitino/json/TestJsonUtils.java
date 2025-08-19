@@ -26,7 +26,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.rel.indexes.IndexDTO;
 import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
@@ -36,6 +39,8 @@ import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.stats.StatisticValue;
+import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -50,6 +55,8 @@ public class TestJsonUtils {
     SimpleModule module = new SimpleModule();
     module.addSerializer(Type.class, new JsonUtils.TypeSerializer());
     module.addDeserializer(Type.class, new JsonUtils.TypeDeserializer());
+    module.addSerializer(StatisticValue.class, new JsonUtils.StatisticValueSerializer());
+    module.addDeserializer(StatisticValue.class, new JsonUtils.StatisticValueDeserializer());
     objectMapper.registerModule(module);
   }
 
@@ -457,5 +464,60 @@ public class TestJsonUtils {
     Assertions.assertEquals(
         objectMapper.readValue(expected, IndexDTO.class),
         objectMapper.readValue(jsonValue, IndexDTO.class));
+  }
+
+  @Test
+  void testStatisticValueSerde() throws JsonProcessingException {
+    String expectJson = "\"1\"";
+    String strValue = objectMapper.writeValueAsString(StatisticValues.stringValue("1"));
+    Assertions.assertEquals(strValue, expectJson);
+    Assertions.assertEquals(
+        objectMapper.readValue(expectJson, StatisticValue.class),
+        objectMapper.readValue(strValue, StatisticValue.class));
+
+    expectJson = "1";
+    String longValue = objectMapper.writeValueAsString(StatisticValues.longValue(1));
+    Assertions.assertEquals(longValue, expectJson);
+    Assertions.assertEquals(
+        objectMapper.readValue(expectJson, StatisticValue.class),
+        objectMapper.readValue(longValue, StatisticValue.class));
+
+    expectJson = "1.0";
+    String doubleValue = objectMapper.writeValueAsString(StatisticValues.doubleValue(1.0));
+    Assertions.assertEquals(doubleValue, expectJson);
+    Assertions.assertEquals(
+        objectMapper.readValue(expectJson, StatisticValue.class),
+        objectMapper.readValue(doubleValue, StatisticValue.class));
+
+    expectJson = "true";
+    String booleanValue = objectMapper.writeValueAsString(StatisticValues.booleanValue(true));
+    Assertions.assertEquals(booleanValue, "true");
+    Assertions.assertEquals(
+        objectMapper.readValue(expectJson, StatisticValue.class),
+        objectMapper.readValue(booleanValue, StatisticValue.class));
+
+    expectJson = "[\"1\",\"2\"]";
+    String listValue =
+        objectMapper.writeValueAsString(
+            StatisticValues.listValue(
+                Lists.newArrayList(
+                    StatisticValues.stringValue("1"), StatisticValues.stringValue("2"))));
+    Assertions.assertEquals(listValue, expectJson);
+    Assertions.assertEquals(
+        objectMapper.readValue(expectJson, StatisticValue.class),
+        objectMapper.readValue(listValue, StatisticValue.class));
+
+    expectJson = "{\"key1\":\"value1\",\"key2\":2}";
+    Map<String, StatisticValue<?>> values = Maps.newHashMap();
+    values.put("key1", StatisticValues.stringValue("value1"));
+    values.put("key2", StatisticValues.longValue(2L));
+
+    String objectValue = objectMapper.writeValueAsString(StatisticValues.objectValue(values));
+    Assertions.assertEquals(
+        objectValue, expectJson, "Object value serialization should match expected format");
+
+    Assertions.assertEquals(
+        objectMapper.readValue(expectJson, StatisticValue.class),
+        objectMapper.readValue(objectValue, StatisticValue.class));
   }
 }

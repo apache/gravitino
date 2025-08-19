@@ -24,7 +24,7 @@ the future versions.
 :::info
 1. Metadata objects are objects that are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
    `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `MODEL`, etc. A metadata object is combined by a `type` and a
-   comma-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
+   dot-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
    "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
    object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name 
    "catalog1.schema1.table1.column1" with type "COLUMN".
@@ -32,9 +32,9 @@ the future versions.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
    the tags of its parent `Schema` and `Catalog`.
-4. Same tag can be associated to both parent and child metadata objects. When you list the
-   associated tags of a child metadata object, this tag will be included twice in the result
-   list with different `inherited` values.
+4. The same tag can be associated with both parent and child metadata objects. But when you list the
+   associated tags of a child metadata object, this tag will be included only once in the result
+   list with `inherited` value `false`.
 :::
 
 ## Tag operations

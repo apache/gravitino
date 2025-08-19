@@ -31,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
@@ -168,6 +169,19 @@ public class TestMemoryEntityStore {
       } finally {
         lock.unlock();
       }
+    }
+
+    @Override
+    public int batchDelete(List<Pair<NameIdentifier, EntityType>> entitiesToDelete, boolean cascade)
+        throws IOException {
+      throw new UnsupportedOperationException(
+          "Batch delete is not supported in InMemoryEntityStore.");
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
+        throws IOException, EntityAlreadyExistsException {
+      throw new UnsupportedOperationException("Batch put is not supported in InMemoryEntityStore.");
     }
 
     @Override

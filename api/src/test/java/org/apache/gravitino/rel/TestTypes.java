@@ -202,6 +202,13 @@ public class TestTypes {
     Assertions.assertEquals("list<integer>", listType.simpleString());
     Assertions.assertEquals(listType, Types.ListType.nullable(Types.IntegerType.get()));
 
+    Types.ListType listTypeNotNull = Types.ListType.notNull(Types.StringType.get());
+    Assertions.assertEquals(Type.Name.LIST, listTypeNotNull.name());
+    Assertions.assertFalse(listTypeNotNull.elementNullable());
+    Assertions.assertEquals(Types.StringType.get(), listTypeNotNull.elementType());
+    Assertions.assertEquals("list<string, NOT NULL>", listTypeNotNull.simpleString());
+    Assertions.assertEquals(listTypeNotNull, Types.ListType.notNull(Types.StringType.get()));
+
     Types.MapType mapType =
         Types.MapType.valueNullable(Types.IntegerType.get(), Types.StringType.get());
     Assertions.assertEquals(Type.Name.MAP, mapType.name());
@@ -210,6 +217,16 @@ public class TestTypes {
     Assertions.assertEquals("map<integer,string>", mapType.simpleString());
     Assertions.assertEquals(
         mapType, Types.MapType.valueNullable(Types.IntegerType.get(), Types.StringType.get()));
+
+    Types.MapType mapTypeNotNull =
+        Types.MapType.valueNotNull(Types.IntegerType.get(), Types.StringType.get());
+    Assertions.assertEquals(Type.Name.MAP, mapTypeNotNull.name());
+    Assertions.assertEquals(Types.IntegerType.get(), mapTypeNotNull.keyType());
+    Assertions.assertEquals(Types.StringType.get(), mapTypeNotNull.valueType());
+    Assertions.assertEquals("map<integer,string, NOT NULL>", mapTypeNotNull.simpleString());
+    Assertions.assertEquals(
+        mapTypeNotNull,
+        Types.MapType.valueNotNull(Types.IntegerType.get(), Types.StringType.get()));
 
     Types.UnionType unionType =
         Types.UnionType.of(

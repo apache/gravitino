@@ -47,7 +47,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.RoleCreateRequest;
-import org.apache.gravitino.dto.responses.DeleteResponse;
+import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -220,7 +220,7 @@ public class RoleOperations {
             if (!deleted) {
               LOG.warn("Failed to delete role {} under metalake {}", role, metalake);
             }
-            return Utils.ok(new DeleteResponse(deleted));
+            return Utils.ok(new DropResponse(deleted, deleted));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.DELETE, role, metalake, e);

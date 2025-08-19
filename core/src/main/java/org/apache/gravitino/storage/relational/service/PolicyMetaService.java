@@ -305,19 +305,6 @@ public class PolicyMetaService {
               ? Collections.emptyList()
               : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToAdd);
 
-      // Check if the policies to add all support the metadata object type.
-      policyPOsToAdd.forEach(
-          policyPO -> {
-            PolicyEntity policy =
-                POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake));
-            if (!policy.supportedObjectTypes().contains(metadataObject.type())) {
-              throw new IllegalArgumentException(
-                  String.format(
-                      "Cannot associate policies for unsupported metadata object type %s, expected: %s.",
-                      objectType, policy.supportedObjectTypes()));
-            }
-          });
-
       // Fetch all the policies need to remove from the metadata object.
       List<String> policyNamesToRemove =
           Arrays.stream(policiesToRemove).map(NameIdentifier::name).collect(Collectors.toList());

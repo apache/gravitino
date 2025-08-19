@@ -22,15 +22,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
-import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
-import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to create a policy. */
@@ -65,15 +62,6 @@ public class PolicyCreateRequest implements RESTRequest {
   })
   private final PolicyContentDTO policyContent;
 
-  @JsonProperty("exclusive")
-  private final Boolean exclusive;
-
-  @JsonProperty("inheritable")
-  private final Boolean inheritable;
-
-  @JsonProperty("supportedObjectTypes")
-  private final Set<MetadataObject.Type> supportedObjectTypes;
-
   /**
    * Creates a new PolicyCreateRequest.
    *
@@ -81,33 +69,20 @@ public class PolicyCreateRequest implements RESTRequest {
    * @param comment The comment of the policy.
    * @param type The type of the policy.
    * @param enabled Whether the policy is enabled.
-   * @param exclusive Whether the policy is exclusive.
-   * @param inheritable Whether the policy is inheritable.
-   * @param supportedObjectTypes The set of metadata object types that the policy can be applied to.
    * @param content The content of the policy.
    */
   public PolicyCreateRequest(
-      String name,
-      String type,
-      String comment,
-      boolean enabled,
-      boolean exclusive,
-      boolean inheritable,
-      Set<MetadataObject.Type> supportedObjectTypes,
-      PolicyContentDTO content) {
+      String name, String type, String comment, boolean enabled, PolicyContentDTO content) {
     this.name = name;
     this.policyType = type;
     this.comment = comment;
     this.enabled = enabled;
-    this.exclusive = exclusive;
-    this.inheritable = inheritable;
-    this.supportedObjectTypes = supportedObjectTypes;
     this.policyContent = content;
   }
 
   /** This is the constructor that is used by Jackson deserializer */
   private PolicyCreateRequest() {
-    this(null, null, null, true, false, false, null, null);
+    this(null, null, null, true, null);
   }
 
   /**
@@ -121,41 +96,6 @@ public class PolicyCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(name), "\"name\" is required and cannot be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(policyType), "\"policyType\" is required and cannot be empty");
-
-    Policy.BuiltInType builtInType = Policy.BuiltInType.fromPolicyType(policyType);
-    if (builtInType != Policy.BuiltInType.CUSTOM) {
-      if (exclusive != null) {
-        Preconditions.checkArgument(
-            exclusive.equals(builtInType.exclusive()),
-            String.format(
-                "Exclusive flag for built-in policy type '%s' must be %s",
-                builtInType, builtInType.exclusive()));
-      }
-
-      if (inheritable != null) {
-        Preconditions.checkArgument(
-            inheritable.equals(builtInType.inheritable()),
-            String.format(
-                "Inheritable flag for built-in policy type '%s' must be %s",
-                builtInType, builtInType.inheritable()));
-      }
-
-      if (supportedObjectTypes != null) {
-        Preconditions.checkArgument(
-            builtInType.supportedObjectTypes().equals(supportedObjectTypes),
-            String.format(
-                "Supported object types for built-in policy type '%s' must be %s",
-                builtInType, builtInType.supportedObjectTypes()));
-      }
-    } else {
-      Preconditions.checkArgument(
-          exclusive != null, "\"exclusive\" is required for custom policy type");
-      Preconditions.checkArgument(
-          inheritable != null, "\"inheritable\" is required for custom policy type");
-      Preconditions.checkArgument(
-          supportedObjectTypes != null,
-          "\"supportedObjectTypes\" is required for custom policy type");
-    }
     Preconditions.checkArgument(
         policyContent != null, "\"content\" is required and cannot be null");
     policyContent.validate();
