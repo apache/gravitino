@@ -260,7 +260,7 @@ subprojects {
   }
 
   fun CompatibleWithJDK8(project: Project): Boolean {
-    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it.endsWith(":release") }
+    val isReleaseRun = gradle.startParameter.taskNames.any { it == "release" || it == "publish" || it == "publishToMavenLocal" }
     if (!isReleaseRun) {
       return false
     }
