@@ -21,7 +21,7 @@ package org.apache.gravitino.dto.responses;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -77,7 +77,7 @@ public class TestResponses {
   void testDropped() throws IllegalArgumentException {
     DropResponse drop = new DropResponse();
 
-    assertFalse(drop.dropped());
+    assertNull(drop.dropped());
   }
 
   @Test

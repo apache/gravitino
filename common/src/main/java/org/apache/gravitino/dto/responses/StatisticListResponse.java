@@ -19,43 +19,43 @@
 package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.ToString;
+import org.apache.gravitino.dto.stats.StatisticDTO;
 
-/**
- * Represents a response for a delete operation. This class is deprecated and will be removed in
- * future versions, please use {@link DropResponse} instead.
- */
-@Deprecated(since = "1.0.0")
+/** Represents a response containing a list of statistics. */
+@Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class DeleteResponse extends BaseResponse {
+public class StatisticListResponse extends BaseResponse {
 
-  @JsonProperty("deleted")
-  private final boolean deleted;
+  @JsonProperty("statistics")
+  private StatisticDTO[] statistics;
 
   /**
-   * Constructor for DeleteResponse.
+   * Constructor for StatisticsListResponse.
    *
-   * @param deleted Whether the delete operation was successful.
+   * @param statistics Array of StatisticDTO objects representing the statistics.
    */
-  public DeleteResponse(boolean deleted) {
+  public StatisticListResponse(StatisticDTO[] statistics) {
     super(0);
-    this.deleted = deleted;
+    this.statistics = statistics;
   }
 
-  /** Default constructor for DeleteResponse (used by Jackson deserializer). */
-  public DeleteResponse() {
-    super();
-    this.deleted = false;
+  /** Default constructor for StatisticsListResponse (used by Jackson deserializer). */
+  public StatisticListResponse() {
+    this(null);
   }
 
-  /**
-   * Returns whether the delete operation was successful.
-   *
-   * @return True if the delete operation was successful, otherwise false.
-   */
-  public boolean deleted() {
-    return deleted;
+  @Override
+  public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(statistics != null, "\"statistics\" must not be null");
+
+    for (StatisticDTO statistic : statistics) {
+      Preconditions.checkArgument(statistic != null, "\"statistic\" must not be null");
+      statistic.validate();
+    }
   }
 }

@@ -1,4 +1,3 @@
-#
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -7,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#  http://www.apache.org/licenses/LICENSE-2.0
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -15,13 +14,23 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
 
-org.apache.gravitino.credential.S3TokenCredential
-org.apache.gravitino.credential.S3SecretKeyCredential
-org.apache.gravitino.credential.GCSTokenCredential
-org.apache.gravitino.credential.OSSTokenCredential
-org.apache.gravitino.credential.OSSSecretKeyCredential
-org.apache.gravitino.credential.ADLSTokenCredential
-org.apache.gravitino.credential.AzureAccountKeyCredential
-org.apache.gravitino.credential.AwsIrsaCredential
+from typing import final
+
+from gravitino.dto.rel.partitioning.partitioning import SingleFieldPartitioning
+
+
+@final
+class MonthPartitioningDTO(SingleFieldPartitioning):
+    """Represents a MonthPartitioning Data Transfer Object (DTO)."""
+
+    def __init__(self, /, *field_name: str):
+        super().__init__(list(field_name))
+
+    def strategy(self) -> SingleFieldPartitioning.Strategy:
+        """Returns the strategy of the partitioning.
+
+        Returns:
+            Strategy: The strategy of the partitioning.
+        """
+        return SingleFieldPartitioning.Strategy.MONTH
