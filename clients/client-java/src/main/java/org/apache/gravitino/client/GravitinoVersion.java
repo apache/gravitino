@@ -55,11 +55,6 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
 
   @Override
   public int compareTo(Object o) {
-    if (!(o instanceof GravitinoVersion)) {
-      return 1;
-    }
-    GravitinoVersion other = (GravitinoVersion) o;
-
     int[] left = getVersionNumber();
     int[] right = other.getVersionNumber();
     for (int i = 0; i < VERSION_PART_NUMBER; i++) {
@@ -69,5 +64,19 @@ public class GravitinoVersion extends VersionDTO implements Comparable {
       }
     }
     return 0;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) return true;
+    if (obj == null || getClass() != obj.getClass()) return false;
+    GravitinoVersion that = (GravitinoVersion) obj;
+    return version().equals(that.version());
+
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(version());
   }
 }
