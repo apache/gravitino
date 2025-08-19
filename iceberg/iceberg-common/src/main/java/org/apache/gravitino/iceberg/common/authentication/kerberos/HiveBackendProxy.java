@@ -27,6 +27,7 @@ import java.util.Map;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
+import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.utils.IcebergHiveCachedClientPool;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
@@ -43,14 +44,14 @@ import org.apache.thrift.TException;
  */
 public class HiveBackendProxy implements MethodInterceptor {
 
-  private final HiveCatalog target;
+  private final ClosableHiveCatalog target;
   private final String kerberosRealm;
   private final UserGroupInformation proxyUser;
   private final Map<String, String> properties;
   private final ClientPool<IMetaStoreClient, TException> newClientPool;
 
   public HiveBackendProxy(
-      Map<String, String> properties, HiveCatalog target, String kerberosRealm) {
+      Map<String, String> properties, ClosableHiveCatalog target, String kerberosRealm) {
     this.target = target;
     this.properties = properties;
     this.kerberosRealm = kerberosRealm;
@@ -118,11 +119,11 @@ public class HiveBackendProxy implements MethodInterceptor {
     return newClientPool;
   }
 
-  public HiveCatalog getProxy() {
+  public ClosableHiveCatalog getProxy() {
     Enhancer e = new Enhancer();
     e.setClassLoader(target.getClass().getClassLoader());
     e.setSuperclass(target.getClass());
     e.setCallback(this);
-    return (HiveCatalog) e.create();
+    return (ClosableHiveCatalog) e.create();
   }
 }

@@ -262,6 +262,33 @@ public class CatalogIcebergKerberosHiveIT extends BaseIT {
     Assertions.assertDoesNotThrow(
         () -> catalog.asSchemas().createSchema(SCHEMA_NAME, "comment", ImmutableMap.of()));
 
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chmod", "-R", "000", "/user/hive/warehouse-catalog-iceberg");
+
+    // Create table and the user has no permission to create table
+    NameIdentifier tableNameIdentifier1 = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
+    exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableNameIdentifier1,
+                        createColumns(),
+                        "",
+                        ImmutableMap.of(),
+                        Transforms.EMPTY_TRANSFORM,
+                        Distributions.NONE,
+                        SortOrders.NONE));
+    exceptionMessage = Throwables.getStackTraceAsString(exception);
+    // Make sure the real user is 'gravitino_client'
+    Assertions.assertTrue(
+        exceptionMessage.contains("Permission denied: user=gravitino_client, access=EXECUTE"));
+
+    // Now try to permit the user to create the table again
+    kerberosHiveContainer.executeInContainer(
+        "hadoop", "fs", "-chmod", "-R", "777", "/user/hive/warehouse-catalog-iceberg");
     // Create table
     NameIdentifier tableNameIdentifier = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
     catalog

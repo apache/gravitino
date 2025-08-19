@@ -23,7 +23,13 @@ import com.google.common.collect.Lists;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.Transaction;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.hive.HiveCatalog;
+import org.apache.iceberg.view.BaseMetastoreViewCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +42,12 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClosableHiveCatalog.class);
 
   private final List<Closeable> resources = Lists.newArrayList();
+
+  private ClosableHiveCatalog proxy;
+
+  public void setProxy(ClosableHiveCatalog proxy) {
+    this.proxy = proxy;
+  }
 
   public ClosableHiveCatalog() {
     super();
@@ -59,5 +71,52 @@ public class ClosableHiveCatalog extends HiveCatalog implements Closeable {
             LOGGER.warn("Failed to close resource: {}", resource, e);
           }
         });
+  }
+
+  @FunctionalInterface
+  interface Executable<R> {
+    R run() throws Exception;
+  }
+
+  public <R> R execute(Executable<R> runnable) {
+    try {
+      return runnable.run();
+    } catch (Exception e) {
+      LOGGER.error("Failed to execute runnable: {}", runnable, e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  public Catalog.TableBuilder buildTable(TableIdentifier identifier, Schema schema) {
+    return new ViewAwareTableBuilder(identifier, schema);
+  }
+
+  private class ViewAwareTableBuilder
+      extends BaseMetastoreViewCatalog.BaseMetastoreViewCatalogTableBuilder {
+    private final TableIdentifier identifier;
+
+    private ViewAwareTableBuilder(TableIdentifier identifier, Schema schema) {
+      super(identifier, schema);
+      this.identifier = identifier;
+    }
+
+    public Transaction createOrReplaceTransaction() {
+      if (proxy.viewExists(this.identifier)) {
+        throw new AlreadyExistsException(
+            "View with same name already exists: %s", new Object[] {this.identifier});
+      } else {
+        return super.createOrReplaceTransaction();
+      }
+    }
+
+    public org.apache.iceberg.Table create() {
+      boolean viewExists = proxy.viewExists(this.identifier);
+      if (viewExists) {
+        throw new AlreadyExistsException(
+            "View with same name already exists: %s", new Object[] {this.identifier});
+      }
+
+      return proxy.execute(() -> super.create());
+    }
   }
 }

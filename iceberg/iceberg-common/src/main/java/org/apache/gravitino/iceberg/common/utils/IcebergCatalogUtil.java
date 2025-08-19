@@ -90,7 +90,10 @@ public class IcebergCatalogUtil {
       if (authenticationConfig.isImpersonationEnabled()) {
         HiveBackendProxy proxyHiveCatalog =
             new HiveBackendProxy(resultProperties, hiveCatalog, kerberosClient.getRealm());
-        return proxyHiveCatalog.getProxy();
+        ClosableHiveCatalog closableHiveCatalog = proxyHiveCatalog.getProxy();
+        hiveCatalog.setProxy(closableHiveCatalog);
+
+        return closableHiveCatalog;
       }
 
       return hiveCatalog;
