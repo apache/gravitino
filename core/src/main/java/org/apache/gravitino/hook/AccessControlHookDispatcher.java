@@ -194,8 +194,8 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
 
-    if(resultOfDeleteRole && oldRole!= null) {
-      notifyRoleUserRelChange(metalake,role);
+    if (resultOfDeleteRole && oldRole != null) {
+      notifyRoleUserRelChange(metalake, role);
     }
 
     return resultOfDeleteRole;
