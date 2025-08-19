@@ -105,3 +105,227 @@ def load_policy_tools(mcp: FastMCP):
 
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_policy_operation().load_policy(policy_name)
+
+    @mcp.tool(tags={"policy"})
+    async def associate_policy_with_metadata(
+        ctx: Context,
+        metadata_full_name: str,
+        metadata_type: str,
+        policies_to_associate: list,
+    ) -> str:
+        """
+        Associate policies with metadata.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            metadata_full_name (str): Full name of the metadata object to associate policies with.
+            It's typically in the format "catalog.schema.table" or "catalog.schema" or "catalog".
+            or "catalog.schema.fileset". The "model", "topic" are also supported and the format
+            is the same as for "catalog.schema.table". For more, please see tool
+             `get_metadata_fullname_formats`.
+
+            metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
+             "fileset", "model", "topic"). For More information, please see
+             tool `list_all_metadata_types`.
+            policies_to_associate (list): List of policy names to associate with the metadata.
+
+        Example input:
+            metadata_full_name: "catalog.schema.table"
+            metadata_type: "table"
+            policies_to_associate: ["policy1", "policy2"]
+
+        Returns:
+            str: JSON-formatted string containing the names of associated policies.
+
+        Example Return Value:
+            [
+              "policy1",
+              "policy2"
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return (
+            await client.as_policy_operation().associate_policy_with_metadata(
+                metadata_full_name,
+                metadata_type,
+                policies_to_associate,
+                [],
+            )
+        )
+
+    # Disable the disassociate_policy_from_metadata tool by default as it will change metadata state.
+    @mcp.tool(tags={"policy"})
+    async def disassociate_policy_from_metadata(
+        ctx: Context,
+        metadata_full_name: str,
+        metadata_type: str,
+        policies_to_disassociate: list,
+    ) -> str:
+        """
+        Disassociate policies from metadata.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            metadata_full_name (str): Full name of the metadata object to disassociate policys from.
+            For more, please see tool `get_metadata_fullname_formats`.
+            metadata_type (str): Type of the metadata object (e.g., "table", "schema", "catalog",
+             "fileset", "model", "topic"). For More information, please see
+             tool `list_all_metadata_types`.
+            policies_to_disassociate (list): List of policy names to disassociate from the metadata.
+
+        Example input:
+            metadata_full_name: "catalog.schema.table"
+            metadata_type: "table"
+            policies_to_disassociate: ["policy1", "policy2"]
+
+        Returns:
+            str: JSON-formatted string containing the names of disassociated policies.
+
+        Example Return Value:
+            [
+              "policy1",
+              "policy2"
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return (
+            await client.as_policy_operation().associate_policy_with_metadata(
+                metadata_full_name, metadata_type, [], policies_to_disassociate
+            )
+        )
+
+    @mcp.tool(tags={"policy"})
+    async def list_policies_for_metadata(
+        ctx: Context, metadata_full_name: str, metadata_type: str
+    ) -> str:
+        """
+        List all policies associated with a specific metadata item.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            metadata_full_name (str): Full name of the metadata item (e.g., table, column). For more, please see tool
+             `get_metadata_fullname_formats`.
+            metadata_type (str): Type of the metadata (e.g., "table", "column"). For More information, please see
+             tool `list_all_metadata_types`.
+
+        Example input:
+            metadata_full_name: "catalog.schema.table"
+            metadata_type: "table"
+
+        Returns:
+            str: JSON-formatted string containing the list of policies associated with the metadata.
+
+        Example Return Value:
+            [
+              {
+                "name": "import",
+                "comment": "Import policy for data governance",
+                "properties": {},
+                "audit": {
+                  "creator": "anonymous",
+                  "createTime": "2025-08-12T11:41:09.257235Z"
+                },
+                "inherited": false
+              }
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().list_policies_for_metadata(
+            metadata_full_name, metadata_type
+        )
+
+    @mcp.tool(tags={"policy"})
+    async def list_metadata_by_policy(ctx: Context, policy_name: str) -> str:
+        """
+        List all metadata items associated with a specific policy.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            policy_name (str): Name of the policy to filter metadata by.
+
+        Returns:
+            str: JSON-formatted string containing the list of metadata items associated with the policy.
+
+        Example Return Value:
+            [
+              {
+                "fullName": "model_catalog",
+                "type": "catalog"
+              },
+              {
+                "fullName": "catalog.schema.table",
+                "type": "table"
+              },
+              {
+                "fullName": "catalog.schema.fileset",
+                "type": "fileset"
+              },
+              {
+                "fullName": "catalog.schema.model",
+                "type": "model"
+              },
+              {
+                "fullName": "catalog.schema.topic",
+                "type": "topic"
+              }
+              {
+                "fullName": "catalog.schema",
+                "type": "schema"
+              }
+              ...
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().list_metadata_by_policy(
+            policy_name
+        )
+
+    @mcp.tool(tags={"policy"})
+    async def get_policy_for_metadata(
+        ctx: Context,
+        metadata_full_name: str,
+        metadata_type: str,
+        policy_name: str,
+    ) -> str:
+        """
+        Get a policy associated with a specific metadata item.
+
+        Args:
+            ctx (Context): The request context object containing lifespan context
+                           and connector information.
+            metadata_full_name (str): Full name of the metadata item (e.g., table, column). For more, please see tool
+             `get_metadata_fullname_formats`.
+            metadata_type (str): Type of the metadata (e.g., "table", "column"). For More information, please see
+             tool `list_all_metadata_types`.
+            policy_name (str): Name of the policy to filter metadata by.
+
+        Example input:
+            metadata_full_name: "catalog.schema.table"
+            metadata_type: "table"
+            policy_name: "policy_a"
+
+        Returns:
+            str: JSON-formatted string containing the list of policies associated with the metadata.
+
+        Example Return Value:
+            [
+              {
+                "name": "import",
+                "comment": "Import policy for data governance",
+                "properties": {},
+                "audit": {
+                  "creator": "anonymous",
+                  "createTime": "2025-08-12T11:41:09.257235Z"
+                },
+                "inherited": false
+              }
+            ]
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_policy_operation().get_policy_for_metadata(
+            metadata_full_name, metadata_type, policy_name
+        )

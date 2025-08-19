@@ -202,7 +202,7 @@ def load_tag_tool(mcp: FastMCP):
         tags_to_associate: list,
     ) -> str:
         """
-        Associate or disassociate tags with metadata.
+        Associate tags with metadata.
 
         Args:
             ctx (Context): The request context object containing lifespan context

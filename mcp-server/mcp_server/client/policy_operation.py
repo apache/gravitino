@@ -45,3 +45,72 @@ class PolicyOperation(ABC):
             str: JSON-formatted string containing full policy metadata
         """
         pass
+
+    @abstractmethod
+    async def associate_policy_with_metadata(
+        self,
+        metadata_full_name: str,
+        metadata_type: str,
+        policies_to_associate: list,
+        policies_to_disassociate: list,
+    ) -> str:
+        """
+        Associate policies with metadata.
+
+        Args:
+            metadata_full_name: Full name of the metadata item (e.g., table, column)
+            metadata_type: Type of the metadata (e.g., "table", "column")
+            policies_to_associate: List of policy names to associate with the metadata
+            policies_to_disassociate: List of policy names to disassociate from the metadata
+
+        Returns:
+            str: JSON formatted string containing list of policy names that were
+            successfully associated with the metadata
+        """
+        pass
+
+    @abstractmethod
+    async def get_policy_for_metadata(
+        self, metadata_full_name: str, metadata_type: str, policy_name: str
+    ) -> str:
+        """
+        List all policies associated with a specific metadata item.
+
+        Args:
+            metadata_full_name: Full name of the metadata item (e.g., table, column)
+            metadata_type: Type of the metadata (e.g., "table", "column")
+            policy_name: Name of the policy
+
+        Returns:
+            str: JSON formatted string containing list of policy names associated with the metadata
+        """
+        pass
+
+    @abstractmethod
+    async def list_policies_for_metadata(
+        self, metadata_full_name: str, metadata_type: str
+    ) -> str:
+        """
+        List all policies associated with a specific metadata item.
+
+        Args:
+            metadata_full_name: Full name of the metadata item (e.g., table, column)
+            metadata_type: Type of the metadata (e.g., "table", "column")
+
+        Returns:
+            str: JSON formatted string containing list of policy names associated with the metadata
+        """
+        pass
+
+    @abstractmethod
+    async def list_metadata_by_policy(self, policy_name: str) -> str:
+        """
+        List all metadata items associated with a specific policy.
+
+        Args:
+            policy_name: Name of the policy to filter metadata by
+
+        Returns:
+            str: JSON formatted string containing list of metadata items associated with the policy
+        """
+        pass
