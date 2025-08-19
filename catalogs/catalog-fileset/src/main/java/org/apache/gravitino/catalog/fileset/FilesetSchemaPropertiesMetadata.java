@@ -21,9 +21,6 @@ package org.apache.gravitino.catalog.fileset;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 
-import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
-import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.fileset.authentication.AuthenticationConfig;
