@@ -58,7 +58,7 @@ public class PartitionStatisticsUpdateRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        updates != null && !updates.isEmpty(), "\"update\" must not be null or empty.");
+        updates != null && !updates.isEmpty(), "\"updates\" must not be null or empty.");
     for (PartitionStatisticsUpdateDTO update : updates) {
       update.validate();
     }
