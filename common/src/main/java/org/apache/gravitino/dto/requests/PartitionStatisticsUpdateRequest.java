@@ -31,7 +31,7 @@ import org.apache.gravitino.rest.RESTRequest;
 @Getter
 @EqualsAndHashCode
 @ToString
-public class PartitionStatsUpdateRequest implements RESTRequest {
+public class PartitionStatisticsUpdateRequest implements RESTRequest {
 
   @JsonProperty("updates")
   private final List<PartitionStatisticsUpdateDTO> updates;
@@ -41,12 +41,12 @@ public class PartitionStatsUpdateRequest implements RESTRequest {
    *
    * @param updates The updates to apply to the partition statistics.
    */
-  public PartitionStatsUpdateRequest(List<PartitionStatisticsUpdateDTO> updates) {
+  public PartitionStatisticsUpdateRequest(List<PartitionStatisticsUpdateDTO> updates) {
     this.updates = updates;
   }
 
   /** Default constructor for PartitionStatsUpdateRequest. (Used for Jackson deserialization.) */
-  public PartitionStatsUpdateRequest() {
+  public PartitionStatisticsUpdateRequest() {
     this(null);
   }
 

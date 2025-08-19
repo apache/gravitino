@@ -34,8 +34,8 @@ import org.apache.gravitino.stats.Statistic;
 @ToString
 public class PartitionStatisticsDTO implements PartitionStatistics {
 
-  @JsonProperty("name")
-  private String name;
+  @JsonProperty("partitionName")
+  private String partitionName;
 
   @JsonProperty("statistics")
   private StatisticDTO[] statistics;
@@ -45,14 +45,14 @@ public class PartitionStatisticsDTO implements PartitionStatistics {
     this(null, null);
   }
 
-  private PartitionStatisticsDTO(String name, StatisticDTO[] statistics) {
-    this.name = name;
+  private PartitionStatisticsDTO(String partitionName, StatisticDTO[] statistics) {
+    this.partitionName = partitionName;
     this.statistics = statistics;
   }
 
   @Override
-  public String name() {
-    return name;
+  public String partitionName() {
+    return partitionName;
   }
 
   @Override
@@ -62,7 +62,8 @@ public class PartitionStatisticsDTO implements PartitionStatistics {
 
   /** Validates the PartitionStatisticsDTO instance. */
   public void validate() {
-    Preconditions.checkArgument(StringUtils.isNotBlank(name), "\"name\" must not be null or empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(partitionName), "\"name\" must not be null or empty");
     Preconditions.checkArgument(statistics != null, "\"statistics\" must not be null");
     for (StatisticDTO statistic : statistics) {
       statistic.validate();
@@ -70,50 +71,15 @@ public class PartitionStatisticsDTO implements PartitionStatistics {
   }
 
   /**
-   * Creates a new builder for PartitionStatisticsDTO.
+   * Creates a new instance of PartitionStatisticsDTO.
    *
-   * @return a new Builder instance
+   * @param partitionName the name of the partition for which these statistics are applicable
+   * @param statistics the statistics applicable to the partition
+   * @return a new instance of PartitionStatisticsDTO
    */
-  public static Builder builder() {
-    return new Builder();
-  }
-
-  /** Builder for PartitionStatisticsDTO. */
-  public static class Builder {
-    private String name;
-    private StatisticDTO[] statistics;
-
-    /**
-     * Sets the name of the partition for which these statistics are applicable.
-     *
-     * @param name the name of the partition
-     * @return the Builder instance for method chaining
-     */
-    public Builder withName(String name) {
-      this.name = name;
-      return this;
-    }
-
-    /**
-     * Sets the statistics for the partition.
-     *
-     * @param statistics the list of statistics applicable to the partition
-     * @return the Builder instance for method chaining
-     */
-    public Builder withStatistics(StatisticDTO[] statistics) {
-      this.statistics = statistics;
-      return this;
-    }
-
-    /**
-     * Builds a PartitionStatisticsDTO instance.
-     *
-     * @return a new PartitionStatisticsDTO instance
-     */
-    public PartitionStatisticsDTO build() {
-      PartitionStatisticsDTO dto = new PartitionStatisticsDTO(name, statistics);
-      dto.validate();
-      return dto;
-    }
+  public static PartitionStatisticsDTO of(String partitionName, StatisticDTO[] statistics) {
+    PartitionStatisticsDTO dto = new PartitionStatisticsDTO(partitionName, statistics);
+    dto.validate();
+    return dto;
   }
 }

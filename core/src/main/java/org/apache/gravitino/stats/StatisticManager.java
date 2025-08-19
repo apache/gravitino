@@ -69,7 +69,7 @@ public class StatisticManager implements Closeable {
   public StatisticManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.store = store;
     this.idGenerator = idGenerator;
-    String className = config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS_NAME);
+    String className = config.get(Configs.PARTITION_STATS_STORAGE_FACTORY_CLASS);
     Map<String, String> options = config.getConfigsWithPrefix(OPTIONS_PREFIX);
     try {
       PartitionStatisticStorageFactory factory =
@@ -78,11 +78,11 @@ public class StatisticManager implements Closeable {
       this.partitionStorage = factory.create(options);
     } catch (Exception e) {
       LOG.error(
-          "Failed to create and initialize partition statistics file factory by name {}.",
+          "Failed to create and initialize partition statistics storage factory by name {}.",
           className,
           e);
       throw new RuntimeException(
-          "Failed to create and initialize partition statistics file factory: " + className, e);
+          "Failed to create and initialize partition statistics storage factory: " + className, e);
     }
   }
 
@@ -359,7 +359,7 @@ public class StatisticManager implements Closeable {
     }
 
     @Override
-    public String name() {
+    public String partitionName() {
       return name;
     }
 

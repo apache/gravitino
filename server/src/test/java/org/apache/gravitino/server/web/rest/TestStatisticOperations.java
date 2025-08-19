@@ -44,8 +44,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.catalog.TableDispatcher;
-import org.apache.gravitino.dto.requests.PartitionStatsDropRequest;
-import org.apache.gravitino.dto.requests.PartitionStatsUpdateRequest;
+import org.apache.gravitino.dto.requests.PartitionStatisticsDropRequest;
+import org.apache.gravitino.dto.requests.PartitionStatisticsUpdateRequest;
 import org.apache.gravitino.dto.requests.StatisticsDropRequest;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
@@ -537,16 +537,12 @@ public class TestStatisticOperations extends JerseyTest {
     statsMap.put(Statistic.CUSTOM_PREFIX + "test1", StatisticValues.stringValue("test"));
     statsMap.put(Statistic.CUSTOM_PREFIX + "test2", StatisticValues.longValue(1L));
     List<PartitionStatisticsUpdateDTO> partitionStatsList = Lists.newArrayList();
-    partitionStatsList.add(
-        PartitionStatisticsUpdateDTO.builder()
-            .withPartitionName("partition1")
-            .withStatistics(statsMap)
-            .build());
+    partitionStatsList.add(PartitionStatisticsUpdateDTO.of("partition1", statsMap));
     MetadataObject tableObject =
         MetadataObjects.parse(
             String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
 
-    PartitionStatsUpdateRequest req = new PartitionStatsUpdateRequest(partitionStatsList);
+    PartitionStatisticsUpdateRequest req = new PartitionStatisticsUpdateRequest(partitionStatsList);
 
     when(tableDispatcher.tableExists(any())).thenReturn(true);
 
@@ -626,7 +622,7 @@ public class TestStatisticOperations extends JerseyTest {
     // Test throw IllegalStatisticNameException
     statsMap.put("test1", StatisticValues.longValue(1L));
 
-    req = new PartitionStatsUpdateRequest(partitionStatsList);
+    req = new PartitionStatisticsUpdateRequest(partitionStatsList);
     Response resp3 =
         target(
                 "/metalakes/"
@@ -653,11 +649,8 @@ public class TestStatisticOperations extends JerseyTest {
   public void testDropPartitionStatistics() {
     List<PartitionStatisticsDropDTO> partitionStatistics = Lists.newArrayList();
     partitionStatistics.add(
-        PartitionStatisticsDropDTO.builder()
-            .withPartitionName("partition1")
-            .withStatisticNames(Lists.newArrayList("stat1", "stat2"))
-            .build());
-    PartitionStatsDropRequest req = new PartitionStatsDropRequest(partitionStatistics);
+        PartitionStatisticsDropDTO.of("partition1", Lists.newArrayList("stat1", "stat2")));
+    PartitionStatisticsDropRequest req = new PartitionStatisticsDropRequest(partitionStatistics);
     when(manager.dropPartitionStatistics(any(), any(), any())).thenReturn(true);
     when(tableDispatcher.tableExists(any())).thenReturn(true);
 

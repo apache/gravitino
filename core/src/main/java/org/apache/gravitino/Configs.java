@@ -447,8 +447,9 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
-  public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS_NAME =
-      new ConfigBuilder("gravitino.stats.partition.storageFactoryClassName")
+  // TODO: Change default value to a Lance partition statistics storage
+  public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
+      new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
           .doc("The partition stats storage factory class.")
           .version(ConfigConstants.VERSION_1_0_0)
           .stringConf()

@@ -47,10 +47,7 @@ public class TestPartitionStatisticsDTO {
             .build();
 
     PartitionStatisticsDTO partitionStatisticsDTO =
-        PartitionStatisticsDTO.builder()
-            .withName("test_partition")
-            .withStatistics(new StatisticDTO[] {statisticDTO})
-            .build();
+        PartitionStatisticsDTO.of("test_partition", new StatisticDTO[] {statisticDTO});
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(partitionStatisticsDTO);
     PartitionStatisticsDTO deserPartitionStatisticsDTO =

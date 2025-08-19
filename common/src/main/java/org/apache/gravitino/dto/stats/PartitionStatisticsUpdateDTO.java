@@ -76,52 +76,16 @@ public class PartitionStatisticsUpdateDTO implements PartitionStatisticsUpdate {
   }
 
   /**
-   * Creates a new builder for PartitionStatisticsUpdateDTO.
+   * Creates a new instance of PartitionStatisticsUpdateDTO.
    *
-   * @return a new Builder instance
+   * @param partitionName the name of the partition for which these statistics are applicable
+   * @param statistics the statistics applicable to the partition
+   * @return a new instance of PartitionStatisticsUpdateDTO
    */
-  public static Builder builder() {
-    return new Builder();
-  }
-
-  /** Builder class for PartitionStatisticsUpdateDTO. */
-  public static class Builder {
-    private String partitionName;
-    private Map<String, StatisticValue<?>> statistics;
-
-    /**
-     * Sets the partition name for the update.
-     *
-     * @param partitionName the name of the partition to update statistics for
-     * @return this Builder instance for method chaining
-     */
-    public Builder withPartitionName(String partitionName) {
-      this.partitionName = partitionName;
-      return this;
-    }
-
-    /**
-     * Sets the statistics to be updated for the partition.
-     *
-     * @param statistics a map of statistic names to their corresponding values to be updated
-     * @return this Builder instance for method chaining
-     */
-    public Builder withStatistics(Map<String, StatisticValue<?>> statistics) {
-      this.statistics = statistics;
-      return this;
-    }
-
-    /**
-     * Builds a PartitionStatisticsUpdateDTO instance with the provided partition name and
-     * statistics.
-     *
-     * @return a new PartitionStatisticsUpdateDTO instance
-     */
-    public PartitionStatisticsUpdateDTO build() {
-      PartitionStatisticsUpdateDTO dto =
-          new PartitionStatisticsUpdateDTO(partitionName, statistics);
-      dto.validate();
-      return dto;
-    }
+  public static PartitionStatisticsUpdateDTO of(
+      String partitionName, Map<String, StatisticValue<?>> statistics) {
+    PartitionStatisticsUpdateDTO dto = new PartitionStatisticsUpdateDTO(partitionName, statistics);
+    dto.validate();
+    return dto;
   }
 }

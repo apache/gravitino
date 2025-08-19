@@ -45,8 +45,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.dto.requests.PartitionStatsDropRequest;
-import org.apache.gravitino.dto.requests.PartitionStatsUpdateRequest;
+import org.apache.gravitino.dto.requests.PartitionStatisticsDropRequest;
+import org.apache.gravitino.dto.requests.PartitionStatisticsUpdateRequest;
 import org.apache.gravitino.dto.requests.StatisticsDropRequest;
 import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
@@ -278,11 +278,9 @@ public class StatisticOperations {
                 statistics.stream()
                     .map(
                         partitionStatistic ->
-                            PartitionStatisticsDTO.builder()
-                                .withName(partitionStatistic.name())
-                                .withStatistics(
-                                    DTOConverters.toDTOs(partitionStatistic.statistics()))
-                                .build())
+                            PartitionStatisticsDTO.of(
+                                partitionStatistic.partitionName(),
+                                DTOConverters.toDTOs(partitionStatistic.statistics())))
                     .toArray(PartitionStatisticsDTO[]::new);
 
             return Utils.ok(new PartitionStatListResponse(partitionStatistics));
@@ -312,7 +310,7 @@ public class StatisticOperations {
       @PathParam("metalake") String metalake,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
-      PartitionStatsUpdateRequest request) {
+      PartitionStatisticsUpdateRequest request) {
     LOG.info("Updating partition statistics for table: {} in the metalake {}", fullName, metalake);
     try {
       return Utils.doAs(
@@ -384,7 +382,7 @@ public class StatisticOperations {
       @PathParam("metalake") String metalake,
       @PathParam("type") String type,
       @PathParam("fullName") String fullName,
-      PartitionStatsDropRequest request) {
+      PartitionStatisticsDropRequest request) {
 
     try {
       return Utils.doAs(

@@ -31,7 +31,7 @@ import org.apache.gravitino.rest.RESTRequest;
 @Getter
 @EqualsAndHashCode
 @ToString
-public class PartitionStatsDropRequest implements RESTRequest {
+public class PartitionStatisticsDropRequest implements RESTRequest {
 
   @JsonProperty("drops")
   private List<PartitionStatisticsDropDTO> drops;
@@ -41,12 +41,12 @@ public class PartitionStatsDropRequest implements RESTRequest {
    *
    * @param drops The partition statistics to drop.
    */
-  public PartitionStatsDropRequest(List<PartitionStatisticsDropDTO> drops) {
+  public PartitionStatisticsDropRequest(List<PartitionStatisticsDropDTO> drops) {
     this.drops = drops;
   }
 
   /** This is the constructor that is used by Jackson deserializer */
-  public PartitionStatsDropRequest() {
+  public PartitionStatisticsDropRequest() {
     this(null);
   }
 

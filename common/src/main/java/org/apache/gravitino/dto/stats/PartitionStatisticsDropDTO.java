@@ -75,53 +75,15 @@ public class PartitionStatisticsDropDTO implements PartitionStatisticsDrop {
   }
 
   /**
-   * Creates a new builder for PartitionStatisticsDropDTO.
+   * Creates a new instance of PartitionStatisticsDropDTO.
    *
-   * @return a new Builder instance
+   * @param partitionName the name of the partition for which these statistics are applicable
+   * @param statisticNames the names of the statistics to drop for the partition
+   * @return a new instance of PartitionStatisticsDropDTO
    */
-  public static Builder builder() {
-    return new Builder();
-  }
-
-  /** Builder for PartitionStatisticsDropDTO. */
-  public static class Builder {
-
-    private String partitionName;
-    private List<String> statisticNames;
-
-    /**
-     * Sets the partition name for the statistics to be dropped.
-     *
-     * @param partitionName the name of the partition for which statistics are to be dropped
-     * @return the Builder instance for method chaining
-     */
-    public Builder withPartitionName(String partitionName) {
-      this.partitionName = partitionName;
-      return this;
-    }
-
-    /**
-     * Sets the list of statistic names to be dropped for the specified partition.
-     *
-     * @param statisticNames the list of statistic names to be dropped
-     * @return the Builder instance for method chaining
-     */
-    public Builder withStatisticNames(List<String> statisticNames) {
-      this.statisticNames = statisticNames;
-      return this;
-    }
-
-    /**
-     * Builds the PartitionStatisticsDropDTO instance with the specified partition name and
-     * statistic names.
-     *
-     * @return a PartitionStatisticsDropDTO instance
-     */
-    public PartitionStatisticsDropDTO build() {
-      PartitionStatisticsDropDTO dto =
-          new PartitionStatisticsDropDTO(partitionName, statisticNames);
-      dto.validate();
-      return dto;
-    }
+  public static PartitionStatisticsDropDTO of(String partitionName, List<String> statisticNames) {
+    PartitionStatisticsDropDTO dto = new PartitionStatisticsDropDTO(partitionName, statisticNames);
+    dto.validate();
+    return dto;
   }
 }
