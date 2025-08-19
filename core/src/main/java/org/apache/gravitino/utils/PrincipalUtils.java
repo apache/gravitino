@@ -46,7 +46,7 @@ public class PrincipalUtils {
       Throwable cause = pae.getCause();
       Throwables.propagateIfPossible(cause, Exception.class);
       throw new RuntimeException("doAs method occurs an unexpected exception", pae);
-    } catch (Throwable t) {
+    } catch (Error t) {
       LOG.warn("doAs method occurs an unexpected error", t);
       throw new RuntimeException("doAs method occurs an unexpected exception", t);
     }
