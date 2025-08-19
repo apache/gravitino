@@ -52,6 +52,7 @@ import org.apache.gravitino.dto.responses.ModelResponse;
 import org.apache.gravitino.dto.responses.ModelVersionInfoListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionListResponse;
 import org.apache.gravitino.dto.responses.ModelVersionResponse;
+import org.apache.gravitino.dto.responses.ModelVersionUriResponse;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -1377,6 +1378,141 @@ public class TestModelOperations extends BaseOperationsTest {
     Assertions.assertArrayEquals(alias, modelVersion.aliases());
     Assertions.assertEquals(version, modelVersion.version());
     Assertions.assertEquals(uris, modelVersion.uris());
+  }
+
+  @Test
+  public void testGetModelVersionUri() {
+    NameIdentifier modelIdent = NameIdentifierUtil.ofModel(metalake, catalog, schema, "model1");
+    when(modelDispatcher.getModelVersionUri(modelIdent, 0, "n1")).thenReturn("u1");
+
+    Response resp =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .path("uri")
+            .queryParam("uriName", "n1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    ModelVersionUriResponse response = resp.readEntity(ModelVersionUriResponse.class);
+    Assertions.assertEquals(0, response.getCode());
+    Assertions.assertEquals("u1", response.getUri());
+
+    // Test mock throw NoSuchModelVersionException
+    doThrow(new NoSuchModelException("mock error"))
+        .when(modelDispatcher)
+        .getModelVersionUri(modelIdent, 0, "n1");
+
+    Response resp1 =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .path("uri")
+            .queryParam("uriName", "n1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp1.getStatus());
+
+    ErrorResponse errorResp = resp1.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
+    Assertions.assertEquals(NoSuchModelException.class.getSimpleName(), errorResp.getType());
+
+    // Test mock throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(modelDispatcher)
+        .getModelVersionUri(modelIdent, 0, "n1");
+
+    Response resp2 =
+        target(modelPath())
+            .path("model1")
+            .path("versions")
+            .path("0")
+            .path("uri")
+            .queryParam("uriName", "n1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp2.getStatus());
+
+    ErrorResponse errorResp1 = resp2.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+
+    // Test get model version by alias
+    when(modelDispatcher.getModelVersionUri(modelIdent, "alias1", "n1")).thenReturn("u1");
+
+    Response resp3 =
+        target(modelPath())
+            .path("model1")
+            .path("aliases")
+            .path("alias1")
+            .path("uri")
+            .queryParam("uriName", "n1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
+
+    ModelVersionUriResponse response1 = resp3.readEntity(ModelVersionUriResponse.class);
+    Assertions.assertEquals(0, response1.getCode());
+    Assertions.assertEquals("u1", response1.getUri());
+
+    // Test mock throw NoSuchModelVersionException
+    doThrow(new NoSuchModelException("mock error"))
+        .when(modelDispatcher)
+        .getModelVersionUri(modelIdent, "alias1", "n1");
+
+    Response resp4 =
+        target(modelPath())
+            .path("model1")
+            .path("aliases")
+            .path("alias1")
+            .path("uri")
+            .queryParam("uriName", "n1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp4.getStatus());
+
+    ErrorResponse errorResp2 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp2.getCode());
+    Assertions.assertEquals(NoSuchModelException.class.getSimpleName(), errorResp2.getType());
+
+    // Test mock throw RuntimeException
+    doThrow(new RuntimeException("mock error"))
+        .when(modelDispatcher)
+        .getModelVersionUri(modelIdent, "alias1", "n1");
+
+    Response resp5 =
+        target(modelPath())
+            .path("model1")
+            .path("aliases")
+            .path("alias1")
+            .path("uri")
+            .queryParam("uriName", "n1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp5.getStatus());
+
+    ErrorResponse errorResp3 = resp5.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp3.getCode());
+    Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp3.getType());
   }
 
   private String modelPath() {
