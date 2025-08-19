@@ -29,11 +29,11 @@ import org.junit.jupiter.api.Test;
 public class TestEntityCacheKey {
 
   @Test
-  void testCreateRelationEntityCacheKeyUsingStaticMethod() {
+  void testCreateRelationEntityCacheRelationKeyUsingStaticMethod() {
     NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role1");
     // test Relation Entity
-    EntityCacheKey key =
-        EntityCacheKey.of(
+    EntityCacheRelationKey key =
+        EntityCacheRelationKey.of(
             ident, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
     Assertions.assertEquals("metalake.system.role.role1:ROLE:ROLE_GROUP_REL", key.toString());
     Assertions.assertEquals(
@@ -42,7 +42,7 @@ public class TestEntityCacheKey {
     Assertions.assertEquals(SupportsRelationOperations.Type.ROLE_GROUP_REL, key.relationType());
 
     // test Store Entity
-    EntityCacheKey key2 = EntityCacheKey.of(ident, Entity.EntityType.ROLE, null);
+    EntityCacheRelationKey key2 = EntityCacheRelationKey.of(ident, Entity.EntityType.ROLE, null);
     Assertions.assertEquals("metalake.system.role.role1:ROLE", key2.toString());
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "system", "role", "role1"), key2.identifier());
@@ -51,22 +51,22 @@ public class TestEntityCacheKey {
   }
 
   @Test
-  void testCreateRelationEntityCacheKeyWithNullArguments() {
+  void testCreateRelationEntityCacheRelationKeyWithNullArguments() {
     NameIdentifier ident = NameIdentifierUtil.ofRole("metalake", "role1");
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
-          EntityCacheKey.of(
+          EntityCacheRelationKey.of(
               null, Entity.EntityType.ROLE, SupportsRelationOperations.Type.ROLE_GROUP_REL);
         });
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> {
-          EntityCacheKey.of(ident, null, SupportsRelationOperations.Type.ROLE_GROUP_REL);
+          EntityCacheRelationKey.of(ident, null, SupportsRelationOperations.Type.ROLE_GROUP_REL);
         });
     Assertions.assertDoesNotThrow(
         () -> {
-          EntityCacheKey.of(ident, Entity.EntityType.ROLE, null);
+          EntityCacheRelationKey.of(ident, Entity.EntityType.ROLE, null);
         });
   }
 
@@ -75,8 +75,9 @@ public class TestEntityCacheKey {
     NameIdentifier ident1 = NameIdentifier.of("ns", "db", "tbl");
     Entity.EntityType type = Entity.EntityType.TABLE;
 
-    EntityCacheKey key1 = EntityCacheKey.of(ident1, type);
-    EntityCacheKey key2 = EntityCacheKey.of(NameIdentifier.of("ns", "db", "tbl"), type);
+    EntityCacheRelationKey key1 = EntityCacheRelationKey.of(ident1, type);
+    EntityCacheRelationKey key2 =
+        EntityCacheRelationKey.of(NameIdentifier.of("ns", "db", "tbl"), type);
 
     Assertions.assertEquals(key1, key2, "Keys with same ident and type should be equal");
     Assertions.assertEquals(
@@ -89,8 +90,9 @@ public class TestEntityCacheKey {
     Entity.EntityType type = Entity.EntityType.TABLE;
     SupportsRelationOperations.Type relType = SupportsRelationOperations.Type.OWNER_REL;
 
-    EntityCacheKey key1 = EntityCacheKey.of(ident, type, relType);
-    EntityCacheKey key2 = EntityCacheKey.of(NameIdentifier.of("ns", "db", "tbl"), type, relType);
+    EntityCacheRelationKey key1 = EntityCacheRelationKey.of(ident, type, relType);
+    EntityCacheRelationKey key2 =
+        EntityCacheRelationKey.of(NameIdentifier.of("ns", "db", "tbl"), type, relType);
 
     Assertions.assertEquals(
         key1, key2, "Keys with same ident, type, and relationType should be equal");
@@ -100,10 +102,10 @@ public class TestEntityCacheKey {
 
   @Test
   public void testInequalityWithDifferentIdentifier() {
-    EntityCacheKey key1 =
-        EntityCacheKey.of(NameIdentifier.of("ns", "db", "tbl1"), Entity.EntityType.TABLE);
-    EntityCacheKey key2 =
-        EntityCacheKey.of(NameIdentifier.of("ns", "db", "tbl2"), Entity.EntityType.TABLE);
+    EntityCacheRelationKey key1 =
+        EntityCacheRelationKey.of(NameIdentifier.of("ns", "db", "tbl1"), Entity.EntityType.TABLE);
+    EntityCacheRelationKey key2 =
+        EntityCacheRelationKey.of(NameIdentifier.of("ns", "db", "tbl2"), Entity.EntityType.TABLE);
 
     Assertions.assertNotEquals(key1, key2, "Keys with different identifiers should not be equal");
   }
@@ -111,8 +113,8 @@ public class TestEntityCacheKey {
   @Test
   public void testInequalityWithDifferentEntityType() {
     NameIdentifier ident = NameIdentifier.of("ns", "db", "obj");
-    EntityCacheKey key1 = EntityCacheKey.of(ident, Entity.EntityType.TABLE);
-    EntityCacheKey key2 = EntityCacheKey.of(ident, Entity.EntityType.FILESET);
+    EntityCacheRelationKey key1 = EntityCacheRelationKey.of(ident, Entity.EntityType.TABLE);
+    EntityCacheRelationKey key2 = EntityCacheRelationKey.of(ident, Entity.EntityType.FILESET);
 
     Assertions.assertNotEquals(key1, key2, "Keys with different entity types should not be equal");
   }
@@ -122,9 +124,10 @@ public class TestEntityCacheKey {
     NameIdentifier ident = NameIdentifier.of("ns", "db", "obj");
     Entity.EntityType type = Entity.EntityType.TABLE;
 
-    EntityCacheKey key1 = EntityCacheKey.of(ident, type, SupportsRelationOperations.Type.OWNER_REL);
-    EntityCacheKey key2 =
-        EntityCacheKey.of(ident, type, SupportsRelationOperations.Type.ROLE_USER_REL);
+    EntityCacheRelationKey key1 =
+        EntityCacheRelationKey.of(ident, type, SupportsRelationOperations.Type.OWNER_REL);
+    EntityCacheRelationKey key2 =
+        EntityCacheRelationKey.of(ident, type, SupportsRelationOperations.Type.ROLE_USER_REL);
 
     Assertions.assertNotEquals(
         key1, key2, "Keys with different relation types should not be equal");
@@ -135,7 +138,7 @@ public class TestEntityCacheKey {
     NameIdentifier ident = NameIdentifierUtil.ofUser("metalake", "user1");
     Entity.EntityType type = Entity.EntityType.USER;
 
-    EntityCacheKey key = EntityCacheKey.of(ident, type);
+    EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, type);
 
     Assertions.assertEquals("metalake.system.user.user1:USER", key.toString());
   }
@@ -146,7 +149,7 @@ public class TestEntityCacheKey {
     Entity.EntityType type = Entity.EntityType.USER;
     SupportsRelationOperations.Type relationType = SupportsRelationOperations.Type.ROLE_USER_REL;
 
-    EntityCacheKey key = EntityCacheKey.of(ident, type, relationType);
+    EntityCacheRelationKey key = EntityCacheRelationKey.of(ident, type, relationType);
 
     Assertions.assertEquals("metalake.system.user.user1:USER:ROLE_USER_REL", key.toString());
   }
